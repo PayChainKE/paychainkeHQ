@@ -1,24 +1,23 @@
 import React from 'react';
-import { Shield, Github, Twitter, Linkedin } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Github, Twitter, Linkedin } from 'lucide-react';
 
 const Footer: React.FC = () => {
   return (
     <footer className="border-t border-border bg-card py-12">
-      <div className="container mx-auto px-4">
-        <div className="grid md:grid-cols-4 gap-8">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* Brand */}
           <div className="md:col-span-2">
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center">
-                <Shield className="w-5 h-5 text-primary-foreground" />
-              </div>
+              <img src="/logo.png" alt="PayChain KE Logo" className="h-8 w-auto" />
               <span className="text-xl font-bold text-foreground">
                 pay<span className="text-primary">Chain</span>KE
               </span>
             </div>
             <p className="text-sm text-muted-foreground max-w-md">
-              The Truth Layer for Kenyan payments. Eliminating fake SMS fraud with 
-              blockchain-verified, real-time M-Pesa verification.
+              Blockchain-verified payment verification for Kenyan merchants. Eliminating fake SMS fraud with
+              real-time M-Pesa verification.
             </p>
             <div className="flex gap-4 mt-4">
               <a href="#" className="text-muted-foreground hover:text-primary transition-colors">
@@ -60,8 +59,8 @@ const Footer: React.FC = () => {
             © 2026 payChainKE. Built in Nairobi 🇰🇪
           </p>
           <div className="flex gap-6 text-xs text-muted-foreground">
-            <a href="#" className="hover:text-primary transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-primary transition-colors">Terms of Service</a>
+            <Link to="/privacy-policy" className="hover:text-primary transition-colors">Privacy Policy</Link>
+            <Link to="/terms-of-service" className="hover:text-primary transition-colors">Terms of Service</Link>
             <a href="#" className="hover:text-primary transition-colors">KRA Compliance</a>
           </div>
         </div>

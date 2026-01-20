@@ -93,7 +93,7 @@ const Dashboard: React.FC = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
       
-      <main className="container mx-auto px-4 pt-24 pb-12">
+      <main className="container mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-12">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground">Merchant Dashboard</h1>
           <p className="text-muted-foreground">Till Number: 174379 • Eastleigh Branch</p>

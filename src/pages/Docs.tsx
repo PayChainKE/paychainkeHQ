@@ -78,7 +78,7 @@ const Docs: React.FC = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
       
-      <main className="container mx-auto px-4 pt-24 pb-12">
+      <main className="container mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-12">
         <div className="max-w-4xl mx-auto">
           <div className="mb-12">
             <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
@@ -89,7 +89,7 @@ const Docs: React.FC = () => {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid sm:grid-cols-2 gap-6">
             {docSections.map((section) => {
               const Icon = section.icon;
               return (

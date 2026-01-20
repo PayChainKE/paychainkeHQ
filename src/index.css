@@ -1,74 +1,68 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
-
 @layer base {
   :root {
-    /* payChainKE Brand Colors - Trust & Security */
-    --background: 222 47% 6%;
-    --foreground: 210 40% 98%;
+    /* PayChainKE Brand Colors - The Truth Layer */
+    --background: 0 0% 98%; /* Off-white background */
+    --foreground: 210 40% 6%; /* Dark text */
 
-    --card: 222 47% 8%;
-    --card-foreground: 210 40% 98%;
+    --card: 0 0% 96%; /* Light card background */
+    --card-foreground: 210 40% 6%; /* Dark card text */
 
-    --popover: 222 47% 10%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 0 0% 96%; /* Light popover background */
+    --popover-foreground: 210 40% 6%; /* Dark popover text */
 
-    /* M-Pesa Green - Primary Action */
-    --primary: 145 72% 40%;
-    --primary-foreground: 222 47% 6%;
+    /* High-Visibility Green - Primary Action */
+    --primary: 160 84% 39%; /* #10B981 */
+    --primary-foreground: 0 0% 98%; /* Light text on primary */
 
     /* Navy Secondary */
-    --secondary: 222 47% 14%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 210 47% 92%; /* Light secondary background */
+    --secondary-foreground: 210 40% 6%; /* Dark secondary text */
 
-    --muted: 222 30% 18%;
-    --muted-foreground: 215 20% 55%;
+    --muted: 210 30% 88%; /* Light muted background */
+    --muted-foreground: 215 20% 35%; /* Dark muted text */
 
-    /* Accent - Electric Blue for alerts */
-    --accent: 199 89% 48%;
-    --accent-foreground: 222 47% 6%;
+    /* Warning Amber for Sentinel Alerts */
+    --accent: 38 92% 50%; /* Warning amber */
+    --accent-foreground: 210 40% 6%; /* Dark text on accent */
 
     /* Status Colors */
     --destructive: 0 72% 51%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 0 0% 98%;
 
-    --success: 145 72% 40%;
-    --success-foreground: 222 47% 6%;
+    --success: 160 84% 39%;
+    --success-foreground: 210 40% 6%;
 
     --warning: 38 92% 50%;
     --warning-foreground: 222 47% 6%;
 
-    --border: 222 30% 18%;
-    --input: 222 30% 14%;
-    --ring: 145 72% 40%;
+    --border: 210 30% 18%;
+    --input: 210 45% 10%;
+    --ring: 160 84% 39%;
 
     --radius: 0.75rem;
-
-    /* Custom gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(145 72% 40%) 0%, hsl(165 72% 35%) 100%);
-    --gradient-dark: linear-gradient(180deg, hsl(222 47% 8%) 0%, hsl(222 47% 4%) 100%);
-    --gradient-glow: radial-gradient(ellipse at center, hsl(145 72% 40% / 0.15) 0%, transparent 70%);
-    --gradient-hero: linear-gradient(135deg, hsl(222 47% 6%) 0%, hsl(222 47% 10%) 50%, hsl(222 47% 6%) 100%);
 
     /* Shadows */
     --shadow-glow: 0 0 60px -15px hsl(145 72% 40% / 0.4);
     --shadow-card: 0 4px 24px -8px hsl(0 0% 0% / 0.5);
 
     /* Font families */
-    --font-display: 'Space Grotesk', system-ui, sans-serif;
+    --font-display: 'Inter', system-ui, sans-serif;
     --font-mono: 'JetBrains Mono', monospace;
 
-    --sidebar-background: 222 47% 8%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 145 72% 40%;
-    --sidebar-primary-foreground: 222 47% 6%;
-    --sidebar-accent: 222 47% 14%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 222 30% 18%;
-    --sidebar-ring: 145 72% 40%;
+    --sidebar-background: 210 45% 8%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 160 84% 39%;
+    --sidebar-primary-foreground: 210 40% 6%;
+    --sidebar-accent: 210 47% 14%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 210 30% 18%;
+    --sidebar-ring: 160 84% 39%;
   }
 }
 
@@ -89,20 +83,19 @@
 
 @layer utilities {
   .text-gradient {
-    @apply bg-clip-text text-transparent;
-    background-image: var(--gradient-primary);
+    @apply text-primary;
   }
 
   .bg-gradient-primary {
-    background-image: var(--gradient-primary);
+    @apply bg-primary;
   }
 
   .bg-gradient-dark {
-    background-image: var(--gradient-dark);
+    @apply bg-card;
   }
 
   .bg-gradient-hero {
-    background-image: var(--gradient-hero);
+    @apply bg-background;
   }
 
   .glow-primary {

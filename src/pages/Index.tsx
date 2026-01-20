@@ -2,7 +2,8 @@ import React from 'react';
 import Navbar from '@/components/Navbar';
 import Hero from '@/components/Hero';
 import Features from '@/components/Features';
-import RoadmapSection from '@/components/RoadmapSection';
+import ProblemSolution from '@/components/ProblemSolution';
+import TechnicalSpecs from '@/components/TechnicalSpecs';
 import Footer from '@/components/Footer';
 
 const Index: React.FC = () => {
@@ -11,7 +12,8 @@ const Index: React.FC = () => {
       <Navbar />
       <Hero />
       <Features />
-      <RoadmapSection />
+      <ProblemSolution />
+      <TechnicalSpecs />
       <Footer />
     </div>
   );

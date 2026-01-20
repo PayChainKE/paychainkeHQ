@@ -5,38 +5,26 @@ import { cn } from '@/lib/utils';
 const features = [
   {
     icon: Zap,
-    title: 'Sub-100ms Truth Ping',
-    description: 'Real-time WebSocket push to merchant devices the moment payment is confirmed by Safaricom.',
+    title: 'High-Speed Verification',
+    description: 'Rust-native engine delivers sub-100ms payment verification with WebSocket push notifications.',
     highlight: true,
   },
   {
     icon: Shield,
-    title: 'Blockchain Anchoring',
-    description: 'Every transaction hash is anchored to Base L2, creating an immutable audit trail.',
-    highlight: false,
-  },
-  {
-    icon: Brain,
-    title: 'AI Fraud Detection',
-    description: 'Rust-native ML (Candle) analyzes behavioral patterns to flag anomalies in real-time.',
-    highlight: false,
-  },
-  {
-    icon: FileCheck,
-    title: 'KRA eTIMS Compliant',
-    description: 'Automated tax reporting integration for seamless compliance with Kenyan regulations.',
-    highlight: false,
-  },
-  {
-    icon: Smartphone,
-    title: 'Pochi & Till Support',
-    description: 'Built for Pochi la Biashara and Till Number merchants most vulnerable to fake SMS.',
+    title: 'Sentinel Intelligence',
+    description: 'Real-time protection against fake SMS fraud and transaction reversals with AI-powered anomaly detection.',
     highlight: false,
   },
   {
     icon: Database,
-    title: 'High Concurrency',
-    description: 'Rust + Tokio handles thousands of concurrent transactions in high-traffic zones.',
+    title: 'Immutable Ledger',
+    description: 'Every transaction is anchored to the Base L2 Blockchain, creating an unbreakable audit trail.',
+    highlight: false,
+  },
+  {
+    icon: FileCheck,
+    title: 'e-TIMS Automation',
+    description: 'One-click compliance with KRA regulations through automated tax reporting integration.',
     highlight: false,
   },
 ];
@@ -44,7 +32,7 @@ const features = [
 const Features: React.FC = () => {
   return (
     <section className="py-24 bg-gradient-dark">
-      <div className="container mx-auto px-4">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-2xl mx-auto mb-16">
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
             Built for the <span className="text-gradient">Kenyan Market</span>
@@ -54,7 +42,7 @@ const Features: React.FC = () => {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {features.map((feature, index) => {
             const Icon = feature.icon;
             return (
