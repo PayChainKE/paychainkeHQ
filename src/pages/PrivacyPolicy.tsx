@@ -18,7 +18,7 @@ const PrivacyPolicy: React.FC = () => {
           <p className="text-muted-foreground">Last updated: January 20, 2026</p>
         </div>
 
-        <div className="prose prose-lg max-w-none text-foreground">
+        <div className="prose prose-invert max-w-none">
           <section className="mb-8">
             <h2 className="text-2xl font-semibold mb-4">1. Information We Collect</h2>
             <p className="mb-4">
