@@ -22,12 +22,16 @@ const Hero: React.FC = () => {
   }, []);
 
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-hero pt-16">
-      {/* Background effects */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-primary/5 blur-3xl" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full bg-accent/5 blur-3xl" />
-      </div>
+    <section 
+      className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16"
+      style={{
+        backgroundImage: 'url(/1.png)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      }}
+    >
+      {/* Background effects removed to showcase the background image */}
 
       <div className="container relative mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
@@ -35,7 +39,7 @@ const Hero: React.FC = () => {
           <div className="stagger-children">
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6">
               <span className="text-foreground">Secure Your </span>
-              <span className="text-primary">Jasho</span>
+              <span className="text-primary">Business</span>
               <br />
               <span className="text-foreground">Verify the Truth</span>
             </h1>
@@ -66,16 +70,15 @@ const Hero: React.FC = () => {
           <div className="flex justify-center lg:justify-end">
             <div className="relative">
               {/* Phone mockup */}
-              <div className="relative w-64 sm:w-72 h-[520px] sm:h-[580px] bg-card rounded-[2.5rem] sm:rounded-[3rem] border-4 border-border p-2 card-shadow mx-auto lg:mx-0">
-                {/* Notch */}
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 w-24 h-6 bg-background rounded-full" />
+              <div className="relative w-72 h-[580px] bg-black rounded-[2.5rem] sm:rounded-[3rem] border-2 border-gray-800 p-1 card-shadow mx-auto lg:mx-0">
+                {/* Dynamic Island */}
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 w-20 h-3 bg-black rounded-full" />
                 
                 {/* Screen */}
                 <div className="w-full h-full bg-background rounded-[2.5rem] overflow-hidden flex flex-col">
                   {/* Header */}
                   <div className="p-6 border-b border-border">
                     <div className="flex items-center gap-2">
-                      <Shield className="w-5 h-5 text-primary" />
                       <span className="font-bold text-foreground">payChainKE</span>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">Merchant Terminal</p>
