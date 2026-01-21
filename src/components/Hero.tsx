@@ -81,22 +81,6 @@ const Hero: React.FC = () => {
             <p className="text-lg text-gray-300 max-w-2xl mb-8">
               Anchor every sale to the blockchain and neutralize "Fake SMS" fraud in sub-100ms with our high-performance Sentinel Intelligence.
             </p>
-
-            {/* Stats */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              <div>
-                <p className="text-2xl sm:text-3xl font-bold text-gray-300">&lt;100ms</p>
-                <p className="text-sm text-gray-300">Verification Speed</p>
-              </div>
-              <div>
-                <p className="text-2xl sm:text-3xl font-bold text-primary">99.9%</p>
-                <p className="text-sm text-gray-300">Fraud Prevention</p>
-              </div>
-              <div>
-                <p className="text-2xl sm:text-3xl font-bold text-gray-300">50K+</p>
-                <p className="text-sm text-gray-300">Till Numbers Protected</p>
-              </div>
-            </div>
           </div>
         </div>
       </div>
