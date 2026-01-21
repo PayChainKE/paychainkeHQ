@@ -69,19 +69,22 @@ const Hero: React.FC = () => {
       </div>
 
       <div className="container relative mx-auto px-4 sm:px-6 lg:px-8 py-20 z-10">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
-          {/* Text Content */}
-          <div className="stagger-children">
-            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold leading-tight mb-6">
+        <div className="grid lg:grid-cols-3 gap-12 items-center min-h-[60vh]">
+          {/* Text Content - Left side on large screens */}
+          <div className="lg:col-span-2 stagger-children">
+            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold leading-tight mb-6 text-left">
               <span className="text-gray-300">Secure Your </span>
               <span className="text-primary">Payment</span>
               <span className="text-gray-300"> Truth.</span>
             </h1>
 
-            <p className="text-lg text-gray-300 max-w-2xl mb-8">
+            <p className="text-lg text-gray-300 max-w-2xl mb-8 text-left">
               Anchor every sale to the blockchain and neutralize "Fake SMS" fraud in sub-100ms with our high-performance Sentinel Intelligence.
             </p>
           </div>
+          
+          {/* Empty space on the right for large screens */}
+          <div className="hidden lg:block"></div>
         </div>
       </div>
     </section>
