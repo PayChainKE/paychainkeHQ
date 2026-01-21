@@ -4,6 +4,16 @@ import TruthPing from './TruthPing';
 
 const Hero: React.FC = () => {
   const [isVerified, setIsVerified] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  // Hero images for slideshow - using encoded URLs for spaces
+  const heroImages = [
+    '/hero%201.png',
+    '/hero%202.png', 
+    '/hero%203.png',
+    '/hero%204.png',
+    '/hero%205.png'
+  ];
 
   useEffect(() => {
     // Demo: trigger verification ping every 5 seconds
@@ -21,85 +31,71 @@ const Hero: React.FC = () => {
     };
   }, []);
 
+  // Slideshow effect for background images
+  useEffect(() => {
+    console.log('Hero slideshow started, current image:', heroImages[currentImageIndex]);
+    const imageInterval = setInterval(() => {
+      setCurrentImageIndex((prevIndex) => {
+        const newIndex = (prevIndex + 1) % heroImages.length;
+        console.log('Switching to image:', heroImages[newIndex]);
+        return newIndex;
+      });
+    }, 5000); // Change image every 5 seconds
+
+    return () => clearInterval(imageInterval);
+  }, []);
+
+  const currentBgImage = heroImages[currentImageIndex];
+
   return (
     <section 
-      className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16"
+      className="relative min-h-[85vh] md:min-h-[75vh] flex items-center justify-center overflow-hidden pt-16"
       style={{
-        backgroundImage: 'url(/1.png)',
+        backgroundImage: `url(${currentBgImage})`,
         backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat'
+        backgroundPosition: 'center center',
+        backgroundRepeat: 'no-repeat',
+        backgroundAttachment: 'scroll',
+        minHeight: '85vh',
+        backgroundColor: currentImageIndex % 2 === 0 ? '#ff0000' : '#0000ff' // Temporary color indicator
       }}
     >
-      {/* Background effects removed to showcase the background image */}
+      {/* Background overlay for better text readability */}
+      <div className="absolute inset-0 bg-black/50 md:bg-black/70"></div>
 
-      <div className="container relative mx-auto px-4 sm:px-6 lg:px-8 py-20">
+      {/* Debug indicator */}
+      <div className="absolute top-4 right-4 bg-white/90 p-2 rounded text-sm font-mono z-20">
+        Image: {currentImageIndex + 1} - {currentBgImage}
+      </div>
+
+      <div className="container relative mx-auto px-4 sm:px-6 lg:px-8 py-20 z-10">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
-          {/* Left: Text Content */}
+          {/* Text Content */}
           <div className="stagger-children">
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6">
-              <span className="text-foreground">Secure Your </span>
-              <span className="text-primary">Business</span>
-              <br />
-              <span className="text-foreground">Verify the Truth</span>
+            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold leading-tight mb-6">
+              <span className="text-gray-300">Secure Your </span>
+              <span className="text-primary">Payment</span>
+              <span className="text-gray-300"> Truth.</span>
             </h1>
 
-            <p className="text-lg text-muted-foreground max-w-lg mb-8">
-              Sub-100ms payment verification with automated e-TIMS compliance.
-              Protect against KES 5.8B in annual fraud with blockchain-anchored truth.
+            <p className="text-lg text-gray-300 max-w-2xl mb-8">
+              Anchor every sale to the blockchain and neutralize "Fake SMS" fraud in sub-100ms with our high-performance Sentinel Intelligence.
             </p>
 
             {/* Stats */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
               <div>
-                <p className="text-2xl sm:text-3xl font-bold text-foreground">&lt;100ms</p>
-                <p className="text-sm text-muted-foreground">Verification Speed</p>
+                <p className="text-2xl sm:text-3xl font-bold text-gray-300">&lt;100ms</p>
+                <p className="text-sm text-gray-300">Verification Speed</p>
               </div>
               <div>
                 <p className="text-2xl sm:text-3xl font-bold text-primary">99.9%</p>
-                <p className="text-sm text-muted-foreground">Fraud Prevention</p>
+                <p className="text-sm text-gray-300">Fraud Prevention</p>
               </div>
               <div>
-                <p className="text-2xl sm:text-3xl font-bold text-foreground">50K+</p>
-                <p className="text-sm text-muted-foreground">Till Numbers Protected</p>
+                <p className="text-2xl sm:text-3xl font-bold text-gray-300">50K+</p>
+                <p className="text-sm text-gray-300">Till Numbers Protected</p>
               </div>
-            </div>
-          </div>
-
-          {/* Right: Truth Ping Demo */}
-          <div className="flex justify-center lg:justify-end">
-            <div className="relative">
-              {/* Phone mockup */}
-              <div className="relative w-72 h-[580px] bg-black rounded-[2.5rem] sm:rounded-[3rem] border-2 border-gray-800 p-1 card-shadow mx-auto lg:mx-0">
-                {/* Dynamic Island */}
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 w-20 h-3 bg-black rounded-full" />
-                
-                {/* Screen */}
-                <div className="w-full h-full bg-background rounded-[2.5rem] overflow-hidden flex flex-col">
-                  {/* Header */}
-                  <div className="p-6 border-b border-border">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-foreground">payChainKE</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">Merchant Terminal</p>
-                  </div>
-
-                  {/* Truth Ping */}
-                  <div className="flex-1 flex items-center justify-center">
-                    <TruthPing isVerified={isVerified} amount={2500} tillNumber="174379" />
-                  </div>
-
-                  {/* Footer */}
-                  <div className="p-4 border-t border-border">
-                    <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                      <Zap className="w-3 h-3 text-primary" />
-                      <span>Powered by Base L2</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Floating badges */}
             </div>
           </div>
         </div>

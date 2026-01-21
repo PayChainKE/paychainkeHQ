@@ -1,5 +1,6 @@
 import React from 'react';
-import { AlertTriangle, CheckCircle, TrendingDown, TrendingUp } from 'lucide-react';
+import { AlertTriangle, CheckCircle, TrendingDown, TrendingUp, Zap } from 'lucide-react';
+import TruthPing from './TruthPing';
 
 const ProblemSolution: React.FC = () => {
   return (
@@ -64,19 +65,59 @@ const ProblemSolution: React.FC = () => {
 
           {/* Solution Section */}
           <div>
-            <div className="text-center mb-12">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 mb-6">
-                <CheckCircle className="w-4 h-4 text-primary" />
-                <span className="text-sm font-medium text-primary">The Solution</span>
+            <div className="grid lg:grid-cols-2 gap-12 items-center mb-12">
+              {/* Left: Text Content */}
+              <div>
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 mb-6">
+                  <CheckCircle className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-medium text-primary">The Solution</span>
+                </div>
+                <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-6">
+                  PayChainKE
+                </h2>
+                <p className="text-lg text-muted-foreground max-w-3xl">
+                  Blockchain-anchored payment verification with real-time fraud protection
+                  and automated compliance. Every transaction is verified, secured, and
+                  reported instantly.
+                </p>
               </div>
-              <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-6">
-                PayChainKE
-              </h2>
-              <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
-                Blockchain-anchored payment verification with real-time fraud protection
-                and automated compliance. Every transaction is verified, secured, and
-                reported instantly.
-              </p>
+
+              {/* Right: Truth Ping Demo */}
+              <div className="flex justify-center lg:justify-end">
+                <div className="relative">
+                  {/* Phone mockup */}
+                  <div className="relative w-72 h-[580px] bg-black rounded-[2.5rem] sm:rounded-[3rem] border-2 border-gray-800 p-1 card-shadow mx-auto lg:mx-0">
+                    {/* Dynamic Island */}
+                    <div className="absolute top-4 left-1/2 -translate-x-1/2 w-20 h-3 bg-black rounded-full" />
+
+                    {/* Screen */}
+                    <div className="w-full h-full bg-background rounded-[2.5rem] overflow-hidden flex flex-col">
+                      {/* Header */}
+                      <div className="p-6 border-b border-border">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-foreground">payChainKE</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">Merchant Terminal</p>
+                      </div>
+
+                      {/* Truth Ping */}
+                      <div className="flex-1 flex items-center justify-center">
+                        <TruthPing isVerified={true} amount={2500} tillNumber="174379" />
+                      </div>
+
+                      {/* Footer */}
+                      <div className="p-4 border-t border-border">
+                        <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                          <Zap className="w-3 h-3 text-primary" />
+                          <span>Powered by Base L2</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Floating badges */}
+                </div>
+              </div>
             </div>
 
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
