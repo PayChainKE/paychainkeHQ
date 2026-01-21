@@ -7,6 +7,7 @@ import TechnicalSpecs from '@/components/TechnicalSpecs';
 import Footer from '@/components/Footer';
 
 const Index: React.FC = () => {
+  console.log('Index page rendering');
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
