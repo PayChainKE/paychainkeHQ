@@ -81,6 +81,16 @@ const Hero: React.FC = () => {
             <p className="text-lg text-gray-300 max-w-2xl mb-8 text-left">
               Anchor every sale to the blockchain and neutralize "Fake SMS" fraud in sub-100ms with our high-performance Sentinel Intelligence.
             </p>
+
+            {/* Call-to-Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-4">
+              <button className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-3 rounded-lg font-semibold transition-colors">
+                Get Started
+              </button>
+              <button className="border border-gray-300 text-gray-300 hover:bg-gray-300 hover:text-gray-900 px-8 py-3 rounded-lg font-semibold transition-colors">
+                Learn More
+              </button>
+            </div>
           </div>
           
           {/* Empty space on the right for large screens */}
