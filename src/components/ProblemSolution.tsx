@@ -47,14 +47,17 @@ const ProblemSolution: React.FC = () => {
               <h3 className={`text-2xl md:text-3xl font-bold text-destructive mb-4 italic transition-all duration-1000 delay-300 ${isInView ? 'animate-modern-typewriter' : 'opacity-0'}`}>
                 KES 1.6 Trillion Lost to Digital Fraud Annually.
               </h3>
-              <p className="text-lg text-muted-foreground text-left">
-                In <strong className="font-bold text-gray-900">2024</strong> alone, Kenya's total <strong className="font-bold text-gray-900">fraud exposure</strong> hit <strong className="font-bold text-gray-900">KES 2.0 Trillion</strong>, with <strong className="font-bold text-gray-900">KES 1.6 Trillion</strong> in actual losses.
+              <p className="text-base lg:text-lg text-muted-foreground text-left">
+                In <strong className="font-bold text-gray-900">2024</strong>, Kenya faced <strong className="font-bold text-gray-900">KES 2.0T fraud exposure</strong>, with <strong className="font-bold text-gray-900">KES 1.6T</strong> in actual losses.
               </p>
-              <p className="text-lg text-muted-foreground text-left">
-                As mobile money transactions <strong className="font-bold text-gray-900">surged to KES 40.24 Trillion</strong>, the sophistication of fraud has created
+              <p className="text-base lg:text-lg text-muted-foreground text-left block lg:hidden">
+                Mobile money surged to <strong className="font-bold text-gray-900">KES 40.24T</strong>, enabling sophisticated fraud that created a "Trust Crisis" for over <strong className="font-bold text-gray-900">1.2M active businesses</strong>.
               </p>
-              <p className="text-lg text-muted-foreground text-left">
-                a "Trust Crisis" for over <strong className="font-bold text-gray-900">1.2 million active businesses</strong>.
+              <p className="text-base lg:text-lg text-muted-foreground text-left hidden lg:block">
+                Mobile money surged to <strong className="font-bold text-gray-900">KES 40.24T</strong>, enabling sophisticated fraud that created
+              </p>
+              <p className="text-base lg:text-lg text-muted-foreground text-left hidden lg:block">
+                a "Trust Crisis" for over <strong className="font-bold text-gray-900">1.2M active businesses</strong>.
               </p>
             </div>
 

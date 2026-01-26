@@ -5,25 +5,25 @@ import { cn } from '@/lib/utils';
 const features = [
   {
     icon: Zap,
-    title: 'High-Speed Verification',
+    title: 'High-Speed Verification.',
     description: 'Rust-native engine delivers sub-100ms payment verification with WebSocket push notifications.',
     highlight: false,
   },
   {
     icon: Database,
-    title: 'Immutable Ledger',
+    title: 'Immutable Ledger.',
     description: 'Every transaction is anchored to the Base L2 Blockchain, creating an unbreakable audit trail.',
     highlight: false,
   },
   {
     icon: Shield,
-    title: 'Sentinel Intelligence',
+    title: 'Sentinel Intelligence.',
     description: 'Real-time protection against fake SMS fraud and transaction reversals with AI-powered anomaly detection.',
     highlight: false,
   },
   {
     icon: FileCheck,
-    title: 'e-TIMS Automation',
+    title: 'e-TIMS Automation.',
     description: 'One-click compliance with KRA regulations through automated tax reporting integration.',
     highlight: false,
   },
@@ -42,13 +42,13 @@ const Features: React.FC = () => {
           </p>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
+        <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
           {/* Kenya image on the left */}
-          <div className="order-1 lg:order-1 bg-white rounded-lg p-6">
+          <div className="order-1 lg:order-1 bg-white rounded-lg p-4 lg:p-6">
             {/* MSME Count Title */}
             <div className="text-center mb-4">
-              <div className="text-2xl font-normal text-gray-800"><span className="font-bold">125</span><span className="font-bold"> Million</span> MSMEs in Africa</div>
-              <div className="text-lg font-normal text-red-600 mt-2">KES 1.6 Trillion Lost to Digital Fraud Annually</div>
+              <div className="text-xl lg:text-2xl font-normal text-gray-800"><span className="font-bold">125</span><span className="font-bold"> Million</span> MSMEs in Africa</div>
+              <div className="text-base lg:text-lg font-normal text-red-600 mt-2">KES 1.6 Trillion Lost to Digital Fraud Annually</div>
             </div>
             <div className="flex justify-center">
               <img
@@ -61,39 +61,28 @@ const Features: React.FC = () => {
 
           {/* Feature cards on the right */}
           <div className="order-2 lg:order-2">
-            <div className="flex justify-end">
-              <div className="grid grid-cols-2 gap-6 max-w-2xl">
-                {features.map((feature, index) => {
-                  const Icon = feature.icon;
-                  return (
-                    <div
-                      key={feature.title}
-                      className={cn(
-                        "group relative p-6 rounded-2xl border transition-all duration-300 hover:border-primary/50 hover:shadow-xl hover:scale-105 bg-white cursor-pointer",
-                        feature.highlight
-                          ? "border-primary/30 shadow-lg"
-                          : "border-gray-200 shadow-sm"
-                      )}
-                      style={{ animationDelay: `${index * 0.1}s` }}
-                    >
-                      <div className={cn(
-                        "w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-colors"
-                      )}>
-                        <Icon className={cn(
-                          "w-6 h-6 transition-colors",
-                          feature.highlight ? "text-primary" : "text-gray-700 group-hover:text-primary"
-                        )} />
-                      </div>
-                      <h3 className="text-lg font-bold text-gray-900 mb-2">
-                        {feature.title}
-                      </h3>
-                      <p className="text-sm text-gray-600">
-                        {feature.description}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
+            <div className="grid grid-cols-2 gap-2 lg:gap-4 max-w-2xl">
+              {features.map((feature, index) => {
+                return (
+                  <div
+                    key={feature.title}
+                    className={cn(
+                      "group relative p-2 lg:p-4 rounded-lg lg:rounded-xl border transition-all duration-300 hover:border-primary/50 hover:shadow-xl hover:scale-105 bg-white cursor-pointer min-h-[120px] lg:min-h-[180px] flex flex-col",
+                      feature.highlight
+                        ? "border-primary/30 shadow-lg"
+                        : "border-gray-200 shadow-sm"
+                    )}
+                    style={{ animationDelay: `${index * 0.1}s` }}
+                  >
+                    <h3 className="text-sm lg:text-lg font-bold text-gray-900 group-hover:text-primary transition-colors duration-300 mb-1 lg:mb-2 flex-shrink-0 leading-tight">
+                      {feature.title}
+                    </h3>
+                    <p className="text-xs lg:text-sm text-gray-600 leading-relaxed flex-grow">
+                      {feature.description}
+                    </p>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
