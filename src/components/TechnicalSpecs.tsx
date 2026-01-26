@@ -69,54 +69,6 @@ const TechnicalSpecs: React.FC = () => {
           ))}
         </div>
 
-        {/* 3D Animation Section */}
-        <div className="mt-16 text-center">
-          <div className="sketchfab-embed-wrapper max-w-4xl mx-auto">
-            <iframe
-              title="Modern Caltrans Traffic Signal Setup"
-              frameBorder="0"
-              allowFullScreen
-              mozallowfullscreen="true"
-              webkitallowfullscreen="true"
-              allow="autoplay; fullscreen; xr-spatial-tracking"
-              xr-spatial-tracking=""
-              execution-while-out-of-viewport=""
-              execution-while-not-rendered=""
-              web-share=""
-              src="https://sketchfab.com/models/83a1c770e7584e01a9021487b130eee7/embed?ui_theme=dark"
-              className="w-full h-96 rounded-lg"
-            ></iframe>
-            <p style={{ fontSize: '13px', fontWeight: 'normal', margin: '5px', color: '#4A4A4A' }}>
-              <a
-                href="https://sketchfab.com/3d-models/modern-caltrans-traffic-signal-setup-83a1c770e7584e01a9021487b130eee7?utm_medium=embed&utm_campaign=share-popup&utm_content=83a1c770e7584e01a9021487b130eee7"
-                target="_blank"
-                rel="nofollow"
-                style={{ fontWeight: 'bold', color: '#1CAAD9' }}
-              >
-                Modern Caltrans Traffic Signal Setup
-              </a>{' '}
-              by{' '}
-              <a
-                href="https://sketchfab.com/raiseriggytherunkey?utm_medium=embed&utm_campaign=share-popup&utm_content=83a1c770e7584e01a9021487b130eee7"
-                target="_blank"
-                rel="nofollow"
-                style={{ fontWeight: 'bold', color: '#1CAAD9' }}
-              >
-                YourLocalJavaCarDealer
-              </a>{' '}
-              on{' '}
-              <a
-                href="https://sketchfab.com?utm_medium=embed&utm_campaign=share-popup&utm_content=83a1c770e7584e01a9021487b130eee7"
-                target="_blank"
-                rel="nofollow"
-                style={{ fontWeight: 'bold', color: '#1CAAD9' }}
-              >
-                Sketchfab
-              </a>
-            </p>
-          </div>
-        </div>
-
         {/* Performance Metrics */}
         <div className="mt-16 bg-gradient-to-r from-primary/5 to-accent/5 rounded-2xl p-8 border border-primary/10">
           <div className="text-center mb-8">
