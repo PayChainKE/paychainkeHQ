@@ -47,7 +47,8 @@ const Features: React.FC = () => {
           <div className="order-1 lg:order-1 bg-white rounded-lg p-6">
             {/* MSME Count Title */}
             <div className="text-center mb-4">
-              <div className="text-2xl font-normal text-gray-800"><span className="font-bold">125 Million</span> MSMEs in Africa</div>
+              <div className="text-2xl font-normal text-gray-800"><span className="font-bold">125</span><span className="font-bold"> Million</span> MSMEs in Africa</div>
+              <div className="text-lg font-normal text-red-600 mt-2">KES 1.6 Trillion Lost to Digital Fraud Annually</div>
             </div>
             <div className="flex justify-center">
               <img

@@ -189,4 +189,124 @@
   .stagger-children > *:nth-child(3) { animation-delay: 0.3s; }
   .stagger-children > *:nth-child(4) { animation-delay: 0.4s; }
   .stagger-children > *:nth-child(5) { animation-delay: 0.5s; }
+
+  /* Typewriter Animation */
+  .typewriter {
+    overflow: hidden;
+    border-right: 2px solid var(--destructive);
+    white-space: nowrap;
+    animation: typing 5s steps(46, end), blink-caret 0.75s step-end infinite;
+  }
+
+  @keyframes typing {
+    from { width: 0; }
+    to { width: 100%; }
+  }
+
+  @keyframes blink-caret {
+    from, to { border-color: transparent; }
+    50% { border-color: var(--destructive); }
+  }
+
+  /* Slide-in Animation */
+  .animate-slide-in {
+    animation: slide-in 1s ease-out;
+  }
+
+  @keyframes slide-in {
+    from {
+      opacity: 0;
+      transform: translateX(-50px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  /* Fade-in-up Animation */
+  .animate-fade-in-up {
+    animation: fade-in-up 0.8s ease-out forwards;
+    opacity: 0;
+  }
+
+  @keyframes fade-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Float Animation */
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0px);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+
+  /* Modern Typewriter Animation */
+  .animate-modern-typewriter {
+    overflow: hidden;
+    border-right: 3px solid var(--destructive);
+    white-space: nowrap;
+    animation: modern-typing 4s steps(46, end), modern-blink-caret 1s step-end infinite 4s;
+  }
+
+  @keyframes modern-typing {
+    from { width: 0; }
+    to { width: 100%; }
+  }
+
+  @keyframes modern-blink-caret {
+    0%, 50% { border-color: var(--destructive); }
+    51%, 100% { border-color: transparent; }
+  }
+
+  /* Modern Fade-in-up Animation */
+  .animate-modern-fade-in-up {
+    animation: modern-fade-in-up 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+    opacity: 0;
+  }
+
+  @keyframes modern-fade-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(40px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  /* Modern Float Animation */
+  .animate-modern-float {
+    animation: modern-float 4s ease-in-out infinite;
+  }
+
+  @keyframes modern-float {
+    0%, 100% {
+      transform: translateY(0px) rotate(0deg);
+    }
+    25% {
+      transform: translateY(-8px) rotate(1deg);
+    }
+    50% {
+      transform: translateY(-15px) rotate(0deg);
+    }
+    75% {
+      transform: translateY(-8px) rotate(-1deg);
+    }
+  }
 }
