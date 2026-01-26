@@ -42,10 +42,10 @@ const ProblemSolution: React.FC = () => {
           <div className={`mb-16 transition-all duration-1000 ${isInView ? 'animate-slide-in' : 'opacity-0 translate-x-[-50px]'}`}>
 <div className="text-left mb-12">
               <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-2">
-                The Problem:
+                The Problems:
               </h2>
               <h3 className={`text-2xl md:text-3xl font-bold text-destructive mb-4 italic transition-all duration-1000 delay-300 ${isInView ? 'animate-modern-typewriter' : 'opacity-0'}`}>
-                KES 1.6 Trillion Lost to Digital Fraud Annually.
+                KES 1.6T Lost to Digital Fraud.
               </h3>
               <p className="text-base lg:text-lg text-muted-foreground text-left">
                 In <strong className="font-bold text-gray-900">2024</strong>, Kenya faced <strong className="font-bold text-gray-900">KES 2.0T fraud exposure</strong>, with <strong className="font-bold text-gray-900">KES 1.6T</strong> in actual losses.
@@ -64,7 +64,7 @@ const ProblemSolution: React.FC = () => {
             <div className={`space-y-12 transition-all duration-1000 ${isInView ? 'stagger-children' : 'opacity-0'}`}>
               {/* Fake SMS Fraud */}
               <div className={`grid lg:grid-cols-2 gap-8 items-center transition-all duration-1000 delay-500 ${isInView ? 'animate-modern-fade-in-up' : 'opacity-0 translate-y-[30px]'}`}>
-                <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-6 min-h-[280px] flex flex-col justify-center order-1 lg:order-1 hover:scale-105 transition-transform duration-300">
+                <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-6 min-h-[280px] flex flex-col justify-center order-2 lg:order-1 hover:scale-105 transition-transform duration-300">
                   <div className="mb-4">
                     <h3 className="text-xl font-semibold text-foreground">Fake SMS & Smishing (The "Social" Fraud)</h3>
                   </div>
@@ -76,7 +76,7 @@ const ProblemSolution: React.FC = () => {
                   </p>
                   <div className="text-2xl font-bold text-destructive">KES 810M</div>
                 </div>
-                <div className={`bg-card rounded-lg p-6 order-2 lg:order-2 transition-all duration-1000 delay-700 ${isInView ? 'animate-modern-float' : 'opacity-0 scale-95'}`}>
+                <div className={`bg-card rounded-lg p-6 order-1 lg:order-2 transition-all duration-1000 delay-700 ${isInView ? 'animate-modern-float' : 'opacity-0 scale-95'}`}>
                   <img
                     src="/fake sms.png"
                     alt="Fake SMS Fraud Illustration"
@@ -87,14 +87,14 @@ const ProblemSolution: React.FC = () => {
 
               {/* Transaction Reversals */}
               <div className={`grid lg:grid-cols-2 gap-8 items-center transition-all duration-1000 delay-900 ${isInView ? 'animate-modern-fade-in-up' : 'opacity-0 translate-y-[30px]'}`}>
-                <div className={`bg-card rounded-lg p-6 order-2 lg:order-1 transition-all duration-1000 delay-1100 ${isInView ? 'animate-modern-float' : 'opacity-0 scale-95'}`}>
+                <div className={`bg-card rounded-lg p-6 order-1 lg:order-1 transition-all duration-1000 delay-1100 ${isInView ? 'animate-modern-float' : 'opacity-0 scale-95'}`}>
                   <img
                     src="/reversal.png"
                     alt="Transaction Reversals Illustration"
                     className="w-full h-64 object-contain rounded-lg"
                   />
                 </div>
-                <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-6 min-h-[280px] flex flex-col justify-center order-1 lg:order-2 hover:scale-105 transition-transform duration-300">
+                <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-6 min-h-[280px] flex flex-col justify-center order-2 lg:order-2 hover:scale-105 transition-transform duration-300">
                   <div className="mb-4">
                     <h3 className="text-xl font-semibold text-foreground">Transaction Reversals & Insider Fraud</h3>
                   </div>
@@ -110,7 +110,7 @@ const ProblemSolution: React.FC = () => {
 
               {/* Compliance Gaps */}
               <div className={`grid lg:grid-cols-2 gap-8 items-center transition-all duration-1000 delay-1300 ${isInView ? 'animate-modern-fade-in-up' : 'opacity-0 translate-y-[30px]'}`}>
-                <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-6 min-h-[280px] flex flex-col justify-center order-1 lg:order-1 hover:scale-105 transition-transform duration-300">
+                <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-6 min-h-[280px] flex flex-col justify-center order-2 lg:order-1 hover:scale-105 transition-transform duration-300">
                   <div className="mb-4">
                     <h3 className="text-xl font-semibold text-foreground">The e-TIMS Compliance Tax</h3>
                   </div>
@@ -122,7 +122,7 @@ const ProblemSolution: React.FC = () => {
                   </p>
                   <div className="text-2xl font-bold text-destructive">2x Tax Penalty</div>
                 </div>
-                <div className={`bg-card rounded-lg p-6 order-2 lg:order-2 transition-all duration-1000 delay-1500 ${isInView ? 'animate-modern-float' : 'opacity-0 scale-95'}`}>
+                <div className={`bg-card rounded-lg p-6 order-1 lg:order-2 transition-all duration-1000 delay-1500 ${isInView ? 'animate-modern-float' : 'opacity-0 scale-95'}`}>
                   <img
                     src="/compliance gap.png"
                     alt="Compliance Gaps Illustration"

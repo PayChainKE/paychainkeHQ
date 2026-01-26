@@ -260,7 +260,7 @@
     overflow: hidden;
     border-right: 3px solid var(--destructive);
     white-space: nowrap;
-    animation: modern-typing 4s steps(46, end), modern-blink-caret 1s step-end infinite 4s;
+    animation: modern-typing 4s steps(28, end), modern-blink-caret 1s step-end infinite 4s;
   }
 
   @keyframes modern-typing {
