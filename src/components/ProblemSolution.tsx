@@ -24,41 +24,71 @@ const ProblemSolution: React.FC = () => {
               </p>
             </div>
 
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
-              <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <TrendingDown className="w-6 h-6 text-destructive" />
-                  <h3 className="text-xl font-semibold text-foreground">Fake SMS Fraud</h3>
+            <div className="space-y-12">
+              {/* Fake SMS Fraud */}
+              <div className="grid lg:grid-cols-2 gap-8 items-center">
+                <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-6 min-h-[280px] flex flex-col justify-center">
+                  <div className="flex items-center gap-3 mb-4">
+                    <TrendingDown className="w-6 h-6 text-destructive" />
+                    <h3 className="text-xl font-semibold text-foreground">Fake SMS Fraud</h3>
+                  </div>
+                  <p className="text-muted-foreground mb-4">
+                    Criminals send fraudulent SMS confirmations, tricking merchants into
+                    releasing goods before payment confirmation.
+                  </p>
+                  <div className="text-2xl font-bold text-destructive">KES 3.2B</div>
                 </div>
-                <p className="text-muted-foreground">
-                  Criminals send fraudulent SMS confirmations, tricking merchants into
-                  releasing goods before payment confirmation.
-                </p>
-                <div className="mt-4 text-2xl font-bold text-destructive">KES 3.2B</div>
+                <div className="bg-card rounded-lg p-6">
+                  <img
+                    src="/fake sms.png"
+                    alt="Fake SMS Fraud Illustration"
+                    className="w-full h-64 object-contain rounded-lg"
+                  />
+                </div>
               </div>
 
-              <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <TrendingDown className="w-6 h-6 text-destructive" />
-                  <h3 className="text-xl font-semibold text-foreground">Transaction Reversals</h3>
+              {/* Transaction Reversals */}
+              <div className="grid lg:grid-cols-2 gap-8 items-center">
+                <div className="bg-card rounded-lg p-6">
+                  <img
+                    src="/reversal.png"
+                    alt="Transaction Reversals Illustration"
+                    className="w-full h-64 object-contain rounded-lg"
+                  />
                 </div>
-                <p className="text-muted-foreground">
-                  Customers dispute legitimate transactions, forcing merchants to refund
-                  while losing the original goods.
-                </p>
-                <div className="mt-4 text-2xl font-bold text-destructive">KES 1.8B</div>
+                <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-6 min-h-[280px] flex flex-col justify-center">
+                  <div className="flex items-center gap-3 mb-4">
+                    <TrendingDown className="w-6 h-6 text-destructive" />
+                    <h3 className="text-xl font-semibold text-foreground">Transaction Reversals</h3>
+                  </div>
+                  <p className="text-muted-foreground mb-4">
+                    Customers dispute legitimate transactions, forcing merchants to refund
+                    while losing the original goods.
+                  </p>
+                  <div className="text-2xl font-bold text-destructive">KES 1.8B</div>
+                </div>
               </div>
 
-              <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <TrendingDown className="w-6 h-6 text-destructive" />
-                  <h3 className="text-xl font-semibold text-foreground">Compliance Gaps</h3>
+              {/* Compliance Gaps */}
+              <div className="grid lg:grid-cols-2 gap-8 items-center">
+                <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-6 min-h-[280px] flex flex-col justify-center">
+                  <div className="flex items-center gap-3 mb-4">
+                    <TrendingDown className="w-6 h-6 text-destructive" />
+                    <h3 className="text-xl font-semibold text-foreground">Compliance Gaps</h3>
+                  </div>
+                  <p className="text-muted-foreground mb-4">
+                    Manual e-TIMS reporting creates errors and penalties, costing businesses
+                    time and additional fees.
+                  </p>
+                  <div className="text-2xl font-bold text-destructive">KES 0.8B</div>
                 </div>
-                <p className="text-muted-foreground">
-                  Manual e-TIMS reporting creates errors and penalties, costing businesses
-                  time and additional fees.
-                </p>
-                <div className="mt-4 text-2xl font-bold text-destructive">KES 0.8B</div>
+                <div className="bg-card rounded-lg p-6">
+                  <img
+                    src="/compliance gap.png"
+                    alt="Compliance Gaps Illustration"
+                    className="w-full h-64 object-contain rounded-lg"
+                  />
+                </div>
               </div>
             </div>
           </div>
