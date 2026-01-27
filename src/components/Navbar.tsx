@@ -45,17 +45,17 @@ const Navbar: React.FC = () => {
   return (
     <>
       <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/40 bg-white">
-        <div className="container mx-auto px-4 sm:px-6">
+        <div className="container mx-auto px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Logo and Mobile Menu Button */}
             <div className="flex items-center gap-4">
               {/* Mobile Menu Button */}
               <button
-                className="md:hidden p-2 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors duration-200"
+                className="md:hidden p-2 text-black font-bold transition-colors duration-200"
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                 aria-label="Toggle mobile menu"
               >
-                {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+                {isMobileMenuOpen ? <X className="w-6 h-6 font-bold" /> : <Menu className="w-6 h-6 font-bold" />}
               </button>
 
               {/* Logo */}
@@ -68,7 +68,7 @@ const Navbar: React.FC = () => {
             </div>
 
             {/* Desktop Nav Links and User Auth */}
-            <div className="hidden md:flex items-center gap-8">
+            <div className="hidden md:flex items-center gap-6 lg:gap-8">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.path;
@@ -77,13 +77,12 @@ const Navbar: React.FC = () => {
                     key={item.path}
                     to={item.path}
                     className={cn(
-                      "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200",
+                      "flex items-center gap-2 px-3 py-2 text-sm font-medium transition-all duration-200",
                       isActive
-                        ? "text-primary bg-primary/10"
-                        : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
+                        ? "text-primary"
+                        : "text-gray-700 hover:text-gray-900"
                     )}
                   >
-                    <Icon className="w-4 h-4" />
                     {item.label}
                   </Link>
                 );
@@ -96,7 +95,7 @@ const Navbar: React.FC = () => {
                   className="flex items-center gap-2 px-2 py-1 transition-colors duration-200"
                   aria-label="User menu"
                 >
-                  <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
+                  <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
                     <img src="/avator.png" alt="User Avatar" className="w-full h-full object-cover" />
                   </div>
                   <ChevronDown className="w-4 h-4 text-gray-600" />
@@ -142,7 +141,7 @@ const Navbar: React.FC = () => {
                 className="flex items-center gap-2 px-2 py-1 transition-colors duration-200"
                 aria-label="User menu"
               >
-                <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
+                <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
                   <img src="/avator.png" alt="User Avatar" className="w-full h-full object-cover" />
                 </div>
                 <ChevronDown className="w-4 h-4 text-gray-600" />
@@ -200,13 +199,14 @@ const Navbar: React.FC = () => {
                   key={item.path}
                   to={item.path}
                   className={cn(
-                    "flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap",
+                    "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap",
                     isActive
                       ? "text-primary bg-primary/10"
                       : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
                   )}
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
+                  <Icon className="w-4 h-4" />
                   {item.label}
                 </Link>
               );
@@ -258,6 +258,7 @@ const Navbar: React.FC = () => {
           <div className="px-6 py-8 pb-20">
             <div className="space-y-2">
               {navItems.map((item, index) => {
+                const Icon = item.icon;
                 const isActive = location.pathname === item.path;
                 return (
                   <Link
@@ -276,7 +277,10 @@ const Navbar: React.FC = () => {
                     }}
                   >
                     <div className="flex items-center justify-between w-full">
-                      <span className="font-medium">{item.label}</span>
+                      <div className="flex items-center gap-3">
+                        <Icon className="w-5 h-5 text-gray-500" />
+                        <span className="font-medium">{item.label}</span>
+                      </div>
                       <ChevronRight className={cn(
                         "w-4 h-4 transition-transform duration-200",
                         isActive ? "text-primary" : "text-gray-400 group-hover:translate-x-1"
