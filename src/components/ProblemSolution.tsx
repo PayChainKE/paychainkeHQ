@@ -5,7 +5,7 @@ import TruthPing from './TruthPing';
 // Custom hook for intersection observer
 const useIntersectionObserver = (options = {}) => {
   const [isIntersecting, setIsIntersecting] = useState(false);
-  const ref = useRef(null);
+  const ref = useRef<HTMLElement>(null);
 
   useEffect(() => {
     const element = ref.current;
@@ -29,7 +29,7 @@ const useIntersectionObserver = (options = {}) => {
     };
   }, [options]);
 
-  return [ref, isIntersecting];
+  return [ref, isIntersecting] as const;
 };
 
 const ProblemSolution: React.FC = () => {
