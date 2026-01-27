@@ -60,7 +60,7 @@ const Navbar: React.FC = () => {
 
               {/* Logo */}
               <Link to="/" className="flex items-center gap-3" onClick={() => setIsMobileMenuOpen(false)}>
-                <img src="/logo.png" alt="PayChain KE Logo" className="h-8 w-auto" />
+                <img src="/logo.png" alt="PayChain KE Logo" className="h-12 w-auto" />
                 <span className="text-lg font-bold text-gray-900">
                   pay<span className="text-primary">Chain</span>KE
                 </span>
@@ -207,7 +207,7 @@ const Navbar: React.FC = () => {
               "flex items-center gap-3 transition-all duration-300",
               isMobileMenuOpen ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2"
             )}>
-              <img src="/logo.png" alt="PayChain KE Logo" className="h-10 w-auto" />
+              <img src="/logo.png" alt="PayChain KE Logo" className="h-14 w-auto" />
               <span className="text-lg font-bold text-gray-900">
                 pay<span className="text-primary">Chain</span>KE
               </span>
