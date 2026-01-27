@@ -182,39 +182,6 @@ const Navbar: React.FC = () => {
         </div>
       </nav>
 
-      {/* Mobile Horizontal Navigation Bar */}
-      <div
-        className={cn(
-          "fixed top-0 left-0 right-0 z-40 md:hidden bg-white border-b border-gray-200 transition-all duration-300",
-          isMobileMenuOpen ? "translate-y-16 opacity-100" : "-translate-y-full opacity-0"
-        )}
-      >
-        <div className="container mx-auto px-4 sm:px-6">
-          <div className="flex items-center justify-center gap-6 py-3 overflow-x-auto">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = location.pathname === item.path;
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={cn(
-                    "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap",
-                    isActive
-                      ? "text-primary bg-primary/10"
-                      : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
-                  )}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  <Icon className="w-4 h-4" />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
       {/* Mobile Menu Overlay */}
       <div
         className={cn(
