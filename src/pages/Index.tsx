@@ -13,23 +13,11 @@ const Index: React.FC = () => {
       <Navbar />
       <Hero />
       
-      {/* Section Separator */}
-      <div className="h-0.5 bg-white/20 mx-auto max-w-6xl"></div>
-      
       <Features />
-      
-      {/* Section Separator */}
-      <div className="h-0.5 bg-white/20 mx-auto max-w-6xl"></div>
       
       <ProblemSolution />
       
-      {/* Section Separator */}
-      <div className="h-0.5 bg-white/20 mx-auto max-w-6xl"></div>
-      
       <TechnicalSpecs />
-      
-      {/* Section Separator */}
-      <div className="h-0.5 bg-white/20 mx-auto max-w-6xl"></div>
       
       <Footer />
     </div>

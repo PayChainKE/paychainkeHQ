@@ -10,10 +10,7 @@ const Footer: React.FC = () => {
           {/* Brand */}
           <div className="md:col-span-2">
             <div className="flex items-center gap-2 mb-4">
-              <img src="/logo.png" alt="PayChain KE Logo" className="h-8 w-auto" />
-              <span className="text-xl font-bold text-foreground">
-                pay<span className="text-primary">Chain</span>KE
-              </span>
+              <img src="/logo 2.png" alt="PayChain KE Logo" className="h-20 w-auto" />
             </div>
             <p className="text-sm text-muted-foreground max-w-md">
               Blockchain-verified payment verification for Kenyan merchants. Eliminating fake SMS fraud with
