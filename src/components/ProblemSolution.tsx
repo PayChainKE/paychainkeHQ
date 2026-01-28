@@ -135,13 +135,10 @@ const ProblemSolution: React.FC = () => {
 
           {/* Solution Section */}
           <div>
-            <div className="grid lg:grid-cols-2 gap-12 items-center mb-12">
+            <div className="grid md:grid-cols-2 gap-12 items-center">
               {/* Left: Text Content */}
               <div>
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 mb-6">
-                  <CheckCircle className="w-4 h-4 text-primary" />
-                  <span className="text-sm font-medium text-primary">The Solution</span>
-                </div>
+                {/* Removed 'The Solution' label as requested */}
                 <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-6">
                   PayChainKE
                 </h2>
@@ -156,7 +153,7 @@ const ProblemSolution: React.FC = () => {
               <div className="flex justify-center lg:justify-end">
                 <div className="relative">
                   {/* Phone mockup */}
-                  <div className="relative w-72 h-[580px] bg-black rounded-[2.5rem] sm:rounded-[3rem] border-2 border-gray-800 p-1 card-shadow mx-auto lg:mx-0">
+                  <div className="relative w-72 h-[580px] bg-black rounded-[2.5rem] sm:rounded-[3rem] border-2 border-gray-800 p-1 card-shadow shadow-2xl mx-auto lg:mx-0">
                     {/* Dynamic Island */}
                     <div className="absolute top-4 left-1/2 -translate-x-1/2 w-20 h-3 bg-black rounded-full" />
 
@@ -164,8 +161,8 @@ const ProblemSolution: React.FC = () => {
                     <div className="w-full h-full bg-background rounded-[2.5rem] overflow-hidden flex flex-col">
                       {/* Header */}
                       <div className="p-6 border-b border-border">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-foreground">payChainKE</span>
+                        <div className="flex items-center">
+                          <span className="font-bold text-foreground">pay</span><span className="font-bold text-green-500">Chain</span><span className="font-bold text-foreground">KE</span>
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">Merchant Terminal</p>
                       </div>
@@ -190,7 +187,7 @@ const ProblemSolution: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8 mt-16">
               <div className="bg-primary/5 border border-primary/20 rounded-lg p-6">
                 <div className="flex items-center gap-3 mb-4">
                   <CheckCircle className="w-6 h-6 text-primary" />

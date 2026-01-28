@@ -59,7 +59,7 @@ const TruthPing: React.FC<TruthPingProps> = ({
 
       {/* Main verification badge */}
       <img 
-        src="/logo.png" 
+        src="/logo 2.png" 
         alt="PayChainKE Logo" 
         className="w-24 h-24 rounded-full object-cover"
       />
