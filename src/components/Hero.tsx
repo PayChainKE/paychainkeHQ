@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Zap } from 'lucide-react';
+import { Shield, Zap, Star } from 'lucide-react';
 import TruthPing from './TruthPing';
 
 const Hero: React.FC = () => {
@@ -58,6 +58,28 @@ const Hero: React.FC = () => {
               <button className="border border-gray-300 text-gray-300 hover:bg-gray-300 hover:text-gray-900 px-8 py-3 rounded-lg font-semibold transition-colors">
                 Learn More
               </button>
+            </div>
+
+            {/* User testimonials and trust indicator */}
+            <div className="mt-8">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="flex -space-x-2">
+                  <img src="/hero 5.png" alt="User 1" className="w-8 h-8 rounded-full object-cover border-2 border-white" />
+                  <img src="/hero 4.png" alt="User 2" className="w-8 h-8 rounded-full object-cover border-2 border-white" />
+                  <img src="/hero 3.png" alt="User 3" className="w-8 h-8 rounded-full object-cover border-2 border-white" />
+                </div>
+                <div className="flex flex-col">
+                  {/* Five star rating */}
+                  <div className="flex items-center gap-1 mb-1">
+                    <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                    <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                    <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                    <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                    <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                  </div>
+                  <span className="text-gray-300 text-sm">Trusted by 30,000+ merchants & enterprises</span>
+                </div>
+              </div>
             </div>
           </div>
           
