@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, LayoutDashboard, FileCode, GitBranch, Menu, X, ChevronRight, Copyright, ChevronDown } from 'lucide-react';
+import { Home, LayoutDashboard, FileCode, GitBranch, Menu, X, ChevronRight, Copyright, ChevronDown, PlayCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const Navbar: React.FC = () => {
@@ -37,6 +37,7 @@ const Navbar: React.FC = () => {
 
   const navItems = [
     { path: '/', label: 'Home', icon: Home },
+    { path: '/how-it-works', label: 'How It Works', icon: PlayCircle },
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/architecture', label: 'Architecture', icon: GitBranch },
     { path: '/docs', label: 'Docs', icon: FileCode },

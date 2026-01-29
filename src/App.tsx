@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Architecture from "./pages/Architecture";
 import Docs from "./pages/Docs";
+import HowItWorks from "./pages/HowItWorks";
 import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import NotFound from "./pages/NotFound";
@@ -39,6 +40,7 @@ const App = () => {
             <BrowserRouter>
               <Routes>
                 <Route path="/" element={<Index />} />
+                <Route path="/how-it-works" element={<HowItWorks />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/architecture" element={<Architecture />} />
                 <Route path="/docs" element={<Docs />} />
