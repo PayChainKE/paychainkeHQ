@@ -60,7 +60,7 @@ const Navbar: React.FC = () => {
 
               {/* Logo */}
               <Link to="/" className="flex items-center gap-3" onClick={() => setIsMobileMenuOpen(false)}>
-                <img src="/logo.png" alt="PayChain KE Logo" className="h-6 md:h-8 w-auto" />
+                <img src="/logo.png" alt="PayChain KE Logo" className="h-6 md:h-8 w-auto border border-green-500" />
               </Link>
             </div>
 
