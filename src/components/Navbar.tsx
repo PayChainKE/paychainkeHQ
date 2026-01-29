@@ -7,6 +7,8 @@ const Navbar: React.FC = () => {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAvatarDropdownOpen, setIsAvatarDropdownOpen] = useState(false);
+  const [isResourcesDropdownOpen, setIsResourcesDropdownOpen] = useState(false);
+  const [isMobileResourcesDropdownOpen, setIsMobileResourcesDropdownOpen] = useState(false);
 
   // Prevent body scroll when mobile menu is open
   useEffect(() => {
@@ -27,20 +29,36 @@ const Navbar: React.FC = () => {
       if (isAvatarDropdownOpen && !(event.target as Element).closest('.avatar-dropdown')) {
         setIsAvatarDropdownOpen(false);
       }
+      if (isResourcesDropdownOpen && !(event.target as Element).closest('.resources-dropdown')) {
+        setIsResourcesDropdownOpen(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isAvatarDropdownOpen]);
+  }, [isAvatarDropdownOpen, isResourcesDropdownOpen]);
 
   const navItems = [
     { path: '/', label: 'Home', icon: Home },
     { path: '/how-it-works', label: 'How It Works', icon: PlayCircle },
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/architecture', label: 'Architecture', icon: GitBranch },
-    { path: '/docs', label: 'Docs', icon: FileCode },
+    { 
+      path: '/docs', 
+      label: 'Resources', 
+      icon: FileCode,
+      hasDropdown: true,
+      dropdownItems: [
+        { path: '/about', label: 'About Us', description: 'Our mission and team', emoji: 'ℹ️' },
+        { path: '/pricing', label: 'Pricing', description: 'Simple, transparent fees', emoji: '💰' },
+        { path: '/docs', label: 'Docs', description: 'API documentation and guides', emoji: '📚' },
+        { path: '/coverage', label: 'Coverage', description: 'Available countries', emoji: '🗺️' },
+        { path: '/blog', label: 'Blog', description: 'Latest articles & updates', emoji: '📰' },
+        { path: '/contact', label: 'Contact Support', description: '', emoji: '' },
+      ]
+    },
   ];
 
   return (
@@ -53,7 +71,12 @@ const Navbar: React.FC = () => {
               {/* Mobile Menu Button */}
               <button
                 className="md:hidden p-2 text-black font-bold transition-colors duration-200"
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                onClick={() => {
+                  setIsMobileMenuOpen(!isMobileMenuOpen);
+                  if (isMobileMenuOpen) {
+                    setIsMobileResourcesDropdownOpen(false);
+                  }
+                }}
                 aria-label="Toggle mobile menu"
               >
                 {isMobileMenuOpen ? <X className="w-6 h-6 font-bold" /> : <Menu className="w-6 h-6 font-bold" />}
@@ -70,6 +93,53 @@ const Navbar: React.FC = () => {
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.path;
+                
+                if (item.hasDropdown) {
+                  return (
+                    <div key={item.path} className="relative resources-dropdown">
+                      <button
+                        onClick={() => setIsResourcesDropdownOpen(!isResourcesDropdownOpen)}
+                        className={cn(
+                          "flex items-center gap-2 px-3 py-2 text-sm font-medium transition-all duration-200",
+                          "text-gray-700 hover:text-gray-900"
+                        )}
+                      >
+                        {item.label}
+                        <ChevronDown className={cn(
+                          "w-4 h-4 transition-transform duration-200",
+                          isResourcesDropdownOpen ? "rotate-180" : ""
+                        )} />
+                      </button>
+                      
+                      {isResourcesDropdownOpen && (
+                        <div className="absolute top-full left-0 mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                          {item.dropdownItems?.map((dropdownItem, index) => (
+                            <Link
+                              key={dropdownItem.path}
+                              to={dropdownItem.path}
+                              className={cn(
+                                "flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors",
+                                index === 0 && "rounded-t-lg",
+                                index === (item.dropdownItems?.length || 0) - 1 && "rounded-b-lg",
+                                dropdownItem.label === 'Contact Support' && "bg-gray-100 hover:bg-gray-200 font-medium"
+                              )}
+                              onClick={() => setIsResourcesDropdownOpen(false)}
+                            >
+                              <span className="text-lg flex-shrink-0 mt-0.5">{dropdownItem.emoji}</span>
+                              <div>
+                                <div className="font-medium text-gray-900">{dropdownItem.label}</div>
+                                {dropdownItem.description && (
+                                  <div className="text-sm text-gray-600">{dropdownItem.description}</div>
+                                )}
+                              </div>
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+                
                 return (
                   <Link
                     key={item.path}
@@ -186,7 +256,10 @@ const Navbar: React.FC = () => {
           "fixed inset-0 z-40 md:hidden transition-all duration-300 ease-in-out",
           isMobileMenuOpen ? "opacity-100 visible" : "opacity-0 invisible"
         )}
-        onClick={() => setIsMobileMenuOpen(false)}
+        onClick={() => {
+          setIsMobileMenuOpen(false);
+          setIsMobileResourcesDropdownOpen(false);
+        }}
       >
         {/* Backdrop */}
         <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
@@ -221,6 +294,61 @@ const Navbar: React.FC = () => {
               {navItems.map((item, index) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.path;
+                
+                if (item.hasDropdown) {
+                  return (
+                    <div key={item.path} className="space-y-1">
+                      <button
+                        onClick={() => setIsMobileResourcesDropdownOpen(!isMobileResourcesDropdownOpen)}
+                        className={cn(
+                          "flex items-center justify-between w-full py-3 transition-all duration-200 group",
+                          "text-gray-700 hover:text-gray-900"
+                        )}
+                        style={{
+                          animationDelay: `${index * 50}ms`,
+                          animation: isMobileMenuOpen ? 'slideInFromRight 0.3s ease-out forwards' : 'none'
+                        }}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Icon className="w-5 h-5 text-gray-500" />
+                          <span className="font-medium">{item.label}</span>
+                        </div>
+                        <ChevronDown className={cn(
+                          "w-4 h-4 transition-transform duration-200",
+                          isMobileResourcesDropdownOpen ? "rotate-180" : ""
+                        )} />
+                      </button>
+                      
+                      {isMobileResourcesDropdownOpen && (
+                        <div className="ml-8 space-y-1 border-l-2 border-gray-200 pl-4">
+                          {item.dropdownItems?.map((dropdownItem, dropdownIndex) => (
+                            <Link
+                              key={dropdownItem.path}
+                              to={dropdownItem.path}
+                              className={cn(
+                                "flex items-center gap-3 py-2 px-3 rounded-lg transition-all duration-200 text-sm",
+                                "text-gray-600 hover:text-gray-900 hover:bg-gray-50",
+                                dropdownItem.label === 'Contact Support' && "bg-gray-100 hover:bg-gray-200 font-medium"
+                              )}
+                              onClick={() => {
+                                setIsMobileMenuOpen(false);
+                                setIsMobileResourcesDropdownOpen(false);
+                              }}
+                              style={{
+                                animationDelay: `${(index * 50) + (dropdownIndex * 30) + 200}ms`,
+                                animation: isMobileMenuOpen ? 'slideInFromRight 0.3s ease-out forwards' : 'none'
+                              }}
+                            >
+                              <span className="text-base">{dropdownItem.emoji}</span>
+                              <span>{dropdownItem.label}</span>
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+                
                 return (
                   <Link
                     key={item.path}
