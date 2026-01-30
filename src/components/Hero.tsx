@@ -56,7 +56,7 @@ const Hero: React.FC = () => {
                 Get Started
               </button>
               <button className="border border-gray-300 text-gray-300 hover:bg-gray-300 hover:text-gray-900 px-8 py-3 rounded-lg font-semibold transition-colors">
-                Learn More
+                Join the Waitlist
               </button>
             </div>
 
