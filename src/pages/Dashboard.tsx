@@ -5,6 +5,8 @@ import { ArrowLeft } from 'lucide-react';
 const Dashboard: React.FC = () => {
   return (
     <div className="min-h-screen relative flex flex-col items-center justify-center p-4" style={{ backgroundImage: 'url("/under construction .png")', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+      {/* Background overlay for opacity */}
+      <div className="absolute inset-0 bg-black bg-opacity-30"></div>
       {/* Back to Home Button at top */}
       <Link to="/" className="absolute top-4 left-4 z-20">
         <button className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm">
@@ -13,7 +15,7 @@ const Dashboard: React.FC = () => {
         </button>
       </Link>
 
-      <div className="text-center max-w-md mx-auto bg-white bg-opacity-90 p-8 rounded-lg shadow-lg">
+      <div className="text-center max-w-md mx-auto bg-white bg-opacity-90 p-8 rounded-lg shadow-lg relative z-10">
         {/* Logo */}
         <div className="mb-8">
           <img src="/logo 2.png" alt="PayChain KE Logo" className="h-24 w-auto mx-auto" />
