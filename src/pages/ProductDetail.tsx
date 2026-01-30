@@ -121,19 +121,16 @@ const ProductDetail: React.FC = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      {/* Breadcrumb */}
+      {/* Back Button */}
       <div className="bg-white border-b">
         <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center text-sm text-gray-600">
-            <button
-              onClick={() => navigate('/store')}
-              className="hover:text-blue-600"
-            >
-              Store
-            </button>
-            <span className="mx-2">/</span>
-            <span className="text-gray-900">{product.name}</span>
-          </div>
+          <button
+            onClick={() => navigate('/store')}
+            className="flex items-center text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-md transition-colors duration-200 border border-gray-200"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Products
+          </button>
         </div>
       </div>
 
@@ -267,7 +264,7 @@ const ProductDetail: React.FC = () => {
         <div className="mt-8 bg-white rounded-lg p-6">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Customer Reviews</h2>
           <div className="space-y-4">
-            {[1, 2, 3].map((review) => (
+            {[1].map((review) => (
               <div key={review} className="border-b pb-4 last:border-b-0">
                 <div className="flex items-center space-x-2 mb-2">
                   <div className="flex">

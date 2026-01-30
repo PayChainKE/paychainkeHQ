@@ -174,7 +174,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
               })}
               
               {/* Cart or User Avatar Dropdown */}
-              {location.pathname === '/store' ? (
+              {location.pathname === '/store' || location.pathname.startsWith('/product') ? (
                 <div className="relative ml-4 pl-4 border-l border-gray-200">
                   <Link to="/store" className="flex items-center gap-2 px-2 py-1 transition-colors duration-200">
                     <div className="relative">
@@ -234,50 +234,65 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
               )}
             </div>
 
-            {/* Mobile User Avatar */}
-            <div className="md:hidden relative avatar-dropdown">
-              <button
-                onClick={() => setIsAvatarDropdownOpen(!isAvatarDropdownOpen)}
-                className="flex items-center gap-2 px-2 py-1 transition-colors duration-200"
-                aria-label="User menu"
-              >
-                <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
-                  <img src="/avator.png" alt="User Avatar" className="w-full h-full object-cover" />
-                </div>
-                <ChevronDown className="w-4 h-4 text-gray-600" />
-              </button>
-              
-              {/* Mobile Dropdown Menu */}
-              {isAvatarDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-4 z-50">
-                  <div className="px-4 pb-3 border-b border-gray-100">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
-                        <img src="/avator.png" alt="User Avatar" className="w-full h-full object-cover" />
-                      </div>
-                      <div>
-                        <div className="font-medium text-gray-900">User</div>
-                        <div className="text-sm text-gray-500">Log in to access your account</div>
+            {/* Mobile User Avatar or Cart */}
+            {location.pathname === '/store' || location.pathname.startsWith('/product') ? (
+              <div className="md:hidden relative">
+                <Link to="/store" className="flex items-center gap-2 px-2 py-1 transition-colors duration-200">
+                  <div className="relative">
+                    <ShoppingCart className="w-6 h-6 text-gray-700" />
+                    {cartCount > 0 && (
+                      <span className="absolute -top-2 -right-2 bg-primary text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                        {cartCount}
+                      </span>
+                    )}
+                  </div>
+                </Link>
+              </div>
+            ) : (
+              <div className="md:hidden relative avatar-dropdown">
+                <button
+                  onClick={() => setIsAvatarDropdownOpen(!isAvatarDropdownOpen)}
+                  className="flex items-center gap-2 px-2 py-1 transition-colors duration-200"
+                  aria-label="User menu"
+                >
+                  <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
+                    <img src="/avator.png" alt="User Avatar" className="w-full h-full object-cover" />
+                  </div>
+                  <ChevronDown className="w-4 h-4 text-gray-600" />
+                </button>
+                
+                {/* Mobile Dropdown Menu */}
+                {isAvatarDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-4 z-50">
+                    <div className="px-4 pb-3 border-b border-gray-100">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
+                          <img src="/avator.png" alt="User Avatar" className="w-full h-full object-cover" />
+                        </div>
+                        <div>
+                          <div className="font-medium text-gray-900">User</div>
+                          <div className="text-sm text-gray-500">Log in to access your account</div>
+                        </div>
                       </div>
                     </div>
+                    <div className="pt-3 space-y-2 px-2">
+                      <button
+                        onClick={() => setIsAvatarDropdownOpen(false)}
+                        className="w-full px-4 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition-colors duration-200 rounded-md border border-gray-200"
+                      >
+                        Sign In
+                      </button>
+                      <button
+                        onClick={() => setIsAvatarDropdownOpen(false)}
+                        className="w-full px-4 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition-colors duration-200 rounded-md border border-gray-200"
+                      >
+                        Sign Up
+                      </button>
+                    </div>
                   </div>
-                  <div className="pt-3 space-y-2 px-2">
-                    <button
-                      onClick={() => setIsAvatarDropdownOpen(false)}
-                      className="w-full px-4 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition-colors duration-200 rounded-md border border-gray-200"
-                    >
-                      Sign In
-                    </button>
-                    <button
-                      onClick={() => setIsAvatarDropdownOpen(false)}
-                      className="w-full px-4 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition-colors duration-200 rounded-md border border-gray-200"
-                    >
-                      Sign Up
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </nav>
