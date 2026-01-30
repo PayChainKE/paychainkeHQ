@@ -126,16 +126,16 @@ const ProductDetail: React.FC = () => {
         <div className="grid lg:grid-cols-2 gap-8">
           {/* Product Images */}
           <div className="space-y-4">
-            <div className="aspect-square bg-gray-50 rounded-lg overflow-hidden relative">
-              {/* Back Button Overlay */}
-              <button
-                onClick={() => navigate('/store')}
-                className="absolute top-4 left-4 z-10 flex items-center text-white bg-black/70 hover:bg-black/80 px-4 py-2 rounded-lg transition-all duration-200 shadow-lg backdrop-blur-sm"
-              >
-                <ArrowLeft className="w-5 h-5 mr-2" />
-                Back
-              </button>
+            {/* Back Button Above Image */}
+            <button
+              onClick={() => navigate('/store')}
+              className="flex items-center text-gray-700 hover:text-green-600 hover:bg-green-50 px-4 py-2 rounded-lg transition-all duration-200 border border-gray-200 shadow-sm"
+            >
+              <ArrowLeft className="w-5 h-5 mr-2" />
+              Back to Products
+            </button>
 
+            <div className="aspect-square bg-gray-50 rounded-lg overflow-hidden">
               <img
                 src="/logo 1.png"
                 alt={product.name}
@@ -184,6 +184,28 @@ const ProductDetail: React.FC = () => {
 
             {/* Quantity and Actions */}
             <div className="space-y-4">
+              {/* Size Selection - Only for clothing items */}
+              {(product.name.toLowerCase().includes('t-shirt') || 
+                product.name.toLowerCase().includes('hoodie') || 
+                product.name.toLowerCase().includes('jacket') ||
+                product.name.toLowerCase().includes('cap') ||
+                product.name.toLowerCase().includes('shirt')) && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Size:</label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {['S', 'M', 'L', 'XL', 'XXL', '3XL'].map((size) => (
+                      <button
+                        key={size}
+                        className="border border-gray-300 rounded-md py-2 px-3 text-sm font-medium hover:border-green-500 hover:bg-green-50 hover:text-green-700 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      >
+                        {size}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Size guide</p>
+                </div>
+              )}
+
               <div className="flex items-center space-x-4">
                 <label className="text-sm font-medium text-gray-700">Quantity:</label>
                 <select className="border border-gray-300 rounded px-3 py-1">

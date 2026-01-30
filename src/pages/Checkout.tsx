@@ -63,7 +63,7 @@ const Checkout: React.FC = () => {
       <Navbar cartCount={getCartItemCount()} />
 
       {/* Header */}
-      <div className="bg-white border-b">
+      <div className="bg-white">
         <div className="container mx-auto px-4 py-4">
           <button
             onClick={() => navigate('/store')}
