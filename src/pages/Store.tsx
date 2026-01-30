@@ -17,7 +17,7 @@ interface Product {
 }
 
 const Store: React.FC = () => {
-  const { addToCart, getCartItemCount } = useCart();
+  const { getCartItemCount } = useCart();
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState({
@@ -332,7 +332,7 @@ const Store: React.FC = () => {
             </div>
           </div>
 
-          <ProductGrid products={filteredProducts} addToCart={addToCart} />
+          <ProductGrid products={filteredProducts} />
         </div>
       </div>
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { Eye } from 'lucide-react';
 
 interface Product {
   id: number;
@@ -12,10 +13,9 @@ interface Product {
 
 interface ProductCardProps {
   product: Product;
-  addToCart: (product: Product) => void;
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({ product, addToCart }) => {
+const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const navigate = useNavigate();
 
   const handleViewDetails = () => {
@@ -25,7 +25,8 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, addToCart }) => {
     <motion.div
       whileHover={{ y: -5, boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)' }}
       transition={{ type: 'spring', stiffness: 300 }}
-      className="bg-white rounded-lg overflow-hidden border border-gray-200 hover:border-gray-300 shadow-sm hover:shadow-md transition-all duration-200 h-full flex flex-col"
+      className="bg-white rounded-lg overflow-hidden border border-gray-200 hover:border-gray-300 shadow-sm hover:shadow-md transition-all duration-200 h-full flex flex-col cursor-pointer"
+      onClick={handleViewDetails}
     >
       <div className="aspect-square bg-gray-50 flex items-center justify-center overflow-hidden">
         <img
@@ -38,21 +39,17 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, addToCart }) => {
         <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2 leading-tight">{product.name}</h3>
         <p className="text-gray-600 text-sm mb-3 line-clamp-2 flex-1">{product.description}</p>
         <div className="mt-auto">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between">
             <span className="text-xl font-bold text-gray-900">KES {product.price}</span>
-          </div>
-          <div className="flex gap-2">
             <button
-              onClick={handleViewDetails}
-              className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-md transition-colors text-sm font-medium border border-gray-300"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleViewDetails();
+              }}
+              className="bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-md transition-colors text-sm font-medium flex items-center gap-1"
             >
+              <Eye className="w-4 h-4" />
               View Details
-            </button>
-            <button
-              onClick={() => addToCart(product)}
-              className="flex-1 bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-md transition-colors text-sm font-medium"
-            >
-              Add to Cart
             </button>
           </div>
         </div>
