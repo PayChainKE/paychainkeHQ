@@ -70,34 +70,21 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
       <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/40 bg-white">
         <div className="container mx-auto px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            {/* Logo and Mobile Menu/Cart Button */}
+            {/* Logo and Mobile Menu Button */}
             <div className="flex items-center gap-4">
-              {/* Mobile Menu/Cart Button */}
-              {location.pathname === '/store' ? (
-                <Link to="/store" className="md:hidden flex items-center gap-2 px-2 py-1 transition-colors duration-200">
-                  <div className="relative">
-                    <ShoppingCart className="w-6 h-6 text-gray-700" />
-                    {cartCount > 0 && (
-                      <span className="absolute -top-2 -right-2 bg-primary text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                        {cartCount}
-                      </span>
-                    )}
-                  </div>
-                </Link>
-              ) : (
-                <button
-                  className="md:hidden p-2 text-black font-bold transition-colors duration-200"
-                  onClick={() => {
-                    setIsMobileMenuOpen(!isMobileMenuOpen);
-                    if (isMobileMenuOpen) {
-                      setIsMobileResourcesDropdownOpen(false);
-                    }
-                  }}
-                  aria-label="Toggle mobile menu"
-                >
-                  {isMobileMenuOpen ? <X className="w-6 h-6 font-bold" /> : <Menu className="w-6 h-6 font-bold" />}
-                </button>
-              )}
+              {/* Mobile Menu Button */}
+              <button
+                className="md:hidden p-2 text-black font-bold transition-colors duration-200"
+                onClick={() => {
+                  setIsMobileMenuOpen(!isMobileMenuOpen);
+                  if (isMobileMenuOpen) {
+                    setIsMobileResourcesDropdownOpen(false);
+                  }
+                }}
+                aria-label="Toggle mobile menu"
+              >
+                {isMobileMenuOpen ? <X className="w-6 h-6 font-bold" /> : <Menu className="w-6 h-6 font-bold" />}
+              </button>
 
               {/* Logo */}
               <Link to="/" className="flex items-center gap-3" onClick={() => setIsMobileMenuOpen(false)}>

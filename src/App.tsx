@@ -16,6 +16,7 @@ import Store from "./pages/Store";
 import ProductDetail from "./pages/ProductDetail";
 import Checkout from "./pages/Checkout";
 import LoadingScreen from "./components/LoadingScreen";
+import ScrollToTop from "./components/ScrollToTop";
 import { CartProvider } from "./context/CartContext";
 
 const queryClient = new QueryClient();
@@ -42,6 +43,7 @@ const App = () => {
             <Sonner />
             <CartProvider>
               <BrowserRouter>
+                <ScrollToTop />
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/how-it-works" element={<HowItWorks />} />
