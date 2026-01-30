@@ -1,10 +1,12 @@
 import React, { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import StoreHero from '../components/StoreHero';
 import ProductGrid from '../components/ProductGrid';
 import Footer from '../components/Footer';
 import FilterSidebar from '../components/FilterSidebar';
-import { SlidersHorizontal } from 'lucide-react';
+import { SlidersHorizontal, ShoppingCart } from 'lucide-react';
+import { useCart } from '../context/CartContext';
 
 interface Product {
   id: number;
@@ -15,7 +17,7 @@ interface Product {
 }
 
 const Store: React.FC = () => {
-  const [cart, setCart] = useState<Product[]>([]);
+  const { addToCart, getCartItemCount } = useCart();
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState({
@@ -149,10 +151,6 @@ const Store: React.FC = () => {
     return filtered;
   }, [allProducts, searchQuery, filters]);
 
-  const addToCart = (product: Product) => {
-    setCart([...cart, product]);
-  };
-
   // Calculate active filters count
   const activeFiltersCount = useMemo(() => {
     let count = 0;
@@ -183,7 +181,7 @@ const Store: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar cartCount={cart.length} />
+      <Navbar cartCount={getCartItemCount()} />
 
       {/* Mobile Filter Bar (Alibaba Style) */}
       <div className="lg:hidden bg-white border-b border-gray-200 sticky top-0 z-30">
@@ -339,6 +337,19 @@ const Store: React.FC = () => {
       </div>
 
       <Footer />
+
+      {/* Floating Cart Button */}
+      {getCartItemCount() > 0 && (
+        <div className="fixed bottom-4 right-4 z-50">
+          <Link
+            to="/checkout"
+            className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-full shadow-lg flex items-center gap-2 transition-colors"
+          >
+            <ShoppingCart className="w-5 h-5" />
+            <span className="font-medium">Checkout ({getCartItemCount()})</span>
+          </Link>
+        </div>
+      )}
     </div>
   );
 };

@@ -176,7 +176,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
               {/* Cart or User Avatar Dropdown */}
               {location.pathname === '/store' || location.pathname.startsWith('/product') ? (
                 <div className="relative ml-4 pl-4 border-l border-gray-200">
-                  <Link to="/store" className="flex items-center gap-2 px-2 py-1 transition-colors duration-200">
+                  <Link to="/checkout" className="flex items-center gap-2 px-2 py-1 transition-colors duration-200">
                     <div className="relative">
                       <ShoppingCart className="w-6 h-6 text-gray-700 hover:text-gray-900" />
                       {cartCount > 0 && (
@@ -237,7 +237,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
             {/* Mobile User Avatar or Cart */}
             {location.pathname === '/store' || location.pathname.startsWith('/product') ? (
               <div className="md:hidden relative">
-                <Link to="/store" className="flex items-center gap-2 px-2 py-1 transition-colors duration-200">
+                <Link to="/checkout" className="flex items-center gap-2 px-2 py-1 transition-colors duration-200">
                   <div className="relative">
                     <ShoppingCart className="w-6 h-6 text-gray-700" />
                     {cartCount > 0 && (

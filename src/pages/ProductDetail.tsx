@@ -1,8 +1,9 @@
 import React from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, ShoppingCart, Heart, Share2, Star } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import { useCart } from '../context/CartContext';
 
 interface Product {
   id: number;
@@ -15,6 +16,7 @@ interface Product {
 const ProductDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { addToCart, getCartItemCount } = useCart();
 
   // Mock product data - in a real app, this would come from an API
   const products: Product[] = [
@@ -112,14 +114,13 @@ const ProductDetail: React.FC = () => {
     );
   }
 
-  const addToCart = () => {
-    // In a real app, this would add to cart
-    alert(`Added ${product.name} to cart!`);
+  const handleAddToCart = () => {
+    addToCart(product);
   };
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
+      <Navbar cartCount={getCartItemCount()} />
 
       {/* Back Button */}
       <div className="bg-white border-b">
@@ -198,7 +199,7 @@ const ProductDetail: React.FC = () => {
 
               <div className="flex space-x-3">
                 <button
-                  onClick={addToCart}
+                  onClick={handleAddToCart}
                   className="flex-1 bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg font-medium transition-colors"
                 >
                   <ShoppingCart className="w-5 h-5 inline mr-2" />
@@ -283,6 +284,19 @@ const ProductDetail: React.FC = () => {
       </div>
 
       <Footer />
+
+      {/* Floating Cart Button */}
+      {getCartItemCount() > 0 && (
+        <div className="fixed bottom-4 right-4 z-50">
+          <Link
+            to="/checkout"
+            className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-full shadow-lg flex items-center gap-2 transition-colors"
+          >
+            <ShoppingCart className="w-5 h-5" />
+            <span className="font-medium">Checkout ({getCartItemCount()})</span>
+          </Link>
+        </div>
+      )}
     </div>
   );
 };

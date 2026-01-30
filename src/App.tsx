@@ -14,7 +14,9 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import NotFound from "./pages/NotFound";
 import Store from "./pages/Store";
 import ProductDetail from "./pages/ProductDetail";
+import Checkout from "./pages/Checkout";
 import LoadingScreen from "./components/LoadingScreen";
+import { CartProvider } from "./context/CartContext";
 
 const queryClient = new QueryClient();
 
@@ -38,19 +40,20 @@ const App = () => {
           <>
             <Toaster />
             <Sonner />
-            <BrowserRouter>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/how-it-works" element={<HowItWorks />} />
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/docs" element={<Docs />} />
-                <Route path="/store" element={<Store />} />
-                <Route path="/product/:id" element={<ProductDetail />} />
-                <Route path="/terms-of-service" element={<TermsOfService />} />
-                <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </BrowserRouter>
+            <CartProvider>
+              <BrowserRouter>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/how-it-works" element={<HowItWorks />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/docs" element={<Docs />} />
+                  <Route path="/store" element={<Store />} />
+                  <Route path="/product/:id" element={<ProductDetail />} />                <Route path="/checkout" element={<Checkout />} />                  <Route path="/terms-of-service" element={<TermsOfService />} />
+                  <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </BrowserRouter>
+            </CartProvider>
             <Analytics />
           </>
         )}
