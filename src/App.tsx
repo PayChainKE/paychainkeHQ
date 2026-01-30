@@ -12,6 +12,8 @@ import HowItWorks from "./pages/HowItWorks";
 import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import NotFound from "./pages/NotFound";
+import Store from "./pages/Store";
+import ProductDetail from "./pages/ProductDetail";
 import LoadingScreen from "./components/LoadingScreen";
 
 const queryClient = new QueryClient();
@@ -42,6 +44,8 @@ const App = () => {
                 <Route path="/how-it-works" element={<HowItWorks />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/docs" element={<Docs />} />
+                <Route path="/store" element={<Store />} />
+                <Route path="/product/:id" element={<ProductDetail />} />
                 <Route path="/terms-of-service" element={<TermsOfService />} />
                 <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                 <Route path="*" element={<NotFound />} />

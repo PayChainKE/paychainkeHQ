@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, LayoutDashboard, FileCode, GitBranch, Menu, X, ChevronRight, Copyright, ChevronDown, PlayCircle } from 'lucide-react';
+import { Home, LayoutDashboard, FileCode, GitBranch, Menu, X, ChevronRight, Copyright, ChevronDown, PlayCircle, ShoppingBag, ShoppingCart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const Navbar: React.FC = () => {
+interface NavbarProps {
+  cartCount?: number;
+}
+
+const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAvatarDropdownOpen, setIsAvatarDropdownOpen] = useState(false);
@@ -44,6 +48,7 @@ const Navbar: React.FC = () => {
     { path: '/', label: 'Home', icon: Home },
     { path: '/how-it-works', label: 'How It Works', icon: PlayCircle },
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { path: '/store', label: 'Merchandise', icon: ShoppingBag },
     { 
       path: '/docs', 
       label: 'Resources', 
@@ -65,21 +70,34 @@ const Navbar: React.FC = () => {
       <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/40 bg-white">
         <div className="container mx-auto px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            {/* Logo and Mobile Menu Button */}
+            {/* Logo and Mobile Menu/Cart Button */}
             <div className="flex items-center gap-4">
-              {/* Mobile Menu Button */}
-              <button
-                className="md:hidden p-2 text-black font-bold transition-colors duration-200"
-                onClick={() => {
-                  setIsMobileMenuOpen(!isMobileMenuOpen);
-                  if (isMobileMenuOpen) {
-                    setIsMobileResourcesDropdownOpen(false);
-                  }
-                }}
-                aria-label="Toggle mobile menu"
-              >
-                {isMobileMenuOpen ? <X className="w-6 h-6 font-bold" /> : <Menu className="w-6 h-6 font-bold" />}
-              </button>
+              {/* Mobile Menu/Cart Button */}
+              {location.pathname === '/store' ? (
+                <Link to="/store" className="md:hidden flex items-center gap-2 px-2 py-1 transition-colors duration-200">
+                  <div className="relative">
+                    <ShoppingCart className="w-6 h-6 text-gray-700" />
+                    {cartCount > 0 && (
+                      <span className="absolute -top-2 -right-2 bg-primary text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                        {cartCount}
+                      </span>
+                    )}
+                  </div>
+                </Link>
+              ) : (
+                <button
+                  className="md:hidden p-2 text-black font-bold transition-colors duration-200"
+                  onClick={() => {
+                    setIsMobileMenuOpen(!isMobileMenuOpen);
+                    if (isMobileMenuOpen) {
+                      setIsMobileResourcesDropdownOpen(false);
+                    }
+                  }}
+                  aria-label="Toggle mobile menu"
+                >
+                  {isMobileMenuOpen ? <X className="w-6 h-6 font-bold" /> : <Menu className="w-6 h-6 font-bold" />}
+                </button>
+              )}
 
               {/* Logo */}
               <Link to="/" className="flex items-center gap-3" onClick={() => setIsMobileMenuOpen(false)}>
@@ -155,50 +173,65 @@ const Navbar: React.FC = () => {
                 );
               })}
               
-              {/* User Avatar Dropdown */}
-              <div className="relative ml-4 pl-4 border-l border-gray-200 avatar-dropdown">
-                <button
-                  onClick={() => setIsAvatarDropdownOpen(!isAvatarDropdownOpen)}
-                  className="flex items-center gap-2 px-2 py-1 transition-colors duration-200"
-                  aria-label="User menu"
-                >
-                  <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
-                    <img src="/avator.png" alt="User Avatar" className="w-full h-full object-cover" />
-                  </div>
-                  <ChevronDown className="w-4 h-4 text-gray-600" />
-                </button>
-                
-                {/* Dropdown Menu */}
-                {isAvatarDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-4 z-50">
-                    <div className="px-4 pb-3 border-b border-gray-100">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
-                          <img src="/avator.png" alt="User Avatar" className="w-full h-full object-cover" />
-                        </div>
-                        <div>
-                          <div className="font-medium text-gray-900">User</div>
-                          <div className="text-sm text-gray-500">Log in to access your account</div>
+              {/* Cart or User Avatar Dropdown */}
+              {location.pathname === '/store' ? (
+                <div className="relative ml-4 pl-4 border-l border-gray-200">
+                  <Link to="/store" className="flex items-center gap-2 px-2 py-1 transition-colors duration-200">
+                    <div className="relative">
+                      <ShoppingCart className="w-6 h-6 text-gray-700 hover:text-gray-900" />
+                      {cartCount > 0 && (
+                        <span className="absolute -top-2 -right-2 bg-primary text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                          {cartCount}
+                        </span>
+                      )}
+                    </div>
+                  </Link>
+                </div>
+              ) : (
+                <div className="relative ml-4 pl-4 border-l border-gray-200 avatar-dropdown">
+                  <button
+                    onClick={() => setIsAvatarDropdownOpen(!isAvatarDropdownOpen)}
+                    className="flex items-center gap-2 px-2 py-1 transition-colors duration-200"
+                    aria-label="User menu"
+                  >
+                    <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
+                      <img src="/avator.png" alt="User Avatar" className="w-full h-full object-cover" />
+                    </div>
+                    <ChevronDown className="w-4 h-4 text-gray-600" />
+                  </button>
+                  
+                  {/* Dropdown Menu */}
+                  {isAvatarDropdownOpen && (
+                    <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-4 z-50">
+                      <div className="px-4 pb-3 border-b border-gray-100">
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
+                            <img src="/avator.png" alt="User Avatar" className="w-full h-full object-cover" />
+                          </div>
+                          <div>
+                            <div className="font-medium text-gray-900">User</div>
+                            <div className="text-sm text-gray-500">Log in to access your account</div>
+                          </div>
                         </div>
                       </div>
+                      <div className="pt-3 space-y-2 px-2">
+                        <button
+                          onClick={() => setIsAvatarDropdownOpen(false)}
+                          className="w-full px-4 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition-colors duration-200 rounded-md border border-gray-200"
+                        >
+                          Sign In
+                        </button>
+                        <button
+                          onClick={() => setIsAvatarDropdownOpen(false)}
+                          className="w-full px-4 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition-colors duration-200 rounded-md border border-gray-200"
+                        >
+                          Sign Up
+                        </button>
+                      </div>
                     </div>
-                    <div className="pt-3 space-y-2 px-2">
-                      <button
-                        onClick={() => setIsAvatarDropdownOpen(false)}
-                        className="w-full px-4 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition-colors duration-200 rounded-md border border-gray-200"
-                      >
-                        Sign In
-                      </button>
-                      <button
-                        onClick={() => setIsAvatarDropdownOpen(false)}
-                        className="w-full px-4 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition-colors duration-200 rounded-md border border-gray-200"
-                      >
-                        Sign Up
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Mobile User Avatar */}
