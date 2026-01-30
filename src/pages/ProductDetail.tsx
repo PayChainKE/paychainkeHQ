@@ -122,24 +122,20 @@ const ProductDetail: React.FC = () => {
     <div className="min-h-screen bg-background">
       <Navbar cartCount={getCartItemCount()} />
 
-      {/* Back Button */}
-      <div className="bg-white border-b">
-        <div className="container mx-auto px-4 py-3">
-          <button
-            onClick={() => navigate('/store')}
-            className="flex items-center text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-md transition-colors duration-200 border border-gray-200"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Products
-          </button>
-        </div>
-      </div>
-
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 pt-24 pb-8">
         <div className="grid lg:grid-cols-2 gap-8">
           {/* Product Images */}
           <div className="space-y-4">
-            <div className="aspect-square bg-gray-50 rounded-lg overflow-hidden">
+            <div className="aspect-square bg-gray-50 rounded-lg overflow-hidden relative">
+              {/* Back Button Overlay */}
+              <button
+                onClick={() => navigate('/store')}
+                className="absolute top-4 left-4 z-10 flex items-center text-white bg-black/70 hover:bg-black/80 px-4 py-2 rounded-lg transition-all duration-200 shadow-lg backdrop-blur-sm"
+              >
+                <ArrowLeft className="w-5 h-5 mr-2" />
+                Back
+              </button>
+
               <img
                 src="/logo 1.png"
                 alt={product.name}
