@@ -55,7 +55,10 @@ const Hero: React.FC = () => {
               <button className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-3 rounded-lg font-semibold transition-colors">
                 Get Started
               </button>
-              <button className="border border-gray-300 text-gray-300 hover:bg-gray-300 hover:text-gray-900 px-8 py-3 rounded-lg font-semibold transition-colors">
+              <button 
+                onClick={() => window.open('https://forms.gle/eJQVeiSGioHN4t6s7', '_blank')}
+                className="border border-gray-300 text-gray-300 hover:bg-gray-300 hover:text-gray-900 px-8 py-3 rounded-lg font-semibold transition-colors"
+              >
                 Join the Waitlist
               </button>
             </div>

@@ -26,11 +26,12 @@ const Dashboard: React.FC = () => {
         </p>
 
         {/* Join Waitlist Button */}
-        <Link to="/">
-          <button className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium transition-colors">
-            Join Waitlist
-          </button>
-        </Link>
+        <button 
+          onClick={() => window.open('https://forms.gle/eJQVeiSGioHN4t6s7', '_blank')}
+          className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+        >
+          Join Waitlist
+        </button>
       </div>
     </div>
   );

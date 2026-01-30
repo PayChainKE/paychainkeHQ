@@ -20,7 +20,6 @@ const WaitlistForm: React.FC = () => {
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSubmitted, setIsSubmitted] = useState(false);
 
   const paymentRails = [
     'M-Pesa Till',
@@ -43,38 +42,11 @@ const WaitlistForm: React.FC = () => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // Redirect to Google Form
+    window.open('https://forms.gle/eJQVeiSGioHN4t6s7', '_blank');
 
     setIsSubmitting(false);
-    setIsSubmitted(true);
-
-    // Reset form after 3 seconds
-    setTimeout(() => {
-      setIsSubmitted(false);
-      setFormData({
-        fullName: '',
-        businessName: '',
-        email: '',
-        paymentRail: '',
-        notifyLaunch: true,
-      });
-    }, 3000);
   };
-
-  if (isSubmitted) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="text-center"
-      >
-        <Shield className="w-16 h-16 text-[#10B981] mx-auto mb-4" />
-        <h3 className="text-xl font-bold text-white mb-2">Welcome to the Truth Layer!</h3>
-        <p className="text-slate-300">Your spot is secured. We'll notify you when the pilot launches.</p>
-      </motion.div>
-    );
-  }
 
   return (
     <motion.form
