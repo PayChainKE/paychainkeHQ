@@ -47,7 +47,7 @@ const TruthPing: React.FC<TruthPingProps> = ({
     }, 8000); // Change message every 8 seconds
 
     return () => clearInterval(interval);
-  }, []);
+  }, [messages.length]);
 
   const currentMessage = messages[currentMessageIndex];
 

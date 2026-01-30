@@ -1,13 +1,6 @@
 import React from 'react';
 import ProductCard from './ProductCard';
-
-interface Product {
-  id: number;
-  name: string;
-  description: string;
-  price: number;
-  image: string;
-}
+import { Product } from '../context/CartContext';
 
 interface ProductGridProps {
   products: Product[];

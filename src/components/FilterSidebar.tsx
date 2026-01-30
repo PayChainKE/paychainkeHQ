@@ -9,7 +9,11 @@ interface FilterSidebarProps {
     priceRange: [number, number];
     sortBy: string;
   };
-  onFiltersChange: (filters: any) => void;
+  onFiltersChange: (filters: {
+    categories: string[];
+    priceRange: [number, number];
+    sortBy: string;
+  }) => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
 }

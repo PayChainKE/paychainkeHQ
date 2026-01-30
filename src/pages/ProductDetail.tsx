@@ -4,14 +4,7 @@ import { ArrowLeft, ShoppingCart, Heart, Share2, Star } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { useCart } from '../context/CartContext';
-
-interface Product {
-  id: number;
-  name: string;
-  description: string;
-  price: number;
-  image: string;
-}
+import { Product } from '../context/CartContext';
 
 const ProductDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -25,72 +18,84 @@ const ProductDetail: React.FC = () => {
       name: 'PayChain Tech T-Shirt',
       description: 'Minimal blockchain pattern with PayChainKE logo. Premium cotton, perfect for developers.',
       price: 2500,
+      image: '/logo 1.png',
     },
     {
       id: 2,
       name: 'Validator Hoodie',
       description: 'Comfortable sweatshirt with "Secure. Verify. Trust." slogan. Ideal for cold Nairobi nights.',
       price: 4500,
+      image: '/logo 1.png',
     },
     {
       id: 3,
       name: 'Truth Layer Cap',
       description: 'Adjustable snapback with embroidered PayChain logo. UV protection for outdoor coding sessions.',
       price: 1800,
+      image: '/logo 1.png',
     },
     {
       id: 4,
       name: 'Blockchain Tote Bag',
       description: 'Eco-friendly canvas tote with minimal crypto design. Perfect for carrying your laptop to meetups.',
       price: 1200,
+      image: '/logo 1.png',
     },
     {
       id: 5,
       name: 'Consensus Socks',
       description: 'Comfy cotton socks with blockchain node pattern. Because great developers need great foundations.',
       price: 800,
+      image: '/logo 1.png',
     },
     {
       id: 6,
       name: 'PayChain Stickers Pack',
       description: '10 premium vinyl stickers with various PayChain designs. Decorate your laptop, water bottle, or anywhere!',
       price: 500,
+      image: '/logo 1.png',
     },
     {
       id: 7,
       name: 'Insulated Water Bottle',
       description: 'Double-wall stainless steel bottle keeps drinks cold for 24hrs. Perfect for long coding sessions.',
       price: 2200,
+      image: '/logo 1.png',
     },
     {
       id: 8,
       name: 'Crypto Tumbler',
       description: 'Travel mug with blockchain-inspired design. Keeps coffee hot and your crypto knowledge fresh.',
       price: 1600,
+      image: '/logo 1.png',
     },
     {
       id: 9,
       name: 'Smart Notebook',
       description: 'Digital notebook that scans and digitizes your notes. Perfect for brainstorming blockchain ideas.',
       price: 3500,
+      image: '/logo 1.png',
     },
     {
       id: 10,
       name: 'RFID Card Holder',
       description: 'Slim wallet with RFID blocking technology. Protects your crypto cards from digital pickpocketing.',
       price: 1400,
+      image: '/logo 1.png',
     },
     {
       id: 11,
       name: 'Full Zip Puff Jacket',
       description: 'Insulated puff jacket with full zipper. Perfect for Nairobi\'s variable weather and late-night coding sessions.',
       price: 5200,
+      image: '/logo 1.png',
     },
     {
       id: 12,
       name: 'Half Zip Puff Jacket',
       description: 'Stylish half-zip puff jacket with blockchain-inspired design. Layer perfectly over your PayChain t-shirt.',
       price: 4800,
+      image: '/logo 1.png',
     },
   ];
 

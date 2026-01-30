@@ -7,14 +7,7 @@ import Footer from '../components/Footer';
 import FilterSidebar from '../components/FilterSidebar';
 import { SlidersHorizontal, ShoppingCart } from 'lucide-react';
 import { useCart } from '../context/CartContext';
-
-interface Product {
-  id: number;
-  name: string;
-  description: string;
-  price: number;
-  image: string;
-}
+import { Product } from '../context/CartContext';
 
 const Store: React.FC = () => {
   const { getCartItemCount } = useCart();
@@ -27,7 +20,7 @@ const Store: React.FC = () => {
   });
 
   // Sample products data (in a real app, this would come from an API)
-  const allProducts: Product[] = [
+  const allProducts: Product[] = useMemo(() => [
     {
       id: 1,
       name: 'PayChain Tech T-Shirt',
@@ -93,30 +86,29 @@ const Store: React.FC = () => {
     },
     {
       id: 10,
-    name: 'RFID Card Holder',
-    description: 'Slim wallet with RFID blocking technology. Protects your crypto cards from digital pickpocketing.',
-    price: 1400,
-    image: '/logo 1.png',
-  },
-  {
-    id: 11,
-    name: 'Full Zip Puff Jacket',
-    description: 'Insulated puff jacket with full zipper. Perfect for Nairobi\'s variable weather and late-night coding sessions.',
-    price: 5200,
-    image: '/logo 1.png',
-  },
-  {
-    id: 12,
-    name: 'Half Zip Puff Jacket',
-    description: 'Stylish half-zip puff jacket with blockchain-inspired design. Layer perfectly over your PayChain t-shirt.',
-    price: 4800,
-    image: '/logo 1.png',
-  },
-];
-
+      name: 'RFID Card Holder',
+      description: 'Slim wallet with RFID blocking technology. Protects your crypto cards from digital pickpocketing.',
+      price: 1400,
+      image: '/logo 1.png',
+    },
+    {
+      id: 11,
+      name: 'Full Zip Puff Jacket',
+      description: 'Insulated puff jacket with full zipper. Perfect for Nairobi\'s variable weather and late-night coding sessions.',
+      price: 5200,
+      image: '/logo 1.png',
+    },
+    {
+      id: 12,
+      name: 'Half Zip Puff Jacket',
+      description: 'Stylish half-zip puff jacket with blockchain-inspired design. Layer perfectly over your PayChain t-shirt.',
+      price: 4800,
+      image: '/logo 1.png',
+    },
+  ], []);
   // Filter and sort products
   const filteredProducts = useMemo(() => {
-    let filtered = allProducts.filter(product => {
+    const filtered = allProducts.filter(product => {
       // Search filter
       const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                            product.description.toLowerCase().includes(searchQuery.toLowerCase());
