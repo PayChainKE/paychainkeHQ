@@ -7,7 +7,6 @@ import { Analytics } from "@vercel/analytics/react";
 import { useState, useEffect } from "react";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
-import Architecture from "./pages/Architecture";
 import Docs from "./pages/Docs";
 import HowItWorks from "./pages/HowItWorks";
 import TermsOfService from "./pages/TermsOfService";
@@ -42,7 +41,6 @@ const App = () => {
                 <Route path="/" element={<Index />} />
                 <Route path="/how-it-works" element={<HowItWorks />} />
                 <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/architecture" element={<Architecture />} />
                 <Route path="/docs" element={<Docs />} />
                 <Route path="/terms-of-service" element={<TermsOfService />} />
                 <Route path="/privacy-policy" element={<PrivacyPolicy />} />
