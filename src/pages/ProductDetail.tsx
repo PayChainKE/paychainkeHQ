@@ -25,7 +25,7 @@ const ProductDetail: React.FC = () => {
       name: 'Validator Hoodie',
       description: 'Comfortable sweatshirt with "Secure. Verify. Trust." slogan. Ideal for cold Nairobi nights.',
       price: 4500,
-      image: '/logo 1.png',
+      image: '/merchendise/hoodies.png',
     },
     {
       id: 3,

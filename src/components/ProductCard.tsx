@@ -23,8 +23,8 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
     >
       <div className="aspect-square bg-gray-50 flex items-center justify-center overflow-hidden">
         <img
-          src="/logo 1.png"
-          alt="PayChain Logo"
+          src={product.image}
+          alt={product.name}
           className="w-full h-full object-cover"
         />
       </div>
