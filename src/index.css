@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,63 +6,102 @@
 
 @layer base {
   :root {
-    /* PayChainKE Brand Colors - The Truth Layer */
-    --background: 0 0% 98%; /* Off-white background */
-    --foreground: 210 40% 6%; /* Dark text */
+    /* ============================================================
+       PAYCHAIN KE — "QUIET CONFIDENCE" 2026 DESIGN SYSTEM
+       Palette: Deep Navy · Crisp White · Success Green
+    ============================================================ */
 
-    --card: 0 0% 96%; /* Light card background */
-    --card-foreground: 210 40% 6%; /* Dark card text */
+    /* Surface */
+    --background: 210 17% 98%;       /* #F8FAFC – off-white canvas */
+    --foreground: 215 32% 10%;       /* near-black text */
 
-    --popover: 0 0% 96%; /* Light popover background */
-    --popover-foreground: 210 40% 6%; /* Dark popover text */
+    --card: 0 0% 100%;               /* pure white cards */
+    --card-foreground: 215 32% 10%;
 
-    /* High-Visibility Green - Primary Action */
-    --primary: 160 84% 39%; /* #10B981 */
-    --primary-foreground: 0 0% 98%; /* Light text on primary */
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 32% 10%;
 
-    /* Navy Secondary */
-    --secondary: 210 47% 92%; /* Light secondary background */
-    --secondary-foreground: 210 40% 6%; /* Dark secondary text */
+    /* Brand Primary – Success Green #10B981 */
+    --primary: 160 84% 39%;
+    --primary-foreground: 0 0% 100%;
 
-    --muted: 210 30% 88%; /* Light muted background */
-    --muted-foreground: 215 20% 35%; /* Dark muted text */
+    /* Brand Secondary – Deep Navy #0A192F */
+    --secondary: 212 79% 11%;
+    --secondary-foreground: 0 0% 100%;
 
-    /* Warning Amber for Sentinel Alerts */
-    --accent: 38 92% 50%; /* Warning amber */
-    --accent-foreground: 210 40% 6%; /* Dark text on accent */
+    --muted: 210 20% 92%;
+    --muted-foreground: 215 16% 47%;
 
-    /* Status Colors */
+    --accent: 210 20% 92%;
+    --accent-foreground: 215 32% 10%;
+
     --destructive: 0 72% 51%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive-foreground: 0 0% 100%;
 
     --success: 160 84% 39%;
-    --success-foreground: 210 40% 6%;
+    --success-foreground: 0 0% 100%;
 
     --warning: 38 92% 50%;
     --warning-foreground: 222 47% 6%;
 
-    --border: 210 30% 18%;
-    --input: 210 45% 10%;
+    --border: 214 20% 88%;
+    --input: 214 20% 88%;
     --ring: 160 84% 39%;
 
-    --radius: 0.75rem;
+    --radius: 0.875rem;
 
-    /* Shadows */
-    --shadow-glow: 0 0 60px -15px hsl(145 72% 40% / 0.4);
-    --shadow-card: 0 4px 24px -8px hsl(0 0% 0% / 0.5);
+    /* Glow tokens */
+    --glow-green: 0 0 40px -8px rgba(16,185,129,0.35);
+    --glow-navy: 0 0 40px -8px rgba(10,25,47,0.3);
+    --shadow-card: 0 4px 32px -8px rgba(10,25,47,0.08);
+    --shadow-lifted: 0 16px 64px -16px rgba(10,25,47,0.14);
 
-    /* Font families */
+    /* Font */
     --font-display: 'Inter', system-ui, sans-serif;
     --font-mono: 'JetBrains Mono', monospace;
 
-    --sidebar-background: 210 45% 8%;
-    --sidebar-foreground: 0 0% 98%;
+    /* Sidebar */
+    --sidebar-background: 212 79% 11%;
+    --sidebar-foreground: 0 0% 95%;
     --sidebar-primary: 160 84% 39%;
-    --sidebar-primary-foreground: 210 40% 6%;
-    --sidebar-accent: 210 47% 14%;
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 210 30% 18%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 212 65% 17%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 212 50% 18%;
     --sidebar-ring: 160 84% 39%;
+  }
+
+  .dark {
+    --background: 212 79% 6%;        /* #050D18 – darker than navy */
+    --foreground: 210 17% 93%;
+
+    --card: 212 68% 10%;             /* #0D1F35 */
+    --card-foreground: 210 17% 93%;
+
+    --popover: 212 68% 10%;
+    --popover-foreground: 210 17% 93%;
+
+    --primary: 160 84% 39%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 212 65% 17%;
+    --secondary-foreground: 210 17% 93%;
+
+    --muted: 212 60% 15%;
+    --muted-foreground: 215 16% 60%;
+
+    --accent: 212 60% 15%;
+    --accent-foreground: 210 17% 93%;
+
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 212 50% 18%;
+    --input: 212 50% 18%;
+    --ring: 160 84% 39%;
+
+    --shadow-card: 0 4px 32px -8px rgba(0,0,0,0.4);
+    --shadow-lifted: 0 16px 64px -16px rgba(0,0,0,0.5);
   }
 }
 
@@ -321,3 +360,32 @@
     transform: translateX(0);
   }
 }
+
+/* ── Quiet Confidence 2026 additions ── */
+@keyframes confidence-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0) }
+  50%       { box-shadow: 0 0 0 8px rgba(16,185,129,0.18) }
+}
+
+.confidence-pulse:hover {
+  animation: confidence-pulse 1.8s ease-in-out infinite;
+}
+
+/* Frosted glass utility */
+.glass {
+  background: rgba(255,255,255,0.70);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.glass-dark {
+  background: rgba(10,25,47,0.80);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* Bento glow on hover */
+.bento-glow:hover {
+  box-shadow: 0 0 0 1px rgba(16,185,129,0.25), 0 20px 60px -12px rgba(10,25,47,0.12);
+}
+

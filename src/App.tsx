@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Docs from "./pages/Docs";
 import HowItWorks from "./pages/HowItWorks";
+import FAQ from './pages/FAQ';
 import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import NotFound from "./pages/NotFound";
@@ -50,7 +51,10 @@ const App = () => {
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/docs" element={<Docs />} />
                   <Route path="/store" element={<Store />} />
-                  <Route path="/product/:id" element={<ProductDetail />} />                <Route path="/checkout" element={<Checkout />} />                  <Route path="/terms-of-service" element={<TermsOfService />} />
+                  <Route path="/product/:id" element={<ProductDetail />} />
+                  <Route path="/checkout" element={<Checkout />} />
+                  <Route path="/faq" element={<FAQ />} />
+                  <Route path="/terms-of-service" element={<TermsOfService />} />
                   <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>

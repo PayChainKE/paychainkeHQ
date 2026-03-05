@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, LayoutDashboard, FileCode, GitBranch, Menu, X, ChevronRight, Copyright, ChevronDown, PlayCircle, ShoppingBag, ShoppingCart } from 'lucide-react';
+import { Home, LayoutDashboard, FileCode, GitBranch, Menu, X, ChevronRight, Copyright, ChevronDown, PlayCircle, ShoppingBag, ShoppingCart, HelpCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NavbarProps {
@@ -49,6 +49,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
     { path: '/how-it-works', label: 'How It Works', icon: PlayCircle },
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/store', label: 'Merchandise', icon: ShoppingBag },
+    { path: '/faq', label: 'FAQ', icon: HelpCircle },
     { 
       path: '/docs', 
       label: 'Resources', 
@@ -59,6 +60,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
         { path: '/pricing', label: 'Pricing', description: 'Simple, transparent fees', emoji: '💰' },
         { path: '/docs', label: 'Docs', description: 'API documentation and guides', emoji: '📚' },
         { path: '/coverage', label: 'Coverage', description: 'Available countries', emoji: '🗺️' },
+        { path: '/faq', label: 'FAQ', description: 'Common questions answered', emoji: '❓' },
         { path: '/blog', label: 'Blog', description: 'Latest articles & updates', emoji: '📰' },
         { path: '/contact', label: 'Contact Support', description: '', emoji: '' },
       ]
@@ -67,7 +69,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
 
   return (
     <>
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/40 bg-white">
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-white/70 dark:bg-[#0A192F]/80 backdrop-blur-md supports-[backdrop-filter]:bg-white/60 transition-colors duration-300">
         <div className="container mx-auto px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Logo and Mobile Menu Button */}
