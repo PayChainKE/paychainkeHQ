@@ -16,7 +16,7 @@ const Hero: React.FC = () => (
       <div className="absolute bottom-6 left-[calc(50%-38px)] -translate-x-1/2 sm:top-[calc(50%+152px)] sm:bottom-auto sm:left-[calc(50%-490px)] sm:-translate-x-1/2 sm:-translate-y-1/2 flex flex-row gap-3">
         <a
           href="/how-it-works"
-          className="inline-flex items-center justify-center px-8 py-3 rounded-lg bg-black text-white font-semibold text-base hover:bg-gray-800 transition-colors cursor-pointer"
+          className="inline-flex items-center justify-center px-5 py-2 text-sm sm:px-8 sm:py-3 sm:text-base rounded-lg bg-black text-white font-semibold hover:bg-gray-800 transition-colors cursor-pointer"
         >
           <span className="inline-block animate-bounce mr-1">👆</span> Join the Waitlist
         </a>
