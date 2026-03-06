@@ -68,7 +68,12 @@ const StatCard: React.FC<StatCardProps> = ({ label, value, sub, delta, positive 
 );
 
 /* ─── Custom Tooltip ─── */
-const CustomTooltip: React.FC<any> = ({ active, payload, label }) => {
+interface TooltipProps {
+  active?: boolean;
+  payload?: { value?: number }[];
+  label?: string;
+}
+const CustomTooltip: React.FC<TooltipProps> = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   return (
     <div className="bg-white border border-gray-100 rounded-xl shadow-lg p-3 text-xs">
