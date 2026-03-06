@@ -13,8 +13,8 @@ const Hero: React.FC = () => (
           <strong>Paychain</strong> makes it simple for your business to accept secure payments while providing inflation protection, bulk payouts, and automated business tools.
         </p>
 
-        {/* CTA Button */}
-        <div className="mt-6">
+        {/* CTA Button — desktop only */}
+        <div className="hidden lg:block mt-6">
           <a
             href="/how-it-works"
             className="inline-flex items-center justify-center px-6 py-3 text-sm sm:text-base rounded-lg bg-black text-white font-semibold hover:bg-gray-800 transition-colors cursor-pointer"
@@ -23,8 +23,8 @@ const Hero: React.FC = () => (
           </a>
         </div>
 
-        {/* Trusted by badge */}
-        <div className="flex items-center gap-3 mt-6">
+        {/* Trusted by badge — desktop only (shown below button) */}
+        <div className="hidden lg:flex items-center gap-3 mt-6">
           <div className="flex -space-x-3">
             {['/Home page/merchant 1.png', '/Home page/merchant 2.png', '/Home page/merchant 3.png'].map((src, i) => (
               <img
@@ -57,6 +57,42 @@ const Hero: React.FC = () => (
           alt="Paychain app design"
           className="w-full max-w-sm sm:max-w-md md:max-w-lg lg:h-full lg:w-auto lg:max-w-none h-auto object-contain"
         />
+      </div>
+
+      {/* CTA Button — mobile only (shown after image, before badge) */}
+      <div className="flex lg:hidden w-full">
+        <a
+          href="/how-it-works"
+          className="inline-flex items-center justify-center px-6 py-3 text-sm rounded-lg bg-black text-white font-semibold hover:bg-gray-800 transition-colors cursor-pointer"
+        >
+          <span className="inline-block animate-bounce mr-1">👆</span> Join the Waitlist
+        </a>
+      </div>
+
+      {/* Trusted by badge — mobile only (shown after image) */}
+      <div className="flex lg:hidden items-center gap-3 w-full">
+        <div className="flex -space-x-3">
+          {['/Home page/merchant 1.png', '/Home page/merchant 2.png', '/Home page/merchant 3.png'].map((src, i) => (
+            <img
+              key={i}
+              src={src}
+              alt={`Merchant ${i + 1}`}
+              className="w-8 h-8 rounded-full border-2 border-white object-cover"
+            />
+          ))}
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <div className="flex gap-0.5">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <svg key={i} className="w-4 h-4 text-yellow-500 fill-yellow-500" viewBox="0 0 20 20">
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.957a1 1 0 00.95.69h4.162c.969 0 1.371 1.24.588 1.81l-3.37 2.448a1 1 0 00-.364 1.118l1.286 3.957c.3.921-.755 1.688-1.54 1.118l-3.37-2.448a1 1 0 00-1.175 0l-3.37 2.448c-.784.57-1.838-.197-1.539-1.118l1.286-3.957a1 1 0 00-.364-1.118L2.063 9.384c-.783-.57-.38-1.81.588-1.81h4.162a1 1 0 00.95-.69L9.049 2.927z" />
+              </svg>
+            ))}
+          </div>
+          <span className="text-sm font-medium text-gray-700 whitespace-nowrap">
+            Trusted by <span className="font-bold text-black">10,000+</span> merchants &amp; enterprises
+          </span>
+        </div>
       </div>
 
     </div>
