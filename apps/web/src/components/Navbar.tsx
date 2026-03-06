@@ -69,7 +69,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
 
   return (
     <>
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-white/70 dark:bg-[#0A192F]/80 backdrop-blur-md supports-[backdrop-filter]:bg-white/60 transition-colors duration-300">
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-gray-200 bg-white transition-colors duration-300">
         <div className="container mx-auto px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Logo and Mobile Menu Button */}
