@@ -69,8 +69,8 @@ const Hero: React.FC = () => (
         </a>
       </div>
 
-      {/* Trusted by badge — mobile only (shown after image) */}
-      <div className="flex lg:hidden items-center gap-3 w-full">
+      {/* Trusted by badge — mobile only (stack images above text, left-aligned on small screens) */}
+      <div className="flex lg:hidden flex-col items-start gap-3 w-full">
         <div className="flex -space-x-3">
           {['/Home page/merchant 1.png', '/Home page/merchant 2.png', '/Home page/merchant 3.png'].map((src, i) => (
             <img
@@ -81,7 +81,7 @@ const Hero: React.FC = () => (
             />
           ))}
         </div>
-        <div className="flex flex-col gap-0.5">
+        <div className="flex flex-col gap-0.5 items-start">
           <div className="flex gap-0.5">
             {Array.from({ length: 5 }).map((_, i) => (
               <svg key={i} className="w-4 h-4 text-yellow-500 fill-yellow-500" viewBox="0 0 20 20">
@@ -89,7 +89,7 @@ const Hero: React.FC = () => (
               </svg>
             ))}
           </div>
-          <span className="text-sm font-medium text-gray-700 whitespace-nowrap">
+          <span className="text-sm font-medium text-gray-700 text-left">
             Trusted by <span className="font-bold text-black">10,000+</span> merchants &amp; enterprises
           </span>
         </div>
