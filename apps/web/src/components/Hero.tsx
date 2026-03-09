@@ -5,7 +5,7 @@ const Hero: React.FC = () => (
     <div className="max-w-7xl mx-auto px-6 sm:px-10 lg:px-16 flex flex-col lg:flex-row items-center gap-10 lg:gap-0 py-12 sm:py-16 lg:py-20">
 
       {/* Left — text content */}
-      <div className="w-full lg:w-1/2 flex flex-col items-start lg:-ml-12">
+      <div className="w-full lg:w-1/2 flex flex-col items-start lg:-ml-12 relative z-10">
         <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-black leading-tight">
           Simple tools for<br />a <span style={{ color: '#00bf63' }}>secure</span> business.
         </h1>
@@ -19,7 +19,7 @@ const Hero: React.FC = () => (
             href="/how-it-works"
             className="inline-flex items-center justify-center px-6 py-3 text-sm sm:text-base rounded-lg bg-black text-white font-semibold hover:bg-gray-800 transition-colors cursor-pointer"
           >
-            <span className="inline-block animate-bounce mr-1">👆</span> Join the Waitlist
+            <span className="inline-block animate-bounce mr-1">👉</span> Join the Waitlist
           </a>
         </div>
 
@@ -51,26 +51,26 @@ const Hero: React.FC = () => (
       </div>
 
       {/* Right — design image (mobile: in flow, desktop: absolute right edge) */}
-      <div className="w-full flex items-center justify-center lg:absolute lg:right-0 lg:top-0 lg:h-full lg:w-1/2 lg:justify-end">
+      <div className="w-full flex items-center justify-center relative z-0 mt-6 lg:mt-0 lg:absolute lg:right-[5cm] lg:top-0 lg:h-full lg:w-1/2 lg:justify-end">
         <img
           src="/Home page/design 1.png"
           alt="Paychain app design"
-          className="w-full max-w-sm sm:max-w-md md:max-w-lg lg:h-full lg:w-auto lg:max-w-none h-auto object-contain"
+          className="w-full max-w-sm sm:max-w-md md:max-w-lg lg:h-full lg:w-auto lg:max-w-none h-auto object-contain transform scale-[1.5]"
         />
-      </div>
 
-      {/* CTA Button — mobile only (shown after image, before badge) */}
-      <div className="flex lg:hidden w-full">
-        <a
-          href="/how-it-works"
-          className="inline-flex items-center justify-center px-6 py-3 text-sm rounded-lg bg-black text-white font-semibold hover:bg-gray-800 transition-colors cursor-pointer"
-        >
-          <span className="inline-block animate-bounce mr-1">👆</span> Join the Waitlist
-        </a>
+        {/* Mobile CTA — overlayed at bottom-center of the image */}
+        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 translate-y-[2cm] z-20 lg:hidden">
+          <a
+            href="/how-it-works"
+            className="inline-flex items-center justify-center px-6 py-3 text-sm rounded-lg bg-black text-white font-semibold hover:bg-gray-800 transition-colors cursor-pointer"
+          >
+            <span className="inline-block animate-bounce mr-1">👉</span> Join the Waitlist
+          </a>
+        </div>
       </div>
 
       {/* Trusted by badge — mobile only (stack images above text, left-aligned on small screens) */}
-      <div className="flex lg:hidden flex-col items-start gap-3 w-full">
+      <div className="flex lg:hidden flex-col items-start gap-3 w-full mt-[2cm] lg:mt-0">
         <div className="flex -space-x-3">
           {['/Home page/merchant 1.png', '/Home page/merchant 2.png', '/Home page/merchant 3.png'].map((src, i) => (
             <img
