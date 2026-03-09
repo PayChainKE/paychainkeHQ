@@ -58,13 +58,10 @@ const ProblemSolution: React.FC = () => {
             transition={{ duration: 0.6 }}
             className="mb-16 text-center"
           >
-            <span className="inline-block text-xs font-semibold tracking-widest uppercase text-red-400 bg-red-500/10 border border-red-500/20 rounded-full px-4 py-1.5 mb-5">
-              Why Merchants Switch to PayChainKE
-            </span>
+            {/* Removed Why Merchants Switch to PayChainKE */}
             <h2 className="text-3xl md:text-5xl font-bold text-white mb-4 leading-tight">
-              Legacy tools are costing you{' '}
               <span className="text-red-400">
-                more than you realise.
+                More than you realise.
               </span>
             </h2>
             <p className="text-lg text-slate-400 max-w-2xl mx-auto">

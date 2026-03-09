@@ -353,7 +353,7 @@ const FAQ: React.FC = () => {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="text-lg text-gray-200 max-w-2xl mx-auto"
           >
-            Everything you need to know about the Hybrid Business OS for African merchants. Can't find your answer?{' '}
+            {/* Everything you need to know about the Hybrid Business OS for African merchants. Can't find your answer?{' '} */}
             <a href="mailto:support@paychainke.com" className="text-emerald-400 hover:underline">
               Contact our support team.
             </a>

@@ -84,8 +84,8 @@ const ComparisonTable: React.FC = () => (
       >
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold text-emerald-400 border border-emerald-500/25 mb-5"
           style={{ background: 'rgba(16,185,129,0.08)' }}>
-          <Zap className="w-3.5 h-3.5" />
-          PayChain vs. Legacy Tools
+          {/* <Zap className="w-3.5 h-3.5" />
+          PayChain vs. Legacy Tools */}
         </div>
         <h2 className="text-4xl md:text-5xl font-bold text-white mb-4 leading-tight">
           Why merchants are{' '}
