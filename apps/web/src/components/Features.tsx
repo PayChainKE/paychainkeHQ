@@ -62,7 +62,7 @@ const features = [
    FEATURES SECTION — Key tools layout (PayChain edition)
 ───────────────────────────────────────────────────────────── */
 const Features: React.FC = () => (
-  <section className="py-24" style={{ backgroundColor: '#dddddd' }}>
+  <section className="py-24 bg-white">
     <div className="container mx-auto px-4 sm:px-6 lg:px-8">
 
       {/* Left-aligned header */}
@@ -83,7 +83,7 @@ const Features: React.FC = () => (
           href="/how-it-works"
           className="inline-flex items-center gap-2 px-8 py-4 rounded-lg bg-black text-white text-lg font-semibold hover:bg-gray-800 transition-colors"
         >
-          Get started <ArrowRight className="w-5 h-5" />
+          How it works <ArrowRight className="w-5 h-5" />
         </a>
       </motion.div>
 
@@ -111,9 +111,7 @@ const Features: React.FC = () => (
                   <img src="/icons/manage.gif" alt="Manage" className="w-[160px] h-[160px] object-contain" style={{ transform: 'scale(1.6)' }} />
                 ) : f.icon === 'pay' ? (
                   <img src="/icons/pay.gif" alt="Pay" className="w-[160px] h-[160px] object-contain" style={{ transform: 'scale(1.6)' }} />
-                ) : (
-                  <Icon className={`w-[96px] h-[96px] ${f.iconColor}`} style={{ transform: 'scale(1.6)' }} />
-                )}
+                ) : null}
               </div>
               {/* Text */}
               <div className="flex flex-col items-start text-left w-full">

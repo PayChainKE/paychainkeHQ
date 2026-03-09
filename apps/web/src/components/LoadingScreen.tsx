@@ -6,7 +6,7 @@ interface LoadingScreenProps {
 
 const LoadingScreen: React.FC<LoadingScreenProps> = ({ isLoading }) => {
   const [displayText, setDisplayText] = useState('');
-  const fullText = 'Welcome to PaychainKE HQ....';
+  const fullText = 'Welcome to Paychain....';
 
   useEffect(() => {
     if (!isLoading) return;
