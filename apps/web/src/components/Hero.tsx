@@ -6,7 +6,7 @@ const Hero: React.FC = () => (
 
       {/* Left — text content */}
       <div className="w-full lg:w-1/2 flex flex-col items-start lg:-ml-12 relative z-10">
-        <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-black leading-tight">
+        <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold lg:font-normal text-black leading-tight">
           Simple tools for<br />a <span style={{ color: '#00bf63' }}>secure</span> business.
         </h1>
         <p className="mt-4 text-sm sm:text-base lg:text-lg text-gray-600 leading-relaxed max-w-lg">
@@ -14,10 +14,10 @@ const Hero: React.FC = () => (
         </p>
 
         {/* CTA Button — desktop only */}
-        <div className="hidden lg:block mt-6">
+        <div className="hidden lg:block mt-6 self-start">
           <a
             href="/how-it-works"
-            className="inline-flex items-center justify-center px-6 py-3 text-sm sm:text-base rounded-lg bg-black text-white font-semibold hover:bg-gray-800 transition-colors cursor-pointer"
+            className="inline-flex items-center justify-center px-6 py-3 text-sm sm:text-base rounded-lg bg-black text-white font-semibold hover:bg-gray-800 transition-colors cursor-pointer whitespace-nowrap"
           >
             <span className="inline-block animate-bounce mr-1">👉</span> Join the Waitlist
           </a>
@@ -59,10 +59,10 @@ const Hero: React.FC = () => (
         />
 
         {/* Mobile CTA — overlayed at bottom-center of the image */}
-        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 translate-y-[2cm] z-20 lg:hidden">
+        <div className="absolute bottom-6 left-4 transform translate-y-[2cm] z-20 lg:hidden">
           <a
             href="/how-it-works"
-            className="inline-flex items-center justify-center px-6 py-3 text-sm rounded-lg bg-black text-white font-semibold hover:bg-gray-800 transition-colors cursor-pointer"
+            className="inline-flex items-center justify-center px-6 py-3 text-sm rounded-lg bg-black text-white font-semibold hover:bg-gray-800 transition-colors cursor-pointer whitespace-nowrap"
           >
             <span className="inline-block animate-bounce mr-1">👉</span> Join the Waitlist
           </a>
@@ -70,7 +70,7 @@ const Hero: React.FC = () => (
       </div>
 
       {/* Trusted by badge — mobile only (stack images above text, left-aligned on small screens) */}
-      <div className="flex lg:hidden flex-col items-start gap-3 w-full mt-[2cm] lg:mt-0">
+      <div className="flex lg:hidden flex-col items-start gap-3 w-full mt-[1.5cm] lg:mt-0">
         <div className="flex -space-x-3">
           {['/Home page/merchant 1.png', '/Home page/merchant 2.png', '/Home page/merchant 3.png'].map((src, i) => (
             <img
