@@ -103,7 +103,7 @@ const TermsOfService: React.FC = () => {
           <section className="mb-8">
             <h2 className="text-2xl font-semibold mb-4">10. Contact Information</h2>
             <p className="mb-4">
-              For questions about these terms, please contact us at:
+              For questions about the terms, please contact us at:
             </p>
             <ul className="list-none pl-0">
               <li>Email: legal@paychainke.com</li>

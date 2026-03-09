@@ -1,5 +1,33 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
+/* Bitcount Prop Double Ink - load local font files
+   Place the font files in: apps/web/public/fonts/
+   Example filenames used below:
+     - BitcountPropDoubleInk-700.woff2
+     - BitcountPropDoubleInk-700.woff
+   If you have other weights, add additional @font-face blocks.
+*/
+@font-face {
+  font-family: "Bitcount Prop Double Ink";
+  src: url('/fonts/BitcountPropDoubleInk-700.woff2') format('woff2'),
+       url('/fonts/BitcountPropDoubleInk-700.woff') format('woff');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  font-optical-sizing: auto;
+  font-variation-settings: "slnt" 0, "CRSV" 0.5, "ELSH" 0, "ELXP" 0, "SZP1" 0, "SZP2" 0, "XPN1" 0, "XPN2" 0, "YPN1" 0, "YPN2" 0;
+  /* Global font sizes */
+  body {
+    font-size: 1.125rem; /* text-lg (18px) */
+    line-height: 1.75rem;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-size: 1.5rem; /* text-2xl (24px) */
+    line-height: 2rem;
+    font-weight: 700;
+  }
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -59,6 +87,9 @@
     /* Font */
     --font-display: 'Inter', system-ui, sans-serif;
     --font-mono: 'JetBrains Mono', monospace;
+      /* Custom display font (Bitcount Prop Double Ink) */
+      /* To use this font, add the font files to `public/fonts/` and update the src paths below. */
+      --font-bitcount: 'Bitcount Prop Double Ink', var(--font-display);
 
     /* Sidebar */
     --sidebar-background: 212 79% 11%;
@@ -136,6 +167,33 @@
   .bg-gradient-hero {
     @apply bg-background;
   }
+
+  /* Utility to apply the Bitcount Prop Double Ink display font to a word */
+  .font-bitcount {
+    font-family: var(--font-bitcount);
+    /* Example fallback styling to preserve intended look */
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+
+/* Embedded Bitcount Prop Double Ink utility (uniquifier: 001) */
+.bitcount-prop-double-ink-001 {
+  font-family: "Bitcount Prop Double Ink", system-ui;
+  font-optical-sizing: auto;
+  font-weight: 700;
+  font-style: normal;
+  font-variation-settings:
+    "slnt" 0,
+    "CRSV" 0.5,
+    "ELSH" 0,
+    "ELXP" 0,
+    "SZP1" 0,
+    "SZP2" 0,
+    "XPN1" 0,
+    "XPN2" 0,
+    "YPN1" 0,
+    "YPN2" 0;
+}
 
   .glow-primary {
     box-shadow: var(--shadow-glow);

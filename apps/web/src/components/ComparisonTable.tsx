@@ -87,7 +87,7 @@ const ComparisonTable: React.FC = () => (
           <Zap className="w-3.5 h-3.5" />
           PayChain vs. Legacy Tools
         </div>
-        <h2 className="text-3xl md:text-4xl font-bold text-white mb-4 leading-tight">
+        <h2 className="text-4xl md:text-5xl font-bold text-white mb-4 leading-tight">
           Why merchants are{' '}
           <span style={{
             background: 'linear-gradient(90deg, #10B981, #34d399)',
@@ -97,7 +97,7 @@ const ComparisonTable: React.FC = () => (
             switching.
           </span>
         </h2>
-        <p className="text-white/45 text-base">
+        <p className="text-white/45 text-lg md:text-xl">
           Legacy payment processors were built for a different era. PayChain is built for 2026 — and beyond.
         </p>
       </motion.div>

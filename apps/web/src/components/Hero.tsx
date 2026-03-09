@@ -6,8 +6,8 @@ const Hero: React.FC = () => (
 
       {/* Left — text content */}
       <div className="w-full lg:w-1/2 flex flex-col items-start lg:-ml-12 relative z-10">
-        <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold lg:font-normal text-black leading-tight">
-          Simple tools for<br />a <span style={{ color: '#00bf63' }}>secure</span> business.
+        <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-black leading-tight">
+          Simple tools for<br />a <span className="bitcount-prop-double-ink-001" style={{ color: '#00bf63' }}>secure</span> business.
         </h1>
         <p className="mt-4 text-sm sm:text-base lg:text-lg text-gray-600 leading-relaxed max-w-lg">
           <strong>Paychain</strong> makes it simple for your business to accept secure payments while providing inflation protection, bulk payouts, and automated business tools.
