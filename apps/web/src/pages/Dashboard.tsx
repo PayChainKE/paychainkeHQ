@@ -88,6 +88,7 @@ const CustomTooltip: React.FC<TooltipProps> = ({ active, payload, label }) => {
 const Dashboard: React.FC = () => {
   const [inflationShield, setInflationShield] = useState(true);
   const [activeNav, setActiveNav] = useState('dashboard');
+  // Removed authentication check for now
 
   const sideNavItems = [
     { id: 'home', icon: Home, label: 'Home', path: '/' },

@@ -47,7 +47,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
   const navItems = [
     { path: '/', label: 'Home', icon: Home },
     { path: '/how-it-works', label: 'How It Works', icon: PlayCircle },
-    { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    // Removed Dashboard from nav bar
     { path: '/store', label: 'Merchandise', icon: ShoppingBag },
     { path: '/faq', label: 'FAQ', icon: HelpCircle },
     { 
@@ -204,6 +204,13 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
                         </div>
                       </div>
                       <div className="pt-3 space-y-2 px-2">
+                        <Link
+                          to="/dashboard"
+                          className="w-full px-4 py-2 text-sm text-primary hover:text-primary-dark hover:bg-gray-50 transition-colors duration-200 rounded-md border border-gray-200 flex items-center gap-2"
+                          onClick={() => setIsAvatarDropdownOpen(false)}
+                        >
+                          <LayoutDashboard className="w-4 h-4" /> Dashboard
+                        </Link>
                         <button
                           onClick={() => setIsAvatarDropdownOpen(false)}
                           className="w-full px-4 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition-colors duration-200 rounded-md border border-gray-200"
@@ -265,6 +272,13 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
                       </div>
                     </div>
                     <div className="pt-3 space-y-2 px-2">
+                      <Link
+                        to="/dashboard"
+                        className="w-full px-4 py-2 text-sm text-primary hover:text-primary-dark hover:bg-gray-50 transition-colors duration-200 rounded-md border border-gray-200 flex items-center gap-2"
+                        onClick={() => setIsAvatarDropdownOpen(false)}
+                      >
+                        <LayoutDashboard className="w-4 h-4" /> Dashboard
+                      </Link>
                       <button
                         onClick={() => setIsAvatarDropdownOpen(false)}
                         className="w-full px-4 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition-colors duration-200 rounded-md border border-gray-200"
