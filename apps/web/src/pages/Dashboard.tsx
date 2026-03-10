@@ -5,7 +5,7 @@ import {
   ArrowLeft, TrendingUp, Shield, Zap, FileCheck, Users, Zap as BoltIcon,
   Bell, Settings, ChevronRight, CheckCircle2, AlertTriangle, Home,
   BarChart2, CreditCard, ArrowUpRight, ArrowDownLeft,
-  Wallet, Wifi, ToggleRight
+  Wallet, Wifi, ToggleRight, ShoppingBag, Briefcase
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar
@@ -91,12 +91,15 @@ const Dashboard: React.FC = () => {
   // Removed authentication check for now
 
   const sideNavItems = [
-    { id: 'home', icon: Home, label: 'Home', path: '/' },
-    { id: 'dashboard', icon: BarChart2, label: 'Dashboard', path: '/dashboard' },
-    { id: 'payments', icon: CreditCard, label: 'Payments', path: '#' },
-    { id: 'payroll', icon: Users, label: 'Payroll', path: '#' },
-    { id: 'compliance', icon: FileCheck, label: 'e-TIMS', path: '#' },
-    { id: 'sentinel', icon: Shield, label: 'Sentinel AI', path: '#' },
+    { id: 'overview', icon: Home, label: 'Overview', path: '/dashboard' },
+    { id: 'tills', icon: ShoppingBag, label: 'My Tills', path: '/dashboard/tills' },
+    { id: 'inflation-shield', icon: Shield, label: 'Inflation Shield', path: '/dashboard/inflation-shield' },
+    { id: 'etims', icon: FileCheck, label: 'e-TIMS Hub', path: '/dashboard/etims' },
+    { id: 'escrow', icon: Briefcase, label: 'Supplier Escrow', path: '/dashboard/escrow' },
+    { id: 'payments', icon: CreditCard, label: 'Payments', path: '/dashboard/payments' },
+    { id: 'cash-advance', icon: TrendingUp, label: 'Cash Advance', path: '/dashboard/cash-advance' },
+    { id: 'payroll', icon: Users, label: 'Payroll & Utilities', path: '/dashboard/payroll' },
+    { id: 'settings', icon: Settings, label: 'Settings', path: '/dashboard/settings' },
   ];
 
   return (
