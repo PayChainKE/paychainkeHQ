@@ -82,11 +82,7 @@ const ComparisonTable: React.FC = () => (
         initial="hidden" whileInView="visible" viewport={{ once: true }}
         className="text-center max-w-2xl mx-auto mb-16"
       >
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold text-emerald-400 border border-emerald-500/25 mb-5"
-          style={{ background: 'rgba(16,185,129,0.08)' }}>
-          {/* <Zap className="w-3.5 h-3.5" />
-          PayChain vs. Legacy Tools */}
-        </div>
+        
         <h2 className="text-4xl md:text-5xl font-bold text-white mb-4 leading-tight">
           Why merchants are{' '}
           <span style={{
@@ -215,23 +211,7 @@ const ComparisonTable: React.FC = () => (
         })}
       </div>
 
-      {/* Bottom CTA */}
-      <motion.div
-        variants={fadeUp(0.5)}
-        initial="hidden" whileInView="visible" viewport={{ once: true }}
-        className="text-center mt-14"
-      >
-        <motion.button
-          whileHover={{ scale: 1.03 }}
-          whileTap={{ scale: 0.96 }}
-          onClick={() => window.open('https://forms.gle/eJQVeiSGioHN4t6s7', '_blank')}
-          className="px-8 py-4 rounded-xl text-sm font-bold text-white shadow-lg shadow-emerald-500/30 transition-all"
-          style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}
-        >
-          Start for Free — No Credit Card Required
-        </motion.button>
-        <p className="text-xs text-white/25 mt-3">VASP 2025 Registered · KRA e-TIMS Certified · Equity Bank Partner</p>
-      </motion.div>
+      {/* Bottom CTA removed as requested */}
     </div>
   </section>
 );

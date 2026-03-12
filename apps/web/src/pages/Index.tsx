@@ -5,6 +5,7 @@ import TrustBar from '@/components/TrustBar';
 import Features from '@/components/Features';
 import ComparisonTable from '@/components/ComparisonTable';
 import ProblemSolution from '@/components/ProblemSolution';
+import CoreBenefits from '@/components/CoreBenefits';
 import TechnicalSpecs from '@/components/TechnicalSpecs';
 import Footer from '@/components/Footer';
 
@@ -15,6 +16,7 @@ const Index: React.FC = () => {
       <Hero />
       <TrustBar />
       <Features />
+      <CoreBenefits />
       <ComparisonTable />
       <ProblemSolution />
       <TechnicalSpecs />

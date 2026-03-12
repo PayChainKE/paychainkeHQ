@@ -46,25 +46,12 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
 
   const navItems = [
     { path: '/', label: 'Home', icon: Home },
+    { path: '/about', label: 'About Us', icon: FileCode },
     { path: '/how-it-works', label: 'How It Works', icon: PlayCircle },
     // Removed Dashboard from nav bar
     { path: '/store', label: 'Merchandise', icon: ShoppingBag },
     { path: '/faq', label: 'FAQ', icon: HelpCircle },
-    { 
-      path: '/docs', 
-      label: 'Resources', 
-      icon: FileCode,
-      hasDropdown: true,
-      dropdownItems: [
-        { path: '/about', label: 'About Us', description: 'Our mission and team', emoji: 'ℹ️' },
-        { path: '/pricing', label: 'Pricing', description: 'Simple, transparent fees', emoji: '💰' },
-        { path: '/docs', label: 'Docs', description: 'API documentation and guides', emoji: '📚' },
-        { path: '/coverage', label: 'Coverage', description: 'Available countries', emoji: '🗺️' },
-        { path: '/faq', label: 'FAQ', description: 'Common questions answered', emoji: '❓' },
-        { path: '/blog', label: 'Blog', description: 'Latest articles & updates', emoji: '📰' },
-        { path: '/contact', label: 'Contact Support', description: '', emoji: '' },
-      ]
-    },
+    // Resources removed from nav bar
   ];
 
   return (

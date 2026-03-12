@@ -62,7 +62,7 @@ const features = [
    FEATURES SECTION — Key tools layout (PayChain edition)
 ───────────────────────────────────────────────────────────── */
 const Features: React.FC = () => (
-  <section className="py-24 bg-white">
+  <section className="py-24 bg-gray-50">
     <div className="container mx-auto px-4 sm:px-6 lg:px-8">
 
       {/* Left-aligned header */}
