@@ -11,6 +11,12 @@ import Docs from "./pages/Docs";
 import HowItWorks from "./pages/HowItWorks";
 import FAQ from './pages/FAQ';
 import ContactUs from "./pages/ContactUs";
+import Products from "./pages/Products";
+import InflationShield from "./pages/InflationShield";
+import HybridSmartTill from "./pages/HybridSmartTill";
+import PaychainBulkPay from "./pages/PaychainBulkPay";
+import OperationsTools from "./pages/OperationsTools";
+import Compliance from "./pages/Compliance";
 import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import About from "./pages/About";
@@ -53,6 +59,12 @@ const App = () => {
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/docs" element={<Docs />} />
                   <Route path="/store" element={<Store />} />
+                  <Route path="/products" element={<Products />} />
+                  <Route path="/products/hybrid-smart-till" element={<HybridSmartTill />} />
+                  <Route path="/products/inflation-shield" element={<InflationShield />} />
+                  <Route path="/products/bulk-pay" element={<PaychainBulkPay />} />
+                  <Route path="/products/operations-tools" element={<OperationsTools />} />
+                  <Route path="/products/compliance" element={<Compliance />} />
                   <Route path="/product/:id" element={<ProductDetail />} />
                   <Route path="/checkout" element={<Checkout />} />
                   <Route path="/faq" element={<FAQ />} />

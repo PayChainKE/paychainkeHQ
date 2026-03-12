@@ -59,13 +59,12 @@ const Footer: React.FC = () => {
         </div>
 
         <div className="mt-12 pt-8 border-t border-border flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-xs text-muted-foreground">
-            © 2026 payChainKE. Built by <span className="text-green-600 font-medium">Brantech Solutions</span>
+          <p className="text-xs text-black font-bold">
+            © 2026 payChainKE.
           </p>
-          <div className="flex gap-6 text-xs text-muted-foreground">
-            <Link to="/privacy-policy" className="hover:text-primary transition-colors">Privacy Policy</Link>
-            <Link to="/terms-of-service" className="hover:text-primary transition-colors">Terms of Service</Link>
-            <a href="#" className="hover:text-primary transition-colors">KRA Compliance</a>
+          <div className="flex gap-6 text-xs">
+            <Link to="/privacy-policy" className="text-black font-bold hover:text-primary transition-colors">Privacy Policy</Link>
+            <Link to="/terms-of-service" className="text-black font-bold hover:text-primary transition-colors">Terms of Service</Link>
           </div>
         </div>
       </div>

@@ -47,9 +47,22 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
   const navItems = [
     { path: '/', label: 'Home', icon: Home },
     { path: '/about', label: 'About Us', icon: FileCode },
+    {
+      path: '/products',
+      label: 'Products',
+      icon: ShoppingCart,
+      hasDropdown: true,
+      dropdownItems: [
+        { path: '/products/hybrid-smart-till', label: 'The Hybrid Smart Till', emoji: '🧾', description: 'Portable POS and offline-first till' },
+        { path: '/products/inflation-shield', label: 'The Inflation Shield', emoji: '🛡️', description: 'Stablecoin vaults and auto-swap' },
+        { path: '/products/bulk-pay', label: 'Paychain Bulk Pay', emoji: '📤', description: 'Batch payroll and mass payouts' },
+        { path: '/products/operations-tools', label: 'Operations tools', emoji: '🧰', description: 'Reconciliation, disputes, and dashboards' },
+        { path: '/products/compliance', label: 'Compliance', emoji: '✅', description: 'KYC, AML, and regulatory workflow' },
+      ],
+    },
     // Removed Dashboard from nav bar
-    { path: '/store', label: 'Merchandise', icon: ShoppingBag },
     { path: '/faq', label: 'FAQs', icon: HelpCircle },
+    { path: '/store', label: 'Merchandise', icon: ShoppingBag },
     { path: '/contact', label: 'Contact Us', icon: Mail },
     // Resources removed from nav bar
   ];
@@ -118,7 +131,6 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
                               )}
                               onClick={() => setIsResourcesDropdownOpen(false)}
                             >
-                              <span className="text-lg flex-shrink-0 mt-0.5">{dropdownItem.emoji}</span>
                               <div>
                                 <div className="font-medium text-gray-900">{dropdownItem.label}</div>
                                 {dropdownItem.description && (
@@ -150,7 +162,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
               })}
               
               {/* Cart or User Avatar Dropdown */}
-              {location.pathname === '/store' || location.pathname.startsWith('/product') ? (
+              {location.pathname === '/store' || location.pathname.startsWith('/product/') ? (
                 <div className="relative ml-4 pl-4 border-l border-gray-200">
                   <Link to="/checkout" className="flex items-center gap-2 px-2 py-1 transition-colors duration-200">
                     <div className="relative">
@@ -218,7 +230,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
             </div>
 
             {/* Mobile User Avatar or Cart */}
-            {location.pathname === '/store' || location.pathname.startsWith('/product') ? (
+            {location.pathname === '/store' || location.pathname.startsWith('/product/') ? (
               <div className="md:hidden relative">
                 <Link to="/checkout" className="flex items-center gap-2 px-2 py-1 transition-colors duration-200">
                   <div className="relative">
@@ -376,7 +388,6 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
                                 animation: isMobileMenuOpen ? 'slideInFromRight 0.3s ease-out forwards' : 'none'
                               }}
                             >
-                              <span className="text-base">{dropdownItem.emoji}</span>
                               <span>{dropdownItem.label}</span>
                             </Link>
                           ))}
