@@ -2,9 +2,6 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { X, CheckCircle2, Shield, Brain, FileCheck, Users, Zap } from 'lucide-react';
 
-/* ─────────────────────────────────────────────────────────────
-   COMPARISON DATA
-───────────────────────────────────────────────────────────── */
 const rows = [
   {
     icon: Shield,
@@ -69,55 +66,49 @@ const fadeUp = (delay = 0) => ({
   visible: { opacity: 1, y: 0, transition: { duration: 0.65, delay, ease: [0.22, 1, 0.36, 1] as const } },
 });
 
-/* ─────────────────────────────────────────────────────────────
-   COMPARISON TABLE
-───────────────────────────────────────────────────────────── */
 const ComparisonTable: React.FC = () => (
   <section className="py-28 bg-[#0A192F] overflow-hidden">
     <div className="container mx-auto px-4 sm:px-6 lg:px-8">
 
-      {/* Header */}
       <motion.div
         variants={fadeUp(0)}
         initial="hidden" whileInView="visible" viewport={{ once: true }}
         className="text-center max-w-2xl mx-auto mb-16"
       >
-        
-        <h2 className="text-4xl md:text-5xl font-bold text-white mb-4 leading-tight">
-          Why merchants are{' '}
+        <h2 className="text-4xl md:text-5xl font-extrabold text-white mb-4 leading-tight">
+          Why merchants are switching to{' '}
           <span style={{
             background: 'linear-gradient(90deg, #10B981, #34d399)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
           }}>
-            switching.
+            PayChain
           </span>
+          .
         </h2>
         <p className="text-white/45 text-lg md:text-xl">
-          Legacy payment processors were built for a different era. PayChain is built for 2026 — and beyond.
+          Legacy payment processors were built for a different era. PayChain is built for 2026 and beyond — faster,
+          compliant, and resilient to real-world risks.
         </p>
       </motion.div>
 
-      {/* Desktop Table */}
       <div className="hidden md:block">
-        {/* Column headers */}
         <motion.div
           variants={fadeUp(0.1)}
           initial="hidden" whileInView="visible" viewport={{ once: true }}
           className="grid grid-cols-3 gap-4 mb-4 px-2"
         >
-          <div /> {/* empty label col */}
-          <div className="rounded-2xl px-6 py-4 text-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
-            <p className="text-sm font-bold text-white/50">Legacy Processors</p>
-            <p className="text-xs text-white/25 mt-0.5">Kopo Kopo · Till Numbers · Manual tools</p>
+          <div />
+          <div className="rounded-2xl px-6 py-4 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <p className="text-sm font-semibold text-white/50">Legacy processors</p>
+            <p className="text-xs text-white/30 mt-0.5">Kopo Kopo · Till Numbers · Manual tools</p>
           </div>
-          <div className="rounded-2xl px-6 py-4 text-center" style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.22)' }}>
-            <p className="text-sm font-bold text-emerald-400">PayChain OS</p>
-            <p className="text-xs text-emerald-400/60 mt-0.5">Hybrid · Blockchain · AI-native</p>
+          <div className="rounded-2xl px-6 py-4 text-center" style={{ background: 'transparent', border: '1px solid rgba(16,185,129,0.12)' }}>
+            <p className="text-sm font-semibold text-emerald-300">PayChain OS</p>
+            <p className="text-xs text-emerald-300/60 mt-0.5">Hybrid · Blockchain · AI-native</p>
           </div>
         </motion.div>
 
-        {/* Rows */}
         <div className="space-y-3">
           {rows.map((row, i) => {
             const Icon = row.icon;
@@ -128,32 +119,32 @@ const ComparisonTable: React.FC = () => (
                 initial="hidden" whileInView="visible" viewport={{ once: true, margin: '-40px' }}
                 className="grid grid-cols-3 gap-4 rounded-2xl overflow-hidden"
               >
-                {/* Category label */}
-                <div className="flex items-center gap-3 px-4 py-5 rounded-2xl" style={{ background: 'rgba(255,255,255,0.03)' }}>
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(16,185,129,0.1)' }}>
-                    <Icon className="w-4 h-4 text-emerald-400" />
+                <div className="flex items-center gap-3 px-4 py-5 rounded-2xl" style={{ background: 'rgba(255,255,255,0.02)' }}>
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(16,185,129,0.08)' }}>
+                    <Icon className="w-4 h-4 text-emerald-300" />
                   </div>
-                  <p className="text-sm font-semibold text-white/80">{row.category}</p>
+                  <div>
+                    <p className="text-sm font-semibold text-white">{row.category}</p>
+                    <p className="text-xs text-white/40"></p>
+                  </div>
                 </div>
 
-                {/* Legacy */}
-                <div className="flex flex-col justify-center px-6 py-5 rounded-2xl" style={{ background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.1)' }}>
+                <div className="flex flex-col justify-center px-6 py-5 rounded-2xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
                   <div className="flex items-center gap-2 mb-1.5">
                     <X className="w-4 h-4 text-red-400 flex-shrink-0" />
-                    <p className="text-sm font-semibold text-red-300/80">{row.legacy.label}</p>
+                    <p className="text-sm font-semibold text-red-300">{row.legacy.label}</p>
                   </div>
-                  <p className="text-xs text-white/30 leading-relaxed pl-6">{row.legacy.detail}</p>
+                  <p className="text-sm text-white/40 leading-relaxed pl-6">{row.legacy.detail}</p>
                 </div>
 
-                {/* PayChain */}
-                <div className="flex flex-col justify-center px-6 py-5 rounded-2xl" style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.18)' }}>
+                <div className="flex flex-col justify-center px-6 py-5 rounded-2xl" style={{ background: 'linear-gradient(180deg, rgba(16,185,129,0.03), rgba(16,185,129,0.02))', border: '1px solid rgba(16,185,129,0.12)' }}>
                   <div className="flex items-center gap-2 mb-1.5">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                    <p className="text-sm font-semibold text-emerald-300">{row.paychain.label}</p>
+                    <p className="text-sm font-semibold text-white">{row.paychain.label}</p>
                   </div>
-                  <p className="text-xs text-white/40 leading-relaxed pl-6 mb-2">{row.paychain.detail}</p>
-                  <span className="ml-6 inline-flex w-fit px-2.5 py-1 rounded-lg text-[10px] font-bold text-emerald-400 uppercase tracking-wider"
-                    style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.2)' }}>
+                  <p className="text-sm text-white/70 leading-relaxed pl-6 mb-3">{row.paychain.detail}</p>
+                  <span className="ml-6 inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold text-emerald-800" style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.18)' }}>
+                    <Zap className="w-3.5 h-3.5 text-emerald-500" />
                     {row.paychain.highlight}
                   </span>
                 </div>
@@ -163,7 +154,6 @@ const ComparisonTable: React.FC = () => (
         </div>
       </div>
 
-      {/* Mobile: Card stack */}
       <div className="md:hidden space-y-6">
         {rows.map((row, i) => {
           const Icon = row.icon;
@@ -175,7 +165,6 @@ const ComparisonTable: React.FC = () => (
               className="rounded-2xl overflow-hidden"
               style={{ border: '1px solid rgba(255,255,255,0.07)' }}
             >
-              {/* Category header */}
               <div className="flex items-center gap-3 px-5 py-4" style={{ background: 'rgba(255,255,255,0.04)' }}>
                 <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(16,185,129,0.12)' }}>
                   <Icon className="w-4 h-4 text-emerald-400" />
@@ -183,7 +172,6 @@ const ComparisonTable: React.FC = () => (
                 <p className="text-sm font-bold text-white">{row.category}</p>
               </div>
 
-              {/* Legacy */}
               <div className="px-5 py-4 border-b" style={{ background: 'rgba(239,68,68,0.03)', borderColor: 'rgba(239,68,68,0.1)' }}>
                 <div className="flex items-center gap-2 mb-1">
                   <X className="w-3.5 h-3.5 text-red-400" />
@@ -193,7 +181,6 @@ const ComparisonTable: React.FC = () => (
                 <p className="text-xs text-white/30">{row.legacy.detail}</p>
               </div>
 
-              {/* PayChain */}
               <div className="px-5 py-4" style={{ background: 'rgba(16,185,129,0.05)' }}>
                 <div className="flex items-center gap-2 mb-1">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
@@ -201,8 +188,7 @@ const ComparisonTable: React.FC = () => (
                 </div>
                 <p className="text-sm font-semibold text-emerald-300 mb-1">{row.paychain.label}</p>
                 <p className="text-xs text-white/40 mb-2">{row.paychain.detail}</p>
-                <span className="inline-flex px-2 py-1 rounded-lg text-[10px] font-bold text-emerald-400 uppercase tracking-wider"
-                  style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.2)' }}>
+                <span className="inline-flex px-2 py-1 rounded-lg text-[10px] font-bold text-emerald-400 uppercase tracking-wider" style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.2)' }}>
                   {row.paychain.highlight}
                 </span>
               </div>
@@ -210,8 +196,6 @@ const ComparisonTable: React.FC = () => (
           );
         })}
       </div>
-
-      {/* Bottom CTA removed as requested */}
     </div>
   </section>
 );

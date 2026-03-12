@@ -3,9 +3,9 @@ import Navbar from '@/components/Navbar';
 import Hero from '@/components/Hero';
 import TrustBar from '@/components/TrustBar';
 import Features from '@/components/Features';
-import ComparisonTable from '@/components/ComparisonTable';
 import ProblemSolution from '@/components/ProblemSolution';
 import CoreBenefits from '@/components/CoreBenefits';
+import ComparisonTable from '@/components/ComparisonTable';
 import TechnicalSpecs from '@/components/TechnicalSpecs';
 import Footer from '@/components/Footer';
 
