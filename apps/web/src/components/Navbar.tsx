@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, LayoutDashboard, FileCode, GitBranch, Menu, X, ChevronRight, Copyright, ChevronDown, PlayCircle, ShoppingBag, ShoppingCart, HelpCircle } from 'lucide-react';
+import { Home, LayoutDashboard, FileCode, GitBranch, Menu, X, ChevronRight, Copyright, ChevronDown, ShoppingBag, ShoppingCart, HelpCircle, Mail } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NavbarProps {
@@ -47,10 +47,10 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
   const navItems = [
     { path: '/', label: 'Home', icon: Home },
     { path: '/about', label: 'About Us', icon: FileCode },
-    { path: '/how-it-works', label: 'How It Works', icon: PlayCircle },
     // Removed Dashboard from nav bar
     { path: '/store', label: 'Merchandise', icon: ShoppingBag },
-    { path: '/faq', label: 'FAQ', icon: HelpCircle },
+    { path: '/faq', label: 'FAQs', icon: HelpCircle },
+    { path: '/contact', label: 'Contact Us', icon: Mail },
     // Resources removed from nav bar
   ];
 

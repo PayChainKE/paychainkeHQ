@@ -10,8 +10,10 @@ import Dashboard from "./pages/Dashboard";
 import Docs from "./pages/Docs";
 import HowItWorks from "./pages/HowItWorks";
 import FAQ from './pages/FAQ';
+import ContactUs from "./pages/ContactUs";
 import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
+import About from "./pages/About";
 import NotFound from "./pages/NotFound";
 import Store from "./pages/Store";
 import ProductDetail from "./pages/ProductDetail";
@@ -54,6 +56,8 @@ const App = () => {
                   <Route path="/product/:id" element={<ProductDetail />} />
                   <Route path="/checkout" element={<Checkout />} />
                   <Route path="/faq" element={<FAQ />} />
+                  <Route path="/contact" element={<ContactUs />} />
+                  <Route path="/about" element={<About />} />
                   <Route path="/terms-of-service" element={<TermsOfService />} />
                   <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                   <Route path="*" element={<NotFound />} />
