@@ -2,6 +2,7 @@ import React from 'react'
 import { motion } from 'framer-motion'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
+import PoweredBy from '@/components/PoweredBy'
 
 const spring = { type: 'spring', stiffness: 120, damping: 18 }
 
@@ -176,6 +177,41 @@ export default function About() {
           </div>
         </Section>
       </main>
+      <Section>
+        <motion.div
+          className="w-full max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0, transition: { ...spring, duration: 0.5 } }}
+          viewport={{ once: true }}
+        >
+          <div className="bg-white border border-gray-100 rounded-2xl p-6 text-left shadow-sm">
+            <div className="text-sm font-medium text-[#0A192F]">Inflation Shield</div>
+            <div className="mt-2 text-lg font-semibold text-[#0A192F]">+20% Preserved</div>
+            <p className="mt-3 text-sm text-slate-600">Auto-converts idle KES float to USDC on Base L2, protecting savings from shilling depreciation 24/7.</p>
+          </div>
+
+          <div className="bg-white border border-gray-100 rounded-2xl p-6 text-left shadow-sm">
+            <div className="text-sm font-medium text-[#0A192F]">Sentinel AI</div>
+            <div className="mt-2 text-lg font-semibold text-[#0A192F]">&lt;100ms Block</div>
+            <p className="mt-3 text-sm text-slate-600">Sub-100ms server-side verification eliminates fake SMS fraud, confirmed directly from Safaricom.</p>
+          </div>
+
+          <div className="bg-white border border-gray-100 rounded-2xl p-6 text-left shadow-sm">
+            <div className="text-sm font-medium text-[#0A192F]">e-TIMS Native</div>
+            <div className="mt-2 text-lg font-semibold text-[#0A192F]">Zero Penalties</div>
+            <p className="mt-3 text-sm text-slate-600">Every sale triggers an automatic ETR receipt and KRA submission. Stay compliant without lifting a finger.</p>
+          </div>
+
+          <div className="bg-white border border-gray-100 rounded-2xl p-6 text-left shadow-sm">
+            <div className="text-sm font-medium text-[#0A192F]">Pay-for-Business</div>
+            <div className="mt-2 text-lg font-semibold text-[#0A192F]">1-Click Payouts</div>
+            <p className="mt-3 text-sm text-slate-600">Bulk payroll, supplier payments, and utility bills — automated in one dashboard. In KES or USDC.</p>
+          </div>
+        </motion.div>
+      </Section>
+      <Section>
+        <PoweredBy />
+      </Section>
       <Footer />
     </div>
   )
