@@ -1,17 +1,6 @@
 # PayChainKE — The Merchant Dashboard Protecting Kenyan Businesses from Inflation
 
-██████╗  █████╗ ██╗   ██╗ ██████╗ ██████╗ ███████╗██╗  ██╗
-██╔══██╗██╔══██╗██║   ██║██╔════╝██╔═══██╗██╔════╝██║ ██╔╝
-██████╔╝███████║██║   ██║██║     ██║   ██║█████╗  █████╔╝ 
-██╔══██╗██╔══██║██║   ██║██║     ██║   ██║██╔══╝  ██╔═██╗ 
-██║  ██║██║  ██║╚██████╔╝╚██████╗╚██████╔╝███████╗██║  ██╗
-╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝  ╚═════╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝
-
-Tagline: "The Merchant Dashboard for a secure business tool"
-
-<img src="https://img.shields.io/badge/React-18-blue?logo=react" alt="React"/> <img src="https://img.shields.io/badge/TypeScript-TS-blue?logo=typescript" alt="TypeScript"/> <img src="https://img.shields.io/badge/TailwindCSS-3-teal?logo=tailwindcss" alt="Tailwind"/> <img src="https://img.shields.io/badge/Vite-5-purple?logo=vite" alt="Vite"/> <img src="https://img.shields.io/badge/Base%20L2-Chain-6f42c1" alt="Base L2"/> <img src="https://img.shields.io/badge/License-MIT-green" alt="MIT"/> <img src="https://img.shields.io/badge/PRs-Welcome-brightgreen" alt="PRs Welcome"/> <img src="https://img.shields.io/badge/Version-2.0.0-blue" alt="Version"/>
-<br>
-PayChainKE v2.0 — a hybrid KES / USDC merchant payments dashboard that combines M-PESA, KRA e-TIMS tax compliance, and Base L2 stablecoin savings.
+<img src="https://img.shields.io/badge/React-18-blue?logo=react" alt="React"/> <img src="https://img.shields.io/badge/TypeScript-TS-blue?logo=typescript" alt="TypeScript"/> <img src="https://img.shields.io/badge/TailwindCSS-3-teal?logo=tailwindcss" alt="Tailwind"/> <img src="https://img.shields.io/badge/Vite-5-purple?logo=vite" alt="Vite"/> <img src="https://img.shields.io/badge/Base%20L2-Chain-6f42c1" alt="Base L2"/>
 
 ---
 
@@ -40,24 +29,7 @@ Solution: PayChainKE lets merchants accept payments in KES, automatically alloca
 
 ---
 
-## Tech Stack
-
-| Layer | Technology | Version | Purpose |
-|:---|:---|:---:|:---|
-| Frontend | React | 18 | App UI and component model |
-| Frontend | TypeScript | — | Type safety across the app |
-| Build | Vite | 5 | Fast dev server and build pipeline |
-| Styling | Tailwind CSS | 3 | Utility-first styling system |
-| UI Primitives | shadcn/ui | — | Accessible components and patterns |
-| Animations | Framer Motion | — | Smooth UI transitions and micro-interactions |
-| Charts | Recharts | — | Financial visualizations and trends |
-| Routing | React Router | v6 | Client-side routing |
-| Blockchain | Base L2 (Coinbase) | — | Settlement and USDC storage |
-| Blockchain SDK | ethers.js (planned) | — | Wallet + contract interaction |
-| Payments | M-PESA Daraja / Jenga | — | Local mobile money + bank integration |
-| Tax | KRA e-TIMS API | — | Automated tax filing per transaction |
-| Auth (planned) | Supabase / Firebase | — | Hosted auth and session management |
-
+<!-- Tech stack intentionally omitted from README as requested -->
 ---
 
 ## Project Structure
@@ -69,143 +41,80 @@ src/
 	components/    — Sidebar, TopBar, HybridBalanceCard, SentinelBadge
 	data/          — Mock data and type definitions
 	hooks/         — useAuthForm, useKYCWizard, useBalance
-	index.css      — Design tokens and Tailwind config
-	main.tsx       — App entry and router
-```
+	# PayChainKE — Corporate Overview
 
+	PayChainKE is a merchant-focused financial platform designed to help businesses preserve value, comply with local tax obligations, and operate with modern payment rails. This document is intended as a formal product and company overview for partners, investors, regulators, and enterprise customers.
+
+	## Executive Summary
+
+	PayChainKE provides merchants with a unified dashboard to manage receivables, compliance, and reserve strategies. The product bridges traditional Kenyan payment flows with regulated stable-value instruments to help businesses reduce exposure to currency depreciation while maintaining seamless local settlement and reporting.
+
+	Our mission is to empower Kenyan businesses with tools that improve financial resilience, simplify tax compliance, and enable predictable settlement workflows.
+
+	## Key Capabilities
+
+	- Inflation Protection: tools and policies that enable merchants to preserve value against adverse currency movements.
+	- Seamless Receivables: merchant-centric payment acceptance workflows tailored for high-conversion checkout and reconciliation.
+	- Compliance Automation: integrated tax reporting and record-keeping designed to align with local regulatory requirements.
+	- Risk Management: transaction-level monitoring to reduce fraud, disputes, and payment failure costs.
+	- Enterprise Operations: batch payments, payroll, supplier settlement, and till management for business scalability.
+
+	## Who We Serve
+
+	PayChainKE is intended for:
+
+	- Small and medium-sized enterprises (SMEs) seeking simpler financial operations.
+	- Sole proprietors who need compliant payment and tax tools.
+	- Corporate merchants requiring payroll, escrow, and supplier settlement capabilities.
+
+	## Commercial Offerings
+
+	- Hosted SaaS: secure multi-tenant dashboard with enterprise feature tiers.
+	- Dedicated Deployments: on-premise or single-tenant hosting for regulated or high-security customers.
+	- API & Integration Services: bespoke onboarding for banks, payroll providers, and enterprise ERPs.
+	- Professional Services: compliance advisory, integration, and migration support.
+
+	## Security & Compliance
+
+	Security is foundational to PayChainKE. We apply industry-standard controls for data protection, access management, and operational resilience. Where applicable, we design integrations to meet local regulatory and data residency requirements and to support auditability for financial and tax authorities.
+
+	## Partnerships & Integrations
+
+	We collaborate with financial institutions, tax authorities, and technology providers to ensure smooth integration and regulatory alignment. Strategic partnerships are established with payment processors, banking APIs, and compliance platforms to deliver dependable merchant services.
+
+	## Enterprise Adoption
+
+	For enterprise customers we provide:
+
+	- SLA-backed service levels
+	- Custom onboarding and data migration
+	- Dedicated support and compliance reporting
+
+	Contact our sales team at sales@paychainke.com to request an enterprise evaluation.
+
+	## Roadmap (High Level)
+
+	- Commercial rollout and merchant onboarding
+	- Expanded institutional integrations and settlement partners
+	- Enhanced compliance workflows and reporting
+	- Advanced risk and analytics capabilities for enterprise customers
+
+	## How to Engage
+
+	For partnership inquiries, sales, or media: contact@paychainke.com
+	For security or compliance discussions: security@paychainke.com
+
+	## Governance & Legal
+
+	PayChainKE operates as an independent fintech product and maintains transparent governance practices. All customers are subject to standard terms of service and privacy policies; commercial terms vary by tier and region.
+
+	## License
+
+	This repository and accompanying materials are provided under the MIT License.
+
+	---
+
+	PayChainKE — Built to support resilient businesses and compliant operations.
 ---
 
-## Getting Started
-
-### Prerequisites
-
-- Node.js >= 18.0.0
-- npm >= 9.0.0
-
-### Installation
-
-```bash
-git clone https://github.com/paychainke/paychainke.git
-cd paychainke
-npm install
-cp .env.example .env.local
-npm run dev
-```
-
-Open http://localhost:5173 in your browser.
-
-### Available Scripts
-
-| Command | Description |
-|:---|:---|
-| `npm run dev` | Start development server (Vite) |
-| `npm run build` | Build production assets |
-| `npm run preview` | Locally preview production build |
-| `npm run lint` | Run ESLint across packages |
-| `npm run type-check` | Run TypeScript type checks |
-
----
-
-## Environment Variables
-
-Create `.env.local` from `.env.example`. Example entries below:
-
-```env
-VITE_MPESA_CONSUMER_KEY=
-VITE_MPESA_CONSUMER_SECRET=
-VITE_JENGA_API_KEY=
-VITE_KRA_ETIMS_PIN=
-VITE_BASE_L2_RPC_URL=
-```
-
-All variables are optional in development — the app runs fully on mock data without keys set.
-
----
-
-## Deployment
-
-### Build for Production
-
-```bash
-npm run build
-# output in /dist (ready for static hosting)
-```
-
-### Deployment Options
-
-| Platform | Method | Notes |
-|:---|:---|:---|
-| Vercel | Git integration | Recommended — zero-config for Vite apps |
-| Netlify | Git or drag/drop | Free tier available for quick previews |
-| GitHub Pages | GitHub Actions | Use `.github/workflows/deploy.yml` for CI deployment |
-| AWS S3 + CloudFront | CLI / CI | Best for global scale and custom caching |
-| Railway | Dockerfile | Simple container deployment for backend services |
-
-Add a custom domain via your hosting provider and configure SSL — most providers offer automated certificates.
-
----
-
-## Contributing
-
-- Fork the repository and create a feature branch: `feature/awesome-feature` or `fix/bug-name`
-- Follow conventional commits: `feat:`, `fix:`, `docs:`, `chore:`
-- Open a PR with a clear description, screenshots, and test steps
-
-See CONTRIBUTING.md for detailed guidelines (link placeholder).
-
----
-
-## Roadmap
-
-**Phase 1 — MVP (Current):**
-- ✅ Auth & KYC onboarding wizard
-- ✅ Hybrid KES/USDC dashboard
-- ✅ Inflation Shield Vault UI
-- ✅ e-TIMS Hub
-- ✅ Payroll & Utilities
-
-**Phase 2 — Integrations (Q2 2026):**
-- ⬜ Live M-PESA Daraja API
-- ⬜ Equity Jenga API (till issuance)
-- ⬜ KRA e-TIMS live API
-- ⬜ Base L2 wallet connection
-
-**Phase 3 — Intelligence (Q3 2026):**
-- ⬜ Sentinel AI fraud model (live)
-- ⬜ Cash flow predictions
-- ⬜ Supplier escrow smart contracts
-
----
-
-## License
-
-MIT License
-
-Copyright (c) 2026 PayChainKE
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
----
-
-Built with ❤️ for Kenyan merchants
-
----
-
-PayChainKE is not affiliated with Safaricom, KRA, or Equity Bank. This is an independent fintech product.
 
