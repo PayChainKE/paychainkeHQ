@@ -39,8 +39,6 @@ src/
 	auth/          — Sign in, Sign up, KYC wizard (5 steps)
 	pages/         — Overview, Tills, Inflation Shield, e-TIMS, Payroll
 	components/    — Sidebar, TopBar, HybridBalanceCard, SentinelBadge
-	data/          — Mock data and type definitions
-	hooks/         — useAuthForm, useKYCWizard, useBalance
 	# PayChainKE — Corporate Overview
 
 	PayChainKE is a merchant-focused financial platform designed to help businesses preserve value, comply with local tax obligations, and operate with modern payment rails. This document is intended as a formal product and company overview for partners, investors, regulators, and enterprise customers.
@@ -115,6 +113,8 @@ src/
 	---
 
 	PayChainKE — Built to support resilient businesses and compliant operations.
+
+
+	PayChainKE — Built to support resilient businesses and compliant operations.
+
 ---
-
-
