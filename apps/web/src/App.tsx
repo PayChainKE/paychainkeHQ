@@ -16,6 +16,7 @@ import HybridSmartTill from "./pages/HybridSmartTill";
 import PaychainBulkPay from "./pages/PaychainBulkPay";
 import OperationsTools from "./pages/OperationsTools";
 import Compliance from "./pages/Compliance";
+import Overview from "./pages/Overview";
 import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import About from "./pages/About";
@@ -58,6 +59,7 @@ const App = () => {
                   <Route path="/docs" element={<Docs />} />
                   <Route path="/store" element={<Store />} />
                   <Route path="/products" element={<Products />} />
+                  <Route path="/overview" element={<Overview />} />
                   <Route path="/products/hybrid-smart-till" element={<HybridSmartTill />} />
                   <Route path="/products/inflation-shield" element={<InflationShield />} />
                   <Route path="/products/bulk-pay" element={<PaychainBulkPay />} />
