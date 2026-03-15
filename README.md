@@ -41,75 +41,70 @@ src/
 	components/    — Sidebar, TopBar, HybridBalanceCard, SentinelBadge
 	# PayChainKE — Corporate Overview
 
-	PayChainKE is a merchant-focused financial platform designed to help businesses preserve value, comply with local tax obligations, and operate with modern payment rails. This document is intended as a formal product and company overview for partners, investors, regulators, and enterprise customers.
+	PayChainKE is a purpose-built financial platform empowering merchants to preserve value, meet regulatory obligations, and manage commercial flows with clarity and confidence. This document is a formal corporate overview prepared for enterprise partners, institutional reviewers, and executive stakeholders.
 
 	## Executive Summary
 
-	PayChainKE provides merchants with a unified dashboard to manage receivables, compliance, and reserve strategies. The product bridges traditional Kenyan payment flows with regulated stable-value instruments to help businesses reduce exposure to currency depreciation while maintaining seamless local settlement and reporting.
+	PayChainKE addresses the practical challenges businesses face when operating in environments with volatile local currency purchasing power and complex compliance requirements. Our platform centralises merchant receivables, settlement controls, compliance reporting, and operational tools—enabling organisations to focus on growth while maintaining financial integrity.
 
-	Our mission is to empower Kenyan businesses with tools that improve financial resilience, simplify tax compliance, and enable predictable settlement workflows.
+	Our core aim is to strengthen merchant resilience by providing reliable settlement pathways, automated compliance support, and enterprise-grade operational capabilities.
 
-	## Key Capabilities
+	## Strategic Capabilities
 
-	- Inflation Protection: tools and policies that enable merchants to preserve value against adverse currency movements.
-	- Seamless Receivables: merchant-centric payment acceptance workflows tailored for high-conversion checkout and reconciliation.
-	- Compliance Automation: integrated tax reporting and record-keeping designed to align with local regulatory requirements.
-	- Risk Management: transaction-level monitoring to reduce fraud, disputes, and payment failure costs.
-	- Enterprise Operations: batch payments, payroll, supplier settlement, and till management for business scalability.
+	- Value Preservation: configurable policies and instruments to protect merchant balances against currency depreciation.
+	- Integrated Receivables: streamlined workflows for capturing payments, reconciling accounts, and reporting performance.
+	- Compliance Enablement: structured record-keeping and reporting designed to align with statutory requirements.
+	- Operational Controls: batch disbursements, payroll orchestration, supplier settlement, and till management to support scale.
+	- Risk & Fraud Management: transaction-level oversight and monitoring to reduce financial loss and operational friction.
 
-	## Who We Serve
+	## Customer Segments
 
-	PayChainKE is intended for:
+	PayChainKE serves a broad range of commercial customers, including:
 
-	- Small and medium-sized enterprises (SMEs) seeking simpler financial operations.
-	- Sole proprietors who need compliant payment and tax tools.
-	- Corporate merchants requiring payroll, escrow, and supplier settlement capabilities.
+	- Small and medium-sized enterprises seeking dependable financial operations.
+	- Sole proprietors requiring simple, compliant payment tools.
+	- Large merchants and corporates needing programmable settlement and payroll capabilities.
 
 	## Commercial Offerings
 
-	- Hosted SaaS: secure multi-tenant dashboard with enterprise feature tiers.
-	- Dedicated Deployments: on-premise or single-tenant hosting for regulated or high-security customers.
-	- API & Integration Services: bespoke onboarding for banks, payroll providers, and enterprise ERPs.
-	- Professional Services: compliance advisory, integration, and migration support.
+	We support multiple engagement models to meet regulatory and commercial needs:
 
-	## Security & Compliance
+	- SaaS Subscriptions: hosted service with tiered enterprise plans and SLA options.
+	- Dedicated Deployments: single-tenant or private deployments for regulated institutions.
+	- Integration Services: tailored onboarding, ERP connectivity, and data migration.
+	- Professional Services: compliance advisory, operational integrations, and custom development.
 
-	Security is foundational to PayChainKE. We apply industry-standard controls for data protection, access management, and operational resilience. Where applicable, we design integrations to meet local regulatory and data residency requirements and to support auditability for financial and tax authorities.
+	## Security and Governance
 
-	## Partnerships & Integrations
+	Security, privacy, and regulatory compliance are core to our approach. We adopt recognised controls for data protection and operational resilience, and we work closely with partners to ensure integrations meet local legal and audit requirements.
 
-	We collaborate with financial institutions, tax authorities, and technology providers to ensure smooth integration and regulatory alignment. Strategic partnerships are established with payment processors, banking APIs, and compliance platforms to deliver dependable merchant services.
+	## Partnerships and Ecosystem
 
-	## Enterprise Adoption
+	PayChainKE collaborates with banks, fintech platforms, and regulatory stakeholders to deliver reliable merchant services. We prioritise partnerships that enhance settlement certainty, compliance reporting, and customer experience.
 
-	For enterprise customers we provide:
+	## Enterprise Engagement
 
-	- SLA-backed service levels
-	- Custom onboarding and data migration
-	- Dedicated support and compliance reporting
+	For enterprise customers we offer:
 
-	Contact our sales team at sales@paychainke.com to request an enterprise evaluation.
+	- Commercial agreements with SLA-backed performance
+	- Dedicated onboarding and migration support
+	- Compliance reporting and audit readiness
 
-	## Roadmap (High Level)
-
-	- Commercial rollout and merchant onboarding
-	- Expanded institutional integrations and settlement partners
-	- Enhanced compliance workflows and reporting
-	- Advanced risk and analytics capabilities for enterprise customers
-
-	## How to Engage
-
-	For partnership inquiries, sales, or media: contact@paychainke.com
-	For security or compliance discussions: security@paychainke.com
+	Email sales@paychainke.com to request an enterprise evaluation or to discuss partnership opportunities.
 
 	## Governance & Legal
 
-	PayChainKE operates as an independent fintech product and maintains transparent governance practices. All customers are subject to standard terms of service and privacy policies; commercial terms vary by tier and region.
+	PayChainKE operates under transparent governance practices. Commercial terms, data handling, and privacy provisions are governed by customer agreements and applicable law.
 
-	## License
+	## Licensing
 
-	This repository and accompanying materials are provided under the MIT License.
+	Materials in this repository are provided under the MIT License unless otherwise specified.
 
+	---
+
+	For general enquiries: contact@paychainke.com
+
+	PayChainKE — supporting resilient, compliant commerce.
 	---
 
 	PayChainKE — Built to support resilient businesses and compliant operations.
