@@ -6,7 +6,6 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Analytics } from "@vercel/analytics/react";
 import { useState, useEffect } from "react";
 import Index from "./pages/Index";
-import Dashboard from "./pages/Dashboard";
 import Docs from "./pages/Docs";
 import HowItWorks from "./pages/HowItWorks";
 import FAQ from './pages/FAQ';
@@ -56,7 +55,6 @@ const App = () => {
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/how-it-works" element={<HowItWorks />} />
-                  <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/docs" element={<Docs />} />
                   <Route path="/store" element={<Store />} />
                   <Route path="/products" element={<Products />} />

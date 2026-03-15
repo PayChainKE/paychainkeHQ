@@ -204,7 +204,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
                       </div>
                       <div className="pt-3 space-y-2 px-2">
                         <Link
-                          to="/dashboard"
+                          to="/paychain-dashboard"
                           className="w-full px-4 py-2 text-sm text-primary hover:text-primary-dark hover:bg-gray-50 transition-colors duration-200 rounded-md border border-gray-200 flex items-center gap-2"
                           onClick={() => setIsAvatarDropdownOpen(false)}
                         >
@@ -272,7 +272,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
                     </div>
                     <div className="pt-3 space-y-2 px-2">
                       <Link
-                        to="/dashboard"
+                        to="/paychain-dashboard"
                         className="w-full px-4 py-2 text-sm text-primary hover:text-primary-dark hover:bg-gray-50 transition-colors duration-200 rounded-md border border-gray-200 flex items-center gap-2"
                         onClick={() => setIsAvatarDropdownOpen(false)}
                       >
