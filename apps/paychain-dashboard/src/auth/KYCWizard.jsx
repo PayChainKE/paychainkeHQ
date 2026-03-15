@@ -1,4 +1,36 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useKYCWizard } from '@/hooks/useAuthForm';
+import StepProgress from '@/components/auth/StepProgress';
+import Step1 from './steps/Step1_BusinessType';
+import Step2 from './steps/Step2_PersonalKYC';
+import Step3 from './steps/Step3_CorporateKYC';
+import Step4 from './steps/Step4_TechnicalSetup';
+import Step5 from './steps/Step5_Success';
+
+export default function KYCWizard(){
+  const { step, next, back, data, setData } = useKYCWizard({});
+  const navigate = useNavigate();
+
+  function renderStep(){
+    if(step === 1) return <Step1 data={data} setData={setData} next={next} />;
+    if(step === 2) return <Step2 data={data} setData={setData} next={next} back={back} />;
+    if(step === 3) return <Step3 data={data} setData={setData} next={next} back={back} />;
+    if(step === 4) return <Step4 data={data} setData={setData} next={next} back={back} />;
+    if(step === 5) return <Step5 data={data} setData={setData} next={next} back={back} />;
+    return null;
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center p-6">
+      <div className="w-full max-w-4xl">
+        <StepProgress step={step} />
+        <div className="card p-6">{renderStep()}</div>
+      </div>
+    </div>
+  );
+}
+import React from 'react';
 import StepProgress from '@/components/auth/StepProgress';
 import Step1 from './steps/Step1_BusinessType';
 import Step2 from './steps/Step2_PersonalKYC';

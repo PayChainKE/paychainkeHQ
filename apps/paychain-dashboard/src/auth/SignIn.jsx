@@ -1,4 +1,64 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import AuthSplitLayout from '@/components/auth/AuthSplitLayout';
+import RightPanel from '@/components/auth/RightPanel';
+import { useSignInForm } from '@/hooks/useAuthForm';
+
+export default function SignIn(){
+  const { values, errors, handleChange, handleSubmit, loading } = useSignInForm();
+  const [show, setShow] = useState(false);
+
+  return (
+    <AuthSplitLayout rightContent={<RightPanel />}>
+      <div className="card p-6">
+        <div className="mb-4">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 bg-emerald-400 rounded-full" />
+            <h1 className="text-xl font-bold">Welcome back</h1>
+          </div>
+          <p className="text-sm text-slate-300">Sign in to your merchant account</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <input name="identifier" placeholder="0712 345 678 or you@business.com" value={values.identifier} onChange={handleChange} className="input-custom w-full" />
+            {errors.identifier && <div className="text-sm text-red-400 mt-1">{errors.identifier}</div>}
+          </div>
+
+          <div>
+            <div className="relative">
+              <input name="password" type={show? 'text':'password'} placeholder="Password" value={values.password} onChange={handleChange} className="input-custom w-full" />
+              <button type="button" onClick={()=>setShow(s=>!s)} className="absolute right-2 top-2 text-sm">{show? 'Hide':'Show'}</button>
+            </div>
+            {errors.password && <div className="text-sm text-red-400 mt-1">{errors.password}</div>}
+          </div>
+
+          <div className="flex items-center justify-between text-sm">
+            <label className="flex items-center gap-2"><input type="checkbox" name="remember" onChange={handleChange} /> Remember me</label>
+            <Link to="/forgot-password" className="text-emerald-text">Forgot password?</Link>
+          </div>
+
+          <div>
+            <button type="submit" className="btn-primary w-full">{loading? 'Launching...':'Launch Dashboard'}</button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="flex-1 h-px bg-white/6" />
+            <div className="text-xs text-slate-400">or</div>
+            <div className="flex-1 h-px bg-white/6" />
+          </div>
+
+          <div>
+            <Link to="/signup" className="btn-outline w-full text-center block">Create merchant account</Link>
+          </div>
+
+          <div className="text-xs text-slate-400 text-center">Protected by Sentinel AI & 256-bit encryption</div>
+        </form>
+      </div>
+    </AuthSplitLayout>
+  );
+}
+import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import AuthSplitLayout from '@/components/auth/AuthSplitLayout';
 import RightPanel from '@/components/auth/RightPanel';

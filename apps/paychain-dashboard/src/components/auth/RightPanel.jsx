@@ -1,5 +1,29 @@
 import React from 'react';
 
+export default function RightPanel({ title = 'Protect Your Business from Inflation' }) {
+  return (
+    <div className="p-6 card">
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold">PayChainKE</h2>
+        <p className="text-sm text-slate-300 mt-2">{title}</p>
+      </div>
+
+      <div className="bg-white/6 p-4 rounded-lg mb-4">
+        <div className="h-28 rounded-lg bg-gradient-to-br from-slate-700/40 to-transparent p-4">
+          <div className="text-xs text-slate-200">Mock Dashboard Preview</div>
+        </div>
+      </div>
+
+      <ul className="space-y-2 text-sm">
+        <li>✦ M-PESA + USDC hybrid balances</li>
+        <li>✦ KRA e-TIMS auto-compliance</li>
+        <li>✦ Sentinel AI fraud protection</li>
+      </ul>
+    </div>
+  );
+}
+import React from 'react';
+
 export default function RightPanel() {
   return (
     <div className="hidden md:flex flex-col gap-6 items-start justify-center w-full h-full p-8 bg-gradient-to-br from-[#071028] to-[#091427] rounded-2xl">

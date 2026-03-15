@@ -15,3 +15,10 @@ export const KYC_STATUS = {
   approved: 'approved',
   rejected: 'rejected',
 };
+
+export default {
+  MOCK_USER,
+  MOCK_OTP,
+  MOCK_WALLET,
+  MOCK_MOU_REF,
+};

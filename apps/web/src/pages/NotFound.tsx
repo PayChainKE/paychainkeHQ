@@ -1,4 +1,4 @@
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 
 const NotFound = () => {
@@ -6,6 +6,16 @@ const NotFound = () => {
 
   useEffect(() => {
     console.error("404 Error: User attempted to access non-existent route:", location.pathname);
+  }, [location.pathname]);
+
+  // If user hit an auth path, forward to the dashboard proxy path
+  useEffect(() => {
+    const authPaths = ['/signin', '/signup', '/forgot-password'];
+    if (authPaths.includes(location.pathname) || location.pathname.startsWith('/kyc')) {
+      const target = `/paychain-dashboard${location.pathname}`;
+      // use native replace so we don't push extra history entry
+      window.location.replace(target);
+    }
   }, [location.pathname]);
 
   return (

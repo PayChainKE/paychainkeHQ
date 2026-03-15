@@ -1,5 +1,27 @@
 import React, { useState } from 'react';
 
+export default function FileUploadCard({ label, accept = '.pdf,.png,.jpg', onFile }) {
+  const [file, setFile] = useState(null);
+
+  function handle(e) {
+    const f = e.target.files && e.target.files[0];
+    if (f) {
+      setFile(f);
+      onFile && onFile(f);
+    }
+  }
+
+  return (
+    <label className="block p-4 border border-white/10 rounded-lg bg-transparent cursor-pointer">
+      <div className="text-sm font-medium">{label}</div>
+      <div className="text-xs text-slate-400 mt-2">Drag PDF here or click to browse</div>
+      <input type="file" accept={accept} className="hidden" onChange={handle} />
+      {file && <div className="mt-2 text-xs text-emerald-text">{file.name} — {(file.size/1024).toFixed(1)} KB</div>}
+    </label>
+  );
+}
+import React, { useState } from 'react';
+
 export default function FileUploadCard({ label, accept = ['pdf', 'jpg', 'png'], onFile }) {
   const [file, setFile] = useState(null);
 

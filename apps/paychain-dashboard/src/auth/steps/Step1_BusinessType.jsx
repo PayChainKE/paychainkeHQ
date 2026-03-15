@@ -1,3 +1,29 @@
+import React from 'react';
+import BusinessTypeCard from '@/components/auth/BusinessTypeCard';
+
+export default function Step1({ data, setData, next }) {
+  const selected = data.businessType || 'individual';
+
+  function choose(type){
+    setData((d)=>({ ...d, businessType: type }));
+  }
+
+  return (
+    <div>
+      <h2 className="text-lg font-bold">What type of business are you?</h2>
+      <p className="text-sm text-slate-300">This determines your compliance requirements</p>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+        <BusinessTypeCard icon="👤" title="Sole Proprietor / Individual" subtitle="Freelancers, hawkers, small traders" badge="Tier 1 KYC" selected={selected==='individual'} onSelect={()=>choose('individual')} />
+        <BusinessTypeCard icon="🏢" title="Registered Company" subtitle="LTDs, partnerships, NGOs, SACCOs" badge="Tier 2 KYC" selected={selected==='company'} onSelect={()=>choose('company')} />
+      </div>
+
+      <div className="mt-6 flex justify-end">
+        <button onClick={next} className="btn-primary">Continue</button>
+      </div>
+    </div>
+  );
+}
 import React, { useState } from 'react';
 import BusinessTypeCard from '@/components/auth/BusinessTypeCard';
 

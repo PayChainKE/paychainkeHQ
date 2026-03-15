@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { MOCK_OTP } from '@/data/authData';
 
 const phoneRegex = /^(?:\+?254|0)?7\d{8}$|^(?:0)?1\d{2,}$/;
@@ -11,9 +12,8 @@ export function validateKenyanPhone(v) {
   return phoneRegex.test(clean);
 }
 
-export function validateKRAPin(v) {
-  if (!v) return false;
-  return kraRegex.test(v);
+export function validateEmail(v) {
+  return !!v && emailRegex.test(v);
 }
 
 export function getPasswordStrength(pw) {
@@ -24,65 +24,77 @@ export function getPasswordStrength(pw) {
   return 'weak';
 }
 
+export function validateKRAPin(v) {
+  if (!v) return false;
+  return kraRegex.test(v);
+}
+
 export function useSignInForm() {
-  const [values, setValues] = useState({ identity: '', password: '', remember: false });
+  const navigate = useNavigate();
+  const [values, setValues] = useState({ identifier: '', password: '', remember: false });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
   function handleChange(e) {
     const { name, value, type, checked } = e.target;
-    setValues(v => ({ ...v, [name]: type === 'checkbox' ? checked : value }));
+    setValues((s) => ({ ...s, [name]: type === 'checkbox' ? checked : value }));
   }
 
   function validate() {
-    const err = {};
-    if (!values.identity) err.identity = 'Phone or email required';
-    else if (!validateKenyanPhone(values.identity) && !emailRegex.test(values.identity)) err.identity = 'Enter a valid phone or email';
-    if (!values.password || values.password.length < 8) err.password = 'Password must be at least 8 characters';
-    setErrors(err);
-    return Object.keys(err).length === 0;
+    const errs = {};
+    const id = values.identifier || '';
+    if (!id) errs.identifier = 'Enter phone or email.';
+    if (id.includes('@') && !validateEmail(id)) errs.identifier = 'Invalid email.';
+    if (!values.password || values.password.length < 8) errs.password = 'Password must be at least 8 characters.';
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
   }
 
-  async function handleSubmit(onSuccess) {
+  async function handleSubmit(e) {
+    e && e.preventDefault && e.preventDefault();
     if (!validate()) return;
     setLoading(true);
-    await new Promise(r => setTimeout(r, 1500));
+    await new Promise((r) => setTimeout(r, 1500));
     setLoading(false);
-    // mock: treat first login as needing KYC if no flag
-    onSuccess && onSuccess();
+    const kyc = localStorage.getItem('kyc_complete');
+    if (kyc === 'true') navigate('/overview');
+    else navigate('/kyc');
   }
 
   return { values, errors, handleChange, handleSubmit, loading };
 }
 
 export function useSignUpForm() {
+  const navigate = useNavigate();
   const [values, setValues] = useState({ name: '', businessName: '', mpesa: '', email: '', password: '', confirm: '', agree: false });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
   function handleChange(e) {
     const { name, value, type, checked } = e.target;
-    setValues(v => ({ ...v, [name]: type === 'checkbox' ? checked : value }));
+    setValues((s) => ({ ...s, [name]: type === 'checkbox' ? checked : value }));
   }
 
   function validate() {
-    const err = {};
-    if (!values.name) err.name = 'Full name required';
-    if (!values.businessName) err.businessName = 'Business name required';
-    if (!values.mpesa || !validateKenyanPhone(values.mpesa)) err.mpesa = 'Valid M-PESA number required';
-    if (!values.password || values.password.length < 8) err.password = 'Password must be at least 8 chars';
-    if (values.password !== values.confirm) err.confirm = 'Passwords do not match';
-    if (!values.agree) err.agree = 'You must accept terms';
-    setErrors(err);
-    return Object.keys(err).length === 0;
+    const errs = {};
+    if (!values.name) errs.name = 'Required';
+    if (!values.businessName) errs.businessName = 'Required';
+    if (!validateKenyanPhone(values.mpesa)) errs.mpesa = 'Invalid Kenyan phone';
+    if (!values.password || values.password.length < 8) errs.password = 'Password must be 8+ chars';
+    if (values.password !== values.confirm) errs.confirm = 'Passwords do not match';
+    if (!values.agree) errs.agree = 'You must agree to terms';
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
   }
 
-  async function handleSubmit(onSuccess) {
+  async function handleSubmit(e) {
+    e && e.preventDefault && e.preventDefault();
     if (!validate()) return;
     setLoading(true);
-    await new Promise(r => setTimeout(r, 1500));
+    await new Promise((r) => setTimeout(r, 1500));
     setLoading(false);
-    onSuccess && onSuccess();
+    localStorage.setItem('mock_user', JSON.stringify({ name: values.name, businessName: values.businessName, mpesa: values.mpesa, email: values.email }));
+    navigate('/kyc/step-1');
   }
 
   return { values, errors, handleChange, handleSubmit, loading };
@@ -92,13 +104,17 @@ export function useKYCWizard(initial = {}) {
   const [step, setStep] = useState(1);
   const [data, setData] = useState(initial);
 
-  const next = (payload) => {
-    if (payload) setData(d => ({ ...d, ...payload }));
-    setStep(s => Math.min(5, s + 1));
-  };
-  const back = () => setStep(s => Math.max(1, s - 1));
+  function next(payload) {
+    if (payload) setData((d) => ({ ...d, ...payload }));
+    setStep((s) => Math.min(5, s + 1));
+  }
+  function back() {
+    setStep((s) => Math.max(1, s - 1));
+  }
 
-  const canProceed = () => true;
+  function canProceed() {
+    return true;
+  }
 
   return { step, next, back, data, setData, canProceed };
 }

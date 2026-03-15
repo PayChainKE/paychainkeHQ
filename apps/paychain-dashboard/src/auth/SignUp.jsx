@@ -1,4 +1,55 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
+import AuthSplitLayout from '@/components/auth/AuthSplitLayout';
+import RightPanel from '@/components/auth/RightPanel';
+import { useSignUpForm } from '@/hooks/useAuthForm';
+import PasswordStrength from '@/components/auth/PasswordStrength';
+
+export default function SignUp(){
+  const { values, errors, handleChange, handleSubmit, loading } = useSignUpForm();
+
+  return (
+    <AuthSplitLayout rightContent={<RightPanel title="Join 12,000+ Kenyan businesses on PayChain" />}>
+      <div className="card p-6">
+        <div className="mb-4">
+          <Link to="/signin" className="text-slate-300">← Back</Link>
+          <h1 className="text-xl font-bold mt-2">Create your merchant account</h1>
+          <p className="text-sm text-slate-300">Join 12,000+ Kenyan businesses on PayChain</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <input name="name" placeholder="Amara Osei" value={values.name} onChange={handleChange} className="input-custom w-full" />
+          {errors.name && <div className="text-sm text-red-400">{errors.name}</div>}
+
+          <input name="businessName" placeholder="Osei General Store" value={values.businessName} onChange={handleChange} className="input-custom w-full" />
+          {errors.businessName && <div className="text-sm text-red-400">{errors.businessName}</div>}
+
+          <input name="mpesa" placeholder="0712 345 678" value={values.mpesa} onChange={handleChange} className="input-custom w-full" />
+          {errors.mpesa && <div className="text-sm text-red-400">{errors.mpesa}</div>}
+
+          <input name="email" placeholder="you@business.com (optional)" value={values.email} onChange={handleChange} className="input-custom w-full" />
+
+          <input name="password" placeholder="Create Password" value={values.password} onChange={handleChange} className="input-custom w-full" />
+          <PasswordStrength password={values.password} />
+          {errors.password && <div className="text-sm text-red-400">{errors.password}</div>}
+
+          <input name="confirm" placeholder="Confirm Password" value={values.confirm} onChange={handleChange} className="input-custom w-full" />
+          {errors.confirm && <div className="text-sm text-red-400">{errors.confirm}</div>}
+
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="agree" onChange={handleChange} /> I agree to PayChain's <a className="text-emerald-text underline" href="#">Terms</a> and <a className="text-emerald-text underline" href="#">Privacy Policy</a></label>
+          {errors.agree && <div className="text-sm text-red-400">{errors.agree}</div>}
+
+          <div>
+            <button type="submit" className="btn-primary w-full">{loading? 'Creating...':'Create Account & Start KYC'}</button>
+          </div>
+
+          <div className="text-sm text-center">Already have an account? <Link to="/signin" className="text-emerald-text">Sign in</Link></div>
+        </form>
+      </div>
+    </AuthSplitLayout>
+  );
+}
+import React from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import AuthSplitLayout from '@/components/auth/AuthSplitLayout';
 import RightPanel from '@/components/auth/RightPanel';

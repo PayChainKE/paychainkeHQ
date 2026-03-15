@@ -17,6 +17,7 @@ import PaychainBulkPay from "./pages/PaychainBulkPay";
 import OperationsTools from "./pages/OperationsTools";
 import Compliance from "./pages/Compliance";
 import Overview from "./pages/Overview";
+import PaychainDashboardProxy from './pages/PaychainDashboardProxy';
 import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import About from "./pages/About";
@@ -60,6 +61,11 @@ const App = () => {
                   <Route path="/store" element={<Store />} />
                   <Route path="/products" element={<Products />} />
                   <Route path="/overview" element={<Overview />} />
+                  <Route path="/paychain-dashboard/*" element={<PaychainDashboardProxy />} />
+                  <Route path="/signin" element={<PaychainDashboardProxy />} />
+                  <Route path="/signup" element={<PaychainDashboardProxy />} />
+                  <Route path="/forgot-password" element={<PaychainDashboardProxy />} />
+                  <Route path="/kyc/*" element={<PaychainDashboardProxy />} />
                   <Route path="/products/hybrid-smart-till" element={<HybridSmartTill />} />
                   <Route path="/products/inflation-shield" element={<InflationShield />} />
                   <Route path="/products/bulk-pay" element={<PaychainBulkPay />} />
