@@ -31,17 +31,10 @@ import { CartProvider } from "./context/CartContext";
 
 const queryClient = new QueryClient();
 
+
 const App = () => {
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    // Simulate loading time for professional feel
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 4500); // 4.5 seconds loading time
-
-    return () => clearTimeout(timer);
-  }, []);
+  // DEBUG: disable splash to ensure page content renders while troubleshooting
+  const [isLoading, setIsLoading] = useState(false);
 
   return (
     <QueryClientProvider client={queryClient}>

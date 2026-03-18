@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import PoweredBy from '@/components/PoweredBy'
+import TrustBar from '@/components/TrustBar'
 
 const spring = { type: 'spring', stiffness: 120, damping: 18 }
 
@@ -209,6 +210,10 @@ export default function About() {
           </div>
         </motion.div>
       </Section>
+      <Section>
+        <TrustBar />
+      </Section>
+
       <Section>
         <PoweredBy />
       </Section>
