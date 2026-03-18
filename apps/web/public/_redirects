@@ -1,0 +1,3 @@
+/*    /index.html   200
+
+# Netlify SPA redirect: send all routes to index.html so client-side routing works on refresh
