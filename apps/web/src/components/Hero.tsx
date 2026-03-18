@@ -18,7 +18,7 @@ const Hero: React.FC = () => (
         <div className="hidden lg:block mt-6 self-start">
           <div className="flex flex-row gap-4 mt-[0.5cm]">
             <a
-              href="/how-it-works"
+              href="/waitlist"
               className="inline-flex items-center justify-center px-6 py-3 text-sm sm:text-base rounded-lg bg-black text-white font-semibold hover:bg-gray-800 transition-colors cursor-pointer whitespace-nowrap"
             >
               Get Started <ArrowRight className="w-5 h-5 ml-2" />
@@ -67,7 +67,7 @@ const Hero: React.FC = () => (
         <div className="absolute bottom-6 left-4 transform translate-y-[2cm] z-20 lg:hidden">
           <div className="flex flex-row gap-4 mt-[2.5cm]">
             <a
-              href="/how-it-works"
+              href="/waitlist"
               className="inline-flex items-center justify-center px-6 py-3 text-sm rounded-lg bg-black text-white font-semibold hover:bg-gray-800 transition-colors cursor-pointer whitespace-nowrap"
             >
               Get Started <ArrowRight className="w-5 h-5 ml-2" />
