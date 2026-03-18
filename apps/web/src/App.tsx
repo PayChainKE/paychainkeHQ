@@ -33,8 +33,25 @@ const queryClient = new QueryClient();
 
 
 const App = () => {
-  // DEBUG: disable splash to ensure page content renders while troubleshooting
-  const [isLoading, setIsLoading] = useState(false);
+  // One-time splash: show only on first visit
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  useEffect(() => {
+    try {
+      const shown = localStorage.getItem('paychain_splash_shown');
+      if (!shown) {
+        setIsLoading(true);
+        const t = setTimeout(() => {
+          setIsLoading(false);
+          localStorage.setItem('paychain_splash_shown', '1');
+        }, 2200);
+        return () => clearTimeout(t);
+      }
+    } catch (e) {
+      // ignore localStorage failures
+      setIsLoading(false);
+    }
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
