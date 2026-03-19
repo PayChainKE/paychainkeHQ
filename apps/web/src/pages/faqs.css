@@ -1,0 +1,71 @@
+:root{
+  --brand-primary:#0B4D2E;
+  --brand-accent:#0B4D2E;
+  --text-primary:#0f172a;
+  --text-secondary:#6b7280;
+  --border:#e6e6e6;
+  --header-height:72px;
+}
+
+.faqs-page{font-family:Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;color:var(--text-primary)}
+
+.faqs-hero{background:var(--brand-primary);color:#fff;padding:80px 24px 56px}
+.faqs-hero-inner{max-width:1100px;margin:0 auto;text-align:center}
+.faqs-hero .eyebrow{font-size:12px;letter-spacing:2px;color:rgba(255,255,255,0.85);text-transform:uppercase;margin-bottom:12px}
+.faqs-hero .headline{font-size:40px;line-height:1.05;margin:0 0 12px;font-weight:700}
+.faqs-hero .sub{font-size:17px;color:rgba(255,255,255,0.75);line-height:1.7;max-width:760px;margin:0 auto}
+.underline-link{color:#fff;text-decoration:underline}
+
+.search-wrapper{margin-top:28px;display:flex;justify-content:center}
+.search-box{width:600px;max-width:100%;height:52px;border-radius:12px;background:#fff;box-shadow:0 4px 24px rgba(0,0,0,0.15);display:flex;align-items:center;padding:0 12px;gap:12px}
+.search-icon{width:18px;height:18px;color:var(--text-secondary)}
+.search-input{flex:1;border:0;outline:none;height:38px;font-size:15px}
+.search-clear{background:none;border:0;color:var(--brand-primary);font-weight:600;cursor:pointer}
+
+.pills-sticky{background:#fff;border-bottom:0.5px solid var(--border);padding:12px 0}
+.pills-row{max-width:1100px;margin:0 auto;padding:0 24px;display:flex;gap:12px;overflow:auto;scrollbar-width:none}
+.pill{flex:0 0 auto;padding:8px 12px;border-radius:999px;border:0.5px solid var(--border);background:transparent;color:var(--text-secondary);display:inline-flex;align-items:center;gap:8px;cursor:pointer}
+.pill .pill-count{background:transparent;padding:2px 6px;border-radius:10px;font-size:12px;color:var(--text-secondary)}
+.pill.active{background:var(--brand-primary);color:#fff;border-color:transparent}
+
+.faqs-main{display:flex;gap:24px;max-width:1100px;margin:40px auto;padding:0 24px}
+.faqs-sidebar{width:300px;position:sticky;top:calc(var(--header-height) + 56px);height:fit-content;max-height:calc(100vh - 120px);overflow:auto}
+.faqs-sidebar nav ul{list-style:none;padding:0;margin:0}
+.side-item{display:flex;justify-content:space-between;padding:12px 8px;cursor:pointer;border-left:4px solid transparent}
+.side-item.active{border-left-color:var(--brand-accent);color:var(--brand-accent);font-weight:600}
+
+.faqs-content{flex:1}
+.faq-category{padding:40px 0;border-bottom:1px solid var(--border);scroll-margin-top:calc(var(--header-height) + 56px + 24px)}
+.category-heading{display:flex;align-items:center;gap:12px;font-size:22px;font-weight:600;color:var(--text-primary);padding-bottom:16px;margin-bottom:24px}
+.category-heading .icon{width:20px;height:20px;color:var(--brand-accent)}
+
+.accordion-item{border-bottom:0.5px solid var(--border)}
+.question-row{display:flex;justify-content:space-between;align-items:center;padding:18px 0;background:transparent;border:0;width:100%;cursor:pointer}
+.question-text{font-size:15px;font-weight:500;color:var(--text-primary);line-height:1.5}
+.chev{color:var(--text-secondary);transition:transform .3s ease}
+.chev.rotated{transform:rotate(180deg);color:var(--brand-accent)}
+.answer-panel{max-height:0;overflow:hidden;opacity:0;transition:max-height .35s ease,padding .35s ease,opacity .25s ease;padding:0}
+.answer-panel.open{max-height:800px;padding:12px 0 20px 0;opacity:1;color:var(--text-secondary)}
+
+.search-results .result-item{padding:12px 0;border-bottom:0.5px solid var(--border)}
+.result-breadcrumb{font-size:13px;color:var(--text-secondary);margin-bottom:6px}
+.result-question{background:none;border:0;padding:0;font-size:16px;text-align:left;color:var(--text-primary);cursor:pointer}
+.result-answer{display:none}
+.result-answer.open{display:block;color:var(--text-secondary);padding-top:8px}
+.no-results{padding:20px;color:var(--text-secondary)}
+
+.search-highlight{background:rgba(11,77,46,0.12);color:var(--brand-accent);padding:0}
+
+.faqs-cta{background:#F5F4F0;padding:56px 24px}
+.cta-inner{max-width:640px;margin:0 auto;text-align:center}
+.cta-cards{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:20px}
+.card{display:flex;gap:12px;align-items:center;padding:12px 16px;background:#fff;border-radius:8px;text-decoration:none;color:var(--text-primary);box-shadow:0 1px 4px rgba(0,0,0,0.04)}
+.card.primary{background:var(--brand-primary);color:#fff}
+.card-icon{width:20px;height:20px}
+
+@media (max-width:900px){
+  .faqs-main{flex-direction:column;padding:0 16px}
+  .faqs-sidebar{display:none}
+  .search-box{width:100%}
+  .pill{flex:0 0 auto}
+}
