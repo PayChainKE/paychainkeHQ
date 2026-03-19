@@ -1,5 +1,8 @@
+import React from 'react'
 import { Link } from "react-router-dom";
 import { useEffect, useRef } from "react";
+import Navbar from '@/components/Navbar'
+import Footer from '@/components/Footer'
 import {
   LayoutDashboard,
   FileCheck,
@@ -85,7 +88,9 @@ const OperationsTools = () => {
   useOperationAnimations(containerRef);
 
   return (
-    <main className="operations-page container mx-auto px-6 py-12" ref={containerRef}>
+    <div className="min-h-screen bg-gray-50 text-[#0A192F] font-sans">
+      <Navbar />
+      <main className="operations-page container mx-auto px-6 py-12" ref={containerRef}>
       <section className="hero grid md:grid-cols-2 gap-8 items-center">
         <div className="hero-copy">
           <h1 className="text-3xl md:text-5xl font-bold leading-tight">
@@ -291,7 +296,9 @@ const OperationsTools = () => {
           <Link to="/waitlist" className="bg-primary text-white px-6 py-3 rounded-md inline-block">Join the Waitlist</Link>
         </div>
       </section>
-    </main>
+      </main>
+      <Footer />
+    </div>
   );
 };
 
