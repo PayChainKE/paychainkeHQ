@@ -48,7 +48,7 @@ const Hero: React.FC = () => (
                 ))}
               </div>
               <span className="text-sm font-medium text-gray-700 whitespace-nowrap mt-2">
-                Trusted by <span className="font-bold text-black">10,000+</span> merchants &amp; enterprises
+                Trusted by <span className="font-bold text-black">5,000+</span> merchants &amp; enterprises
               </span>
             </div>
           </div>
@@ -97,7 +97,7 @@ const Hero: React.FC = () => (
             ))}
           </div>
           <span className="text-sm font-medium text-gray-700 text-left">
-            Trusted by <span className="font-bold text-black">10,000+</span> merchants &amp; enterprises
+            Trusted by <span className="font-bold text-black">5,000+</span> merchants &amp; enterprises
           </span>
         </div>
       </div>
