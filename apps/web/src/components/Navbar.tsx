@@ -56,8 +56,8 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
         { path: '/products/hybrid-smart-till', label: 'The Hybrid Smart Till', emoji: '🧾', description: 'Portable POS and offline-first till' },
         { path: '/products/inflation-shield', label: 'The Inflation Shield', emoji: '🛡️', description: 'Stablecoin vaults and auto-swap' },
         { path: '/products/bulk-pay', label: 'Paychain Bulk Pay', emoji: '📤', description: 'Batch payroll and mass payouts' },
-        { path: '/products/operations-tools', label: 'Operations tools', emoji: '🧰', description: 'Reconciliation, disputes, and dashboards' },
         { path: '/products/cash-advance', label: 'Cash Advance', emoji: '💸', description: 'Working capital and short-term advances' },
+        { path: '/products/operations-tools', label: 'Operations tools', emoji: '🧰', description: 'Reconciliation, disputes, and dashboards' },
       ],
     },
     // Removed Dashboard from nav bar
