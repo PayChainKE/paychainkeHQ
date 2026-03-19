@@ -112,15 +112,50 @@ export default function FAQPage(): JSX.Element {
   function scrollToSection(id: string) {
     const el = sectionsRef.current[id];
     if (!el) return;
+    // smooth scroll the section into view
     el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // update URL hash for deep-linking
+    try {
+      history.replaceState(null, '', `#h-${id}`);
+    } catch (e) {
+      location.hash = `h-${id}`;
+    }
+    // set active category in UI
+    setActiveCat(id);
+
+    // scroll the pill into view
     const pill = document.querySelector(`[data-pill="${id}"]`) as HTMLElement | null;
     pill && pill.scrollIntoView({ behavior: 'smooth', inline: 'center' });
+
+    // open first question in the category and focus the question button
+    const cat = FAQ_DATA.find(c => c.id === id);
+    const firstQ = cat && cat.questions && cat.questions[0] && cat.questions[0].id;
+    if (firstQ) {
+      setOpenItems({ [firstQ]: true });
+      setTimeout(() => {
+        const btn = document.getElementById(`button-${firstQ}`) as HTMLElement | null;
+        btn && btn.focus();
+      }, 450);
+    }
   }
 
   function renderIcon(name: string) {
     const Comp = ICON_MAP[name as keyof typeof ICON_MAP] || Compass;
     return <Comp className="icon" />;
   }
+
+  // Handle deep links on initial load (e.g., /faqs#h-bulk-pay)
+  useEffect(() => {
+    try {
+      const hash = location.hash;
+      if (hash && hash.startsWith('#h-')) {
+        const id = hash.replace('#h-', '');
+        setTimeout(() => scrollToSection(id), 300);
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, []);
 
   return (
     <div className="faqs-page">
@@ -130,7 +165,7 @@ export default function FAQPage(): JSX.Element {
         <div className="faqs-hero-inner">
           <div className="eyebrow">Help Centre</div>
           <h1 className="headline">Everything You Need to Know About PayChain.</h1>
-          <p className="sub">Simple answers to the questions Kenyan merchants ask us most. Can't find what you're looking for? Reach us directly at <a href="mailto:support@paychain.co.ke" className="underline-link">support@paychain.co.ke</a></p>
+          <p className="sub">Simple answers to the questions Kenyan merchants ask us most. Can't find what you're looking for? Reach us directly at <a href="tel:+254790889066" className="underline-link">+254 790 889 066</a></p>
 
           <div className="search-wrapper" role="search" aria-label="Search FAQ">
             <div className="search-box">
