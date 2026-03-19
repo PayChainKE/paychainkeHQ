@@ -65,6 +65,21 @@
 .about__stat-label{font-weight:700; margin-top:8px}
 .about__stat-desc{color:rgba(255,255,255,0.85); margin-top:8px}
 
+/* Mobile responsiveness improvements for stats */
+@media (max-width:600px){
+  .about__stats{padding:40px 12px}
+  .about__stats-grid{grid-template-columns:1fr; gap:18px}
+  .about__stat{padding:18px; text-align:center}
+  .about__stat-value{font-size:36px}
+  .about__stat-label{margin-top:6px}
+  .about__stat-desc{font-size:14px}
+}
+
+@media (min-width:601px) and (max-width:900px){
+  /* keep two-column layout but reduce sizes for small tablets */
+  .about__stat-value{font-size:48px}
+}
+
 /* Story */
 .about__story{padding:80px 20px; background:#FBFAF7}
 .about__story-inner{display:flex; gap:40px; max-width:var(--max-width); margin:0 auto; align-items:flex-start}

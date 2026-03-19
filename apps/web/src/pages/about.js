@@ -34,7 +34,12 @@ export default function initAbout() {
       const progress = Math.min((ts - start) / duration, 1)
       const value = Math.floor(progress * (target - startVal) + startVal)
       // format with commas for thousands
-      el.querySelector('.about__stat-value') && (el.querySelector('.about__stat-value').textContent = new Intl.NumberFormat().format(value))
+      const out = el.querySelector('.about__stat-value')
+      if (out) {
+        const prefix = el.getAttribute('data-prefix') || ''
+        const suffix = el.getAttribute('data-suffix') || ''
+        out.textContent = prefix + new Intl.NumberFormat().format(value) + suffix
+      }
       if (progress < 1) requestAnimationFrame(step)
     }
     requestAnimationFrame(step)

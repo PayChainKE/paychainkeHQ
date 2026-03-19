@@ -103,16 +103,39 @@ export default function About(): JSX.Element {
               <div className="about__stat-label">Registered SMEs in Kenya</div>
               <div className="about__stat-desc">The largest untapped merchant fintech market on the continent.</div>
             </li>
-            <li className="about__stat" data-count="30">
-              <div className="about__stat-value">30%+</div>
-              <div className="about__stat-label">Shilling depreciation vs USD (2021–2024)</div>
-              <div className="about__stat-desc">Every percentage point absorbed directly by Kenyan merchants.</div>
-            </li>
+            {/* Shilling depreciation stat removed per request */}
             {/* Removed per request: M-PESA SMS fraud stat */}
-            <li className="about__stat" data-count="10">
-              <div className="about__stat-value">&lt;10%</div>
-              <div className="about__stat-label">Kenyan SMEs with access to formal business credit</div>
-              <div className="about__stat-desc">Despite the majority generating consistent, verifiable revenue.</div>
+            {/* Formal credit access stat removed per request */}
+
+            {/* Added stats requested */}
+            <li className="about__stat" data-count="83" data-suffix="%">
+              <div className="about__stat-value">83%</div>
+              <div className="about__stat-label">of transactions in Kenya happen via mobile money</div>
+              <div className="about__stat-desc">Mobile money is the dominant payment rail across Kenya.</div>
+            </li>
+
+            <li className="about__stat" data-count="70" data-suffix="%">
+              <div className="about__stat-value">70%</div>
+              <div className="about__stat-label">of Kenyan SMEs lack access to formal credit</div>
+              <div className="about__stat-desc">A widespread access gap constraining business growth.</div>
+            </li>
+
+            <li className="about__stat" data-count="20" data-suffix="%">
+              <div className="about__stat-value">20%</div>
+              <div className="about__stat-label">KES lost 20% of its value against the dollar in the last 3 years</div>
+              <div className="about__stat-desc">Currency depreciation directly reduces merchant margins.</div>
+            </li>
+
+            <li className="about__stat" data-count="5" data-prefix="<" data-suffix="%">
+              <div className="about__stat-value">&lt;5%</div>
+              <div className="about__stat-label">Less than 5% of SMEs use more than one financial tool</div>
+              <div className="about__stat-desc">Most merchants remain locked into a single, fragmented workflow.</div>
+            </li>
+
+            <li className="about__stat" data-count="5000">
+              <div className="about__stat-value">5,000</div>
+              <div className="about__stat-label">Target: 5,000 merchants by end of Year 1</div>
+              <div className="about__stat-desc">Year‑1 adoption target for the public launch.</div>
             </li>
           </ul>
         </section>
@@ -277,8 +300,6 @@ export default function About(): JSX.Element {
 
           <div className="about__cta-actions">
             <a className="btn btn--primary" href="/waitlist" aria-label="Join the Beta Waitlist">Join the Beta Waitlist →</a>
-            <a className="btn btn--ghost" href="mailto:partnerships@paychain.co.ke">Partnership Enquiries</a>
-            <a className="about__cta-link" href="mailto:careers@paychain.co.ke">Careers at PayChain →</a>
           </div>
         </section>
       </main>
