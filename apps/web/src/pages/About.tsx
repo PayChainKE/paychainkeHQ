@@ -5,7 +5,7 @@ import Footer from '@/components/Footer'
 import PoweredBy from '@/components/PoweredBy'
 import TrustBar from '@/components/TrustBar'
 
-const spring = { type: 'spring', stiffness: 120, damping: 18 }
+const spring = { type: 'spring' as const, stiffness: 120, damping: 18 }
 
 const Section: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
   <motion.section

@@ -4,7 +4,7 @@ import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import { Mail, Phone, MapPin, Clock, CheckCircle } from 'lucide-react'
 
-const spring = { type: 'spring', stiffness: 120, damping: 18 }
+const spring = { type: 'spring' as const, stiffness: 120, damping: 18 }
 
 export default function ContactUs() {
   const [form, setForm] = useState({ name: '', email: '', company: '', phone: '', subject: '', message: '' })
