@@ -10,7 +10,7 @@ import {
   Eye,
   ShieldCheck,
 } from 'lucide-react';
-import useCashAdvanceAnimations from './useCashAdvanceAnimations';
+import useCashAdvanceAnimations from './useCashAdvanceAnimations.ts';
 
 const CashAdvance: React.FC = () => {
   const rootRef = useRef<HTMLElement | null>(null);
