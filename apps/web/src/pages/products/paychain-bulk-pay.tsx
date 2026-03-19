@@ -26,7 +26,7 @@ const PaychainBulkPay: React.FC = () => {
         {/* HERO */}
         <section className="bulk-hero grid lg:grid-cols-2 gap-10 items-center" aria-labelledby="bulk-hero-title" data-animate>
           <div>
-            <h1 id="bulk-hero-title" className="text-3xl sm:text-4xl md:text-5xl font-extrabold leading-tight mb-4">Pay Everyone. From One Place. In One Click.</h1>
+            <h1 id="bulk-hero-title" className="mt-[2cm] text-3xl sm:text-4xl md:text-5xl font-extrabold leading-tight mb-4">Pay Everyone. From One Place. In One Click.</h1>
             <p className="text-lg text-muted-foreground mb-6">PayChain Bulk Pay lets you run payroll, pay suppliers, and settle utility bills directly from your merchant dashboard — no more app switching, no more manual transfers, no more end-of-month chaos.</p>
             <div className="flex gap-3">
               <div className="inline-flex bg-primary/30 border border-primary/40 rounded-lg p-1">
@@ -50,7 +50,7 @@ const PaychainBulkPay: React.FC = () => {
         {/* PROBLEM */}
         <section className="problem mt-12 p-8 rounded-lg" data-animate>
           <h2 className="text-2xl font-semibold mb-3">Running Payroll Shouldn't Feel Like a Second Job.</h2>
-          <p className="text-base text-white/90">Every month, Kenyan business owners spend hours making individual M-PESA transfers — one by one, employee by employee, supplier by supplier. One wrong number. One network error. One missed payment. And the damage to trust takes weeks to repair.</p>
+          <p className="text-base text-black">Every month, Kenyan business owners spend hours making individual M-PESA transfers — one by one, employee by employee, supplier by supplier. One wrong number. One network error. One missed payment. And the damage to trust takes weeks to repair.</p>
         </section>
 
         {/* EXPLAINER */}
