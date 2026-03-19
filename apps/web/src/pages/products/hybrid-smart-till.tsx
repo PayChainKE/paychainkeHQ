@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Link } from 'react-router-dom';
@@ -12,7 +12,7 @@ import {
   Check,
 } from 'lucide-react';
 import './hybrid-smart-till.css';
-import initSmartTillAnimations from './hybrid-smart-till.js';
+import useSmartTillAnimations from './useSmartTillAnimations';
 
 const features = [
   {
@@ -48,9 +48,7 @@ const features = [
 ];
 
 const HybridSmartTill: React.FC = () => {
-  useEffect(() => {
-    initSmartTillAnimations();
-  }, []);
+  useSmartTillAnimations();
 
   return (
     <div className="smart-till-page bg-background text-foreground min-h-screen">
