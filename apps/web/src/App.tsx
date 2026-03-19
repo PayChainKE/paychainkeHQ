@@ -11,11 +11,11 @@ import HowItWorks from "./pages/HowItWorks";
 import FAQ from './pages/FAQ';
 import ContactUs from "./pages/ContactUs";
 import Products from "./pages/Products";
-import InflationShield from "./pages/InflationShield";
-import HybridSmartTill from "./pages/HybridSmartTill";
-import PaychainBulkPay from "./pages/PaychainBulkPay";
-import OperationsTools from "./pages/OperationsTools";
-import Compliance from "./pages/Compliance";
+import InflationShield from "./pages/products/inflation-shield";
+import HybridSmartTill from "./pages/products/hybrid-smart-till";
+import PaychainBulkPay from "./pages/products/paychain-bulk-pay";
+import OperationsTools from "./pages/products/operations-tools";
+import CashAdvance from "./pages/products/cash-advance";
 import Overview from "./pages/Overview";
 import PaychainDashboardProxy from './pages/PaychainDashboardProxy';
 import TermsOfService from "./pages/TermsOfService";
@@ -81,7 +81,7 @@ const App = () => {
                   <Route path="/products/inflation-shield" element={<InflationShield />} />
                   <Route path="/products/bulk-pay" element={<PaychainBulkPay />} />
                   <Route path="/products/operations-tools" element={<OperationsTools />} />
-                  <Route path="/products/compliance" element={<Compliance />} />
+                  <Route path="/products/cash-advance" element={<CashAdvance />} />
                   <Route path="/product/:id" element={<ProductDetail />} />
                   <Route path="/checkout" element={<Checkout />} />
                   <Route path="/faq" element={<FAQ />} />
