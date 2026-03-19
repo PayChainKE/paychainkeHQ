@@ -11,7 +11,6 @@ const featurePills = [
 ];
 
 const businessTypes = ['Retail Shop', 'Restaurant or Café', 'Import & Export', 'Service Agency', 'Other'];
-const revenueRanges = ['Under KES 50,000', 'KES 50,000–200,000', 'KES 200,000–500,000', 'KES 500,000–1,000,000', 'Over KES 1,000,000'];
 
 function phoneSanitize(raw: string) {
   const digits = raw.replace(/[^0-9]/g, '');
@@ -23,7 +22,6 @@ const Waitlist: React.FC = () => {
   const [businessName, setBusinessName] = useState('');
   const [phone, setPhone] = useState('');
   const [businessType, setBusinessType] = useState(businessTypes[0]);
-  const [revenue, setRevenue] = useState(revenueRanges[0]);
   const [challenge, setChallenge] = useState('');
 
   const [errors, setErrors] = useState<Record<string,string>>({});
@@ -65,19 +63,13 @@ const Waitlist: React.FC = () => {
     <div className="min-h-screen bg-background text-foreground">
       <Navbar />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <main style={{ marginTop: '2cm' }} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 items-start">
           {/* HERO */}
           <section className="flex-1">
-            <div className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6 animate-pulse">
-              Closed Beta — Q2 2026
-            </div>
-
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold leading-tight mb-4">Kenya's Smartest Merchant Dashboard<br/>Is Almost Here.</h1>
 
             <p className="text-lg text-muted-foreground max-w-2xl mb-6">PayChain is a verified M-PESA collection, bulk pay, KES→USDC swap, and working capital platform — built for Kenyan SMEs who are done with fraud, fragmentation, and banks that say no.</p>
-
-            <p className="text-sm text-muted-foreground mb-6">Only a limited number of merchants will be accepted into the closed beta.</p>
 
             <div className="flex gap-3 overflow-x-auto pb-2 mb-6">
               {featurePills.map((p) => (
@@ -85,14 +77,7 @@ const Waitlist: React.FC = () => {
               ))}
             </div>
 
-            <div className="flex items-center gap-3 text-sm text-muted-foreground mb-8">
-              <div className="flex -space-x-2">
-                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs font-semibold">MK</div>
-                <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 text-xs font-semibold">AB</div>
-                <div className="w-8 h-8 rounded-full bg-sky-100 flex items-center justify-center text-sky-700 text-xs font-semibold">ZT</div>
-              </div>
-              <div>Join <span className="font-semibold">500+</span> Kenyan merchants already on the waitlist.</div>
-            </div>
+            
 
             {/* SUPPORTING ZONE B (short preview) */}
             <section className="space-y-8 mt-6">
@@ -152,12 +137,7 @@ const Waitlist: React.FC = () => {
                       </select>
                     </label>
 
-                    <label className="block">
-                      <div className="text-sm font-medium">Monthly Revenue</div>
-                      <select value={revenue} onChange={e => setRevenue(e.target.value)} className="mt-1 w-full rounded-md border px-3 py-2">
-                        {revenueRanges.map(r => <option key={r} value={r}>{r}</option>)}
-                      </select>
-                    </label>
+                    
 
                     <label className="block">
                       <div className="text-sm font-medium">What's your biggest payment challenge? <span className="text-sm text-muted-foreground">(optional)</span></div>
