@@ -132,7 +132,9 @@ const PaychainBulkPay: React.FC = () => {
         </section>
       </main>
 
-      <Footer />
-    </div>
-  );
-};
+          <Footer />
+        </div>
+      );
+    };
+
+    export default PaychainBulkPay;
