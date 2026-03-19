@@ -1,250 +1,293 @@
-import React from 'react'
-import { motion } from 'framer-motion'
+import React, { useEffect } from 'react'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
-import PoweredBy from '@/components/PoweredBy'
 import TrustBar from '@/components/TrustBar'
+import './about.css'
+import initAbout from './about.js'
 
-const spring = { type: 'spring' as const, stiffness: 120, damping: 18 }
+/*
+  About.tsx
+  - Production-ready About page component for PayChain
+  - Semantic HTML, accessibility-focused, imports BEM CSS and animation JS
+  - Injects Open Graph meta and Organization JSON-LD on mount
+*/
 
-const Section: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
-  <motion.section
-    className={`w-full max-w-6xl mx-auto py-20 px-6 ${className}`}
-    initial={{ opacity: 0, y: 24 }}
-    whileInView={{ opacity: 1, y: 0, transition: { ...spring, duration: 0.5 } }}
-    viewport={{ once: true, amount: 0.2 }}
-  >
-    {children}
-  </motion.section>
-)
+export default function About(): JSX.Element {
+  useEffect(() => {
+    // Initialize animations and interaction handlers defined in about.js
+    // about.js respects prefers-reduced-motion and cleans up observers/listeners on return
+    const cleanup = initAbout()
 
-const TruthGrid: React.FC = () => (
-  <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none" aria-hidden>
-    <defs>
-      <linearGradient id="g" x1="0" x2="1">
-        <stop offset="0%" stopColor="#E6F8F0" stopOpacity="0.08" />
-        <stop offset="100%" stopColor="#E6F8F0" stopOpacity="0" />
-      </linearGradient>
-    </defs>
-    <rect width="100%" height="100%" fill="white" />
-    <g className="opacity-40">
-      {[...Array(12)].map((_, i) => (
-        <line key={i} x1={`${(i + 1) * 8}%`} y1="0" x2={`${(i + 1) * 8}%`} y2="100%" stroke="url(#g)" strokeWidth="1" />
-      ))}
-    </g>
-  </svg>
-)
-export default function About() {
+    // Inject OG meta tags and JSON-LD for Organization (idempotent)
+    if (!document.querySelector('meta[property="og:title"][content="About PayChain — Built in Kenya for Kenya\'s Merchants"]')) {
+      const ogs: { rel?: string; prop?: string; content: string }[] = [
+        { prop: 'og:title', content: "About PayChain — Built in Kenya's Merchants" },
+        { prop: 'og:description', content: 'PayChain is a Nairobi-born fintech company building Kenya\'s most trusted merchant OS — verified payments, bulk pay, KES→USDC swaps, and data-driven cash advances.' },
+        { prop: 'og:url', content: 'https://www.paychain.co.ke/about' },
+        { prop: 'og:image', content: '/assets/og-about.jpg' }
+      ]
+      ogs.forEach(o => {
+        const m = document.createElement('meta')
+        if (o.prop) m.setAttribute('property', o.prop)
+        m.setAttribute('content', o.content)
+        document.head.appendChild(m)
+      })
+
+      // Schema.org Organization structured data
+      const ld = document.createElement('script')
+      ld.type = 'application/ld+json'
+      ld.text = JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'Organization',
+        name: 'PayChain',
+        url: 'https://www.paychain.co.ke',
+        logo: 'https://www.paychain.co.ke/assets/logo.png',
+        sameAs: ['https://twitter.com/paychainke']
+      })
+      document.head.appendChild(ld)
+    }
+
+    // Preload display font for hero headline to avoid CLS
+    if (!document.querySelector('link[data-paychain-preload]')) {
+      const link = document.createElement('link')
+      link.setAttribute('data-paychain-preload', '1')
+      link.rel = 'preload'
+      link.as = 'font'
+      link.href = '/fonts/Fraunces.woff2'
+      link.type = 'font/woff2'
+      link.crossOrigin = 'anonymous'
+      document.head.appendChild(link)
+    }
+
+    return () => cleanup && cleanup()
+  }, [])
+
   return (
-    <div className="min-h-screen bg-white text-[#0A192F] font-sans relative overflow-hidden">
+    <div className="about">
       <Navbar />
 
-      {/* About hero using provided image to match site hero sizing */}
-      <section className="w-full bg-white overflow-hidden relative">
-        <div className="max-w-7xl mx-auto px-6 sm:px-10 lg:px-16 flex flex-col lg:flex-row items-center gap-10 lg:gap-0 py-12 sm:py-16 lg:py-20">
-          <div className="w-full lg:w-1/2 flex flex-col items-start lg:-ml-12 relative z-10">
-            <motion.h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-black leading-tight" initial={{ opacity: 0, y: 8 }} whileInView={{ opacity: 1, y: 0, transition: { ...spring } }} viewport={{ once: true }}>
-              Infrastructure for Digital Truth.
-            </motion.h1>
-
-            <motion.p className="mt-4 text-sm sm:text-base lg:text-lg text-gray-600 leading-relaxed max-w-lg" initial={{ opacity: 0, y: 8 }} whileInView={{ opacity: 1, y: 0, transition: { ...spring, delay: 0.04 } }} viewport={{ once: true }}>
-              We are building the Hybrid Business OS to protect and empower the African merchant.
-            </motion.p>
-          </div>
-
-          <div className="w-full flex items-center justify-center relative z-0 mt-6 lg:mt-0 lg:relative lg:w-1/2">
-            <div className="w-full h-56 sm:h-72 md:h-96 lg:h-[420px] rounded-lg overflow-hidden shadow-lg" style={{ backgroundImage: "url('/hero%203.png')", backgroundSize: 'cover', backgroundPosition: 'center' }} />
-          </div>
+      {/* HERO SECTION: immersive, full-bleed */}
+      <header className="about__hero" role="banner" aria-labelledby="about-hero-title">
+        <div className="about__hero-bg" aria-hidden></div>
+        <div className="about__hero-inner">
+          <p className="about__eyebrow" aria-hidden>Our Story</p>
+          <h1 id="about-hero-title" className="about__headline">
+            <span className="about__headline-line">We Saw What the System Was Doing to Kenya's Merchants.</span>
+            <span className="about__headline-line">We Decided to Fix It.</span>
+          </h1>
+          <p className="about__subhead">PayChain is a Nairobi-born fintech company on a mission to give every Kenyan merchant the financial infrastructure they deserve — verified, intelligent, and built entirely around how business actually works in Kenya.</p>
         </div>
+      </header>
+
+      <main className="about__main" id="content">
+        {/* OPENING STATEMENT */}
+        <section className="about__opening" aria-labelledby="opening-quote">
+          <blockquote className="about__pullquote" id="opening-quote">
+            <span className="about__quote-mark">“</span>
+            Millions of Kenyan merchants move billions of shillings every single day. They are the engine of this economy. And yet the system built around them was never actually built for them.
+          </blockquote>
+
+          <div className="about__opening-body">
+            <p>That is the sentence that started PayChain. Not a market report. Not a pitch deck. Not a slide about TAM. A simple, uncomfortable truth that anyone who has spent time in Kenyan markets already knew.</p>
+            <p>The SMS verification system is broken. The shilling keeps sliding. The banks keep saying no. Every tool a Kenyan merchant needs lives in a different app — fragmented, inefficient, and designed for someone else.</p>
+            <p>PayChain was not born in a boardroom. It was born out of proximity to that frustration. And it is being built to eliminate it — permanently.</p>
+          </div>
+        </section>
+
+        {/* STATS */}
+        <section className="about__stats" aria-labelledby="stats-heading">
+          <h2 id="stats-heading" className="about__section-title">The Problem, in Numbers</h2>
+          <ul className="about__stats-grid" role="list">
+            <li className="about__stat" data-count="7400000">
+              <div className="about__stat-value">7.4M</div>
+              <div className="about__stat-label">Registered SMEs in Kenya</div>
+              <div className="about__stat-desc">The largest untapped merchant fintech market on the continent.</div>
+            </li>
+            <li className="about__stat" data-count="30">
+              <div className="about__stat-value">30%+</div>
+              <div className="about__stat-label">Shilling depreciation vs USD (2021–2024)</div>
+              <div className="about__stat-desc">Every percentage point absorbed directly by Kenyan merchants.</div>
+            </li>
+            {/* Removed per request: M-PESA SMS fraud stat */}
+            <li className="about__stat" data-count="10">
+              <div className="about__stat-value">&lt;10%</div>
+              <div className="about__stat-label">Kenyan SMEs with access to formal business credit</div>
+              <div className="about__stat-desc">Despite the majority generating consistent, verifiable revenue.</div>
+            </li>
+          </ul>
+        </section>
+
+        {/* OUR STORY */}
+        <section className="about__story" aria-labelledby="story-heading">
+          <div className="about__story-inner">
+            <div className="about__story-text">
+              <h2 id="story-heading" className="about__section-title">How PayChain Came to Be</h2>
+              <p className="about__story-sub">Built in Kenya. Engineered for Kenya. Refusing to apologize for either.</p>
+
+              <article className="about__story-block" data-anim>
+                <div className="about__eyebrow-small">The Observation</div>
+                <p>The starting point was not a technology. It was an observation — that the merchants running Kenya's most active markets were being failed, quietly and consistently, by the infrastructure that was supposed to help them. M-PESA changed everything. And then it stopped. The SMS confirmation that was revolutionary in 2007 is now the most exploited vulnerability in Kenyan commerce. Verification technology exists to fix it. Nobody had fixed it.</p>
+              </article>
+
+              <article className="about__story-block" data-anim>
+                <div className="about__eyebrow-small">The Decision</div>
+                <p>The decision to build PayChain was simple: the tools exist, the infrastructure exists, the market exists — the only thing missing was a team willing to put them together specifically for the Kenyan merchant. Not a watered-down version of a product designed for London or San Francisco. Something designed from the ground up for Nairobi, Juja, Mombasa, Kisumu, and every market in between.</p>
+              </article>
+
+              <article className="about__story-block" data-anim>
+                <div className="about__eyebrow-small">The Build</div>
+                <p>We started with verified payment collection and built outward. Bulk Pay, because merchants drowning in manual transfers needed relief. The Inflation Shield, because watching the shilling depreciate while holding KES is a tax on hard work nobody signed up for. Cash Advance, because the most powerful thing you can do for a growing business is give it access to its own future revenue — based on what it earns, not the paperwork it can produce.</p>
+              </article>
+            </div>
+
+            <div className="about__story-deco" aria-hidden>
+              <div className="about__deco-vertical">01</div>
+            </div>
+          </div>
+        </section>
+
+        {/* MISSION & VISION */}
+        <section className="about__mission-vision" aria-labelledby="mv-heading">
+          <h2 id="mv-heading" className="sr-only">Mission and Vision</h2>
+          <div className="about__mv-grid">
+            <div className="about__mv-card about__mv-card--mission">
+              <div className="about__eyebrow-small">Our Mission</div>
+              <p>To eliminate financial fragmentation and the digital trust deficit holding Kenyan SMEs back — by building the most trusted, most intelligent, and most accessible merchant operating system in Kenya.</p>
+            </div>
+            <div className="about__mv-card about__mv-card--vision">
+              <div className="about__eyebrow-small">Our Vision</div>
+              <p>A Kenya where every merchant — from the Jua Kali artisan in Gikomba to the import trader clearing goods at Mombasa port — has access to verified payments, stable financial tools, and credit built on the truth of their business. Not on who they know. Not on what they own. On what they have built.</p>
+            </div>
+          </div>
+        </section>
+
+        {/* VALUES */}
+        <section className="about__values" aria-labelledby="values-heading">
+          <h2 id="values-heading" className="about__section-title">What We Actually Believe</h2>
+          <p className="about__values-sub">These are not values designed for a company brochure. They are the decisions we make when the easy choice and the right choice are not the same thing.</p>
+
+          <ol className="about__values-list">
+            <li className="about__value" data-anim>
+              <div className="about__value-number">01</div>
+              <div className="about__value-body">
+                <div className="about__value-title">Truth Over Everything</div>
+                <p>Every product we build is designed to surface the truth — the truth of a payment, the truth of a merchant's revenue, the truth of what credit should cost. In an environment where SMS fraud, opaque fees, and information asymmetry are standard practice, we have chosen to build the opposite. Transparency is not a feature. It is the architecture.</p>
+              </div>
+            </li>
+
+            <li className="about__value" data-anim>
+              <div className="about__value-number">02</div>
+              <div className="about__value-body">
+                <div className="about__value-title">The Merchant Is the Product</div>
+                <p>In traditional finance, the merchant is valuable when their account grows, disposable when it doesn't. At PayChain, the merchant's success is the only metric that matters. Every feature, every design decision, every line of code is evaluated against one question: does this make a Kenyan merchant's life measurably better? If the answer is no, we do not ship it.</p>
+              </div>
+            </li>
+
+            <li className="about__value" data-anim>
+              <div className="about__value-number">03</div>
+              <div className="about__value-body">
+                <div className="about__value-title">Security Is Not a Feature. It Is the Foundation.</div>
+                <p>We are building financial infrastructure. There is no version of that responsibility that allows for shortcuts on security. Every transaction that flows through PayChain is verified, logged, encrypted, and protected at institutional grade. We will never trade security for speed, convenience, or cost.</p>
+              </div>
+            </li>
+
+            <li className="about__value" data-anim>
+              <div className="about__value-number">04</div>
+              <div className="about__value-body">
+                <div className="about__value-title">Built Here. Built for Here.</div>
+                <p>Kenya is not a developing market version of somewhere else. It is a sophisticated, complex, fast-moving economy with its own infrastructure and its own needs. PayChain is not localized for Kenya. It was built in Kenya — from the first line of code — designed to reflect the reality of how business actually works here.</p>
+              </div>
+            </li>
+
+            <li className="about__value" data-anim>
+              <div className="about__value-number">05</div>
+              <div className="about__value-body">
+                <div className="about__value-title">Data Belongs to the Merchant</div>
+                <p>The transaction history that flows through PayChain belongs to the merchant who earned it. We use it — with consent — to build their Trust Score and unlock their Cash Advance. We do not sell it, share it, or use it for anything the merchant has not agreed to. In a world where data is the new oil, we have chosen to put that oil in the merchant's own hands.</p>
+              </div>
+            </li>
+
+            <li className="about__value" data-anim>
+              <div className="about__value-number">06</div>
+              <div className="about__value-body">
+                <div className="about__value-title">We Are Playing a Long Game</div>
+                <p>PayChain is not optimized for the next quarter. It is optimized for the next decade. Every merchant, every transaction, every Trust Score — these are the compounding foundations of something that will matter in Kenya for a very long time. We are building accordingly.</p>
+              </div>
+            </li>
+          </ol>
+        </section>
+
+        {/* ROADMAP */}
+        <section className="about__roadmap" aria-labelledby="roadmap-heading">
+          <h2 id="roadmap-heading" className="about__section-title">Where We Are. Where We Are Going.</h2>
+          <div className="about__timeline" aria-hidden>
+            <div className="about__timeline-line" />
+            <ol className="about__timeline-list">
+              <li className="about__timeline-item about__timeline-item--active" data-node>
+                <div className="about__timeline-node">1</div>
+                <div className="about__timeline-content">
+                  <div className="about__timeline-title">Build (Now → Q2 2026)</div>
+                  <div className="about__timeline-badge">In Progress</div>
+                  <p>Engineering underway. M-PESA Daraja API integration in development. Base Network blockchain rails configured. Merchant dashboard UI being built. CBK licensing initiated.</p>
+                </div>
+              </li>
+
+              <li className="about__timeline-item" data-node>
+                <div className="about__timeline-node">2</div>
+                <div className="about__timeline-content">
+                  <div className="about__timeline-title">Closed Beta (Q2 2026)</div>
+                  <p>Hand-selected Nairobi and Juja merchants gain full platform access. Real transactions. Real Trust Scores. Real feedback shaping the product before public launch.</p>
+                </div>
+              </li>
+
+              <li className="about__timeline-item" data-node>
+                <div className="about__timeline-node">3</div>
+                <div className="about__timeline-content">
+                  <div className="about__timeline-title">Public Launch (Q3 2026)</div>
+                  <p>PayChain opens to all Kenyan merchants. Target: 5,000 merchants in Year 1. Full product suite live from Day 1.</p>
+                </div>
+              </li>
+
+              <li className="about__timeline-item" data-node>
+                <div className="about__timeline-node">4</div>
+                <div className="about__timeline-content">
+                  <div className="about__timeline-title">Regional Expansion (Year 2–3)</div>
+                  <p>Mombasa, Kisumu, and Nakuru in Year 2. Uganda and Tanzania in Year 3.</p>
+                </div>
+              </li>
+
+              <li className="about__timeline-item" data-node>
+                <div className="about__timeline-node">5</div>
+                <div className="about__timeline-content">
+                  <div className="about__timeline-title">Pan-African Infrastructure (Year 4–5)</div>
+                  <p>1,000,000+ merchants. The dominant hybrid payment service provider for African SMEs.</p>
+                </div>
+              </li>
+            </ol>
+          </div>
+        </section>
+
+        {/* TRUST & INFRASTRUCTURE */}
+      
+
+        {/* CTA */}
+        <section className="about__cta" aria-labelledby="cta-heading">
+          <h2 id="cta-heading" className="about__cta-title">If You Believe Kenyan Merchants Deserve Better Infrastructure, We Should Talk.</h2>
+          <p className="about__cta-body">Whether you are a merchant ready for early access, an investor who sees what we see in this market, a strategic partner looking to plug into Kenya's next payment infrastructure, or a talented operator who wants to build something that matters — we want to hear from you.</p>
+
+          <div className="about__cta-actions">
+            <a className="btn btn--primary" href="/waitlist" aria-label="Join the Beta Waitlist">Join the Beta Waitlist →</a>
+            <a className="btn btn--ghost" href="mailto:partnerships@paychain.co.ke">Partnership Enquiries</a>
+            <a className="about__cta-link" href="mailto:careers@paychain.co.ke">Careers at PayChain →</a>
+          </div>
+        </section>
+      </main>
+
+      <section className="about__supporting">
+        <TrustBar />
       </section>
 
-      <main className="relative z-10">
-        <Section>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
-            <motion.article
-              className="md:col-span-2 bg-white border border-gray-100 rounded-2xl p-8 shadow-sm"
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0, transition: { ...spring, duration: 0.5 } }}
-              viewport={{ once: true }}
-            >
-              <h3 className="text-lg font-semibold text-[#0A192F]">Our Mission</h3>
-              <p className="mt-4 text-slate-600 text-lg">
-                Eliminating the trust deficit in African retail by linking directly to institutional source data.
-              </p>
-            </motion.article>
-
-            <motion.aside
-              className="bg-[#F8FAFC] rounded-2xl p-6 border border-gray-100 shadow-sm"
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0, transition: { ...spring, delay: 0.06, duration: 0.5 } }}
-              viewport={{ once: true }}
-            >
-              <h4 className="text-sm font-semibold text-[#0A192F]">The Problem</h4>
-              <ul className="mt-3 text-slate-600 list-disc list-inside space-y-2">
-                <li>Fake SMS fraud that undermines merchant liquidity.</li>
-                <li>Currency inflation eroding real purchasing power.</li>
-              </ul>
-            </motion.aside>
-          </div>
-
-          <motion.div
-            className="mt-8 bg-white border border-gray-100 rounded-2xl p-8 shadow-sm"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0, transition: { ...spring, delay: 0.08, duration: 0.5 } }}
-            viewport={{ once: true }}
-          >
-            <h4 className="text-base font-semibold text-[#0A192F]">The Hybrid Solution</h4>
-            <p className="mt-3 text-slate-600">
-              We bridge traditional institutional rails like Jenga and M-PESA with modern settlement on Base L2 USDC, combining
-              local payment certainty with on-chain settlement resilience and programmability.
-            </p>
-          </motion.div>
-        </Section>
-
-        <Section>
-          <div className="max-w-7xl mx-auto">
-            <motion.h3 className="text-2xl font-semibold text-[#0A192F]" initial={{ opacity: 0, y: 8 }} whileInView={{ opacity: 1, y: 0, transition: { ...spring } }} viewport={{ once: true }}>
-              The PayChainKE Narrative
-            </motion.h3>
-
-            <motion.div className="mt-6 space-y-8 text-slate-700" initial={{ opacity: 0, y: 8 }} whileInView={{ opacity: 1, y: 0, transition: { ...spring, delay: 0.03 } }} viewport={{ once: true }}>
-              <div>
-                <h4 className="text-lg font-semibold text-[#0A192F]">1. Our Purpose: The Architecture of Trust</h4>
-                <p className="mt-3">
-                  In the rapidly evolving landscape of African commerce, the "Digital Trust Deficit" remains the single greatest
-                  barrier to scale. PayChainKE was founded to dismantle this barrier. We don't just process transactions; we anchor
-                  them in absolute truth. By linking directly to institutional source data, we ensure that every merchant—from a
-                  boutique in Nairobi to a wholesaler in Juja—operates on a foundation of verified financial facts.
-                </p>
-              </div>
-
-              <div>
-                <h4 className="text-lg font-semibold text-[#0A192F]">2. Bridging Two Worlds: The Hybrid PSP Model</h4>
-                <p className="mt-3">
-                  We believe the future of finance is not a choice between traditional rails and decentralized protocols—it is the
-                  seamless integration of both.
-                </p>
-                <ul className="mt-3 list-disc list-inside text-slate-600">
-                  <li><strong>The Fiat Core:</strong> Leveraging the reach of M-PESA and the banking stability of the Jenga API ecosystem.</li>
-                  <li className="mt-2"><strong>The Web3 Shield:</strong> Utilizing Base Layer 2 to provide a non-custodial Inflation Shield, allowing merchants to store value in USDC stablecoins with near-zero latency.</li>
-                </ul>
-              </div>
-
-              <div>
-                <h4 className="text-lg font-semibold text-[#0A192F]">3. Engineered for Resilience</h4>
-                <p className="mt-3">Our technical philosophy is built on three industrial-grade pillars:</p>
-                <ul className="mt-3 list-disc list-inside text-slate-600 space-y-2">
-                  <li><strong>Sentinel AI:</strong> A high-performance Rust engine that validates every digital handshake in under 100ms, making "Fake SMS" fraud mathematically impossible.</li>
-                  <li><strong>Non-Custodial Sovereignty:</strong> We provide the tools, but the merchant owns the keys. This architecture ensures full compliance with the VASP Act 2025 while protecting user privacy.</li>
-                  <li><strong>Universal Connectivity:</strong> Integrated with Africa’s Talking, we ensure that "Truth Alerts" reach merchants via USSD even in low-data environments, ensuring 100% operational uptime.</li>
-                </ul>
-              </div>
-
-              <div>
-                <h4 className="text-lg font-semibold text-[#0A192F]">4. The "Zero-Knowledge" Security Paradigm</h4>
-                <p className="mt-3">We operate on a principle of radical security where privacy is not an afterthought, but a core architectural requirement. By utilizing a non-custodial framework, PayChainKE ensures that we never hold, see, or touch your private keys or your digital assets. This "Zero-Knowledge" approach means your financial sovereignty is absolute—you are the sole custodian of your wealth, protected by the mathematical certainty of the Base L2 blockchain.</p>
-              </div>
-
-              <div>
-                <h4 className="text-lg font-semibold text-[#0A192F]">5. Beyond Payments: The Business Operating System</h4>
-                <p className="mt-3">PayChainKE is more than a gateway; it is a comprehensive command center for the modern merchant. We understand that running a business involves more than just accepting funds. Our ecosystem integrates:</p>
-                <ul className="mt-3 list-disc list-inside text-slate-600 space-y-2">
-                  <li><strong>Operational Automation:</strong> Seamlessly transition from a verified sale to an automated e-TIMS tax filing without opening a second app.</li>
-                  <li><strong>Smart Liquidity:</strong> A "Unified Balance" view that allows you to manage KES cash flow for daily operations alongside a USDC vault for long-term wealth preservation.</li>
-                  <li><strong>Enterprise Outbound:</strong> The same industrial-grade security used to verify your income is applied to your expenses—from bulk payroll to supplier settlements.</li>
-                </ul>
-              </div>
-
-              <div>
-                <h4 className="text-lg font-semibold text-[#0A192F]">6. A Commitment to the "Last Mile" Merchant</h4>
-                <p className="mt-3">Our vision of 1st-world infrastructure is one that serves everyone, regardless of their hardware or internet stability. By partnering with Africa’s Talking, we’ve engineered a "Dual-Rail" notification system. If your data connection fails in a high-traffic retail environment, our Sentinel AI automatically pushes a "Truth Alert" via USSD or SMS. We ensure that the merchant in the heart of Nairobi CBD and the wholesaler in the outskirts of Juja receive the same high-fidelity service.</p>
-              </div>
-
-              <div>
-                <h4 className="text-lg font-semibold text-[#0A192F]">7. Guided by Global Strategic Excellence</h4>
-                <p className="mt-3">The PayChainKE mission is powered by a synergy of local technical execution and global strategic foresight. Led by Brandon, a specialist in high-performance fintech architecture, and mentored by Michelle Chivunga, a globally recognized voice in blockchain policy and digital transformation, we are not just building for today’s market—we are architecting the future of African commerce.</p>
-              </div>
-
-              <div>
-                <h4 className="text-lg font-semibold text-[#0A192F]">8. Our Strategic Values (The PayChain Code)</h4>
-                <ul className="mt-3 list-disc list-inside text-slate-600 space-y-2">
-                  <li><strong>Absolute Veracity:</strong> We do not guess; we verify directly with institutional source data.</li>
-                  <li><strong>Merchant-First Sovereignty:</strong> The merchant is the owner; the platform is the facilitator.</li>
-                  <li><strong>Hyper-Scale Efficiency:</strong> Sub-100ms performance is our standard, ensuring that technology never slows down a sale.</li>
-                  <li><strong>Inclusive Innovation:</strong> Cutting-edge Web3 stability delivered with the familiarity of M-PESA.</li>
-                </ul>
-              </div>
-            </motion.div>
-          </div>
-        </Section>
-      </main>
-      <Section>
-        <motion.div
-          className="w-full max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0, transition: { ...spring, duration: 0.5 } }}
-          viewport={{ once: true }}
-        >
-          <div className="bg-white border border-gray-100 rounded-2xl p-6 text-left shadow-sm">
-            <div className="text-sm font-medium text-[#0A192F]">Inflation Shield</div>
-            <div className="mt-2 text-lg font-semibold text-[#0A192F]">+20% Preserved</div>
-            <p className="mt-3 text-sm text-slate-600">Auto-converts idle KES float to USDC on Base L2, protecting savings from shilling depreciation 24/7.</p>
-          </div>
-
-          <div className="bg-white border border-gray-100 rounded-2xl p-6 text-left shadow-sm">
-            <div className="text-sm font-medium text-[#0A192F]">Sentinel AI</div>
-            <div className="mt-2 text-lg font-semibold text-[#0A192F]">&lt;100ms Block</div>
-            <p className="mt-3 text-sm text-slate-600">Sub-100ms server-side verification eliminates fake SMS fraud, confirmed directly from Safaricom.</p>
-          </div>
-
-          <div className="bg-white border border-gray-100 rounded-2xl p-6 text-left shadow-sm">
-            <div className="text-sm font-medium text-[#0A192F]">e-TIMS Native</div>
-            <div className="mt-2 text-lg font-semibold text-[#0A192F]">Zero Penalties</div>
-            <p className="mt-3 text-sm text-slate-600">Every sale triggers an automatic ETR receipt and KRA submission. Stay compliant without lifting a finger.</p>
-          </div>
-
-          <div className="bg-white border border-gray-100 rounded-2xl p-6 text-left shadow-sm">
-            <div className="text-sm font-medium text-[#0A192F]">Pay-for-Business</div>
-            <div className="mt-2 text-lg font-semibold text-[#0A192F]">1-Click Payouts</div>
-            <p className="mt-3 text-sm text-slate-600">Bulk payroll, supplier payments, and utility bills — automated in one dashboard. In KES or USDC.</p>
-          </div>
-        </motion.div>
-      </Section>
-      <Section>
-        <TrustBar />
-      </Section>
-
-      <Section>
-        <PoweredBy />
-      </Section>
       <Footer />
-    </div>
-  )
-}
-
-function Chip({ label }: { label: string }) {
-  return (
-    <div className="px-4 py-2 rounded-lg bg-[#F8FAFC] border border-gray-100 text-sm text-[#0A192F] shadow-sm">
-      {label}
-    </div>
-  )
-}
-
-function StepCard({ number, title, desc }: { number: number; title: string; desc: string }) {
-  return (
-    <div className="bg-white border border-gray-100 rounded-2xl p-6 text-left shadow-sm">
-      <div className="text-sm font-medium text-[#10B981]">Step {number}</div>
-      <div className="mt-2 font-semibold text-[#0A192F]">{title}</div>
-      <div className="mt-2 text-sm text-slate-600">{desc}</div>
-    </div>
-  )
-}
-
-function StatCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="bg-[#F8FAFC] border border-gray-100 rounded-2xl p-6">
-      <div className="text-2xl font-semibold text-[#0A192F]">{value}</div>
-      <div className="mt-1 text-sm text-slate-600">{label}</div>
     </div>
   )
 }

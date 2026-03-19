@@ -1,0 +1,141 @@
+/*
+  about.css — BEM, CSS custom properties, and tokens.
+  - Design tokens in :root for colors, spacing, fonts
+  - Uses cautious animations and respects prefers-reduced-motion
+  - Class names follow BEM: about, about__hero, about__stats, etc.
+*/
+
+:root{
+  --brand-deep:#071428; /* deep brand for hero */
+  --accent:#10B981; /* brand accent */
+  --muted:#6B7280; /* body muted */
+  --bg:#ffffff;
+  --max-width:1200px;
+  --editorial-width:820px;
+  --section-pad-desktop:120px;
+  --section-pad-tablet:80px;
+  --section-pad-mobile:60px;
+  --display-font: 'Fraunces', serif;
+  --body-font: 'Plus Jakarta Sans', 'Outfit', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+}
+
+/* Page root */
+.about{
+  font-family:var(--body-font);
+  color:var(--brand-deep);
+  background:var(--bg);
+}
+
+/* Utility: section spacing */
+.about__hero{padding:var(--section-pad-mobile) 20px; position:relative; overflow:hidden;}
+@media(min-width:768px){.about__hero{padding:var(--section-pad-tablet) 40px}}
+@media(min-width:1280px){.about__hero{padding:var(--section-pad-desktop) 80px}}
+
+/* HERO */
+.about__hero{background:linear-gradient(180deg,var(--brand-deep) 0%, #021122 60%); color: #fff;}
+.about__hero-bg{
+  position:absolute; inset:0; z-index:0; pointer-events:none;
+  /* gradient mesh using CSS vars controlled by mouse */
+  background: radial-gradient(600px at var(--mouse-x,50%) var(--mouse-y,50%), rgba(16,185,129,0.07), transparent 10%), radial-gradient(300px at calc(var(--mouse-x,50%) + 20%) calc(var(--mouse-y,50%) - 10%), rgba(255,255,255,0.02), transparent 15%);
+  mix-blend-mode:screen; opacity:0.9;
+  transition:transform 400ms linear;
+}
+
+.about__hero-inner{position:relative; z-index:2; max-width:var(--max-width); margin:0 auto; text-align:left;}
+.about__eyebrow{font-family:var(--body-font); letter-spacing:2px; text-transform:uppercase; color:var(--accent); font-size:12px; margin-bottom:18px; opacity:0; transform:translateY(6px); transition:opacity .45s ease, transform .45s ease}
+.about__headline{font-family:var(--display-font); font-size:48px; line-height:1.02; margin:0 0 16px; color:#fff; display:block}
+@media(min-width:1024px){.about__headline{font-size:72px}}
+.about__headline-line{display:block; opacity:0; transform:translateY(12px); will-change:transform,opacity}
+.about__subhead{font-size:18px; color:rgba(255,255,255,0.9); max-width:820px; opacity:0; transform:translateY(6px)}
+
+/* Opening statement */
+.about__opening{max-width:var(--editorial-width); margin:80px auto; text-align:center; padding:0 20px}
+.about__pullquote{font-family:var(--display-font); font-style:italic; font-size:34px; color:var(--brand-deep); margin:0 0 24px; position:relative}
+.about__quote-mark{color:var(--accent); font-size:72px; position:absolute; left:-48px; top:-28px; opacity:0.85}
+.about__opening-body{font-size:17px; line-height:1.8; color:var(--muted); margin-top:22px; text-align:left}
+
+/* Stats */
+.about__stats{background:#071428; color:#fff; padding:60px 20px}
+.about__section-title{font-family:var(--display-font); font-size:24px; color:var(--brand-deep); margin-bottom:24px}
+.about__stats-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:28px; max-width:var(--max-width); margin:0 auto}
+@media(max-width:900px){.about__stats-grid{grid-template-columns:repeat(2,1fr)}}
+.about__stat{background:transparent; padding:28px; border-radius:12px; text-align:left}
+.about__stat-value{font-family:var(--display-font); font-size:64px; color:var(--accent); line-height:1}
+@media(min-width:1280px){.about__stat-value{font-size:80px}}
+.about__stat-label{font-weight:700; margin-top:8px}
+.about__stat-desc{color:rgba(255,255,255,0.85); margin-top:8px}
+
+/* Story */
+.about__story{padding:80px 20px; background:#FBFAF7}
+.about__story-inner{display:flex; gap:40px; max-width:var(--max-width); margin:0 auto; align-items:flex-start}
+@media(max-width:900px){.about__story-inner{flex-direction:column}}
+.about__story-text{flex:1}
+.about__story-deco{width:220px; display:flex; align-items:center; justify-content:center}
+.about__deco-vertical{border-left:2px solid var(--brand-deep); padding-left:24px; font-size:96px; color:rgba(7,20,40,0.06)}
+.about__eyebrow-small{font-size:12px; color:var(--accent); text-transform:uppercase; letter-spacing:1.6px; margin-bottom:8px}
+.about__story-block{margin-bottom:28px}
+.about__story-sub{font-weight:600; margin-bottom:18px}
+
+/* Mission & Vision */
+.about__mission-vision{padding:80px 20px}
+.about__mv-grid{display:grid; grid-template-columns:1fr 1fr; gap:24px; max-width:var(--max-width); margin:0 auto}
+@media(max-width:900px){.about__mv-grid{grid-template-columns:1fr}}
+.about__mv-card{padding:28px; border-radius:12px}
+.about__mv-card--mission{background:var(--brand-deep); color:#fff}
+.about__mv-card--vision{background:#fff; border:1px solid rgba(7,20,40,0.04)}
+
+/* Values */
+.about__values{padding:80px 20px; max-width:var(--max-width); margin:0 auto}
+.about__values-sub{max-width:820px; margin-bottom:24px; color:var(--muted)}
+.about__values-list{list-style:none; padding:0; margin:0}
+.about__value{display:flex; gap:20px; align-items:flex-start; padding:28px 0; border-top:1px solid rgba(7,20,40,0.04)}
+.about__value-number{font-family:var(--display-font); color:var(--accent); font-size:48px; min-width:80px}
+.about__value-title{font-family:var(--display-font); font-size:24px; margin-bottom:8px}
+.about__value-body p{color:var(--muted); margin:0}
+.about__value:hover{background:rgba(16,185,129,0.02)}
+
+/* Roadmap */
+.about__roadmap{padding:80px 20px; max-width:var(--max-width); margin:0 auto}
+.about__timeline{position:relative; padding:40px 0}
+.about__timeline-line{position:absolute; left:32px; top:0; bottom:0; width:4px; background:rgba(7,20,40,0.06); border-radius:4px}
+.about__timeline-list{list-style:none; margin:0; padding:0}
+/* Make each timeline item a two-column grid so the number sits to the left of the text */
+.about__timeline-item{display:grid; grid-template-columns:64px 1fr; gap:20px; align-items:start; margin-bottom:36px}
+.about__timeline-node{width:64px; height:64px; border-radius:50%; background:#fff; border:4px solid rgba(7,20,40,0.06); display:flex; align-items:center; justify-content:center; font-weight:700; justify-self:center}
+.about__timeline-item--active .about__timeline-node{background:var(--accent); color:#fff; box-shadow:0 6px 18px rgba(16,185,129,0.18)}
+.about__timeline-title{font-weight:700}
+.about__timeline-badge{display:inline-block; background:var(--accent); color:#fff; padding:4px 8px; border-radius:6px; font-size:12px; margin-top:6px}
+
+/* Trust */
+.about__trust{padding:80px 20px; background:#fff}
+.about__trust-grid{display:grid; grid-template-columns:repeat(5,1fr); gap:20px; max-width:var(--max-width); margin:0 auto}
+@media(max-width:1000px){.about__trust-grid{grid-template-columns:repeat(2,1fr)}}
+.about__trust-badge{background:#fff; border:1px solid rgba(7,20,40,0.04); padding:18px; border-radius:10px; text-align:center}
+.about__trust-icon{font-size:26px}
+.about__trust-title{font-weight:700; margin-top:8px}
+.about__trust-desc{color:var(--muted); margin-top:6px}
+
+/* CTA */
+.about__cta{padding:120px 20px; background:linear-gradient(180deg,var(--brand-deep), #021122); color:#fff; text-align:center}
+.about__cta-title{font-family:var(--display-font); font-size:28px; max-width:900px; margin:0 auto 16px}
+.about__cta-body{color:rgba(255,255,255,0.9); max-width:900px; margin:0 auto 24px}
+.about__cta-actions{display:flex; gap:16px; justify-content:center; align-items:center; flex-wrap:wrap}
+.btn{display:inline-block; padding:12px 20px; border-radius:10px; text-decoration:none}
+.btn--primary{background:var(--accent); color:#fff; font-weight:700}
+.btn--ghost{background:transparent; border:1px solid rgba(255,255,255,0.18); color:#fff}
+.about__cta-link{color:#fff; text-decoration:underline}
+
+/* Animation helpers */
+[data-anim]{opacity:0; transform:translateY(18px); transition:opacity .6s ease, transform .6s ease}
+[data-anim].is-revealed{opacity:1; transform:none}
+.about__headline-line{transition:opacity .36s ease, transform .36s ease}
+.about__headline-line.is-revealed{opacity:1; transform:none}
+.about__eyebrow.is-revealed, .about__subhead.is-revealed{opacity:1; transform:none}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce){
+  *{transition:none !important; animation:none !important}
+}
+
+/* Small accessibility helper */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
