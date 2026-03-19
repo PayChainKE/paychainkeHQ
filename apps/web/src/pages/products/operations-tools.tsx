@@ -198,7 +198,7 @@ const OperationsTools = () => {
         <h3 className="text-2xl font-semibold">Every Tool You Need. Nothing You Don't.</h3>
         <div className="mt-6 grid gap-8">
           {features.map((f, i) => {
-            const Icon = f.icon as any;
+            const Icon = f.icon as unknown as React.ComponentType<React.SVGProps<SVGSVGElement>>;
             const left = i % 2 === 0;
             return (
               <div key={f.title} className={`feature-row grid md:grid-cols-2 gap-6 items-center reveal ${left ? "" : "md:flex-row-reverse"}`}>
