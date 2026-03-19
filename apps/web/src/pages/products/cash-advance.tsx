@@ -60,7 +60,7 @@ const CashAdvance: React.FC = () => {
             </ul>
 
             <div className="mt-6">
-              <a href="/waitlist" className="btn-primary btn-cta" aria-label="Join the Waitlist">Join the Waitlist</a>
+              <a href="/waitlist" className="btn-primary btn-cta text-[#0A192F]" aria-label="Join the Waitlist">Join the Waitlist</a>
             </div>
 
             <div className="text-sm text-muted-foreground mt-3">Closed beta Q2 2026 · Limited merchant spots</div>
@@ -160,14 +160,14 @@ const CashAdvance: React.FC = () => {
           </ol>
         </section>
 
-        <section className="trust-score mt-16 py-12 bg-deep text-white rounded-md">
+        <section className="trust-score mt-16 py-12 bg-deep rounded-md">
           <div className="grid md:grid-cols-3 items-center gap-6">
             <div className="md:col-span-2">
-              <h3 className="text-2xl font-semibold">The Credit System Built on Truth.</h3>
+              <h3 className="text-2xl font-semibold text-[#0A192F]">The Credit System Built on Truth.</h3>
               <div className="mt-4 grid md:grid-cols-2 gap-6">
                 <div>
-                  <h4 className="font-semibold">What builds your Trust Score</h4>
-                  <ul className="mt-3 space-y-2">
+                  <h4 className="font-semibold text-[#0A192F]">What builds your Trust Score</h4>
+                  <ul className="mt-3 space-y-2 text-[#0A192F]">
                     <li>Transaction Volume — total verified inbound collections</li>
                     <li>Transaction Consistency — regularity of payments received</li>
                     <li>Revenue Trajectory — growth, stability, or fluctuation pattern</li>
@@ -178,8 +178,8 @@ const CashAdvance: React.FC = () => {
                 </div>
 
                 <div>
-                  <h4 className="font-semibold">What doesn't affect your score</h4>
-                  <ul className="mt-3 space-y-2 text-muted-foreground">
+                  <h4 className="font-semibold text-[#0A192F]">What doesn't affect your score</h4>
+                  <ul className="mt-3 space-y-2 text-[#0A192F]">
                     <li>Your personal credit history ✗</li>
                     <li>Whether you own property ✗</li>
                     <li>Your bank account balance ✗</li>
@@ -341,12 +341,12 @@ const CashAdvance: React.FC = () => {
         </section>
 
         <section className="final-cta mt-16 py-12 text-white bg-deep rounded-md text-center">
-          <h3 className="text-3xl font-semibold">The Sooner You Start Transacting, the Sooner You Unlock Working Capital.</h3>
-          <p className="mt-4">Every verified collection through PayChain brings you closer to your first Cash Advance offer. Join our closed beta and start your 3-month clock today.</p>
+            <h3 className="text-3xl font-semibold text-[#0A192F]">The Sooner You Start Transacting, the Sooner You Unlock Working Capital.</h3>
+          <p className="mt-4 text-[#0A192F]">Every verified collection through PayChain brings you closer to your first Cash Advance offer. Join our closed beta and start your 3-month clock today.</p>
           <div className="mt-6">
-            <a href="/waitlist" className="btn-primary btn-cta">Join the Beta Waitlist →</a>
+            <a href="/waitlist" className="btn-primary btn-cta text-[#0A192F]">Join the Beta Waitlist →</a>
           </div>
-          <div className="mt-3 text-sm">Closed beta Q2 2026 · Limited merchant spots · No collateral · No bank queue</div>
+          <div className="mt-3 text-sm text-[#0A192F]">Closed beta Q2 2026 · Limited merchant spots · No collateral · No bank queue</div>
         </section>
       </main>
 
