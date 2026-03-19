@@ -1,0 +1,13 @@
+.operations-page .hero-visual { min-height: 360px; }
+.operations-page .chart-box { height: 180px; }
+.operations-page .trust-fill { background: linear-gradient(90deg,#10B981,#059669); }
+.operations-page .transaction-feed table tr td { padding: 8px 0; border-bottom: 1px solid #f3f4f6; }
+.operations-page .feature-row .icon { width: 48px; height: 48px; display:flex; align-items:center; justify-content:center; }
+.operations-page .kra-spotlight .paper { box-shadow: 0 1px 0 rgba(0,0,0,0.03); }
+.operations-page .reveal { opacity: 0; transform: translateY(10px); transition: opacity 420ms ease, transform 420ms ease; }
+.operations-page .reveal.is-visible { opacity: 1; transform: translateY(0); }
+.operations-page .final-cta .bg-primary { background-color: var(--primary); }
+
+@media (min-width: 768px) {
+  .operations-page .chart-box { height: 220px; }
+}
