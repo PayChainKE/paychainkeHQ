@@ -15,9 +15,9 @@ const items = [
 
 export default function MerchantBottomNav(){
   return (
-    <nav className="mc-bottom-nav">
+    <nav className="mc-bottom-nav" style={{display:'none'}}>
       {items.map(it=> (
-        <NavLink key={it.to} to={it.to} className={({isActive})=> isActive ? 'mb-nav-link active' : 'mb-nav-link'}>
+        <NavLink key={it.to} to={it.to} style={{flex:1,textAlign:'center',textDecoration:'none',color:'#374151',paddingTop:8}}>
           <div style={{display:'flex',flexDirection:'column',alignItems:'center',fontSize:11}}>
             <it.Icon size={18} />
             <div style={{marginTop:4,fontSize:11}}>{it.label}</div>
