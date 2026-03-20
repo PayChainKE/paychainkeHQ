@@ -422,7 +422,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
             <div className="absolute bottom-0 left-0 right-0 bg-gray-900 text-white p-4 border-t border-gray-700">
               <div className="flex items-center justify-center gap-2 text-xs">
                 <Copyright className="w-3 h-3" />
-                <span style={{ color: 'var(--accent)', fontWeight: 700 }}>2026 PaychainKE</span>
+                <span style={{ color: '#00bf63', fontWeight: 700, fontSize: '16px' }}>2026 PaychainKE</span>
               </div>
             </div>
           </div>
