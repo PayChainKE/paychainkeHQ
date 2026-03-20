@@ -1,0 +1,33 @@
+:root{
+  --brand-primary: #0B4D2E;
+  --accent: #10B981;
+  --bg: #f6f7f9;
+  --text: #0f1720;
+}
+*{box-sizing:border-box;font-family:Inter, ui-sans-serif, system-ui, -apple-system, sans-serif}
+body{margin:0;background:var(--bg);color:var(--text)}
+.pc-app{display:flex}
+.pc-sidebar{width:240px;background:#0B1F0F;color:white;height:100vh;padding:20px;position:fixed}
+.pc-sidebar .pc-brand{font-weight:700;margin-bottom:20px}
+.pc-sidebar nav ul{list-style:none;padding:0}
+.pc-sidebar nav a{color:rgba(255,255,255,0.85);display:flex;gap:8px;align-items:center;padding:10px 0;text-decoration:none}
+.pc-main{margin-left:240px;flex:1;min-height:100vh}
+.pc-header{height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;border-bottom:1px solid #e6e9ee;background:white}
+.pc-content{padding:24px}
+.pc-grid{display:flex;gap:16px}
+.pc-statcard{background:white;padding:16px;border-radius:8px;flex:1}
+.pc-table{width:100%;border-collapse:collapse;background:white}
+.pc-table th,.pc-table td{padding:10px;border-bottom:1px solid #efefef;text-align:left}
+.pc-page-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.pc-section{margin-top:12px}
+.pc-toast-host{position:fixed;top:20px;right:20px;width:320px;display:flex;flex-direction:column;gap:8px}
+.pc-toast{background:white;padding:12px;border-radius:6px;box-shadow:0 6px 18px rgba(0,0,0,0.08)}
+.pc-btn{background:var(--brand-primary);color:white;border:none;padding:10px 12px;border-radius:8px}
+.pc-login{display:flex;height:100vh}
+.pc-login-left{flex:0 0 45%;background:#0B1F0F;color:white;padding:48px;position:relative}
+.pc-login-right{flex:1;background:white;display:flex;align-items:center;justify-content:center}
+.pc-login-form{width:100%;max-width:360px;padding:24px}
+.pc-login-form input{width:100%;padding:10px;margin-top:8px;margin-bottom:12px;border:1px solid #e6e9ee;border-radius:6px}
+.pc-error{background:#FEF2F2;border:0.5px solid #FCA5A5;padding:10px;border-radius:6px;color:#991B1B;margin-bottom:8px}
+.shake{animation:shake 400ms ease}
+@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-5px)}40%,80%{transform:translateX(5px)}}
