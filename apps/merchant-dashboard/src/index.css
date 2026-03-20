@@ -46,7 +46,36 @@ body{background:var(--bg-app);color:var(--text-primary);-webkit-font-smoothing:a
 @media (max-width:768px){
   .mc-sidebar{position:relative;width:100%;height:auto}
   .mc-main{margin-left:0}
-  .mc-bottom-nav{display:flex;position:fixed;bottom:0;left:0;right:0;height:60px;background:white;border-top:1px solid var(--border);justify-content:space-around;align-items:center}
+  .mc-bottom-nav{
+    display:flex;
+    position:fixed;
+    bottom:0;
+    left:0;
+    right:0;
+    height:62px;
+    background:white;
+    border-top:1px solid var(--border);
+    justify-content:space-around;
+    align-items:center;
+    z-index:50;
+    padding:6px 8px;
+  }
+  .mc-bottom-nav .mb-nav-link{
+    flex:1;
+    text-align:center;
+    text-decoration:none;
+    color:var(--text-secondary);
+    font-size:11px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:6px 4px;
+    border-radius:8px;
+    transition:background .12s, color .12s;
+  }
+  .mc-bottom-nav .mb-nav-link svg{ color:var(--text-secondary) }
+  .mc-bottom-nav .mb-nav-link.active{ background:var(--brand-accent-light); color:var(--brand-primary) }
+  .mc-bottom-nav .mb-nav-link.active svg{ color:var(--brand-primary) }
 }
 
 .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, monospace}
