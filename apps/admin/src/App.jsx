@@ -9,6 +9,9 @@ import Merchants from './pages/Merchants';
 import Analytics from './pages/Analytics';
 import Messages from './pages/Messages';
 import Settings from './pages/Settings';
+import Team from './pages/Team';
+import UserDashboard from './pages/UserDashboard';
+import { UsersProvider } from './context/UsersContext';
 import ToastHost from './components/ui/Toast';
 
 function Protected({ children }){
@@ -23,16 +26,20 @@ export default function App(){
     <BrowserRouter>
       <AuthProvider>
         <ToastProvider>
-          <Routes>
+          <UsersProvider>
+            <Routes>
             <Route path="/login" element={<Login/>} />
             <Route path="/" element={<Navigate to="/overview" replace />} />
             <Route path="/overview" element={<Protected><Overview/></Protected>} />
             <Route path="/waitlist" element={<Protected><Waitlist/></Protected>} />
+              <Route path="/team" element={<Protected><Team/></Protected>} />
+              <Route path="/team/:id/dashboard" element={<Protected><UserDashboard/></Protected>} />
             <Route path="/merchants" element={<Protected><Merchants/></Protected>} />
             <Route path="/analytics" element={<Protected><Analytics/></Protected>} />
             <Route path="/messages" element={<Protected><Messages/></Protected>} />
             <Route path="/settings" element={<Protected><Settings/></Protected>} />
-          </Routes>
+            </Routes>
+          </UsersProvider>
           <ToastHost />
         </ToastProvider>
       </AuthProvider>

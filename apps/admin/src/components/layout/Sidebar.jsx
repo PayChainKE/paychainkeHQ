@@ -9,7 +9,8 @@ export default function Sidebar(){
       <nav>
         <ul>
           <li><NavLink to="/overview"><Home size={16}/> Overview</NavLink></li>
-          <li><NavLink to="/waitlist"><Users size={16}/> Waitlist</NavLink></li>
+            <li><NavLink to="/waitlist"><Users size={16}/> Waitlist</NavLink></li>
+            <li><NavLink to="/team"><Users size={16}/> Team</NavLink></li>
           <li><NavLink to="/merchants"><Users size={16}/> Merchants</NavLink></li>
           <li><NavLink to="/analytics"><BarChart2 size={16}/> Analytics</NavLink></li>
           <li><NavLink to="/messages"><MessageCircle size={16}/> Messages</NavLink></li>
