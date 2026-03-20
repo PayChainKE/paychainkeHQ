@@ -43,9 +43,9 @@
 
 .about__hero-inner{position:relative; z-index:2; max-width:var(--max-width); margin:0 auto; text-align:left;}
 .about__eyebrow{font-family:var(--body-font); letter-spacing:2px; text-transform:uppercase; color:var(--accent); font-size:12px; margin-bottom:18px; opacity:0; transform:translateY(6px); transition:opacity .45s ease, transform .45s ease}
-.about__headline{font-family:var(--display-font); font-size:48px; line-height:1.02; margin:0 0 16px; color:#fff; display:block}
+.about__headline{font-family:var(--display-font); font-size:48px; line-height:1.02; margin:0 0 16px; color:#fff; display:block; font-weight:700}
 @media(min-width:1024px){.about__headline{font-size:72px}}
-.about__headline-line{display:block; opacity:0; transform:translateY(12px); will-change:transform,opacity; color:var(--accent) !important}
+.about__headline-line{display:block; opacity:0; transform:translateY(12px); will-change:transform,opacity; color:#00bf63 !important; font-weight:700}
 .about__subhead{font-size:18px; color:rgba(255,255,255,0.9); max-width:820px; opacity:0; transform:translateY(6px)}
 
 /* Opening statement */
