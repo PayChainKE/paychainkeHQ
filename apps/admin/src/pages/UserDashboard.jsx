@@ -1,6 +1,7 @@
 import React from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { useUsers } from '../context/UsersContext'
+import Layout from '../components/layout/Layout'
 
 function StatCard({ title, value }){
   return (
@@ -15,11 +16,11 @@ export default function UserDashboard(){
   const { id } = useParams()
   const { users } = useUsers()
   const user = users.find(u=>u.id === id)
-  if (!user) return <div className="pc-content">User not found</div>
+  if (!user) return <Layout><div className="pc-content">User not found</div></Layout>
 
   // Simple role-based widgets — can be extended for high-standard dashboards
   return (
-    <div className="pc-content">
+    <Layout>
       <div className="pc-page-head">
         <h2>{user.name} — {user.role}</h2>
         <div><small>Joined: {new Date(user.createdAt).toLocaleString()}</small></div>
@@ -37,6 +38,10 @@ export default function UserDashboard(){
           <p style={{margin:0}}>This is a role-custom dashboard view. For first-world standard polish, we can integrate charts, KPIs, and detailed analytics tailored per role.</p>
         </div>
       </section>
-    </div>
+
+      <section className="pc-section">
+        <Link to="/team">← Back to team</Link>
+      </section>
+    </Layout>
   )
 }

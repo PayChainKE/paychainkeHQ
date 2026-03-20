@@ -1,6 +1,8 @@
 import React, { useState } from 'react'
 import { useUsers } from '../context/UsersContext'
 import { useAuth } from '../context/AuthContext'
+import Layout from '../components/layout/Layout'
+import { Link } from 'react-router-dom'
 
 function RoleBadge({ role }){ return <span style={{fontSize:12, padding:'4px 8px', background:'#eef', borderRadius:6}}>{role}</span> }
 
@@ -20,7 +22,7 @@ export default function Team(){
   }
 
   return (
-    <div className="pc-content">
+    <Layout>
       <div className="pc-page-head">
         <h2>Team</h2>
         <div>
@@ -55,13 +57,13 @@ export default function Team(){
                 <div style={{marginTop:6}}><RoleBadge role={u.role} /> {u.canOnboard ? <small style={{marginLeft:8}}>Onboards merchants</small> : null}</div>
               </div>
               <div style={{display:'flex',gap:8,alignItems:'center'}}>
-                <a href={`/team/${u.id}/dashboard`}>View dashboard</a>
+                <Link to={`/team/${u.id}/dashboard`}>View dashboard</Link>
                 <button onClick={()=>removeUser(u.id)} style={{background:'transparent',border:'1px solid #eee',padding:'6px 8px'}}>Remove</button>
               </div>
             </div>
           ))}
         </div>
       </section>
-    </div>
+    </Layout>
   )
 }
