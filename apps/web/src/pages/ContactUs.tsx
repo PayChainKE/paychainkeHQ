@@ -27,8 +27,7 @@ const CONTACT_DETAILS = [
   {
     icon: Mail,
     label: "Email",
-    value: "hello@paychainke.co",
-    href: "mailto:hello@paychainke.co",
+    value: "Reach us via the contact form",
   },
   {
     icon: Phone,
@@ -57,7 +56,7 @@ const CARD_DATA = [
     body:
       "Our support team is Nairobi-based and responds to every message personally. Whether you want to understand how Cash Advance eligibility works, need help with your waitlist application, or just want to know if PayChain is right for your business — ask us directly.",
     response: "We respond within 24 hours on business days.",
-    emailHref: "mailto:hello@paychainke.co",
+    // email removed — use the contact form
     phoneHref: "tel:+254790889066",
     secondary: { label: "Or join the waitlist →", href: "/waitlist" },
   },
@@ -68,9 +67,7 @@ const CARD_DATA = [
     body:
       "We are actively pursuing partnerships with Kenyan trade associations, SACCOs, financial institutions, and any organization whose members would benefit from PayChain's infrastructure. If you work with Kenyan SMEs — let's talk.",
     response: "We respond within 48 hours.",
-    emailHref:
-      "mailto:hello@paychainke.co?subject=Partnership%20—%20%5BYour%20Organization%5D",
-    hint: "Subject: Partnership — [Your Organization]",
+    hint: "We will follow up via the contact form",
   },
   {
     icon: TrendingUp,
@@ -80,9 +77,7 @@ const CARD_DATA = [
     body:
       "PayChain is currently raising its pre-seed round. We are looking for investors who understand the Kenyan SME market, believe that merchant data is more valuable than collateral, and want to back a team building infrastructure that will matter in East Africa for decades.",
     response: "We respond within 48 hours.",
-    emailHref:
-      "mailto:hello@paychainke.co?subject=Investment%20—%20%5BYour%20Name%20/%20Fund%5D",
-    hint: "Subject: Investment — [Your Name / Fund]",
+    hint: "We will follow up via the contact form",
   },
   {
     icon: Newspaper,
@@ -92,9 +87,7 @@ const CARD_DATA = [
     body:
       "We are happy to speak on the record about the state of merchant payments in Kenya, the role of blockchain in East African commerce, and what PayChain is building to address it. Press kit and assets available on request.",
     response: "We respond within 24 hours.",
-    emailHref:
-      "mailto:hello@paychainke.co?subject=Press%20—%20%5BPublication%20Name%5D",
-    hint: "Subject: Press — [Publication Name]",
+    hint: "We will follow up via the contact form",
   },
 ];
 
@@ -211,7 +204,7 @@ export default function ContactUs() {
   useEffect(() => {
     const metas = [
       { property: "og:title", content: "Contact PayChain — Get in Touch" },
-      { property: "og:description", content: "Reach the PayChain team directly. Email: hello@paychainke.co Phone: +254 790 889 066. Based in Nairobi, Kenya." },
+      { property: "og:description", content: "Reach the PayChain team directly. Phone: +254 790 889 066. Based in Nairobi, Kenya." },
       { property: "og:url", content: "https://www.paychain.co.ke/contact" },
       { name: "twitter:card", content: "summary" },
     ];
@@ -287,7 +280,7 @@ export default function ContactUs() {
                   <div className={styles.cardBody}>{card.body}</div>
                   <div className={styles.cardResponse}><Clock size={12} /> <span>{card.response}</span></div>
                   {card.emailHref && (
-                    <a href={card.emailHref} className={styles.cardPrimary}>{"hello@paychainke.co"} <ArrowRight size={14} /></a>
+                    <a href={card.emailHref} className={styles.cardPrimary}>{card.emailHref.replace('mailto:', '')} <ArrowRight size={14} /></a>
                   )}
                   {card.phoneHref && (
                     <a href={card.phoneHref} className={styles.cardPhone}><Phone size={14} /> +254 790 889 066</a>
@@ -319,7 +312,7 @@ export default function ContactUs() {
               <div className={styles.directBlock}>
                 <div className={styles.smallLabel}>Or reach us directly</div>
                 <div className={styles.contactRows}>
-                  <div className={styles.contactRow}><Mail size={16} color="#1D9E75" /><a href="mailto:hello@paychainke.co" className={styles.directLink}>hello@paychainke.co</a></div>
+                  <div className={styles.contactRow}><Mail size={16} color="#1D9E75" /><div className={styles.directLink}>Use the contact form</div></div>
                   <div className={styles.contactRow}><Phone size={16} color="#1D9E75" /><a href="tel:+254790889066" className={styles.directLink}>+254 790 889 066</a></div>
                 </div>
                 <div className={styles.hoursRow}><Clock size={14} className={styles.mutedIcon} /><span className={styles.hoursText}>Mon — Fri, 9:00 — 17:00 EAT</span></div>
@@ -411,7 +404,7 @@ export default function ContactUs() {
                     <div className={styles.successTitle}>Message received.</div>
                     <div className={styles.successBody}>Thank you for reaching out. A member of the PayChain team will reply to <span style={{ fontWeight: 600 }}>{submittedEmail}</span> within 24 hours on business days.</div>
                     <div className={styles.successDirect}>Or reach us directly:</div>
-                    <a href="mailto:hello@paychainke.co" className={styles.successLink}>hello@paychainke.co</a>
+                    <div className={styles.successLink}>Use the contact form</div>
                     <a href="tel:+254790889066" className={styles.successLink}>+254 790 889 066</a>
                     <div className={styles.successCtas}>
                       <a href="/how-it-works" className={styles.successCta}>How PayChain Works →</a>
@@ -437,7 +430,7 @@ export default function ContactUs() {
               <hr className={styles.locDivider} />
               <div className={styles.smallLabel}>Contact</div>
               <div className={styles.contactRows}>
-                <div className={styles.contactRow}><Mail size={16} color="#1D9E75" /><a href="mailto:hello@paychainke.co" className={styles.directLink}>hello@paychainke.co</a></div>
+                <div className={styles.contactRow}><Mail size={16} color="#1D9E75" /><div className={styles.directLink}>Use the contact form</div></div>
                 <div className={styles.contactRow}><Phone size={16} color="#1D9E75" /><a href="tel:+254790889066" className={styles.directLink}>+254 790 889 066</a></div>
               </div>
               <hr className={styles.locDivider} />
@@ -471,10 +464,9 @@ export default function ContactUs() {
             <div className={styles.careersBody}>We are a small, focused team building financial infrastructure that will matter in Kenya for a long time. If you are a talented engineer, business developer, compliance specialist, or community builder who believes Kenyan merchants deserve better — we want to hear from you.</div>
             <div className={styles.careersNote}>We review every application personally.</div>
           </div>
-          <a href="mailto:hello@paychainke.co?subject=Careers%20—%20%5BRole%20/%20Skill%5D" className={styles.careersCard}>
+          <a href="#contact-form" className={styles.careersCard}>
             <Mail size={28} color="#1D9E75" />
-            <div className={styles.careersEmail}>hello@paychainke.co</div>
-            <div className={styles.careersHint}>Subject: Careers — [Your Role / Skill]</div>
+            <div className={styles.careersEmail}>Apply via the contact form</div>
           </a>
         </div>
       </section>
