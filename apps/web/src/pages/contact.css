@@ -1,0 +1,103 @@
+:root{
+  --brand-primary:#0B4D2E;
+  --brand-accent:#0BFF81;
+  --brand-accent-light:rgba(11,77,46,0.06);
+  --text-primary:#0B1F1A;
+  --text-secondary:#4B5563;
+  --text-muted:#6B7280;
+  --border:rgba(15,23,20,0.06);
+  --bg-card:#FFFFFF;
+  --shadow-card:0 6px 24px rgba(2,6,23,0.06);
+  --radius-md:12px;
+}
+
+.contact-page{font-family:Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; color:var(--text-primary)}
+.container{max-width:1100px;margin:0 auto;padding:0 24px}
+
+.hero{background:var(--brand-primary);color:#fff;padding:80px 0;text-align:center}
+.hero .eyebrow{font-size:11px;letter-spacing:1.6px;text-transform:uppercase;color:var(--brand-accent);opacity:0;animation:fadeIn 200ms forwards 200ms}
+.hero .headline{font-size:40px;line-height:1.05;margin-top:16px;display:inline-block}
+.hero .headline span{display:block;opacity:0;transform:translateY(10px);animation:slideUp 400ms forwards}
+.hero .headline span:nth-child(1){animation-delay:260ms}
+.hero .headline span:nth-child(2){animation-delay:460ms}
+.hero .headline span:nth-child(3){animation-delay:660ms}
+.hero .subhead{max-width:680px;margin:18px auto 0;color:rgba(255,255,255,0.75);font-size:17px;line-height:1.75}
+
+.details-strip{background:#fff;border-bottom:0.5px solid var(--border);padding:28px 0;opacity:0;animation:fadeIn 400ms forwards 1000ms}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;max-width:900px;margin:0 auto}
+.detail{display:flex;align-items:center;gap:14px}
+.detail .icon{width:40px;height:40px;border-radius:50%;background:var(--brand-accent-light);color:var(--brand-accent);display:flex;align-items:center;justify-content:center;font-size:18px}
+.detail .label{font-size:11px;letter-spacing:1.6px;text-transform:uppercase;color:var(--text-muted);font-weight:500}
+.detail .value{font-size:14px;color:var(--text-primary);font-weight:500}
+.detail a{color:var(--brand-primary);text-decoration:none}
+.detail a:hover{color:var(--brand-accent);text-decoration:underline}
+
+.cards{background:#fff;padding:80px 0}
+.cards-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:24px;max-width:1100px;margin:0 auto}
+.card{background:var(--bg-card);border:0.5px solid var(--border);border-radius:12px;padding:28px 32px;box-shadow:var(--shadow-card);transition:transform .2s,box-shadow .2s}
+.card:hover{transform:translateY(-4px);box-shadow:0 8px 32px rgba(0,0,0,0.08)}
+.card-top{display:flex;align-items:center;gap:12px}
+.card-icon{width:44px;height:44px;border-radius:50%;background:var(--brand-accent-light);display:flex;align-items:center;justify-content:center;color:var(--brand-accent);font-size:20px}
+.card-label{font-size:11px;color:var(--brand-accent);text-transform:uppercase;font-weight:500}
+.card h3{font-size:16px;margin-top:16px;font-weight:600}
+.card p{font-size:14px;color:var(--text-secondary);line-height:1.7;margin-top:8px}
+.response{font-size:12px;color:var(--text-muted);margin-top:16px}
+.primary-link{display:inline-flex;align-items:center;gap:6px;color:var(--brand-primary);font-weight:500}
+.secondary-link{display:block;color:var(--text-secondary);margin-top:8px}
+.hint{font-size:12px;color:var(--text-muted);font-style:italic;margin-top:4px}
+
+.form-section{background:#F5F4F0;padding:80px 0}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:32px;max-width:1100px;margin:0 auto}
+.form-left h2{font-size:28px;margin-bottom:8px}
+.lead{font-size:15px;color:var(--text-secondary);line-height:1.7}
+.reassurance{list-style:none;padding:0;margin-top:18px}
+.reassurance li{font-size:14px;margin:8px 0;color:var(--text-secondary)}
+.direct-block{margin-top:20px}
+.direct-block .small-label{font-size:11px;letter-spacing:1.6px;text-transform:uppercase;color:var(--text-muted)}
+.direct-block .contact-row{margin-top:8px}
+.direct-block a{color:var(--brand-primary)}
+
+.form-right .form-card{background:#fff;border:0.5px solid var(--border);border-radius:16px;padding:36px;box-shadow:0 4px 24px rgba(0,0,0,0.08)}
+.form-right label{display:block;margin-top:12px;font-size:13px}
+.form-right input,.form-right select,.form-right textarea{width:100%;padding:10px;border:0.5px solid var(--border);border-radius:8px;margin-top:6px}
+.two-cols{display:flex;gap:16px}
+.two-cols label{flex:1}
+.char-count{font-size:12px;color:var(--text-muted)}
+.char-count.amber{color:#f59e0b}
+.char-count.red{color:#ef4444}
+.field-error{color:#ef4444;font-size:12px;margin-top:6px}
+.network-error{background:#FEF2F2;border:0.5px solid #FECACA;padding:12px;border-radius:8px}
+.submit{width:100%;height:48px;background:var(--brand-primary);color:#fff;border-radius:8px;border:0;margin-top:18px}
+.privacy{font-size:12px;color:var(--text-muted);margin-top:12px}
+
+.location{background:#fff;padding:80px 0}
+.loc-card{background:#F5F4F0;border-radius:12px;padding:32px}
+.wordmark{font-size:16px;color:var(--brand-primary)}
+.loc-head{font-size:18px;font-weight:600;margin-top:8px}
+.small-label{font-size:11px;letter-spacing:1.6px;text-transform:uppercase;color:var(--text-muted);margin-top:12px}
+.hours-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.map{padding-left:24px}
+.map-note{font-size:12px;color:var(--text-muted);margin-top:8px}
+
+.careers{background:var(--brand-primary);color:#fff;padding:64px 0}
+.careers-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;max-width:900px;margin:0 auto}
+.career .eyebrow{color:var(--brand-accent)}
+.careers-card{background:rgba(255,255,255,0.08);border-radius:10px;padding:24px;text-align:center;border:0.5px solid rgba(255,255,255,0.15)}
+.careers-card a{color:#fff;font-weight:500}
+
+.final-cta{background:#F5F4F0;padding:80px 0;text-align:center}
+.cta-center h3{font-size:28px}
+.btn{display:inline-block;background:var(--brand-primary);color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none}
+.btn-ghost{background:transparent;border:1px solid var(--border);padding:10px 18px}
+.btn.big{height:48px;padding:0 28px}
+
+@media(max-width:900px){
+  .grid-4{grid-template-columns:repeat(2,1fr)}
+  .cards-grid{grid-template-columns:1fr}
+  .form-grid{grid-template-columns:1fr}
+  .map{padding-left:0;margin-top:20px}
+  .careers-grid{grid-template-columns:1fr}
+}
+
+@keyframes fadeIn{to{opacity:1;transform:none}}
+@keyframes slideUp{to{opacity:1;transform:none;transform:translateY(0)}}
