@@ -56,7 +56,37 @@
 
 /* Stats */
 .about__stats{background:#071428; color:#fff; padding:60px 20px}
-.about__section-title{font-family:var(--display-font); font-size:24px; color:var(--brand-deep); margin-bottom:24px}
+.about__section-title{font-family:var(--display-font); font-size:32px; color:var(--brand-deep); margin-bottom:24px}
+
+/* Make specific major section titles use the brand green and appear bold */
+#story-heading.about__section-title,
+#values-heading.about__section-title,
+#roadmap-heading.about__section-title{
+  color:#00bf63 !important;
+  font-weight:700 !important;
+}
+
+/* Force bold for the requested major headings and CTA */
+#cta-heading.about__cta-title,
+#story-heading.about__section-title,
+#values-heading.about__section-title,
+#roadmap-heading.about__section-title,
+.about__mv-card--mission .about__eyebrow-small,
+.about__mv-card--vision .about__eyebrow-small,
+.about__section-title,
+.about__cta-title{
+  font-weight:700 !important;
+}
+
+/* Final override: force the main requested headings to appear very bold */
+#cta-heading.about__cta-title,
+#story-heading.about__section-title,
+#values-heading.about__section-title,
+#roadmap-heading.about__section-title,
+.about__mv-card--mission .about__eyebrow-small,
+.about__mv-card--vision .about__eyebrow-small{
+  font-weight:900 !important;
+}
 .about__stats-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:28px; max-width:var(--max-width); margin:0 auto}
 @media(max-width:900px){.about__stats-grid{grid-template-columns:repeat(2,1fr)}}
 .about__stat{background:transparent; padding:28px; border-radius:12px; text-align:left}
@@ -64,6 +94,28 @@
 @media(min-width:1280px){.about__stat-value{font-size:80px}}
 .about__stat-label{font-weight:700; margin-top:8px; color:var(--accent) !important}
 .about__stat-desc{color:rgba(255,255,255,0.85); margin-top:8px}
+
+/* Ensure the key top-line stat (Registered SMEs) uses the brand green and strong weight */
+.about__stats .about__stat[data-count="7400000"] .about__stat-value,
+.about__stats .about__stat[data-count="7400000"] .about__stat-label{
+  color:#00bf63 !important;
+  font-weight:700;
+}
+
+/* Ensure other key stats use the brand green and bold weight */
+.about__stats .about__stat[data-count="83"] .about__stat-value,
+.about__stats .about__stat[data-count="83"] .about__stat-label,
+.about__stats .about__stat[data-count="70"] .about__stat-value,
+.about__stats .about__stat[data-count="70"] .about__stat-label,
+.about__stats .about__stat[data-count="20"] .about__stat-value,
+.about__stats .about__stat[data-count="20"] .about__stat-label,
+.about__stats .about__stat[data-count="5"] .about__stat-value,
+.about__stats .about__stat[data-count="5"] .about__stat-label,
+.about__stats .about__stat[data-count="5000"] .about__stat-value,
+.about__stats .about__stat[data-count="5000"] .about__stat-label{
+  color:#00bf63 !important;
+  font-weight:700;
+}
 
 /* Mobile responsiveness improvements for stats */
 @media (max-width:600px){
@@ -97,7 +149,24 @@
 @media(max-width:900px){.about__mv-grid{grid-template-columns:1fr}}
 .about__mv-card{padding:28px; border-radius:12px}
 .about__mv-card--mission{background:var(--brand-deep); color:#fff}
-.about__mv-card--vision{background:#fff; border:1px solid rgba(7,20,40,0.04)}
+.about__mv-card--vision{background:var(--brand-deep); color:#fff; border:none}
+.about__mv-card--vision .about__eyebrow-small{color:var(--accent)}
+.about__mv-card--vision p{color:rgba(255,255,255,0.92)}
+
+/* Mission & Vision titles: ensure they use the brand green and appear bold */
+.about__mv-card--mission .about__eyebrow-small,
+.about__mv-card--vision .about__eyebrow-small{
+  color:#00bf63 !important;
+  font-weight:900 !important;
+  font-family:var(--display-font) !important;
+  font-size:20px !important;
+}
+
+/* CTA heading (final call-to-action) */
+#cta-heading.about__cta-title{
+  color:#00bf63 !important;
+  font-weight:700 !important;
+}
 
 /* Values */
 .about__values{padding:80px 20px; max-width:var(--max-width); margin:0 auto}
@@ -121,6 +190,9 @@
 .about__timeline-title{font-weight:700}
 .about__timeline-badge{display:inline-block; background:var(--accent); color:#fff; padding:4px 8px; border-radius:6px; font-size:12px; margin-top:6px}
 
+/* Show the first timeline number in dark color (white circle, dark number) */
+.about__timeline-list .about__timeline-item:first-child .about__timeline-node{background:#fff; color:var(--brand-deep); border:4px solid rgba(7,20,40,0.06); box-shadow:none}
+
 /* Trust */
 .about__trust{padding:80px 20px; background:#fff}
 .about__trust-grid{display:grid; grid-template-columns:repeat(5,1fr); gap:20px; max-width:var(--max-width); margin:0 auto}
@@ -132,11 +204,18 @@
 
 /* CTA */
 .about__cta{padding:120px 20px; background:linear-gradient(180deg,var(--brand-deep), #021122); color:#fff; text-align:center}
-.about__cta-title{font-family:var(--display-font); font-size:28px; max-width:900px; margin:0 auto 16px}
+#cta-heading.about__cta-title{font-family:var(--display-font); font-size:32px !important; max-width:900px; margin:0 auto 16px; color:var(--accent); font-weight:900 !important; text-align:center; -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility}
+
+/* Extra strong bold for CTA heading in case display font lacks heavier weight */
+.about__cta-title{font-family:var(--display-font); font-size:32px !important; max-width:900px; margin:0 auto 16px; color:var(--accent); font-weight:900 !important; text-align:center; -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility}
 .about__cta-body{color:rgba(255,255,255,0.9); max-width:900px; margin:0 auto 24px}
-.about__cta-actions{display:flex; gap:16px; justify-content:center; align-items:center; flex-wrap:wrap}
+.about__cta-actions{display:inline-flex; gap:12px; align-items:center; flex-wrap:wrap; padding:8px 12px; background:#00bf63 !important; color:#fff; border-radius:10px; box-shadow:0 4px 12px rgba(16,185,129,0.08)}
 .btn{display:inline-block; padding:12px 20px; border-radius:10px; text-decoration:none}
+.about__cta .btn--primary{background:transparent; color:#fff; font-weight:700; border:1px solid rgba(255,255,255,0.12); padding:8px 14px}
+.about__cta-actions a, .about__cta-actions .btn{color:#fff !important}
 .btn--primary{background:var(--accent); color:#fff; font-weight:700}
+
+.about__cta .btn--primary:hover{background:rgba(255,255,255,0.06)}
 .btn--ghost{background:transparent; border:1px solid rgba(255,255,255,0.18); color:#fff}
 .about__cta-link{color:#fff; text-decoration:underline}
 
