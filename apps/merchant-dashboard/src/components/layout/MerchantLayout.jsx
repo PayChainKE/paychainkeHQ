@@ -1,7 +1,6 @@
 import React from 'react'
 import MerchantSidebar from './MerchantSidebar'
 import MerchantHeader from './MerchantHeader'
-import MerchantBottomNav from './MerchantBottomNav'
 
 export default function MerchantLayout({ children, title='Overview' }){
   return (
@@ -11,7 +10,7 @@ export default function MerchantLayout({ children, title='Overview' }){
         <MerchantHeader title={title} />
         <main className="mc-content">{children}</main>
       </div>
-      <MerchantBottomNav />
+      <div className="mc-bottom-nav" />
     </div>
   )
 }
