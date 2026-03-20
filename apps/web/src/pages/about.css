@@ -157,3 +157,8 @@
 
 /* Utility: force accent color, use when inherited color is blocking styles */
 .force-accent{ color: var(--accent) !important }
+
+/* Mobile: add 1cm gap above the hero headline lines to improve spacing on small screens */
+@media (max-width: 600px) {
+  .about__headline { margin-top: 1cm; }
+}
