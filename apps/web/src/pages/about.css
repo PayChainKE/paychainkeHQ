@@ -7,7 +7,7 @@
 
 :root{
   --brand-deep:#071428; /* deep brand for hero */
-  --accent:#10B981; /* brand accent */
+  --accent:#00bf63; /* brand accent (updated to requested green) */
   --muted:#6B7280; /* body muted */
   --bg:#ffffff;
   --max-width:1200px;
