@@ -70,8 +70,8 @@ export default function About(): JSX.Element {
       <header className="about__hero" role="banner" aria-labelledby="about-hero-title">
         <div className="about__hero-bg" aria-hidden></div>
         <div className="about__hero-inner">
-          <p className="about__eyebrow" aria-hidden>Our Story</p>
-          <h1 id="about-hero-title" className="about__headline">
+          
+          <h1 id="about-hero-title" className="about__headline force-accent">
             <span className="about__headline-line">We Saw What the System Was Doing to Kenya's Merchants.</span>
             <span className="about__headline-line">We Decided to Fix It.</span>
           </h1>
@@ -97,10 +97,10 @@ export default function About(): JSX.Element {
         {/* STATS */}
         <section className="about__stats" aria-labelledby="stats-heading">
           <h2 id="stats-heading" className="about__section-title">The Problem, in Numbers</h2>
-          <ul className="about__stats-grid" role="list">
+          <ul className="about__stats-grid force-accent" role="list">
             <li className="about__stat" data-count="7400000">
-              <div className="about__stat-value">7.4M</div>
-              <div className="about__stat-label">Registered SMEs in Kenya</div>
+              <div className="about__stat-value" style={{ color: 'var(--accent)' }}>7,400,000</div>
+              <div className="about__stat-label" style={{ color: 'var(--accent)' }}>Registered SMEs in Kenya</div>
               <div className="about__stat-desc">The largest untapped merchant fintech market on the continent.</div>
             </li>
             {/* Shilling depreciation stat removed per request */}
@@ -109,32 +109,32 @@ export default function About(): JSX.Element {
 
             {/* Added stats requested */}
             <li className="about__stat" data-count="83" data-suffix="%">
-              <div className="about__stat-value">83%</div>
-              <div className="about__stat-label">of transactions in Kenya happen via mobile money</div>
+              <div className="about__stat-value" style={{ color: 'var(--accent)' }}>83%</div>
+              <div className="about__stat-label" style={{ color: 'var(--accent)' }}>of transactions in Kenya happen via mobile money</div>
               <div className="about__stat-desc">Mobile money is the dominant payment rail across Kenya.</div>
             </li>
 
             <li className="about__stat" data-count="70" data-suffix="%">
-              <div className="about__stat-value">70%</div>
-              <div className="about__stat-label">of Kenyan SMEs lack access to formal credit</div>
+              <div className="about__stat-value" style={{ color: 'var(--accent)' }}>70%</div>
+              <div className="about__stat-label" style={{ color: 'var(--accent)' }}>of Kenyan SMEs lack access to formal credit</div>
               <div className="about__stat-desc">A widespread access gap constraining business growth.</div>
             </li>
 
             <li className="about__stat" data-count="20" data-suffix="%">
-              <div className="about__stat-value">20%</div>
-              <div className="about__stat-label">KES lost 20% of its value against the dollar in the last 3 years</div>
+              <div className="about__stat-value" style={{ color: 'var(--accent)' }}>20%</div>
+              <div className="about__stat-label" style={{ color: 'var(--accent)' }}>KES lost 20% of its value against the dollar in the last 3 years</div>
               <div className="about__stat-desc">Currency depreciation directly reduces merchant margins.</div>
             </li>
 
             <li className="about__stat" data-count="5" data-prefix="<" data-suffix="%">
-              <div className="about__stat-value">&lt;5%</div>
-              <div className="about__stat-label">Less than 5% of SMEs use more than one financial tool</div>
+              <div className="about__stat-value" style={{ color: 'var(--accent)' }}>&lt;5%</div>
+              <div className="about__stat-label" style={{ color: 'var(--accent)' }}>Less than 5% of SMEs use more than one financial tool</div>
               <div className="about__stat-desc">Most merchants remain locked into a single, fragmented workflow.</div>
             </li>
 
             <li className="about__stat" data-count="5000">
-              <div className="about__stat-value">5,000</div>
-              <div className="about__stat-label">Target: 5,000 merchants by end of Year 1</div>
+              <div className="about__stat-value" style={{ color: 'var(--accent)' }}>5,000</div>
+              <div className="about__stat-label" style={{ color: 'var(--accent)' }}>Target: 5,000 merchants by end of Year 1</div>
               <div className="about__stat-desc">Year‑1 adoption target for the public launch.</div>
             </li>
           </ul>
