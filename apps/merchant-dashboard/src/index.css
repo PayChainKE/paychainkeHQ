@@ -1,0 +1,52 @@
+:root{
+  --brand-primary:#0B4D2E;
+  --brand-accent:#1D9E75;
+  --brand-accent-light:#E1F5EE;
+  --bg-app:#F5F4F1;
+  --bg-sidebar:#0B1F0F;
+  --bg-card:#FFFFFF;
+  --border: rgba(0,0,0,0.07);
+  --text-primary:#111827;
+  --text-secondary:#6B7280;
+  --positive:#22C55E;
+  --negative:#EF4444;
+  --radius-md:8px;
+  --sidebar-width:260px;
+  --header-height:56px;
+}
+*{box-sizing:border-box;font-family:Plus Jakarta Sans,Inter, system-ui, -apple-system, sans-serif}
+html,body,#root{height:100%;margin:0}
+body{background:var(--bg-app);color:var(--text-primary);-webkit-font-smoothing:antialiased}
+
+/* Layout */
+.mc-app{display:flex;min-height:100vh}
+.mc-sidebar{width:var(--sidebar-width);background:var(--bg-sidebar);color:white;position:fixed;left:0;top:0;bottom:0;padding:20px}
+.mc-main{margin-left:var(--sidebar-width);flex:1;min-height:100vh}
+.mc-header{height:var(--header-height);display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:white;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:40}
+.mc-content{padding:20px}
+
+/* Sidebar */
+.mc-brand{font-weight:700;margin-bottom:12px}
+.mc-merchant-card{background:rgba(255,255,255,0.04);padding:12px;border-radius:8px;margin-bottom:12px;border:1px solid rgba(255,255,255,0.03)}
+.mc-nav ul{list-style:none;padding:0;margin:12px 0}
+.mc-nav a{display:block;color:rgba(255,255,255,0.9);padding:10px;border-radius:6px;text-decoration:none}
+.mc-nav a.active{background:rgba(255,255,255,0.04)}
+
+/* Cards and utilities */
+.mc-grid{display:flex;gap:16px;flex-wrap:wrap}
+.stat-card{background:var(--bg-card);padding:16px;border-radius:12px;box-shadow:var(--shadow-card,0 1px 2px rgba(0,0,0,0.04));min-width:180px}
+.pc-btn{background:var(--brand-primary);color:white;padding:10px 12px;border-radius:8px;border:none}
+
+/* Tables */
+.mc-table{width:100%;border-collapse:collapse;background:var(--bg-card)}
+.mc-table th,.mc-table td{padding:10px;border-bottom:1px solid var(--border);text-align:left}
+
+/* Mobile bottom nav */
+.mc-bottom-nav{display:none}
+@media (max-width:768px){
+  .mc-sidebar{position:relative;width:100%;height:auto}
+  .mc-main{margin-left:0}
+  .mc-bottom-nav{display:flex;position:fixed;bottom:0;left:0;right:0;height:60px;background:white;border-top:1px solid var(--border);justify-content:space-around;align-items:center}
+}
+
+.mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, monospace}
