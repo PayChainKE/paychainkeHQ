@@ -170,5 +170,19 @@
 @media (min-width:768px){ .formColumns{ flex-direction:row; } .formIntro{ flex:1; } .formCardWrap{ flex:1; } .locGrid{ grid-template-columns:48% 52%; } }
 @media (min-width:1024px){ .headline{ font-size:48px; } .cardsGrid{ grid-template-columns: repeat(2,1fr); } .detailsInner{ grid-template-columns: repeat(4,1fr); } }
 
+/* Mobile tweaks for Contact page */
+@media (max-width: 767px) {
+  .careersInner { flex-direction: column; gap: 18px; align-items: flex-start; }
+  .careersCard, .careersCard:hover { background: none; }
+  .careersCard, .careersCard a { width: 100%; }
+  .careersCard .careersEmail { font-size: 14px; }
+  .careersCard { padding: 18px; }
+  .careersCard { align-items: flex-start; }
+  .careersCard { flex-direction: row; justify-content: space-between; }
+  .careersCard > svg { margin-right: 12px; }
+  .formCard { padding: 20px; }
+  .headline { font-size: 28px; }
+}
+
 /* Prefers reduced motion */
 @media (prefers-reduced-motion: reduce){ .animate-on-scroll, .animate-from-left, .animate-from-right, .line{ transition:none; animation:none; opacity:1; transform:none; } }
