@@ -45,7 +45,8 @@ const Waitlist: React.FC = () => {
     if (Object.keys(v).length) return;
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:5000/api/waitlist', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/waitlist`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
