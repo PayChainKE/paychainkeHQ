@@ -45,7 +45,7 @@ const Waitlist: React.FC = () => {
     if (Object.keys(v).length) return;
     setLoading(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
       const response = await fetch(`${apiUrl}/api/waitlist`, {
         method: 'POST',
         headers: {
