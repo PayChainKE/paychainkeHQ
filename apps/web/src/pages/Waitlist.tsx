@@ -45,9 +45,24 @@ const Waitlist: React.FC = () => {
     if (Object.keys(v).length) return;
     setLoading(true);
     try {
-      // Simulate API call
-      await new Promise((r) => setTimeout(r, 1000));
-      // TODO: replace with real POST /api/waitlist
+      const response = await fetch('http://localhost:5000/api/waitlist', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fullName,
+          businessName,
+          phone,
+          businessType,
+          challenge,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to submit');
+      }
+
       setSuccess(true);
     } catch (err) {
       setErrors({ form: 'Unable to submit. Please try again.' });
