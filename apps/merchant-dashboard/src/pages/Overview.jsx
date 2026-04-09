@@ -35,35 +35,42 @@ export default function Overview() {
       {/* Section 1: Balance Cards Row */}
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in-up [animation-delay:100ms]">
         {/* KES Balance Card */}
-        <div className="bg-[#00351D] text-white p-9 rounded-[16px] shadow-2xl relative overflow-hidden group border border-white/5">
+        <div className="bg-[#00351D] text-white p-7 rounded-[16px] shadow-2xl relative overflow-hidden group border border-white/5">
           <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full -mr-40 -mt-40 blur-3xl group-hover:scale-125 transition-transform duration-1000"></div>
           <div className="relative z-10">
-            <div className="flex justify-between items-start mb-16">
-              <span className="bg-[#1F4D3C] text-[#5EFEB3] px-5 py-1.5 rounded-full text-[9px] font-bold tracking-[0.15em] uppercase border border-white/10">Primary Ledger</span>
+            <div className="flex justify-between items-start mb-10">
+              <span className="bg-[#1F4D3C] text-[#5EFEB3] px-4 py-1.5 rounded-full text-[9px] font-black tracking-[0.15em] uppercase border border-white/10">Primary Ledger</span>
               <span className="text-white/40 text-[9px] uppercase font-bold tracking-[0.15em]">Till: {mockMerchant.tillNumber}</span>
             </div>
-            <h3 className="font-headline text-6xl tracking-tighter tabular-nums mb-6">KES 184,250</h3>
-            <div className="flex items-center gap-2 text-[#5EFEB3] font-bold text-xs tracking-wide">
-              <span className="material-symbols-outlined text-xs" style={{fontVariationSettings: "'FILL' 1"}}>trending_up</span>
-              <span>+KES 18,450 today</span>
+            <div className="flex justify-between items-center mb-10">
+              <div>
+                <h3 className="font-headline font-bold text-4xl tracking-tighter tabular-nums mb-1">KES 184,250</h3>
+                <div className="flex items-center gap-2 text-[#5EFEB3] font-bold text-[10px] tracking-wide">
+                  <span className="material-symbols-outlined text-[10px]" style={{fontVariationSettings: "'FILL' 1"}}>trending_up</span>
+                  <span>+KES 18,450 today</span>
+                </div>
+              </div>
+              <button className="px-5 py-2.5 bg-white/5 hover:bg-white/10 text-white rounded-full text-[10px] font-black transition-all border border-white/10 uppercase tracking-widest leading-none">
+                Swap KES → USDC
+              </button>
             </div>
           </div>
         </div>
 
-        {/* USDC Balance Card */}
-        <div className="bg-[#0D2444] text-white p-9 rounded-[16px] shadow-2xl relative overflow-hidden group border border-white/5">
+        {/* USDC Balance Card */ }
+        <div className="bg-[#0D2444] text-white p-7 rounded-[16px] shadow-2xl relative overflow-hidden group border border-white/5">
           <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/10 rounded-full -ml-32 -mb-32 blur-3xl"></div>
           <div className="relative z-10 flex flex-col h-full">
-            <div className="flex justify-between items-start mb-16">
-              <span className="bg-[#243B5C] text-[#A6C8FF] px-5 py-1.5 rounded-full text-[9px] font-bold tracking-[0.15em] uppercase border border-white/10">Global Settlements</span>
+            <div className="flex justify-between items-start mb-10">
+              <span className="bg-[#243B5C] text-[#A6C8FF] px-4 py-1.5 rounded-full text-[9px] font-black tracking-[0.15em] uppercase border border-white/10">Global Settlements</span>
             </div>
             <div className="flex-1">
-              <h3 className="font-headline text-6xl tracking-tighter tabular-nums mb-3">312.50 USDC</h3>
-              <p className="text-white/40 text-sm font-bold tracking-tight">≈ {formatKES(mockMerchant.financials.usdcBalance * 130)}</p>
+              <h3 className="font-headline font-bold text-4xl tracking-tighter tabular-nums mb-3">312.50 USDC</h3>
+              <p className="text-white/40 text-[10px] font-bold tracking-tight opacity-70 uppercase">≈ {formatKES(mockMerchant.financials.usdcBalance * 130)}</p>
             </div>
-            <div className="flex gap-4 mt-12">
-              <button className="flex-1 py-4 px-6 rounded-xl bg-white/5 hover:bg-white/10 text-[11px] font-bold transition-all border border-white/10 tracking-wide">Swap KES → USDC</button>
-              <button className="flex-1 py-4 px-6 rounded-xl bg-white/5 hover:bg-white/10 text-[11px] font-bold transition-all border border-white/10 tracking-wide">Send USDC</button>
+            <div className="flex gap-4 mt-8">
+              <button className="flex-1 py-3 px-4 bg-white/5 hover:bg-white/10 text-white rounded-xl text-[10px] font-black transition-all border border-white/10 uppercase tracking-widest leading-none">Swap KES → USDC</button>
+              <button className="flex-1 py-3 px-4 bg-white/5 hover:bg-white/10 text-white rounded-xl text-[10px] font-black transition-all border border-white/10 uppercase tracking-widest leading-none">Send USDC</button>
             </div>
           </div>
         </div>
