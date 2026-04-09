@@ -51,28 +51,28 @@ export default function Overview() {
       {/* Section 1: Balance Cards Row */}
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in-up [animation-delay:100ms]">
         {/* KES Balance Card */}
-        <div className="bg-[#00351D] text-white p-7 rounded-[16px] shadow-2xl relative overflow-hidden group border border-white/5">
+        <div className="bg-[#00351D] text-white p-6 lg:p-7 rounded-[16px] shadow-2xl relative overflow-hidden group border border-white/5">
           <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full -mr-40 -mt-40 blur-3xl group-hover:scale-125 transition-transform duration-1000"></div>
           <div className="relative z-10">
-            <div className="flex justify-between items-start mb-10">
-              <span className="bg-[#1F4D3C] text-[#5EFEB3] px-4 py-1.5 rounded-full text-[9px] font-black tracking-[0.15em] uppercase border border-white/10">Primary Ledger</span>
-              <div className="flex items-center gap-4">
-                <span className="text-white/40 text-[9px] uppercase font-bold tracking-[0.15em]">Till: {mockMerchant.tillNumber}</span>
+            <div className="flex justify-between items-start mb-8 lg:mb-10">
+              <span className="bg-[#1F4D3C] text-[#5EFEB3] px-3 lg:px-4 py-1.5 rounded-full text-[8px] lg:text-[9px] font-black tracking-[0.15em] uppercase border border-white/10">Primary Ledger</span>
+              <div className="flex items-center gap-3 lg:gap-4 text-[8px] lg:text-[9px]">
+                <span className="text-white/40 uppercase font-bold tracking-[0.15em] hidden sm:inline">Till: {mockMerchant.tillNumber}</span>
                 <button 
                   onClick={() => setShowAmounts(!showAmounts)}
-                  className="text-white/40 hover:text-white transition-colors"
+                  className="text-white/40 hover:text-white transition-colors p-1"
                   title={showAmounts ? "Hide Amounts" : "Show Amounts"}
                 >
-                  <span className="material-symbols-outlined text-lg leading-none">
+                  <span className="material-symbols-outlined text-base lg:text-lg leading-none">
                     {showAmounts ? 'visibility' : 'visibility_off'}
                   </span>
                 </button>
               </div>
             </div>
-            <div className="flex justify-between items-center mb-10">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 lg:gap-0 mb-8 lg:mb-10">
               <div>
-                <h3 className={`font-headline font-bold text-4xl tracking-tighter tabular-nums mb-1 transition-all duration-300 ${!showAmounts && 'blur-lg grayscale'}`}>KES 184,250</h3>
-                <div className={`flex items-center gap-2 text-[#5EFEB3] font-bold text-[10px] tracking-wide transition-all duration-300 ${!showAmounts && 'blur-sm grayscale'}`}>
+                <h3 className={`font-headline font-bold text-3xl lg:text-4xl tracking-tighter tabular-nums mb-1 transition-all duration-300 ${!showAmounts && 'blur-lg grayscale'}`}>KES 184,250</h3>
+                <div className={`flex items-center gap-2 text-[#5EFEB3] font-bold text-[9px] lg:text-[10px] tracking-wide transition-all duration-300 ${!showAmounts && 'blur-sm grayscale'}`}>
                   <span className="material-symbols-outlined text-[10px]" style={{fontVariationSettings: "'FILL' 1"}}>trending_up</span>
                   <span>+KES 18,450 today</span>
                 </div>
@@ -81,29 +81,29 @@ export default function Overview() {
           </div>
         </div>
 
-        {/* USDC Balance Card */ }
-        <div className="bg-[#0D2444] text-white p-7 rounded-[16px] shadow-2xl relative overflow-hidden group border border-white/5">
+        {/* USDC Balance Card */}
+        <div className="bg-[#0D2444] text-white p-6 lg:p-7 rounded-[16px] shadow-2xl relative overflow-hidden group border border-white/5">
           <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/10 rounded-full -ml-32 -mb-32 blur-3xl"></div>
           <div className="relative z-10 flex flex-col h-full">
-            <div className="flex justify-between items-start mb-10">
-              <span className="bg-[#243B5C] text-[#A6C8FF] px-4 py-1.5 rounded-full text-[9px] font-black tracking-[0.15em] uppercase border border-white/10">Global Settlements</span>
+            <div className="flex justify-between items-start mb-8 lg:mb-10">
+              <span className="bg-[#243B5C] text-[#A6C8FF] px-3 lg:px-4 py-1.5 rounded-full text-[8px] lg:text-[9px] font-black tracking-[0.15em] uppercase border border-white/10">Global Settlements</span>
               <button 
                 onClick={() => setShowAmounts(!showAmounts)}
-                className="text-white/40 hover:text-white transition-colors"
+                className="text-white/40 hover:text-white transition-colors p-1"
                 title={showAmounts ? "Hide Amounts" : "Show Amounts"}
               >
-                <span className="material-symbols-outlined text-lg leading-none">
+                <span className="material-symbols-outlined text-base lg:text-lg leading-none">
                   {showAmounts ? 'visibility' : 'visibility_off'}
                 </span>
               </button>
             </div>
             <div className="flex-1">
-              <h3 className={`font-headline font-bold text-4xl tracking-tighter tabular-nums mb-3 transition-all duration-300 ${!showAmounts && 'blur-lg grayscale'}`}>312.50 USDC</h3>
-              <p className={`text-white/40 text-[10px] font-bold tracking-tight opacity-70 uppercase transition-all duration-300 ${!showAmounts && 'blur-sm grayscale'}`}>≈ {formatKES(mockMerchant.financials.usdcBalance * 130)}</p>
+              <h3 className={`font-headline font-bold text-3xl lg:text-4xl tracking-tighter tabular-nums mb-2 lg:mb-3 transition-all duration-300 ${!showAmounts && 'blur-lg grayscale'}`}>312.50 USDC</h3>
+              <p className={`text-white/40 text-[9px] lg:text-[10px] font-bold tracking-tight opacity-70 uppercase transition-all duration-300 ${!showAmounts && 'blur-sm grayscale'}`}>≈ {formatKES(mockMerchant.financials.usdcBalance * 130)}</p>
             </div>
-            <div className="flex gap-4 mt-8">
-              <button className="flex-1 py-3 px-4 bg-white/5 hover:bg-white/10 text-white rounded-xl text-[10px] font-black transition-all border border-white/10 uppercase tracking-widest leading-none">Swap KES → USDC</button>
-              <button className="flex-1 py-3 px-4 bg-white/5 hover:bg-white/10 text-white rounded-xl text-[10px] font-black transition-all border border-white/10 uppercase tracking-widest leading-none">Send USDC</button>
+            <div className="flex gap-3 lg:gap-4 mt-6 lg:mt-8">
+              <button className="flex-1 py-3 px-3 lg:px-4 bg-white/5 hover:bg-white/10 text-white rounded-xl text-[9px] lg:text-[10px] font-black transition-all border border-white/10 uppercase tracking-widest leading-none">Swap</button>
+              <button className="flex-1 py-3 px-3 lg:px-4 bg-white/5 hover:bg-white/10 text-white rounded-xl text-[9px] lg:text-[10px] font-black transition-all border border-white/10 uppercase tracking-widest leading-none">Send</button>
             </div>
           </div>
         </div>

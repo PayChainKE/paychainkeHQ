@@ -1,15 +1,23 @@
 import React from 'react'
 import { mockMerchant } from '../../mockData/merchant'
 
-export default function MerchantHeader({ title }) {
+export default function MerchantHeader({ title, onMenuClick }) {
   const unread = mockMerchant.notifications.filter(n => !n.isRead).length
   
   return (
-    <header className="sticky top-0 right-0 w-full h-[56px] z-40 bg-white/90 backdrop-blur-md flex justify-between items-center px-8 border-b border-outline-variant/15 glass-header">
-      <div className="flex items-center gap-2">
-        <span className="text-on-surface-variant text-sm font-medium">Dashboard</span>
-        <span className="text-outline-variant text-xs">/</span>
-        <span className="text-primary font-bold text-sm">{title}</span>
+    <header className="sticky top-0 right-0 w-full h-[64px] lg:h-[56px] z-40 bg-white/90 backdrop-blur-md flex justify-between items-center px-4 lg:px-8 border-b border-outline-variant/15 glass-header transition-all">
+      <div className="flex items-center gap-4">
+        <button 
+          onClick={onMenuClick}
+          className="lg:hidden p-2 -ml-2 hover:bg-emerald-50 rounded-full text-on-surface-variant transition-colors"
+        >
+          <span className="material-symbols-outlined text-2xl">menu</span>
+        </button>
+        <div className="flex items-center gap-2">
+          <span className="text-on-surface-variant text-[10px] lg:text-sm font-medium opacity-60 hidden sm:inline">Dashboard</span>
+          <span className="text-outline-variant text-xs hidden sm:inline">/</span>
+          <span className="text-primary font-bold text-xs lg:text-sm truncate max-w-[120px] lg:max-w-none">{title}</span>
+        </div>
       </div>
       
       <div className="flex items-center gap-4">

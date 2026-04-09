@@ -10,7 +10,7 @@ const navItems = [
   { name: 'Trust Score', icon: 'verified_user', path: '/trust-score' },
 ]
 
-export default function MerchantSidebar() {
+export default function MerchantSidebar({ isOpen, onClose }) {
   const [showAmounts, setShowAmounts] = useState(() => {
     const saved = localStorage.getItem('paychain_privacy_mode')
     return saved !== null ? JSON.parse(saved) : true
@@ -26,7 +26,14 @@ export default function MerchantSidebar() {
   }, [])
 
   return (
-    <aside className="fixed left-0 top-0 h-full w-[240px] z-50 bg-[#162723] flex flex-col overflow-y-auto">
+    <aside className={`fixed left-0 top-0 h-full w-[240px] z-[50] bg-[#162723] flex flex-col overflow-y-auto transition-transform duration-300 ease-in-out lg:translate-x-0 ${isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}`}>
+      {/* Close Button Mobile Only */}
+      <button 
+        onClick={onClose}
+        className="lg:hidden absolute top-6 right-6 text-white/40 hover:text-white"
+      >
+        <span className="material-symbols-outlined">close</span>
+      </button>
       {/* Brand & Identity Header */}
       <div className="p-6">
         <h1 className="font-headline font-bold text-3xl text-white tracking-tight mb-8">PayChain</h1>
