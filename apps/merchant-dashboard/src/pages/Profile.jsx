@@ -9,6 +9,7 @@ export default function Profile() {
   const [name, setName] = useState(mockMerchant.name)
   const [email, setEmail] = useState(mockMerchant.email)
   const [autoSettle, setAutoSettle] = useState(true)
+  const [showQuestions, setShowQuestions] = useState(false)
   const toast = useToast()
 
   async function save() {
@@ -35,104 +36,204 @@ export default function Profile() {
           {/* Main Settings Area */}
           <div className="col-span-12 lg:col-span-8 space-y-8">
             
-            {/* Section 1: Business Profile */}
-            <div className="bg-surface-container-lowest p-10 rounded-[40px] border border-outline-variant/5 shadow-sm editorial-shadow animate-fade-in-up [animation-delay:100ms]">
-              <div className="flex items-center justify-between mb-8">
-                <h3 className="font-headline text-2xl text-primary tracking-tight">Business Profile</h3>
-                <span className="text-[10px] bg-emerald-500/10 text-emerald-700 px-3 py-1 rounded-full font-bold uppercase tracking-widest border border-emerald-500/10">Verified Business</span>
+            {/* Section 1: Administrator Profile */}
+            <div className="bg-surface-container-lowest p-6 lg:p-10 rounded-[32px] lg:rounded-[40px] border border-outline-variant/5 shadow-sm editorial-shadow animate-fade-in-up [animation-delay:100ms]">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
+                <div>
+                  <h3 className="font-headline text-2xl text-primary tracking-tight">Profile</h3>
+                  <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-[0.2em] mt-1 opacity-60">Identity Management</p>
+                </div>
+                <span className="text-[10px] bg-emerald-500/10 text-emerald-700 px-4 py-1.5 rounded-full font-black uppercase tracking-widest border border-emerald-500/10 flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Identity Verified
+                </span>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-3">
-                  <label className="text-[10px] text-on-surface-variant font-bold uppercase tracking-[0.2em] pl-1 opacity-60">Legal Entity</label>
-                  <div className="relative group">
-                    <input 
-                      className="w-full bg-surface-container-low/50 border border-outline-variant/10 rounded-2xl py-4 px-5 text-sm font-medium text-on-surface focus:ring-1 focus:ring-primary transition-all"
-                      value={mockMerchant.businessName}
-                      disabled
-                    />
-                    <span className="material-symbols-outlined absolute right-5 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm opacity-20">lock</span>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-y-8 gap-x-12">
+                {[
+                  { label: "Name", value: "Kamau General Store", locked: true },
+                  { label: "Email", value: "brandonomutiti05@gmail.com", locked: false },
+                  { label: "Phone", value: "+254790889066", locked: true },
+                  { label: "Role", value: "Administrator", badge: "Primary" },
+                  { label: "Primary contact", value: "Yes", status: true },
+                  { label: "Created at", value: "19 March 2026", sub: "Member since" },
+                  { label: "Last sign in", value: "10 April 2026, 00:36:49", sub: "Security timestamp" },
+                  { label: "Sign in count", value: "6", sub: "Access frequency" },
+                  { label: "SMS/USSD activated", value: "No", status: false },
+                  { label: "2FA Setup", value: "Yes", status: true },
+                ].map((item, idx) => (
+                  <div key={idx} className="space-y-2 group">
+                    <label className="text-[9px] text-on-surface-variant font-black uppercase tracking-[0.2em] pl-1 opacity-50 group-hover:opacity-100 transition-opacity">{item.label}</label>
+                    <div className="relative">
+                      <div className={`w-full bg-surface-container-low/30 border border-outline-variant/10 rounded-2xl py-3.5 px-5 text-sm font-black text-primary flex items-center justify-between ${item.locked ? 'opacity-70 bg-surface-container-low/10' : 'group-hover:border-primary/20'} transition-all`}>
+                        <span className={!showAmounts && item.label === "Phone" ? 'blur-md' : ''}>{item.value}</span>
+                        {item.locked && <span className="material-symbols-outlined text-xs opacity-30">lock</span>}
+                        {item.badge && <span className="text-[8px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-black uppercase tracking-wider">{item.badge}</span>}
+                        {item.status !== undefined && (
+                          <div className={`w-2 h-2 rounded-full ${item.status ? 'bg-emerald-500' : 'bg-red-400'} shadow-[0_0_8px_rgba(0,0,0,0.1)]`}></div>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div className="space-y-3">
-                  <label className="text-[10px] text-on-surface-variant font-bold uppercase tracking-[0.2em] pl-1 opacity-60">Contact Email</label>
-                  <div className="relative">
-                    <input 
-                      className="w-full bg-surface-container-low/50 border border-outline-variant/10 rounded-2xl py-4 px-5 text-sm font-medium text-on-surface focus:ring-1 focus:ring-primary transition-all"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                    />
-                    <span className="material-symbols-outlined absolute right-5 top-1/2 -translate-y-1/2 text-primary/40 text-sm">edit</span>
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <label className="text-[10px] text-on-surface-variant font-bold uppercase tracking-[0.2em] pl-1 opacity-60">Authorized Signatory</label>
-                  <input 
-                    className="w-full bg-surface-container-low/50 border border-outline-variant/10 rounded-2xl py-4 px-5 text-sm font-medium text-on-surface focus:ring-1 focus:ring-primary transition-all"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-3">
-                  <label className="text-[10px] text-on-surface-variant font-bold uppercase tracking-[0.2em] pl-1 opacity-60">Global Identifier</label>
-                  <input 
-                    className="w-full bg-surface-container-low/50 border border-outline-variant/10 rounded-2xl py-4 px-5 text-sm font-medium text-on-surface focus:ring-1 focus:ring-primary transition-all"
-                    value={mockMerchant.phone}
-                    disabled
-                  />
-                </div>
+                ))}
               </div>
-              <div className="mt-10 flex justify-end">
+              
+              <div className="mt-12 flex justify-between items-center pt-8 border-t border-outline-variant/5">
+                <p className="text-[10px] text-on-surface-variant font-medium max-w-[240px]">Last USSD PIN failed attempts: <span className="text-primary font-black">0</span> • PIN Blocked: <span className="text-red-500 font-black">No</span></p>
                 <button 
                   onClick={save}
-                  className="bg-primary text-white px-10 py-4 rounded-2xl font-bold text-sm shadow-xl hover:bg-primary-container transition-all flex items-center gap-3 active:scale-95"
+                  className="bg-[#06201B] text-white px-8 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl hover:opacity-90 transition-all flex items-center gap-3 active:scale-95"
                 >
-                  <span className="material-symbols-outlined text-lg">save</span>
-                  Synchronize Profile
+                  <span className="material-symbols-outlined text-lg">sync</span>
+                  Update Global Profile
                 </button>
               </div>
             </div>
 
-            {/* Section 2: Settlement Configuration */}
-            <div className="bg-surface-container-lowest p-10 rounded-[40px] border border-outline-variant/5 shadow-sm editorial-shadow animate-fade-in-up [animation-delay:200ms]">
-              <div className="mb-8">
-                <h3 className="font-headline text-2xl text-primary tracking-tight">Settlement Logic</h3>
-                <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-[0.2em] mt-1 opacity-60">Autonomous Treasury Rules</p>
-              </div>
+            {/* Section 2: Security & Authentication */}
+            <div className="bg-[#06201B] p-6 lg:p-10 rounded-[32px] lg:rounded-[40px] text-white shadow-2xl relative animate-fade-in-up [animation-delay:200ms]">
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="flex flex-col justify-between p-8 bg-emerald-500/5 rounded-[32px] border border-emerald-500/10 hover:bg-emerald-500/[0.08] transition-all">
-                  <div className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-emerald-600 mb-6">
-                    <span className="material-symbols-outlined text-2xl">bolt</span>
-                  </div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-10">
                   <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <p className="text-lg font-headline text-primary">Auto-Settle</p>
-                      <button 
-                        onClick={() => setAutoSettle(!autoSettle)}
-                        className={`w-12 h-6 rounded-full relative transition-colors ${autoSettle ? 'bg-emerald-600' : 'bg-surface-container-highest'}`}
-                      >
-                        <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${autoSettle ? 'left-7' : 'left-1'}`}></div>
-                      </button>
-                    </div>
-                    <p className="text-xs text-on-surface-variant font-medium leading-relaxed">Instantly transfer KES to linked bank when balance exceeds threshold.</p>
+                    <h3 className="font-headline text-2xl text-white tracking-tight">Security</h3>
+                    <p className="text-[10px] text-emerald-400/60 font-black uppercase tracking-[0.2em] mt-1">Encryption & Access Rules</p>
+                  </div>
+                  <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-emerald-400 border border-white/5">
+                    <span className="material-symbols-outlined text-2xl">shield_locked</span>
                   </div>
                 </div>
 
-                <div className="flex flex-col justify-between p-8 bg-blue-500/5 rounded-[32px] border border-blue-500/10 hover:bg-blue-500/[0.08] transition-all">
-                  <div className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-blue-600 mb-6">
-                    <span className="material-symbols-outlined text-2xl">shield_moon</span>
-                  </div>
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <p className="text-lg font-headline text-primary">Auto-Shield</p>
-                      <button className="w-12 h-6 rounded-full bg-surface-container-highest relative">
-                        <div className="absolute top-1 left-1 w-4 h-4 rounded-full bg-white"></div>
-                      </button>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                  {/* Change Password Sub-section */}
+                  <div className="space-y-6">
+                    <h4 className="text-[10px] text-white/30 font-black uppercase tracking-widest flex items-center gap-2">
+                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                       Change your password
+                    </h4>
+                    
+                    <div className="space-y-4">
+                      {['Current password', 'New password', 'Confirm new password'].map((label, i) => (
+                        <div key={i} className="space-y-2">
+                          <label className="text-[9px] text-white/40 font-black uppercase tracking-widest pl-1">{label}</label>
+                          <input 
+                            type="password"
+                            placeholder="••••••••••••"
+                            className="w-full bg-white/5 border border-white/10 rounded-xl py-3.5 px-5 text-sm font-medium text-white focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 outline-none transition-all placeholder:text-white/10"
+                          />
+                        </div>
+                      ))}
                     </div>
-                    <p className="text-xs text-on-surface-variant font-medium leading-relaxed">Automatically convert a percentage of incoming KES to stable USDC.</p>
+                  </div>
+
+                  {/* Advanced Auth Sub-section */}
+                  <div className="space-y-8">
+                    <div className="space-y-6">
+                      <h4 className="text-[10px] text-white/30 font-black uppercase tracking-widest flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                        Advanced Methods
+                      </h4>
+                      
+                      <button 
+                        onClick={() => setShowQuestions(true)}
+                        className="w-full flex items-center justify-between p-5 bg-white/5 rounded-[24px] border border-white/5 hover:bg-white/[0.08] transition-all group"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-white/60 group-hover:text-amber-400">
+                            <span className="material-symbols-outlined">quiz</span>
+                          </div>
+                          <div className="text-left">
+                            <p className="text-sm font-black text-white">Security Questions</p>
+                            <p className="text-[10px] text-white/30 font-medium">3 questions configured</p>
+                          </div>
+                        </div>
+                        <span className="material-symbols-outlined text-white/20">chevron_right</span>
+                      </button>
+
+                    </div>
+
+                    <div className="p-5 bg-amber-500/5 rounded-[24px] border border-amber-500/10">
+                       <div className="flex gap-4">
+                         <span className="material-symbols-outlined text-amber-500 text-lg">help</span>
+                         <p className="text-[10px] text-amber-200/50 leading-relaxed font-medium">
+                           Need help with your security keys? Reach out to your account manager or use the encrypted support portal.
+                         </p>
+                       </div>
+                    </div>
                   </div>
                 </div>
+
+                <div className="mt-12 flex justify-end">
+                  <button className="bg-emerald-500 text-[#06201B] px-10 py-5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl hover:bg-white transition-all active:scale-95">
+                    Update Security Vault
+                  </button>
+                </div>
               </div>
+
+              {/* Security Questions Form Overlay */}
+              {showQuestions && (
+                <div className="fixed inset-0 lg:absolute z-[100] lg:z-50 bg-[#06201B] p-6 lg:p-10 rounded-none lg:rounded-[40px] animate-fade-in duration-300 flex flex-col">
+                  <div className="flex items-center justify-between mb-8">
+                    <div className="flex items-center gap-4">
+                      <button 
+                        onClick={() => setShowQuestions(false)}
+                        className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-white/40 hover:text-white transition-colors"
+                      >
+                        <span className="material-symbols-outlined">arrow_back</span>
+                      </button>
+                      <div>
+                        <h3 className="font-headline text-2xl text-white tracking-tight">Security Questions</h3>
+                        <p className="text-[10px] text-emerald-400/60 font-black uppercase tracking-[0.2em] mt-1">Identity Recovery Vault</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-emerald-500/5 border border-emerald-500/10 p-4 sm:p-5 rounded-2xl mb-6 lg:mb-8 shrink-0">
+                    <p className="text-[11px] sm:text-xs text-emerald-100/60 font-medium leading-relaxed">
+                      Security questions protect your account from fraudsters and aid account recovery if you forget your password or get locked out.
+                    </p>
+                  </div>
+
+                  <div className="space-y-6 overflow-y-auto pr-2 custom-scrollbar flex-1 min-h-0">
+                    {[
+                      "What is the name of the first school you attended?",
+                      "What is the name of your favorite musician or band?",
+                      "What was the make and model of your first car?"
+                    ].map((q, i) => (
+                      <div key={i} className="space-y-3">
+                        <label className="text-[10px] text-white/30 font-black uppercase tracking-widest flex items-center gap-2">
+                          <span className="w-1 h-1 rounded-full bg-emerald-500"></span>
+                          Question {i + 1}
+                        </label>
+                        <p className="text-sm font-black text-white px-1">{q}</p>
+                        <input 
+                          type="text"
+                          placeholder="Provide your answer"
+                          className="w-full bg-white/5 border border-white/10 rounded-xl py-3.5 px-5 text-sm font-medium text-white focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 outline-none transition-all placeholder:text-white/10"
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-8 lg:mt-10 flex justify-end gap-3 sm:gap-4 shrink-0 border-t border-white/5 pt-6">
+                    <button 
+                      onClick={() => setShowQuestions(false)}
+                      className="px-8 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest text-white/40 hover:text-white transition-all underline decoration-emerald-500/20 underline-offset-8"
+                    >
+                      Go back
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setShowQuestions(false)
+                        toast.push({ message: 'Security questions synchronized' })
+                      }}
+                      className="bg-emerald-500 text-[#06201B] px-10 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-2xl hover:bg-white transition-all active:scale-95"
+                    >
+                      Submit
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
