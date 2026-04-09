@@ -6,6 +6,7 @@ export default function Login() {
   const { login } = useMerchantAuth()
   const [phone, setPhone] = useState('0712345678')
   const [password, setPassword] = useState('Paychain2026')
+  const [showPassword, setShowPassword] = useState(false)
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(false)
   const nav = useNavigate()
@@ -27,10 +28,10 @@ export default function Login() {
   return (
     <div className="flex min-h-screen bg-[#FDFDFC]">
       {/* Left Branding Side - Hidden on small screens */}
-      <div className="hidden lg:flex w-1/2 bg-[#0A2540] p-16 flex-col justify-between relative overflow-hidden">
+      <div className="hidden lg:flex w-1/2 bg-[#06201B] p-16 flex-col justify-between relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
           <div className="absolute -top-1/4 -left-1/4 w-full h-full bg-emerald-500 rounded-full blur-[120px]"></div>
-          <div className="absolute -bottom-1/4 -right-1/4 w-full h-full bg-blue-500 rounded-full blur-[120px]"></div>
+          <div className="absolute -bottom-1/4 -right-1/4 w-full h-full bg-emerald-600 rounded-full blur-[120px]"></div>
         </div>
         
         <div className="relative z-10">
@@ -112,13 +113,24 @@ export default function Login() {
                 <label className="text-[11px] font-black uppercase tracking-widest text-primary/60">Password</label>
                 <a href="mailto:hello@paychainke.co" className="text-[9px] font-black uppercase tracking-widest text-emerald-600 hover:text-emerald-700">Forgot Access?</a>
               </div>
-              <input 
-                type="password" 
-                className="w-full bg-white border border-outline-variant/15 rounded-2xl py-4 px-5 text-lg font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40"
-                value={password} 
-                onChange={e => setPassword(e.target.value)} 
-                placeholder="••••••••"
-              />
+              <div className="relative">
+                <input 
+                  type={showPassword ? "text" : "password"} 
+                  className="w-full bg-white border border-outline-variant/15 rounded-2xl py-4 px-5 text-lg font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40 pr-14"
+                  value={password} 
+                  onChange={e => setPassword(e.target.value)} 
+                  placeholder="••••••••"
+                />
+                <button 
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-primary/40 hover:text-primary transition-colors p-1"
+                >
+                  <span className="material-symbols-outlined text-xl">
+                    {showPassword ? 'visibility' : 'visibility_off'}
+                  </span>
+                </button>
+              </div>
             </div>
 
             {err && (
