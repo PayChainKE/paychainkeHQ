@@ -12,12 +12,12 @@ const navItems = [
 
 export default function MerchantSidebar() {
   return (
-    <aside className="fixed left-0 top-0 h-full w-[240px] z-50 bg-[#1f302b] dark:bg-emerald-950 flex flex-col overflow-y-auto">
+    <aside className="fixed left-0 top-0 h-full w-[240px] z-50 bg-[#162723] flex flex-col overflow-y-auto">
       {/* Brand & Identity Header */}
       <div className="p-6">
-        <h1 className="font-headline text-2xl text-white tracking-tight">PayChain</h1>
-        <div className="mt-4 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center overflow-hidden">
+        <h1 className="font-headline text-3xl text-white tracking-tight mb-8">PayChain</h1>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center overflow-hidden border border-white/10 shadow-sm">
             <img 
               alt="Merchant Profile Avatar" 
               className="w-full h-full object-cover" 
@@ -26,31 +26,31 @@ export default function MerchantSidebar() {
           </div>
           <div>
             <p className="text-white text-xs font-bold leading-tight truncate w-[130px]">{mockMerchant.businessName}</p>
-            <p className="text-[#c0c9c0] text-[10px] uppercase tracking-wider">Till: {mockMerchant.tillNumber} • Trust: {mockMerchant.trustScore.current}/100</p>
+            <p className="text-[#a8b3a8] text-[9px] uppercase tracking-wider mt-0.5">TILL: {mockMerchant.tillNumber} • TRUST: {mockMerchant.trustScore.current}/100</p>
           </div>
         </div>
       </div>
 
       {/* Primary Navigation */}
-      <nav className="flex-1 mt-4">
+      <nav className="flex-1 mt-6">
         {navItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
             className={({ isActive }) => 
-              `flex items-center gap-3 py-3 px-6 transition-all relative group ${
+              `flex items-center gap-3 py-3.5 px-6 transition-all relative group ${
                 isActive 
-                ? 'text-[#86f8c9] border-l-4 border-[#86f8c9] bg-emerald-900/30 font-bold' 
-                : 'text-[#c0c9c0] hover:text-white hover:bg-emerald-800/20'
+                ? 'text-[#5EFEB3] bg-[#0E3D2E] font-bold after:absolute after:left-0 after:top-0 after:bottom-0 after:w-1 after:bg-[#5EFEB3]' 
+                : 'text-[#c0c9c0] hover:text-white hover:bg-emerald-900/40'
               }`
             }
           >
             {({ isActive }) => (
               <>
-                <span className={`material-symbols-outlined transition-colors ${isActive ? 'text-[#86f8c9]' : 'text-inherit opacity-70 group-hover:opacity-100'}`}>
+                <span className={`material-symbols-outlined transition-colors text-xl ${isActive ? 'text-[#5EFEB3]' : 'text-inherit opacity-60 group-hover:opacity-100'}`}>
                   {item.icon}
                 </span>
-                <span className="text-sm">{item.name}</span>
+                <span className="text-xs tracking-wide">{item.name}</span>
               </>
             )}
           </NavLink>
@@ -59,19 +59,19 @@ export default function MerchantSidebar() {
 
       {/* Available Funds Box & Footer Actions */}
       <div className="p-6 mt-auto">
-        <div className="bg-emerald-900/40 rounded-xl p-4 mb-6">
-          <p className="text-[#86f8c9] text-[10px] font-bold uppercase tracking-widest mb-1">Available Funds</p>
-          <p className="text-white font-headline text-lg tracking-tight">KES {new Intl.NumberFormat().format(mockMerchant.financials.kesBalance)}</p>
-          <p className="text-[#c0c9c0] text-[10px]">{mockMerchant.financials.usdcBalance.toFixed(2)} USDC</p>
+        <div className="bg-[#0D241E] rounded-[24px] p-5 mb-8 border border-white/5">
+          <p className="text-[#5EFEB3] text-[9px] font-bold uppercase tracking-widest mb-2">Available Funds</p>
+          <p className="text-white font-headline text-2xl tracking-tight mb-0.5">KES {new Intl.NumberFormat().format(mockMerchant.financials.kesBalance)}</p>
+          <p className="text-[#a8b3a8] text-[10px]">{mockMerchant.financials.usdcBalance.toFixed(2)} USDC</p>
         </div>
         
-        <div className="space-y-1">
-          <NavLink to="/profile" className="flex items-center gap-3 text-[#c0c9c0] hover:text-white py-2 px-2 transition-colors rounded-lg hover:bg-emerald-800/20">
-            <span className="material-symbols-outlined text-sm">settings</span>
+        <div className="space-y-1 pt-4 border-t border-white/5">
+          <NavLink to="/profile" className="flex items-center gap-3 text-[#c0c9c0] hover:text-white py-2 px-1 transition-colors group">
+            <span className="material-symbols-outlined text-lg opacity-60 group-hover:opacity-100 transition-opacity">settings</span>
             <span className="text-xs">Settings</span>
           </NavLink>
-          <NavLink to="/support" className="flex items-center gap-3 text-[#c0c9c0] hover:text-white py-2 px-2 transition-colors rounded-lg hover:bg-emerald-800/20">
-            <span className="material-symbols-outlined text-sm">help_outline</span>
+          <NavLink to="/support" className="flex items-center gap-3 text-[#c0c9c0] hover:text-white py-2 px-1 transition-colors group">
+            <span className="material-symbols-outlined text-lg opacity-60 group-hover:opacity-100 transition-opacity">help_outline</span>
             <span className="text-xs">Support</span>
           </NavLink>
         </div>

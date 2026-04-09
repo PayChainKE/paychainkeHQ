@@ -10,22 +10,20 @@ export default function RevenueChart({ labels, data, accentColor = '#1d9e75' }) 
       {
         label: 'Revenue',
         data,
-        borderColor: accentColor,
+        borderColor: '#00855D',
         backgroundColor: (context) => {
           const ctx = context.chart.ctx;
           const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-          gradient.addColorStop(0, `${accentColor}33`); // 20% opacity
-          gradient.addColorStop(1, `${accentColor}00`); // 0% opacity
+          gradient.addColorStop(0, `rgba(0, 133, 93, 0.1)`);
+          gradient.addColorStop(1, `rgba(0, 133, 93, 0)`);
           return gradient;
         },
-        tension: 0.5, // Smoother curve
+        tension: 0.45,
         fill: true,
-        pointRadius: 4,
-        pointBackgroundColor: '#ffffff',
-        pointBorderColor: accentColor,
-        pointBorderWidth: 2,
+        pointRadius: 0,
         pointHoverRadius: 6,
-        borderWidth: 3,
+        borderWidth: 4,
+        capBezierPoints: true,
       }
     ]
   }
