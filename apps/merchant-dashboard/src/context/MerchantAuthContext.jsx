@@ -43,30 +43,29 @@ export function MerchantAuthProvider({ children }){
     // simulate API delay
     await new Promise(r=>setTimeout(r,800))
     const norm = normalizePhone(phone)
-    // First time login - temp password
     const saved = JSON.parse(localStorage.getItem(CRED_KEY) || JSON.stringify({phone:TEST_PHONE,password:TEST_TEMP_PW,first:true}))
     
-    // Always allow the latest demo credentials even if localStorage has stale data
-    const isDemoMatch = norm === TEST_PHONE && password === TEST_TEMP_PW
-    const isSavedMatch = norm === saved.phone && password === saved.password
+    // If using the INITIAL DEMO CREDENTIALS, always trigger reset flow
+    if (norm === TEST_PHONE && password === TEST_TEMP_PW) {
+      setIsFirstLogin(true)
+      return { success:true, firstLogin:true }
+    }
 
-    if (isDemoMatch || isSavedMatch){
-      if (saved.first && isSavedMatch && !isDemoMatch){
-        setIsFirstLogin(true)
-        return { success:true, firstLogin:true }
-      }
+    // If using SAVED CUSTOM CREDENTIALS, allow direct dashboard access
+    if (norm === saved.phone && password === saved.password){
       setMerchant(mockMerchant)
       localStorage.setItem(STORAGE_KEY, JSON.stringify(mockMerchant))
       setIsFirstLogin(false)
       return { success:true }
     }
+
     return { success:false, error:'Invalid phone number or password.' }
   }
 
   async function setNewPassword(newPassword){
     await new Promise(r=>setTimeout(r,800))
     // persist mock credential change
-    const saved = JSON.parse(localStorage.getItem(CRED_KEY) || '{}')
+    const saved = JSON.parse(localStorage.getItem(CRED_KEY) || JSON.stringify({phone:TEST_PHONE,password:TEST_TEMP_PW,first:true}))
     saved.password = newPassword
     saved.first = false
     localStorage.setItem(CRED_KEY, JSON.stringify(saved))
