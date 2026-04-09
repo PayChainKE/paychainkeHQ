@@ -11,6 +11,7 @@ export default function Overview() {
   const [stats, setStats] = useState(getTransactionStats())
   const [fraudAlerts, setFraudAlerts] = useState(0) // Logic scaffolding
   const [settlementBalance, setSettlementBalance] = useState(0) // Logic scaffolding
+  const [showAmounts, setShowAmounts] = useState(true)
   
   useEffect(() => {
     // Logic scaffolding: Simulate data loading or calculation
@@ -40,12 +41,23 @@ export default function Overview() {
           <div className="relative z-10">
             <div className="flex justify-between items-start mb-10">
               <span className="bg-[#1F4D3C] text-[#5EFEB3] px-4 py-1.5 rounded-full text-[9px] font-black tracking-[0.15em] uppercase border border-white/10">Primary Ledger</span>
-              <span className="text-white/40 text-[9px] uppercase font-bold tracking-[0.15em]">Till: {mockMerchant.tillNumber}</span>
+              <div className="flex items-center gap-4">
+                <span className="text-white/40 text-[9px] uppercase font-bold tracking-[0.15em]">Till: {mockMerchant.tillNumber}</span>
+                <button 
+                  onClick={() => setShowAmounts(!showAmounts)}
+                  className="text-white/40 hover:text-white transition-colors"
+                  title={showAmounts ? "Hide Amounts" : "Show Amounts"}
+                >
+                  <span className="material-symbols-outlined text-lg leading-none">
+                    {showAmounts ? 'visibility' : 'visibility_off'}
+                  </span>
+                </button>
+              </div>
             </div>
             <div className="flex justify-between items-center mb-10">
               <div>
-                <h3 className="font-headline font-bold text-4xl tracking-tighter tabular-nums mb-1">KES 184,250</h3>
-                <div className="flex items-center gap-2 text-[#5EFEB3] font-bold text-[10px] tracking-wide">
+                <h3 className={`font-headline font-bold text-4xl tracking-tighter tabular-nums mb-1 transition-all duration-300 ${!showAmounts && 'blur-lg grayscale'}`}>KES 184,250</h3>
+                <div className={`flex items-center gap-2 text-[#5EFEB3] font-bold text-[10px] tracking-wide transition-all duration-300 ${!showAmounts && 'blur-sm grayscale'}`}>
                   <span className="material-symbols-outlined text-[10px]" style={{fontVariationSettings: "'FILL' 1"}}>trending_up</span>
                   <span>+KES 18,450 today</span>
                 </div>
@@ -60,10 +72,19 @@ export default function Overview() {
           <div className="relative z-10 flex flex-col h-full">
             <div className="flex justify-between items-start mb-10">
               <span className="bg-[#243B5C] text-[#A6C8FF] px-4 py-1.5 rounded-full text-[9px] font-black tracking-[0.15em] uppercase border border-white/10">Global Settlements</span>
+              <button 
+                onClick={() => setShowAmounts(!showAmounts)}
+                className="text-white/40 hover:text-white transition-colors"
+                title={showAmounts ? "Hide Amounts" : "Show Amounts"}
+              >
+                <span className="material-symbols-outlined text-lg leading-none">
+                  {showAmounts ? 'visibility' : 'visibility_off'}
+                </span>
+              </button>
             </div>
             <div className="flex-1">
-              <h3 className="font-headline font-bold text-4xl tracking-tighter tabular-nums mb-3">312.50 USDC</h3>
-              <p className="text-white/40 text-[10px] font-bold tracking-tight opacity-70 uppercase">≈ {formatKES(mockMerchant.financials.usdcBalance * 130)}</p>
+              <h3 className={`font-headline font-bold text-4xl tracking-tighter tabular-nums mb-3 transition-all duration-300 ${!showAmounts && 'blur-lg grayscale'}`}>312.50 USDC</h3>
+              <p className={`text-white/40 text-[10px] font-bold tracking-tight opacity-70 uppercase transition-all duration-300 ${!showAmounts && 'blur-sm grayscale'}`}>≈ {formatKES(mockMerchant.financials.usdcBalance * 130)}</p>
             </div>
             <div className="flex gap-4 mt-8">
               <button className="flex-1 py-3 px-4 bg-white/5 hover:bg-white/10 text-white rounded-xl text-[10px] font-black transition-all border border-white/10 uppercase tracking-widest leading-none">Swap KES → USDC</button>
@@ -86,8 +107,8 @@ export default function Overview() {
               <p className="text-[10px] text-primary font-black uppercase tracking-widest leading-none">{stat.label}</p>
               {stat.showBadge && <span className="material-symbols-outlined text-xs text-emerald-600" style={{fontVariationSettings: "'FILL' 1"}}>verified</span>}
             </div>
-            <p className="text-3xl font-headline text-primary mb-2 leading-none">{stat.value}</p>
-            <p className={`text-[10px] ${stat.trendColor} font-bold tracking-tight opacity-90`}>{stat.trend}</p>
+            <p className={`text-3xl font-headline text-primary mb-2 leading-none transition-all duration-300 ${!showAmounts && 'blur-md'}`}>{stat.value}</p>
+            <p className={`text-[10px] ${stat.trendColor} font-bold tracking-tight opacity-90 transition-all duration-300 ${!showAmounts && 'blur-xs opacity-40'}`}>{stat.trend}</p>
           </div>
         ))}
       </section>
@@ -136,7 +157,7 @@ export default function Overview() {
                     <span className="material-symbols-outlined text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
                     <span className="text-[9px] font-bold uppercase tracking-[0.1em]">Verified</span>
                   </div>
-                  <div>
+                  <div className={`transition-all duration-300 ${!showAmounts && 'blur-md'}`}>
                     <p className="text-sm font-extrabold text-emerald-700 group-hover:text-[#5EFEB3] transition-colors">+{formatKES(tx.amount)}</p>
                     <p className="text-[10px] text-on-surface-variant font-bold opacity-50 tracking-tight group-hover:text-white/40 transition-colors">{tx.time}</p>
                   </div>
@@ -156,7 +177,7 @@ export default function Overview() {
               <p className="text-primary text-[10px] font-black uppercase tracking-[0.2em]">Active Cash Advance</p>
               <span className="material-symbols-outlined text-primary text-lg" style={{ fontVariationSettings: "'wght' 300" }}>account_balance_wallet</span>
             </div>
-            <h4 className="font-headline text-4xl text-primary mb-8">KES 150,000</h4>
+            <h4 className={`font-headline text-4xl text-primary mb-8 transition-all duration-300 ${!showAmounts && 'blur-lg'}`}>KES 150,000</h4>
             <div className="space-y-6">
               <div className="w-full bg-[#F0FDF4] h-2 rounded-full overflow-hidden border border-emerald-50">
                 <div className="bg-emerald-500 h-full rounded-full transition-all duration-1000 ease-out" style={{ width: '45%' }}></div>
