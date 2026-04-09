@@ -12,6 +12,10 @@ export default function Overview() {
   const [fraudAlerts, setFraudAlerts] = useState(0) // Logic scaffolding
   const [settlementBalance, setSettlementBalance] = useState(0) // Logic scaffolding
   const [activeTimeframe, setActiveTimeframe] = useState('7D')
+  const [showAmounts, setShowAmounts] = useState(() => {
+    const saved = localStorage.getItem('paychain_privacy_mode')
+    return saved !== null ? JSON.parse(saved) : true
+  })
   
   const timeframes = {
     '7D': {
