@@ -22,6 +22,18 @@ export function MerchantAuthProvider({ children }){
     if (raw){
       try{ setMerchant(JSON.parse(raw)); setIsFirstLogin(false) }catch(e){}
     }
+    
+    // Reset stale credentials if they don't match the new demo defaults
+    const saved = localStorage.getItem(CRED_KEY)
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        if (parsed.phone !== TEST_PHONE && parsed.phone === '+254712847291') {
+          localStorage.removeItem(CRED_KEY)
+        }
+      } catch (e) {}
+    }
+    
     setIsLoading(false)
   },[])
 
@@ -33,8 +45,13 @@ export function MerchantAuthProvider({ children }){
     const norm = normalizePhone(phone)
     // First time login - temp password
     const saved = JSON.parse(localStorage.getItem(CRED_KEY) || JSON.stringify({phone:TEST_PHONE,password:TEST_TEMP_PW,first:true}))
-    if (norm === saved.phone && password === saved.password){
-      if (saved.first){
+    
+    // Always allow the latest demo credentials even if localStorage has stale data
+    const isDemoMatch = norm === TEST_PHONE && password === TEST_TEMP_PW
+    const isSavedMatch = norm === saved.phone && password === saved.password
+
+    if (isDemoMatch || isSavedMatch){
+      if (saved.first && isSavedMatch && !isDemoMatch){
         setIsFirstLogin(true)
         return { success:true, firstLogin:true }
       }
