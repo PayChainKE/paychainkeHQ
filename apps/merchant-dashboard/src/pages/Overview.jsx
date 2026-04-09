@@ -50,9 +50,6 @@ export default function Overview() {
                   <span>+KES 18,450 today</span>
                 </div>
               </div>
-              <button className="px-5 py-2.5 bg-white/5 hover:bg-white/10 text-white rounded-full text-[10px] font-black transition-all border border-white/10 uppercase tracking-widest leading-none">
-                Swap KES → USDC
-              </button>
             </div>
           </div>
         </div>
