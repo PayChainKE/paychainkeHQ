@@ -15,7 +15,7 @@ export default function MerchantSidebar() {
     <aside className="fixed left-0 top-0 h-full w-[240px] z-50 bg-[#162723] flex flex-col overflow-y-auto">
       {/* Brand & Identity Header */}
       <div className="p-6">
-        <h1 className="font-headline text-3xl text-white tracking-tight mb-8">PayChain</h1>
+        <h1 className="font-headline font-bold text-3xl text-white tracking-tight mb-8">PayChain</h1>
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center overflow-hidden border border-white/10 shadow-sm">
             <img 
