@@ -33,11 +33,18 @@ export default function Overview() {
 
   const recentTx = transactionsData.filter(t => t.type === 'inbound').slice(0, 5)
 
+  const getGreeting = () => {
+    const hour = new Date().getHours()
+    if (hour < 12) return 'Good morning'
+    if (hour < 17) return 'Good afternoon'
+    return 'Good evening'
+  }
+
   return (
     <MerchantLayout title="Overview">
       {/* Greeting */}
       <section className="mb-4">
-        <h2 className="font-headline font-bold text-4xl text-primary tracking-tight">Good morning, {mockMerchant.name.split(' ')[0]}. 👋</h2>
+        <h2 className="font-headline font-bold text-4xl text-primary tracking-tight">{getGreeting()}, {mockMerchant.name.split(' ')[0]}. 👋</h2>
         <p className="text-on-surface-variant text-sm mt-1.5 opacity-80 font-medium">Here's how {mockMerchant.businessName} is doing today.</p>
       </section>
 
