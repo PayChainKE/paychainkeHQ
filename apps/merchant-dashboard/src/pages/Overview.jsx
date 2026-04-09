@@ -182,24 +182,34 @@ export default function Overview() {
               { id: 4, name: 'Evans Kiprono', ref: 'PLM992OSS', amount: 12500, time: '1 hour ago', initials: 'EK', color: 'bg-indigo-100' },
               { id: 5, name: 'Alice Nyambura', ref: 'VFR4451PP', amount: 2100, time: '2 hours ago', initials: 'AN', color: 'bg-purple-100' }
             ].map(tx => (
-              <div key={tx.id} className="px-8 py-5 flex items-center justify-between hover:bg-[#00351D] transition-all group cursor-pointer">
-                <div className="flex items-center gap-4">
-                  <div className={`w-12 h-12 rounded-full ${tx.color} flex items-center justify-center overflow-hidden font-bold text-primary text-xs border border-white/20 shadow-sm group-hover:bg-white/10 group-hover:text-white group-hover:border-white/10 transition-colors`}>
+              <div key={tx.id} className="px-4 lg:px-8 py-4 lg:py-5 flex items-center justify-between hover:bg-[#00351D] transition-all group cursor-pointer border-l-2 border-transparent hover:border-emerald-500">
+                <div className="flex items-center gap-3 lg:gap-4 flex-1 min-w-0">
+                  <div className={`w-10 h-10 lg:w-12 lg:h-12 rounded-full ${tx.color} flex items-center justify-center overflow-hidden font-black text-primary text-[10px] lg:text-xs border border-white/20 shadow-sm group-hover:bg-white/10 group-hover:text-amber-400 group-hover:border-amber-400/20 transition-all duration-300 shrink-0`}>
                     {tx.initials}
                   </div>
-                  <div>
-                    <p className="text-sm font-bold text-on-surface leading-snug group-hover:text-white transition-colors">{tx.name}</p>
-                    <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider opacity-60 group-hover:text-white/60 transition-colors">REF: {tx.ref}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] lg:text-sm font-black text-primary leading-tight group-hover:text-white transition-colors truncate">{tx.name}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <p className="text-[9px] lg:text-[10px] text-on-surface-variant font-black uppercase tracking-widest opacity-40 group-hover:text-white/40 group-hover:opacity-100 transition-colors truncate">REF: {tx.ref}</p>
+                      <div className="flex lg:hidden items-center gap-1 text-emerald-600 group-hover:text-emerald-400 transition-colors">
+                        <span className="material-symbols-outlined text-[10px]" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-10 text-right">
-                  <div className="flex items-center gap-1.5 text-emerald-600 group-hover:text-[#5EFEB3] transition-colors">
-                    <span className="material-symbols-outlined text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
-                    <span className="text-[9px] font-bold uppercase tracking-[0.1em]">Verified</span>
+                
+                <div className="flex items-center gap-4 lg:gap-10 text-right shrink-0">
+                  <div className="hidden lg:flex items-center gap-1.5 text-emerald-600 group-hover:text-[#5EFEB3] transition-colors">
+                    <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
+                    <span className="text-[9px] font-black uppercase tracking-[0.1em]">Verified</span>
                   </div>
-                  <div>
-                    <p className="text-sm font-extrabold text-emerald-700 group-hover:text-[#5EFEB3] transition-colors">+{formatKES(tx.amount)}</p>
-                    <p className="text-[10px] text-on-surface-variant font-bold opacity-50 tracking-tight group-hover:text-white/40 transition-colors">{tx.time}</p>
+                  <div className="flex flex-col items-end">
+                    <p className="text-[13px] lg:text-sm font-black text-emerald-700 group-hover:text-[#5EFEB3] transition-colors leading-none mb-1">
+                      +{formatKES(tx.amount)}
+                    </p>
+                    <p className="text-[9px] lg:text-[10px] text-on-surface-variant font-black opacity-30 tracking-widest group-hover:text-white/30 transition-colors uppercase">
+                      {tx.time}
+                    </p>
                   </div>
                 </div>
               </div>
