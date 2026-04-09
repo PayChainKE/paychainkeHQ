@@ -147,7 +147,7 @@ export default function Overview() {
 
         {/* Section 5: Cash Advance & Tips */}
         <div className="space-y-6">
-          <section className="bg-white p-8 rounded-[16px] border border-[#E5E7EB] shadow-sm editorial-shadow">
+          <section className="bg-white p-8 rounded-[16px] border border-[#E5E7EB] border-t-4 border-t-[#00351D] shadow-sm editorial-shadow">
             <div className="flex justify-between items-center mb-8">
               <p className="text-primary text-[10px] font-black uppercase tracking-[0.2em]">Active Cash Advance</p>
               <span className="material-symbols-outlined text-primary text-lg" style={{ fontVariationSettings: "'wght' 300" }}>account_balance_wallet</span>
@@ -192,7 +192,7 @@ export default function Overview() {
           { icon: 'swap_horiz', label: 'Swap to USDC' },
           { icon: 'insights', label: 'View Trust Score' }
         ].map((action, idx) => (
-          <button key={idx} className="flex flex-col items-center justify-center p-8 bg-white rounded-[20px] border border-[#E5E7EB] shadow-sm hover:bg-[#00351D] hover:border-[#00351D] transition-all group active:scale-95">
+          <button key={idx} className="flex flex-col items-center justify-center p-8 bg-white rounded-[20px] border border-[#E5E7EB] border-t-2 border-t-[#00351D] shadow-sm hover:bg-[#00351D] hover:border-[#00351D] transition-all group active:scale-95">
             <div className="w-14 h-14 rounded-full bg-[#F0FDF4] mb-4 flex items-center justify-center border border-emerald-50 group-hover:bg-white/10 transition-colors">
               <span className="material-symbols-outlined text-primary group-hover:text-[#5EFEB3] group-hover:scale-110 transition-all">{action.icon}</span>
             </div>
