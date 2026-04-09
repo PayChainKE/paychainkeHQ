@@ -116,14 +116,27 @@ export default function Notifications() {
           )}
         </div>
 
-        {/* Info Box */}
-        <div className="mt-12 bg-primary p-8 lg:p-10 rounded-[40px] relative overflow-hidden group border border-white/5">
-          <div className="absolute -top-24 -right-24 w-64 h-64 bg-emerald-500 rounded-full blur-[100px] opacity-20 pointer-events-none transition-transform duration-1000 group-hover:scale-150"></div>
-          <div className="relative z-10">
-            <h4 className="text-white text-2xl font-headline tracking-tight mb-3">Notification Settings</h4>
-            <p className="text-white/60 text-sm leading-relaxed max-w-lg mb-0 font-medium">
-              You're currently receiving all system alerts via the Merchant Dashboard and M-PESA registered phone. To adjust your preferences, contact your onboarding officer.
-            </p>
+        {/* Info Box - Dark Green Premium Theme */}
+        <div className="mt-12 lg:mt-16 bg-[#06201B] p-8 lg:p-12 rounded-[40px] relative overflow-hidden group shadow-2xl">
+          {/* Glassmorphic Highlights */}
+          <div className="absolute -top-24 -right-24 w-80 h-80 bg-emerald-500 rounded-full blur-[100px] opacity-20 pointer-events-none transition-transform duration-1000 group-hover:scale-150"></div>
+          <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-emerald-600 rounded-full blur-[80px] opacity-10 pointer-events-none"></div>
+          
+          <div className="flex flex-col lg:flex-row items-center lg:items-center gap-8 lg:gap-12 relative z-10">
+            <div className="w-16 h-16 lg:w-20 lg:h-20 rounded-3xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-inner backdrop-blur-sm">
+              <span className="material-symbols-outlined text-4xl group-hover:scale-110 transition-transform duration-500">settings_suggest</span>
+            </div>
+            
+            <div className="flex-1 text-center lg:text-left">
+              <h4 className="text-white text-2xl lg:text-4xl font-headline tracking-tight mb-4">Notification Settings</h4>
+              <p className="text-blue-100/70 text-base lg:text-xl leading-relaxed max-w-2xl font-medium">
+                You're currently receiving all system alerts via the <span className="text-emerald-400 font-black">Merchant Dashboard</span> and <span className="text-white font-black">M-PESA registered phone</span>. 
+              </p>
+              <div className="mt-8 flex flex-col lg:flex-row items-center gap-3 text-emerald-400/60 transition-colors group-hover:text-emerald-400">
+                <span className="material-symbols-outlined text-xl">info</span>
+                <p className="text-[10px] lg:text-[12px] font-black uppercase tracking-[0.2em]">To adjust your preferences, contact your onboarding officer.</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
