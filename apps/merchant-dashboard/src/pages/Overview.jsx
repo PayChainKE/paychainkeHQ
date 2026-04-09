@@ -14,7 +14,7 @@ export default function Overview() {
   const [fraudAlerts, setFraudAlerts] = useState(0) // Logic scaffolding
   const [settlementBalance, setSettlementBalance] = useState(0) // Logic scaffolding
   const [activeTimeframe, setActiveTimeframe] = useState('7D')
-  
+
   const timeframes = {
     '7D': {
       labels: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'],
@@ -35,7 +35,7 @@ export default function Overview() {
     const totalTransactions = mockMerchant.financials.totalTransactions
     const alerts = 0 // In a real app, this would come from an API
     const settlement = mockMerchant.financials.kesBalance + (mockMerchant.financials.usdcBalance * 130)
-    
+
     setFraudAlerts(alerts)
     setSettlementBalance(settlement)
   }, [])
@@ -69,7 +69,7 @@ export default function Overview() {
               <span className="bg-[#1F4D3C] text-[#5EFEB3] px-3 lg:px-4 py-1.5 rounded-full text-[8px] lg:text-[9px] font-black tracking-[0.15em] uppercase border border-white/10">Primary Ledger</span>
               <div className="flex items-center gap-3 lg:gap-4 text-[8px] lg:text-[9px]">
                 <span className="text-white/40 uppercase font-bold tracking-[0.15em] hidden sm:inline">Till: {mockMerchant.tillNumber}</span>
-                <button 
+                <button
                   onClick={togglePrivacy}
                   className="text-white/40 hover:text-white transition-colors p-1"
                   title={showAmounts ? "Hide Amounts" : "Show Amounts"}
@@ -84,7 +84,7 @@ export default function Overview() {
               <div>
                 <h3 className={`font-headline font-bold text-3xl lg:text-4xl tracking-tighter tabular-nums mb-1 transition-all duration-300 ${!showAmounts && 'blur-lg grayscale'}`}>KES 184,250</h3>
                 <div className={`flex items-center gap-2 text-[#5EFEB3] font-bold text-[9px] lg:text-[10px] tracking-wide transition-all duration-300 ${!showAmounts && 'blur-sm grayscale'}`}>
-                  <span className="material-symbols-outlined text-[10px]" style={{fontVariationSettings: "'FILL' 1"}}>trending_up</span>
+                  <span className="material-symbols-outlined text-[10px]" style={{ fontVariationSettings: "'FILL' 1" }}>trending_up</span>
                   <span>+KES 18,450 today</span>
                 </div>
               </div>
@@ -98,7 +98,7 @@ export default function Overview() {
           <div className="relative z-10 flex flex-col h-full">
             <div className="flex justify-between items-start mb-8 lg:mb-10">
               <span className="bg-[#243B5C] text-[#A6C8FF] px-3 lg:px-4 py-1.5 rounded-full text-[8px] lg:text-[9px] font-black tracking-[0.15em] uppercase border border-white/10">Global Settlements</span>
-              <button 
+              <button
                 onClick={togglePrivacy}
                 className="text-white/40 hover:text-white transition-colors p-1"
                 title={showAmounts ? "Hide Amounts" : "Show Amounts"}
@@ -131,7 +131,7 @@ export default function Overview() {
           <div key={i} className="bg-white p-6 lg:p-8 rounded-[12px] border border-[#E5E7EB] shadow-sm editorial-shadow transition-all group">
             <div className="flex justify-between items-center mb-4 lg:mb-6">
               <p className="text-[9px] lg:text-[10px] text-primary font-black uppercase tracking-widest leading-none">{stat.label}</p>
-              {stat.showBadge && <span className="material-symbols-outlined text-xs text-emerald-600" style={{fontVariationSettings: "'FILL' 1"}}>verified</span>}
+              {stat.showBadge && <span className="material-symbols-outlined text-xs text-emerald-600" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>}
             </div>
             <p className="text-2xl lg:text-3xl font-headline text-primary mb-2 leading-none">{stat.value}</p>
             <p className={`text-[9px] lg:text-[10px] ${stat.trendColor} font-bold tracking-tight opacity-90`}>{stat.trend}</p>
@@ -145,14 +145,13 @@ export default function Overview() {
           <h3 className="font-headline font-bold text-lg lg:text-xl text-primary">Revenue Overview</h3>
           <div className="flex bg-[#F0FDF4] p-0.5 rounded-md border border-emerald-100 self-end lg:self-auto">
             {['7D', '30D', '6M'].map((period) => (
-              <button 
+              <button
                 key={period}
                 onClick={() => setActiveTimeframe(period)}
-                className={`px-2 lg:px-3 py-0.5 text-[8px] lg:text-[9px] font-bold rounded-md transition-all uppercase tracking-wider ${
-                  activeTimeframe === period 
-                  ? 'bg-white text-emerald-800 shadow-sm' 
-                  : 'text-emerald-800/40 hover:text-emerald-800'
-                }`}
+                className={`px-2 lg:px-3 py-0.5 text-[8px] lg:text-[9px] font-bold rounded-md transition-all uppercase tracking-wider ${activeTimeframe === period
+                    ? 'bg-white text-emerald-800 shadow-sm'
+                    : 'text-emerald-800/40 hover:text-emerald-800'
+                  }`}
               >
                 {period}
               </button>
@@ -160,11 +159,11 @@ export default function Overview() {
           </div>
         </div>
         <div className="h-48 lg:h-60 w-full">
-          <RevenueChart 
-            labels={timeframes[activeTimeframe].labels} 
-            data={timeframes[activeTimeframe].data} 
-            key={activeTimeframe} 
-            accentColor="#00855D" 
+          <RevenueChart
+            labels={timeframes[activeTimeframe].labels}
+            data={timeframes[activeTimeframe].data}
+            key={activeTimeframe}
+            accentColor="#00855D"
           />
         </div>
       </section>

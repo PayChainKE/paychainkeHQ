@@ -2,6 +2,7 @@ import React from 'react'
 import { NavLink } from 'react-router-dom'
 import { mockMerchant } from '../../mockData/merchant'
 import { usePrivacyMode } from '../../hooks/usePrivacyMode'
+import userIcon from '../../assets/user-icon.png'
 
 const navItems = [
   { name: 'Dashboard', icon: 'dashboard', path: '/overview' },
@@ -31,7 +32,7 @@ export default function MerchantSidebar({ isOpen, onClose }) {
             <img 
               alt="Merchant Profile Avatar" 
               className="w-full h-full object-cover" 
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuAqqRMZyoMRVXBMC8LNLpfMkAUupF6H7DdECCf2jI3P-GQ83nzXXfi_Q8B25rhGyusUMGE641H3ANU0DPHwp_Cp25_xadTSiOmjlcjEdI-qZgPzwdYMK02wlungtcuOOMQKOeJr6ckAWa6M-Y2lXvbbzEWnY3hqmHigc2CNwe4dKmZ8S7X2XMcK8-m2v-RXi3jTm4i1tPJPtJwHrEu8AEvDAER89vSENsBGC2I4Nb-KHbMHC8SGFcWU7g_okoilICY7Pfc1uEOQBy--"
+              src={userIcon}
             />
           </div>
           <div>
@@ -83,6 +84,15 @@ export default function MerchantSidebar({ isOpen, onClose }) {
           <NavLink to="/support" className="flex items-center gap-3 text-[#c0c9c0] hover:text-white py-2 px-1 transition-colors group">
             <span className="material-symbols-outlined text-lg opacity-60 group-hover:opacity-100 transition-opacity">help_outline</span>
             <span className="text-xs">Support</span>
+          </NavLink>
+          <NavLink to="/notifications" className="flex items-center justify-between text-[#c0c9c0] hover:text-white py-2 px-1 transition-colors group">
+            <div className="flex items-center gap-3">
+              <span className="material-symbols-outlined text-lg opacity-60 group-hover:opacity-100 transition-opacity">notifications</span>
+              <span className="text-xs">Notifications</span>
+            </div>
+            {mockMerchant.notifications.filter(n => !n.isRead).length > 0 && (
+              <span className="w-1.5 h-1.5 bg-red-600 rounded-full"></span>
+            )}
           </NavLink>
         </div>
       </div>

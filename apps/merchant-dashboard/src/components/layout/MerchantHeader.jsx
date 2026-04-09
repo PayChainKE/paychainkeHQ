@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { mockMerchant } from '../../mockData/merchant'
 import { useMerchantAuth } from '../../context/MerchantAuthContext'
+import userIcon from '../../assets/user-icon.png'
 
 export default function MerchantHeader({ title, onMenuClick }) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
@@ -27,7 +28,7 @@ export default function MerchantHeader({ title, onMenuClick }) {
   }
   
   return (
-    <header className="sticky top-0 right-0 w-full h-[64px] lg:h-[56px] z-40 bg-white/90 backdrop-blur-md flex justify-between items-center px-4 lg:px-8 border-b border-outline-variant/15 glass-header transition-all">
+    <header className="fixed top-0 right-0 left-0 lg:left-[240px] h-[64px] lg:h-[56px] z-40 bg-white/90 backdrop-blur-md flex justify-between items-center px-4 lg:px-8 border-b border-outline-variant/15 glass-header transition-all">
       <div className="flex items-center gap-4">
         <button 
           onClick={onMenuClick}
@@ -61,7 +62,7 @@ export default function MerchantHeader({ title, onMenuClick }) {
             className={`flex items-center gap-2 p-1 lg:p-1.5 rounded-full transition-all duration-300 ${isDropdownOpen ? 'bg-emerald-50 ring-2 ring-emerald-500/20' : 'hover:bg-emerald-50'}`}
           >
             <div className="w-8 h-8 lg:w-9 lg:h-9 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 overflow-hidden border border-emerald-500/10">
-              <span className="material-symbols-outlined text-2xl lg:text-[28px]" style={{fontVariationSettings: "'FILL' 1"}}>account_circle</span>
+              <img src={userIcon} alt="User" className="w-full h-full object-cover" />
             </div>
             <span className="material-symbols-outlined text-on-surface-variant text-sm lg:text-base transition-transform duration-300" style={{ transform: isDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>
               expand_more
