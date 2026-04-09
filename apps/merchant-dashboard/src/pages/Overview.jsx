@@ -107,8 +107,8 @@ export default function Overview() {
               <p className="text-[10px] text-primary font-black uppercase tracking-widest leading-none">{stat.label}</p>
               {stat.showBadge && <span className="material-symbols-outlined text-xs text-emerald-600" style={{fontVariationSettings: "'FILL' 1"}}>verified</span>}
             </div>
-            <p className={`text-3xl font-headline text-primary mb-2 leading-none transition-all duration-300 ${!showAmounts && 'blur-md'}`}>{stat.value}</p>
-            <p className={`text-[10px] ${stat.trendColor} font-bold tracking-tight opacity-90 transition-all duration-300 ${!showAmounts && 'blur-xs opacity-40'}`}>{stat.trend}</p>
+            <p className="text-3xl font-headline text-primary mb-2 leading-none">{stat.value}</p>
+            <p className={`text-[10px] ${stat.trendColor} font-bold tracking-tight opacity-90`}>{stat.trend}</p>
           </div>
         ))}
       </section>
@@ -157,7 +157,7 @@ export default function Overview() {
                     <span className="material-symbols-outlined text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
                     <span className="text-[9px] font-bold uppercase tracking-[0.1em]">Verified</span>
                   </div>
-                  <div className={`transition-all duration-300 ${!showAmounts && 'blur-md'}`}>
+                  <div>
                     <p className="text-sm font-extrabold text-emerald-700 group-hover:text-[#5EFEB3] transition-colors">+{formatKES(tx.amount)}</p>
                     <p className="text-[10px] text-on-surface-variant font-bold opacity-50 tracking-tight group-hover:text-white/40 transition-colors">{tx.time}</p>
                   </div>
@@ -177,7 +177,7 @@ export default function Overview() {
               <p className="text-primary text-[10px] font-black uppercase tracking-[0.2em]">Active Cash Advance</p>
               <span className="material-symbols-outlined text-primary text-lg" style={{ fontVariationSettings: "'wght' 300" }}>account_balance_wallet</span>
             </div>
-            <h4 className={`font-headline text-4xl text-primary mb-8 transition-all duration-300 ${!showAmounts && 'blur-lg'}`}>KES 150,000</h4>
+            <h4 className="font-headline text-4xl text-primary mb-8">KES 150,000</h4>
             <div className="space-y-6">
               <div className="w-full bg-[#F0FDF4] h-2 rounded-full overflow-hidden border border-emerald-50">
                 <div className="bg-emerald-500 h-full rounded-full transition-all duration-1000 ease-out" style={{ width: '45%' }}></div>
