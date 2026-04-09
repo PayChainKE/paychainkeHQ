@@ -11,8 +11,16 @@ export default function Overview() {
   const [stats, setStats] = useState(getTransactionStats())
   const [fraudAlerts, setFraudAlerts] = useState(0) // Logic scaffolding
   const [settlementBalance, setSettlementBalance] = useState(0) // Logic scaffolding
-  const [showAmounts, setShowAmounts] = useState(true)
+  const [showAmounts, setShowAmounts] = useState(() => {
+    const saved = localStorage.getItem('paychain_privacy_mode')
+    return saved !== null ? JSON.parse(saved) : true
+  })
   
+  useEffect(() => {
+    localStorage.setItem('paychain_privacy_mode', JSON.stringify(showAmounts))
+    window.dispatchEvent(new Event('paychain_privacy_toggle'))
+  }, [showAmounts])
+
   useEffect(() => {
     // Logic scaffolding: Simulate data loading or calculation
     const totalTransactions = mockMerchant.financials.totalTransactions

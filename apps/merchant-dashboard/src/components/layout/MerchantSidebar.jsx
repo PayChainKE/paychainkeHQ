@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
 import { mockMerchant } from '../../mockData/merchant'
 
@@ -11,6 +11,20 @@ const navItems = [
 ]
 
 export default function MerchantSidebar() {
+  const [showAmounts, setShowAmounts] = useState(() => {
+    const saved = localStorage.getItem('paychain_privacy_mode')
+    return saved !== null ? JSON.parse(saved) : true
+  })
+
+  useEffect(() => {
+    const handleToggle = () => {
+      const saved = localStorage.getItem('paychain_privacy_mode')
+      setShowAmounts(saved !== null ? JSON.parse(saved) : true)
+    }
+    window.addEventListener('paychain_privacy_toggle', handleToggle)
+    return () => window.removeEventListener('paychain_privacy_toggle', handleToggle)
+  }, [])
+
   return (
     <aside className="fixed left-0 top-0 h-full w-[240px] z-50 bg-[#162723] flex flex-col overflow-y-auto">
       {/* Brand & Identity Header */}
@@ -61,8 +75,8 @@ export default function MerchantSidebar() {
       <div className="p-6 mt-auto">
         <div className="bg-[#0D241E] rounded-[16px] p-5 mb-8 border border-white/5">
           <p className="text-[#5EFEB3] text-[9px] font-bold uppercase tracking-widest mb-2">Available Funds</p>
-          <p className="text-white font-headline text-2xl tracking-tight mb-0.5">KES {new Intl.NumberFormat().format(mockMerchant.financials.kesBalance)}</p>
-          <p className="text-[#a8b3a8] text-[10px]">{mockMerchant.financials.usdcBalance.toFixed(2)} USDC</p>
+          <p className={`text-white font-headline text-2xl tracking-tight mb-0.5 transition-all duration-300 ${!showAmounts && 'blur-md'}`}>KES {new Intl.NumberFormat().format(mockMerchant.financials.kesBalance)}</p>
+          <p className={`text-[#a8b3a8] text-[10px] transition-all duration-300 ${!showAmounts && 'blur-sm'}`}>{mockMerchant.financials.usdcBalance.toFixed(2)} USDC</p>
         </div>
         
         <div className="space-y-1 pt-4 border-t border-white/5">
