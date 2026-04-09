@@ -11,11 +11,23 @@ export default function Overview() {
   const [stats, setStats] = useState(getTransactionStats())
   const [fraudAlerts, setFraudAlerts] = useState(0) // Logic scaffolding
   const [settlementBalance, setSettlementBalance] = useState(0) // Logic scaffolding
-  const [showAmounts, setShowAmounts] = useState(() => {
-    const saved = localStorage.getItem('paychain_privacy_mode')
-    return saved !== null ? JSON.parse(saved) : true
-  })
+  const [activeTimeframe, setActiveTimeframe] = useState('7D')
   
+  const timeframes = {
+    '7D': {
+      labels: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'],
+      data: revenueByDay.data
+    },
+    '30D': {
+      labels: ['WEEK 1', 'WEEK 2', 'WEEK 3', 'WEEK 4'],
+      data: [84000, 72000, 95000, 110000]
+    },
+    '6M': {
+      labels: ['OCT', 'NOV', 'DEC', 'JAN', 'FEB', 'MAR'],
+      data: [240000, 280000, 310000, 290000, 350000, 420000]
+    }
+  }
+
   useEffect(() => {
     localStorage.setItem('paychain_privacy_mode', JSON.stringify(showAmounts))
     window.dispatchEvent(new Event('paychain_privacy_toggle'))
@@ -133,13 +145,28 @@ export default function Overview() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 lg:mb-5">
           <h3 className="font-headline font-bold text-lg lg:text-xl text-primary">Revenue Overview</h3>
           <div className="flex bg-[#F0FDF4] p-0.5 rounded-md border border-emerald-100 self-end lg:self-auto">
-            <button className="px-2 lg:px-3 py-0.5 text-[8px] lg:text-[9px] font-bold rounded-md bg-white text-emerald-800 shadow-sm transition-all uppercase tracking-wider">7D</button>
-            <button className="px-2 lg:px-3 py-0.5 text-[8px] lg:text-[9px] font-bold text-emerald-800/40 hover:text-emerald-800 transition-all uppercase tracking-wider">30D</button>
-            <button className="px-2 lg:px-3 py-0.5 text-[8px] lg:text-[9px] font-bold text-emerald-800/40 hover:text-emerald-800 transition-all uppercase tracking-wider">6M</button>
+            {['7D', '30D', '6M'].map((period) => (
+              <button 
+                key={period}
+                onClick={() => setActiveTimeframe(period)}
+                className={`px-2 lg:px-3 py-0.5 text-[8px] lg:text-[9px] font-bold rounded-md transition-all uppercase tracking-wider ${
+                  activeTimeframe === period 
+                  ? 'bg-white text-emerald-800 shadow-sm' 
+                  : 'text-emerald-800/40 hover:text-emerald-800'
+                }`}
+              >
+                {period}
+              </button>
+            ))}
           </div>
         </div>
         <div className="h-48 lg:h-60 w-full">
-          <RevenueChart labels={['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']} data={revenueByDay.data} accentColor="#00855D" />
+          <RevenueChart 
+            labels={timeframes[activeTimeframe].labels} 
+            data={timeframes[activeTimeframe].data} 
+            key={activeTimeframe} 
+            accentColor="#00855D" 
+          />
         </div>
       </section>
 
