@@ -43,6 +43,6 @@ export default function App(){
           <ToastHost />
         </ToastProvider>
       </MerchantAuthProvider>
-    </BrowserRouter>
+      </BrowserRouter>
   )
 }

@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>PayChain | Collections</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;family=Noto+Serif:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "tertiary-fixed": "#d3e7e0",
+                        "on-secondary": "#ffffff",
+                        "tertiary-container": "#354641",
+                        "on-primary": "#ffffff",
+                        "tertiary-fixed-dim": "#b7cbc4",
+                        "surface-bright": "#eaffe8",
+                        "on-tertiary-fixed-variant": "#394a45",
+                        "error": "#ba1a1a",
+                        "surface-tint": "#2e6a48",
+                        "on-error-container": "#93000a",
+                        "primary-fixed-dim": "#96d4ab",
+                        "on-primary-fixed": "#002110",
+                        "on-tertiary-container": "#a0b4ad",
+                        "on-primary-fixed-variant": "#115132",
+                        "on-surface": "#0c2010",
+                        "primary-container": "#0b4d2e",
+                        "outline-variant": "#c0c9c0",
+                        "on-tertiary": "#ffffff",
+                        "on-background": "#0c2010",
+                        "surface-container-highest": "#d0e9cf",
+                        "on-secondary-fixed": "#002115",
+                        "secondary-container": "#83f5c6",
+                        "on-secondary-container": "#007151",
+                        "surface-variant": "#d0e9cf",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-high": "#d6efd4",
+                        "primary": "#00351d",
+                        "surface-container": "#dcf5da",
+                        "background": "#eaffe8",
+                        "surface-dim": "#c8e1c7",
+                        "on-surface-variant": "#404942",
+                        "secondary-fixed": "#86f8c9",
+                        "on-secondary-fixed-variant": "#00513a",
+                        "inverse-surface": "#213523",
+                        "error-container": "#ffdad6",
+                        "tertiary": "#1f302b",
+                        "inverse-on-surface": "#def7dd",
+                        "surface-container-low": "#e1fadf",
+                        "surface": "#eaffe8",
+                        "secondary-fixed-dim": "#68dbae",
+                        "on-primary-container": "#80bd95",
+                        "on-error": "#ffffff",
+                        "on-tertiary-fixed": "#0d1f1b",
+                        "outline": "#707971",
+                        "primary-fixed": "#b1f1c6",
+                        "secondary": "#006c4e",
+                        "inverse-primary": "#96d4ab"
+                    },
+                    fontFamily: {
+                        "headline": ["DM Serif Display", "serif"],
+                        "body": ["Plus Jakarta Sans", "sans-serif"],
+                        "label": ["Plus Jakarta Sans", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .serif-font { font-family: 'DM Serif Display', serif; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #c0c9c0; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface flex min-h-screen">
+<!-- SideNavBar (Shared Component) -->
+<aside class="fixed left-0 top-0 h-full w-[240px] z-50 bg-[#1f302b] dark:bg-emerald-950 flex flex-col overflow-y-auto">
+<div class="p-6">
+<h1 class="font-['DM_Serif_Display'] text-2xl text-white tracking-tight">PayChain</h1>
+<p class="text-[10px] text-secondary-fixed/60 mt-1 uppercase tracking-widest font-bold">Till: PC847291 • Trust: 74/100</p>
+</div>
+<nav class="flex-1 mt-4">
+<!-- Active state: Collections -->
+<a class="flex items-center text-[#c0c9c0] hover:text-white py-3 px-6 transition-colors group" href="#">
+<span class="material-symbols-outlined mr-3 text-lg">dashboard</span>
+<span class="font-['Plus_Jakarta_Sans'] text-sm font-medium">Dashboard</span>
+</a>
+<a class="flex items-center text-[#86f8c9] border-l-4 border-[#86f8c9] bg-emerald-900/30 font-bold py-3 px-6 transition-colors" href="#">
+<span class="material-symbols-outlined mr-3 text-lg" data-weight="fill" style="font-variation-settings: 'FILL' 1;">payments</span>
+<span class="font-['Plus_Jakarta_Sans'] text-sm font-medium">Collections</span>
+</a>
+<a class="flex items-center text-[#c0c9c0] hover:text-white py-3 px-6 transition-colors" href="#">
+<span class="material-symbols-outlined mr-3 text-lg">group_add</span>
+<span class="font-['Plus_Jakarta_Sans'] text-sm font-medium">Bulk Pay</span>
+</a>
+<a class="flex items-center text-[#c0c9c0] hover:text-white py-3 px-6 transition-colors" href="#">
+<span class="material-symbols-outlined mr-3 text-lg">currency_exchange</span>
+<span class="font-['Plus_Jakarta_Sans'] text-sm font-medium">Inflation Shield</span>
+</a>
+<a class="flex items-center text-[#c0c9c0] hover:text-white py-3 px-6 transition-colors" href="#">
+<span class="material-symbols-outlined mr-3 text-lg">verified_user</span>
+<span class="font-['Plus_Jakarta_Sans'] text-sm font-medium">Trust Score</span>
+</a>
+</nav>
+<div class="px-6 py-4">
+<div class="bg-emerald-900/40 rounded-xl p-4 border border-white/5">
+<p class="text-[10px] text-[#86f8c9] font-bold uppercase mb-1">Available Liquidity</p>
+<p class="text-white font-headline text-lg tracking-tight">KES 184,250</p>
+<p class="text-secondary-fixed/60 text-xs">312.50 USDC</p>
+</div>
+</div>
+<div class="mt-auto pb-6">
+<a class="flex items-center text-[#c0c9c0] hover:text-white py-3 px-6 transition-colors" href="#">
+<span class="material-symbols-outlined mr-3 text-lg">settings</span>
+<span class="font-['Plus_Jakarta_Sans'] text-sm font-medium">Settings</span>
+</a>
+<a class="flex items-center text-[#c0c9c0] hover:text-white py-3 px-6 transition-colors" href="#">
+<span class="material-symbols-outlined mr-3 text-lg">help_outline</span>
+<span class="font-['Plus_Jakarta_Sans'] text-sm font-medium">Support</span>
+</a>
+<div class="px-6 mt-4 flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-emerald-800 flex items-center justify-center overflow-hidden">
+<img alt="Merchant Profile Avatar" class="w-full h-full object-cover" data-alt="close-up portrait of a professional African merchant smiling, soft studio lighting, professional attire" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDTifu3l69y5P19zVN4Ho6yboJ33kLjUHkgihhuMLG4Rdsyyqr0na7QFx-FDyWFJxXE1CGGl4gep1UjhVebX7_odWcaqW9YbnZHK5S028G7R0haNVxa92qyTJbOSiWxedmQEtYw-x--a7YtB6lX-ZOqAW8ali0U1pe0DMXnBM0G6KZl_ySbDomHPpIQ7OacZx5TYD8Dj2dvd1FsIBUJGv_q3sdt8uT6ILR2hbgpr7FxQiTbrqIOe3PmjfPZw7DQ0t-JO5wR2pDZ6-so"/>
+</div>
+<div class="text-[11px] text-white/70">
+<p class="font-bold">Merchant Hub</p>
+<p class="opacity-60 text-[9px]">Verified Partner</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="ml-[240px] flex-1 flex flex-col min-h-screen">
+<!-- TopNavBar (Shared Component) -->
+<header class="sticky top-0 right-0 w-full h-[56px] z-40 bg-white/90 dark:bg-emerald-950/90 backdrop-blur-md flex justify-between items-center px-8 border-b border-[#c0c9c0]/15">
+<div class="flex items-center gap-4">
+<span class="text-primary font-headline text-xl">Collections</span>
+</div>
+<div class="flex items-center gap-6">
+<button class="text-slate-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/50 rounded-full p-2 transition-colors relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full border-2 border-white"></span>
+</button>
+<div class="flex items-center gap-2 cursor-pointer group">
+<span class="material-symbols-outlined text-slate-500 group-hover:text-primary transition-colors">account_circle</span>
+<span class="text-sm font-medium text-slate-700">Till PC847291</span>
+</div>
+</div>
+</header>
+<!-- Page Content -->
+<div class="p-8 max-w-7xl mx-auto w-full">
+<!-- Page Title & Subtext -->
+<div class="mb-8">
+<h2 class="serif-font text-4xl text-primary tracking-tight">Collections</h2>
+<p class="text-on-surface-variant font-medium mt-1">All verified inbound payments to Till PC847291</p>
+</div>
+<!-- Section 1: Summary Strip -->
+<div class="grid grid-cols-4 gap-4 mb-8">
+<div class="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/10 shadow-sm">
+<p class="text-[11px] text-on-surface-variant font-bold uppercase tracking-wider mb-1">Today</p>
+<p class="text-primary serif-font text-2xl">KES 12,450.00</p>
+</div>
+<div class="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/10 shadow-sm">
+<p class="text-[11px] text-on-surface-variant font-bold uppercase tracking-wider mb-1">This Week</p>
+<p class="text-primary serif-font text-2xl">KES 84,920.50</p>
+</div>
+<div class="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/10 shadow-sm">
+<p class="text-[11px] text-on-surface-variant font-bold uppercase tracking-wider mb-1">This Month</p>
+<p class="text-primary serif-font text-2xl">KES 245,100.00</p>
+</div>
+<div class="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/10 shadow-sm">
+<p class="text-[11px] text-on-surface-variant font-bold uppercase tracking-wider mb-1">All Time</p>
+<p class="text-primary serif-font text-2xl">KES 1.84M</p>
+</div>
+</div>
+<!-- Section 2: Filter Bar -->
+<div class="flex flex-col md:flex-row gap-4 items-center justify-between mb-6">
+<div class="flex items-center gap-2 bg-surface-container-low p-1 rounded-full w-full md:w-auto">
+<button class="px-5 py-2 text-xs font-bold rounded-full bg-surface-container-lowest text-primary shadow-sm">All</button>
+<button class="px-5 py-2 text-xs font-semibold rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors">Inbound</button>
+<button class="px-5 py-2 text-xs font-semibold rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors">Outbound</button>
+<button class="px-5 py-2 text-xs font-semibold rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors">FX Swaps</button>
+</div>
+<div class="flex items-center gap-3 w-full md:w-auto">
+<div class="relative flex-1 md:w-64">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">search</span>
+<input class="w-full bg-surface-container-low border-none rounded-full py-2 pl-10 pr-4 text-sm focus:ring-1 focus:ring-primary focus:bg-surface-container-lowest transition-all placeholder:text-outline-variant" placeholder="Search reference..." type="text"/>
+</div>
+<button class="bg-surface-container-low hover:bg-surface-container-high p-2 rounded-full transition-colors flex items-center gap-2 px-4 border border-outline-variant/15">
+<span class="material-symbols-outlined text-sm">calendar_today</span>
+<span class="text-xs font-bold">Aug 12 - Aug 19</span>
+</button>
+<button class="bg-primary text-white p-2 rounded-full transition-colors flex items-center gap-2 px-4 shadow-md active:scale-95 duration-150">
+<span class="material-symbols-outlined text-sm">download</span>
+<span class="text-xs font-bold">Export</span>
+</button>
+</div>
+</div>
+<!-- Main Layout with Table and Transaction Modal -->
+<div class="grid grid-cols-12 gap-8 items-start">
+<!-- Section 3: Transaction Table -->
+<div class="col-span-12 xl:col-span-8 bg-surface-container-lowest rounded-2xl shadow-sm overflow-hidden border border-outline-variant/10">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low">
+<th class="px-6 py-4 text-[11px] font-bold text-on-surface-variant uppercase tracking-widest">Date/Time</th>
+<th class="px-6 py-4 text-[11px] font-bold text-on-surface-variant uppercase tracking-widest">Type</th>
+<th class="px-6 py-4 text-[11px] font-bold text-on-surface-variant uppercase tracking-widest">From/To</th>
+<th class="px-6 py-4 text-[11px] font-bold text-on-surface-variant uppercase tracking-widest">Amount</th>
+<th class="px-6 py-4 text-[11px] font-bold text-on-surface-variant uppercase tracking-widest">Status</th>
+<th class="px-6 py-4 text-[11px] font-bold text-on-surface-variant uppercase tracking-widest text-right">Details</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-container">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-container-high/50 transition-colors group">
+<td class="px-6 py-5">
+<p class="text-sm font-semibold text-primary">19 Aug, 2024</p>
+<p class="text-[11px] text-on-surface-variant">14:32:01</p>
+</td>
+<td class="px-6 py-5">
+<span class="px-3 py-1 bg-green-500/10 text-green-700 text-[10px] font-bold rounded-full uppercase tracking-tighter">Inbound</span>
+</td>
+<td class="px-6 py-5">
+<p class="text-sm font-semibold text-primary">Mary Wanjiku</p>
+<p class="text-[11px] font-mono text-on-surface-variant group-hover:text-primary transition-colors cursor-pointer">QJX8472KL <span class="material-symbols-outlined text-[10px] opacity-0 group-hover:opacity-100 align-middle">content_copy</span></p>
+</td>
+<td class="px-6 py-5">
+<p class="text-sm font-bold text-green-600">+KES 4,500.00</p>
+</td>
+<td class="px-6 py-5">
+<div class="flex items-center gap-1.5">
+<div class="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+<span class="text-xs font-semibold text-on-surface">Verified</span>
+</div>
+</td>
+<td class="px-6 py-5 text-right">
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-lg">visibility</span>
+</button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-container-high/50 transition-colors group">
+<td class="px-6 py-5">
+<p class="text-sm font-semibold text-primary">19 Aug, 2024</p>
+<p class="text-[11px] text-on-surface-variant">11:15:44</p>
+</td>
+<td class="px-6 py-5">
+<span class="px-3 py-1 bg-amber-500/10 text-amber-700 text-[10px] font-bold rounded-full uppercase tracking-tighter">Bulk Pay</span>
+</td>
+<td class="px-6 py-5">
+<p class="text-sm font-semibold text-primary">Payroll (8 Employees)</p>
+<p class="text-[11px] font-mono text-on-surface-variant">BP90321PP</p>
+</td>
+<td class="px-6 py-5">
+<p class="text-sm font-bold text-error">-KES 120,400.00</p>
+</td>
+<td class="px-6 py-5">
+<div class="flex items-center gap-1.5">
+<div class="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+<span class="text-xs font-semibold text-on-surface">Verified</span>
+</div>
+</td>
+<td class="px-6 py-5 text-right">
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-lg">visibility</span>
+</button>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-surface-container-high/50 transition-colors group">
+<td class="px-6 py-5">
+<p class="text-sm font-semibold text-primary">18 Aug, 2024</p>
+<p class="text-[11px] text-on-surface-variant">22:45:10</p>
+</td>
+<td class="px-6 py-5">
+<span class="px-3 py-1 bg-blue-500/10 text-blue-700 text-[10px] font-bold rounded-full uppercase tracking-tighter">FX Swap</span>
+</td>
+<td class="px-6 py-5">
+<p class="text-sm font-semibold text-primary">Treasury Swap</p>
+<p class="text-[11px] font-mono text-on-surface-variant">SW982110X</p>
+</td>
+<td class="px-6 py-5">
+<p class="text-sm font-bold text-blue-600">KES → 450 USDC</p>
+</td>
+<td class="px-6 py-5">
+<div class="flex items-center gap-1.5">
+<div class="w-1.5 h-1.5 rounded-full bg-amber-500"></div>
+<span class="text-xs font-semibold text-on-surface">Pending</span>
+</div>
+</td>
+<td class="px-6 py-5 text-right">
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-lg">visibility</span>
+</button>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-surface-container-high/50 transition-colors group">
+<td class="px-6 py-5">
+<p class="text-sm font-semibold text-primary">18 Aug, 2024</p>
+<p class="text-[11px] text-on-surface-variant">09:12:05</p>
+</td>
+<td class="px-6 py-5">
+<span class="px-3 py-1 bg-green-500/10 text-green-700 text-[10px] font-bold rounded-full uppercase tracking-tighter">Inbound</span>
+</td>
+<td class="px-6 py-5">
+<p class="text-sm font-semibold text-primary">John Doe</p>
+<p class="text-[11px] font-mono text-on-surface-variant">QJX0022LA</p>
+</td>
+<td class="px-6 py-5">
+<p class="text-sm font-bold text-green-600">+KES 2,100.00</p>
+</td>
+<td class="px-6 py-5">
+<div class="flex items-center gap-1.5">
+<div class="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+<span class="text-xs font-semibold text-on-surface">Verified</span>
+</div>
+</td>
+<td class="px-6 py-5 text-right">
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-lg">visibility</span>
+</button>
+</td>
+</tr>
+<!-- Row 5 -->
+<tr class="hover:bg-surface-container-high/50 transition-colors group border-none">
+<td class="px-6 py-5">
+<p class="text-sm font-semibold text-primary">17 Aug, 2024</p>
+<p class="text-[11px] text-on-surface-variant">18:05:32</p>
+</td>
+<td class="px-6 py-5">
+<span class="px-3 py-1 bg-red-500/10 text-red-700 text-[10px] font-bold rounded-full uppercase tracking-tighter">Inbound</span>
+</td>
+<td class="px-6 py-5">
+<p class="text-sm font-semibold text-primary">Sarah Kamau</p>
+<p class="text-[11px] font-mono text-on-surface-variant">QJX5510KM</p>
+</td>
+<td class="px-6 py-5">
+<p class="text-sm font-bold text-on-surface-variant">+KES 12,000.00</p>
+</td>
+<td class="px-6 py-5">
+<div class="flex items-center gap-1.5">
+<div class="w-1.5 h-1.5 rounded-full bg-error"></div>
+<span class="text-xs font-semibold text-on-surface">Failed</span>
+</div>
+</td>
+<td class="px-6 py-5 text-right">
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-lg">visibility</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="p-6 bg-surface-container-low flex justify-between items-center">
+<p class="text-[11px] font-bold text-on-surface-variant uppercase tracking-widest">Showing 5 of 1,280 transactions</p>
+<div class="flex gap-2">
+<button class="w-8 h-8 rounded-full border border-outline-variant/30 flex items-center justify-center text-on-surface-variant hover:bg-surface-container-lowest transition-colors">
+<span class="material-symbols-outlined text-sm">chevron_left</span>
+</button>
+<button class="w-8 h-8 rounded-full border border-outline-variant/30 flex items-center justify-center text-on-surface-variant hover:bg-surface-container-lowest transition-colors">
+<span class="material-symbols-outlined text-sm">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Section 4: Transaction Detail Modal (As part of screen/aside) -->
+<div class="col-span-12 xl:col-span-4 bg-surface-container-lowest rounded-2xl shadow-xl overflow-hidden border border-primary/5 flex flex-col h-full sticky top-[80px]">
+<div class="p-8 flex flex-col items-center text-center border-b border-outline-variant/10">
+<div class="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
+<span class="material-symbols-outlined text-green-700 text-3xl" data-weight="fill" style="font-variation-settings: 'FILL' 1;">verified_user</span>
+</div>
+<h3 class="serif-font text-2xl text-primary">Verified Payment</h3>
+<p class="text-on-surface-variant text-sm font-medium">This payment is verified on-chain and cannot be disputed.</p>
+</div>
+<div class="p-8 space-y-6 flex-1">
+<div class="grid grid-cols-2 gap-4">
+<div>
+<p class="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest mb-1">Amount</p>
+<p class="text-xl font-headline text-green-700">KES 4,500.00</p>
+</div>
+<div class="text-right">
+<p class="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest mb-1">Timestamp</p>
+<p class="text-sm font-bold text-primary">19 Aug, 14:32</p>
+</div>
+</div>
+<div class="space-y-4 pt-4 border-t border-outline-variant/10">
+<div class="flex justify-between items-center">
+<p class="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">Sender</p>
+<p class="text-sm font-semibold text-primary">Mary Wanjiku</p>
+</div>
+<div class="flex justify-between items-center">
+<p class="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">Reference</p>
+<p class="text-sm font-mono font-bold text-primary">QJX8472KL</p>
+</div>
+<div class="flex justify-between items-center">
+<p class="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">Receiving Till</p>
+<p class="text-sm font-semibold text-primary">PC847291</p>
+</div>
+<div class="flex justify-between items-center">
+<p class="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">Verification</p>
+<div class="bg-secondary-fixed/30 px-2 py-0.5 rounded flex items-center gap-1">
+<span class="material-symbols-outlined text-[10px] text-on-secondary-fixed">lock</span>
+<span class="text-[10px] font-bold text-on-secondary-fixed uppercase">On-Chain</span>
+</div>
+</div>
+</div>
+<div class="bg-surface-container-low p-4 rounded-xl border border-outline-variant/15">
+<p class="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest mb-2">Blockchain Hash</p>
+<p class="text-[10px] font-mono break-all leading-relaxed text-primary/70">0x74d2f83130c50d4f18d7990119f18a45...82d1c9</p>
+</div>
+</div>
+<div class="p-6 bg-surface-container-low mt-auto">
+<button class="w-full bg-primary text-white py-3 rounded-xl font-bold text-sm shadow-md hover:shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm">download</span>
+                            Download Receipt
+                        </button>
+<button class="w-full mt-2 text-on-surface-variant py-2 text-xs font-bold hover:text-primary transition-colors">
+                            View On Explorer
+                        </button>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Contextual FAB (Suppressed on Details but active here for common collection actions) -->
+<button class="fixed bottom-8 right-8 w-14 h-14 bg-primary text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-40">
+<span class="material-symbols-outlined text-2xl">add</span>
+</button>
+</body></html>

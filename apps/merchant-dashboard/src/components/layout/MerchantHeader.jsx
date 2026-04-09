@@ -1,21 +1,27 @@
 import React from 'react'
-import { Bell } from 'lucide-react'
 import { mockMerchant } from '../../mockData/merchant'
 
-export default function MerchantHeader({ title }){
-  const unread = mockMerchant.notifications.filter(n=>!n.isRead).length
+export default function MerchantHeader({ title }) {
+  const unread = mockMerchant.notifications.filter(n => !n.isRead).length
+  
   return (
-    <header className="mc-header">
-      <div style={{display:'flex',alignItems:'center',gap:12}}>
-        <button style={{display:'none'}}>☰</button>
-        <div style={{fontWeight:700}}>{title}</div>
-        <div style={{marginLeft:8,color:'#6B7280'}}>{`Till: ${mockMerchant.tillNumber}`}</div>
+    <header className="sticky top-0 right-0 w-full h-[56px] z-40 bg-white/90 backdrop-blur-md flex justify-between items-center px-8 border-b border-outline-variant/15 glass-header">
+      <div className="flex items-center gap-2">
+        <span className="text-on-surface-variant text-sm font-medium">Dashboard</span>
+        <span className="text-outline-variant text-xs">/</span>
+        <span className="text-primary font-bold text-sm">{title}</span>
       </div>
-      <div style={{display:'flex',alignItems:'center',gap:12}}>
-        <button style={{background:'transparent',border:0,position:'relative'}}><Bell />{unread>0 && <span style={{position:'absolute',right:2,top:2,width:8,height:8,background:'#EF4444',borderRadius:999}} />}</button>
-        <div style={{display:'flex',alignItems:'center',gap:8}}>
-          <div style={{fontSize:13,fontWeight:600}}>{mockMerchant.name}</div>
-        </div>
+      
+      <div className="flex items-center gap-4">
+        <button className="hover:bg-emerald-50 rounded-full p-2 transition-colors relative">
+          <span className="material-symbols-outlined text-on-surface-variant">notifications</span>
+          {unread > 0 && (
+            <span className="absolute top-2 right-2 w-2 h-2 bg-error rounded-full border-2 border-white"></span>
+          )}
+        </button>
+        <button className="hover:bg-emerald-50 rounded-full p-2 transition-colors">
+          <span className="material-symbols-outlined text-on-surface-variant">account_circle</span>
+        </button>
       </div>
     </header>
   )
