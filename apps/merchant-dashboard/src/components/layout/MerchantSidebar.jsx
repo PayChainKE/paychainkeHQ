@@ -59,7 +59,7 @@ export default function MerchantSidebar() {
 
       {/* Available Funds Box & Footer Actions */}
       <div className="p-6 mt-auto">
-        <div className="bg-[#0D241E] rounded-[24px] p-5 mb-8 border border-white/5">
+        <div className="bg-[#0D241E] rounded-[16px] p-5 mb-8 border border-white/5">
           <p className="text-[#5EFEB3] text-[9px] font-bold uppercase tracking-widest mb-2">Available Funds</p>
           <p className="text-white font-headline text-2xl tracking-tight mb-0.5">KES {new Intl.NumberFormat().format(mockMerchant.financials.kesBalance)}</p>
           <p className="text-[#a8b3a8] text-[10px]">{mockMerchant.financials.usdcBalance.toFixed(2)} USDC</p>

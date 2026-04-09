@@ -35,7 +35,7 @@ export default function Overview() {
       {/* Section 1: Balance Cards Row */}
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in-up [animation-delay:100ms]">
         {/* KES Balance Card */}
-        <div className="bg-[#00351D] text-white p-9 rounded-[24px] shadow-2xl relative overflow-hidden group border border-white/5">
+        <div className="bg-[#00351D] text-white p-9 rounded-[16px] shadow-2xl relative overflow-hidden group border border-white/5">
           <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full -mr-40 -mt-40 blur-3xl group-hover:scale-125 transition-transform duration-1000"></div>
           <div className="relative z-10">
             <div className="flex justify-between items-start mb-16">
@@ -51,7 +51,7 @@ export default function Overview() {
         </div>
 
         {/* USDC Balance Card */}
-        <div className="bg-[#0D2444] text-white p-9 rounded-[24px] shadow-2xl relative overflow-hidden group border border-white/5">
+        <div className="bg-[#0D2444] text-white p-9 rounded-[16px] shadow-2xl relative overflow-hidden group border border-white/5">
           <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/10 rounded-full -ml-32 -mb-32 blur-3xl"></div>
           <div className="relative z-10 flex flex-col h-full">
             <div className="flex justify-between items-start mb-16">
@@ -77,9 +77,9 @@ export default function Overview() {
           { label: "Total Transactions", value: "847", trend: "Since October 2025", trendColor: "text-on-surface-variant" },
           { label: "Trust Score", value: "74/100", trend: "Cash Advance Eligible ✔", trendColor: "text-emerald-600", showBadge: true }
         ].map((stat, i) => (
-          <div key={i} className="bg-white p-8 rounded-[20px] border border-[#E5E7EB] shadow-sm editorial-shadow transition-all group">
+          <div key={i} className="bg-white p-8 rounded-[12px] border border-[#E5E7EB] shadow-sm editorial-shadow transition-all group">
             <div className="flex justify-between items-center mb-6">
-              <p className="text-[9px] text-on-surface-variant font-bold uppercase tracking-widest opacity-60 leading-none">{stat.label}</p>
+              <p className="text-[10px] text-primary font-black uppercase tracking-widest leading-none">{stat.label}</p>
               {stat.showBadge && <span className="material-symbols-outlined text-xs text-emerald-600" style={{fontVariationSettings: "'FILL' 1"}}>verified</span>}
             </div>
             <p className="text-3xl font-headline text-primary mb-2 leading-none">{stat.value}</p>
@@ -89,9 +89,9 @@ export default function Overview() {
       </section>
 
       {/* Section 3: Revenue Chart */}
-      <section className="bg-white p-8 rounded-[20px] border border-[#E5E7EB] shadow-sm editorial-shadow">
+      <section className="bg-white p-8 rounded-[16px] border border-[#E5E7EB] shadow-sm editorial-shadow">
         <div className="flex justify-between items-center mb-10">
-          <h3 className="font-headline text-3xl text-primary">Revenue Overview</h3>
+          <h3 className="font-headline font-bold text-3xl text-primary">Revenue Overview</h3>
           <div className="flex bg-[#F0FDF4] p-1 rounded-lg border border-emerald-100">
             <button className="px-5 py-1.5 text-[10px] font-bold rounded-md bg-white text-emerald-800 shadow-sm transition-all uppercase tracking-wider">7D</button>
             <button className="px-5 py-1.5 text-[10px] font-bold text-emerald-800/40 hover:text-emerald-800 transition-all uppercase tracking-wider">30D</button>
@@ -105,9 +105,9 @@ export default function Overview() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Section 4: Recent Collections */}
-        <section className="lg:col-span-2 bg-white rounded-[20px] border border-[#E5E7EB] shadow-sm editorial-shadow overflow-hidden">
+        <section className="lg:col-span-2 bg-white rounded-[16px] border border-[#E5E7EB] shadow-sm editorial-shadow overflow-hidden">
           <div className="p-8 border-b border-slate-50">
-            <h3 className="font-headline text-3xl text-primary">Recent Collections</h3>
+            <h3 className="font-headline font-bold text-3xl text-primary">Recent Collections</h3>
           </div>
           <div className="divide-y divide-slate-50">
             {[
@@ -147,9 +147,9 @@ export default function Overview() {
 
         {/* Section 5: Cash Advance & Tips */}
         <div className="space-y-6">
-          <section className="bg-white p-8 rounded-[20px] border border-[#E5E7EB] shadow-sm editorial-shadow">
+          <section className="bg-white p-8 rounded-[16px] border border-[#E5E7EB] shadow-sm editorial-shadow">
             <div className="flex justify-between items-center mb-8">
-              <p className="text-on-surface-variant text-[9px] font-bold uppercase tracking-[0.2em] opacity-60">Active Cash Advance</p>
+              <p className="text-primary text-[10px] font-black uppercase tracking-[0.2em]">Active Cash Advance</p>
               <span className="material-symbols-outlined text-primary text-lg" style={{ fontVariationSettings: "'wght' 300" }}>account_balance_wallet</span>
             </div>
             <h4 className="font-headline text-4xl text-primary mb-8">KES 150,000</h4>
