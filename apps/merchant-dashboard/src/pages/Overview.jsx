@@ -129,16 +129,16 @@ export default function Overview() {
       </section>
 
       {/* Section 3: Revenue Chart */}
-      <section className="bg-white p-8 rounded-[16px] border border-[#E5E7EB] shadow-sm editorial-shadow">
-        <div className="flex justify-between items-center mb-10">
-          <h3 className="font-headline font-bold text-3xl text-primary">Revenue Overview</h3>
-          <div className="flex bg-[#F0FDF4] p-1 rounded-lg border border-emerald-100">
-            <button className="px-5 py-1.5 text-[10px] font-bold rounded-md bg-white text-emerald-800 shadow-sm transition-all uppercase tracking-wider">7D</button>
-            <button className="px-5 py-1.5 text-[10px] font-bold text-emerald-800/40 hover:text-emerald-800 transition-all uppercase tracking-wider">30D</button>
-            <button className="px-5 py-1.5 text-[10px] font-bold text-emerald-800/40 hover:text-emerald-800 transition-all uppercase tracking-wider">6M</button>
+      <section className="bg-white p-6 lg:p-7 rounded-[16px] border border-[#E5E7EB] shadow-sm editorial-shadow">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 lg:mb-8">
+          <h3 className="font-headline font-bold text-xl lg:text-2xl text-primary">Revenue Overview</h3>
+          <div className="flex bg-[#F0FDF4] p-0.5 rounded-lg border border-emerald-100 self-end lg:self-auto">
+            <button className="px-3 lg:px-4 py-1 text-[9px] lg:text-[10px] font-bold rounded-md bg-white text-emerald-800 shadow-sm transition-all uppercase tracking-wider">7D</button>
+            <button className="px-3 lg:px-4 py-1 text-[9px] lg:text-[10px] font-bold text-emerald-800/40 hover:text-emerald-800 transition-all uppercase tracking-wider">30D</button>
+            <button className="px-3 lg:px-4 py-1 text-[9px] lg:text-[10px] font-bold text-emerald-800/40 hover:text-emerald-800 transition-all uppercase tracking-wider">6M</button>
           </div>
         </div>
-        <div className="h-96 w-full">
+        <div className="h-64 lg:h-72 w-full">
           <RevenueChart labels={['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']} data={revenueByDay.data} accentColor="#00855D" />
         </div>
       </section>
