@@ -2,8 +2,10 @@ import React, { useState } from 'react'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import { payees, bulkPayHistory } from '../mockData/bulkPay'
 import { formatKES } from '../utils/formatCurrency'
+import { usePrivacyMode } from '../hooks/usePrivacyMode'
 
 export default function BulkPay() {
+  const { showAmounts } = usePrivacyMode()
   const [step, setStep] = useState(1)
   const [selectedPayees, setSelectedPayees] = useState(
     payees.slice(0, 3).reduce((acc, p) => ({ ...acc, [p.id]: true }), {})
@@ -32,12 +34,12 @@ export default function BulkPay() {
 
   return (
     <MerchantLayout title="Bulk Pay">
-      <div className="p-8 max-w-7xl mx-auto flex flex-col lg:flex-row gap-8">
+      <div className="px-1 lg:px-0 max-w-7xl mx-auto flex flex-col lg:flex-row gap-6 lg:gap-8">
         
         {/* Left Column: Saved Payees (380px) */}
-        <section className="w-full lg:w-[380px] flex flex-col gap-6">
+        <section className="w-full lg:w-[380px] flex flex-col gap-4 lg:gap-6">
           <div className="flex items-center justify-between">
-            <h2 className="font-headline text-2xl text-primary">Saved Payees</h2>
+            <h2 className="font-headline text-2xl lg:text-3xl text-primary tracking-tight">Saved Payees</h2>
             <button className="bg-primary text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 hover:opacity-90 active:scale-95 transition-all">
               <span className="material-symbols-outlined text-sm">add</span>
               Add Payee
@@ -89,7 +91,7 @@ export default function BulkPay() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-bold text-primary">{formatKES(p.salary || p.amount || 0)}</p>
+                  <p className={`text-sm font-bold text-primary transition-all duration-300 ${!showAmounts && 'blur-md'}`}>{formatKES(p.salary || p.amount || 0)}</p>
                   <p className="text-[10px] text-on-surface-variant font-medium opacity-60">Cycle</p>
                 </div>
               </div>
@@ -120,8 +122,8 @@ export default function BulkPay() {
               ))}
             </div>
             <div className="text-right hidden sm:block">
-              <p className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest">Available liquidity</p>
-              <p className="font-headline text-lg text-primary leading-tight">{formatKES(balance)}</p>
+              <p className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest leading-none mb-1">Available liquidity</p>
+              <p className={`font-headline text-lg lg:text-xl text-primary leading-tight transition-all duration-300 ${!showAmounts && 'blur-md'}`}>{formatKES(balance)}</p>
             </div>
           </div>
 
@@ -205,7 +207,7 @@ export default function BulkPay() {
                   <span className="text-[10px] text-emerald-300 font-bold uppercase tracking-[0.2em] mb-1">Total Payout</span>
                   <div className="flex items-baseline gap-2">
                     <span className="text-sm font-bold text-emerald-400">KES</span>
-                    <span className="font-headline text-4xl tracking-tighter tabular-nums">{batchTotal.toLocaleString()}</span>
+                    <span className={`font-headline text-2xl lg:text-4xl tracking-tighter tabular-nums transition-all duration-300 ${!showAmounts && 'blur-lg'}`}>{batchTotal.toLocaleString()}</span>
                   </div>
                 </div>
               </div>

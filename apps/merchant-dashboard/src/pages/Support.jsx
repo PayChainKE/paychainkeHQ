@@ -19,20 +19,20 @@ export default function Support() {
 
   return (
     <MerchantLayout title="Support">
-      <div className="p-8 max-w-5xl mx-auto w-full space-y-12">
+      <div className="px-1 lg:px-0 max-w-5xl mx-auto w-full space-y-8 lg:space-y-12">
         {/* Section 1: Hero Search */}
-        <div className="text-center py-16 animate-fade-in-up">
-          <div className="inline-flex items-center gap-2 bg-emerald-500/10 text-emerald-700 px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest mb-6 border border-emerald-500/10 scale-in">
+        <div className="text-center py-8 lg:py-16 animate-fade-in-up">
+          <div className="inline-flex items-center gap-2 bg-emerald-500/10 text-emerald-700 px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest mb-4 lg:mb-6 border border-emerald-500/10 scale-in">
             <span className="material-symbols-outlined text-sm pulse">verified_user</span>
             Concierge Support
           </div>
-          <h2 className="font-headline text-6xl text-primary tracking-tight mb-6">How can we help?</h2>
-          <p className="text-on-surface-variant font-medium mb-12 max-w-2xl mx-auto leading-relaxed">Search our automated knowledge base or navigate the solution grid for instant resolution.</p>
+          <h2 className="font-headline text-3xl lg:text-6xl text-primary tracking-tight mb-4 lg:mb-6 leading-tight">How can we help?</h2>
+          <p className="text-on-surface-variant text-[11px] lg:text-sm font-medium mb-8 lg:mb-12 max-w-2xl mx-auto leading-relaxed opacity-80">Search our automated knowledge base or navigate the solution grid for instant resolution.</p>
           <div className="relative max-w-3xl mx-auto group">
-            <span className="material-symbols-outlined absolute left-8 top-1/2 -translate-y-1/2 text-primary text-3xl opacity-40 group-focus-within:opacity-100 transition-opacity">search</span>
+            <span className="material-symbols-outlined absolute left-6 lg:left-8 top-1/2 -translate-y-1/2 text-primary text-2xl lg:text-3xl opacity-40 group-focus-within:opacity-100 transition-opacity">search</span>
             <input 
-              className="w-full bg-surface-container-lowest border border-outline-variant/10 rounded-[32px] py-7 pl-20 pr-8 text-xl font-medium shadow-2xl focus:ring-2 focus:ring-primary focus:shadow-[0_0_80px_rgba(0,105,92,0.1)] transition-all placeholder:text-outline-variant editorial-shadow"
-              placeholder="Describe your issue in detail..."
+              className="w-full bg-surface-container-lowest border border-outline-variant/10 rounded-[24px] lg:rounded-[32px] py-4 lg:py-7 pl-14 lg:pl-20 pr-6 lg:pr-8 text-lg lg:text-xl font-medium shadow-2xl focus:ring-2 focus:ring-primary focus:shadow-[0_0_80px_rgba(0,105,92,0.1)] transition-all placeholder:text-outline-variant editorial-shadow"
+              placeholder="Describe your issue..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />

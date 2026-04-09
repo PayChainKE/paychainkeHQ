@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react'
+import React from 'react'
 import { NavLink } from 'react-router-dom'
 import { mockMerchant } from '../../mockData/merchant'
+import { usePrivacyMode } from '../../hooks/usePrivacyMode'
 
 const navItems = [
   { name: 'Dashboard', icon: 'dashboard', path: '/overview' },
@@ -11,19 +12,7 @@ const navItems = [
 ]
 
 export default function MerchantSidebar({ isOpen, onClose }) {
-  const [showAmounts, setShowAmounts] = useState(() => {
-    const saved = localStorage.getItem('paychain_privacy_mode')
-    return saved !== null ? JSON.parse(saved) : true
-  })
-
-  useEffect(() => {
-    const handleToggle = () => {
-      const saved = localStorage.getItem('paychain_privacy_mode')
-      setShowAmounts(saved !== null ? JSON.parse(saved) : true)
-    }
-    window.addEventListener('paychain_privacy_toggle', handleToggle)
-    return () => window.removeEventListener('paychain_privacy_toggle', handleToggle)
-  }, [])
+  const { showAmounts } = usePrivacyMode()
 
   return (
     <aside className={`fixed left-0 top-0 h-full w-[240px] z-[50] bg-[#162723] flex flex-col overflow-y-auto transition-transform duration-300 ease-in-out lg:translate-x-0 ${isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}`}>

@@ -39,6 +39,8 @@ export default function App(){
             <Route path="/trust-score" element={<Protected><TrustScore/></Protected>} />
             <Route path="/profile" element={<Protected><Profile/></Protected>} />
             <Route path="/support" element={<Protected><Support/></Protected>} />
+            {/* Catch-all route for 404s and refreshes */}
+            <Route path="*" element={<Navigate to="/overview" replace />} />
           </Routes>
           <ToastHost />
         </ToastProvider>

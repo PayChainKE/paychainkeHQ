@@ -6,16 +6,14 @@ import { mockMerchant } from '../mockData/merchant'
 import { revenueByDay } from '../mockData/analytics'
 import { transactionsData, getTransactionStats } from '../mockData/transactions'
 import { formatKES } from '../utils/formatCurrency'
+import { usePrivacyMode } from '../hooks/usePrivacyMode'
 
 export default function Overview() {
+  const { showAmounts, togglePrivacy } = usePrivacyMode()
   const [stats, setStats] = useState(getTransactionStats())
   const [fraudAlerts, setFraudAlerts] = useState(0) // Logic scaffolding
   const [settlementBalance, setSettlementBalance] = useState(0) // Logic scaffolding
   const [activeTimeframe, setActiveTimeframe] = useState('7D')
-  const [showAmounts, setShowAmounts] = useState(() => {
-    const saved = localStorage.getItem('paychain_privacy_mode')
-    return saved !== null ? JSON.parse(saved) : true
-  })
   
   const timeframes = {
     '7D': {
@@ -31,11 +29,6 @@ export default function Overview() {
       data: [240000, 280000, 310000, 290000, 350000, 420000]
     }
   }
-
-  useEffect(() => {
-    localStorage.setItem('paychain_privacy_mode', JSON.stringify(showAmounts))
-    window.dispatchEvent(new Event('paychain_privacy_toggle'))
-  }, [showAmounts])
 
   useEffect(() => {
     // Logic scaffolding: Simulate data loading or calculation
@@ -75,7 +68,7 @@ export default function Overview() {
               <div className="flex items-center gap-3 lg:gap-4 text-[8px] lg:text-[9px]">
                 <span className="text-white/40 uppercase font-bold tracking-[0.15em] hidden sm:inline">Till: {mockMerchant.tillNumber}</span>
                 <button 
-                  onClick={() => setShowAmounts(!showAmounts)}
+                  onClick={togglePrivacy}
                   className="text-white/40 hover:text-white transition-colors p-1"
                   title={showAmounts ? "Hide Amounts" : "Show Amounts"}
                 >
@@ -104,7 +97,7 @@ export default function Overview() {
             <div className="flex justify-between items-start mb-8 lg:mb-10">
               <span className="bg-[#243B5C] text-[#A6C8FF] px-3 lg:px-4 py-1.5 rounded-full text-[8px] lg:text-[9px] font-black tracking-[0.15em] uppercase border border-white/10">Global Settlements</span>
               <button 
-                onClick={() => setShowAmounts(!showAmounts)}
+                onClick={togglePrivacy}
                 className="text-white/40 hover:text-white transition-colors p-1"
                 title={showAmounts ? "Hide Amounts" : "Show Amounts"}
               >

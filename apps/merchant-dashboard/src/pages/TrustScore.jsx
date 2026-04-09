@@ -1,8 +1,10 @@
 import React from 'react'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import { mockMerchant } from '../mockData/merchant'
+import { usePrivacyMode } from '../hooks/usePrivacyMode'
 
 export default function TrustScore() {
+  const { showAmounts } = usePrivacyMode()
   const score = mockMerchant.trustScore.current
   const eligible = mockMerchant.trustScore.eligibleForAdvance
   
@@ -29,7 +31,7 @@ export default function TrustScore() {
 
   return (
     <MerchantLayout title="Trust Score">
-      <div className="p-8 max-w-6xl mx-auto w-full space-y-12">
+      <div className="px-1 lg:px-0 max-w-6xl mx-auto w-full space-y-8 lg:space-y-12">
         {/* Section 1: Hero Score */}
         <div className="flex flex-col items-center text-center">
           <div className="relative flex items-center justify-center mb-6">
@@ -107,8 +109,8 @@ export default function TrustScore() {
 
         {/* Section 3: Key Factors Bento Grid */}
         <div className="animate-fade-in-up [animation-delay:200ms]">
-          <h3 className="font-headline text-3xl text-primary mb-8 tracking-tight">Trust Intelligence</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <h3 className="font-headline text-2xl lg:text-3xl text-primary mb-6 lg:mb-8 tracking-tight">Trust Intelligence</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
             {factors.map((f, i) => (
               <div key={i} className={`p-8 rounded-[32px] border border-outline-variant/5 shadow-sm editorial-shadow transition-all hover:translate-y-[-4px] cursor-pointer group ${
                 i === 0 ? 'bg-emerald-500/5' : i === 1 ? 'bg-blue-500/5' : i === 2 ? 'bg-amber-500/5' : 'bg-indigo-500/5'

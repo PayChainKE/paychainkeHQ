@@ -2,8 +2,10 @@ import React, { useState } from 'react'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import { mockMerchant } from '../mockData/merchant'
 import { useToast } from '../context/ToastContext'
+import { usePrivacyMode } from '../hooks/usePrivacyMode'
 
 export default function Profile() {
+  const { showAmounts } = usePrivacyMode()
   const [name, setName] = useState(mockMerchant.name)
   const [email, setEmail] = useState(mockMerchant.email)
   const [autoSettle, setAutoSettle] = useState(true)
@@ -22,11 +24,11 @@ export default function Profile() {
 
   return (
     <MerchantLayout title="Settings">
-      <div className="p-8 max-w-7xl mx-auto w-full">
+      <div className="px-1 lg:px-0 max-w-7xl mx-auto w-full">
         {/* Header */}
-        <div className="mb-10">
-          <h2 className="font-headline text-4xl text-primary tracking-tight">Settings</h2>
-          <p className="text-on-surface-variant font-medium mt-1">Manage your business profile, settlement rules, and security preferences.</p>
+        <div className="mb-6 lg:mb-10">
+          <h2 className="font-headline text-3xl lg:text-4xl text-primary tracking-tight">Settings</h2>
+          <p className="text-on-surface-variant text-[11px] lg:text-sm font-medium mt-1.5 opacity-80">Manage your business profile, settlement rules, and security preferences.</p>
         </div>
 
         <div className="grid grid-cols-12 gap-8">
@@ -145,7 +147,7 @@ export default function Profile() {
                   <span className="material-symbols-outlined text-2xl">id_card</span>
                 </div>
                 <h4 className="text-[10px] text-blue-200/60 font-bold uppercase tracking-widest mb-1">Merchant Identity</h4>
-                <p className="font-headline text-3xl mb-1">{mockMerchant.tillNumber}</p>
+                <p className={`font-headline text-2xl lg:text-3xl mb-1 transition-all duration-300 ${!showAmounts && 'blur-md'}`}>{mockMerchant.tillNumber}</p>
                 <p className="text-sm text-blue-100/60 font-medium">Verified Merchant since Oct 2025</p>
                 <div className="mt-8 pt-8 border-t border-white/10 flex items-center gap-2">
                   <span className="material-symbols-outlined text-emerald-400 text-sm" style={{fontVariationSettings: "'FILL' 1"}}>check_circle</span>

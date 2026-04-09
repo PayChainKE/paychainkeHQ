@@ -3,8 +3,10 @@ import MerchantLayout from '../components/layout/MerchantLayout'
 import { formatKES, formatUSDC } from '../utils/formatCurrency'
 import { transactionsData } from '../mockData/transactions'
 import { formatDateISO } from '../utils/formatDate'
+import { usePrivacyMode } from '../hooks/usePrivacyMode'
 
 export default function InflationShield() {
+  const { showAmounts } = usePrivacyMode()
   const [kesAmount, setKesAmount] = useState(10000)
   const rate = 132.45
   const feeRate = 0.005
@@ -14,12 +16,12 @@ export default function InflationShield() {
 
   return (
     <MerchantLayout title="Inflation Shield">
-      <div className="p-8 max-w-7xl mx-auto w-full space-y-12">
+      <div className="px-1 lg:px-0 max-w-7xl mx-auto w-full space-y-8 lg:space-y-12">
         {/* Section 1: Page Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div>
-            <h2 className="font-headline text-4xl text-primary tracking-tight">Inflation Shield</h2>
-            <p className="text-on-surface-variant font-medium mt-1">Swap your KES revenue into USDC to protect against local currency depreciation.</p>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 lg:gap-6">
+          <div className="max-w-xl">
+            <h2 className="font-headline text-3xl lg:text-5xl text-primary tracking-tight leading-tight">Inflation Shield</h2>
+            <p className="text-on-surface-variant text-[11px] lg:text-sm font-medium mt-1.5 lg:mt-2 opacity-80 leading-relaxed">Swap your KES revenue into USDC to protect against local currency depreciation.</p>
           </div>
           <div className="flex items-center gap-3 bg-secondary-fixed/5 p-4 rounded-2xl border border-secondary-fixed/10">
             <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-600">
@@ -40,7 +42,7 @@ export default function InflationShield() {
               <div>
                 <p className="text-[11px] text-emerald-400 font-bold uppercase tracking-[0.2em] mb-2">Local Revenue</p>
                 <h4 className="text-[11px] text-white/40 font-bold uppercase tracking-widest mb-1">KES Balance</h4>
-                <p className="font-headline text-4xl tracking-tighter tabular-nums">{formatKES(184250)}</p>
+                <p className={`font-headline text-3xl lg:text-4xl tracking-tighter tabular-nums transition-all duration-300 ${!showAmounts && 'blur-md'}`}>{formatKES(184250)}</p>
               </div>
               <div className="w-16 h-16 rounded-3xl bg-white/10 flex items-center justify-center text-emerald-300 border border-white/10 backdrop-blur-md">
                 <span className="material-symbols-outlined text-3xl" style={{fontVariationSettings: "'FILL' 1"}}>account_balance</span>
@@ -53,7 +55,7 @@ export default function InflationShield() {
               <div>
                 <p className="text-[11px] text-blue-300 font-bold uppercase tracking-[0.2em] mb-2">Shield Protection</p>
                 <h4 className="text-[11px] text-white/40 font-bold uppercase tracking-widest mb-1">USDC Assets</h4>
-                <p className="font-headline text-4xl tracking-tighter tabular-nums text-white">{formatUSDC(312.50)}</p>
+                <p className={`font-headline text-3xl lg:text-4xl tracking-tighter tabular-nums text-white transition-all duration-300 ${!showAmounts && 'blur-md'}`}>{formatUSDC(312.50)}</p>
               </div>
               <div className="w-16 h-16 rounded-3xl bg-white/10 flex items-center justify-center text-blue-300 border border-white/10 backdrop-blur-md">
                 <span className="material-symbols-outlined text-3xl text-white" style={{fontVariationSettings: "'FILL' 1"}}>security</span>
@@ -77,7 +79,7 @@ export default function InflationShield() {
               <div className="bg-surface-container-low p-6 rounded-2xl border border-outline-variant/5">
                 <div className="flex justify-between items-center mb-4">
                   <span className="text-[11px] text-on-surface-variant font-bold uppercase tracking-widest">You Send</span>
-                  <span className="text-[11px] text-on-surface-variant font-medium">Balance: {formatKES(184250)}</span>
+                  <span className={`text-[11px] text-on-surface-variant font-medium transition-all duration-300 ${!showAmounts && 'blur-sm'}`}>Balance: {formatKES(184250)}</span>
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2 bg-surface-container-lowest px-3 py-1.5 rounded-full border border-outline-variant/10">
@@ -158,9 +160,9 @@ export default function InflationShield() {
                       </td>
                       <td className="px-4 py-5">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-on-surface-variant">{formatKES(tx.kesAmount || 0)}</span>
+                          <span className={`text-xs font-bold text-on-surface-variant transition-all duration-300 ${!showAmounts && 'blur-sm'}`}>{formatKES(tx.kesAmount || 0)}</span>
                           <span className="material-symbols-outlined text-[12px] text-on-surface-variant">arrow_forward</span>
-                          <span className="text-xs font-bold text-primary">{tx.usdcAmount} USDC</span>
+                          <span className={`text-xs font-bold text-primary transition-all duration-300 ${!showAmounts && 'blur-sm'}`}>{tx.usdcAmount} USDC</span>
                         </div>
                       </td>
                       <td className="px-4 py-5">

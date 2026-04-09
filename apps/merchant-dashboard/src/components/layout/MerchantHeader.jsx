@@ -1,7 +1,9 @@
 import React from 'react'
 import { mockMerchant } from '../../mockData/merchant'
+import { usePrivacyMode } from '../../hooks/usePrivacyMode'
 
 export default function MerchantHeader({ title, onMenuClick }) {
+  const { showAmounts, togglePrivacy } = usePrivacyMode()
   const unread = mockMerchant.notifications.filter(n => !n.isRead).length
   
   return (
@@ -20,7 +22,16 @@ export default function MerchantHeader({ title, onMenuClick }) {
         </div>
       </div>
       
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 lg:gap-4">
+        <button 
+          onClick={togglePrivacy}
+          className="hover:bg-emerald-50 rounded-full p-2 transition-colors flex items-center justify-center group"
+          title={showAmounts ? "Hide Sensitive Data" : "Show Sensitive Data"}
+        >
+          <span className={`material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors ${!showAmounts ? 'text-primary' : ''}`}>
+            {showAmounts ? 'visibility' : 'visibility_off'}
+          </span>
+        </button>
         <button className="hover:bg-emerald-50 rounded-full p-2 transition-colors relative">
           <span className="material-symbols-outlined text-on-surface-variant">notifications</span>
           {unread > 0 && (

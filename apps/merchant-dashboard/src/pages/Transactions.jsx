@@ -3,8 +3,10 @@ import MerchantLayout from '../components/layout/MerchantLayout'
 import { transactionsData } from '../mockData/transactions'
 import { formatDateISO } from '../utils/formatDate'
 import { formatKES } from '../utils/formatCurrency'
+import { usePrivacyMode } from '../hooks/usePrivacyMode'
 
 export default function Transactions() {
+  const { showAmounts } = usePrivacyMode()
   const [activeTab, setActiveTab] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedTx, setSelectedTx] = useState(transactionsData[0])
@@ -30,24 +32,24 @@ export default function Transactions() {
 
   return (
     <MerchantLayout title="Collections">
-      <div className="p-8 max-w-7xl mx-auto w-full">
+      <div className="px-1 lg:px-0 max-w-7xl mx-auto w-full">
         {/* Page Title & Subtext */}
-        <div className="mb-8">
-          <h2 className="font-headline text-4xl text-primary tracking-tight">Collections</h2>
-          <p className="text-on-surface-variant font-medium mt-1">All verified inbound payments to Till PC847291</p>
+        <div className="mb-6 lg:mb-8">
+          <h2 className="font-headline text-3xl lg:text-4xl text-primary tracking-tight">Collections</h2>
+          <p className="text-on-surface-variant text-[11px] lg:text-sm font-medium mt-1.5 opacity-80">All verified inbound payments to Till PC847291</p>
         </div>
 
         {/* Section 1: Summary Strip */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12 animate-fade-in-up [animation-delay:100ms]">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-8 lg:mb-12 animate-fade-in-up [animation-delay:100ms]">
           {[
             { label: 'Today', value: 'KES 12,450.00', bg: 'bg-emerald-500/5', text: 'text-emerald-700' },
             { label: 'This Week', value: 'KES 84,920.50', bg: 'bg-amber-500/5', text: 'text-amber-700' },
             { label: 'This Month', value: 'KES 245,100.00', bg: 'bg-blue-500/5', text: 'text-blue-700' },
             { label: 'All Time', value: 'KES 1.84M', bg: 'bg-indigo-500/5', text: 'text-indigo-700' },
           ].map((stat, i) => (
-            <div key={i} className={`${stat.bg} p-8 rounded-[32px] border border-outline-variant/10 editorial-shadow transition-transform hover:scale-105`}>
-              <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest mb-1">{stat.label}</p>
-              <p className={`${stat.text} font-headline text-2xl`}>{stat.value}</p>
+            <div key={i} className={`${stat.bg} p-6 lg:p-8 rounded-[24px] lg:rounded-[32px] border border-outline-variant/10 shadow-sm transition-transform hover:scale-105 group`}>
+              <p className="text-[9px] lg:text-[10px] text-on-surface-variant font-bold uppercase tracking-widest mb-1 lg:mb-2">{stat.label}</p>
+              <p className={`${stat.text} font-headline text-lg lg:text-2xl transition-all duration-300 ${!showAmounts && 'blur-md'}`}>{stat.value}</p>
             </div>
           ))}
         </div>
@@ -126,7 +128,7 @@ export default function Transactions() {
                         <p className="text-[11px] font-mono text-on-surface-variant group-hover:text-primary transition-colors">{tx.reference}</p>
                       </td>
                       <td className="px-6 py-5">
-                        <p className={`text-sm font-bold ${tx.type === 'inbound' ? 'text-green-600' : 'text-primary'}`}>
+                        <p className={`text-sm font-bold transition-all duration-300 ${tx.type === 'inbound' ? 'text-green-600' : 'text-primary'} ${!showAmounts && 'blur-md'}`}>
                           {tx.type === 'fx_swap' ? `${tx.usdcAmount} USDC` : `KES ${tx.amount}`}
                         </p>
                       </td>
@@ -160,7 +162,7 @@ export default function Transactions() {
                 <div className="grid grid-cols-2 gap-6">
                   <div>
                     <p className="text-[10px] text-blue-200/40 font-bold uppercase tracking-[0.2em] mb-2">Settlement</p>
-                    <p className="text-2xl font-headline text-white">{selectedTx.type === 'fx_swap' ? `${selectedTx.usdcAmount} USDC` : `KES ${selectedTx.amount}`}</p>
+                    <p className={`text-2xl font-headline text-white transition-all duration-300 ${!showAmounts && 'blur-lg'}`}>{selectedTx.type === 'fx_swap' ? `${selectedTx.usdcAmount} USDC` : `KES ${selectedTx.amount}`}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-[10px] text-blue-200/40 font-bold uppercase tracking-[0.2em] mb-2">Status</p>
