@@ -72,9 +72,14 @@ export default function MerchantHeader({ title, onMenuClick }) {
           {/* Dropdown Menu */}
           {isDropdownOpen && (
             <div className="absolute right-0 mt-3 w-56 lg:w-64 bg-white/95 backdrop-blur-xl border border-outline-variant/15 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] rounded-2xl py-2 z-[60] animate-fade-in-down origin-top-right overflow-hidden">
-              <div className="px-4 py-3 border-b border-outline-variant/10 mb-1">
-                <p className="text-xs font-black text-primary uppercase tracking-widest mb-0.5">{mockMerchant.businessName}</p>
-                <p className="text-[10px] text-on-surface-variant font-medium opacity-60 truncate">{mockMerchant.email}</p>
+              <div className="px-4 py-3 border-b border-outline-variant/10 mb-1 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full border border-emerald-500/10 overflow-hidden shrink-0">
+                  <img src={userIcon} alt="Avatar" className="w-full h-full object-cover" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-black text-primary uppercase tracking-widest mb-0.5 truncate">{mockMerchant.businessName}</p>
+                  <p className="text-[10px] text-on-surface-variant font-medium opacity-60 truncate">{mockMerchant.email}</p>
+                </div>
               </div>
               
               <Link 
