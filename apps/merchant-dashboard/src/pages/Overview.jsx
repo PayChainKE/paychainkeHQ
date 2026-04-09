@@ -43,9 +43,9 @@ export default function Overview() {
   return (
     <MerchantLayout title="Overview">
       {/* Greeting */}
-      <section className="mb-4">
-        <h2 className="font-headline font-bold text-4xl text-primary tracking-tight">{getGreeting()}, {mockMerchant.name.split(' ')[0]}. 👋</h2>
-        <p className="text-on-surface-variant text-sm mt-1.5 opacity-80 font-medium">Here's how {mockMerchant.businessName} is doing today.</p>
+      <section className="mb-6 px-1 lg:px-0">
+        <h2 className="font-headline font-bold text-3xl lg:text-4xl text-primary tracking-tight leading-tight">{getGreeting()}, {mockMerchant.name.split(' ')[0]}. 👋</h2>
+        <p className="text-on-surface-variant text-[11px] lg:text-sm mt-1.5 opacity-80 font-medium leading-relaxed">Here's how {mockMerchant.businessName} is doing today.</p>
       </section>
 
       {/* Section 1: Balance Cards Row */}
@@ -110,20 +110,20 @@ export default function Overview() {
       </section>
 
       {/* Section 2: Stats Row */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-in-up [animation-delay:200ms]">
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 animate-fade-in-up [animation-delay:200ms]">
         {[
-          { label: "Today's Revenue", value: "KES 18,450", trend: "12 payments processed", trendColor: "text-on-surface-variant" },
-          { label: "This Month", value: "KES 284,500", trend: "↓ 14% vs last month", trendColor: "text-red-500" },
-          { label: "Total Transactions", value: "847", trend: "Since October 2025", trendColor: "text-on-surface-variant" },
-          { label: "Trust Score", value: "74/100", trend: "Cash Advance Eligible ✔", trendColor: "text-emerald-600", showBadge: true }
+          { label: "Today's Revenue", value: "KES 18,450", trend: "12 payments", trendColor: "text-on-surface-variant" },
+          { label: "This Month", value: "KES 284,500", trend: "↓ 14% vs last", trendColor: "text-red-500" },
+          { label: "Total Transactions", value: "847", trend: "Since Oct 2025", trendColor: "text-on-surface-variant" },
+          { label: "Trust Score", value: "74/100", trend: "Eligible ✔", trendColor: "text-emerald-600", showBadge: true }
         ].map((stat, i) => (
-          <div key={i} className="bg-white p-8 rounded-[12px] border border-[#E5E7EB] shadow-sm editorial-shadow transition-all group">
-            <div className="flex justify-between items-center mb-6">
-              <p className="text-[10px] text-primary font-black uppercase tracking-widest leading-none">{stat.label}</p>
+          <div key={i} className="bg-white p-6 lg:p-8 rounded-[12px] border border-[#E5E7EB] shadow-sm editorial-shadow transition-all group">
+            <div className="flex justify-between items-center mb-4 lg:mb-6">
+              <p className="text-[9px] lg:text-[10px] text-primary font-black uppercase tracking-widest leading-none">{stat.label}</p>
               {stat.showBadge && <span className="material-symbols-outlined text-xs text-emerald-600" style={{fontVariationSettings: "'FILL' 1"}}>verified</span>}
             </div>
-            <p className="text-3xl font-headline text-primary mb-2 leading-none">{stat.value}</p>
-            <p className={`text-[10px] ${stat.trendColor} font-bold tracking-tight opacity-90`}>{stat.trend}</p>
+            <p className="text-2xl lg:text-3xl font-headline text-primary mb-2 leading-none">{stat.value}</p>
+            <p className={`text-[9px] lg:text-[10px] ${stat.trendColor} font-bold tracking-tight opacity-90`}>{stat.trend}</p>
           </div>
         ))}
       </section>
@@ -225,18 +225,18 @@ export default function Overview() {
       </div>
 
       {/* Section 6: Quick Actions Row */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 pb-20">
+      <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 pb-20">
         {[
           { icon: 'add_card', label: 'Request Advance' },
           { icon: 'send_money', label: 'Send Bulk Pay' },
-          { icon: 'swap_horiz', label: 'Swap to USDC' },
-          { icon: 'insights', label: 'View Trust Score' }
+          { icon: 'swap_horiz', label: 'Swap USDC' },
+          { icon: 'insights', label: 'Trust Score' }
         ].map((action, idx) => (
-          <button key={idx} className="flex flex-col items-center justify-center p-8 bg-white rounded-[20px] border border-[#E5E7EB] border-t-2 border-t-[#00351D] shadow-sm hover:bg-[#00351D] hover:border-[#00351D] transition-all group active:scale-95">
-            <div className="w-14 h-14 rounded-full bg-[#F0FDF4] mb-4 flex items-center justify-center border border-emerald-50 group-hover:bg-white/10 transition-colors">
-              <span className="material-symbols-outlined text-primary group-hover:text-[#5EFEB3] group-hover:scale-110 transition-all">{action.icon}</span>
+          <button key={idx} className="flex flex-col items-center justify-center p-6 lg:p-8 bg-white rounded-[16px] lg:rounded-[20px] border border-[#E5E7EB] border-t-2 border-t-[#00351D] shadow-sm hover:bg-[#00351D] hover:border-[#00351D] transition-all group active:scale-95">
+            <div className="w-10 h-10 lg:w-14 lg:h-14 rounded-full bg-[#F0FDF4] mb-3 lg:mb-4 flex items-center justify-center border border-emerald-50 group-hover:bg-white/10 transition-colors">
+              <span className="material-symbols-outlined text-primary group-hover:text-[#5EFEB3] text-xl lg:text-2xl group-hover:scale-110 transition-all">{action.icon}</span>
             </div>
-            <span className="text-[11px] font-bold text-primary uppercase tracking-widest leading-none group-hover:text-white transition-colors">{action.label}</span>
+            <span className="text-[9px] lg:text-[11px] font-bold text-primary uppercase tracking-widest leading-none group-hover:text-white transition-colors">{action.label}</span>
           </button>
         ))}
       </section>
