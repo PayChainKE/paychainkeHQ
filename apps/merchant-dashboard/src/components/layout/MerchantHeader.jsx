@@ -43,14 +43,17 @@ export default function MerchantHeader({ title, onMenuClick }) {
       </div>
       
       <div className="flex items-center gap-4">
-        <button className="hover:bg-emerald-50 rounded-full p-2 transition-all duration-300 relative group">
+        <Link 
+          to="/notifications"
+          className="hover:bg-emerald-50 rounded-full p-2 transition-all duration-300 relative group"
+        >
           <span className="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors text-2xl">notifications</span>
           {unread > 0 && (
             <span className="absolute top-1.5 right-1.5 min-w-[16px] h-[16px] bg-red-600 rounded-full flex items-center justify-center text-[10px] font-black text-white px-1 ring-2 ring-white animate-pulse-subtle shadow-lg">
               {unread > 9 ? '9+' : unread}
             </span>
           )}
-        </button>
+        </Link>
         
         <div className="relative" ref={dropdownRef}>
           <button 

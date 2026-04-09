@@ -12,6 +12,7 @@ import CashAdvance from './pages/CashAdvance'
 import TrustScore from './pages/TrustScore'
 import Profile from './pages/Profile'
 import Support from './pages/Support'
+import Notifications from './pages/Notifications'
 import ToastHost from './components/ui/Toast'
 
 function Protected({ children }){
@@ -39,6 +40,7 @@ export default function App(){
             <Route path="/trust-score" element={<Protected><TrustScore/></Protected>} />
             <Route path="/profile" element={<Protected><Profile/></Protected>} />
             <Route path="/support" element={<Protected><Support/></Protected>} />
+            <Route path="/notifications" element={<Protected><Notifications/></Protected>} />
             {/* Catch-all route for 404s and refreshes */}
             <Route path="*" element={<Navigate to="/overview" replace />} />
           </Routes>

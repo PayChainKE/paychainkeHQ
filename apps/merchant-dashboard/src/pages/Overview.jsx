@@ -52,8 +52,10 @@ export default function Overview() {
   return (
     <MerchantLayout title="Overview">
       {/* Greeting */}
-      <section className="mb-6 px-1 lg:px-0">
-        <h2 className="font-headline font-bold text-3xl lg:text-4xl text-primary tracking-tight leading-tight">{getGreeting()}, {mockMerchant.name.split(' ')[0]}. 👋</h2>
+      <section className="mb-6 px-1 lg:px-0 overflow-hidden">
+        <h2 className="font-headline font-bold text-[24px] sm:text-3xl lg:text-4xl text-primary tracking-tight leading-tight whitespace-nowrap">
+          {getGreeting()}, {mockMerchant.name.split(' ')[0]}. 👋
+        </h2>
         <p className="text-on-surface-variant text-[11px] lg:text-sm mt-1.5 opacity-80 font-medium leading-relaxed">Here's how {mockMerchant.businessName} is doing today.</p>
       </section>
 
