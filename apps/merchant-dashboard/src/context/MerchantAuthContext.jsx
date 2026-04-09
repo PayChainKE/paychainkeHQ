@@ -8,8 +8,8 @@ const STORAGE_KEY = 'paychain_merchant_session'
 const CRED_KEY = 'paychain_merchant_creds'
 
 // Initial test credentials (first-time temp password)
-const TEST_PHONE = '+254712847291'
-const TEST_TEMP_PW = 'TempPass2026!'
+const TEST_PHONE = '+254712345678'
+const TEST_TEMP_PW = 'Paychain2026'
 
 export function MerchantAuthProvider({ children }){
   const [merchant, setMerchant] = useState(null)

@@ -5,8 +5,8 @@ import '../index.css'
 
 export default function Login(){
   const { login } = useMerchantAuth()
-  const [phone, setPhone] = useState('0712847291')
-  const [password, setPassword] = useState('TempPass2026!')
+  const [phone, setPhone] = useState('0712345678')
+  const [password, setPassword] = useState('Paychain2026')
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(false)
   const nav = useNavigate()
