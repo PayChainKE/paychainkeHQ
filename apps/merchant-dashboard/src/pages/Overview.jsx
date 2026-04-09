@@ -117,24 +117,24 @@ export default function Overview() {
               { id: 4, name: 'Evans Kiprono', ref: 'PLM992OSS', amount: 12500, time: '1 hour ago', initials: 'EK', color: 'bg-indigo-100' },
               { id: 5, name: 'Alice Nyambura', ref: 'VFR4451PP', amount: 2100, time: '2 hours ago', initials: 'AN', color: 'bg-purple-100' }
             ].map(tx => (
-              <div key={tx.id} className="px-8 py-5 flex items-center justify-between hover:bg-surface-container-low transition-colors group">
+              <div key={tx.id} className="px-8 py-5 flex items-center justify-between hover:bg-[#00351D] transition-all group cursor-pointer">
                 <div className="flex items-center gap-4">
-                  <div className={`w-12 h-12 rounded-full ${tx.color} flex items-center justify-center overflow-hidden font-bold text-primary text-xs border border-white/20 shadow-sm`}>
+                  <div className={`w-12 h-12 rounded-full ${tx.color} flex items-center justify-center overflow-hidden font-bold text-primary text-xs border border-white/20 shadow-sm group-hover:bg-white/10 group-hover:text-white group-hover:border-white/10 transition-colors`}>
                     {tx.initials}
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-on-surface leading-snug">{tx.name}</p>
-                    <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider opacity-60">REF: {tx.ref}</p>
+                    <p className="text-sm font-bold text-on-surface leading-snug group-hover:text-white transition-colors">{tx.name}</p>
+                    <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider opacity-60 group-hover:text-white/60 transition-colors">REF: {tx.ref}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-10 text-right">
-                  <div className="flex items-center gap-1.5 text-emerald-600">
+                  <div className="flex items-center gap-1.5 text-emerald-600 group-hover:text-[#5EFEB3] transition-colors">
                     <span className="material-symbols-outlined text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
                     <span className="text-[9px] font-bold uppercase tracking-[0.1em]">Verified</span>
                   </div>
                   <div>
-                    <p className="text-sm font-extrabold text-emerald-700">+{formatKES(tx.amount)}</p>
-                    <p className="text-[10px] text-on-surface-variant font-bold opacity-50 tracking-tight">{tx.time}</p>
+                    <p className="text-sm font-extrabold text-emerald-700 group-hover:text-[#5EFEB3] transition-colors">+{formatKES(tx.amount)}</p>
+                    <p className="text-[10px] text-on-surface-variant font-bold opacity-50 tracking-tight group-hover:text-white/40 transition-colors">{tx.time}</p>
                   </div>
                 </div>
               </div>
@@ -192,11 +192,11 @@ export default function Overview() {
           { icon: 'swap_horiz', label: 'Swap to USDC' },
           { icon: 'insights', label: 'View Trust Score' }
         ].map((action, idx) => (
-          <button key={idx} className="flex flex-col items-center justify-center p-8 bg-white rounded-[20px] border border-[#E5E7EB] shadow-sm hover:border-emerald-200 hover:bg-[#F0FDF4] transition-all group active:scale-95">
-            <div className="w-14 h-14 rounded-full bg-[#F0FDF4] mb-4 flex items-center justify-center border border-emerald-50 group-hover:bg-white transition-colors">
-              <span className="material-symbols-outlined text-primary group-hover:scale-110 transition-transform">{action.icon}</span>
+          <button key={idx} className="flex flex-col items-center justify-center p-8 bg-white rounded-[20px] border border-[#E5E7EB] shadow-sm hover:bg-[#00351D] hover:border-[#00351D] transition-all group active:scale-95">
+            <div className="w-14 h-14 rounded-full bg-[#F0FDF4] mb-4 flex items-center justify-center border border-emerald-50 group-hover:bg-white/10 transition-colors">
+              <span className="material-symbols-outlined text-primary group-hover:text-[#5EFEB3] group-hover:scale-110 transition-all">{action.icon}</span>
             </div>
-            <span className="text-[11px] font-bold text-primary uppercase tracking-widest leading-none">{action.label}</span>
+            <span className="text-[11px] font-bold text-primary uppercase tracking-widest leading-none group-hover:text-white transition-colors">{action.label}</span>
           </button>
         ))}
       </section>
