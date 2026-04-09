@@ -26,6 +26,19 @@ export default function MerchantLayout({ children, title = 'Overview' }) {
         <main className="flex-1 px-4 lg:px-8 pt-4 pb-12 max-w-[1400px] w-full mx-auto space-y-6 lg:space-y-10">
           {children}
         </main>
+        
+        {/* Full-width Thin branded Footer */}
+        <footer className="w-full bg-[#FAFAF9] border-t border-emerald-900/10 py-4 mt-auto transition-colors">
+          <div className="px-4 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-2 max-w-[1400px] mx-auto">
+            <p className="text-emerald-900/60 text-[9px] lg:text-[10px] font-bold tracking-tight">
+              &copy; 2026 PayChain KE. All rights reserved.
+            </p>
+            <div className="flex items-center gap-1.5 opacity-90 transition-all duration-300">
+              <span className="text-emerald-900/40 text-[8px] lg:text-[9px] uppercase tracking-[0.2em] font-black">Powered by</span>
+              <span className="text-primary font-black text-[11px] lg:text-xs tracking-tight">Paychain</span>
+            </div>
+          </div>
+        </footer>
       </div>
     </div>
   )
