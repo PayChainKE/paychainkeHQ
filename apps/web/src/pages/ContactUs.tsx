@@ -105,9 +105,11 @@ export default function ContactUs() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [submittedEmail, setSubmittedEmail] = useState("");
   const [charCount, setCharCount] = useState(0);
 
   const formRef = useRef<HTMLFormElement | null>(null);
+  const firstErrorRef = useRef<HTMLElement | null>(null);
 
   // Intersection observer for scroll-triggered animations
   useEffect(() => {
@@ -239,7 +241,7 @@ export default function ContactUs() {
       <section className={styles.detailsStrip}>
         <div className={styles.detailsInner}>
           {CONTACT_DETAILS.map((d) => {
-            const Icon = d.icon;
+            const Icon = d.icon as any;
             const content = (
               <div className={styles.detailBlock} key={d.label}>
                 <div className={styles.iconCircle}><Icon size={18} /></div>
@@ -267,7 +269,7 @@ export default function ContactUs() {
           <h2 className={styles.sectionHeadline}>Reach the Right Person Directly.</h2>
           <div className={styles.cardsGrid}>
             {CARD_DATA.map((card, idx) => {
-              const Icon = card.icon;
+              const Icon = card.icon as any;
               return (
                 <article key={idx} className={`${styles.card} ${styles['animate-on-scroll']}`} style={{ transitionDelay: `${idx * 100}ms` }}>
                   <div className={styles.cardTop}>
