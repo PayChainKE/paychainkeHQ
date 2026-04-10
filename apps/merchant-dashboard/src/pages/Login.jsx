@@ -388,13 +388,6 @@ export default function Login() {
             </div>
           )}
 
-          <div className="mt-8 lg:mt-12 bg-emerald-50 p-6 rounded-[24px] border border-emerald-100 relative overflow-hidden group">
-            <div className="absolute -top-10 -right-10 w-32 h-32 bg-emerald-200/50 rounded-full blur-3xl transition-transform group-hover:scale-150 duration-700"></div>
-            <p className="text-xs font-bold text-emerald-800 leading-relaxed relative z-10">
-              <span className="material-symbols-outlined text-lg align-middle mr-2 text-emerald-600">info</span>
-              New to PayChain? Access is exclusively provided by your onboarding officer after physical verification.
-            </p>
-          </div>
         </div>
       </div>
     </div>
