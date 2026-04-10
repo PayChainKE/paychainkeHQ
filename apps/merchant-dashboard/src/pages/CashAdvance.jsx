@@ -1,4 +1,4 @@
-
+import React from 'react'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import { mockMerchant } from '../mockData/merchant'
 import { formatKES } from '../utils/formatCurrency'
