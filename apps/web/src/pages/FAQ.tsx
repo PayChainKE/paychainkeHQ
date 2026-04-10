@@ -21,7 +21,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import './faqs.css';
 
-const ICON_MAP: Record<string, React.ComponentType<any>> = {
+const ICON_MAP: Record<string, React.ComponentType<unknown>> = {
   Compass,
   CreditCard,
   TrendingUp,
