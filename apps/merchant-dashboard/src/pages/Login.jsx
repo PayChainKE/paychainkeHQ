@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
+import footerLogo from '../assets/paychain-logo.svg'
 
 export default function Login() {
   const { login, setNewPassword } = useMerchantAuth()
@@ -147,9 +148,12 @@ export default function Login() {
         </div>
 
         <div className="relative z-10 mt-12 lg:mt-0">
-          <p className="text-[10px] text-white/30 uppercase font-black tracking-[0.2em]">
-            Merchant access is by invitation only.
-          </p>
+          <div className="flex items-center gap-2.5 opacity-40">
+            <p className="text-[10px] text-white uppercase font-black tracking-[0.2em]">
+              Powered by
+            </p>
+            <img src={footerLogo} alt="PayChain Logo" className="h-4 w-auto object-contain brightness-0 invert" />
+          </div>
         </div>
       </div>
 
