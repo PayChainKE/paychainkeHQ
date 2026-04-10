@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
-import footerLogo from '../assets/paychain-logo.svg'
+import mainLogo from '../assets/signin-logo.png'
 
 export default function Login() {
   const { login, setNewPassword } = useMerchantAuth()
@@ -109,7 +109,7 @@ export default function Login() {
         </div>
         
         <div className="relative z-10">
-          <img src={footerLogo} alt="PayChain Logo" className="h-10 w-auto object-contain brightness-0 invert" />
+          <img src={mainLogo} alt="PayChain Logo" className="h-10 w-auto object-contain" />
         </div>
 
         <div className="relative z-10 max-w-lg mt-12 lg:mt-0">
@@ -143,7 +143,7 @@ export default function Login() {
             <p className="text-[10px] text-white uppercase font-black tracking-[0.2em]">
               Powered by
             </p>
-            <img src={footerLogo} alt="PayChain Logo" className="h-4 w-auto object-contain brightness-0 invert" />
+            <img src={mainLogo} alt="PayChain Logo" className="h-4 w-auto object-contain" />
           </div>
         </div>
       </div>
