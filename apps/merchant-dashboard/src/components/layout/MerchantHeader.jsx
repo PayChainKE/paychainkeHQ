@@ -37,9 +37,7 @@ export default function MerchantHeader({ title, onMenuClick }) {
           <span className="material-symbols-outlined text-2xl">menu</span>
         </button>
         <div className="flex items-center gap-2">
-          <span className="text-on-surface-variant text-[10px] lg:text-sm font-medium opacity-60 hidden sm:inline">Dashboard</span>
-          <span className="text-outline-variant text-xs hidden sm:inline">/</span>
-          <span className="text-primary font-bold text-xs lg:text-sm truncate max-w-[120px] lg:max-w-none">{title}</span>
+          <span className="text-primary font-black text-sm lg:text-base tracking-tight truncate max-w-[120px] lg:max-w-none">{title}</span>
         </div>
       </div>
       

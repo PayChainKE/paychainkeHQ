@@ -5,7 +5,7 @@ import { usePrivacyMode } from '../../hooks/usePrivacyMode'
 import userIcon from '../../assets/user-icon.png'
 
 const navItems = [
-  { name: 'Dashboard', icon: 'dashboard', path: '/overview' },
+  { name: 'Overview', icon: 'dashboard', path: '/overview' },
   { name: 'Collections', icon: 'payments', path: '/transactions' },
   { name: 'Bulk Pay', icon: 'group_add', path: '/bulk-pay' },
   { name: 'Inflation Shield', icon: 'currency_exchange', path: '/inflation-shield' },
@@ -61,7 +61,7 @@ export default function MerchantSidebar({ isOpen, onClose }) {
                 <span className={`material-symbols-outlined transition-colors text-xl ${isActive ? 'text-[#5EFEB3]' : 'text-inherit opacity-60 group-hover:opacity-100'}`}>
                   {item.icon}
                 </span>
-                <span className="text-xs tracking-wide">{item.name}</span>
+                <span className="font-bold text-xs tracking-wide">{item.name}</span>
               </>
             )}
           </NavLink>

@@ -28,7 +28,7 @@ export default function Profile() {
       <div className="px-1 lg:px-0 max-w-7xl mx-auto w-full">
         {/* Header */}
         <div className="mb-6 lg:mb-10">
-          <h2 className="font-headline text-3xl lg:text-4xl text-primary tracking-tight">Settings</h2>
+          <h2 className="font-headline font-bold text-3xl lg:text-4xl text-primary tracking-tight">Settings</h2>
           <p className="text-on-surface-variant text-[11px] lg:text-sm font-medium mt-1.5 opacity-80">Manage your business profile, settlement rules, and security preferences.</p>
         </div>
 
@@ -37,10 +37,10 @@ export default function Profile() {
           <div className="col-span-12 lg:col-span-8 space-y-8">
             
             {/* Section 1: Administrator Profile */}
-            <div className="bg-surface-container-lowest p-6 lg:p-10 rounded-[32px] lg:rounded-[40px] border border-outline-variant/5 shadow-sm editorial-shadow animate-fade-in-up [animation-delay:100ms]">
+            <div className="bg-white p-6 lg:p-10 rounded-[32px] lg:rounded-[40px] border border-slate-100 shadow-sm editorial-shadow animate-fade-in-up [animation-delay:100ms]">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
                 <div>
-                  <h3 className="font-headline text-2xl text-primary tracking-tight">Profile</h3>
+                  <h3 className="font-headline font-bold text-2xl text-primary tracking-tight">Profile</h3>
                   <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-[0.2em] mt-1 opacity-60">Identity Management</p>
                 </div>
                 <span className="text-[10px] bg-emerald-500/10 text-emerald-700 px-4 py-1.5 rounded-full font-black uppercase tracking-widest border border-emerald-500/10 flex items-center gap-2">
@@ -49,11 +49,11 @@ export default function Profile() {
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-y-8 gap-x-12">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-y-6 lg:gap-y-8 gap-x-12">
                 {[
                   { label: "Name", value: "Kamau General Store", locked: true },
-                  { label: "Email", value: "brandonomutiti05@gmail.com", locked: false },
-                  { label: "Phone", value: "+254790889066", locked: true },
+                  { label: "Email", value: "jameskamau@gmail.com", locked: false },
+                  { label: "Phone", value: "+254712345678", locked: true },
                   { label: "Role", value: "Administrator", badge: "Primary" },
                   { label: "Primary contact", value: "Yes", status: true },
                   { label: "Created at", value: "19 March 2026", sub: "Member since" },
@@ -65,7 +65,7 @@ export default function Profile() {
                   <div key={idx} className="space-y-2 group">
                     <label className="text-[9px] text-on-surface-variant font-black uppercase tracking-[0.2em] pl-1 opacity-50 group-hover:opacity-100 transition-opacity">{item.label}</label>
                     <div className="relative">
-                      <div className={`w-full bg-surface-container-low/30 border border-outline-variant/10 rounded-2xl py-3.5 px-5 text-sm font-black text-primary flex items-center justify-between ${item.locked ? 'opacity-70 bg-surface-container-low/10' : 'group-hover:border-primary/20'} transition-all`}>
+                      <div className={`w-full bg-surface-container-low/30 border border-slate-100 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] rounded-2xl py-3.5 px-5 text-sm font-black text-primary flex items-center justify-between ${item.locked ? 'opacity-70 bg-surface-container-low/10' : 'group-hover:border-primary/20 group-hover:shadow-[0_4px_14px_-4px_rgba(0,0,0,0.1)]'} transition-all duration-300`}>
                         <span className={!showAmounts && item.label === "Phone" ? 'blur-md' : ''}>{item.value}</span>
                         {item.locked && <span className="material-symbols-outlined text-xs opacity-30">lock</span>}
                         {item.badge && <span className="text-[8px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-black uppercase tracking-wider">{item.badge}</span>}
@@ -78,13 +78,13 @@ export default function Profile() {
                 ))}
               </div>
               
-              <div className="mt-12 flex justify-between items-center pt-8 border-t border-outline-variant/5">
+              <div className="mt-10 lg:mt-12 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 pt-8 border-t border-slate-100">
                 <p className="text-[10px] text-on-surface-variant font-medium max-w-[240px]">Last USSD PIN failed attempts: <span className="text-primary font-black">0</span> • PIN Blocked: <span className="text-red-500 font-black">No</span></p>
                 <button 
                   onClick={save}
-                  className="bg-[#06201B] text-white px-8 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl hover:opacity-90 transition-all flex items-center gap-3 active:scale-95"
+                  className="w-full md:w-auto bg-[#06201B] text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:opacity-90 transition-all flex items-center justify-center gap-2 active:scale-95"
                 >
-                  <span className="material-symbols-outlined text-lg">sync</span>
+                  <span className="material-symbols-outlined text-base">sync</span>
                   Update Global Profile
                 </button>
               </div>
@@ -96,7 +96,7 @@ export default function Profile() {
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-10">
                   <div>
-                    <h3 className="font-headline text-2xl text-white tracking-tight">Security</h3>
+                    <h3 className="font-headline font-bold text-2xl text-white tracking-tight">Security</h3>
                     <p className="text-[10px] text-emerald-400/60 font-black uppercase tracking-[0.2em] mt-1">Encryption & Access Rules</p>
                   </div>
                   <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-emerald-400 border border-white/5">
@@ -259,7 +259,7 @@ export default function Profile() {
 
             {/* Security Mini-Bento */}
             <div className="bg-surface-container-lowest p-8 rounded-[32px] border border-outline-variant/10 shadow-sm editorial-shadow">
-              <h3 className="font-headline text-lg text-primary mb-6">Security History</h3>
+              <h3 className="font-headline font-bold text-lg text-primary mb-6">Security History</h3>
               <div className="space-y-6">
                 {loginHistory.map((log, i) => (
                   <div key={i} className="flex items-center gap-4">
@@ -273,7 +273,7 @@ export default function Profile() {
                   </div>
                 ))}
               </div>
-              <button className="w-full mt-8 py-3 rounded-xl border border-outline-variant/20 text-xs font-bold text-primary hover:bg-surface-container-low transition-colors">
+              <button className="w-full mt-8 py-3.5 rounded-xl bg-emerald-500 text-[#06201B] text-xs font-black uppercase tracking-widest shadow-md hover:bg-[#06201B] hover:text-emerald-400 hover:shadow-xl transition-all duration-300 active:scale-95">
                 Sign Out All Devices
               </button>
             </div>
