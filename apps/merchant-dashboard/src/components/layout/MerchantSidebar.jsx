@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom'
 import { mockMerchant } from '../../mockData/merchant'
 import { usePrivacyMode } from '../../hooks/usePrivacyMode'
 import userIcon from '../../assets/user-icon.png'
+import logo from '../../assets/logo.png'
 
 const navItems = [
   { name: 'Overview', icon: 'dashboard', path: '/overview' },
@@ -28,7 +29,9 @@ export default function MerchantSidebar({ isOpen, onClose }) {
       </button>
       {/* Brand & Identity Header */}
       <div className="p-6">
-        <h1 className="font-headline font-bold text-3xl text-white tracking-tight mb-8">PayChain</h1>
+        <div className="mb-8 lg:flex lg:justify-center">
+          <img src={logo} alt="PayChain Logo" className="h-8 max-w-full w-auto object-contain" />
+        </div>
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center overflow-hidden border border-white/10 shadow-sm">
             <img 

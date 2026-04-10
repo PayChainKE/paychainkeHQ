@@ -1,4 +1,4 @@
-# PayChainKE — The Merchant Operating System Built for Kenya
+# <img src="apps/merchant-dashboard/src/assets/logo.png" alt="PayChain Logo" height="32" /> PayChainKE — The Merchant Operating System Built for Kenya
 
 <img src="https://img.shields.io/badge/React-18-blue?logo=react" alt="React"/> <img src="https://img.shields.io/badge/TypeScript-TS-blue?logo=typescript" alt="TypeScript"/> <img src="https://img.shields.io/badge/TailwindCSS-3-teal?logo=tailwindcss" alt="Tailwind"/> <img src="https://img.shields.io/badge/Vite-5-purple?logo=vite" alt="Vite"/> <img src="https://img.shields.io/badge/Base%20L2-Chain-6f42c1" alt="Base L2"/> <img src="https://img.shields.io/badge/M--PESA-Daraja-00BE00" alt="M-PESA Daraja"/>
 
