@@ -95,7 +95,7 @@ export default function Login() {
 
   const SecurityRequirement = ({ met, label }) => (
     <div className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-colors ${met ? 'text-emerald-500' : 'text-primary/30'}`}>
-      <span className="material-symbols-outlined text-[10px]">{met ? 'check_circle' : 'circle'}</span>
+      <span className="material-symbols-outlined text-[8px]">{met ? 'check_circle' : 'circle'}</span>
       {label}
     </div>
   )
