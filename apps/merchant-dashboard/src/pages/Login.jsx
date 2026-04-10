@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import mainLogo from '../assets/signin-logo.png'
+import footerBrandsLogo from '../assets/signin-footer-logo.png'
 
 export default function Login() {
   const { login, setNewPassword } = useMerchantAuth()
@@ -139,12 +140,6 @@ export default function Login() {
         </div>
 
         <div className="relative z-10 mt-12 lg:mt-0">
-          <div className="flex items-center gap-2.5 opacity-40">
-            <p className="text-[10px] text-white uppercase font-black tracking-[0.2em]">
-              Powered by
-            </p>
-            <img src={mainLogo} alt="PayChain Logo" className="h-4 w-auto object-contain" />
-          </div>
         </div>
       </div>
 
@@ -155,7 +150,7 @@ export default function Login() {
             /* LOGIN FORM */
             <>
               <div className="mb-8 lg:mb-10">
-                 <h3 className="font-headline text-3xl lg:text-5xl text-primary tracking-tight">Sign in</h3>
+                 <h3 className="font-headline text-3xl lg:text-5xl text-primary tracking-tight font-black">Sign in</h3>
                  <p className="text-on-surface-variant font-medium mt-2 opacity-70">
                    Enter credentials provided during onboarding.
                  </p>
@@ -223,6 +218,13 @@ export default function Login() {
                     </>
                   )}
                 </button>
+                
+                <div className="flex items-center justify-center gap-2 opacity-50 pt-4">
+                  <p className="text-[9px] text-primary/60 uppercase font-black tracking-[0.2em]">
+                    Powered by
+                  </p>
+                  <img src={footerBrandsLogo} alt="PayChain Logo" className="h-3.5 w-auto object-contain" />
+                </div>
               </form>
             </>
           ) : isOTPMode ? (
@@ -284,13 +286,10 @@ export default function Login() {
           ) : (
             /* RESET PASSWORD FORM */
             <div className="animate-fade-in-up duration-500">
-              <div className="mb-6 lg:mb-10">
-                 <div className="inline-flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full mb-3 lg:mb-4">
-                   <span className="material-symbols-outlined text-xs text-emerald-600" style={{fontVariationSettings: "'FILL' 1"}}>verified_user</span>
-                   <span className="text-[9px] uppercase font-black tracking-widest text-emerald-600">Identity Verified</span>
-                 </div>
-                 <h3 className="font-headline text-2xl lg:text-5xl text-primary tracking-tight">Set Custom Access</h3>
-                 <p className="text-on-surface-variant font-medium mt-1.5 text-sm lg:text-base lg:mt-2 opacity-70 leading-relaxed">
+              <div className="mb-6 lg:mb-10 flex flex-col items-center text-center">
+                 <img src={footerBrandsLogo} alt="PayChain Logo" className="h-10 mb-6 w-auto object-contain" />
+                 <h3 className="font-headline text-2xl lg:text-5xl text-primary tracking-tight font-black">Set Custom Access</h3>
+                 <p className="text-on-surface-variant font-medium mt-1.5 text-sm lg:text-base lg:mt-2 opacity-70 leading-relaxed max-w-sm">
                    To complete onboarding, please create a high-security password.
                  </p>
               </div>
