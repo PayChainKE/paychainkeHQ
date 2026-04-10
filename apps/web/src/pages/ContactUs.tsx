@@ -136,6 +136,7 @@ export default function ContactUs() {
   }, [formData.message]);
 
   const validate = () => {
+    const ICON_MAP: Record<string, React.ComponentType<unknown>> = {};
     const errs: Record<string, string> = {};
     if (!formData.name || formData.name.trim().length < 2) {
       errs.name = "Please enter your full name";
@@ -279,8 +280,8 @@ export default function ContactUs() {
                   <div className={styles.cardHeadline}>{card.headline}</div>
                   <div className={styles.cardBody}>{card.body}</div>
                   <div className={styles.cardResponse}><Clock size={12} /> <span>{card.response}</span></div>
-                  {card.emailHref && (
-                    <a href={card.emailHref} className={styles.cardPrimary}>{card.emailHref.replace('mailto:', '')} <ArrowRight size={14} /></a>
+                  {(card as any).emailHref && (
+                    <a href={(card as any).emailHref} className={styles.cardPrimary}>{(card as any).emailHref.replace('mailto:', '')} <ArrowRight size={14} /></a>
                   )}
                   {card.phoneHref && (
                     <a href={card.phoneHref} className={styles.cardPhone}><Phone size={14} /> +254 790 889 066</a>
