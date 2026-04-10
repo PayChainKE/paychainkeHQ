@@ -120,26 +120,22 @@ export default function Login() {
 
         <div className="relative z-10 max-w-lg mt-12 lg:mt-0">
           <h2 className="font-headline text-5xl lg:text-7xl text-white tracking-tighter leading-[0.9] mb-6 lg:mb-8 transition-all">
-            {isOTPMode ? (
-              <>Verify<br/>OTP<br/>Code<span className="text-emerald-400">.</span></>
-            ) : isResetMode ? (
-              <>Secure<br/>Your<br/>Access<span className="text-amber-400">.</span></>
-            ) : (
-              <>Collect<span className="text-emerald-400">.</span><br/>Pay<span className="text-emerald-400">.</span><br/>Grow<span className="text-emerald-400">.</span></>
-            )}
+            Collect<span className="text-emerald-400">.</span><br/>
+            Pay<span className="text-emerald-400">.</span><br/>
+            Grow<span className="text-emerald-400">.</span>
           </h2>
           <div className="space-y-4 lg:space-y-6 text-blue-100/60 font-medium text-base lg:text-lg">
             <p className="flex items-center gap-4">
               <span className="material-symbols-outlined text-emerald-400 text-xl">shield_locked</span>
-              {isOTPMode ? 'Two-factor authentication' : isResetMode ? 'Encrypted credential storage' : 'Verified M-PESA collections'}
+              Verified M-PESA collections
             </p>
             <p className="flex items-center gap-4">
               <span className="material-symbols-outlined text-emerald-400 text-xl">key_visualizer</span>
-              {isOTPMode ? 'One-time secure token' : isResetMode ? 'Advanced hashing protection' : 'Working capital, no collateral'}
+              Working capital, no collateral
             </p>
             <p className="flex items-center gap-4">
               <span className="material-symbols-outlined text-emerald-400 text-xl">verified_user</span>
-              {isOTPMode ? 'Instant verification' : isResetMode ? 'Global security standards' : 'Your data builds your credit'}
+              Your data builds your credit
             </p>
           </div>
         </div>
@@ -151,7 +147,7 @@ export default function Login() {
       {/* Right Login/Reset/OTP Side */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-6 lg:p-16 bg-white lg:bg-transparent -mt-10 lg:mt-0 rounded-t-[40px] lg:rounded-none relative z-20 shadow-[0_-20px_50px_rgba(0,0,0,0.1)] lg:shadow-none transition-all">
         <div className="max-w-md w-full animate-fade-in-up">
-          {!isResetMode ? (
+          {!isResetMode && !isOTPMode ? (
             /* LOGIN FORM */
             <>
               <div className="mb-8 lg:mb-10">
@@ -235,13 +231,10 @@ export default function Login() {
           ) : isOTPMode ? (
             /* OTP VERIFICATION VIEW */
             <div className="animate-fade-in-up duration-500">
-              <div className="mb-6 lg:mb-10">
-                 <div className="inline-flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full mb-3 lg:mb-4">
-                   <span className="material-symbols-outlined text-xs text-emerald-600" style={{fontVariationSettings: "'FILL' 1"}}>mail</span>
-                   <span className="text-[9px] uppercase font-black tracking-widest text-emerald-600">Verification Required</span>
-                 </div>
+              <div className="mb-6 lg:mb-10 text-center flex flex-col items-center">
+                 <img src={footerBrandsLogo} alt="PayChain Logo" className="h-10 mb-6 w-auto object-contain" />
                  <h3 className="font-headline text-2xl lg:text-5xl text-primary tracking-tight font-black">Security Code</h3>
-                 <p className="text-on-surface-variant font-medium mt-1.5 text-sm lg:text-base lg:mt-2 opacity-70 leading-relaxed">
+                 <p className="text-on-surface-variant font-medium mt-1.5 text-sm lg:text-base lg:mt-2 opacity-70 leading-relaxed max-w-sm">
                    Enter the 6-digit code sent to your phone ending in <span className="text-primary font-black">...{phone.slice(-3)}</span>
                  </p>
               </div>
@@ -277,8 +270,8 @@ export default function Login() {
                       <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
                     ) : (
                       <>
-                        Verify & Activate Account
-                        <span className="material-symbols-outlined">verified_user</span>
+                        Verify Account
+                        <span className="material-symbols-outlined">arrow_forward</span>
                       </>
                     )}
                   </button>
