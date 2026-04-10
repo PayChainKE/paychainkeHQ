@@ -49,6 +49,9 @@ export default function MerchantSidebar({ isOpen, onClose }) {
             <p className="text-[#a8b3a8] text-[9px] uppercase tracking-wider mt-0.5">TILL: {mockMerchant.tillNumber} • TRUST: {mockMerchant.trustScore.current}/100</p>
           </div>
         </div>
+
+        {/* Post-Info Separator */}
+        <div className="h-px bg-white/5 mt-8 w-full" />
       </div>
 
       {/* Primary Navigation */}
