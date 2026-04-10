@@ -32,6 +32,10 @@ export default function MerchantSidebar({ isOpen, onClose }) {
         <div className="mb-8 lg:flex lg:justify-center">
           <img src={logo} alt="PayChain Logo" className="h-8 max-w-full w-auto object-contain" />
         </div>
+        
+        {/* Separator Line */}
+        <div className="h-px bg-white/10 mb-8 w-full" />
+
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center overflow-hidden border border-white/10 shadow-sm">
             <img 
