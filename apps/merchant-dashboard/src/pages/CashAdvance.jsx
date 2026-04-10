@@ -1,4 +1,4 @@
-import React from 'react'
+
 import MerchantLayout from '../components/layout/MerchantLayout'
 import { mockMerchant } from '../mockData/merchant'
 import { formatKES } from '../utils/formatCurrency'
@@ -7,7 +7,7 @@ import { usePrivacyMode } from '../hooks/usePrivacyMode'
 export default function CashAdvance() {
   const { showAmounts } = usePrivacyMode()
   const adv = mockMerchant.cashAdvance.currentAdvance
-  
+
   return (
     <MerchantLayout title="Cash Advance">
       <div className="px-1 lg:px-0 max-w-4xl mx-auto w-full space-y-8 lg:space-y-12">
@@ -22,7 +22,7 @@ export default function CashAdvance() {
         {/* Section 2: Active Advance Card */}
         <div className="bg-[#00351D] text-white p-8 lg:p-12 rounded-[32px] lg:rounded-[40px] shadow-2xl relative overflow-hidden group border border-white/5">
           <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full -mr-40 -mt-40 blur-3xl group-hover:scale-125 transition-transform duration-1000"></div>
-          
+
           <div className="relative z-10">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 md:gap-0 mb-8 lg:mb-12">
               <div className="flex items-center gap-4">
@@ -44,12 +44,12 @@ export default function CashAdvance() {
               <div className="space-y-3">
                 <div className="flex justify-between items-end">
                   <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest">Repayment Progress</p>
-                  <p className="text-[10px] text-[#5EFEB3] font-black uppercase tracking-widest">{Math.round(adv.repaidAmount/adv.amount*100)}% Complete</p>
+                  <p className="text-[10px] text-[#5EFEB3] font-black uppercase tracking-widest">{Math.round(adv.repaidAmount / adv.amount * 100)}% Complete</p>
                 </div>
                 <div className="w-full bg-white/10 h-3 rounded-full overflow-hidden border border-white/5">
-                  <div 
-                    className="bg-[#5EFEB3] h-full rounded-full transition-all duration-1000 ease-out shadow-[0_0_20px_rgba(94,254,179,0.4)]" 
-                    style={{ width: `${(adv.repaidAmount/adv.amount*100)}%` }}
+                  <div
+                    className="bg-[#5EFEB3] h-full rounded-full transition-all duration-1000 ease-out shadow-[0_0_20px_rgba(94,254,179,0.4)]"
+                    style={{ width: `${(adv.repaidAmount / adv.amount * 100)}%` }}
                   ></div>
                 </div>
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0 mt-3 text-[10px] text-white/60 font-medium">
