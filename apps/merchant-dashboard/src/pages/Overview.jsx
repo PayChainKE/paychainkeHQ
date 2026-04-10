@@ -170,11 +170,11 @@ export default function Overview() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Section 4: Recent Collections */}
-        <section className="lg:col-span-2 bg-white rounded-[16px] border border-[#E5E7EB] shadow-sm editorial-shadow overflow-hidden">
-          <div className="p-8 border-b border-slate-50">
-            <h3 className="font-headline font-bold text-3xl text-primary">Recent Collections</h3>
+        <section className="lg:col-span-2 bg-white rounded-[16px] border border-slate-300 shadow-sm editorial-shadow overflow-hidden">
+          <div className="p-8 border-b border-slate-300">
+            <h3 className="font-headline font-bold text-3xl text-primary">Recent Transactions</h3>
           </div>
-          <div className="divide-y divide-slate-50">
+          <div className="flex flex-col">
             {[
               { id: 1, name: 'Mary Wanjiku', ref: 'QJX8472KL', amount: 4250, time: '2 min ago', initials: 'MW', color: 'bg-emerald-100' },
               { id: 2, name: 'John Okoth', ref: 'ZXC9021MM', amount: 1200, time: '15 min ago', initials: 'JO', color: 'bg-blue-100' },
@@ -182,7 +182,7 @@ export default function Overview() {
               { id: 4, name: 'Evans Kiprono', ref: 'PLM992OSS', amount: 12500, time: '1 hour ago', initials: 'EK', color: 'bg-indigo-100' },
               { id: 5, name: 'Alice Nyambura', ref: 'VFR4451PP', amount: 2100, time: '2 hours ago', initials: 'AN', color: 'bg-purple-100' }
             ].map(tx => (
-              <div key={tx.id} className="px-4 lg:px-8 py-4 lg:py-5 flex items-center justify-between hover:bg-[#00351D] transition-all group cursor-pointer border-l-2 border-transparent hover:border-emerald-500">
+              <div key={tx.id} className="px-4 lg:px-8 py-4 lg:py-5 flex items-center justify-between hover:bg-[#00351D] transition-all group cursor-pointer border-b border-slate-300">
                 <div className="flex items-center gap-3 lg:gap-4 flex-1 min-w-0">
                   <div className={`w-10 h-10 lg:w-12 lg:h-12 rounded-full ${tx.color} flex items-center justify-center overflow-hidden font-black text-primary text-[10px] lg:text-xs border border-white/20 shadow-sm group-hover:bg-white/10 group-hover:text-amber-400 group-hover:border-amber-400/20 transition-all duration-300 shrink-0`}>
                     {tx.initials}
@@ -215,8 +215,8 @@ export default function Overview() {
               </div>
             ))}
           </div>
-          <div className="p-6 text-center bg-surface-container-low/30 border-t border-slate-50">
-            <button className="text-[10px] font-bold text-primary uppercase tracking-[0.2em] hover:underline transition-all">View All Collections</button>
+          <div className="p-6 text-center bg-surface-container-low/30 border-t border-slate-300">
+            <button className="text-[10px] font-bold text-primary uppercase tracking-[0.2em] hover:underline transition-all">View All Transactions</button>
           </div>
         </section>
 
@@ -263,7 +263,7 @@ export default function Overview() {
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 pb-20">
         {[
           { icon: 'add_card', label: 'Request Advance' },
-          { icon: 'send_money', label: 'Send Bulk Pay' },
+          { icon: 'send_money', label: 'Send Bulk Payments' },
           { icon: 'swap_horiz', label: 'Swap USDC' },
           { icon: 'insights', label: 'Trust Score' }
         ].map((action, idx) => (

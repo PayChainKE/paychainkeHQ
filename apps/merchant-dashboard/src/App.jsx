@@ -2,6 +2,7 @@ import React from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { MerchantAuthProvider, useMerchantAuth } from './context/MerchantAuthContext'
 import { ToastProvider } from './context/ToastContext'
+import ScrollToTop from './components/utils/ScrollToTop'
 import Login from './pages/Login'
 import SetPassword from './pages/SetPassword'
 import Overview from './pages/Overview'
@@ -13,6 +14,7 @@ import TrustScore from './pages/TrustScore'
 import Profile from './pages/Profile'
 import Support from './pages/Support'
 import Notifications from './pages/Notifications'
+import MyTills from './pages/MyTills'
 import ToastHost from './components/ui/Toast'
 
 function Protected({ children }){
@@ -26,6 +28,7 @@ function Protected({ children }){
 export default function App(){
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <MerchantAuthProvider>
         <ToastProvider>
           <Routes>
@@ -37,6 +40,7 @@ export default function App(){
             <Route path="/bulk-pay" element={<Protected><BulkPay/></Protected>} />
             <Route path="/inflation-shield" element={<Protected><InflationShield/></Protected>} />
             <Route path="/cash-advance" element={<Protected><CashAdvance/></Protected>} />
+            <Route path="/tills" element={<Protected><MyTills/></Protected>} />
             <Route path="/trust-score" element={<Protected><TrustScore/></Protected>} />
             <Route path="/profile" element={<Protected><Profile/></Protected>} />
             <Route path="/support" element={<Protected><Support/></Protected>} />

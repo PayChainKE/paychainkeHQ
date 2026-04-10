@@ -6,10 +6,12 @@ import userIcon from '../../assets/user-icon.png'
 
 const navItems = [
   { name: 'Overview', icon: 'dashboard', path: '/overview' },
-  { name: 'Collections', icon: 'payments', path: '/transactions' },
-  { name: 'Bulk Pay', icon: 'group_add', path: '/bulk-pay' },
+  { name: 'Transactions', icon: 'payments', path: '/transactions' },
+  { name: 'Bulk Payments', icon: 'group_add', path: '/bulk-pay' },
   { name: 'Inflation Shield', icon: 'currency_exchange', path: '/inflation-shield' },
   { name: 'Trust Score', icon: 'verified_user', path: '/trust-score' },
+  { name: 'Cash Advance', icon: 'account_balance_wallet', path: '/cash-advance' },
+  { name: 'My Tills', icon: 'point_of_sale', path: '/tills' },
 ]
 
 export default function MerchantSidebar({ isOpen, onClose }) {

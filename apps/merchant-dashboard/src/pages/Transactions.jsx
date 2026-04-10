@@ -31,11 +31,11 @@ export default function Transactions() {
   ]
 
   return (
-    <MerchantLayout title="Collections">
+    <MerchantLayout title="Transactions">
       <div className="px-1 lg:px-0 max-w-7xl mx-auto w-full">
         {/* Page Title & Subtext */}
         <div className="mb-6 lg:mb-8">
-          <h2 className="font-headline text-3xl lg:text-4xl text-primary tracking-tight">Collections</h2>
+          <h2 className="font-headline font-bold text-3xl lg:text-4xl text-primary tracking-tight">Transactions</h2>
           <p className="text-on-surface-variant text-[11px] lg:text-sm font-medium mt-1.5 opacity-80">All verified inbound payments to Till PC847291</p>
         </div>
 

@@ -4,8 +4,8 @@ import { Home, Inbox, Users, Shield, CreditCard, Star, User, MessageSquare } fro
 
 const items = [
   { to: '/overview', label: 'Overview', Icon: Home },
-  { to: '/transactions', label: 'Collections', Icon: Inbox },
-  { to: '/bulk-pay', label: 'Bulk Pay', Icon: Users },
+  { to: '/transactions', label: 'Transactions', Icon: Inbox },
+  { to: '/bulk-pay', label: 'Bulk Payments', Icon: Users },
   { to: '/inflation-shield', label: 'Inflation Shield', Icon: Shield },
   { to: '/cash-advance', label: 'Cash Advance', Icon: CreditCard },
   { to: '/trust-score', label: 'Trust Score', Icon: Star },

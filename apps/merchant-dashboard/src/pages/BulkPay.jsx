@@ -33,7 +33,7 @@ export default function BulkPay() {
   const isLiquidityLow = batchTotal > balance
 
   return (
-    <MerchantLayout title="Bulk Pay">
+    <MerchantLayout title="Bulk Payments">
       <div className="px-1 lg:px-0 max-w-7xl mx-auto flex flex-col lg:flex-row gap-6 lg:gap-8">
         
         {/* Left Column: Saved Payees (380px) */}
