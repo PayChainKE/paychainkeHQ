@@ -21,7 +21,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import './faqs.css';
 
-const ICON_MAP: Record<string, any> = {
+const ICON_MAP: Record<string, React.ComponentType<any>> = {
   Compass,
   CreditCard,
   TrendingUp,
@@ -125,7 +125,9 @@ export default function FAQPage(): JSX.Element {
 
     // scroll the pill into view
     const pill = document.querySelector(`[data-pill="${id}"]`) as HTMLElement | null;
-    pill && pill.scrollIntoView({ behavior: 'smooth', inline: 'center' });
+    if (pill) {
+      pill.scrollIntoView({ behavior: 'smooth', inline: 'center' });
+    }
 
     // open first question in the category and focus the question button
     const cat = FAQ_DATA.find(c => c.id === id);
@@ -134,7 +136,9 @@ export default function FAQPage(): JSX.Element {
       setOpenItems({ [firstQ]: true });
       setTimeout(() => {
         const btn = document.getElementById(`button-${firstQ}`) as HTMLElement | null;
-        btn && btn.focus();
+        if (btn) {
+          btn.focus();
+        }
       }, 450);
     }
   }
