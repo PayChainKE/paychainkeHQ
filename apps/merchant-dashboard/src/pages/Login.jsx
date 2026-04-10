@@ -42,7 +42,7 @@ export default function Login() {
     setLoading(false)
     if (res.success) {
       if (res.firstLogin) {
-        setIsResetMode(true)
+        setIsOTPMode(true) // Start with OTP for first login
       } else {
         nav('/overview')
       }
@@ -63,11 +63,14 @@ export default function Login() {
     }
 
     setLoading(true)
-    // Simulate setting password, then move to OTP
-    await new Promise(r => setTimeout(r, 1000))
+    // Simulate setting password
+    const res = await setNewPassword(newPassword)
     setLoading(false)
-    setIsOTPMode(true)
-    setErr('')
+    if (res.success) {
+      nav('/overview')
+    } else {
+      setErr(res.error)
+    }
   }
 
   async function handleVerifyOTP(e) {
@@ -76,11 +79,13 @@ export default function Login() {
     if (code.length < 6) return
     
     setLoading(true)
-    const res = await setNewPassword(newPassword)
+    // Simulate verification
+    await new Promise(r => setTimeout(r, 1000))
     setLoading(false)
-    if (res.success) {
-      nav('/overview')
-    }
+    
+    setIsOTPMode(false)
+    setIsResetMode(true) // Move to Reset Password after OTP
+    setErr('')
   }
 
   const handleOtpChange = (element, index) => {
@@ -213,7 +218,7 @@ export default function Login() {
                     <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
                   ) : (
                     <>
-                      Sign In to Dashboard
+                      Verify Account
                       <span className="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_forward</span>
                     </>
                   )}
@@ -375,8 +380,8 @@ export default function Login() {
                       <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
                     ) : (
                       <>
-                        Verify password
-                        <span className="material-symbols-outlined">verified</span>
+                        Set password
+                        <span className="material-symbols-outlined">arrow_forward</span>
                       </>
                     )}
                   </button>
