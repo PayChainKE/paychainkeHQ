@@ -94,8 +94,8 @@ export default function Login() {
   }
 
   const SecurityRequirement = ({ met, label }) => (
-    <div className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${met ? 'text-emerald-500' : 'text-primary/30'}`}>
-      <span className="material-symbols-outlined text-sm">{met ? 'check_circle' : 'circle'}</span>
+    <div className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-colors ${met ? 'text-emerald-500' : 'text-primary/30'}`}>
+      <span className="material-symbols-outlined text-[10px]">{met ? 'check_circle' : 'circle'}</span>
       {label}
     </div>
   )
@@ -330,11 +330,12 @@ export default function Login() {
                   </div>
 
                   {/* Security Indicators Grid */}
-                  <div className="grid grid-cols-2 gap-y-2 gap-x-3 p-4 sm:p-5 bg-[#F0FDF4]/30 rounded-2xl mt-4 border border-emerald-500/5">
+                  {/* Security Indicators Vertical List */}
+                  <div className="flex flex-col gap-3 p-5 bg-[#F0FDF4]/40 rounded-3xl mt-5 border border-emerald-500/5 shadow-inner">
                     <SecurityRequirement met={strength.length} label="Minimum 8 Characters" />
-                    <SecurityRequirement met={strength.upper} label="Uppercase letters" />
-                    <SecurityRequirement met={strength.number} label="Numerical digits" />
-                    <SecurityRequirement met={strength.symbol} label="Special Symbols" />
+                    <SecurityRequirement met={strength.upper} label="Uppercase letters (A, B, C)" />
+                    <SecurityRequirement met={strength.number} label="Numerical digits (1, 2, 3)" />
+                    <SecurityRequirement met={strength.symbol} label="Special Symbols (@, #, $)" />
                   </div>
                 </div>
 
