@@ -35,7 +35,7 @@ const ICON_MAP: Record<string, React.ComponentType<unknown>> = {
 
 const ALLOW_MULTIPLE_OPEN = false;
 
-function debounce<T extends (...args: any[]) => void>(fn: T, ms = 200) {
+function debounce<T extends (...args: unknown[]) => void>(fn: T, ms = 200) {
   let t: ReturnType<typeof setTimeout> | null = null;
   return (...args: Parameters<T>) => {
     if (t) clearTimeout(t);

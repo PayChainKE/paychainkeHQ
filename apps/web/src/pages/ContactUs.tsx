@@ -136,7 +136,6 @@ export default function ContactUs() {
   }, [formData.message]);
 
   const validate = () => {
-    const ICON_MAP: Record<string, React.ComponentType<unknown>> = {};
     const errs: Record<string, string> = {};
     if (!formData.name || formData.name.trim().length < 2) {
       errs.name = "Please enter your full name";
