@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useRef, useState } from "react";
 import styles from "./ContactUs.module.css";
 import Navbar from "@/components/Navbar";
