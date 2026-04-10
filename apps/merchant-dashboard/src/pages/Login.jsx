@@ -109,16 +109,7 @@ export default function Login() {
         </div>
         
         <div className="relative z-10">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 lg:w-10 lg:h-10 bg-emerald-500 rounded-lg lg:rounded-xl flex items-center justify-center shadow-lg">
-              <span className="material-symbols-outlined text-white font-bold text-sm lg:text-base">payments</span>
-            </div>
-            <h1 className="text-xl lg:text-2xl font-black tracking-tighter text-white">PayChain<span className="text-emerald-400">.</span></h1>
-          </div>
-          <div className="mt-3 lg:mt-4 inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span className="text-[9px] lg:text-[10px] uppercase font-black tracking-widest text-emerald-400">Merchant Portal</span>
-          </div>
+          <img src={footerLogo} alt="PayChain Logo" className="h-10 w-auto object-contain brightness-0 invert" />
         </div>
 
         <div className="relative z-10 max-w-lg mt-12 lg:mt-0">
