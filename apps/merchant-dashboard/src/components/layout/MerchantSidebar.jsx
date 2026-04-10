@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom'
 import { mockMerchant } from '../../mockData/merchant'
 import { usePrivacyMode } from '../../hooks/usePrivacyMode'
 import userIcon from '../../assets/user-icon.png'
-import logo from '../../assets/logo.png'
+import logo from '../../assets/logo2.png'
 
 const navItems = [
   { name: 'Overview', icon: 'dashboard', path: '/overview' },
