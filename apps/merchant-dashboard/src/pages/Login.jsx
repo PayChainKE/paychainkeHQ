@@ -235,7 +235,7 @@ export default function Login() {
                    <span className="material-symbols-outlined text-xs text-emerald-600" style={{fontVariationSettings: "'FILL' 1"}}>mail</span>
                    <span className="text-[9px] uppercase font-black tracking-widest text-emerald-600">Verification Required</span>
                  </div>
-                 <h3 className="font-headline text-2xl lg:text-5xl text-primary tracking-tight">Security Code</h3>
+                 <h3 className="font-headline text-2xl lg:text-5xl text-primary tracking-tight font-black">Security Code</h3>
                  <p className="text-on-surface-variant font-medium mt-1.5 text-sm lg:text-base lg:mt-2 opacity-70 leading-relaxed">
                    Enter the 6-digit code sent to your phone ending in <span className="text-primary font-black">...{phone.slice(-3)}</span>
                  </p>
