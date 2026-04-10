@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import mainLogo from '../assets/signin-logo.png'
 import footerBrandsLogo from '../assets/signin-footer-logo.png'
+import poweredByLogo from '../assets/poweredby-logo.png'
 
 export default function Login() {
   const { login, setNewPassword } = useMerchantAuth()
@@ -224,7 +225,7 @@ export default function Login() {
                   <p className="text-[9px] text-primary/60 uppercase font-black tracking-[0.2em]">
                     Powered by
                   </p>
-                  <img src={footerBrandsLogo} alt="PayChain Logo" className="h-3.5 w-auto object-contain" />
+                  <img src={poweredByLogo} alt="PayChain Logo" className="h-4 w-auto object-contain" />
                 </div>
               </form>
             </>
