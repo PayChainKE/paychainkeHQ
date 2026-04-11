@@ -65,7 +65,7 @@ export default function Overview() {
       {/* Section 1: Balance Cards Row */}
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in-up [animation-delay:100ms] relative z-20">
         {/* KES Balance Card */}
-        <div className="bg-[#00351D] text-white p-6 lg:p-7 rounded-[16px] shadow-2xl relative group border border-white/5">
+        <div className="bg-[#00351D] text-white p-6 lg:p-7 rounded-[16px] shadow-2xl relative z-20 group border border-white/5">
           <div className="absolute inset-0 overflow-hidden rounded-[16px] pointer-events-none">
             <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full -mr-40 -mt-40 blur-3xl group-hover:scale-125 transition-transform duration-1000"></div>
           </div>
@@ -168,7 +168,7 @@ export default function Overview() {
         </div>
 
         {/* USDC Balance Card */}
-        <div className="bg-[#0D2444] text-white p-6 lg:p-7 rounded-[16px] shadow-2xl relative overflow-hidden group border border-white/5">
+        <div className="bg-[#0D2444] text-white p-6 lg:p-7 rounded-[16px] shadow-2xl relative z-10 overflow-hidden group border border-white/5">
           <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/10 rounded-full -ml-32 -mb-32 blur-3xl"></div>
           <div className="relative z-10 flex flex-col h-full">
             <div className="flex justify-between items-start mb-8 lg:mb-10">
