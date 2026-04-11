@@ -15,6 +15,9 @@ import Profile from './pages/Profile'
 import Support from './pages/Support'
 import Notifications from './pages/Notifications'
 import MyTills from './pages/MyTills'
+import Wallet from './pages/Wallet'
+import SendMoney from './pages/SendMoney'
+import RequestMoney from './pages/RequestMoney'
 import ToastHost from './components/ui/Toast'
 
 function Protected({ children }){
@@ -45,6 +48,9 @@ export default function App(){
             <Route path="/profile" element={<Protected><Profile/></Protected>} />
             <Route path="/support" element={<Protected><Support/></Protected>} />
             <Route path="/notifications" element={<Protected><Notifications/></Protected>} />
+            <Route path="/wallet" element={<Protected><Wallet/></Protected>} />
+            <Route path="/send-money" element={<Protected><SendMoney/></Protected>} />
+            <Route path="/request-money" element={<Protected><RequestMoney/></Protected>} />
             {/* Catch-all route for 404s and refreshes */}
             <Route path="*" element={<Navigate to="/overview" replace />} />
           </Routes>

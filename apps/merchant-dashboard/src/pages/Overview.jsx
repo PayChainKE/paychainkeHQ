@@ -7,13 +7,16 @@ import { revenueByDay } from '../mockData/analytics'
 import { transactionsData, getTransactionStats } from '../mockData/transactions'
 import { formatKES } from '../utils/formatCurrency'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
+import { useNavigate } from 'react-router-dom'
 
 export default function Overview() {
+  const navigate = useNavigate()
   const { showAmounts, togglePrivacy } = usePrivacyMode()
   const [stats, setStats] = useState(getTransactionStats())
   const [fraudAlerts, setFraudAlerts] = useState(0) // Logic scaffolding
   const [settlementBalance, setSettlementBalance] = useState(0) // Logic scaffolding
   const [activeTimeframe, setActiveTimeframe] = useState('7D')
+  const [showMoveMoney, setShowMoveMoney] = useState(false)
 
   const timeframes = {
     '7D': {
@@ -60,19 +63,20 @@ export default function Overview() {
       </section>
 
       {/* Section 1: Balance Cards Row */}
-      <section className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in-up [animation-delay:100ms]">
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in-up [animation-delay:100ms] relative z-20">
         {/* KES Balance Card */}
-        <div className="bg-[#00351D] text-white p-6 lg:p-7 rounded-[16px] shadow-2xl relative overflow-hidden group border border-white/5">
-          <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full -mr-40 -mt-40 blur-3xl group-hover:scale-125 transition-transform duration-1000"></div>
-          <div className="relative z-10">
+        <div className="bg-[#00351D] text-white p-6 lg:p-7 rounded-[16px] shadow-2xl relative group border border-white/5">
+          <div className="absolute inset-0 overflow-hidden rounded-[16px] pointer-events-none">
+            <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full -mr-40 -mt-40 blur-3xl group-hover:scale-125 transition-transform duration-1000"></div>
+          </div>
+          <div className="relative z-10 flex flex-col h-full">
             <div className="flex justify-between items-start mb-8 lg:mb-10">
-              <span className="bg-[#1F4D3C] text-[#5EFEB3] px-3 lg:px-4 py-1.5 rounded-full text-[8px] lg:text-[9px] font-black tracking-[0.15em] uppercase border border-white/10">Primary Ledger</span>
+              <span className="bg-[#1F4D3C] text-[#5EFEB3] px-3 lg:px-4 py-1.5 rounded-full text-[8px] lg:text-[9px] font-black tracking-[0.15em] uppercase border border-white/10">Business Till Account</span>
               <div className="flex items-center gap-3 lg:gap-4 text-[8px] lg:text-[9px]">
                 <span className="text-white/40 uppercase font-bold tracking-[0.15em] hidden sm:inline">Till: {mockMerchant.tillNumber}</span>
                 <button
                   onClick={togglePrivacy}
                   className="text-white/40 hover:text-white transition-colors p-1"
-                  title={showAmounts ? "Hide Amounts" : "Show Amounts"}
                 >
                   <span className="material-symbols-outlined text-base lg:text-lg leading-none">
                     {showAmounts ? 'visibility' : 'visibility_off'}
@@ -80,14 +84,85 @@ export default function Overview() {
                 </button>
               </div>
             </div>
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 lg:gap-0 mb-8 lg:mb-10">
-              <div>
-                <h3 className={`font-headline font-bold text-3xl lg:text-4xl tracking-tighter tabular-nums mb-1 transition-all duration-300 ${!showAmounts && 'blur-lg grayscale'}`}>KES 184,250</h3>
-                <div className={`flex items-center gap-2 text-[#5EFEB3] font-bold text-[9px] lg:text-[10px] tracking-wide transition-all duration-300 ${!showAmounts && 'blur-sm grayscale'}`}>
-                  <span className="material-symbols-outlined text-[10px]" style={{ fontVariationSettings: "'FILL' 1" }}>trending_up</span>
-                  <span>+KES 18,450 today</span>
-                </div>
+            
+            <div className="flex-1">
+              <h3 className={`font-headline font-bold text-3xl lg:text-4xl tracking-tighter tabular-nums mb-1 transition-all duration-300 ${!showAmounts && 'blur-lg grayscale'}`}>KES 184,250</h3>
+              <div className={`flex items-center gap-2 text-[#5EFEB3] font-bold text-[9px] lg:text-[10px] tracking-wide transition-all duration-300 ${!showAmounts && 'blur-sm grayscale'}`}>
+                <span className="material-symbols-outlined text-[10px]" style={{ fontVariationSettings: "'FILL' 1" }}>trending_up</span>
+                <span>+KES 18,450 today</span>
               </div>
+            </div>
+
+            <div className="flex gap-3 lg:gap-4 mt-6 lg:mt-8 relative">
+              <button 
+                onClick={() => setShowMoveMoney(!showMoveMoney)}
+                className={`flex-1 py-2 px-4 ${showMoveMoney ? 'bg-white text-[#00351D]' : 'bg-white/5 hover:bg-white/10 text-white'} rounded-xl text-[9px] lg:text-[10px] font-black transition-all border border-white/10 uppercase tracking-widest leading-none flex items-center justify-center gap-2 z-50`}
+              >
+                Move money
+                <span className={`material-symbols-outlined text-xs leading-none transition-transform duration-300 ${showMoveMoney ? 'rotate-180' : ''}`}>expand_more</span>
+              </button>
+              
+              {showMoveMoney && (
+                <>
+                  {/* Backdrop for closing */}
+                  <div 
+                    className="fixed inset-0 z-40 bg-black/5 backdrop-blur-[2px]" 
+                    onClick={() => setShowMoveMoney(false)}
+                  ></div>
+                  
+                  {/* Floating Action Menu */}
+                  <div className="absolute left-0 sm:left-auto sm:right-0 top-full mt-4 w-[calc(100vw-4rem)] sm:w-[280px] bg-white rounded-[20px] shadow-[0_25px_70px_rgba(0,0,0,0.4)] border border-slate-200 z-[100] animate-in fade-in zoom-in-95 slide-in-from-top-4 duration-300 ease-out overflow-hidden">
+                    <div className="bg-[#F8FAFC] px-4 py-2 border-b border-slate-100 flex justify-between items-center">
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Select Operation</span>
+                      <span className="text-[8px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">Secure</span>
+                    </div>
+                    
+                    <div className="p-1.5 space-y-0.5">
+                      <button 
+                        onClick={() => navigate('/send-money')}
+                        className="w-full text-left p-3 hover:bg-emerald-50/50 rounded-xl transition-all group relative overflow-hidden"
+                      >
+                        <div className="flex items-center gap-3 relative z-10">
+                          <div className="w-10 h-10 rounded-xl bg-[#00351D] text-[#5EFEB3] flex items-center justify-center shrink-0 shadow-lg group-hover:scale-105 transition-transform">
+                            <span className="material-symbols-outlined text-lg">send_money</span>
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between mb-0.5">
+                              <p className="text-[10px] font-black uppercase tracking-widest text-[#00351D]">Send Money</p>
+                              <span className="material-symbols-outlined text-slate-300 text-xs group-hover:translate-x-1 transition-transform">arrow_forward</span>
+                            </div>
+                            <p className="text-[9px] text-slate-500 font-medium leading-tight line-clamp-1">via M-pesa or Bank</p>
+                          </div>
+                        </div>
+                      </button>
+                      
+                      <div className="h-px bg-slate-100 mx-3 my-0.5"></div>
+                      
+                      <button 
+                        onClick={() => navigate('/request-money')}
+                        className="w-full text-left p-3 hover:bg-emerald-50/50 rounded-xl transition-all group"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center shrink-0 group-hover:bg-amber-100 transition-colors">
+                            <span className="material-symbols-outlined text-lg">payments</span>
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between mb-0.5">
+                              <p className="text-[10px] font-black uppercase tracking-widest text-[#00351D]">Request Money</p>
+                              <span className="material-symbols-outlined text-slate-300 text-xs group-hover:translate-x-1 transition-transform">arrow_forward</span>
+                            </div>
+                            <p className="text-[9px] text-slate-500 font-medium leading-tight line-clamp-1">STK push or payment link.</p>
+                          </div>
+                        </div>
+                      </button>
+                    </div>
+                    
+                    <div className="px-4 py-2 bg-slate-50/50 border-t border-slate-100 text-center">
+                       <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest leading-none">Limit: KES 250,000</p>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -97,11 +172,10 @@ export default function Overview() {
           <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/10 rounded-full -ml-32 -mb-32 blur-3xl"></div>
           <div className="relative z-10 flex flex-col h-full">
             <div className="flex justify-between items-start mb-8 lg:mb-10">
-              <span className="bg-[#243B5C] text-[#A6C8FF] px-3 lg:px-4 py-1.5 rounded-full text-[8px] lg:text-[9px] font-black tracking-[0.15em] uppercase border border-white/10">Global Settlements</span>
+              <span className="bg-[#243B5C] text-[#A6C8FF] px-3 lg:px-4 py-1.5 rounded-full text-[8px] lg:text-[9px] font-black tracking-[0.15em] uppercase border border-white/10">Business Digital wallet</span>
               <button
                 onClick={togglePrivacy}
                 className="text-white/40 hover:text-white transition-colors p-1"
-                title={showAmounts ? "Hide Amounts" : "Show Amounts"}
               >
                 <span className="material-symbols-outlined text-base lg:text-lg leading-none">
                   {showAmounts ? 'visibility' : 'visibility_off'}
@@ -113,15 +187,19 @@ export default function Overview() {
               <p className={`text-white/40 text-[9px] lg:text-[10px] font-bold tracking-tight opacity-70 uppercase transition-all duration-300 ${!showAmounts && 'blur-sm grayscale'}`}>≈ {formatKES(mockMerchant.financials.usdcBalance * 130)}</p>
             </div>
             <div className="flex gap-3 lg:gap-4 mt-6 lg:mt-8">
-              <button className="flex-1 py-3 px-3 lg:px-4 bg-white/5 hover:bg-white/10 text-white rounded-xl text-[9px] lg:text-[10px] font-black transition-all border border-white/10 uppercase tracking-widest leading-none">Swap</button>
-              <button className="flex-1 py-3 px-3 lg:px-4 bg-white/5 hover:bg-white/10 text-white rounded-xl text-[9px] lg:text-[10px] font-black transition-all border border-white/10 uppercase tracking-widest leading-none">Send</button>
+              <button 
+                onClick={() => navigate('/inflation-shield')}
+                className="flex-1 py-3.5 px-3 lg:px-4 bg-white/5 hover:bg-white/10 text-white rounded-xl text-[9px] lg:text-[10px] font-black transition-all border border-white/10 uppercase tracking-widest leading-none"
+              >
+                Swap
+              </button>
             </div>
           </div>
         </div>
       </section>
 
       {/* Section 2: Stats Row */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 animate-fade-in-up [animation-delay:200ms]">
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 animate-fade-in-up [animation-delay:200ms] relative z-10">
         {[
           { label: "Today's Revenue", value: "KES 18,450", trend: "12 payments", trendColor: "text-on-surface-variant" },
           { label: "This Month", value: "KES 284,500", trend: "↓ 14% vs last", trendColor: "text-red-500" },

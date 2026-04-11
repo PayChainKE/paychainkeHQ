@@ -5,7 +5,8 @@ const ToastContext = createContext()
 export function ToastProvider({ children }){
   const [toasts, setToasts] = useState([])
   function push(t){ const id = `t_${Date.now()}`; setToasts(s=>[...s,{id,...t}]); setTimeout(()=>setToasts(s=>s.filter(x=>x.id!==id)),4000)}
-  return <ToastContext.Provider value={{ toasts, push }}>{children}</ToastContext.Provider>
+  const addToast = push
+  return <ToastContext.Provider value={{ toasts, push, addToast }}>{children}</ToastContext.Provider>
 }
 
 export function useToast(){ return useContext(ToastContext) }

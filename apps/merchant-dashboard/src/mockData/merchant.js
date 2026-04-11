@@ -8,6 +8,8 @@ export const mockMerchant = {
   businessType: 'Retail',
   revenueRange: 'KES 200,000–500,000',
   tillNumber: 'PC847291',
+  walletAddress: '0x8472...91d0',
+  fullWalletAddress: '0x847291aB2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q7R8s9T0u1V',
   accountStatus: 'active',
   kycStatus: 'verified',
   trustScore: {
