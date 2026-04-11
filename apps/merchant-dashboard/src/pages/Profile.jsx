@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import { mockMerchant } from '../mockData/merchant'
-import { useToast } from '../context/ToastContext'
+import { useToast } from '../context/NotificationContext'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 
 export default function Profile() {

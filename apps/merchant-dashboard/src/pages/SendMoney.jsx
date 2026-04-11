@@ -1,9 +1,8 @@
-import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import MerchantLayout from '../components/layout/MerchantLayout'
+import { useNotification } from '../context/NotificationContext'
 
 export default function SendMoney() {
   const navigate = useNavigate()
+  const { addNotification } = useNotification()
   const [step, setStep] = useState(1)
   const [destination, setDestination] = useState('')
   const [showDestDropdown, setShowDestDropdown] = useState(false)
@@ -150,7 +149,18 @@ export default function SendMoney() {
               </button>
             )}
             <button 
-              onClick={() => step < 3 && setStep(step + 1)}
+              onClick={() => {
+                if (step === 3) {
+                  addNotification({
+                    type: 'payment',
+                    message: `Sent payment to ${destinations.find(d => d.id === destination)?.label} successfully.`,
+                    title: 'Transfer Complete'
+                  })
+                  navigate('/overview')
+                } else {
+                  setStep(step + 1)
+                }
+              }}
               disabled={step === 1 && !destination}
               className={`flex-1 py-4 px-6 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all shadow-lg ${step === 1 && !destination ? 'bg-slate-100 text-slate-300 cursor-not-allowed shadow-none' : 'bg-[#00351D] text-white hover:brightness-110'}`}
             >

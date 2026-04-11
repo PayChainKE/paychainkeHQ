@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { mockMerchant } from '../../mockData/merchant'
+import { useNotification } from '../../context/NotificationContext'
 import { useMerchantAuth } from '../../context/MerchantAuthContext'
+import { mockMerchant } from '../../mockData/merchant'
 import userIcon from '../../assets/user-icon.png'
 
 export default function MerchantHeader({ title, onMenuClick }) {
@@ -9,7 +10,7 @@ export default function MerchantHeader({ title, onMenuClick }) {
   const dropdownRef = useRef(null)
   const navigate = useNavigate()
   const { logout } = useMerchantAuth()
-  const unread = mockMerchant.notifications.filter(n => !n.isRead).length
+  const { unreadCount } = useNotification()
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -47,9 +48,9 @@ export default function MerchantHeader({ title, onMenuClick }) {
           className="hover:bg-emerald-50 rounded-full p-2 transition-all duration-300 relative group"
         >
           <span className="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors text-2xl">notifications</span>
-          {unread > 0 && (
+          {unreadCount > 0 && (
             <span className="absolute top-1.5 right-1.5 min-w-[16px] h-[16px] bg-red-600 rounded-full flex items-center justify-center text-[10px] font-black text-white px-1 ring-2 ring-white animate-pulse-subtle shadow-lg">
-              {unread > 9 ? '9+' : unread}
+              {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           )}
         </Link>

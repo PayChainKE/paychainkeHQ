@@ -1,7 +1,7 @@
 import React from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { MerchantAuthProvider, useMerchantAuth } from './context/MerchantAuthContext'
-import { ToastProvider } from './context/ToastContext'
+import { NotificationProvider } from './context/NotificationContext'
 import ScrollToTop from './components/utils/ScrollToTop'
 import Login from './pages/Login'
 import SetPassword from './pages/SetPassword'
@@ -33,7 +33,7 @@ export default function App(){
     <BrowserRouter>
       <ScrollToTop />
       <MerchantAuthProvider>
-        <ToastProvider>
+        <NotificationProvider>
           <Routes>
             <Route path="/login" element={<Login/>} />
             <Route path="/set-password" element={<SetPassword/>} />
@@ -55,8 +55,8 @@ export default function App(){
             <Route path="*" element={<Navigate to="/overview" replace />} />
           </Routes>
           <ToastHost />
-        </ToastProvider>
+        </NotificationProvider>
       </MerchantAuthProvider>
-      </BrowserRouter>
+    </BrowserRouter>
   )
 }

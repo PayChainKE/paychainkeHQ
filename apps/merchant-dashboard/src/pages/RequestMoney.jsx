@@ -1,9 +1,8 @@
-import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import MerchantLayout from '../components/layout/MerchantLayout'
+import { useNotification } from '../context/NotificationContext'
 
 export default function RequestMoney() {
   const navigate = useNavigate()
+  const { addNotification } = useNotification()
   const [step, setStep] = useState(1)
   const [selectedOption, setSelectedOption] = useState(null)
 
@@ -135,7 +134,18 @@ export default function RequestMoney() {
                    Back
                  </button>
                  <button 
-                   onClick={() => step < 3 && setStep(step + 1)}
+                   onClick={() => {
+                     if (step === 3) {
+                       addNotification({
+                         type: 'notifications',
+                         message: `Payment request for ${selectedOption?.title} has been sent.`,
+                         title: 'Request Sent'
+                       })
+                       navigate('/overview')
+                     } else {
+                       setStep(step + 1)
+                     }
+                   }}
                    className="flex-1 py-4 bg-[#00351D] text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:brightness-110 transition-all shadow-xl"
                  >
                    {step === 3 ? 'Confirm & Request' : 'Continue'}

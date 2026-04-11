@@ -1,26 +1,14 @@
-import React, { useState } from 'react'
+import React from 'react'
 import MerchantLayout from '../components/layout/MerchantLayout'
-import { mockMerchant } from '../mockData/merchant'
+import { useNotification } from '../context/NotificationContext'
 
 export default function Notifications() {
-  const [notifications, setNotifications] = useState(mockMerchant.notifications)
-
-  const markAsRead = (id) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n))
-    // Update mock data globally for consistency in this demo
-    const n = mockMerchant.notifications.find(item => item.id === id)
-    if (n) n.isRead = true
-  }
-
-  const markAllAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })))
-    mockMerchant.notifications.forEach(n => n.isRead = true)
-  }
-
-  const deleteNotification = (id) => {
-    setNotifications(prev => prev.filter(n => n.id !== id))
-    mockMerchant.notifications = mockMerchant.notifications.filter(n => n.id !== id)
-  }
+  const { 
+    notifications, 
+    markAsRead, 
+    markAllAsRead, 
+    deleteNotification 
+  } = useNotification()
 
   const getIcon = (type) => {
     switch (type) {
@@ -71,7 +59,7 @@ export default function Notifications() {
               <p className="text-on-surface-variant opacity-60">You're all caught up! No new notifications.</p>
             </div>
           ) : (
-            notifications.map((n, idx) => (
+            notifications.map((n) => (
               <div 
                 key={n.id}
                 className={`group relative bg-white rounded-3xl p-5 lg:p-6 border transition-all duration-300 editorial-shadow hover:-translate-y-1 ${!n.isRead ? 'border-primary/20 bg-emerald-50/20 ring-1 ring-primary/5' : 'border-outline-variant/15 opacity-80 hover:opacity-100'}`}
@@ -118,7 +106,6 @@ export default function Notifications() {
 
         {/* Info Box - Dark Green Premium Theme */}
         <div className="mt-10 lg:mt-16 bg-[#06201B] p-6 lg:p-12 rounded-[32px] lg:rounded-[40px] relative overflow-hidden group shadow-2xl">
-          {/* Glassmorphic Highlights */}
           <div className="absolute -top-24 -right-24 w-80 h-80 bg-emerald-500 rounded-full blur-[100px] opacity-20 pointer-events-none transition-transform duration-1000 group-hover:scale-150"></div>
           <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-emerald-600 rounded-full blur-[80px] opacity-10 pointer-events-none"></div>
           

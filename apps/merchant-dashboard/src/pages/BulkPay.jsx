@@ -141,6 +141,12 @@ export default function BulkPay() {
                       <input 
                         type="checkbox" 
                         checked={Object.values(selectedPayees).every(v=>v)}
+                        onChange={() => {
+                          const allSelected = Object.values(selectedPayees).every(v=>v);
+                          const newSelection = {};
+                          payees.forEach(p => newSelection[p.id] = !allSelected);
+                          setSelectedPayees(newSelection);
+                        }}
                         className="rounded border-outline-variant text-primary focus:ring-primary w-4 h-4" 
                       />
                     </th>

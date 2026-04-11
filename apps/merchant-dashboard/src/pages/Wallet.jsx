@@ -5,7 +5,7 @@ import { mockMerchant } from '../mockData/merchant'
 import { walletStats, walletHistory } from '../mockData/wallet'
 import { formatDateISO } from '../utils/formatDate'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
-import { useToast } from '../context/ToastContext'
+import { useToast } from '../context/NotificationContext'
 
 export default function Wallet() {
   const { showAmounts } = usePrivacyMode()
