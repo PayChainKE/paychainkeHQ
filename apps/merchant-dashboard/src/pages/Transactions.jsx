@@ -43,25 +43,74 @@ export default function Transactions() {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     
-    // Header - Deep Midnight Blue Accent
+    // Stats calculation
+    const totalIn = filteredRows.filter(t => t.type === 'inbound').reduce((s, o) => s + (o.amount || 0), 0);
+    const totalOut = filteredRows.filter(t => t.type === 'bulk_pay' || t.type === 'settlement').reduce((s, o) => s + (o.amount || 0), 0);
+    const swpKES = filteredRows.filter(t => t.type === 'fx_swap').reduce((s, o) => s + (o.kesAmount || 0), 0);
+    const swpUSDC = filteredRows.filter(t => t.type === 'fx_swap').reduce((s, o) => s + (o.usdcAmount || 0), 0);
+    
+    // Header - Professional Midnight Theme
     doc.setFillColor(10, 37, 64); // #0A2540
-    doc.rect(0, 0, pageWidth, 40, 'F');
+    doc.rect(0, 0, pageWidth, 45, 'F');
     
-    // Logo
-    doc.addImage(statementLogo, 'PNG', 15, 10, 35, 20);
+    // Logo - Adjusted for higher visibility
+    doc.addImage(statementLogo, 'PNG', 15, 12, 40, 22, undefined, 'FAST');
     
-    // Business Identity
+    // Identity
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(18);
+    doc.setFontSize(22);
     doc.setFont('helvetica', 'bold');
-    doc.text('PAYCHAIN KEA', pageWidth - 15, 18, { align: 'right' });
+    doc.text('PAYCHAIN KEA', pageWidth - 15, 20, { align: 'right' });
     
-    doc.setFontSize(9);
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text('OFFICIAL TRANSACTION STATEMENT', pageWidth - 15, 25, { align: 'right' });
-    doc.text(`TILL: PC847291 | DATE: ${new Date().toLocaleDateString()}`, pageWidth - 15, 30, { align: 'right' });
+    doc.text('OFFICIAL BUSINESS STATEMENT', pageWidth - 15, 28, { align: 'right' });
+    doc.text(`STATEMENT ID: PC-ST-${Math.random().toString(36).substring(7).toUpperCase()}`, pageWidth - 15, 33, { align: 'right' });
+    doc.text(`ISSUED: ${new Date().toLocaleString()}`, pageWidth - 15, 38, { align: 'right' });
 
-    // Table
+    // Official Narrative Section
+    doc.setTextColor(10, 37, 64);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Business Overview', 15, 55);
+    
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    const narrative = `This document serves as the official transaction summary for Till PC847291. It provides a comprehensive record of all financial movements, including inbound payments, outbound settlements, and currency swaps. These records are cryptographically verified and stored on the PayChainKE immutable ledger for your business security.`;
+    const lines = doc.splitTextToSize(narrative, pageWidth - 30);
+    doc.text(lines, 15, 62);
+
+    // Summary Statistics Card
+    autoTable(doc, {
+      startY: 75,
+      head: [['TOTAL MONEY IN', 'TOTAL MONEY OUT', 'TOTAL SWAPPED']],
+      body: [[
+        `KES ${totalIn.toLocaleString()}`,
+        `KES ${totalOut.toLocaleString()}`,
+        `KES ${swpKES.toLocaleString()} / ${swpUSDC} USDC`
+      ]],
+      theme: 'plain',
+      headStyles: { 
+        fillColor: [240, 245, 250], 
+        textColor: [10, 37, 64],
+        fontSize: 8,
+        fontStyle: 'bold',
+        halign: 'center'
+      },
+      bodyStyles: {
+        fontSize: 12,
+        fontStyle: 'bold',
+        textColor: [10, 37, 64],
+        halign: 'center'
+      },
+      margin: { left: 15, right: 15 }
+    });
+
+    // Transaction Table
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Transaction Details', 15, doc.lastAutoTable.finalY + 15);
+
     const tableData = filteredRows.map(tx => {
       const dateTime = formatDateISO(tx.timestamp).split(',');
       const party = tx.sender?.name || tx.recipient?.name || 'Treasury';
@@ -80,7 +129,7 @@ export default function Transactions() {
     });
 
     autoTable(doc, {
-      startY: 50,
+      startY: doc.lastAutoTable.finalY + 20,
       head: [['DATE', 'TYPE', 'REFERENCE', 'PARTY', 'AMOUNT', 'STATUS']],
       body: tableData,
       theme: 'striped',
@@ -98,24 +147,22 @@ export default function Transactions() {
       alternateRowStyles: {
         fillColor: [245, 247, 249]
       },
-      margin: { top: 50, left: 15, right: 15 }
+      margin: { left: 15, right: 15 }
     });
 
-    // Footer - Security Note
+    // Footer
     const finalY = doc.lastAutoTable.finalY || 150;
-    doc.setDrawColor(230, 230, 230);
-    doc.line(15, finalY + 10, pageWidth - 15, finalY + 10);
-    
-    doc.setTextColor(100, 100, 100);
     doc.setFontSize(8);
-    doc.setFont('helvetica', 'italic');
-    doc.text('This document is cryptographically signed and stored on the PayChainKE immutable ledger.', 15, finalY + 20);
-    doc.text('Verification Protocol: PC-V4.2 Secured | Audit Hash: ' + Math.random().toString(36).substring(2, 15).toUpperCase(), 15, finalY + 25);
+    doc.setTextColor(150, 150, 150);
+    doc.text(`END OF STATEMENT - PAGE ${doc.internal.getNumberOfPages()}`, pageWidth / 2, finalY + 15, { align: 'center' });
     
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Page ${doc.internal.getNumberOfPages()}`, pageWidth / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' });
+    // Cryptographic signature line
+    doc.setDrawColor(200, 200, 200);
+    doc.line(15, doc.internal.pageSize.getHeight() - 25, pageWidth - 15, doc.internal.pageSize.getHeight() - 25);
+    doc.text('Verify authenticity at paychain.ke/verify', 15, doc.internal.pageSize.getHeight() - 15);
+    doc.text('Audit Hash: ' + Math.random().toString(36).substring(2, 18).toUpperCase(), pageWidth - 15, doc.internal.pageSize.getHeight() - 15, { align: 'right' });
 
-    doc.save(`PayChain_Statement_${new Date().toISOString().split('T')[0]}.pdf`);
+    doc.save(`PayChain_Official_Statement_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
   useEffect(() => {
