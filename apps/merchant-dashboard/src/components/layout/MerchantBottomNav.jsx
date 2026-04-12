@@ -1,10 +1,10 @@
 import React from 'react'
 import { NavLink } from 'react-router-dom'
-import { Home, Inbox, Users, Shield, CreditCard, Star, User, MessageSquare } from 'lucide-react'
+import { Home, History, Users, Shield, CreditCard, Star, User, MessageSquare } from 'lucide-react'
 
 const items = [
   { to: '/overview', label: 'Overview', Icon: Home },
-  { to: '/transactions', label: 'Transactions', Icon: Inbox },
+  { to: '/transactions', label: 'Transactions', Icon: History },
   { to: '/bulk-pay', label: 'Bulk Payments', Icon: Users },
   { to: '/inflation-shield', label: 'Inflation Shield', Icon: Shield },
   { to: '/cash-advance', label: 'Cash Advance', Icon: CreditCard },

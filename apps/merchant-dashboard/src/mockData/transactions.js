@@ -31,7 +31,7 @@ const outbound = Array.from({length:30}).map((_,i)=>{
   const amount = randInt(500,150000)
   return {
     id:`txn_out_${i}`,
-    type:'outbound',
+    type: i % 2 === 0 ? 'bulk_pay' : 'settlement',
     amount,
     recipient:{name: pick(names), phone:`07${randInt(100,999)} ${randInt(100,999)} ${randInt(100,999)}`},
     reference: ref('BLK'),
@@ -54,6 +54,7 @@ const fx = Array.from({length:20}).map((_,i)=>{
     usdcAmount:usdc,
     rate,
     fee,
+    reference: ref('SWP'),
     status:'completed',
     timestamp: daysAgo(randInt(0,180))
   }

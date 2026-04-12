@@ -7,17 +7,27 @@ import logo from '../../assets/logo2.png'
 
 const navItems = [
   { name: 'Overview', icon: 'dashboard', path: '/overview' },
-  { name: 'Transactions', icon: 'payments', path: '/transactions' },
+  { name: 'Transactions', icon: 'receipt_long', path: '/transactions' },
   { name: 'Bulk Payments', icon: 'group_add', path: '/bulk-pay' },
   { 
     name: 'Digital Wallet', 
     icon: 'account_balance_wallet', 
     path: '/wallet',
+    showOverview: true,
+    overviewLabel: 'Wallet Overview',
     children: [
       { name: 'Inflation Shield', icon: 'currency_exchange', path: '/inflation-shield' },
     ]
   },
-  { name: 'Trust Score', icon: 'verified_user', path: '/trust-score' },
+  { 
+    name: 'Cash Advance', 
+    icon: 'payments', 
+    path: '/cash-advance',
+    showOverview: false,
+    children: [
+      { name: 'Trust Score', icon: 'verified_user', path: '/trust-score' },
+    ]
+  },
   { name: 'My Tills', icon: 'point_of_sale', path: '/tills' },
 ]
 
@@ -28,42 +38,55 @@ function NavItem({ item, depth = 0 }) {
   if (hasChildren) {
     return (
       <div className="flex flex-col">
-        <div 
+        <NavLink 
+          to={item.path}
           onClick={() => setIsOpen(!isOpen)}
-          className={`flex items-center justify-between py-3.5 px-6 cursor-pointer transition-all relative group text-[#c0c9c0] hover:text-white hover:bg-emerald-900/40`}
+          className={({ isActive }) => 
+            `flex items-center justify-between py-3.5 px-6 cursor-pointer transition-all relative group ${
+              isActive 
+              ? 'text-[#5EFEB3] bg-[#0E3D2E] font-bold after:absolute after:left-0 after:top-0 after:bottom-0 after:w-1 after:bg-[#5EFEB3]' 
+              : 'text-[#c0c9c0] hover:text-white hover:bg-emerald-900/40'
+            }`
+          }
         >
-          <div className="flex items-center gap-3">
-            <span className={`material-symbols-outlined transition-colors text-xl opacity-60 group-hover:opacity-100`}>
-              {item.icon}
-            </span>
-            <span className="font-bold text-xs tracking-wide">{item.name}</span>
-          </div>
-          <span className={`material-symbols-outlined text-sm transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}>
-            expand_more
-          </span>
-        </div>
+          {({ isActive }) => (
+            <>
+              <div className="flex items-center gap-3">
+                <span className={`material-symbols-outlined transition-colors text-xl ${isActive ? 'text-[#5EFEB3]' : 'opacity-60 group-hover:opacity-100'}`}>
+                  {item.icon}
+                </span>
+                <span className="font-bold text-xs tracking-wide">{item.name}</span>
+              </div>
+              <span className={`material-symbols-outlined text-sm transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}>
+                expand_more
+              </span>
+            </>
+          )}
+        </NavLink>
         
         {isOpen && (
           <div className="bg-[#0D241E]/40 border-l border-white/5 ml-4">
-            <NavLink
-              to={item.path}
-              className={({ isActive }) => 
-                `flex items-center gap-3 py-3 px-6 transition-all relative group ${
-                  isActive 
-                  ? 'text-[#5EFEB3] bg-[#0E3D2E]/60 font-bold' 
-                  : 'text-[#a8b3a8] hover:text-white hover:bg-emerald-900/20'
-                }`
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  <span className={`material-symbols-outlined transition-colors text-lg ${isActive ? 'text-[#5EFEB3]' : 'text-inherit opacity-40 group-hover:opacity-80'}`}>
-                    account_balance
-                  </span>
-                  <span className="font-bold text-[11px] tracking-wide">Wallet Overview</span>
-                </>
-              )}
-            </NavLink>
+            {item.showOverview !== false && (
+              <NavLink
+                to={item.path}
+                className={({ isActive }) => 
+                  `flex items-center gap-3 py-3 px-6 transition-all relative group ${
+                    isActive 
+                    ? 'text-[#5EFEB3] bg-[#0E3D2E]/60 font-bold' 
+                    : 'text-[#a8b3a8] hover:text-white hover:bg-emerald-900/20'
+                  }`
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    <span className={`material-symbols-outlined transition-colors text-lg ${isActive ? 'text-[#5EFEB3]' : 'text-inherit opacity-40 group-hover:opacity-80'}`}>
+                      account_balance
+                    </span>
+                    <span className="font-bold text-[11px] tracking-wide">{item.overviewLabel || 'Overview'}</span>
+                  </>
+                )}
+              </NavLink>
+            )}
             {item.children.map((child) => (
               <NavLink
                 key={child.path}

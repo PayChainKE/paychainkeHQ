@@ -1,19 +1,21 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import { transactionsData } from '../mockData/transactions'
 import { formatDateISO } from '../utils/formatDate'
-import { formatKES } from '../utils/formatCurrency'
+import { formatKES, formatUSDC } from '../utils/formatCurrency'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
+import logo from '../assets/logo2.png'
 
 export default function Transactions() {
   const { showAmounts } = usePrivacyMode()
   const [activeTab, setActiveTab] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedTx, setSelectedTx] = useState(transactionsData[0])
+  const [selectedTx, setSelectedTx] = useState(null)
 
   const filteredRows = transactionsData.filter(t => {
     const matchesSearch = !searchQuery || 
       (t.sender?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (t.recipient?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (t.reference || '').toLowerCase().includes(searchQuery.toLowerCase())
     
     if (activeTab === 'All') return matchesSearch
@@ -23,12 +25,20 @@ export default function Transactions() {
     return matchesSearch
   })
 
-  const stats = [
-    { label: 'Today', value: 'KES 12,450.00' },
-    { label: 'This Week', value: 'KES 84,920.50' },
-    { label: 'This Month', value: 'KES 245,100.00' },
-    { label: 'All Time', value: 'KES 1.84M' },
-  ]
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 5
+  
+  const totalItems = filteredRows.length
+  const totalPages = Math.ceil(totalItems / itemsPerPage)
+  
+  const paginatedRows = filteredRows.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  )
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [activeTab, searchQuery])
 
   return (
     <MerchantLayout title="Transactions">
@@ -40,14 +50,14 @@ export default function Transactions() {
         </div>
 
         {/* Section 1: Summary Strip */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-8 lg:mb-12 animate-fade-in-up [animation-delay:100ms]">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6 mb-8 lg:mb-12 animate-fade-in-up [animation-delay:100ms]">
           {[
-            { label: 'Today', value: 'KES 12,450.00', bg: 'bg-emerald-500/5', text: 'text-emerald-700' },
-            { label: 'This Week', value: 'KES 84,920.50', bg: 'bg-amber-500/5', text: 'text-amber-700' },
-            { label: 'This Month', value: 'KES 245,100.00', bg: 'bg-blue-500/5', text: 'text-blue-700' },
-            { label: 'All Time', value: 'KES 1.84M', bg: 'bg-indigo-500/5', text: 'text-indigo-700' },
+            { label: 'Today', value: 'KES 12,450.00', text: 'text-emerald-700' },
+            { label: 'This Week', value: 'KES 84,920.50', text: 'text-amber-700' },
+            { label: 'This Month', value: 'KES 245,100.00', text: 'text-blue-700' },
+            { label: 'All Time', value: 'KES 1.84M', text: 'text-indigo-700' },
           ].map((stat, i) => (
-            <div key={i} className={`${stat.bg} p-6 lg:p-8 rounded-[24px] lg:rounded-[32px] border border-outline-variant/10 shadow-sm transition-transform hover:scale-105 group`}>
+            <div key={i} className="bg-white p-6 lg:p-8 rounded-[24px] lg:rounded-[32px] border border-outline-variant/10 shadow-sm transition-transform hover:scale-105 group">
               <p className="text-[9px] lg:text-[10px] text-on-surface-variant font-bold uppercase tracking-widest mb-1 lg:mb-2">{stat.label}</p>
               <p className={`${stat.text} font-headline text-lg lg:text-2xl transition-all duration-300 ${!showAmounts && 'blur-md'}`}>{stat.value}</p>
             </div>
@@ -55,140 +65,286 @@ export default function Transactions() {
         </div>
 
         {/* Section 2: Filter Bar */}
-        <div className="flex flex-col md:flex-row gap-4 items-center justify-between mb-6">
-          <div className="flex items-center gap-1 bg-surface-container-low p-1 rounded-full w-full md:w-auto">
+        <div className="flex flex-col md:flex-row gap-4 items-center justify-between mb-8">
+          <div className="flex items-center gap-1 bg-surface-container-low/40 backdrop-blur-md p-1.5 rounded-full w-full md:w-auto overflow-x-auto no-scrollbar scroll-smooth border border-on-surface-variant/30 shadow-md">
             {['All', 'Inbound', 'Outbound', 'FX Swaps'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-5 py-2 text-xs font-bold rounded-full transition-all ${
+                className={`px-6 py-2.5 text-xs font-bold rounded-full transition-all whitespace-nowrap min-w-fit ${
                   activeTab === tab
-                    ? 'bg-surface-container-lowest text-primary shadow-sm'
-                    : 'text-on-surface-variant hover:bg-surface-container-high'
+                    ? 'bg-white text-primary shadow-lg scale-100'
+                    : 'text-on-surface-variant hover:bg-white/20 hover:text-primary active:scale-95'
                 }`}
               >
                 {tab}
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-3 w-full md:w-auto">
-            <div className="relative flex-1 md:w-64">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">search</span>
+          <div className="flex items-center gap-4 w-full md:w-auto">
+            <div className="relative flex-1 md:w-72 group">
+              <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant/40 text-lg transition-colors group-focus-within:text-primary">search</span>
               <input
-                className="w-full bg-surface-container-low border-none rounded-full py-2 pl-10 pr-4 text-sm focus:ring-1 focus:ring-primary focus:bg-surface-container-lowest transition-all placeholder:text-outline-variant"
+                className="w-full bg-surface-container-low/40 backdrop-blur-md border border-on-surface-variant/30 rounded-full py-3 pl-12 pr-6 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary/50 focus:bg-white/60 transition-all placeholder:text-on-surface-variant/30 font-medium"
                 placeholder="Search reference..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <button className="bg-primary text-white p-2 rounded-full transition-colors flex items-center gap-2 px-4 shadow-md active:scale-95 duration-150">
-              <span className="material-symbols-outlined text-sm">download</span>
-              <span className="text-xs font-bold">Export</span>
+            <button className="bg-primary/10 backdrop-blur-md border border-primary/20 text-primary p-3 rounded-full transition-all flex items-center justify-center gap-2 md:px-6 shadow-sm hover:bg-primary hover:text-white active:scale-95 duration-200 group shrink-0">
+              <span className="material-symbols-outlined text-lg transition-transform group-hover:-translate-y-0.5">download</span>
+              <span className="text-xs font-bold uppercase tracking-wider hidden md:inline">Export</span>
             </button>
           </div>
         </div>
 
         {/* Main Layout Grid */}
         <div className="grid grid-cols-12 gap-8 items-start">
-          {/* Section 3: Transaction Table */}
-          <div className="col-span-12 xl:col-span-8 bg-surface-container-lowest rounded-2xl shadow-sm overflow-hidden border border-outline-variant/10 editorial-shadow">
-            <div className="overflow-x-auto text-on-surface">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-surface-container-low">
-                    <th className="px-6 py-4 text-[11px] font-bold text-on-surface-variant uppercase tracking-widest">Date/Time</th>
-                    <th className="px-6 py-4 text-[11px] font-bold text-on-surface-variant uppercase tracking-widest">Type</th>
-                    <th className="px-6 py-4 text-[11px] font-bold text-on-surface-variant uppercase tracking-widest">Party</th>
-                    <th className="px-6 py-4 text-[11px] font-bold text-on-surface-variant uppercase tracking-widest">Amount</th>
-                    <th className="px-6 py-4 text-[11px] font-bold text-on-surface-variant uppercase tracking-widest">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-surface-container text-on-surface">
-                  {filteredRows.map((tx) => (
-                    <tr 
-                      key={tx.id} 
-                      onClick={() => setSelectedTx(tx)}
-                      className={`hover:bg-surface-container-low transition-colors cursor-pointer group ${selectedTx?.id === tx.id ? 'bg-surface-container-low/50' : ''}`}
-                    >
-                      <td className="px-6 py-5">
-                        <p className="text-sm font-semibold text-primary">{formatDateISO(tx.timestamp).split(',')[0]}</p>
-                        <p className="text-[11px] text-on-surface-variant">{formatDateISO(tx.timestamp).split(',')[1]}</p>
-                      </td>
-                      <td className="px-6 py-5">
-                        <span className={`px-3 py-1 text-[10px] font-bold rounded-full uppercase tracking-tighter ${
-                          tx.type === 'inbound' ? 'bg-green-500/10 text-green-700' :
-                          tx.type === 'fx_swap' ? 'bg-blue-500/10 text-blue-700' :
-                          'bg-amber-500/10 text-amber-700'
-                        }`}>
-                          {tx.type.replace('_', ' ')}
-                        </span>
-                      </td>
-                      <td className="px-6 py-5">
-                        <p className="text-sm font-semibold text-primary">{tx.sender?.name || tx.recipient?.name || 'Treasury'}</p>
-                        <p className="text-[11px] font-mono text-on-surface-variant group-hover:text-primary transition-colors">{tx.reference}</p>
-                      </td>
-                      <td className="px-6 py-5">
-                        <p className={`text-sm font-bold transition-all duration-300 ${tx.type === 'inbound' ? 'text-green-600' : 'text-primary'} ${!showAmounts && 'blur-md'}`}>
-                          {tx.type === 'fx_swap' ? `${tx.usdcAmount} USDC` : `KES ${tx.amount}`}
-                        </p>
-                      </td>
-                      <td className="px-6 py-5">
-                        <div className="flex items-center gap-1.5">
-                          <div className={`w-1.5 h-1.5 rounded-full ${tx.status === 'verified' || tx.status === 'completed' ? 'bg-green-500' : 'bg-amber-500'}`}></div>
-                          <span className="text-xs font-semibold capitalize">{tx.status}</span>
-                        </div>
-                      </td>
+          {/* Section 3: Transaction List & Pagination */}
+          <div className="col-span-12 space-y-4">
+            
+            {/* Desktop Table View */}
+            <div className="hidden lg:block bg-surface-container-lowest rounded-2xl shadow-sm overflow-hidden border border-outline-variant/10 editorial-shadow">
+              <div className="overflow-x-auto text-on-surface">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-[#0A2540] border-b border-white/10 transition-colors shadow-lg">
+                      <th className="px-6 py-5 text-[11px] font-bold text-blue-100 uppercase tracking-[0.2em] opacity-60">Date/Time</th>
+                      <th className="px-6 py-5 text-[11px] font-bold text-blue-100 uppercase tracking-[0.2em] opacity-60">Type</th>
+                      <th className="px-6 py-5 text-[11px] font-bold text-blue-100 uppercase tracking-[0.2em] opacity-60">Party</th>
+                      <th className="px-6 py-5 text-[11px] font-bold text-blue-100 uppercase tracking-[0.2em] opacity-60">Amount</th>
+                      <th className="px-6 py-5 text-[11px] font-bold text-blue-100 uppercase tracking-[0.2em] opacity-60">Status</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-surface-container text-on-surface">
+                    {paginatedRows.map((tx) => (
+                      <tr 
+                        key={tx.id} 
+                        onClick={() => setSelectedTx(tx)}
+                        className={`hover:bg-surface-container-low transition-colors cursor-pointer group ${
+                          selectedTx?.id === tx.id ? 'bg-surface-container-low/50' : 'bg-white'
+                        }`}
+                      >
+                        <td className="px-6 py-5">
+                          <p className="text-sm font-semibold text-primary">{formatDateISO(tx.timestamp).split(',')[0]}</p>
+                          <p className="text-[11px] text-on-surface-variant">{formatDateISO(tx.timestamp).split(',')[1]}</p>
+                        </td>
+                        <td className="px-6 py-5">
+                          <span className={`px-3 py-1 text-[10px] font-bold rounded-full uppercase tracking-tighter ${
+                            tx.type === 'inbound' ? 'bg-green-500/10 text-green-700' :
+                            tx.type === 'fx_swap' ? 'bg-blue-500/10 text-blue-700' :
+                            'bg-amber-500/10 text-amber-700'
+                          }`}>
+                            {tx.type.replace('_', ' ')}
+                          </span>
+                        </td>
+                        <td className="px-6 py-5">
+                          <p className="text-sm font-semibold text-primary">{tx.sender?.name || tx.recipient?.name || 'Treasury'}</p>
+                          <p className="text-[11px] font-mono text-on-surface-variant group-hover:text-primary transition-colors">{tx.reference}</p>
+                        </td>
+                        <td className="px-6 py-5">
+                          <p className={`text-sm font-bold transition-all duration-300 ${tx.type === 'inbound' ? 'text-green-600' : 'text-primary'}`}>
+                            {tx.type === 'fx_swap' ? formatUSDC(tx.usdcAmount) : formatKES(tx.amount || tx.kesAmount || 0)}
+                          </p>
+                        </td>
+                        <td className="px-6 py-5">
+                          <div className="flex items-center gap-1.5">
+                            <div className={`w-1.5 h-1.5 rounded-full ${tx.status === 'verified' || tx.status === 'completed' ? 'bg-green-500' : 'bg-amber-500'}`}></div>
+                            <span className="text-xs font-semibold capitalize">{tx.status}</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Mobile Cards View - Vertical Info Sheet Layout */}
+            <div className="lg:hidden divide-y divide-outline-variant/10 border-t border-b border-outline-variant/20">
+              {paginatedRows.map((tx) => (
+                <div 
+                  key={tx.id} 
+                  onClick={() => setSelectedTx(tx)}
+                  className={`bg-white p-6 transition-all active:bg-surface-container-low flex flex-col gap-1.5 ${
+                    selectedTx?.id === tx.id ? 'bg-surface-container-low/50 ring-2 ring-inset ring-primary/20' : ''
+                  }`}
+                >
+                  {/* Date/Time */}
+                  <p className="text-[10px] text-on-surface-variant/40 font-bold uppercase tracking-[0.2em]">
+                    {formatDateISO(tx.timestamp).split(',')[0]}
+                  </p>
+                  <p className="text-[9px] text-on-surface-variant/30 font-bold uppercase tracking-widest -mt-1 mb-2">
+                    {formatDateISO(tx.timestamp).split(',')[1]}
+                  </p>
+
+                  {/* Type Badge */}
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={`text-[8px] font-black px-1.5 py-0.5 uppercase tracking-tighter border ${
+                      tx.type === 'inbound' ? 'bg-emerald-500/5 text-emerald-700 border-emerald-500/10' : 
+                      tx.type === 'fx_swap' ? 'bg-blue-500/5 text-blue-700 border-blue-500/10' : 
+                      'bg-amber-500/5 text-amber-700 border-amber-500/10'
+                    }`}>
+                      {tx.type.replace('_', ' ')}
+                    </span>
+                  </div>
+
+                  {/* Party & Reference */}
+                  <p className="text-base font-bold text-primary leading-tight">
+                    {tx.sender?.name || tx.recipient?.name || 'Treasury'}
+                  </p>
+                  <p className="text-[10px] text-on-surface-variant/40 font-mono tracking-tight mb-2">
+                    {tx.reference}
+                  </p>
+
+                  {/* Amount */}
+                  <p className={`text-xl font-headline tracking-tighter ${tx.type === 'inbound' ? 'text-emerald-700' : 'text-primary'}`}>
+                    {tx.type === 'inbound' ? '+' : '-'}{tx.type === 'fx_swap' ? formatUSDC(tx.usdcAmount) : formatKES(tx.amount || tx.kesAmount || 0)}
+                  </p>
+
+                  {/* Status */}
+                  <div className="flex items-center justify-between mt-2 pt-2 border-t border-outline-variant/5">
+                    <span className={`text-[9px] font-black uppercase tracking-[0.3em] ${
+                      tx.status === 'verified' || tx.status === 'completed' 
+                        ? 'text-emerald-600' 
+                        : 'text-amber-600'
+                    }`}>
+                      {tx.status}
+                    </span>
+                    <span className="material-symbols-outlined text-primary/20 text-lg">arrow_forward</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Pagination Controls */}
+            <div className="mt-8 flex items-center justify-between bg-surface-container-low/30 px-6 py-4 rounded-3xl border border-outline-variant/10 shadow-sm animate-fade-in-up [animation-delay:200ms]">
+              <div className="flex flex-col">
+                <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-[0.15em] opacity-60">Listing Volume</p>
+                <p className="text-xs font-bold text-primary mt-0.5">
+                  Showing <span className="text-primary-container bg-primary/10 px-1.5 py-0.5 rounded-md mx-0.5 font-mono">{paginatedRows.length}</span> of <span className="text-primary">{totalItems.toLocaleString()}</span> transactions
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="w-10 h-10 rounded-full flex items-center justify-center bg-surface-container-lowest border border-outline-variant/10 text-primary shadow-sm hover:bg-primary hover:text-white disabled:opacity-20 disabled:hover:bg-surface-container-lowest disabled:hover:text-primary transition-all duration-300 active:scale-90"
+                >
+                  <span className="material-symbols-outlined text-xl">chevron_left</span>
+                </button>
+                <div className="flex items-center gap-1.5 px-3">
+                  <span className="text-xs font-bold text-primary">{currentPage}</span>
+                  <span className="text-[10px] font-bold text-outline-variant uppercase tracking-widest">of</span>
+                  <span className="text-xs font-bold text-on-surface-variant">{totalPages || 1}</span>
+                </div>
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage >= totalPages}
+                  className="w-10 h-10 rounded-full flex items-center justify-center bg-surface-container-lowest border border-outline-variant/10 text-primary shadow-sm hover:bg-primary hover:text-white disabled:opacity-20 disabled:hover:bg-surface-container-lowest disabled:hover:text-primary transition-all duration-300 active:scale-90"
+                >
+                  <span className="material-symbols-outlined text-xl">chevron_right</span>
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Section 4: Detail Sidebar */}
+          {/* Section 4: Detail Panel (Side-Slide Drawer) */}
           {selectedTx && (
-            <div className="col-span-12 xl:col-span-4 bg-[#0A2540] rounded-[40px] shadow-2xl overflow-hidden border border-white/5 flex flex-col sticky top-[80px] h-fit text-white">
-              <div className="p-10 flex flex-col items-center text-center border-b border-white/5 relative">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full -mr-16 -mt-16 blur-2xl"></div>
-                <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mb-6 border border-white/10 backdrop-blur-md ${selectedTx.type === 'inbound' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/20 text-blue-400'}`}>
-                  <span className="material-symbols-outlined text-4xl" style={{fontVariationSettings: "'FILL' 1"}}>
-                    {selectedTx.type === 'inbound' ? 'verified_user' : 'currency_exchange'}
-                  </span>
-                </div>
-                <h3 className="font-headline text-3xl capitalize tracking-tight">{selectedTx.type.replace('_', ' ')}</h3>
-                <p className="text-blue-100/60 text-xs font-medium mt-2 tracking-widest uppercase opacity-60">REF: {selectedTx.reference}</p>
-              </div>
-              <div className="p-10 space-y-8">
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <p className="text-[10px] text-blue-200/40 font-bold uppercase tracking-[0.2em] mb-2">Settlement</p>
-                    <p className={`text-2xl font-headline text-white transition-all duration-300 ${!showAmounts && 'blur-lg'}`}>{selectedTx.type === 'fx_swap' ? `${selectedTx.usdcAmount} USDC` : `KES ${selectedTx.amount}`}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[10px] text-blue-200/40 font-bold uppercase tracking-[0.2em] mb-2">Status</p>
-                    <div className="inline-flex items-center gap-2 text-emerald-400">
-                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 pulse"></div>
-                      <p className="text-sm font-bold uppercase tracking-tighter">{selectedTx.status}</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-5 pt-8 border-t border-white/5">
-                  <div className="flex justify-between items-center">
-                    <p className="text-[10px] text-blue-200/40 font-bold uppercase tracking-[0.2em]">Counterparty</p>
-                    <p className="text-sm font-bold text-white">{selectedTx.sender?.name || selectedTx.recipient?.name || 'Treasury'}</p>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <p className="text-[10px] text-blue-200/40 font-bold uppercase tracking-[0.2em]">Verification</p>
-                    <div className="bg-white/10 px-3 py-1 rounded-full border border-white/5 flex items-center gap-2">
-                      <span className="material-symbols-outlined text-[10px] text-blue-200">lock</span>
-                      <span className="text-[10px] font-bold text-blue-200 uppercase tracking-widest">Protocol V4</span>
-                    </div>
-                  </div>
-                </div>
-                <button className="w-full bg-blue-600 hover:bg-blue-500 text-white py-5 rounded-2xl font-bold text-sm shadow-xl transition-all flex items-center justify-center gap-3 active:scale-95 mt-4">
-                  <span className="material-symbols-outlined text-lg">receipt_long</span>
-                  Download Global Ledger
+            <div className="fixed inset-0 z-[100] flex justify-end">
+              {/* Overlay Backdrop - Click to close */}
+              <div 
+                className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-fade-in" 
+                onClick={() => setSelectedTx(null)}
+              ></div>
+              
+              <div className="
+                w-[calc(100%-64px)] sm:w-full sm:max-w-md h-full overflow-y-auto
+                bg-white rounded-none shadow-2xl relative border-l border-outline-variant/10 flex flex-col animate-slide-in-right
+              ">
+                {/* Close Button */}
+                <button 
+                  onClick={() => setSelectedTx(null)}
+                  className="absolute top-4 right-4 w-10 h-10 lg:w-12 lg:h-12 rounded-none bg-transparent flex items-center justify-center hover:bg-white/10 transition-colors z-20"
+                >
+                  <span className="material-symbols-outlined text-white">close</span>
                 </button>
+
+                {/* Header Section - Fixed 5cm height (approx 189px) */}
+                <div className="h-[189px] min-h-[189px] px-8 lg:px-12 flex flex-col items-center justify-center text-center border-b border-white/5 relative bg-[#162723] overflow-hidden">
+                  <div className="mb-4 transition-transform duration-700 hover:scale-[1.01]">
+                    <img src={logo} alt="PayChain Logo" className="h-12 lg:h-16 w-auto object-contain" />
+                  </div>
+                  <h3 className="font-bold text-xl lg:text-2xl uppercase tracking-[0.1em] leading-none text-white">Transaction Details</h3>
+                  <p className="text-white/40 text-[10px] font-bold mt-4 tracking-[0.2em] uppercase">REFERENCE ID: {selectedTx.reference}</p>
+                </div>
+
+                {/* Info List Section - strictly vertical */}
+                <div className="flex-1 p-8 lg:p-12 space-y-10">
+                  
+                  {/* Settlement Section */}
+                  <div className="space-y-3">
+                    <p className="text-[10px] text-on-surface-variant/60 font-bold uppercase tracking-[0.2em]">Settlement</p>
+                    <p className={`text-3xl lg:text-4xl font-headline text-primary transition-all duration-300 ${!showAmounts && 'blur-lg'}`}>
+                      {selectedTx.type === 'fx_swap' ? formatUSDC(selectedTx.usdcAmount) : formatKES(selectedTx.amount || selectedTx.kesAmount || 0)}
+                    </p>
+                  </div>
+
+                  {/* Network Status Section */}
+                  <div className="space-y-3 pt-6 border-t border-outline-variant/5">
+                    <p className="text-[10px] text-on-surface-variant/60 font-bold uppercase tracking-[0.2em]">Network Status</p>
+                    <div className="inline-flex items-center gap-2.5 px-3 py-1.5 rounded-none bg-emerald-500/10 border border-emerald-500/20 text-emerald-700">
+                      <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                      <p className="text-[11px] font-black uppercase tracking-widest">{selectedTx.status}</p>
+                    </div>
+                  </div>
+
+                  {/* Counterparty Section */}
+                  <div className="space-y-3 pt-6 border-t border-outline-variant/5">
+                    <p className="text-[10px] text-on-surface-variant/60 font-bold uppercase tracking-[0.2em]">Counterparty</p>
+                    <div>
+                      <p className="text-lg font-bold text-primary">{selectedTx.sender?.name || selectedTx.recipient?.name || 'Internal Treasury'}</p>
+                      <p className="text-[10px] text-on-surface-variant/40 font-bold mt-1 uppercase tracking-widest">{selectedTx.sender?.id || selectedTx.recipient?.id || 'SYSTEM'}</p>
+                    </div>
+                  </div>
+
+                  {/* Timestamp Section */}
+                  <div className="space-y-3 pt-6 border-t border-outline-variant/5">
+                    <p className="text-[10px] text-on-surface-variant/60 font-bold uppercase tracking-[0.2em]">Timestamp</p>
+                    <p className="text-xs font-bold text-primary/70 uppercase tracking-widest">{formatDateISO(selectedTx.timestamp)}</p>
+                  </div>
+
+                  {/* Verification Section */}
+                  <div className="space-y-3 pt-6 border-t border-outline-variant/5 border-b border-outline-variant/5 pb-10">
+                    <p className="text-[10px] text-on-surface-variant/60 font-bold uppercase tracking-[0.2em]">Verification</p>
+                    <div className="bg-surface-container-low px-4 py-3 rounded-none border border-outline-variant/10 flex items-center gap-3 w-fit">
+                      <span className="material-symbols-outlined text-lg text-primary/40">shield_with_heart</span>
+                      <span className="text-[10px] font-bold text-primary/60 uppercase tracking-[0.1em]">Protocol V4.2 Secured</span>
+                    </div>
+                  </div>
+
+                  {/* Action Section */}
+                  <div className="pt-2 flex flex-col items-center gap-6">
+                    <button className="w-fit min-w-[240px] bg-[#162723] hover:bg-emerald-950 active:scale-[0.98] text-white py-3.5 px-10 rounded-none font-bold text-xs shadow-xl transition-all flex items-center justify-center gap-3 border border-white/5">
+                      <span className="material-symbols-outlined text-lg">receipt_long</span>
+                      Generate Audit Receipt
+                    </button>
+                    
+                    <button 
+                      onClick={() => setSelectedTx(null)}
+                      className="text-on-surface-variant/40 hover:text-primary font-bold text-[10px] uppercase tracking-[0.2em] transition-all flex items-center gap-2"
+                    >
+                      Done
+                    </button>
+                  </div>
+                </div>
+
+                {/* Footer Section */}
+                <div className="bg-[#162723] p-6 border-t border-white/5 text-center mt-auto">
+                  <p className="text-[9px] text-white/30 font-bold uppercase tracking-[0.2em] leading-relaxed">
+                    This transaction is cryptographically signed and stored on the immutable ledger.
+                  </p>
+                </div>
               </div>
             </div>
           )}
