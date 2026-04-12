@@ -16,7 +16,7 @@ export default function Transactions() {
   const [activeTab, setActiveTab] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedTx, setSelectedTx] = useState(null)
-
+  
   const filteredRows = transactionsData.filter(t => {
     const matchesSearch = !searchQuery || 
       (t.sender?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -42,45 +42,45 @@ export default function Transactions() {
   )
 
   const handleExport = () => {
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
+    const doc = new jsPDF()
+    const pageWidth = doc.internal.pageSize.getWidth()
     
     // Stats calculation
-    const totalIn = filteredRows.filter(t => t.type === 'inbound').reduce((s, o) => s + (o.amount || 0), 0);
-    const totalOut = filteredRows.filter(t => t.type === 'bulk_pay' || t.type === 'settlement').reduce((s, o) => s + (o.amount || 0), 0);
-    const swpKES = filteredRows.filter(t => t.type === 'fx_swap').reduce((s, o) => s + (o.kesAmount || 0), 0);
-    const swpUSDC = filteredRows.filter(t => t.type === 'fx_swap').reduce((s, o) => s + (o.usdcAmount || 0), 0);
+    const totalIn = filteredRows.filter(t => t.type === 'inbound').reduce((s, o) => s + (o.amount || 0), 0)
+    const totalOut = filteredRows.filter(t => t.type === 'bulk_pay' || t.type === 'settlement').reduce((s, o) => s + (o.amount || 0), 0)
+    const swpKES = filteredRows.filter(t => t.type === 'fx_swap').reduce((s, o) => s + (o.kesAmount || 0), 0)
+    const swpUSDC = filteredRows.filter(t => t.type === 'fx_swap').reduce((s, o) => s + (o.usdcAmount || 0), 0)
     
     // Header - Professional Midnight Theme
-    doc.setFillColor(10, 37, 64); // #0A2540
-    doc.rect(0, 0, pageWidth, 45, 'F');
+    doc.setFillColor(10, 37, 64) // #0A2540
+    doc.rect(0, 0, pageWidth, 45, 'F')
     
     // Logo - Adjusted for higher visibility
-    doc.addImage(statementLogo, 'PNG', 15, 12, 40, 22, undefined, 'FAST');
+    doc.addImage(statementLogo, 'PNG', 15, 12, 40, 22, undefined, 'FAST')
     
     // Identity
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(22);
-    doc.setFont('helvetica', 'bold');
-    doc.text('PAYCHAIN KEA', pageWidth - 15, 20, { align: 'right' });
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(22)
+    doc.setFont('helvetica', 'bold')
+    doc.text('PAYCHAIN', pageWidth - 15, 20, { align: 'right' })
     
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text('OFFICIAL BUSINESS STATEMENT', pageWidth - 15, 28, { align: 'right' });
-    doc.text(`STATEMENT ID: PC-ST-${Math.random().toString(36).substring(7).toUpperCase()}`, pageWidth - 15, 33, { align: 'right' });
-    doc.text(`ISSUED: ${new Date().toLocaleString()}`, pageWidth - 15, 38, { align: 'right' });
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
+    doc.text('OFFICIAL BUSINESS STATEMENT', pageWidth - 15, 28, { align: 'right' })
+    doc.text(`STATEMENT ID: PC-ST-${Math.random().toString(36).substring(7).toUpperCase()}`, pageWidth - 15, 33, { align: 'right' })
+    doc.text(`ISSUED: ${new Date().toLocaleString()}`, pageWidth - 15, 38, { align: 'right' })
 
     // Official Narrative Section
-    doc.setTextColor(10, 37, 64);
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Business Overview', 15, 55);
+    doc.setTextColor(10, 37, 64)
+    doc.setFontSize(14)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Business Overview', 15, 55)
     
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    const narrative = `This document serves as the official transaction summary for Till PC847291. It provides a comprehensive record of all financial movements, including inbound payments, outbound settlements, and currency swaps. These records are cryptographically verified and stored on the PayChainKE immutable ledger for your business security.`;
-    const lines = doc.splitTextToSize(narrative, pageWidth - 30);
-    doc.text(lines, 15, 62);
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
+    const narrative = `This document serves as the official transaction summary for Till PC847291. It provides a comprehensive record of all financial movements, including inbound payments, outbound settlements, and currency swaps. These records are cryptographically verified and stored on the PayChainKE immutable ledger for your business security.`
+    const lines = doc.splitTextToSize(narrative, pageWidth - 30)
+    doc.text(lines, 15, 62)
 
     // Summary Statistics Card
     autoTable(doc, {
@@ -106,19 +106,19 @@ export default function Transactions() {
         halign: 'center'
       },
       margin: { left: 15, right: 15 }
-    });
+    })
 
     // Transaction Table
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Transaction Details', 15, doc.lastAutoTable.finalY + 15);
+    doc.setFontSize(14)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Transaction Details', 15, doc.lastAutoTable.finalY + 15)
 
     const tableData = filteredRows.map(tx => {
-      const dateTime = formatDateISO(tx.timestamp).split(',');
-      const party = tx.sender?.name || tx.recipient?.name || 'Treasury';
+      const dateTime = formatDateISO(tx.timestamp).split(',')
+      const party = tx.sender?.name || tx.recipient?.name || 'Treasury'
       const amount = tx.type === 'fx_swap' 
         ? `${tx.usdcAmount} USDC` 
-        : `KES ${(tx.amount || tx.kesAmount || 0).toLocaleString()}`;
+        : `KES ${(tx.amount || tx.kesAmount || 0).toLocaleString()}`
         
       return [
         dateTime[0].trim(),
@@ -127,8 +127,8 @@ export default function Transactions() {
         party,
         amount,
         tx.status.toUpperCase()
-      ];
-    });
+      ]
+    })
 
     autoTable(doc, {
       startY: doc.lastAutoTable.finalY + 20,
@@ -150,127 +150,127 @@ export default function Transactions() {
         fillColor: [245, 247, 249]
       },
       margin: { left: 15, right: 15 }
-    });
+    })
 
     // Footer
-    const finalY = doc.lastAutoTable.finalY || 150;
-    doc.setFontSize(8);
-    doc.setTextColor(150, 150, 150);
-    doc.text(`END OF STATEMENT - PAGE ${doc.internal.getNumberOfPages()}`, pageWidth / 2, finalY + 15, { align: 'center' });
+    const finalY = doc.lastAutoTable.finalY || 150
+    doc.setFontSize(8)
+    doc.setTextColor(150, 150, 150)
+    doc.text(`END OF STATEMENT - PAGE ${doc.internal.getNumberOfPages()}`, pageWidth / 2, finalY + 15, { align: 'center' })
     
     // Cryptographic signature line
-    doc.setDrawColor(200, 200, 200);
-    doc.line(15, doc.internal.pageSize.getHeight() - 25, pageWidth - 15, doc.internal.pageSize.getHeight() - 25);
-    doc.text('Verify authenticity at paychain.ke/verify', 15, doc.internal.pageSize.getHeight() - 15);
-    doc.text('Audit Hash: ' + Math.random().toString(36).substring(2, 18).toUpperCase(), pageWidth - 15, doc.internal.pageSize.getHeight() - 15, { align: 'right' });
+    doc.setDrawColor(200, 200, 200)
+    doc.line(15, doc.internal.pageSize.getHeight() - 25, pageWidth - 15, doc.internal.pageSize.getHeight() - 25)
+    doc.text('Verify authenticity at paychain.ke/verify', 15, doc.internal.pageSize.getHeight() - 15)
+    doc.text('Audit Hash: ' + Math.random().toString(36).substring(2, 18).toUpperCase(), pageWidth - 15, doc.internal.pageSize.getHeight() - 15, { align: 'right' })
 
-    doc.save(`PayChain_Official_Statement_${new Date().toISOString().split('T')[0]}.pdf`);
+    doc.save(`PayChain_Official_Statement_${new Date().toISOString().split('T')[0]}.pdf`)
     
     addNotification({
       type: 'notifications',
       title: 'Statement Downloaded',
       message: 'Your official transaction statement has been generated and downloaded successfully.'
-    });
-  };
+    })
+  }
 
   const generateAuditReceipt = () => {
-    if (!selectedTx) return;
+    if (!selectedTx) return
     
     const doc = new jsPDF({
       unit: 'mm',
       format: [148, 210] // A5 Format
-    });
+    })
     
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const tx = selectedTx;
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const tx = selectedTx
     
     // Header - Premium Midnight Accent
-    doc.setFillColor(22, 39, 35); // #162723 matching the detail panel header
-    doc.rect(0, 0, pageWidth, 40, 'F');
+    doc.setFillColor(22, 39, 35) // #162723 matching the detail panel header
+    doc.rect(0, 0, pageWidth, 40, 'F')
     
     // Logo
-    doc.addImage(statementLogo, 'PNG', (pageWidth/2) - 20, 8, 40, 22);
+    doc.addImage(statementLogo, 'PNG', (pageWidth/2) - 20, 8, 40, 22)
     
     // Receipt Title
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('OFFICIAL AUDIT RECEIPT', pageWidth / 2, 35, { align: 'center' });
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(14)
+    doc.setFont('helvetica', 'bold')
+    doc.text('OFFICIAL AUDIT RECEIPT', pageWidth / 2, 35, { align: 'center' })
 
     // Main Content
-    doc.setTextColor(22, 39, 35);
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text('REFERENCE ID', 20, 55);
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text(tx.reference, 20, 62);
+    doc.setTextColor(22, 39, 35)
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
+    doc.text('REFERENCE ID', 20, 55)
+    doc.setFontSize(12)
+    doc.setFont('helvetica', 'bold')
+    doc.text(tx.reference, 20, 62)
     
     // Divider
-    doc.setDrawColor(230, 230, 230);
-    doc.line(20, 68, pageWidth - 20, 68);
+    doc.setDrawColor(230, 230, 230)
+    doc.line(20, 68, pageWidth - 20, 68)
 
     // Grid details
-    const labelY = 80;
-    const valueY = 87;
+    const labelY = 80
+    const valueY = 87
     
     // Column 1
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(100, 100, 100);
-    doc.text('TRANSACTION TYPE', 20, labelY);
-    doc.text('NETWORK STATUS', 20, labelY + 20);
-    doc.text('COUNTERPARTY', 20, labelY + 40);
-    doc.text('TIMESTAMP', 20, labelY + 60);
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(100, 100, 100)
+    doc.text('TRANSACTION TYPE', 20, labelY)
+    doc.text('NETWORK STATUS', 20, labelY + 20)
+    doc.text('COUNTERPARTY', 20, labelY + 40)
+    doc.text('TIMESTAMP', 20, labelY + 60)
 
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(22, 39, 35);
-    doc.text(tx.type.replace('_', ' ').toUpperCase(), 20, valueY);
-    doc.text(tx.status.toUpperCase(), 20, valueY + 20);
-    doc.text(tx.sender?.name || tx.recipient?.name || 'Internal Treasury', 20, valueY + 40);
-    doc.text(formatDateISO(tx.timestamp), 20, valueY + 60);
+    doc.setFontSize(11)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(22, 39, 35)
+    doc.text(tx.type.replace('_', ' ').toUpperCase(), 20, valueY)
+    doc.text(tx.status.toUpperCase(), 20, valueY + 20)
+    doc.text(tx.sender?.name || tx.recipient?.name || 'Internal Treasury', 20, valueY + 40)
+    doc.text(formatDateISO(tx.timestamp), 20, valueY + 60)
 
     // Column 2 - Amount Focus
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(100, 100, 100);
-    doc.text('TOTAL AMOUNT', 85, labelY);
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(100, 100, 100)
+    doc.text('TOTAL AMOUNT', 85, labelY)
     
-    doc.setFontSize(18);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(22, 39, 35);
+    doc.setFontSize(18)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(22, 39, 35)
     const amountStr = tx.type === 'fx_swap' 
       ? `${tx.usdcAmount} USDC` 
-      : `${(tx.amount || tx.kesAmount || 0).toLocaleString()} KES`;
-    doc.text(amountStr, 85, valueY + 2);
+      : `${(tx.amount || tx.kesAmount || 0).toLocaleString()} KES`
+    doc.text(amountStr, 85, valueY + 2)
 
     // Verification Note
-    doc.setFillColor(245, 247, 249);
-    doc.rect(20, 155, pageWidth - 40, 15, 'F');
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(22, 39, 35);
-    doc.text('VERIFICATION: PROTOCOL V4.2 SECURED', pageWidth / 2, 164, { align: 'center' });
+    doc.setFillColor(245, 247, 249)
+    doc.rect(20, 155, pageWidth - 40, 15, 'F')
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(22, 39, 35)
+    doc.text('VERIFICATION: PROTOCOL V4.2 SECURED', pageWidth / 2, 164, { align: 'center' })
 
     // Footer
-    doc.setFontSize(8);
-    doc.setTextColor(150, 150, 150);
-    doc.setFont('helvetica', 'italic');
-    doc.text('This receipt is a cryptographically verified record of the transaction.', pageWidth / 2, 185, { align: 'center' });
-    doc.text('Audit Hash: ' + Math.random().toString(36).substring(2, 18).toUpperCase(), pageWidth / 2, 190, { align: 'center' });
+    doc.setFontSize(8)
+    doc.setTextColor(150, 150, 150)
+    doc.setFont('helvetica', 'italic')
+    doc.text('This receipt is a cryptographically verified record of the transaction.', pageWidth / 2, 185, { align: 'center' })
+    doc.text('Audit Hash: ' + Math.random().toString(36).substring(2, 18).toUpperCase(), pageWidth / 2, 190, { align: 'center' })
     
-    doc.setFont('helvetica', 'normal');
-    doc.text('Verified by PayChain Ledger Node v0.8.2', pageWidth / 2, 195, { align: 'center' });
+    doc.setFont('helvetica', 'normal')
+    doc.text('Verified by PayChain Ledger Node v0.8.2', pageWidth / 2, 195, { align: 'center' })
 
-    doc.save(`PayChain_Audit_Receipt_${tx.reference}.pdf`);
+    doc.save(`PayChain_Audit_Receipt_${tx.reference}.pdf`)
     
     addNotification({
       type: 'notifications',
       title: 'Receipt Generated',
       message: `Official Audit Receipt for TXN ${tx.reference} has been downloaded.`
-    });
-  };
+    })
+  }
 
   useEffect(() => {
     setCurrentPage(1)
@@ -288,10 +288,10 @@ export default function Transactions() {
         {/* Section 1: Summary Strip */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6 mb-8 lg:mb-12 animate-fade-in-up [animation-delay:100ms]">
           {[
-            { label: 'Today', value: 'KES 12,450.00', text: 'text-emerald-700' },
-            { label: 'This Week', value: 'KES 84,920.50', text: 'text-emerald-700' },
-            { label: 'This Month', value: 'KES 245,100.00', text: 'text-emerald-700' },
-            { label: 'All Time', value: 'KES 1.84M', text: 'text-emerald-700' },
+            { label: 'Today', value: 'KES 12,450.00', text: 'text-emerald-700 font-bold' },
+            { label: 'This Week', value: 'KES 84,920.50', text: 'text-emerald-700 font-bold' },
+            { label: 'This Month', value: 'KES 245,100.00', text: 'text-emerald-700 font-bold' },
+            { label: 'All Time', value: 'KES 1.84M', text: 'text-emerald-700 font-bold' },
           ].map((stat, i) => (
             <div key={i} className="bg-white p-6 lg:p-8 rounded-[24px] lg:rounded-[32px] border border-outline-variant/10 shadow-sm transition-transform hover:scale-105 group">
               <p className="text-[9px] lg:text-[10px] text-on-surface-variant font-black uppercase tracking-widest mb-1 lg:mb-2">{stat.label}</p>
@@ -330,7 +330,8 @@ export default function Transactions() {
             <button 
               onClick={handleExport}
               className="bg-[#0A2540] backdrop-blur-md border border-white/10 text-blue-100 p-3 rounded-full transition-all flex items-center justify-center gap-2 md:px-6 shadow-xl hover:bg-[#0C2D4E] hover:text-white active:scale-95 duration-200 group shrink-0"
-            >              <span className="material-symbols-outlined text-lg transition-transform group-hover:-translate-y-0.5 text-blue-300">download</span>
+            >
+              <span className="material-symbols-outlined text-lg transition-transform group-hover:-translate-y-0.5 text-blue-300">download</span>
               <span className="text-xs font-black uppercase tracking-[0.2em] hidden md:inline">Export</span>
             </button>
           </div>
@@ -566,7 +567,8 @@ export default function Transactions() {
                     <button 
                       onClick={generateAuditReceipt}
                       className="w-fit min-w-[240px] bg-[#162723] hover:bg-emerald-950 active:scale-[0.98] text-white py-3.5 px-10 rounded-none font-bold text-xs shadow-xl transition-all flex items-center justify-center gap-3 border border-white/5"
-                    >                      <span className="material-symbols-outlined text-lg">receipt_long</span>
+                    >
+                      <span className="material-symbols-outlined text-lg">receipt_long</span>
                       Generate Audit Receipt
                     </button>
                     
