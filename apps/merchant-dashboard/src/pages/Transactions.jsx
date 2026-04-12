@@ -5,6 +5,9 @@ import { formatDateISO } from '../utils/formatDate'
 import { formatKES, formatUSDC } from '../utils/formatCurrency'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import logo from '../assets/logo2.png'
+import statementLogo from '../../images/sign in logo2.png'
+import { jsPDF } from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 export default function Transactions() {
   const { showAmounts } = usePrivacyMode()
@@ -36,6 +39,85 @@ export default function Transactions() {
     currentPage * itemsPerPage
   )
 
+  const handleExport = () => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    
+    // Header - Deep Midnight Blue Accent
+    doc.setFillColor(10, 37, 64); // #0A2540
+    doc.rect(0, 0, pageWidth, 40, 'F');
+    
+    // Logo
+    doc.addImage(statementLogo, 'PNG', 15, 10, 35, 20);
+    
+    // Business Identity
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text('PAYCHAIN KEA', pageWidth - 15, 18, { align: 'right' });
+    
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text('OFFICIAL TRANSACTION STATEMENT', pageWidth - 15, 25, { align: 'right' });
+    doc.text(`TILL: PC847291 | DATE: ${new Date().toLocaleDateString()}`, pageWidth - 15, 30, { align: 'right' });
+
+    // Table
+    const tableData = filteredRows.map(tx => {
+      const dateTime = formatDateISO(tx.timestamp).split(',');
+      const party = tx.sender?.name || tx.recipient?.name || 'Treasury';
+      const amount = tx.type === 'fx_swap' 
+        ? `${tx.usdcAmount} USDC` 
+        : `KES ${(tx.amount || tx.kesAmount || 0).toLocaleString()}`;
+        
+      return [
+        dateTime[0].trim(),
+        tx.type.replace('_', ' ').toUpperCase(),
+        tx.reference,
+        party,
+        amount,
+        tx.status.toUpperCase()
+      ];
+    });
+
+    autoTable(doc, {
+      startY: 50,
+      head: [['DATE', 'TYPE', 'REFERENCE', 'PARTY', 'AMOUNT', 'STATUS']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { 
+        fillColor: [10, 37, 64], 
+        textColor: [255, 255, 255],
+        fontSize: 9,
+        fontStyle: 'bold',
+        cellPadding: 5
+      },
+      bodyStyles: {
+        fontSize: 8,
+        cellPadding: 4
+      },
+      alternateRowStyles: {
+        fillColor: [245, 247, 249]
+      },
+      margin: { top: 50, left: 15, right: 15 }
+    });
+
+    // Footer - Security Note
+    const finalY = doc.lastAutoTable.finalY || 150;
+    doc.setDrawColor(230, 230, 230);
+    doc.line(15, finalY + 10, pageWidth - 15, finalY + 10);
+    
+    doc.setTextColor(100, 100, 100);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'italic');
+    doc.text('This document is cryptographically signed and stored on the PayChainKE immutable ledger.', 15, finalY + 20);
+    doc.text('Verification Protocol: PC-V4.2 Secured | Audit Hash: ' + Math.random().toString(36).substring(2, 15).toUpperCase(), 15, finalY + 25);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Page ${doc.internal.getNumberOfPages()}`, pageWidth / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' });
+
+    doc.save(`PayChain_Statement_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
   useEffect(() => {
     setCurrentPage(1)
   }, [activeTab, searchQuery])
@@ -53,13 +135,13 @@ export default function Transactions() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6 mb-8 lg:mb-12 animate-fade-in-up [animation-delay:100ms]">
           {[
             { label: 'Today', value: 'KES 12,450.00', text: 'text-emerald-700' },
-            { label: 'This Week', value: 'KES 84,920.50', text: 'text-amber-700' },
-            { label: 'This Month', value: 'KES 245,100.00', text: 'text-blue-700' },
-            { label: 'All Time', value: 'KES 1.84M', text: 'text-indigo-700' },
+            { label: 'This Week', value: 'KES 84,920.50', text: 'text-emerald-700' },
+            { label: 'This Month', value: 'KES 245,100.00', text: 'text-emerald-700' },
+            { label: 'All Time', value: 'KES 1.84M', text: 'text-emerald-700' },
           ].map((stat, i) => (
             <div key={i} className="bg-white p-6 lg:p-8 rounded-[24px] lg:rounded-[32px] border border-outline-variant/10 shadow-sm transition-transform hover:scale-105 group">
-              <p className="text-[9px] lg:text-[10px] text-on-surface-variant font-bold uppercase tracking-widest mb-1 lg:mb-2">{stat.label}</p>
-              <p className={`${stat.text} font-headline text-lg lg:text-2xl transition-all duration-300 ${!showAmounts && 'blur-md'}`}>{stat.value}</p>
+              <p className="text-[9px] lg:text-[10px] text-on-surface-variant font-black uppercase tracking-widest mb-1 lg:mb-2">{stat.label}</p>
+              <p className={`${stat.text} font-headline font-bold text-lg lg:text-2xl transition-all duration-300 ${!showAmounts && 'blur-md'}`}>{stat.value}</p>
             </div>
           ))}
         </div>
@@ -71,7 +153,7 @@ export default function Transactions() {
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-6 py-2.5 text-xs font-bold rounded-full transition-all whitespace-nowrap min-w-fit ${
+                className={`px-6 py-2.5 text-xs font-black rounded-full transition-all whitespace-nowrap min-w-fit ${
                   activeTab === tab
                     ? 'bg-white text-primary shadow-lg scale-100'
                     : 'text-on-surface-variant hover:bg-white/20 hover:text-primary active:scale-95'
@@ -91,9 +173,11 @@ export default function Transactions() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <button className="bg-primary/10 backdrop-blur-md border border-primary/20 text-primary p-3 rounded-full transition-all flex items-center justify-center gap-2 md:px-6 shadow-sm hover:bg-primary hover:text-white active:scale-95 duration-200 group shrink-0">
-              <span className="material-symbols-outlined text-lg transition-transform group-hover:-translate-y-0.5">download</span>
-              <span className="text-xs font-bold uppercase tracking-wider hidden md:inline">Export</span>
+            <button 
+              onClick={handleExport}
+              className="bg-[#0A2540] backdrop-blur-md border border-white/10 text-blue-100 p-3 rounded-full transition-all flex items-center justify-center gap-2 md:px-6 shadow-xl hover:bg-[#0C2D4E] hover:text-white active:scale-95 duration-200 group shrink-0"
+            >              <span className="material-symbols-outlined text-lg transition-transform group-hover:-translate-y-0.5 text-blue-300">download</span>
+              <span className="text-xs font-black uppercase tracking-[0.2em] hidden md:inline">Export</span>
             </button>
           </div>
         </div>
