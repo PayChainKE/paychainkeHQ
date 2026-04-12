@@ -4,6 +4,7 @@ import { transactionsData } from '../mockData/transactions'
 import { formatDateISO } from '../utils/formatDate'
 import { formatKES, formatUSDC } from '../utils/formatCurrency'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
+import { useNotification } from '../context/NotificationContext'
 import logo from '../assets/logo2.png'
 import statementLogo from '../../images/sign in logo2.png'
 import { jsPDF } from 'jspdf'
@@ -11,6 +12,7 @@ import autoTable from 'jspdf-autotable'
 
 export default function Transactions() {
   const { showAmounts } = usePrivacyMode()
+  const { addNotification } = useNotification()
   const [activeTab, setActiveTab] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedTx, setSelectedTx] = useState(null)
@@ -163,6 +165,12 @@ export default function Transactions() {
     doc.text('Audit Hash: ' + Math.random().toString(36).substring(2, 18).toUpperCase(), pageWidth - 15, doc.internal.pageSize.getHeight() - 15, { align: 'right' });
 
     doc.save(`PayChain_Official_Statement_${new Date().toISOString().split('T')[0]}.pdf`);
+    
+    addNotification({
+      type: 'notifications',
+      title: 'Statement Downloaded',
+      message: 'Your official transaction statement has been generated and downloaded successfully.'
+    });
   };
 
   const generateAuditReceipt = () => {
@@ -256,6 +264,12 @@ export default function Transactions() {
     doc.text('Verified by PayChain Ledger Node v0.8.2', pageWidth / 2, 195, { align: 'center' });
 
     doc.save(`PayChain_Audit_Receipt_${tx.reference}.pdf`);
+    
+    addNotification({
+      type: 'notifications',
+      title: 'Receipt Generated',
+      message: `Official Audit Receipt for TXN ${tx.reference} has been downloaded.`
+    });
   };
 
   useEffect(() => {
