@@ -6,6 +6,8 @@ import { payees, bulkPayHistory } from '../mockData/bulkPay'
 import { formatKES } from '../utils/formatCurrency'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useNotification } from '../context/NotificationContext'
+import paychainLogo from '../../images/logo.png'
+
 export default function BulkPay() {
   const { showAmounts } = usePrivacyMode()
   const { addNotification } = useNotification()
@@ -143,6 +145,142 @@ export default function BulkPay() {
       tillNumber: ''
     });
   }
+
+  // Invoice Feature State
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [invoiceDetails, setInvoiceDetails] = useState({
+    customer: 'Acme Corp',
+    invoiceNumber: 'INV-00105',
+    issueDate: '2026-04-12',
+    dueDate: '2026-11-12',
+    currency: 'KES',
+    notes: 'Payment terms, thank you note...',
+    recurring: false,
+    items: [
+      { id: 1, description: 'Consulting Services - Oct', qty: 10, price: 100 },
+      { id: 2, description: 'Server Maintenance', qty: 1, price: 200 }
+    ]
+  });
+
+  const invoiceSubtotal = invoiceDetails.items.reduce((sum, item) => sum + (item.qty * item.price), 0);
+  const invoiceTotal = invoiceSubtotal; // Assuming no tax right now
+
+  const handleAddInvoiceItem = () => {
+    setInvoiceDetails(prev => ({
+      ...prev,
+      items: [...prev.items, { id: Date.now(), description: '', qty: 1, price: 0 }]
+    }))
+  };
+
+  const handleUpdateInvoiceItem = (id, field, value) => {
+    setInvoiceDetails(prev => ({
+      ...prev,
+      items: prev.items.map(item => item.id === id ? { ...item, [field]: value } : item)
+    }))
+  };
+
+  const downloadInvoicePDF = async () => {
+    addNotification({ title: 'Processing', message: 'Generating professional invoice...', type: 'info' });
+    const element = document.getElementById('invoice-pdf-pane');
+    if (element) {
+      try {
+        const dataUrl = await domtoimage.toPng(element, { bgcolor: '#ffffff' });
+        const pdf = new jsPDF({
+          orientation: 'portrait',
+          unit: 'px',
+          format: [element.clientWidth, element.clientHeight]
+        });
+        pdf.addImage(dataUrl, 'PNG', 0, 0, element.clientWidth, element.clientHeight);
+        pdf.save(`Invoice_${invoiceDetails.invoiceNumber}.pdf`);
+        addNotification({ title: 'Download Complete', message: `Invoice saved successfully.`, type: 'success' });
+      } catch (err) {
+        addNotification({ title: 'Error', message: 'Failed to generate PDF: ' + err.message, type: 'error' });
+      }
+    }
+  };
+
+  const handleSaveDraft = () => {
+    const isEditingExisting = invoicesList.find(inv => inv.id === invoiceDetails.invoiceNumber);
+    
+    if (isEditingExisting) {
+      setInvoicesList(prev => prev.map(inv => 
+        inv.id === invoiceDetails.invoiceNumber 
+          ? { ...inv, customer: invoiceDetails.customer, amount: invoiceTotal, status: 'Draft' }
+          : inv
+      ));
+    } else {
+      setInvoicesList(prev => [
+        { 
+          id: invoiceDetails.invoiceNumber, 
+          customer: invoiceDetails.customer || 'Unnamed Customer', 
+          amount: invoiceTotal, 
+          date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }), 
+          status: 'Draft' 
+        },
+        ...prev
+      ]);
+    }
+
+    setShowInvoiceModal(false);
+    addNotification({
+      title: 'Draft Saved',
+      message: `Invoice #${invoiceDetails.invoiceNumber} safely stored in Invoices -> Drafts.`,
+      type: 'success'
+    });
+  };
+
+  const handleSendInvoice = () => {
+    setInvoicesList(prev => [
+      { 
+        id: invoiceDetails.invoiceNumber, 
+        customer: invoiceDetails.customer || 'Unnamed Customer', 
+        amount: invoiceTotal, 
+        date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }), 
+        status: 'Sent' 
+      },
+      ...prev.filter(inv => inv.id !== invoiceDetails.invoiceNumber)
+    ]);
+
+    setShowInvoiceModal(false);
+    addNotification({
+      title: 'Invoice Sent',
+      message: `Invoice #${invoiceDetails.invoiceNumber} has been sent to ${invoiceDetails.customer}.`,
+      type: 'success'
+    });
+  };
+
+  const handleOpenInvoiceModal = () => {
+    setInvoiceDetails(prev => ({
+        ...prev,
+        invoiceNumber: `INV-${String(Math.floor(Math.random() * 900000) + 100000)}`
+    }));
+    setShowInvoiceModal(true);
+  };
+
+  const [showLinkModal, setShowLinkModal] = useState(false);
+
+  const handleGenerateLink = () => {
+    setShowLinkModal(true);
+  };
+
+  const handleCopyLink = () => {
+    const fakeLink = `https://app.paychain.co.ke/invoice/${invoiceDetails.invoiceNumber.replace('INV-', '')}`;
+    navigator.clipboard.writeText(fakeLink);
+    addNotification({
+      title: 'Link Copied',
+      message: `Invoice link (${fakeLink}) ready to share.`,
+      type: 'success'
+    });
+    setShowLinkModal(false);
+  };
+
+  const [invoicesList, setInvoicesList] = useState([
+    { id: 'INV-420915', customer: 'Acme Corp', amount: 154000, date: '12 Apr 2026', status: 'Sent' },
+    { id: 'INV-883102', customer: 'Zeta Technologies', amount: 84000, date: '11 Apr 2026', status: 'Sent' },
+    { id: 'INV-109482', customer: 'Nexus Imports', amount: 32000, date: '13 Apr 2026', status: 'Draft' },
+    { id: 'INV-551029', customer: 'Local Retailer Ltd', amount: 110500, date: '10 Apr 2026', status: 'Draft' },
+  ]);
+  const [invoiceFilter, setInvoiceFilter] = useState('All');
 
   // Fund Account Modal State
   const [showFundModal, setShowFundModal] = useState(false)
@@ -625,7 +763,7 @@ export default function BulkPay() {
                         <h4 className="text-[10px] md:text-[12px] font-bold text-primary group-hover:text-[#00351D] transition-colors leading-tight truncate">{p.name}</h4>
                         {selectedPayees[p.id] && <span className="text-[6px] md:text-[7px] text-emerald-600 font-extrabold uppercase tracking-wider bg-emerald-50 px-1 py-0.5 rounded-sm">Selected</span>}
                       </div>
-                      <p className="text-[7px] md:text-[8px] text-on-surface-variant font-bold uppercase tracking-widest opacity-40">{p.type}</p>
+                      <p className={`text-[7px] md:text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm inline-block mt-0.5 ${p.type.toLowerCase() === 'employee' ? 'text-blue-600 bg-blue-50' : p.type.toLowerCase() === 'supplier' ? 'text-purple-600 bg-purple-50' : p.type.toLowerCase() === 'utility' ? 'text-amber-600 bg-amber-50' : 'text-on-surface-variant opacity-40'}`}>{p.type}</p>
                     </div>
                   </div>
                   
@@ -645,6 +783,27 @@ export default function BulkPay() {
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Invoices (Billing & Drafts) - Sidebar version for desktop */}
+          <div className="hidden lg:block bg-white rounded-[32px] overflow-hidden shadow-[0_20px_80px_rgba(0,0,0,0.06)] border border-outline-variant/10 p-6 md:p-8 mt-2">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-emerald-50 text-emerald-700 rounded-xl flex items-center justify-center font-bold">
+                 <span className="material-symbols-outlined">receipt_long</span>
+              </div>
+              <div>
+                <h3 className="font-headline text-xl text-primary tracking-tight font-bold">Invoices</h3>
+                <p className="text-[10px] text-on-surface-variant font-medium mt-0.5 opacity-60 italic">Billing & Drafts</p>
+              </div>
+            </div>
+            <p className="text-xs text-on-surface-variant font-medium mb-6 leading-relaxed">Generate, send, and manage professional invoices directly to your clients.</p>
+            <button 
+              onClick={handleOpenInvoiceModal} 
+              className="w-full bg-[#00351D] text-white hover:bg-emerald-950 py-3.5 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-xl active:scale-[0.98]"
+            >
+              <span className="material-symbols-outlined text-sm">add</span>
+              Create Invoice
+            </button>
           </div>
         </section>
 
@@ -671,21 +830,28 @@ export default function BulkPay() {
               ))}
             </div>
             
-            <div className="flex items-center gap-4 md:gap-6 relative z-10 shrink-0">
-              <div className="w-[1px] h-8 bg-outline-variant/20 hidden md:block"></div>
-              <div className="flex flex-col md:flex-row md:items-baseline gap-1 md:gap-2 text-right md:text-left">
-                <p className="text-[7px] md:text-[9px] text-on-surface-variant uppercase font-black tracking-widest leading-none opacity-50">Liquidity</p>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-[8px] md:text-[10px] font-bold text-emerald-600">KES</span>
-                  <p className={`font-headline text-xs md:text-base text-primary leading-none transition-all duration-300 ${!showAmounts && 'blur-md'}`}>{balance.toLocaleString()}</p>
+            <div className="flex items-center gap-4 md:gap-7 relative z-10 shrink-0">
+              <div className="w-[1px] h-9 bg-outline-variant/20 hidden md:block"></div>
+              
+              <div className="flex items-center gap-4">
+                <div className="flex flex-col md:flex-row md:items-baseline gap-1 md:gap-3 text-right md:text-left group cursor-default">
+                  <p className="text-[7px] md:text-[9px] text-on-surface-variant uppercase font-black tracking-widest leading-none opacity-50 group-hover:opacity-100 transition-opacity">Liquidity</p>
+                  <div className="flex items-baseline gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/[0.03] border border-emerald-500/10 group-hover:bg-emerald-500/[0.07] group-hover:border-emerald-500/30 transition-all">
+                    <span className="text-[8px] md:text-[10px] font-bold text-emerald-600">KES</span>
+                    <p className={`font-headline text-xs md:text-lg text-primary leading-none transition-all duration-300 font-bold ${!showAmounts && 'blur-md'}`}>
+                      {balance.toLocaleString()}
+                    </p>
+                  </div>
                 </div>
+
+                <button 
+                  onClick={() => setShowFundModal(true)}
+                  className="p-1.5 md:p-2 rounded-xl bg-[#00351D] text-white hover:bg-emerald-950 transition-all flex items-center justify-center shadow-lg active:scale-90 group/fund"
+                  title="Fund Account"
+                >
+                  <span className="material-symbols-outlined text-[16px] md:text-[20px] group-hover/fund:rotate-90 transition-transform duration-500">add</span>
+                </button>
               </div>
-              <button 
-                onClick={() => setShowFundModal(true)}
-                className="px-3 py-1.5 md:px-4 md:py-2 rounded-xl bg-white border border-outline-variant/10 text-primary flex items-center justify-center gap-1.5 hover:border-emerald-500/30 hover:bg-emerald-50 transition-all shadow-sm active:scale-95 group"
-              >
-                <span className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.1em]">Fund</span>
-              </button>
             </div>
           </div>
 
@@ -977,6 +1143,118 @@ export default function BulkPay() {
               )}
             </div>
           </div>
+
+          {/* Invoices (Billing & Drafts) - Sequential version for mobile */}
+          <div className="lg:hidden bg-white rounded-[32px] overflow-hidden shadow-[0_20px_80px_rgba(0,0,0,0.06)] border border-outline-variant/10 p-6 md:p-8">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-emerald-50 text-emerald-700 rounded-xl flex items-center justify-center font-bold">
+                 <span className="material-symbols-outlined">receipt_long</span>
+              </div>
+              <div>
+                <h3 className="font-headline text-xl text-primary tracking-tight font-bold">Invoices</h3>
+                <p className="text-[10px] text-on-surface-variant font-medium mt-0.5 opacity-60 italic">Billing & Drafts</p>
+              </div>
+            </div>
+            <p className="text-xs text-on-surface-variant font-medium mb-6 leading-relaxed">Generate, send, and manage professional invoices directly to your clients.</p>
+            <button 
+              onClick={handleOpenInvoiceModal} 
+              className="w-full bg-[#00351D] text-white hover:bg-emerald-950 py-3.5 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-xl active:scale-[0.98]"
+            >
+              <span className="material-symbols-outlined text-sm">add</span>
+              Create Invoice
+            </button>
+          </div>
+
+          {/* Invoice Statistics Container */}
+          <div className="md:px-0">
+            <div className="bg-white rounded-[32px] overflow-hidden shadow-[0_20px_80px_rgba(0,0,0,0.06)] border border-outline-variant/10 p-6 md:p-8">
+               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                  <div>
+                    <h3 className="font-headline text-xl text-primary tracking-tight font-bold">Invoice Tracking</h3>
+                    <p className="text-[10px] text-on-surface-variant font-medium mt-1 opacity-60 italic">Monitor the status of your issued billing.</p>
+                  </div>
+                  <div className="flex gap-2 p-1.5 bg-surface-container-lowest border border-outline-variant/5 rounded-xl self-start md:self-auto">
+                    {['All', 'Drafts', 'Sent'].map(f => (
+                      <button 
+                        key={f}
+                        onClick={() => setInvoiceFilter(f)}
+                        className={`px-4 py-2 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${
+                          invoiceFilter === f 
+                            ? 'bg-white text-primary shadow-[0_2px_10px_rgba(0,0,0,0.04)] border border-outline-variant/5' 
+                            : 'text-on-surface-variant/60 hover:text-primary'
+                        }`}
+                      >
+                        {f}
+                      </button>
+                    ))}
+                  </div>
+               </div>
+
+               <div className="flex flex-col gap-3">
+                 <div className="p-4 rounded-[20px] bg-[#f8fafc] border border-outline-variant/5 flex items-center justify-between group hover:border-blue-500/10 transition-colors">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                        <span className="material-symbols-outlined text-[20px]">receipt_long</span>
+                      </div>
+                      <div>
+                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50">Total Invoices</span>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+                          <span className="text-[8px] font-bold text-primary opacity-60 uppercase tracking-widest">Lifetime</span>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="font-headline text-xl font-black text-primary group-hover:scale-105 origin-right transition-transform">12,450</p>
+                 </div>
+               </div>
+
+               {/* Recent Invoices List */}
+               <div className="mt-8">
+                 <h4 className="text-xs font-black uppercase tracking-widest text-on-surface-variant opacity-50 mb-4">Recent Activity</h4>
+                 <div className="flex flex-col gap-3">
+                   {invoicesList.filter(inv => invoiceFilter === 'All' || inv.status === (invoiceFilter === 'Drafts' ? 'Draft' : invoiceFilter)).map(inv => (
+                     <div key={inv.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-[20px] bg-surface-container-lowest border border-outline-variant/10 shadow-sm hover:border-emerald-500/20 transition-all group gap-4">
+                       <div className="flex items-center gap-4">
+                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${inv.status === 'Sent' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                           <span className="material-symbols-outlined text-[18px]">{inv.status === 'Sent' ? 'send' : 'edit_document'}</span>
+                         </div>
+                         <div>
+                           <p className="text-sm font-bold text-primary">{inv.customer}</p>
+                           <div className="flex items-center gap-2 mt-0.5">
+                             <p className="text-[10px] text-on-surface-variant font-medium opacity-60">#{inv.id.replace('INV-', '')} • {inv.date}</p>
+                             <div className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-widest ${inv.status === 'Sent' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                               {inv.status}
+                             </div>
+                           </div>
+                         </div>
+                       </div>
+                       
+                       <div className="flex items-center justify-between sm:gap-6 pl-14 sm:pl-0">
+                         <div className="text-left sm:text-right">
+                           <p className="text-xs font-bold text-primary">KES {inv.amount.toLocaleString()}</p>
+                           <p className="text-[9px] text-on-surface-variant font-medium opacity-50 italic uppercase tracking-widest">Total value</p>
+                         </div>
+                         <button 
+                           onClick={() => {
+                              setInvoiceDetails(prev => ({
+                                  ...prev,
+                                  invoiceNumber: inv.id,
+                                  customer: inv.customer
+                              }));
+                              setShowInvoiceModal(true);
+                           }}
+                           className="w-10 h-10 sm:w-8 sm:h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center transition-colors shadow-sm active:scale-90"
+                         >
+                           <span className="material-symbols-outlined text-[18px] sm:text-sm">edit</span>
+                         </button>
+                       </div>
+                     </div>
+                   ))}
+                 </div>
+               </div>
+
+            </div>
+          </div>
         </section>
         {/* Fund Account Modal Overlay */}
         {showFundModal && (
@@ -987,7 +1265,7 @@ export default function BulkPay() {
                   <div>
                     <h2 className="font-headline text-2xl text-primary tracking-tight font-bold">Fund Account</h2>
                     <p className="text-[10px] text-on-surface-variant font-medium mt-1 opacity-60">
-                      {fundStep === 1 ? 'Select Funding Method' : fundStep === 2 ? 'Enter Details' : 'Confirm Funding'}
+                      {fundStep === 1 ? 'Select Funding Method' : fundStep === 2 ? 'Enter Details' : 'Funding Successful'}
                     </p>
                   </div>
                   <button 
@@ -1087,12 +1365,39 @@ export default function BulkPay() {
                         Back
                       </button>
                       <button 
-                        onClick={handleFundAccount}
+                        onClick={() => {
+                          setBalance(prev => prev + (parseFloat(fundDetails.amount) || 0));
+                          setFundStep(3);
+                          addNotification({ title: 'Account Funded', message: `KES ${fundDetails.amount} added to your balance.`, type: 'success' });
+                        }}
                         className="flex-[2] py-3.5 rounded-2xl bg-[#00351D] text-white font-bold text-sm shadow-xl animate-bounce-slow"
                       >
                         Pay Now
                       </button>
                     </div>
+                  </div>
+                )}
+
+                {fundStep === 3 && (
+                  <div className="py-12 flex flex-col items-center text-center space-y-6 animate-in zoom-in duration-700">
+                    <div className="w-24 h-24 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center relative">
+                      <div className="absolute inset-0 bg-emerald-400/20 rounded-full animate-ping"></div>
+                      <span className="material-symbols-outlined text-5xl font-black">check</span>
+                    </div>
+                    <div>
+                      <h3 className="font-headline text-2xl font-black text-primary">Funds Received!</h3>
+                      <p className="text-sm text-on-surface-variant font-medium mt-2">Your liquidity has been topped up successfully.</p>
+                      <div className="mt-6 p-4 rounded-3xl bg-emerald-50 border border-emerald-500/10 inline-block">
+                        <p className="text-[10px] text-emerald-700 font-bold uppercase tracking-widest leading-none mb-1">New Balance</p>
+                        <p className="font-headline text-2xl font-black text-emerald-800">KES {(balance + (parseFloat(fundDetails.amount) || 0)).toLocaleString()}</p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => { setShowFundModal(false); setFundStep(1); setFundDetails({...fundDetails, amount: ''}); }}
+                      className="w-full py-4 rounded-2xl bg-[#00351D] text-white font-bold text-sm transition-all shadow-xl"
+                    >
+                      Continue to Bulk Pay
+                    </button>
                   </div>
                 )}
               </div>
@@ -1190,7 +1495,277 @@ export default function BulkPay() {
             </div>
           </div>
         )}
+        {/* Invoice Modal Overlay */}
+        {showInvoiceModal && (
+          <div className="fixed inset-0 bg-primary/80 backdrop-blur-md z-[120] flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-300">
+            <div className="bg-surface-container-lowest w-full h-full max-h-full rounded-[32px] md:rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in duration-500 border border-white/20 flex flex-col">
+              
+              {/* Modal Header */}
+              <div className="px-6 py-4 md:px-8 md:py-6 border-b border-outline-variant/10 flex items-center justify-between bg-white shrink-0">
+                <div>
+                  <h2 className="font-headline text-xl md:text-2xl text-primary tracking-tight font-bold">Create Invoice</h2>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => setShowInvoiceModal(false)} className="px-4 py-2 text-xs font-bold text-on-surface-variant hover:text-primary transition-colors">Cancel</button>
+                  <button onClick={handleSaveDraft} className="px-4 py-2 text-xs font-bold text-primary border border-outline-variant/20 rounded-xl hover:bg-surface-container-low transition-all">Save Draft</button>
+                </div>
+              </div>
+
+              {/* Dual Pane Layout */}
+              <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
+                
+                {/* Left Pane: Editor */}
+                <div className="w-full lg:w-1/2 overflow-y-auto p-5 md:p-10 border-r border-outline-variant/10 bg-white custom-scroll">
+                  
+                  {/* Meta Group */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+                    <div className="space-y-4 md:col-span-2">
+                       <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60">Customer</label>
+                       <input 
+                         type="text" 
+                         value={invoiceDetails.customer} 
+                         onChange={e => setInvoiceDetails({...invoiceDetails, customer: e.target.value})} 
+                         className="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-2xl px-5 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50" 
+                       />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60 pr-1 flex items-center gap-1">
+                        Invoice Number 
+                      </label>
+                      <div className="w-full bg-surface-container-lowest/50 border border-outline-variant/10 rounded-xl px-4 py-2.5 flex items-center justify-between cursor-not-allowed">
+                         <span className="text-sm font-bold text-primary/70">{invoiceDetails.invoiceNumber}</span>
+                         <span className="material-symbols-outlined text-[14px] text-on-surface-variant/40">lock</span>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60">Currency</label>
+                      <input type="text" value={invoiceDetails.currency} onChange={e => setInvoiceDetails({...invoiceDetails, currency: e.target.value})} className="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-xl px-4 py-2.5 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60">Issue Date</label>
+                      <input type="date" value={invoiceDetails.issueDate} onChange={e => setInvoiceDetails({...invoiceDetails, issueDate: e.target.value})} className="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-xl px-4 py-2.5 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60">Due Date</label>
+                      <input type="date" value={invoiceDetails.dueDate} onChange={e => setInvoiceDetails({...invoiceDetails, dueDate: e.target.value})} className="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-xl px-4 py-2.5 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50" />
+                    </div>
+                  </div>
+
+                  {/* Items Array */}
+                  <div className="mb-10">
+                    <h4 className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60 mb-4">Items</h4>
+                    
+                    <div className="hidden md:grid grid-cols-[1fr_80px_100px_100px_40px] gap-4 mb-2 px-2">
+                      <span className="text-[9px] text-on-surface-variant font-bold uppercase tracking-widest">Description</span>
+                      <span className="text-[9px] text-on-surface-variant font-bold uppercase tracking-widest text-center">Qty</span>
+                      <span className="text-[9px] text-on-surface-variant font-bold uppercase tracking-widest text-right">Price</span>
+                      <span className="text-[9px] text-on-surface-variant font-bold uppercase tracking-widest text-right">Amount</span>
+                      <span></span>
+                    </div>
+
+                    <div className="space-y-4 mb-5">
+                      {invoiceDetails.items.map((item, index) => (
+                        <div key={item.id} className="grid grid-cols-1 md:grid-cols-[1fr_80px_100px_100px_40px] gap-3 md:gap-4 items-center bg-surface-container-lowest border md:border-0 border-outline-variant/10 p-4 md:p-0 rounded-[24px] md:bg-transparent shadow-sm md:shadow-none">
+                          <input type="text" value={item.description} onChange={e => handleUpdateInvoiceItem(item.id, 'description', e.target.value)} placeholder="Item description" className="w-full bg-white border border-outline-variant/20 rounded-xl px-3 py-2.5 text-xs font-medium text-primary focus:ring-0 focus:border-emerald-500/50" />
+                          <div className="flex items-center gap-2">
+                            <span className="md:hidden text-[9px] font-bold text-on-surface-variant uppercase tracking-widest">Qty</span>
+                            <input type="number" value={item.qty} onChange={e => handleUpdateInvoiceItem(item.id, 'qty', parseInt(e.target.value) || 0)} className="w-full bg-white border border-outline-variant/20 rounded-xl px-3 py-2.5 text-xs font-medium text-center text-primary focus:ring-0 focus:border-emerald-500/50" />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="md:hidden text-[9px] font-bold text-on-surface-variant uppercase tracking-widest">Price</span>
+                            <input type="number" value={item.price} onChange={e => handleUpdateInvoiceItem(item.id, 'price', parseFloat(e.target.value) || 0)} className="w-full bg-white border border-outline-variant/20 rounded-xl px-3 py-2.5 text-xs font-medium text-right text-primary focus:ring-0 focus:border-emerald-500/50" />
+                          </div>
+                          <div className="text-right text-xs font-bold text-primary flex justify-between items-center md:items-end md:block">
+                            <span className="md:hidden text-[9px] font-bold text-on-surface-variant uppercase tracking-widest">Total</span>
+                            {(item.qty * item.price).toLocaleString()}
+                          </div>
+                         <button onClick={() => setInvoiceDetails(prev => ({...prev, items: prev.items.filter(i => i.id !== item.id)}))} className="w-8 h-8 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 flex items-center justify-center transition-colors">
+                           <span className="material-symbols-outlined text-sm">delete</span>
+                         </button>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <button onClick={handleAddInvoiceItem} className="w-full py-3 border-2 border-dashed border-outline-variant/20 rounded-2xl text-xs font-bold text-primary hover:border-emerald-500/30 hover:bg-emerald-50 transition-all">+ Add Item</button>
+
+                  </div>
+
+                  {/* Totals */}
+                  <div className="flex flex-col items-end gap-3 mb-10 border-t border-outline-variant/10 pt-6">
+                     <div className="flex items-center justify-between w-full max-w-xs">
+                        <span className="text-xs font-bold text-on-surface-variant opacity-60">Subtotal</span>
+                        <span className="text-sm font-bold text-primary">{invoiceDetails.currency} {invoiceSubtotal.toLocaleString()}</span>
+                     </div>
+                     <div className="flex items-center justify-between w-full max-w-xs">
+                        <span className="text-xs text-on-surface-variant font-black uppercase tracking-widest">Total</span>
+                        <span className="font-headline text-2xl font-bold text-primary">{invoiceDetails.currency} {invoiceTotal.toLocaleString()}</span>
+                     </div>
+                  </div>
+
+                  {/* Settings */}
+                  <div className="space-y-4 pb-10">
+                    <h4 className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60">Settings</h4>
+                    <div className="space-y-2">
+                       <label className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest opacity-60">Notes / Terms</label>
+                       <textarea value={invoiceDetails.notes} onChange={e => setInvoiceDetails({...invoiceDetails, notes: e.target.value})} className="w-full h-24 bg-surface-container-lowest border border-outline-variant/20 rounded-2xl px-5 py-3 text-xs font-medium text-primary focus:ring-0 focus:border-emerald-500/50 resize-none" placeholder="Payment terms, thank you note..."></textarea>
+                    </div>
+                    <label className="flex items-center gap-3 cursor-pointer group">
+                      <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${invoiceDetails.recurring ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-outline-variant/30 text-transparent group-hover:border-emerald-500'}`}>
+                        <span className="material-symbols-outlined text-[12px] font-bold">check</span>
+                      </div>
+                      <input type="checkbox" className="hidden" checked={invoiceDetails.recurring} onChange={e => setInvoiceDetails({...invoiceDetails, recurring: e.target.checked})} />
+                      <span className="text-xs font-bold text-primary">Recurring Invoice</span>
+                    </label>
+                  </div>
+
+                </div>
+
+                {/* Right Pane: Live Preview */}
+                <div className="w-full lg:w-1/2 bg-surface-container-lowest flex flex-col h-full bg-[#f8fafc]">
+                  {/* Preview Actions */}
+                  <div className="p-4 flex items-center justify-end gap-3 shrink-0">
+                    <button onClick={downloadInvoicePDF} className="px-4 py-2 bg-white border border-outline-variant/10 rounded-xl text-xs font-bold text-primary hover:bg-emerald-50 transition-colors flex items-center gap-2">
+                       <span className="material-symbols-outlined text-sm">picture_as_pdf</span> PDF
+                    </button>
+                    <button onClick={handleGenerateLink} className="px-4 py-2 bg-white border border-outline-variant/10 rounded-xl text-xs font-bold text-primary hover:bg-emerald-50 transition-colors flex items-center gap-2">
+                       <span className="material-symbols-outlined text-sm">link</span> Link
+                    </button>
+                  </div>
+
+                  {/* Document Container */}
+                  <div className="flex-1 overflow-y-auto px-4 pb-12 pt-2 flex justify-center custom-scroll">
+                     {/* The Target PDF Area */}
+                     <div id="invoice-pdf-pane" className="w-[640px] md:w-[700px] min-h-[900px] bg-white shadow-[0_10px_40px_rgba(0,0,0,0.06)] p-8 md:p-14 flex flex-col relative scale-[0.48] xs:scale-[0.55] sm:scale-[0.8] md:scale-[0.9] lg:scale-100 origin-top shadow-2xl transition-transform duration-500">
+                        
+                        {/* Inv Header */}
+                        <div className="flex justify-between items-start mb-16">
+                           <div>
+                              <img src={paychainLogo} alt="PayChain Logo" className="h-10 mb-4 object-contain contrast-125 saturate-150" />
+                              <h2 className="font-headline text-lg font-bold text-primary">PayChain</h2>
+                              <p className="text-xs text-on-surface-variant mt-1 max-w-[150px]">123 Tech Park, Nairobi, Kenya</p>
+                           </div>
+                           <div className="text-right">
+                              <h1 className="font-headline tracking-[0.2em] text-3xl font-black text-[#00351D] opacity-20 uppercase mb-2">Invoice</h1>
+                              <p className="font-bold text-primary text-sm">#{invoiceDetails.invoiceNumber}</p>
+                           </div>
+                        </div>
+
+                        {/* Addresses & Dates */}
+                        <div className="flex justify-between items-start mb-12">
+                           <div>
+                              <p className="text-[9px] text-on-surface-variant font-black uppercase tracking-widest opacity-60 mb-2">Bill To</p>
+                              <h3 className="font-bold text-primary text-base mb-1">{invoiceDetails.customer}</h3>
+                              <p className="text-xs text-on-surface-variant italic mb-1">billing@acmecorp.com</p>
+                              <p className="text-xs text-on-surface-variant max-w-[150px]">123 Market St, San Francisco, CA</p>
+                           </div>
+                           <div className="text-right flex flex-col gap-3">
+                              <div>
+                                 <p className="text-[9px] text-on-surface-variant font-black uppercase tracking-widest opacity-60 mb-1">Issue Date</p>
+                                 <p className="font-bold text-sm text-primary">{invoiceDetails.issueDate}</p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] text-on-surface-variant font-black uppercase tracking-widest opacity-60 mb-1">Due Date</p>
+                                <p className="font-bold text-sm text-primary">{invoiceDetails.dueDate}</p>
+                              </div>
+                           </div>
+                        </div>
+
+                        {/* Table */}
+                        <div className="mb-12 flex-1">
+                           <div className="grid grid-cols-[1fr_80px_100px_100px] gap-4 border-b-2 border-[#00351D] pb-3 mb-4">
+                              <span className="text-[10px] text-[#00351D] font-black uppercase tracking-widest">Description</span>
+                              <span className="text-[10px] text-[#00351D] font-black uppercase tracking-widest text-center">Qty</span>
+                              <span className="text-[10px] text-[#00351D] font-black uppercase tracking-widest text-right">Price</span>
+                              <span className="text-[10px] text-[#00351D] font-black uppercase tracking-widest text-right">Amount</span>
+                           </div>
+
+                           <div className="space-y-4">
+                             {invoiceDetails.items.map((item) => (
+                               <div key={item.id} className="grid grid-cols-[1fr_80px_100px_100px] gap-4 items-center border-b border-outline-variant/10 pb-4">
+                                  <span className="text-sm font-bold text-primary">{item.description || '—'}</span>
+                                  <span className="text-sm text-on-surface-variant text-center">{item.qty}</span>
+                                  <span className="text-sm text-on-surface-variant text-right">{item.price.toLocaleString()}</span>
+                                  <span className="text-sm font-bold text-primary text-right">{(item.qty * item.price).toLocaleString()}</span>
+                               </div>
+                             ))}
+                           </div>
+                        </div>
+
+                        {/* Totals */}
+                        <div className="flex justify-end mb-16">
+                           <div className="w-1/2 flex flex-col gap-3">
+                              <div className="flex justify-between items-center pt-4">
+                                 <p className="text-xs font-bold text-on-surface-variant opacity-60">Subtotal</p>
+                                 <p className="text-sm font-bold text-primary">{invoiceDetails.currency} {invoiceSubtotal.toLocaleString()}</p>
+                              </div>
+                              <div className="flex justify-between items-center py-4 border-t-2 border-b-2 border-outline-variant/10">
+                                 <p className="text-sm text-[#00351D] font-black uppercase tracking-widest">Total</p>
+                                 <p className="font-headline text-2xl font-black text-primary">{invoiceDetails.currency} {invoiceTotal.toLocaleString()}</p>
+                              </div>
+                           </div>
+                        </div>
+
+                        {/* Footer Notes */}
+                        {invoiceDetails.notes && (
+                           <div className="mb-12">
+                             <p className="text-[9px] text-on-surface-variant font-black uppercase tracking-widest opacity-60 mb-2">Notes / Terms</p>
+                             <p className="text-xs text-on-surface-variant whitespace-pre-wrap">{invoiceDetails.notes}</p>
+                           </div>
+                        )}
+
+                        <div className="mt-auto border-t border-outline-variant/10 pt-6">
+                           <p className="text-[9px] text-center text-on-surface-variant font-bold uppercase tracking-widest opacity-50">Powered by PayChain Finance • Nairobi, Kenya</p>
+                        </div>
+                     </div>
+                     
+
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Invoice Link Sharing Modal */}
+        {showLinkModal && (
+          <div className="fixed inset-0 bg-[#0A2540]/60 backdrop-blur-md z-[130] flex items-center justify-center p-4 animate-in fade-in duration-300">
+            <div className="bg-white w-full max-w-sm rounded-[32px] md:rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in duration-500 border border-white/20">
+              <div className="p-6 md:p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="font-headline text-xl text-primary tracking-tight font-bold">Invoice Link</h2>
+                  </div>
+                  <button 
+                    onClick={() => setShowLinkModal(false)}
+                    className="w-8 h-8 rounded-full bg-surface-container-low flex items-center justify-center text-primary/40 hover:text-primary transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-sm">close</span>
+                  </button>
+                </div>
+                
+                <p className="text-xs text-on-surface-variant font-medium mb-6 leading-relaxed">
+                  Share this link with your customer to allow them to view and pay this invoice online.
+                </p>
+
+                <div className="bg-surface-container-lowest/50 border border-outline-variant/20 rounded-2xl p-4 flex items-center justify-between gap-3 mb-6">
+                   <p className="text-sm font-bold text-primary truncate flex-1">
+                     https://app.paychain.co.ke/invoice/{invoiceDetails.invoiceNumber.replace('INV-', '')}
+                   </p>
+                </div>
+
+                <button 
+                  onClick={handleCopyLink}
+                  className="w-full py-3.5 rounded-2xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold text-sm transition-all"
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
+
     </MerchantLayout>
   )
 }
