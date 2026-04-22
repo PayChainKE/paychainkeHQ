@@ -34,10 +34,11 @@ const Waitlist = mongoose.model('Waitlist', waitlistSchema);
 // Newsletter Schema
 const newsletterSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
-  createdAt: { type: Date, default: Date.now }
+  status: { type: String, default: 'active' },
+  subscribedAt: { type: Date, default: Date.now }
 });
 
-const NewsletterSubscriber = mongoose.model('NewsletterSubscriber', newsletterSchema);
+const Newsletter = mongoose.model('Newsletter', newsletterSchema);
 
 // Routes
 // Health check endpoint
@@ -82,18 +83,48 @@ app.post('/api/waitlist', async (req, res) => {
 app.post('/api/newsletter/subscribe', async (req, res) => {
   try {
     const { email } = req.body;
-    if (!email || !email.includes('@')) {
-      return res.status(400).json({ error: 'Invalid email address' });
+    
+    // Email Validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || !emailRegex.test(email)) {
+      return res.status(400).json({ error: 'Please provide a valid email address' });
     }
 
-    // Check if already subscribed
-    const existing = await NewsletterSubscriber.findOne({ email });
+    // Check for duplicates
+    const existing = await Newsletter.findOne({ email });
     if (existing) {
-      return res.status(400).json({ error: 'Email already subscribed' });
+      return res.status(400).json({ error: 'This email is already subscribed to our newsletter' });
     }
 
-    const newSubscriber = new NewsletterSubscriber({ email });
+    // Save to Database
+    const newSubscriber = new Newsletter({ email });
     await newSubscriber.save();
+
+    // Sync with Resend Contacts and Send Welcome Email
+    try {
+      // 1. Add to Resend Contacts (if Audience ID exists, but we can use contacts.create for general storage)
+      // Note: for now we use general email sending, but we can also add to a list if provided.
+      
+      // 2. Send automated welcome newsletter email
+      await resend.emails.send({
+        from: 'PayChain <info@paychain.co.ke>',
+        to: [email],
+        subject: 'Welcome to the PayChain Newsletter!',
+        html: `
+          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #1a1a1a;">
+            <h1 style="font-size: 24px; font-weight: 800;">Thanks for subscribing!</h1>
+            <p>You're now subscribed to the PayChain Newsletter. We'll keep you updated on the latest fintech trends, M-PESA fraud prevention, and product updates.</p>
+            <p>Stay tuned for our next update!</p>
+            <br />
+            <p>Best regards,<br />The PayChain Team</p>
+          </div>
+        `,
+      });
+      console.log(`Newsletter welcome email sent to ${email}`);
+    } catch (apiErr) {
+      console.error('Resend API error:', apiErr);
+      // We don't fail the request if Resend fails, as the DB entry is saved
+    }
 
     res.status(201).json({ message: 'Subscribed successfully' });
   } catch (err) {
