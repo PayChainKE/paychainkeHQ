@@ -1,9 +1,12 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const { Resend } = require('resend');
+const { getWelcomeEmailTemplate } = require('./email-templates');
 require('dotenv').config();
 
 const app = express();
+const resend = new Resend(process.env.RESEND_API_KEY);
 const PORT = process.env.PORT || 5000;
 
 // Middleware
@@ -44,6 +47,23 @@ app.post('/api/waitlist', async (req, res) => {
     const { fullName, businessName, phone, businessType, email, challenge } = req.body;
     const newEntry = new Waitlist({ fullName, businessName, phone, businessType, email, challenge });
     await newEntry.save();
+
+    // Send welcome email if email is provided
+    if (email && email.includes('@')) {
+      try {
+        await resend.emails.send({
+          from: 'PayChain <info@paychain.co.ke>',
+          to: [email],
+          subject: 'Welcome to the PayChain Waitlist!',
+          html: getWelcomeEmailTemplate(fullName),
+        });
+        console.log(`Welcome email sent to ${email}`);
+      } catch (emailErr) {
+        console.error('Error sending welcome email:', emailErr);
+        // We don't fail the request if the email fails
+      }
+    }
+
     res.status(201).json({ message: 'Waitlist entry saved successfully' });
   } catch (err) {
     console.error('Error saving waitlist entry:', err);
