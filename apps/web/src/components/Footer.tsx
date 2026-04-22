@@ -1,11 +1,79 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Twitter, Linkedin } from 'lucide-react';
 
 const Footer: React.FC = () => {
+  const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+
+  const onSubscribe = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) return;
+    setLoading(true);
+    setStatus(null);
+
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/newsletter/subscribe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        setStatus({ type: 'success', message: 'Successfully subscribed!' });
+        setEmail('');
+      } else {
+        setStatus({ type: 'error', message: data.error || 'Failed to subscribe' });
+      }
+    } catch (err) {
+      setStatus({ type: 'error', message: 'Unable to connect to server' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <footer className="border-t border-border bg-card py-12">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Newsletter Section */}
+        <div className="mb-12 pb-12 border-b border-border">
+          <div className="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8">
+            <div className="text-left max-w-md">
+              <h3 className="text-2xl font-bold text-foreground mb-2">Join the PayChain Newsletter</h3>
+              <p className="text-muted-foreground text-sm">
+                Get the latest insights on Kenya's fintech landscape, fraud prevention, and product updates delivered to your inbox.
+              </p>
+            </div>
+            <div className="w-full max-w-md">
+              <form onSubmit={onSubscribe} className="flex flex-col sm:flex-row gap-3">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your email"
+                  required
+                  className="flex-1 bg-background border border-border rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary outline-none transition-all shadow-sm"
+                />
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="bg-primary text-white rounded-xl px-8 py-3 text-sm font-semibold hover:opacity-90 active:scale-95 transition-all shadow-md disabled:opacity-50 whitespace-nowrap"
+                >
+                  {loading ? 'Subscribing...' : 'Subscribe'}
+                </button>
+              </form>
+              {status && (
+                <div className={`mt-3 text-sm font-medium ${status.type === 'success' ? 'text-emerald-600' : 'text-rose-500'}`}>
+                  {status.message}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* Brand */}
           <div className="md:col-span-2">

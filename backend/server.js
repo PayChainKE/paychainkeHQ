@@ -31,6 +31,14 @@ const waitlistSchema = new mongoose.Schema({
 
 const Waitlist = mongoose.model('Waitlist', waitlistSchema);
 
+// Newsletter Schema
+const newsletterSchema = new mongoose.Schema({
+  email: { type: String, required: true, unique: true },
+  createdAt: { type: Date, default: Date.now }
+});
+
+const NewsletterSubscriber = mongoose.model('NewsletterSubscriber', newsletterSchema);
+
 // Routes
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -67,6 +75,29 @@ app.post('/api/waitlist', async (req, res) => {
     res.status(201).json({ message: 'Waitlist entry saved successfully' });
   } catch (err) {
     console.error('Error saving waitlist entry:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/api/newsletter/subscribe', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email || !email.includes('@')) {
+      return res.status(400).json({ error: 'Invalid email address' });
+    }
+
+    // Check if already subscribed
+    const existing = await NewsletterSubscriber.findOne({ email });
+    if (existing) {
+      return res.status(400).json({ error: 'Email already subscribed' });
+    }
+
+    const newSubscriber = new NewsletterSubscriber({ email });
+    await newSubscriber.save();
+
+    res.status(201).json({ message: 'Subscribed successfully' });
+  } catch (err) {
+    console.error('Error subscribing to newsletter:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
