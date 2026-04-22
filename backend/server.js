@@ -21,6 +21,7 @@ const waitlistSchema = new mongoose.Schema({
   businessName: { type: String, required: true },
   phone: { type: String, required: true },
   businessType: { type: String, required: true },
+  email: { type: String },
   challenge: { type: String },
   createdAt: { type: Date, default: Date.now }
 });
@@ -40,8 +41,8 @@ app.get('/api/health', (req, res) => {
 
 app.post('/api/waitlist', async (req, res) => {
   try {
-    const { fullName, businessName, phone, businessType, challenge } = req.body;
-    const newEntry = new Waitlist({ fullName, businessName, phone, businessType, challenge });
+    const { fullName, businessName, phone, businessType, email, challenge } = req.body;
+    const newEntry = new Waitlist({ fullName, businessName, phone, businessType, email, challenge });
     await newEntry.save();
     res.status(201).json({ message: 'Waitlist entry saved successfully' });
   } catch (err) {

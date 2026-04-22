@@ -21,6 +21,7 @@ const Waitlist: React.FC = () => {
   const [fullName, setFullName] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [businessType, setBusinessType] = useState(businessTypes[0]);
   const [challenge, setChallenge] = useState('');
 
@@ -55,6 +56,7 @@ const Waitlist: React.FC = () => {
           fullName,
           businessName,
           phone,
+          email,
           businessType,
           challenge,
         }),
@@ -143,6 +145,11 @@ const Waitlist: React.FC = () => {
                       <input value={phone} onChange={e => setPhone(e.target.value)} className="mt-1 w-full rounded-md border px-3 py-2" placeholder="07XX XXX XXX (M-PESA number)" />
                       <div className="text-xs text-muted-foreground mt-1">This is the number linked to your M-PESA account</div>
                       {errors.phone && <div className="text-rose-500 text-sm mt-1">{errors.phone}</div>}
+                    </label>
+
+                    <label className="block">
+                      <div className="text-sm font-medium">Email Address <span className="text-sm text-muted-foreground">(optional)</span></div>
+                      <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="mt-1 w-full rounded-md border px-3 py-2" placeholder="you@example.com" />
                     </label>
 
                     <label className="block">
