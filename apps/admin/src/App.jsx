@@ -11,6 +11,7 @@ import Messages from './pages/Messages';
 import Settings from './pages/Settings';
 import Team from './pages/Team';
 import UserDashboard from './pages/UserDashboard';
+import Newsletter from './pages/Newsletter';
 import { UsersProvider } from './context/UsersContext';
 import ToastHost from './components/ui/Toast';
 
@@ -32,6 +33,7 @@ export default function App(){
             <Route path="/" element={<Navigate to="/overview" replace />} />
             <Route path="/overview" element={<Protected><Overview/></Protected>} />
             <Route path="/waitlist" element={<Protected><Waitlist/></Protected>} />
+            <Route path="/newsletter" element={<Protected><Newsletter/></Protected>} />
               <Route path="/team" element={<Protected><Team/></Protected>} />
               <Route path="/team/:id/dashboard" element={<Protected><UserDashboard/></Protected>} />
             <Route path="/merchants" element={<Protected><Merchants/></Protected>} />

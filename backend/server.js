@@ -133,6 +133,16 @@ app.post('/api/newsletter/subscribe', async (req, res) => {
   }
 });
 
+app.get('/api/newsletter', async (req, res) => {
+  try {
+    const subscribers = await Newsletter.find().sort({ subscribedAt: -1 });
+    res.json(subscribers);
+  } catch (err) {
+    console.error('Error fetching newsletter subscribers:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 app.get('/api/waitlist', async (req, res) => {
   try {
     const entries = await Waitlist.find().sort({ createdAt: -1 });
