@@ -28,6 +28,16 @@ const waitlistSchema = new mongoose.Schema({
 const Waitlist = mongoose.model('Waitlist', waitlistSchema);
 
 // Routes
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
+  res.json({
+    status: 'ok',
+    database: dbStatus,
+    timestamp: new Date().toISOString()
+  });
+});
+
 app.post('/api/waitlist', async (req, res) => {
   try {
     const { fullName, businessName, phone, businessType, challenge } = req.body;
