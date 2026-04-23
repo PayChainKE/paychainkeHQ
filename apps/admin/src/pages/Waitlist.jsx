@@ -42,7 +42,18 @@ export default function Waitlist(){
       <div className="pc-page-head">
         <h2>Waitlist</h2>
         <div className="pc-actions">
-          <button onClick={()=>exportCSV('waitlist.csv', waitlistData)}>Export CSV</button>
+          <button onClick={()=>{
+            const cleaned = waitlistData.map(w => ({
+              'Date Joined': new Date(w.createdAt).toLocaleDateString(),
+              'Full Name': w.fullName,
+              'Business Name': w.businessName,
+              'Phone': w.phone,
+              'Email': w.email || 'N/A',
+              'Business Type': w.businessType,
+              'Challenge': w.challenge || 'N/A'
+            }));
+            exportCSV('waitlist.csv', cleaned);
+          }}>Export CSV</button>
         </div>
       </div>
       <div className="pc-section">
@@ -61,6 +72,7 @@ export default function Waitlist(){
                 <th>Name</th>
                 <th>Business</th>
                 <th>Phone</th>
+                <th>Email</th>
                 <th>Type</th>
                 <th>Challenge</th>
                 <th>Date Joined</th>
@@ -72,6 +84,7 @@ export default function Waitlist(){
                   <td>{w.fullName}</td>
                   <td>{w.businessName}</td>
                   <td>{w.phone}</td>
+                  <td>{w.email || 'N/A'}</td>
                   <td>{w.businessType}</td>
                   <td>{w.challenge || 'N/A'}</td>
                   <td>{new Date(w.createdAt).toLocaleDateString()}</td>

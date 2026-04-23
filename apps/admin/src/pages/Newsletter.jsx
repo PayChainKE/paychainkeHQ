@@ -42,7 +42,14 @@ export default function Newsletter(){
         <div className="pc-actions">
           <button 
             className="pc-btn pc-btn-primary"
-            onClick={()=>exportCSV('newsletter_subscribers.csv', subscribers)}
+            onClick={()=>{
+              const cleaned = subscribers.map(s => ({
+                'Email Address': s.email,
+                'Status': s.status || 'active',
+                'Date Subscribed': new Date(s.subscribedAt).toLocaleString()
+              }));
+              exportCSV('newsletter_subscribers.csv', cleaned);
+            }}
           >
             Export CSV
           </button>
