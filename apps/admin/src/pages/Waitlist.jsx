@@ -18,7 +18,11 @@ export default function Waitlist(){
         const data = await response.json();
         setWaitlistData(data);
       } catch (err) {
-        setError(err.message);
+        if (err.name === 'TypeError' && err.message === 'Failed to fetch') {
+          setError(`Could not connect to the API server. Please ensure the API is running and the VITE_API_URL is correctly configured. (Attempted: ${apiUrl})`);
+        } else {
+          setError(err.message);
+        }
       } finally {
         setLoading(false);
       }
