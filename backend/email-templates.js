@@ -18,7 +18,7 @@ const getWelcomeEmailTemplate = (fullName) => `
 <body>
   <div class="container">
     <div class="header">
-      <a href="https://paychain.co.ke" class="logo">PayChain</a>
+      <img src="https://www.paychain.co.ke/logo.png" alt="PayChain" style="height: 48px; width: auto;" />
     </div>
     <div class="content">
       <h1>You're on the list, ${fullName}!</h1>
