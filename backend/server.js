@@ -113,7 +113,7 @@ app.post('/api/newsletter/subscribe', async (req, res) => {
         html: `
           <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #1a1a1a;">
             <div style="margin-bottom: 30px;">
-              <img src="https://www.paychain.co.ke/logo.png" alt="PayChain" style="height: 40px; width: auto;" />
+              <img src="https://paychain.co.ke/logo.png" alt="PayChain" style="height: 40px; width: auto;" />
             </div>
             <h1 style="font-size: 24px; font-weight: 800;">Thanks for subscribing!</h1>
             <p>You're now subscribed to the PayChain Newsletter. We'll keep you updated on the latest fintech trends, M-PESA fraud prevention, and product updates.</p>
