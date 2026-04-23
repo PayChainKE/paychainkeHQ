@@ -5,7 +5,7 @@ const UsersContext = createContext()
 const STORAGE_KEY = 'paychain_admin_users'
 
 const DEFAULT_USERS = [
-  { id: 'u_admin_1', name: 'PayChain Admin', email: 'administrator@paychain.co.ke', role: 'Administrator', canOnboard: true, createdAt: new Date().toISOString() }
+  { id: 'u_admin_1', name: 'PayChain Admin', email: 'brandon@paychain.co.ke', role: 'Administrator', canOnboard: true, createdAt: new Date().toISOString() }
 ]
 
 export function UsersProvider({ children }){

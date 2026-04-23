@@ -10,6 +10,7 @@ import Analytics from './pages/Analytics';
 import Messages from './pages/Messages';
 import Settings from './pages/Settings';
 import Team from './pages/Team';
+import Ledger from './pages/Ledger';
 import UserDashboard from './pages/UserDashboard';
 import Newsletter from './pages/Newsletter';
 import { UsersProvider } from './context/UsersContext';
@@ -39,6 +40,7 @@ export default function App(){
             <Route path="/merchants" element={<Protected><Merchants/></Protected>} />
             <Route path="/analytics" element={<Protected><Analytics/></Protected>} />
             <Route path="/messages" element={<Protected><Messages/></Protected>} />
+            <Route path="/ledger" element={<Protected><Ledger/></Protected>} />
             <Route path="/settings" element={<Protected><Settings/></Protected>} />
             </Routes>
           </UsersProvider>

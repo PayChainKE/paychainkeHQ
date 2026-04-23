@@ -13,7 +13,11 @@
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
-    "vite": "^5.0.0",
-    "@vitejs/plugin-react-swc": "^3.0.0"
+    "@tailwindcss/postcss": "^4.2.4",
+    "@vitejs/plugin-react-swc": "^3.0.0",
+    "autoprefixer": "^10.5.0",
+    "postcss": "^8.5.10",
+    "tailwindcss": "^4.2.4",
+    "vite": "^5.0.0"
   }
 }

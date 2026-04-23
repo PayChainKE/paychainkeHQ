@@ -1,43 +1,99 @@
-:root{
-  --brand-primary: #0B4D2E;
-  --accent: #10B981;
-  --bg: #f6f7f9;
-  --text: #0f1720;
+@import "tailwindcss";
+@source "./**/*.{js,jsx}";
+
+@theme {
+  --font-body: "Plus Jakarta Sans", sans-serif;
+  --font-headline: "Plus Jakarta Sans", sans-serif;
+  --font-label: "Plus Jakarta Sans", sans-serif;
+
+  --color-primary: #00351d;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #0b4d2e;
+  --color-on-primary-container: #80bd95;
+  --color-primary-fixed: #b1f1c6;
+  --color-primary-fixed-dim: #96d4ab;
+  --color-on-primary-fixed: #002110;
+  --color-on-primary-fixed-variant: #115132;
+
+  --color-secondary: #006c4e;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #83f5c6;
+  --color-on-secondary-container: #007151;
+  --color-secondary-fixed: #86f8c9;
+  --color-secondary-fixed-dim: #68dbae;
+  --color-on-secondary-fixed: #002115;
+  --color-on-secondary-fixed-variant: #00513a;
+
+  --color-tertiary: #1f302b;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #354641;
+  --color-on-tertiary-container: #a0b4ad;
+  --color-tertiary-fixed: #d3e7e0;
+  --color-tertiary-fixed-dim: #b7cbc4;
+  --color-on-tertiary-fixed: #0d1f1b;
+  --color-on-tertiary-fixed-variant: #394a45;
+
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #93000a;
+
+  --color-surface: #faf9f6;
+  --color-on-surface: #1b1c1a;
+  --color-surface-variant: #e3e2df;
+  --color-on-surface-variant: #404942;
+  --color-surface-dim: #dbdad7;
+  --color-surface-bright: #faf9f6;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f4f3f0;
+  --color-surface-container: #efeeeb;
+  --color-surface-container-high: #e9e8e5;
+  --color-surface-container-highest: #e3e2df;
+
+  --color-outline: #707971;
+  --color-outline-variant: #c0c9c0;
+  --color-inverse-surface: #2f312f;
+  --color-inverse-on-surface: #f2f1ee;
+  --color-inverse-primary: #96d4ab;
+  --color-surface-tint: #2e6a48;
+
+  --radius-sm: 0.125rem;
+  --radius-md: 0.125rem;
+  --radius-lg: 0.25rem;
+  --radius-xl: 0.5rem;
+  --radius-2xl: 0.75rem;
+
+  --tracking-tight: -0.02em;
+  --tracking-tighter: -0.05em;
 }
-*{box-sizing:border-box;font-family:Inter, ui-sans-serif, system-ui, -apple-system, sans-serif}
-body{margin:0;background:var(--bg);color:var(--text)}
-.pc-app{display:flex}
-.pc-sidebar{width:240px;background:#0B1F0F;color:white;height:100vh;padding:20px;position:fixed}
-.pc-sidebar .pc-brand{font-weight:700;margin-bottom:20px}
-.pc-sidebar nav ul{list-style:none;padding:0}
-.pc-sidebar nav a{color:rgba(255,255,255,0.85);display:flex;gap:8px;align-items:center;padding:10px 0;text-decoration:none}
-.pc-main{margin-left:240px;flex:1;min-height:100vh}
-.pc-header{height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;border-bottom:1px solid #e6e9ee;background:white}
-.pc-content{padding:24px}
-.pc-grid{display:flex;gap:16px}
-.pc-statcard{background:white;padding:16px;border-radius:8px;flex:1}
-.pc-table{width:100%;border-collapse:collapse;background:white}
-.pc-table th,.pc-table td{padding:10px;border-bottom:1px solid #efefef;text-align:left}
-.pc-page-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
-.pc-section{margin-top:12px}
-.pc-toast-host{position:fixed;top:20px;right:20px;width:320px;display:flex;flex-direction:column;gap:8px}
-.pc-toast{background:white;padding:12px;border-radius:6px;box-shadow:0 6px 18px rgba(0,0,0,0.08)}
-.pc-btn{background:var(--brand-primary);color:white;border:none;padding:10px 12px;border-radius:8px}
-.pc-login{display:flex;height:100vh}
-.pc-login-left{flex:0 0 45%;background:#0B1F0F;color:white;padding:48px;position:relative}
-.pc-login-right{flex:1;background:white;display:flex;align-items:center;justify-content:center}
-.pc-login-form{width:100%;max-width:360px;padding:24px}
-.pc-login-form input{width:100%;padding:10px;margin-top:8px;margin-bottom:12px;border:1px solid #e6e9ee;border-radius:6px}
-.pc-error{background:#FEF2F2;border:0.5px solid #FCA5A5;padding:10px;border-radius:6px;color:#991B1B;margin-bottom:8px}
-.shake{animation:shake 400ms ease}
-@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-5px)}40%,80%{transform:translateX(5px)}}
 
-.pc-badge{padding:4px 8px;border-radius:99px;font-size:11px;font-weight:600;text-transform:uppercase}
-.pc-badge-success{background:#ECFDF5;color:#047857}
-.pc-badge-warning{background:#FFFBEB;color:#92400E}
-.pc-badge-info{background:#EFF6FF;color:#1E40AF}
-.pc-badge-early_adopter{background:#F5F3FF;color:#5B21B6}
+@layer base {
+  body {
+    background-color: var(--color-surface);
+    color: var(--color-on-surface);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
 
-.pc-loading{display:flex;flex-direction:column;align-items:center;padding:40px;gap:12px;color:#64748b}
-.pc-spinner{width:24px;height:24px;border:3px solid #e2e8f0;border-top-color:var(--brand-primary);border-radius:50%;animation:spin 1s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  vertical-align: middle;
+}
+
+.glass-panel {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 0, 0, 0.07);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.pc-spinner {
+  @apply w-6 h-6 border-2 rounded-full animate-spin;
+  border-color: var(--color-surface-container-highest) transparent transparent transparent;
+  border-top-color: var(--color-primary);
+}

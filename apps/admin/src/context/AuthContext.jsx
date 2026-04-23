@@ -4,8 +4,8 @@ import { useNavigate } from 'react-router-dom';
 const AuthContext = createContext();
 
 // Credentials provided by user for local/dev login
-const ADMIN_EMAIL = 'administrator@paychain.co.ke';
-const ADMIN_PW = 'Paychain.co.ke@2026';
+const ADMIN_EMAIL = 'brandon@paychain.co.ke';
+const ADMIN_PW = 'Paychain@25';
 
 export function AuthProvider({ children }){
   const [admin, setAdmin] = useState(null);

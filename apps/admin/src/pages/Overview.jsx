@@ -1,33 +1,257 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Layout from '../components/layout/Layout';
-import StatCard from '../components/ui/StatCard';
-import { merchantsData } from '../mockData/merchants';
-import { waitlistData } from '../mockData/waitlist';
-import { messagesData } from '../mockData/messages';
 
-export default function Overview(){
-  const totalMerchants = merchantsData.length;
-  const totalWaitlist = waitlistData.length;
-  const totalMessages = messagesData.length;
+const Overview = () => {
+  const [waitlist, setWaitlist] = useState([]);
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [waitlistRes, messagesRes] = await Promise.all([
+          fetch('/api/waitlist'),
+          fetch('/api/contact')
+        ]);
+        const [waitlistJson, messagesJson] = await Promise.all([
+          waitlistRes.json(),
+          messagesRes.json()
+        ]);
+        setWaitlist(waitlistJson);
+        setMessages(messagesJson);
+      } catch (err) {
+        console.error('Error fetching overview data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const stats = {
+    total: waitlist.length,
+    pending: waitlist.filter(w => w.status?.toLowerCase() === 'pending').length,
+    approved: waitlist.filter(w => w.status?.toLowerCase() === 'approved').length,
+    converted: waitlist.filter(w => w.status?.toLowerCase() === 'converted' || w.status?.toLowerCase() === 'active').length,
+    kyc: waitlist.filter(w => w.status?.toLowerCase() === 'kyc').length,
+  };
+
+  const recentActivity = messages.slice(0, 5).map(m => ({
+    type: 'Message',
+    label: m.subject,
+    entity: m.name,
+    time: new Date(m.createdAt).toLocaleDateString(),
+    color: 'bg-blue-500'
+  }));
+
+  const topMerchants = []; // Placeholder or fetch actual merchants if endpoint exists
 
   return (
     <Layout>
-      <div className="pc-grid">
-        <StatCard title="Merchants" value={totalMerchants} />
-        <StatCard title="Waitlist" value={totalWaitlist} />
-        <StatCard title="Messages" value={totalMessages} />
+      <div className="space-y-10">
+        {/* Page Title Area */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 mb-8">
+          <div>
+            <h2 className="text-[24px] md:text-[28px] font-semibold text-on-surface tracking-tight">System Overview</h2>
+            <p className="text-[13px] md:text-[14px] text-on-surface-variant mt-1">
+              Real-time monitoring of PayChain ecosystem performance.
+            </p>
+          </div>
+          <div className="text-left sm:text-right">
+            <p className="text-[10px] md:text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest leading-none mb-1">Last Update</p>
+            <p className="text-[14px] font-semibold text-on-surface tracking-tight">{new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })}</p>
+          </div>
+        </div>
+
+        {/* Waitlist Stats Row */}
+        <section>
+          <div className="flex items-center gap-3 mb-4 text-slate-400">
+            <span className="text-[11px] font-bold uppercase tracking-widest font-label">Waitlist Pipeline</span>
+            <div className="flex-1 h-[1px] bg-outline-variant/10"></div>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+            <div className="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/20 flex flex-col gap-1 transition-all hover:scale-[1.01] hover:shadow-sm">
+              <span className="text-[12px] font-medium text-on-surface-variant/60">Total Entries</span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-[28px] font-semibold text-on-surface tracking-tighter">{stats.total}</span>
+                <span className="text-[12px] font-bold text-secondary tracking-tight">Live</span>
+              </div>
+            </div>
+            <div className="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/20 flex flex-col gap-1 relative overflow-hidden transition-all hover:scale-[1.01] hover:shadow-sm">
+              <div className="absolute top-0 right-0 w-1 h-full bg-amber-400 animate-pulse"></div>
+              <span className="text-[12px] font-medium text-on-surface-variant/60">Pending Review</span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-[28px] font-semibold text-on-surface tracking-tighter">{stats.pending}</span>
+                <span className="w-2 h-2 bg-amber-400 rounded-full animate-pulse"></span>
+              </div>
+            </div>
+            <div className="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/20 flex flex-col gap-1 transition-all hover:scale-[1.01] hover:shadow-sm">
+              <span className="text-[12px] font-medium text-on-surface-variant/60">Approved</span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-[28px] font-semibold text-on-surface tracking-tighter">{stats.approved}</span>
+              </div>
+            </div>
+            <div className="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/20 flex flex-col gap-1 transition-all hover:scale-[1.01] hover:shadow-sm">
+              <span className="text-[12px] font-medium text-on-surface-variant/60">Conversion Rate</span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-[28px] font-semibold text-on-surface tracking-tighter">
+                  {stats.total > 0 ? ((stats.converted / stats.total) * 100).toFixed(1) : 0}%
+                </span>
+                <span className="text-[12px] font-bold text-secondary tracking-tight">Stable</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Charts Row */}
+        <section className="grid grid-cols-1 lg:grid-cols-10 gap-6">
+          {/* Area Chart Placeholder */}
+          <div className="lg:col-span-6 bg-surface-container-lowest p-6 rounded-xl border border-black/[0.03]">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h3 className="text-[16px] font-semibold text-on-surface">Growth Over Time</h3>
+                <p className="text-[12px] text-slate-500">Daily application volume vs conversions</p>
+              </div>
+              <select className="text-[12px] font-medium border-0 bg-surface-container-low rounded-lg focus:ring-0">
+                <option>Last 30 Days</option>
+                <option>Last 7 Days</option>
+              </select>
+            </div>
+            <div className="h-[240px] w-full relative flex items-end gap-1 px-2">
+              <div className="flex-1 bg-secondary-container/20 h-[30%] rounded-t-sm"></div>
+              <div className="flex-1 bg-secondary-container/40 h-[45%] rounded-t-sm"></div>
+              <div className="flex-1 bg-secondary-container/60 h-[40%] rounded-t-sm"></div>
+              <div className="flex-1 bg-secondary-container h-[55%] rounded-t-sm"></div>
+              <div className="flex-1 bg-secondary-fixed-dim/80 h-[70%] rounded-t-sm"></div>
+              <div className="flex-1 bg-secondary-fixed-dim h-[65%] rounded-t-sm"></div>
+              <div className="flex-1 bg-secondary/80 h-[80%] rounded-t-sm"></div>
+              <div className="flex-1 bg-secondary h-[90%] rounded-t-sm"></div>
+              <div className="flex-1 bg-primary/80 h-[85%] rounded-t-sm"></div>
+              <div className="flex-1 bg-primary-fixed-dim h-[75%] rounded-t-sm"></div>
+              <div className="flex-1 bg-primary-container h-[60%] rounded-t-sm"></div>
+              <div className="flex-1 bg-primary h-[50%] rounded-t-sm"></div>
+            </div>
+          </div>
+          {/* Doughnut Chart Area */}
+          <div className="lg:col-span-4 bg-surface-container-lowest p-6 rounded-xl border border-black/[0.03] flex flex-col">
+            <h3 className="text-[16px] font-semibold text-on-surface mb-6">Merchant Composition</h3>
+            <div className="flex-1 flex items-center justify-center relative">
+              <div className="w-40 h-40 rounded-full border-[16px] border-primary flex items-center justify-center relative">
+                <div className="absolute inset-[-16px] w-40 h-40 rounded-full border-[16px] border-transparent border-t-secondary border-r-secondary-container rotate-[45deg]"></div>
+                <div className="text-center font-body">
+                  <span className="block text-xl font-bold tracking-tight">18</span>
+                  <span className="text-[10px] uppercase font-bold text-on-surface-variant/40 tracking-widest">Total</span>
+                </div>
+              </div>
+            </div>
+            <div className="mt-6 space-y-2">
+              <div className="flex items-center justify-between text-[12px] font-medium">
+                <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-primary"></span> Retail</div>
+                <span className="font-bold">45%</span>
+              </div>
+              <div className="flex items-center justify-between text-[12px] font-medium">
+                <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-secondary"></span> Hospitality</div>
+                <span className="font-bold">25%</span>
+              </div>
+              <div className="flex items-center justify-between text-[12px] font-medium">
+                <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-secondary-container"></span> Import/Export</div>
+                <span className="font-bold">30%</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Pipeline Funnel */}
+        <section>
+          <div className="flex items-center gap-3 mb-4 text-slate-400">
+            <span className="text-[11px] font-bold uppercase tracking-widest font-label">Pipeline Funnel</span>
+            <div className="flex-1 h-[1px] bg-outline-variant/10"></div>
+          </div>
+          <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/20">
+            <div className="flex w-full gap-2 overflow-x-auto no-scrollbar">
+              <div className="flex-1 min-w-[80px] h-12 bg-primary rounded-lg flex items-center justify-center text-on-primary text-[10px] font-bold tracking-widest uppercase">WAITLIST ({stats.total})</div>
+              <div className="flex-[0.85] min-w-[80px] h-12 bg-primary/90 rounded-lg flex items-center justify-center text-on-primary text-[10px] font-bold tracking-widest uppercase">APPROVED ({stats.approved})</div>
+              <div className="flex-[0.7] min-w-[80px] h-12 bg-primary/80 rounded-lg flex items-center justify-center text-on-primary text-[10px] font-bold tracking-widest uppercase">KYC ({stats.kyc})</div>
+              <div className="flex-[0.55] min-w-[80px] h-12 bg-secondary rounded-lg flex items-center justify-center text-on-secondary text-[10px] font-bold tracking-widest uppercase">CONVERTED ({stats.converted})</div>
+            </div>
+          </div>
+        </section>
+
+        {/* Bottom Data Tables */}
+        <section className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+          {/* Recent Activity */}
+          <div>
+            <div className="flex items-center justify-between mb-4 px-1">
+              <h3 className="text-[16px] font-semibold text-on-surface">Recent activity</h3>
+              <button className="text-[12px] text-secondary font-bold hover:underline">View Audit Log</button>
+            </div>
+            <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/20 overflow-hidden shadow-sm">
+              <table className="w-full text-left font-body">
+                <tbody className="divide-y divide-outline-variant/10">
+                  {recentActivity.map((act, i) => (
+                    <tr key={i} className="hover:bg-surface-container-low transition-colors">
+                      <td className="px-5 py-4"><div className={`w-2 h-2 rounded-full ${act.type === 'KYC' || act.type === 'Payment' ? 'bg-secondary' : 'bg-amber-400'}`}></div></td>
+                      <td className="px-2 py-4 text-[13px] font-semibold text-on-surface tracking-tight">{act.label}</td>
+                      <td className="px-5 py-4 text-[13px] text-on-surface-variant/70">{act.entity}</td>
+                      <td className="px-5 py-4 text-[11px] text-on-surface-variant/40 font-bold uppercase tracking-widest text-right">{act.time}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Top Merchants */}
+          <div>
+            <div className="flex items-center justify-between mb-4 px-1">
+              <h3 className="text-[16px] font-semibold text-on-surface">Top ranked merchants</h3>
+              <button className="text-[12px] text-secondary font-bold hover:underline">Full Directory</button>
+            </div>
+            <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/20 overflow-hidden shadow-sm">
+              <table className="w-full text-left font-body">
+                <thead className="bg-surface-container-low text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-widest border-b border-outline-variant/20">
+                  <tr>
+                    <th className="px-6 py-3">Business</th>
+                    <th className="px-6 py-3">Revenue Hub</th>
+                    <th className="px-6 py-3">Trust</th>
+                    <th className="px-6 py-4 text-right"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-outline-variant/10">
+                  {topMerchants.map((m) => (
+                    <tr key={m.id} className="hover:bg-secondary-container/10 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col">
+                          <span className="text-[13px] font-bold text-on-surface tracking-tight">{m.businessName}</span>
+                          <span className="text-[11px] text-on-surface-variant/60 font-medium">{m.businessType}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-[13px] font-bold text-on-surface tracking-tight">
+                        KES {m.financials.totalCollected.toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <div className="w-12 h-1 bg-surface-container rounded-full overflow-hidden">
+                            <div className="h-full bg-secondary rounded-full" style={{ width: `${m.trustScore.current}%` }}></div>
+                          </div>
+                          <span className="text-[11px] font-bold text-secondary">{m.trustScore.current}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <button className="text-on-surface-variant/30 hover:text-secondary transition-colors">
+                          <span className="material-symbols-outlined text-[20px]">chevron_right</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
       </div>
-      <section className="pc-section">
-        <h3>Recent signups</h3>
-        <table className="pc-table">
-          <thead><tr><th>Name</th><th>Business</th><th>Status</th><th>Joined</th></tr></thead>
-          <tbody>
-            {merchantsData.slice(0,8).map(m=> (
-              <tr key={m.id}><td>{m.name}</td><td>{m.businessName}</td><td>{m.accountStatus}</td><td>{new Date(m.joinedAt).toLocaleDateString()}</td></tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
     </Layout>
   );
-}
+};
+
+export default Overview;
