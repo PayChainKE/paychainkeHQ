@@ -11,7 +11,7 @@ export default function Newsletter(){
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:5000' : '');
         const response = await fetch(`${apiUrl}/api/newsletter`);
         if (!response.ok) {
           throw new Error('Failed to fetch subscribers');

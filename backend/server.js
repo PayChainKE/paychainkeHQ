@@ -27,7 +27,7 @@ const waitlistSchema = new mongoose.Schema({
   email: { type: String },
   challenge: { type: String },
   createdAt: { type: Date, default: Date.now }
-});
+}, { collection: 'waitlist' });
 
 const Waitlist = mongoose.model('Waitlist', waitlistSchema);
 
@@ -36,7 +36,7 @@ const newsletterSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   status: { type: String, default: 'active' },
   subscribedAt: { type: Date, default: Date.now }
-});
+}, { collection: 'newsletter' });
 
 const Newsletter = mongoose.model('Newsletter', newsletterSchema);
 
