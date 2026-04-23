@@ -19,7 +19,7 @@ const Sidebar = ({ isOpen, onClose }) => {
   ];
 
   return (
-    <aside className={`fixed left-0 top-0 h-full w-[240px] bg-[#0B1F0F] flex flex-col py-6 px-4 z-50 transition-transform duration-300 lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+    <aside className={`fixed left-0 top-0 h-full w-[240px] bg-primary flex flex-col py-6 px-4 z-50 transition-transform duration-300 lg:translate-x-0 ${isOpen ? 'translate-x-0 shadow-editorial' : '-translate-x-full'}`}>
       <div className="flex items-center justify-between mb-10 px-2 lg:justify-center">
         <div className="flex flex-col items-center gap-2">
           <img src={logo} alt="PayChain Logo" className="h-8 max-w-full w-auto object-contain" />

@@ -9,7 +9,7 @@ const Analytics = () => {
       <div className="space-y-10">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
           <div>
-            <h2 className="text-[24px] md:text-[28px] font-semibold text-on-surface tracking-tight">System Analytics</h2>
+            <h2 className="text-[28px] md:text-[32px] font-bold text-on-surface tracking-tighter font-headline">System Analytics</h2>
             <p className="text-on-surface-variant/60 text-[13px] md:text-[14px] mt-1 font-body">Deep insights into ecosystem growth and merchant health.</p>
           </div>
           <button className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs font-bold rounded-lg shadow-sm hover:bg-surface-container-low transition-all uppercase tracking-widest font-label">
@@ -29,7 +29,7 @@ const Analytics = () => {
             <button className="px-3 py-1.5 text-xs font-bold text-on-surface-variant/60 hover:bg-surface-container-low rounded-lg tracking-tight font-label">Last 12 Months</button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-            <div className="col-span-12 lg:col-span-8 bg-surface-container-lowest rounded-xl p-4 md:p-6 border border-outline-variant/20 shadow-sm overflow-hidden">
+            <div className="col-span-12 lg:col-span-8 bg-surface-container-lowest rounded-xl p-4 md:p-6 border border-outline-variant/20 shadow-editorial overflow-hidden">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
                 <div>
                   <h4 className="text-sm font-bold text-on-surface uppercase tracking-widest font-label">Signups Over Time</h4>

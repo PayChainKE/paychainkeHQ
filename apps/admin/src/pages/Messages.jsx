@@ -44,10 +44,10 @@ const Messages = () => {
         {/* LEFT PANEL: MESSAGE LIST */}
         <section className={`w-full md:w-[380px] bg-surface flex flex-col h-full overflow-hidden font-body transition-all duration-300 ${
           isMobileDetailOpen ? 'translate-x-[-100%] md:translate-x-0 hidden md:flex' : 'translate-x-0 flex'
-        } border-r border-outline-variant/10 shadow-xl md:shadow-none z-10`}>
+        } border-r border-outline-variant/10 shadow-editorial md:shadow-none z-10`}>
           <div className="p-4 space-y-4 flex-shrink-0">
             <div className="flex items-center justify-between">
-              <h2 className="text-[13px] md:text-sm font-bold text-on-surface uppercase tracking-widest font-label">Inquiry Inbox</h2>
+              <h2 className="text-[13px] md:text-sm font-bold text-on-surface uppercase tracking-widest font-headline">Inquiry Inbox</h2>
               <span className="px-2 py-0.5 bg-secondary-container/20 text-secondary text-[10px] md:text-[11px] font-bold rounded-lg tracking-tight uppercase">{stats.unread} UNREAD</span>
             </div>
             <div className="flex gap-1 bg-surface-container-low p-1 rounded-xl">

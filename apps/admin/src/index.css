@@ -3,59 +3,33 @@
 
 @theme {
   --font-body: "Plus Jakarta Sans", sans-serif;
-  --font-headline: "Plus Jakarta Sans", sans-serif;
+  --font-headline: "DM Serif Display", serif;
   --font-label: "Plus Jakarta Sans", sans-serif;
 
   --color-primary: #00351d;
-  --color-on-primary: #ffffff;
   --color-primary-container: #0b4d2e;
-  --color-on-primary-container: #80bd95;
-  --color-primary-fixed: #b1f1c6;
-  --color-primary-fixed-dim: #96d4ab;
-  --color-on-primary-fixed: #002110;
-  --color-on-primary-fixed-variant: #115132;
-
+  --color-primary-fixed-dim: #86f8c9;
+  
   --color-secondary: #006c4e;
-  --color-on-secondary: #ffffff;
-  --color-secondary-container: #83f5c6;
-  --color-on-secondary-container: #007151;
   --color-secondary-fixed: #86f8c9;
-  --color-secondary-fixed-dim: #68dbae;
-  --color-on-secondary-fixed: #002115;
-  --color-on-secondary-fixed-variant: #00513a;
+  --color-secondary-container: #cdffd8;
 
-  --color-tertiary: #1f302b;
-  --color-on-tertiary: #ffffff;
-  --color-tertiary-container: #354641;
-  --color-on-tertiary-container: #a0b4ad;
-  --color-tertiary-fixed: #d3e7e0;
-  --color-tertiary-fixed-dim: #b7cbc4;
-  --color-on-tertiary-fixed: #0d1f1b;
-  --color-on-tertiary-fixed-variant: #394a45;
+  --color-surface: #f0fdf4;
+  --color-surface-container-lowest: #fff;
+  --color-surface-container-low: #f7faf7;
+  --color-surface-container: #eff4ef;
+  --color-surface-container-high: #e7ece7;
+  --color-surface-container-highest: #dfe5df;
 
-  --color-error: #ba1a1a;
-  --color-on-error: #ffffff;
-  --color-error-container: #ffdad6;
-  --color-on-error-container: #93000a;
-
-  --color-surface: #faf9f6;
-  --color-on-surface: #1b1c1a;
-  --color-surface-variant: #e3e2df;
+  --color-on-surface: #0c2010;
   --color-on-surface-variant: #404942;
-  --color-surface-dim: #dbdad7;
-  --color-surface-bright: #faf9f6;
-  --color-surface-container-lowest: #ffffff;
-  --color-surface-container-low: #f4f3f0;
-  --color-surface-container: #efeeeb;
-  --color-surface-container-high: #e9e8e5;
-  --color-surface-container-highest: #e3e2df;
-
   --color-outline: #707971;
-  --color-outline-variant: #c0c9c0;
-  --color-inverse-surface: #2f312f;
-  --color-inverse-on-surface: #f2f1ee;
-  --color-inverse-primary: #96d4ab;
-  --color-surface-tint: #2e6a48;
+  --color-outline-variant: #bfc9bf;
+  --color-border-offwhite: #e5e7eb;
+  --color-error: #ba1a1a;
+
+  --shadow-editorial: 0px 8px 32px #00351d0d;
+  --shadow-premium-glow: 0px 4px 24px #006c4e1f;
 
   --radius-sm: 0.125rem;
   --radius-md: 0.125rem;

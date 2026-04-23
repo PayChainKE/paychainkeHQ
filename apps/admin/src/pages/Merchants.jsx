@@ -9,7 +9,7 @@ const Merchants = () => {
         {/* Page Title Area */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
           <div>
-            <h2 className="text-[24px] md:text-[28px] font-semibold text-on-surface tracking-tight">Merchant Directory</h2>
+            <h2 className="text-[28px] md:text-[32px] font-bold text-on-surface tracking-tighter font-headline">Merchant Directory</h2>
             <p className="text-[13px] md:text-[14px] text-on-surface-variant mt-1">Manage all registered businesses and their active status.</p>
           </div>
           <button className="w-full sm:w-auto bg-primary text-on-primary px-5 py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:shadow-lg transition-all active:scale-95 font-label uppercase tracking-widest">
@@ -20,7 +20,7 @@ const Merchants = () => {
 
         {/* Stats Strip */}
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 md:gap-4">
-          <div className="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/20 flex items-center justify-between shadow-sm transition-all hover:scale-[1.02]">
+          <div className="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/20 flex items-center justify-between shadow-premium-glow transition-all hover:scale-[1.02]">
             <div>
               <p className="text-[10px] md:text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/40 mb-1">Active</p>
               <h3 className="text-xl md:text-2xl font-bold text-on-surface tracking-tight">{merchantStats.active}</h3>
@@ -29,7 +29,7 @@ const Merchants = () => {
               <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
             </div>
           </div>
-          <div className="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/20 flex items-center justify-between shadow-sm transition-all hover:scale-[1.02]">
+          <div className="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/20 flex items-center justify-between shadow-premium-glow transition-all hover:scale-[1.02]">
             <div>
               <p className="text-[10px] md:text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/40 mb-1">Suspended</p>
               <h3 className="text-xl md:text-2xl font-bold text-on-surface tracking-tight">{merchantStats.suspended}</h3>
@@ -38,7 +38,7 @@ const Merchants = () => {
               <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>block</span>
             </div>
           </div>
-          <div className="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/20 flex items-center justify-between shadow-sm transition-all hover:scale-[1.02]">
+          <div className="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/20 flex items-center justify-between shadow-premium-glow transition-all hover:scale-[1.02]">
             <div>
               <p className="text-[10px] md:text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/40 mb-1">Review</p>
               <h3 className="text-xl md:text-2xl font-bold text-on-surface tracking-tight">{merchantStats.underReview}</h3>
@@ -47,7 +47,7 @@ const Merchants = () => {
               <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>visibility</span>
             </div>
           </div>
-          <div className="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/20 flex items-center justify-between shadow-sm transition-all hover:scale-[1.02]">
+          <div className="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/20 flex items-center justify-between shadow-premium-glow transition-all hover:scale-[1.02]">
             <div>
               <p className="text-[10px] md:text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/40 mb-1">KYC Pending</p>
               <h3 className="text-xl md:text-2xl font-bold text-on-surface tracking-tight">{merchantStats.total - merchantStats.kycVerified}</h3>
@@ -68,7 +68,7 @@ const Merchants = () => {
         </div>
 
         {/* Merchant Table Section */}
-        <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/20 overflow-hidden shadow-sm">
+        <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/20 overflow-hidden shadow-editorial">
           <div className="px-4 md:px-6 py-4 border-b border-outline-variant/10 flex flex-col md:flex-row md:justify-between md:items-center gap-4 bg-white">
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full">
               <div className="relative flex-1 max-w-md">

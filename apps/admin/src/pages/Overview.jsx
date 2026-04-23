@@ -52,7 +52,7 @@ const Overview = () => {
         {/* Page Title Area */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 mb-8">
           <div>
-            <h2 className="text-[24px] md:text-[28px] font-semibold text-on-surface tracking-tight">System Overview</h2>
+            <h2 className="text-[28px] md:text-[32px] font-bold text-on-surface tracking-tighter font-headline">System Overview</h2>
             <p className="text-[13px] md:text-[14px] text-on-surface-variant mt-1">
               Real-time monitoring of PayChain ecosystem performance.
             </p>
@@ -70,7 +70,7 @@ const Overview = () => {
             <div className="flex-1 h-[1px] bg-outline-variant/10"></div>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-            <div className="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/20 flex flex-col gap-1 transition-all hover:scale-[1.01] hover:shadow-sm">
+            <div className="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/20 flex flex-col gap-1 transition-all hover:scale-[1.01] hover:shadow-premium-glow">
               <span className="text-[12px] font-medium text-on-surface-variant/60">Total Entries</span>
               <div className="flex items-baseline gap-2">
                 <span className="text-[28px] font-semibold text-on-surface tracking-tighter">{stats.total}</span>
@@ -85,7 +85,7 @@ const Overview = () => {
                 <span className="w-2 h-2 bg-amber-400 rounded-full animate-pulse"></span>
               </div>
             </div>
-            <div className="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/20 flex flex-col gap-1 transition-all hover:scale-[1.01] hover:shadow-sm">
+            <div className="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/20 flex flex-col gap-1 transition-all hover:scale-[1.01] hover:shadow-premium-glow">
               <span className="text-[12px] font-medium text-on-surface-variant/60">Approved</span>
               <div className="flex items-baseline gap-2">
                 <span className="text-[28px] font-semibold text-on-surface tracking-tighter">{stats.approved}</span>
@@ -106,7 +106,7 @@ const Overview = () => {
         {/* Charts Row */}
         <section className="grid grid-cols-1 lg:grid-cols-10 gap-6">
           {/* Area Chart Placeholder */}
-          <div className="lg:col-span-6 bg-surface-container-lowest p-6 rounded-xl border border-black/[0.03]">
+          <div className="lg:col-span-6 bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/10 shadow-editorial">
             <div className="flex items-center justify-between mb-8">
               <div>
                 <h3 className="text-[16px] font-semibold text-on-surface">Growth Over Time</h3>
@@ -133,7 +133,7 @@ const Overview = () => {
             </div>
           </div>
           {/* Doughnut Chart Area */}
-          <div className="lg:col-span-4 bg-surface-container-lowest p-6 rounded-xl border border-black/[0.03] flex flex-col">
+          <div className="lg:col-span-4 bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/10 shadow-editorial flex flex-col">
             <h3 className="text-[16px] font-semibold text-on-surface mb-6">Merchant Composition</h3>
             <div className="flex-1 flex items-center justify-center relative">
               <div className="w-40 h-40 rounded-full border-[16px] border-primary flex items-center justify-center relative">

@@ -84,7 +84,7 @@ const Waitlist = () => {
       <div className="space-y-1">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-6 mb-8">
           <div className="space-y-1">
-            <h2 className="text-[24px] md:text-[28px] font-semibold text-on-surface tracking-tight">Waitlist Ledger</h2>
+            <h2 className="text-[28px] md:text-[32px] font-bold text-on-surface tracking-tighter font-headline">Waitlist Ledger</h2>
             <p className="text-on-surface-variant/60 text-[13px] md:text-[14px] font-body">Managing the digital record of upcoming Kenyan merchant partners.</p>
           </div>
           <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -120,7 +120,7 @@ const Waitlist = () => {
         </div>
 
         {/* Table Controls */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between mb-4 bg-surface p-3 rounded-xl border border-outline-variant/20 shadow-sm gap-4">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between mb-4 bg-surface p-3 rounded-xl border border-outline-variant/20 shadow-editorial gap-4">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
             <div className="relative flex-1 max-w-sm">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/40 text-sm">search</span>
@@ -149,7 +149,7 @@ const Waitlist = () => {
         </div>
 
         {/* Waitlist Table Card */}
-        <div className="bg-surface-container-lowest rounded-xl border border-black/[0.03] shadow-[0px_4px_20px_rgba(11,31,15,0.04)] overflow-hidden">
+        <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/10 shadow-editorial overflow-hidden">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-20 gap-4">
               <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
