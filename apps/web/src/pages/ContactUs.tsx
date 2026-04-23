@@ -180,17 +180,35 @@ export default function ContactUs() {
       return;
     }
 
-    // Valid submission — simulate API call
+    // Valid submission — send to API
     setErrors({});
     setIsSubmitting(true);
-    // store submitted email for success message
     setSubmittedEmail(formData.email);
 
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setIsSuccess(true);
-      // hide form fields visually (handled in render)
-    }, 1500);
+    const submitData = async () => {
+      try {
+        const apiUrl = import.meta.env.VITE_API_URL || '';
+        const response = await fetch(`${apiUrl}/api/contact`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(formData),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to send message');
+        }
+
+        setIsSuccess(true);
+      } catch (err) {
+        setErrors({ form: 'Unable to send message. Please try again later.' });
+      } finally {
+        setIsSubmitting(false);
+      }
+    };
+
+    submitData();
   };
 
   const resetForm = () => {
@@ -389,6 +407,8 @@ export default function ContactUs() {
                         <ChevronDown size={16} className={styles.chev} />
                       </div>
                     </div>
+                    
+                    {errors.form && <div className={styles.formError} role="alert"><AlertCircle size={14} /> {errors.form}</div>}
 
                     <button type="submit" className={styles.submitBtn} disabled={isSubmitting} aria-disabled={isSubmitting}>
                       {isSubmitting ? (<><span className={styles.spinner} aria-hidden="true"></span> Sending...</>) : (<><span>Send Message</span> <ArrowRight size={14} /></>)}

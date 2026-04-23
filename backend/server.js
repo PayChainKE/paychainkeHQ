@@ -40,6 +40,25 @@ const newsletterSchema = new mongoose.Schema({
 
 const Newsletter = mongoose.model('Newsletter', newsletterSchema);
 
+// Contact Message Schema
+const contactMessageSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  email: { type: String, required: true },
+  phone: { type: String, default: '' },
+  contactType: {
+    type: String,
+    required: true,
+    enum: ['merchant','investor','partnership','press','developer','careers','other']
+  },
+  subject: { type: String, required: true },
+  message: { type: String, required: true },
+  referralSource: { type: String, default: '' },
+  isRead: { type: Boolean, default: false },
+  repliedAt: { type: Date },
+}, { timestamps: true, collection: 'contacts' });
+
+const ContactMessage = mongoose.model('ContactMessage', contactMessageSchema);
+
 // Routes
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -156,6 +175,52 @@ app.get('/api/waitlist', async (req, res) => {
   }
 });
 
+// Contact Routes
+app.post('/api/contact', async (req, res) => {
+  try {
+    const { name, email, phone = '', contactType, subject, message, referralSource = '' } = req.body;
+    
+    // Basic validation
+    if (!name || !email || !contactType || !subject || !message) {
+      return res.status(400).json({ error: 'Please provide all required fields' });
+    }
+
+    const contact = new ContactMessage({ name, email, phone, contactType, subject, message, referralSource });
+    await contact.save();
+
+    res.status(201).json({ message: 'Message received successfully' });
+  } catch (err) {
+    console.error('Error saving contact message:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/api/contact', async (req, res) => {
+  try {
+    const filter = {};
+    if (req.query.isRead === 'false') filter.isRead = false;
+    const messages = await ContactMessage.find(filter).sort({ createdAt: -1 });
+    res.json(messages);
+  } catch (err) {
+    console.error('Error fetching contact messages:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.patch('/api/contact/:id/read', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const msg = await ContactMessage.findByIdAndUpdate(id, { isRead: true }, { new: true });
+    if (!msg) return res.status(404).json({ error: 'Message not found' });
+    res.json(msg);
+  } catch (err) {
+    console.error('Error updating contact message:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
+
+module.exports = app;

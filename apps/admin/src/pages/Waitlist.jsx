@@ -10,7 +10,7 @@ export default function Waitlist(){
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:5000' : '');
+        const apiUrl = import.meta.env.VITE_API_URL || '';
         const response = await fetch(`${apiUrl}/api/waitlist`);
         if (!response.ok) {
           throw new Error('Failed to fetch waitlist');
@@ -19,7 +19,7 @@ export default function Waitlist(){
         setWaitlistData(data);
       } catch (err) {
         if (err.name === 'TypeError' && err.message === 'Failed to fetch') {
-          setError(`Could not connect to the API server. Please ensure the API is running and the VITE_API_URL is correctly configured. (Attempted: ${apiUrl})`);
+          setError(`Could not connect to the API server. Please ensure the backend is running. (Attempted: ${import.meta.env.VITE_API_URL || '/api/waitlist'})`);
         } else {
           setError(err.message);
         }
