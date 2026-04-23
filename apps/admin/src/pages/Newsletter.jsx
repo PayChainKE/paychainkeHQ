@@ -11,7 +11,8 @@ export default function Newsletter(){
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const apiUrl = import.meta.env.VITE_API_URL || '';
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const apiUrl = import.meta.env.VITE_API_URL || (isLocal ? '' : 'https://www.paychain.co.ke');
         const response = await fetch(`${apiUrl}/api/newsletter`);
         if (!response.ok) {
           throw new Error('Failed to fetch subscribers');
