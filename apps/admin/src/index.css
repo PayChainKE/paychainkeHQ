@@ -14,8 +14,8 @@
   --color-secondary-fixed: #86f8c9;
   --color-secondary-container: #cdffd8;
 
-  --color-surface: #f0fdf4;
-  --color-surface-container-lowest: #fff;
+  --color-surface: #F0FDF4;
+  --color-surface-container-lowest: #ffffff;
   --color-surface-container-low: #f7faf7;
   --color-surface-container: #eff4ef;
   --color-surface-container-high: #e7ece7;
@@ -25,11 +25,11 @@
   --color-on-surface-variant: #404942;
   --color-outline: #707971;
   --color-outline-variant: #bfc9bf;
-  --color-border-offwhite: #e5e7eb;
+  --color-border-offwhite: #E5E7EB;
   --color-error: #ba1a1a;
 
-  --shadow-editorial: 0px 8px 32px #00351d0d;
-  --shadow-premium-glow: 0px 4px 24px #006c4e1f;
+  --shadow-editorial: 0px 8px 32px rgba(0, 53, 29, 0.05);
+  --shadow-premium-glow: 0px 4px 24px rgba(0, 108, 78, 0.12);
 
   --radius-sm: 0.125rem;
   --radius-md: 0.125rem;
@@ -57,9 +57,10 @@
 }
 
 .glass-panel {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(0, 0, 0, 0.07);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 53, 29, 0.05);
 }
 
 .no-scrollbar::-webkit-scrollbar {
@@ -71,3 +72,7 @@
   border-color: var(--color-surface-container-highest) transparent transparent transparent;
   border-top-color: var(--color-primary);
 }
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #c0c9c0; border-radius: 10px; }
