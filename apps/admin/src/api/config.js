@@ -7,10 +7,29 @@ import axios from 'axios';
  * If not set, we fall back to the production gateway.
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
-  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-    ? '' 
-    : 'https://www.paychain.co.ke');
+const getBaseUrl = () => {
+  // 1. Check environment variable first (Highest Priority)
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL;
+  }
+
+  const hostname = window.location.hostname;
+  
+  // 2. Development/Localhost
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.includes('192.168')) {
+    return ''; // Uses Vite proxy
+  }
+
+  // 3. Automated Fallback for Production Subdomains
+  if (hostname.includes('paychain.co.ke')) {
+    return 'https://www.paychain.co.ke';
+  }
+
+  // 4. Default Production Gateway
+  return 'https://www.paychain.co.ke';
+};
+
+const API_BASE_URL = getBaseUrl();
 
 const api = axios.create({
   baseURL: API_BASE_URL,
