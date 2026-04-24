@@ -2,28 +2,23 @@ import axios from 'axios';
 
 /**
  * PayChain Merchant Dashboard API Configuration
- * 
- * Standardized connectivity layer to support both local development
- * and production deployment via Vercel.
+ * Senior DevOps Refactor: Using import.meta.env for Vite compliance
  */
 
 const getBaseUrl = () => {
-  // 1. Check environment variables first (Highest Priority)
-  if (import.meta.env.VITE_API_BASE_URL) {
-    return import.meta.env.VITE_API_BASE_URL;
+  const envUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL;
+  
+  if (import.meta.env.PROD) {
+    console.log("PayChain Merchant Diagnostic - Current API URL:", envUrl || "FALLBACK DIRECT TO WWW");
   }
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
-  }
+
+  if (envUrl) return envUrl;
 
   const hostname = window.location.hostname;
-  
-  // 2. Development/Localhost
-  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.includes('192.168')) {
-    return ''; // Uses Vite proxy
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return ''; // Use Vite Proxy for local development
   }
 
-  // 3. Ultimate Fallback (Hardcoded Gateway)
   return 'https://www.paychain.co.ke';
 };
 
@@ -36,5 +31,15 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (!error.response) {
+      console.error('PAYCHAIN_MERCHANT_NETWORK_ERROR: Possible CORS mismatch or Backend Down.');
+    }
+    return Promise.reject(error);
+  }
+);
 
 export default api;
