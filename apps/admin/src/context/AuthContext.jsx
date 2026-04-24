@@ -20,26 +20,68 @@ export function AuthProvider({ children }){
     setIsLoading(false);
   },[]);
 
-  async function login(email, password){
-    // simulate API delay
-    await new Promise(r=>setTimeout(r,1000));
-    if (email === ADMIN_EMAIL && password === ADMIN_PW){
-      const payload = { id: 'admin_001', name: 'PayChain Admin', email, role: 'super_admin' };
-      setAdmin(payload);
-      localStorage.setItem('paychain_admin_session', JSON.stringify(payload));
-      return { success: true };
+  async function login(email, password) {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/admin/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await response.json();
+      
+      if (data.mfaRequired) {
+        return { success: true, mfaRequired: true, email: data.email };
+      }
+      
+      if (!data.success) {
+        return { success: false, error: data.error || 'Login failed' };
+      }
+      
+      return { success: false, error: 'Unexpected response' };
+    } catch (err) {
+      console.error('Login error:', err);
+      return { success: false, error: 'Connection error' };
+    } finally {
+      setIsLoading(false);
     }
-    return { success: false, error: 'Invalid email or password' };
   }
 
-  function logout(){
+  async function verifyOtp(email, otpCode) {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/admin/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otpCode })
+      });
+      const data = await response.json();
+      
+      if (data.success && data.token) {
+        setAdmin(data.adminUser);
+        localStorage.setItem('paychain_admin_session', JSON.stringify(data.adminUser));
+        localStorage.setItem('paychain_admin_token', data.token);
+        return { success: true };
+      }
+      
+      return { success: false, error: data.error || 'Verification failed' };
+    } catch (err) {
+      console.error('OTP verification error:', err);
+      return { success: false, error: 'Connection error' };
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  function logout() {
     localStorage.removeItem('paychain_admin_session');
+    localStorage.removeItem('paychain_admin_token');
     setAdmin(null);
     navigate('/login');
   }
 
   return (
-    <AuthContext.Provider value={{ admin, isLoading, isAuthenticated: !!admin, login, logout }}>
+    <AuthContext.Provider value={{ admin, isLoading, isAuthenticated: !!admin, login, verifyOtp, logout }}>
       {children}
     </AuthContext.Provider>
   );

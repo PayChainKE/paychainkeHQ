@@ -4,24 +4,41 @@ import { useAuth } from '../context/AuthContext';
 import logo from '../assets/logo.png';
 
 const Login = () => {
-  const { login } = useAuth();
+  const { login, verifyOtp } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [otpCode, setOtpCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState(1); // 1: Password, 2: OTP
 
   const [showPassword, setShowPassword] = useState(false);
 
-  const handleSubmit = async (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    
     const res = await login(email, password);
-    if (!res.success) {
+    if (res.mfaRequired) {
+      setStep(2);
+    } else if (!res.success) {
       setError(res.error);
-    } else {
+    }
+    setLoading(false);
+  };
+
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    
+    const res = await verifyOtp(email, otpCode);
+    if (res.success) {
       navigate('/overview');
+    } else {
+      setError(res.error);
     }
     setLoading(false);
   };
@@ -76,13 +93,17 @@ const Login = () => {
         <div className="max-w-[400px] w-full space-y-10">
           {/* Header */}
           <div className="text-left">
-            <h3 className="font-headline text-4xl lg:text-6xl text-primary tracking-tight font-black">Sign in</h3>
+            <h3 className="font-headline text-4xl lg:text-6xl text-primary tracking-tight font-black">
+              {step === 1 ? 'Sign in' : 'Verify Identity'}
+            </h3>
             <p className="text-on-surface-variant font-medium mt-2 opacity-70">
-              Authorized access for PayChain administrators.
+              {step === 1 
+                ? 'Authorized access for PayChain administrators.' 
+                : `We've sent a 6-digit code to ${email}`}
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={step === 1 ? handleLogin : handleVerifyOtp} className="space-y-6">
             {error && (
               <div className="bg-red-50 border border-red-200 p-4 rounded-xl flex items-center gap-3 text-red-700 animate-shake">
                 <span className="material-symbols-outlined text-lg">error_outline</span>
@@ -90,45 +111,74 @@ const Login = () => {
               </div>
             )}
 
-            <div className="space-y-2">
-              <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1" htmlFor="email">Email address</label>
-              <input
-                id="email"
-                className="w-full bg-white border border-outline-variant/15 rounded-2xl py-3.5 lg:py-4 px-5 text-lg font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@paychain.co.ke"
-                type="email"
-                required
-              />
-            </div>
+            {step === 1 ? (
+              <>
+                <div className="space-y-2">
+                  <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1" htmlFor="email">Email address</label>
+                  <input
+                    id="email"
+                    className="w-full bg-white border border-outline-variant/15 rounded-2xl py-3.5 lg:py-4 px-5 text-lg font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="admin@paychain.co.ke"
+                    type="email"
+                    required
+                  />
+                </div>
 
-            <div className="space-y-2">
-              <div className="flex justify-between items-center px-1">
-                <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1" htmlFor="password">Password</label>
-                <button type="button" className="text-[9px] font-black uppercase tracking-widest text-emerald-600 hover:text-emerald-700">Forgot?</button>
-              </div>
-              <div className="relative">
-                <input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  className="w-full bg-white border border-outline-variant/15 rounded-2xl py-3.5 lg:py-4 px-5 text-lg font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40 pr-14"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                />
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center px-1">
+                    <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1" htmlFor="password">Password</label>
+                    <button type="button" className="text-[9px] font-black uppercase tracking-widest text-emerald-600 hover:text-emerald-700">Forgot?</button>
+                  </div>
+                  <div className="relative">
+                    <input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      className="w-full bg-white border border-outline-variant/15 rounded-2xl py-3.5 lg:py-4 px-5 text-lg font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40 pr-14"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      required
+                    />
+                    <button 
+                      type="button" 
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-primary/40 hover:text-primary transition-colors p-1"
+                    >
+                      <span className="material-symbols-outlined text-xl">
+                        {showPassword ? 'visibility' : 'visibility_off'}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1" htmlFor="otp">Verification Code</label>
+                  <input
+                    id="otp"
+                    className="w-full bg-white border border-outline-variant/15 rounded-2xl py-4 px-5 text-3xl font-headline text-primary text-center tracking-[0.5em] focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/20"
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="000000"
+                    type="text"
+                    inputMode="numeric"
+                    required
+                    autoFocus
+                  />
+                </div>
                 <button 
                   type="button" 
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-primary/40 hover:text-primary transition-colors p-1"
+                  onClick={() => setStep(1)}
+                  className="text-[10px] font-black uppercase tracking-widest text-primary/40 hover:text-primary flex items-center gap-2"
                 >
-                  <span className="material-symbols-outlined text-xl">
-                    {showPassword ? 'visibility' : 'visibility_off'}
-                  </span>
+                  <span className="material-symbols-outlined text-sm">arrow_back</span>
+                  Back to credentials
                 </button>
               </div>
-            </div>
+            )}
 
             <button
               className="w-full bg-[#162723] text-white py-4 lg:py-5 rounded-2xl font-black text-lg shadow-2xl hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-white/5 disabled:opacity-50"
@@ -139,11 +189,24 @@ const Login = () => {
                 <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
               ) : (
                 <>
-                  Enter Dashboard
+                  {step === 1 ? 'Enter Dashboard' : 'Verify & Unlock'}
                   <span className="material-symbols-outlined">arrow_forward</span>
                 </>
               )}
             </button>
+            
+            <div className="flex items-center justify-center gap-2 opacity-50 pt-8">
+              <p className="text-[9px] text-primary/60 uppercase font-black tracking-[0.2em]">
+                {step === 1 ? 'Secure Administrator Portal' : 'Two-Factor Authentication Active'}
+              </p>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+};
+      </button>
             
             <div className="flex items-center justify-center gap-2 opacity-50 pt-8">
               <p className="text-[9px] text-primary/60 uppercase font-black tracking-[0.2em]">
