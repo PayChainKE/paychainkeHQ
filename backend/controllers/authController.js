@@ -7,6 +7,8 @@ import generateToken from '../utils/generateToken.js';
 // @access  Public
 export const login = async (req, res) => {
   const { email, password } = req.body;
+  console.log(`🔑 DEBUG: Login attempt for email: [${email}]`);
+  console.log(`🔑 DEBUG: Password length: ${password?.length}`);
   console.log(`🔑 Login attempt started for: ${email}`);
 
   try {
