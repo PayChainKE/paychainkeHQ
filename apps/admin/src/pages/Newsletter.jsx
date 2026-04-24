@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Layout from '../components/layout/Layout';
 import { exportCSV } from '../utils/exportCSV';
+import { API_BASE_URL } from '../utils/api';
 
 export default function Newsletter() {
   const [subscribers, setSubscribers] = useState([]);
@@ -10,7 +11,7 @@ export default function Newsletter() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch('/api/newsletter');
+        const response = await fetch(`${API_BASE_URL}/api/newsletter`);
         if (!response.ok) throw new Error('Failed to fetch subscribers');
         const data = await response.json();
         setSubscribers(data);

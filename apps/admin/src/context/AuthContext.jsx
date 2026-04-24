@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../utils/api';
 
 const AuthContext = createContext();
 
@@ -23,7 +24,7 @@ export function AuthProvider({ children }){
   async function login(email, password) {
     setIsLoading(true);
     try {
-      const response = await fetch('/api/admin/auth/login', {
+      const response = await fetch(`${API_BASE_URL}/api/admin/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
@@ -50,7 +51,7 @@ export function AuthProvider({ children }){
   async function verifyOtp(email, otpCode) {
     setIsLoading(true);
     try {
-      const response = await fetch('/api/admin/auth/verify-otp', {
+      const response = await fetch(`${API_BASE_URL}/api/admin/auth/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, otpCode })

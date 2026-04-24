@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/layout/Layout';
+import { API_BASE_URL } from '../utils/api';
 
 const Waitlist = () => {
   const [data, setData] = useState([]);
@@ -10,7 +11,7 @@ const Waitlist = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch('/api/waitlist');
+        const response = await fetch(`${API_BASE_URL}/api/waitlist`);
         if (!response.ok) throw new Error('Failed to fetch waitlist');
         const json = await response.json();
         // Map backend fields to frontend expected fields if necessary
