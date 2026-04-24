@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>PayChain Merchant Settings</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&amp;family=Plus+Jakarta+Sans:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "secondary": "#006c4e",
+              "primary-fixed": "#b1f1c6",
+              "on-primary-fixed": "#002110",
+              "primary": "#00351d",
+              "secondary-container": "#83f5c6",
+              "surface-tint": "#2e6a48",
+              "on-tertiary-fixed": "#0d1f1b",
+              "tertiary": "#1f302b",
+              "error": "#ba1a1a",
+              "surface-bright": "#eaffe8",
+              "on-surface-variant": "#404942",
+              "on-surface": "#0c2010",
+              "inverse-surface": "#213523",
+              "surface-container-highest": "#d0e9cf",
+              "secondary-fixed": "#86f8c9",
+              "inverse-on-surface": "#def7dd",
+              "tertiary-fixed": "#d3e7e0",
+              "surface-container-lowest": "#ffffff",
+              "tertiary-container": "#354641",
+              "surface": "#eaffe8",
+              "primary-fixed-dim": "#96d4ab",
+              "on-tertiary-fixed-variant": "#394a45",
+              "outline-variant": "#c0c9c0",
+              "tertiary-fixed-dim": "#b7cbc4",
+              "surface-dim": "#c8e1c7",
+              "on-primary": "#ffffff",
+              "on-error-container": "#93000a",
+              "primary-container": "#0b4d2e",
+              "on-secondary-fixed": "#002115",
+              "on-secondary-container": "#007151",
+              "surface-variant": "#d0e9cf",
+              "surface-container-high": "#d6efd4",
+              "inverse-primary": "#96d4ab",
+              "error-container": "#ffdad6",
+              "on-primary-fixed-variant": "#115132",
+              "background": "#eaffe8",
+              "on-secondary-fixed-variant": "#00513a",
+              "surface-container": "#dcf5da",
+              "on-error": "#ffffff",
+              "on-tertiary": "#ffffff",
+              "on-background": "#0c2010",
+              "surface-container-low": "#e1fadf",
+              "outline": "#707971",
+              "secondary-fixed-dim": "#68dbae",
+              "on-primary-container": "#80bd95",
+              "on-tertiary-container": "#a0b4ad",
+              "on-secondary": "#ffffff"
+            },
+            fontFamily: {
+              "headline": ["DM Serif Display", "serif"],
+              "body": ["Plus Jakarta Sans", "sans-serif"],
+              "label": ["Plus Jakarta Sans", "sans-serif"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #c0c9c0; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface selection:bg-secondary-container selection:text-on-secondary-container">
+<!-- SideNavBar Component -->
+<aside class="fixed left-0 top-0 h-screen w-60 bg-tertiary flex flex-col py-6 z-40 shadow-[12px_0px_32px_rgba(11,77,46,0.06)]">
+<div class="px-6 mb-8">
+<div class="flex items-center gap-3 mb-6">
+<div class="w-10 h-10 bg-primary-container rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary-fixed text-xl">account_balance_wallet</span>
+</div>
+<div>
+<h1 class="font-headline text-xl text-white leading-tight">PayChain</h1>
+<p class="text-[10px] uppercase tracking-widest text-on-tertiary-container font-bold">Merchant Hub</p>
+</div>
+</div>
+<div class="bg-stone-800/50 p-3 rounded-xl mb-8">
+<p class="text-white text-xs font-semibold">PayChain Merchant</p>
+<div class="flex items-center gap-1.5 mt-1">
+<span class="material-symbols-outlined text-[12px] text-emerald-400" style="font-variation-settings: 'FILL' 1;">verified</span>
+<span class="text-stone-400 text-[10px] uppercase tracking-wider">Verified Business</span>
+</div>
+</div>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-3 text-stone-400 hover:text-stone-100 px-6 py-3 transition-all hover:bg-stone-800 font-medium text-sm" href="#">
+<span class="material-symbols-outlined text-lg">dashboard</span>
+<span>Dashboard</span>
+</a>
+<a class="flex items-center gap-3 bg-emerald-400/10 text-emerald-400 border-r-4 border-emerald-400 px-6 py-3 transition-all font-medium text-sm" href="#">
+<span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">settings</span>
+<span>Business Profile</span>
+</a>
+<a class="flex items-center gap-3 text-stone-400 hover:text-stone-100 px-6 py-3 transition-all hover:bg-stone-800 font-medium text-sm" href="#">
+<span class="material-symbols-outlined text-lg">security_update_good</span>
+<span>Security</span>
+</a>
+<a class="flex items-center gap-3 text-stone-400 hover:text-stone-100 px-6 py-3 transition-all hover:bg-stone-800 font-medium text-sm" href="#">
+<span class="material-symbols-outlined text-lg">notifications_active</span>
+<span>Notifications</span>
+</a>
+<a class="flex items-center gap-3 text-stone-400 hover:text-stone-100 px-6 py-3 transition-all hover:bg-stone-800 font-medium text-sm" href="#">
+<span class="material-symbols-outlined text-lg">help_center</span>
+<span>Help Center</span>
+</a>
+<a class="flex items-center gap-3 text-stone-400 hover:text-stone-100 px-6 py-3 transition-all hover:bg-stone-800 font-medium text-sm" href="#">
+<span class="material-symbols-outlined text-lg">support_agent</span>
+<span>Contact Support</span>
+</a>
+</nav>
+<div class="px-6 mt-auto">
+<button class="w-full bg-primary text-on-primary py-2.5 rounded-md text-xs font-bold uppercase tracking-widest shadow-lg shadow-primary/20 hover:bg-primary-container transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm">add</span>
+                New Transaction
+            </button>
+<button class="flex items-center gap-3 text-stone-400 hover:text-stone-100 py-6 transition-all font-medium text-sm mt-4">
+<span class="material-symbols-outlined text-lg">logout</span>
+<span>Sign Out</span>
+</button>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="ml-60 min-h-screen">
+<!-- Sticky Header -->
+<header class="sticky top-0 z-30 bg-surface-container-lowest/90 backdrop-blur-md px-10 py-4 flex justify-between items-center">
+<div>
+<h2 class="font-headline text-3xl text-primary leading-tight">Settings</h2>
+<p class="text-on-surface-variant text-sm mt-0.5">Manage your business profile and security preferences.</p>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 rounded-full hover:bg-surface-container transition-colors relative">
+<span class="material-symbols-outlined text-on-surface-variant">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"></span>
+</button>
+<div class="h-8 w-[1px] bg-outline-variant/30 mx-2"></div>
+<div class="flex items-center gap-3">
+<img alt="Merchant Profile" class="w-10 h-10 rounded-full object-cover border-2 border-primary-fixed" data-alt="Close up portrait of a professional African businessman smiling against a neutral studio background with soft lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDwnRfhxtchaNKAD9xiBbRENFZ4N_dxk1YrtfIN1YQd5LpTskbqrUogcXCfGPx8JK8MaY6ra418r8EWEb99RsrZDO5vZU9nvEQV7_w9muIb96nkvc1YhoX25-SJOyfBjhN8tuJbnZpxa_6nEdIbH5x5LlmgG4BOGbJDZPkKFvXePkaYB9uRMpgbKKTb902FTpeywO42gjqir_8GHJLk4IbnMjociG8xiXhoE1xPfrVAv65ddeeOdi7jzv1ueHAf0rbwSPqY_UHgQW5n"/>
+<div>
+<p class="text-sm font-bold text-on-surface leading-none">James Kamau</p>
+<p class="text-[10px] text-on-surface-variant font-medium mt-1">Merchant Admin</p>
+</div>
+</div>
+</div>
+</header>
+<!-- Horizontal Nav Tabs -->
+<div class="px-10 mt-6">
+<div class="flex items-center gap-8 border-b border-outline-variant/20">
+<button class="pb-4 text-primary font-bold text-sm border-b-2 border-primary relative">
+                    Business Profile
+                </button>
+<button class="pb-4 text-on-surface-variant hover:text-primary transition-colors font-medium text-sm">
+                    Security
+                </button>
+<button class="pb-4 text-on-surface-variant hover:text-primary transition-colors font-medium text-sm">
+                    Notifications
+                </button>
+<button class="pb-4 text-on-surface-variant hover:text-primary transition-colors font-medium text-sm">
+                    Integrations
+                </button>
+</div>
+</div>
+<!-- Dashboard Content Grid -->
+<div class="p-10 max-w-7xl mx-auto space-y-8">
+<!-- Business Profile Section -->
+<section>
+<div class="mb-6">
+<h3 class="font-headline text-xl text-primary">Business Profile</h3>
+<p class="text-xs text-on-surface-variant">Primary identifiers for your merchant account on the PayChain network.</p>
+</div>
+<div class="grid grid-cols-12 gap-6">
+<!-- Profile Card -->
+<div class="col-span-12 lg:col-span-8 bg-surface-container-lowest p-8 rounded-xl flex flex-col gap-8 shadow-[0px_4px_24px_rgba(11,77,46,0.03)]">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
+<div class="space-y-1.5">
+<label class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Merchant Name</label>
+<div class="flex items-center justify-between border-b border-outline-variant/40 pb-2">
+<p class="text-on-surface font-semibold">James Kamau</p>
+<span class="material-symbols-outlined text-sm text-outline">edit</span>
+</div>
+</div>
+<div class="space-y-1.5">
+<label class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Business Name</label>
+<div class="flex items-center justify-between border-b border-outline-variant/40 pb-2">
+<p class="text-on-surface font-semibold">Kamau General Store</p>
+<span class="material-symbols-outlined text-sm text-outline">verified_user</span>
+</div>
+</div>
+<div class="space-y-1.5">
+<label class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Contact Email</label>
+<div class="flex items-center justify-between border-b border-outline-variant/40 pb-2">
+<p class="text-on-surface font-semibold">j.kamau@generalstore.ke</p>
+<span class="material-symbols-outlined text-sm text-outline">mail</span>
+</div>
+</div>
+<div class="space-y-1.5">
+<label class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Phone Number</label>
+<div class="flex items-center justify-between border-b border-outline-variant/40 pb-2">
+<p class="text-on-surface font-semibold">+254 712 345 678</p>
+<span class="material-symbols-outlined text-sm text-outline">smartphone</span>
+</div>
+</div>
+</div>
+<div class="space-y-4 pt-4">
+<label class="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">payments</span>
+                                Settlement Configuration
+                            </label>
+<div class="flex flex-col md:flex-row gap-4">
+<div class="flex-1 bg-surface-container-low p-4 rounded-lg flex flex-col gap-1">
+<span class="text-[10px] text-on-surface-variant font-medium">M-PESA Business Shortcode</span>
+<input class="bg-transparent border-none p-0 text-primary font-bold text-xl focus:ring-0" type="text" value="847291"/>
+</div>
+<div class="flex-1 bg-surface-container-low p-4 rounded-lg flex flex-col gap-1">
+<span class="text-[10px] text-on-surface-variant font-medium">Auto-Settlement Threshold</span>
+<div class="flex items-center justify-between">
+<p class="text-primary font-bold text-xl">5,000.00 <span class="text-xs font-sans font-medium text-on-surface-variant ml-1 uppercase">USDC</span></p>
+<span class="material-symbols-outlined text-secondary">tune</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Till Badge -->
+<div class="col-span-12 lg:col-span-4 bg-primary text-on-primary p-8 rounded-xl flex flex-col justify-between overflow-hidden relative">
+<div class="absolute -top-10 -right-10 w-40 h-40 bg-white/5 rounded-full blur-3xl"></div>
+<div>
+<p class="text-[10px] uppercase tracking-[0.2em] font-bold text-primary-fixed-dim mb-1">Active Merchant ID</p>
+<h4 class="font-headline text-4xl">PC847291</h4>
+</div>
+<div class="mt-12 space-y-4">
+<div class="flex justify-between items-end border-b border-white/10 pb-2">
+<div>
+<p class="text-[10px] font-medium text-white/60">Registered Region</p>
+<p class="text-sm font-semibold">Nairobi, Kenya</p>
+</div>
+<span class="material-symbols-outlined text-primary-fixed opacity-50">map</span>
+</div>
+<button class="w-full py-3 bg-secondary-container text-on-secondary-container rounded-md font-bold text-xs uppercase tracking-widest hover:bg-secondary-fixed transition-all">
+                                Generate QR Tag
+                            </button>
+</div>
+</div>
+</div>
+</section>
+<!-- Security & Notifications Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+<!-- Security Section -->
+<section class="space-y-6">
+<div class="flex items-center justify-between">
+<div>
+<h3 class="font-headline text-xl text-primary">Security</h3>
+<p class="text-xs text-on-surface-variant">Guard your financial environment.</p>
+</div>
+<span class="material-symbols-outlined text-secondary" style="font-variation-settings: 'FILL' 1;">security</span>
+</div>
+<div class="bg-surface-container-low rounded-xl p-6 space-y-6">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 bg-surface-container-highest rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-on-surface">vibration</span>
+</div>
+<div>
+<p class="text-sm font-bold text-on-surface">2-Factor Authentication</p>
+<p class="text-[10px] text-on-surface-variant font-medium">Secured via Mobile Authenticator</p>
+</div>
+</div>
+<div class="w-10 h-5 bg-secondary rounded-full relative cursor-pointer">
+<div class="absolute right-1 top-1 w-3 h-3 bg-white rounded-full"></div>
+</div>
+</div>
+<div class="flex items-center justify-between pt-4 border-t border-outline-variant/20">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 bg-surface-container-highest rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-on-surface">key</span>
+</div>
+<div>
+<p class="text-sm font-bold text-on-surface">PIN Management</p>
+<p class="text-[10px] text-on-surface-variant font-medium">Used for high-value approvals</p>
+</div>
+</div>
+<button class="text-[10px] font-bold uppercase tracking-widest text-secondary hover:underline">Reset PIN</button>
+</div>
+<div class="space-y-4">
+<p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Recent Login History</p>
+<div class="space-y-2">
+<div class="flex items-center justify-between p-3 bg-surface-container-lowest rounded-lg">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-sm text-outline">laptop_mac</span>
+<div>
+<p class="text-xs font-bold">MacBook Pro 14 - Nairobi</p>
+<p class="text-[10px] text-on-surface-variant">Today, 09:42 AM</p>
+</div>
+</div>
+<span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">Current</span>
+</div>
+<div class="flex items-center justify-between p-3 bg-surface-container-lowest rounded-lg">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-sm text-outline">smartphone</span>
+<div>
+<p class="text-xs font-bold">iPhone 15 - Mombasa</p>
+<p class="text-[10px] text-on-surface-variant">Yesterday, 11:15 PM</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Notifications Section -->
+<section class="space-y-6">
+<div class="flex items-center justify-between">
+<div>
+<h3 class="font-headline text-xl text-primary">Notifications</h3>
+<p class="text-xs text-on-surface-variant">Choose how you stay informed.</p>
+</div>
+<span class="material-symbols-outlined text-secondary">mail</span>
+</div>
+<div class="bg-surface-container-lowest rounded-xl shadow-[0px_12px_32px_rgba(11,77,46,0.04)] overflow-hidden">
+<table class="w-full text-left text-sm">
+<thead class="bg-surface-container-low">
+<tr>
+<th class="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Alert Type</th>
+<th class="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant text-center">SMS</th>
+<th class="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant text-center">Email</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/10">
+<tr>
+<td class="px-6 py-4">
+<p class="font-bold text-on-surface">Payment Received</p>
+<p class="text-[10px] text-on-surface-variant font-medium">Instant alerts for incoming funds</p>
+</td>
+<td class="px-6 py-4 text-center">
+<input checked="" class="rounded border-outline-variant text-primary focus:ring-primary w-4 h-4" type="checkbox"/>
+</td>
+<td class="px-6 py-4 text-center">
+<input checked="" class="rounded border-outline-variant text-primary focus:ring-primary w-4 h-4" type="checkbox"/>
+</td>
+</tr>
+<tr>
+<td class="px-6 py-4">
+<p class="font-bold text-on-surface">Bulk Pay Completed</p>
+<p class="text-[10px] text-on-surface-variant font-medium">Confirmation for vendor payouts</p>
+</td>
+<td class="px-6 py-4 text-center">
+<input class="rounded border-outline-variant text-primary focus:ring-primary w-4 h-4" type="checkbox"/>
+</td>
+<td class="px-6 py-4 text-center">
+<input checked="" class="rounded border-outline-variant text-primary focus:ring-primary w-4 h-4" type="checkbox"/>
+</td>
+</tr>
+<tr>
+<td class="px-6 py-4">
+<p class="font-bold text-on-surface">Low USDC Balance</p>
+<p class="text-[10px] text-on-surface-variant font-medium">Alert when balance drops &lt; $100</p>
+</td>
+<td class="px-6 py-4 text-center">
+<input checked="" class="rounded border-outline-variant text-primary focus:ring-primary w-4 h-4" type="checkbox"/>
+</td>
+<td class="px-6 py-4 text-center">
+<input checked="" class="rounded border-outline-variant text-primary focus:ring-primary w-4 h-4" type="checkbox"/>
+</td>
+</tr>
+<tr>
+<td class="px-6 py-4">
+<p class="font-bold text-on-surface">Weekly Analytics</p>
+<p class="text-[10px] text-on-surface-variant font-medium">Summary of your store's performance</p>
+</td>
+<td class="px-6 py-4 text-center">
+<input class="rounded border-outline-variant text-primary focus:ring-primary w-4 h-4" type="checkbox"/>
+</td>
+<td class="px-6 py-4 text-center">
+<input checked="" class="rounded border-outline-variant text-primary focus:ring-primary w-4 h-4" type="checkbox"/>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="p-4 bg-surface-container-low/50 flex justify-end">
+<button class="px-6 py-2 bg-primary text-on-primary rounded font-bold text-[10px] uppercase tracking-widest">Update Preferences</button>
+</div>
+</div>
+</section>
+</div>
+<!-- Integrations Section (Bento Style) -->
+<section>
+<div class="mb-6">
+<h3 class="font-headline text-xl text-primary">Connected Integrations</h3>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="bg-surface-container-low p-6 rounded-xl border border-transparent hover:border-secondary transition-all cursor-pointer group">
+<div class="flex justify-between items-start mb-4">
+<div class="w-12 h-12 bg-surface-container-lowest rounded-full flex items-center justify-center shadow-sm">
+<span class="material-symbols-outlined text-secondary">point_of_sale</span>
+</div>
+<span class="text-[10px] font-bold text-secondary uppercase bg-secondary/10 px-2 py-1 rounded">Connected</span>
+</div>
+<h5 class="font-bold text-on-surface mb-1">Point of Sale (v2)</h5>
+<p class="text-[10px] text-on-surface-variant font-medium">Synced with 4 store terminals.</p>
+</div>
+<div class="bg-surface-container-low p-6 rounded-xl border border-transparent hover:border-secondary transition-all cursor-pointer group">
+<div class="flex justify-between items-start mb-4">
+<div class="w-12 h-12 bg-surface-container-lowest rounded-full flex items-center justify-center shadow-sm">
+<span class="material-symbols-outlined text-secondary">database</span>
+</div>
+<span class="text-[10px] font-bold text-secondary uppercase bg-secondary/10 px-2 py-1 rounded">Connected</span>
+</div>
+<h5 class="font-bold text-on-surface mb-1">Inventory API</h5>
+<p class="text-[10px] text-on-surface-variant font-medium">Automatic balance adjustments.</p>
+</div>
+<div class="bg-surface-container-lowest border-2 border-dashed border-outline-variant/30 p-6 rounded-xl flex flex-col items-center justify-center text-center hover:bg-surface-container-low transition-all">
+<span class="material-symbols-outlined text-outline-variant mb-2">add_circle</span>
+<p class="text-xs font-bold text-on-surface-variant">Add New Integration</p>
+</div>
+</div>
+</section>
+</div>
+<footer class="p-10 text-center">
+<p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40">Powered by PayChain Ledger Protocol • © 2024</p>
+</footer>
+</main>
+</body></html>

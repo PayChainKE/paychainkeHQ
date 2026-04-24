@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;family=Noto+Serif:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "tertiary-fixed": "#d3e7e0",
+              "on-secondary": "#ffffff",
+              "tertiary-container": "#354641",
+              "on-primary": "#ffffff",
+              "tertiary-fixed-dim": "#b7cbc4",
+              "surface-bright": "#eaffe8",
+              "on-tertiary-fixed-variant": "#394a45",
+              "error": "#ba1a1a",
+              "surface-tint": "#2e6a48",
+              "on-error-container": "#93000a",
+              "primary-fixed-dim": "#96d4ab",
+              "on-primary-fixed": "#002110",
+              "on-tertiary-container": "#a0b4ad",
+              "on-primary-fixed-variant": "#115132",
+              "on-surface": "#0c2010",
+              "primary-container": "#0b4d2e",
+              "outline-variant": "#c0c9c0",
+              "on-tertiary": "#ffffff",
+              "on-background": "#0c2010",
+              "surface-container-highest": "#d0e9cf",
+              "on-secondary-fixed": "#002115",
+              "secondary-container": "#83f5c6",
+              "on-secondary-container": "#007151",
+              "surface-variant": "#d0e9cf",
+              "surface-container-lowest": "#ffffff",
+              "surface-container-high": "#d6efd4",
+              "primary": "#00351d",
+              "surface-container": "#dcf5da",
+              "background": "#eaffe8",
+              "surface-dim": "#c8e1c7",
+              "on-surface-variant": "#404942",
+              "secondary-fixed": "#86f8c9",
+              "on-secondary-fixed-variant": "#00513a",
+              "inverse-surface": "#213523",
+              "error-container": "#ffdad6",
+              "tertiary": "#1f302b",
+              "inverse-on-surface": "#def7dd",
+              "surface-container-low": "#e1fadf",
+              "surface": "#eaffe8",
+              "secondary-fixed-dim": "#68dbae",
+              "on-primary-container": "#80bd95",
+              "on-error": "#ffffff",
+              "on-tertiary-fixed": "#0d1f1b",
+              "outline": "#707971",
+              "primary-fixed": "#b1f1c6",
+              "secondary": "#006c4e",
+              "inverse-primary": "#96d4ab"
+            },
+            fontFamily: {
+              "headline": ["DM Serif Display", "serif"],
+              "body": ["Plus Jakarta Sans", "sans-serif"],
+              "label": ["Plus Jakarta Sans", "sans-serif"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .editorial-shadow {
+            box-shadow: 0px 12px 32px rgba(11, 77, 46, 0.06);
+        }
+    </style>
+</head>
+<body class="bg-background font-body text-on-background min-h-screen">
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-0 h-full w-[240px] z-50 bg-[#1f302b] dark:bg-emerald-950 flex flex-col h-screen overflow-y-auto">
+<div class="p-6 space-y-1">
+<h1 class="font-['DM_Serif_Display'] text-2xl text-white tracking-tight">PayChain</h1>
+<p class="font-['Plus_Jakarta_Sans'] text-[10px] text-on-tertiary-container uppercase tracking-widest opacity-70">Till: PC847291 • Trust: 74/100</p>
+</div>
+<nav class="flex-1 mt-4">
+<a class="flex items-center text-[#c0c9c0] hover:text-white py-3 px-6 transition-colors font-['Plus_Jakarta_Sans'] text-sm font-medium" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="dashboard">dashboard</span>
+                Dashboard
+            </a>
+<a class="flex items-center text-[#c0c9c0] hover:text-white py-3 px-6 transition-colors font-['Plus_Jakarta_Sans'] text-sm font-medium" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="payments">payments</span>
+                Collections
+            </a>
+<a class="flex items-center text-[#c0c9c0] hover:text-white py-3 px-6 transition-colors font-['Plus_Jakarta_Sans'] text-sm font-medium" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="group_add">group_add</span>
+                Bulk Pay
+            </a>
+<a class="flex items-center text-[#c0c9c0] hover:text-white py-3 px-6 transition-colors font-['Plus_Jakarta_Sans'] text-sm font-medium" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="currency_exchange">currency_exchange</span>
+                Inflation Shield
+            </a>
+<a class="text-[#86f8c9] border-l-4 border-[#86f8c9] bg-emerald-900/30 font-bold py-3 px-6 flex items-center font-['Plus_Jakarta_Sans'] text-sm" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="verified_user" style="font-variation-settings: 'FILL' 1;">verified_user</span>
+                Trust Score
+            </a>
+</nav>
+<div class="px-6 py-4">
+<button class="w-full bg-secondary-container text-on-secondary-container py-3 rounded-xl font-bold text-xs uppercase tracking-tight hover:opacity-90 transition-all active:scale-95">
+                KES 184,250 | 312.50 USDC
+            </button>
+</div>
+<footer class="mt-auto mb-6">
+<a class="flex items-center text-[#c0c9c0] hover:text-white py-3 px-6 transition-colors font-['Plus_Jakarta_Sans'] text-sm font-medium" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="settings">settings</span>
+                Settings
+            </a>
+<a class="flex items-center text-[#c0c9c0] hover:text-white py-3 px-6 transition-colors font-['Plus_Jakarta_Sans'] text-sm font-medium" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="help_outline">help_outline</span>
+                Support
+            </a>
+</footer>
+</aside>
+<!-- Main Content Shell -->
+<main class="ml-[240px] min-h-screen">
+<!-- TopNavBar -->
+<header class="sticky top-0 right-0 w-full h-[56px] z-40 bg-white/90 dark:bg-emerald-950/90 backdrop-blur-md flex justify-between items-center px-8 border-b border-[#c0c9c0]/15">
+<h2 class="font-headline text-xl text-[#0b4d2e] dark:text-emerald-300">Trust Score</h2>
+<div class="flex items-center space-x-4">
+<button class="hover:bg-emerald-50 dark:hover:bg-emerald-900/50 rounded-full p-2 transition-colors flex items-center text-primary active:opacity-70 duration-150">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<div class="h-8 w-8 rounded-full bg-surface-container overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="professional portrait of a confident african merchant in a tailored blazer against a minimalist studio background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAgsGPDXgH3LOc7zbVTTXKyXHd73gKHU0uPyJaYnER6KfJIs9hQwQ8WBE3KTHLJ0kleX9QKroQCiOQSr8C0c8wtI5x1F4RG2YW8e2HUvQW7WsnV-46voo8195-ufs1nu53_7_CjNTHs1SWqMkY_ss3o2g4bJrm4wPfQunk2GmtQETHCJ736OkLMBaZu7nQ6uHN2omFtOc171jteSCO3_DY7TatnhjSsQRZXRtC4LFWzvEMNKzht1XKE0LHcMewn_eFl7u54RTsBF3g_"/>
+</div>
+</div>
+</header>
+<div class="p-8 max-w-6xl mx-auto space-y-10">
+<!-- Section 1: Hero Score Visualization -->
+<section class="flex flex-col md:flex-row items-center gap-12 bg-surface-container-low p-10 rounded-xl editorial-shadow">
+<div class="relative flex items-center justify-center">
+<!-- Progress Ring SVG -->
+<svg class="w-48 h-48 transform -rotate-90">
+<circle class="text-surface-container-highest" cx="96" cy="96" fill="transparent" r="88" stroke="currentColor" stroke-width="12"></circle>
+<circle class="text-secondary" cx="96" cy="96" fill="transparent" r="88" stroke="currentColor" stroke-dasharray="552.92" stroke-dashoffset="143.76" stroke-width="12"></circle>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<span class="font-headline text-5xl text-primary">74<span class="text-2xl text-on-surface-variant font-body">/100</span></span>
+<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Merchant Rating</span>
+</div>
+</div>
+<div class="space-y-4 text-center md:text-left">
+<div class="inline-flex items-center px-4 py-2 bg-secondary-container text-on-secondary-container rounded-full text-xs font-bold">
+<span class="material-symbols-outlined text-sm mr-2" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                        Cash Advance Eligible ✓
+                    </div>
+<h3 class="font-headline text-3xl text-primary leading-tight">Your financial health is <br/><span class="text-secondary">Exceptional</span></h3>
+<p class="text-on-surface-variant max-w-md leading-relaxed">Based on your last 90 days of activity. You are in the top 5% of merchants in your region, qualifying you for instant liquidity access up to KES 500,000.</p>
+</div>
+</section>
+<!-- Section 2: Score Factor Cards -->
+<section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+<!-- Factor 1 -->
+<div class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/15 flex flex-col justify-between editorial-shadow">
+<div>
+<span class="text-[10px] font-bold text-outline uppercase tracking-widest">Transaction Volume</span>
+<div class="flex items-baseline justify-between mt-2">
+<span class="font-headline text-2xl text-primary">18.4k</span>
+<span class="text-secondary font-bold text-xs">+12%</span>
+</div>
+</div>
+<div class="mt-4">
+<div class="h-1.5 w-full bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-secondary w-[85%]"></div>
+</div>
+<p class="text-[11px] text-on-surface-variant mt-3 leading-tight italic">High volume relative to regional peers improves score.</p>
+</div>
+</div>
+<!-- Factor 2 -->
+<div class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/15 flex flex-col justify-between editorial-shadow">
+<div>
+<span class="text-[10px] font-bold text-outline uppercase tracking-widest">Consistency</span>
+<div class="flex items-baseline justify-between mt-2">
+<span class="font-headline text-2xl text-primary">98%</span>
+<span class="text-secondary font-bold text-xs">Stable</span>
+</div>
+</div>
+<div class="mt-4">
+<div class="h-1.5 w-full bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-secondary w-[98%]"></div>
+</div>
+<p class="text-[11px] text-on-surface-variant mt-3 leading-tight italic">Daily activity frequency is a primary trust signal.</p>
+</div>
+</div>
+<!-- Factor 3 -->
+<div class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/15 flex flex-col justify-between editorial-shadow">
+<div>
+<span class="text-[10px] font-bold text-outline uppercase tracking-widest">Revenue Growth</span>
+<div class="flex items-baseline justify-between mt-2">
+<span class="font-headline text-2xl text-primary">KES 2.1M</span>
+<span class="text-secondary font-bold text-xs">Rising</span>
+</div>
+</div>
+<div class="mt-4">
+<div class="h-1.5 w-full bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-secondary w-[65%]"></div>
+</div>
+<p class="text-[11px] text-on-surface-variant mt-3 leading-tight italic">Consistently increasing monthly totals.</p>
+</div>
+</div>
+<!-- Factor 4 -->
+<div class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/15 flex flex-col justify-between editorial-shadow">
+<div>
+<span class="text-[10px] font-bold text-outline uppercase tracking-widest">Tenure</span>
+<div class="flex items-baseline justify-between mt-2">
+<span class="font-headline text-2xl text-primary">14 Mo</span>
+<span class="text-on-surface-variant font-bold text-xs">Maturing</span>
+</div>
+</div>
+<div class="mt-4">
+<div class="h-1.5 w-full bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-secondary w-[45%]"></div>
+</div>
+<p class="text-[11px] text-on-surface-variant mt-3 leading-tight italic">Longevity on platform reduces risk profile.</p>
+</div>
+</div>
+<!-- Factor 5 -->
+<div class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/15 flex flex-col justify-between editorial-shadow">
+<div>
+<span class="text-[10px] font-bold text-outline uppercase tracking-widest">Transaction Size</span>
+<div class="flex items-baseline justify-between mt-2">
+<span class="font-headline text-2xl text-primary">KES 4.2k</span>
+<span class="text-on-surface-variant font-bold text-xs">Avg</span>
+</div>
+</div>
+<div class="mt-4">
+<div class="h-1.5 w-full bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-secondary w-[55%]"></div>
+</div>
+<p class="text-[11px] text-on-surface-variant mt-3 leading-tight italic">Diversity of transaction ticket sizes detected.</p>
+</div>
+</div>
+<!-- Factor 6 -->
+<div class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/15 flex flex-col justify-between editorial-shadow">
+<div>
+<span class="text-[10px] font-bold text-outline uppercase tracking-widest">Repayment History</span>
+<div class="flex items-baseline justify-between mt-2">
+<span class="font-headline text-2xl text-primary">100%</span>
+<span class="text-secondary font-bold text-xs">Perfect</span>
+</div>
+</div>
+<div class="mt-4">
+<div class="h-1.5 w-full bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-secondary w-[100%]"></div>
+</div>
+<p class="text-[11px] text-on-surface-variant mt-3 leading-tight italic">All previous capital advances settled on time.</p>
+</div>
+</div>
+</section>
+<!-- Section 3: Milestone Band -->
+<section class="bg-primary text-on-primary p-10 rounded-xl editorial-shadow overflow-x-auto">
+<div class="min-w-[800px]">
+<h4 class="font-headline text-2xl mb-12">Your Growth Journey</h4>
+<div class="relative px-4">
+<!-- Connecting Line -->
+<div class="absolute top-1/2 left-0 w-full h-0.5 bg-on-primary-container/30 -translate-y-1/2"></div>
+<!-- Progress Highlight -->
+<div class="absolute top-1/2 left-0 w-[58%] h-0.5 bg-secondary-fixed -translate-y-1/2"></div>
+<div class="relative flex justify-between">
+<!-- Milestone 50 -->
+<div class="flex flex-col items-center gap-4">
+<span class="material-symbols-outlined bg-primary-container p-2 rounded-full text-sm" data-icon="lock_open">lock_open</span>
+<div class="w-3 h-3 rounded-full bg-secondary-fixed border-4 border-primary"></div>
+<div class="text-center">
+<span class="block font-bold text-lg">50</span>
+<span class="text-[10px] opacity-70 uppercase tracking-tighter">Standard</span>
+</div>
+</div>
+<!-- Milestone 60 -->
+<div class="flex flex-col items-center gap-4">
+<span class="material-symbols-outlined bg-primary-container p-2 rounded-full text-sm" data-icon="rocket_launch">rocket_launch</span>
+<div class="w-3 h-3 rounded-full bg-secondary-fixed border-4 border-primary"></div>
+<div class="text-center">
+<span class="block font-bold text-lg">60</span>
+<span class="text-[10px] opacity-70 uppercase tracking-tighter">Growth Pro</span>
+</div>
+</div>
+<!-- YOU ARE HERE (74) -->
+<div class="flex flex-col items-center gap-4 -translate-y-2">
+<span class="material-symbols-outlined bg-secondary text-secondary-fixed p-3 rounded-full text-lg shadow-lg" data-icon="stars" style="font-variation-settings: 'FILL' 1;">stars</span>
+<div class="w-5 h-5 rounded-full bg-secondary-fixed border-4 border-primary ring-4 ring-secondary/30"></div>
+<div class="text-center">
+<span class="block font-bold text-2xl text-secondary-fixed">74</span>
+<span class="text-xs font-bold text-secondary-fixed uppercase tracking-wider">You are here</span>
+</div>
+</div>
+<!-- Milestone 80 -->
+<div class="flex flex-col items-center gap-4">
+<span class="material-symbols-outlined bg-primary-container p-2 rounded-full text-sm opacity-50" data-icon="account_balance">account_balance</span>
+<div class="w-3 h-3 rounded-full bg-on-primary-container/30 border-4 border-primary"></div>
+<div class="text-center opacity-50">
+<span class="block font-bold text-lg">80</span>
+<span class="text-[10px] uppercase tracking-tighter">Elite Merchant</span>
+</div>
+</div>
+<!-- Milestone 90 -->
+<div class="flex flex-col items-center gap-4">
+<span class="material-symbols-outlined bg-primary-container p-2 rounded-full text-sm opacity-50" data-icon="shield">shield</span>
+<div class="w-3 h-3 rounded-full bg-on-primary-container/30 border-4 border-primary"></div>
+<div class="text-center opacity-50">
+<span class="block font-bold text-lg">90</span>
+<span class="text-[10px] uppercase tracking-tighter">Zero Fee Tier</span>
+</div>
+</div>
+<!-- Milestone 100 -->
+<div class="flex flex-col items-center gap-4">
+<span class="material-symbols-outlined bg-primary-container p-2 rounded-full text-sm opacity-50" data-icon="workspace_premium">workspace_premium</span>
+<div class="w-3 h-3 rounded-full bg-on-primary-container/30 border-4 border-primary"></div>
+<div class="text-center opacity-50">
+<span class="block font-bold text-lg">100</span>
+<span class="text-[10px] uppercase tracking-tighter">PayChain Partner</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 4: Transparency Card -->
+<section class="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
+<div class="space-y-6">
+<h4 class="font-headline text-3xl text-primary">Algorithm Transparency</h4>
+<p class="text-on-surface-variant leading-relaxed">We believe you should own your financial identity. Our scoring model is purely based on the transactional truth of your business, never your personal lifestyle.</p>
+<button class="bg-primary text-on-primary px-6 py-3 rounded-xl font-bold flex items-center hover:opacity-90 transition-all">
+                        View Detailed Audit Log
+                        <span class="material-symbols-outlined ml-2 text-sm" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+<div class="bg-surface-container-high p-8 rounded-xl space-y-6">
+<h5 class="font-bold text-primary uppercase text-xs tracking-widest">What never affects your score</h5>
+<div class="grid grid-cols-2 gap-6">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-error" data-icon="close">close</span>
+<span class="text-sm font-medium text-on-surface">Personal Credit</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-error" data-icon="close">close</span>
+<span class="text-sm font-medium text-on-surface">Property Assets</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-error" data-icon="close">close</span>
+<span class="text-sm font-medium text-on-surface">Bank Balance</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-error" data-icon="close">close</span>
+<span class="text-sm font-medium text-on-surface">Bank Relations</span>
+</div>
+</div>
+</div>
+</section>
+</div>
+</main>
+</body></html>

@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>PayChain Merchant Support</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "secondary": "#006c4e",
+              "primary-fixed": "#b1f1c6",
+              "on-primary-fixed": "#002110",
+              "primary": "#00351d",
+              "secondary-container": "#83f5c6",
+              "surface-tint": "#2e6a48",
+              "on-tertiary-fixed": "#0d1f1b",
+              "tertiary": "#1f302b",
+              "error": "#ba1a1a",
+              "surface-bright": "#eaffe8",
+              "on-surface-variant": "#404942",
+              "on-surface": "#0c2010",
+              "inverse-surface": "#213523",
+              "surface-container-highest": "#d0e9cf",
+              "secondary-fixed": "#86f8c9",
+              "inverse-on-surface": "#def7dd",
+              "tertiary-fixed": "#d3e7e0",
+              "surface-container-lowest": "#ffffff",
+              "tertiary-container": "#354641",
+              "surface": "#eaffe8",
+              "primary-fixed-dim": "#96d4ab",
+              "on-tertiary-fixed-variant": "#394a45",
+              "outline-variant": "#c0c9c0",
+              "tertiary-fixed-dim": "#b7cbc4",
+              "surface-dim": "#c8e1c7",
+              "on-primary": "#ffffff",
+              "on-error-container": "#93000a",
+              "primary-container": "#0b4d2e",
+              "on-secondary-fixed": "#002115",
+              "on-secondary-container": "#007151",
+              "surface-variant": "#d0e9cf",
+              "surface-container-high": "#d6efd4",
+              "inverse-primary": "#96d4ab",
+              "error-container": "#ffdad6",
+              "on-primary-fixed-variant": "#115132",
+              "background": "#eaffe8",
+              "on-secondary-fixed-variant": "#00513a",
+              "surface-container": "#dcf5da",
+              "on-error": "#ffffff",
+              "on-tertiary": "#ffffff",
+              "on-background": "#0c2010",
+              "surface-container-low": "#e1fadf",
+              "outline": "#707971",
+              "secondary-fixed-dim": "#68dbae",
+              "on-primary-container": "#80bd95",
+              "on-tertiary-container": "#a0b4ad",
+              "on-secondary": "#ffffff"
+            },
+            fontFamily: {
+              "headline": ["DM Serif Display", "serif"],
+              "body": ["Plus Jakarta Sans", "sans-serif"],
+              "label": ["Plus Jakarta Sans", "sans-serif"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        display: inline-block;
+        line-height: 1;
+        text-transform: none;
+        letter-spacing: normal;
+        word-wrap: normal;
+        white-space: nowrap;
+        direction: ltr;
+      }
+      body {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        background-color: #eaffe8;
+      }
+      .editorial-shadow {
+        box-shadow: 0px 12px 32px rgba(11, 77, 46, 0.06);
+      }
+    </style>
+</head>
+<body class="text-on-surface selection:bg-secondary-container">
+<!-- SideNavBar (from JSON) -->
+<aside class="fixed left-0 top-0 h-screen w-60 bg-stone-900 flex flex-col py-6 z-50 editorial-shadow">
+<div class="px-6 mb-8">
+<h1 class="font-headline text-xl text-white">PayChain Merchant</h1>
+<p class="text-[0.6875rem] text-stone-400 font-medium tracking-tight uppercase">Verified Business</p>
+</div>
+<nav class="flex-1 px-2 space-y-1">
+<a class="flex items-center gap-3 text-stone-400 hover:text-stone-100 px-4 py-3 ease-in-out duration-200 hover:bg-stone-800 rounded-lg" href="#">
+<span class="material-symbols-outlined">storefront</span>
+<span class="text-sm font-medium">Business Profile</span>
+</a>
+<a class="flex items-center gap-3 text-stone-400 hover:text-stone-100 px-4 py-3 ease-in-out duration-200 hover:bg-stone-800 rounded-lg" href="#">
+<span class="material-symbols-outlined">security_update_good</span>
+<span class="text-sm font-medium">Security</span>
+</a>
+<a class="flex items-center gap-3 text-stone-400 hover:text-stone-100 px-4 py-3 ease-in-out duration-200 hover:bg-stone-800 rounded-lg" href="#">
+<span class="material-symbols-outlined">notifications_active</span>
+<span class="text-sm font-medium">Notifications</span>
+</a>
+<a class="flex items-center gap-3 bg-emerald-400/10 text-emerald-400 border-r-4 border-emerald-400 px-4 py-3 ease-in-out duration-200" href="#">
+<span class="material-symbols-outlined">help_center</span>
+<span class="text-sm font-medium">Help Center</span>
+</a>
+<a class="flex items-center gap-3 text-stone-400 hover:text-stone-100 px-4 py-3 ease-in-out duration-200 hover:bg-stone-800 rounded-lg" href="#">
+<span class="material-symbols-outlined">support_agent</span>
+<span class="text-sm font-medium">Contact Support</span>
+</a>
+</nav>
+<div class="px-4 mt-auto space-y-4">
+<button class="w-full bg-emerald-400 text-stone-900 font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 text-sm hover:bg-emerald-300 transition-colors">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">add_circle</span>
+                New Transaction
+            </button>
+<a class="flex items-center gap-3 text-stone-400 hover:text-stone-100 px-4 py-3 ease-in-out duration-200 hover:bg-stone-800 rounded-lg" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="text-sm font-medium">Sign Out</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="ml-60 min-h-screen bg-surface">
+<!-- Top Header Area -->
+<header class="sticky top-0 z-40 bg-surface-container-lowest/90 backdrop-blur-md px-10 h-16 flex items-center justify-between">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-primary">help_outline</span>
+<h2 class="font-headline text-xl text-primary">Support &amp; Help Center</h2>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2">
+<img alt="Merchant Business Profile" class="w-8 h-8 rounded-full object-cover" data-alt="Portrait of a professional merchant in a crisp white shirt, clean corporate headshot with soft studio lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDyHHtmnC4_cktE_SJE-Zv3eT9MVkcYytJ8RT6Fq0wuav0BYi7pLPKMyU-CeCVJS9Hmst9kkbJpNpRag8qJ_AQ6t0HibCbVWltgVcyVVZfWxoCqRniIPhyVS-NRKvBjA_5XfqRZaBT9GIrL8casOgEwWzI1pA3JRZnlG_sW3aZ-rKOamsHFws-9jK9K8ya3f3frLB639j-K-cnFZysQ-BGwVq1ZRZKqMVZLGYOMdTGpZTMJQ3lrQbzIhQxTVL6sWOOOWfFSqZrykZcp"/>
+<span class="text-xs font-semibold text-on-surface">Merchant #8842</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer">notifications</span>
+</div>
+</header>
+<div class="max-w-7xl mx-auto px-10 py-12">
+<!-- Hero Search Section -->
+<section class="mb-16">
+<div class="max-w-3xl">
+<h3 class="font-headline text-4xl text-primary mb-6">How can we help you today?</h3>
+<div class="relative group">
+<div class="absolute inset-y-0 left-5 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-outline">search</span>
+</div>
+<input class="w-full pl-14 pr-6 py-5 bg-surface-container-lowest border-none rounded-xl text-lg editorial-shadow focus:ring-2 focus:ring-primary-fixed transition-all placeholder:text-outline-variant" placeholder="Search for guides, transactions, or technical docs..." type="text"/>
+</div>
+<div class="mt-4 flex flex-wrap gap-2">
+<span class="text-xs font-bold text-on-surface-variant uppercase tracking-widest mr-2 py-1">Trending:</span>
+<span class="px-3 py-1 bg-secondary-fixed-dim text-on-secondary-fixed text-[10px] font-bold rounded-full uppercase tracking-tighter">API V2 Docs</span>
+<span class="px-3 py-1 bg-secondary-fixed-dim text-on-secondary-fixed text-[10px] font-bold rounded-full uppercase tracking-tighter">Settlement Delay</span>
+<span class="px-3 py-1 bg-secondary-fixed-dim text-on-secondary-fixed text-[10px] font-bold rounded-full uppercase tracking-tighter">KYC Updates</span>
+</div>
+</div>
+</section>
+<!-- Quick Help Cards: Bento Grid -->
+<section class="mb-20">
+<h4 class="text-xs font-bold text-on-surface-variant uppercase tracking-[0.2em] mb-8">Popular Solutions</h4>
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+<!-- Card 1 -->
+<div class="group p-8 bg-surface-container-lowest rounded-xl editorial-shadow hover:translate-y-[-4px] transition-all cursor-pointer">
+<div class="w-12 h-12 bg-surface-container-low rounded-lg flex items-center justify-center mb-6 group-hover:bg-primary group-hover:text-on-primary transition-colors">
+<span class="material-symbols-outlined">payments</span>
+</div>
+<h5 class="font-headline text-xl text-primary mb-2">M-PESA Integration</h5>
+<p class="text-sm text-on-surface-variant leading-relaxed">Detailed steps to link your Till or Paybill number to PayChain.</p>
+</div>
+<!-- Card 2 -->
+<div class="group p-8 bg-surface-container-lowest rounded-xl editorial-shadow hover:translate-y-[-4px] transition-all cursor-pointer">
+<div class="w-12 h-12 bg-surface-container-low rounded-lg flex items-center justify-center mb-6 group-hover:bg-primary group-hover:text-on-primary transition-colors">
+<span class="material-symbols-outlined">currency_exchange</span>
+</div>
+<h5 class="font-headline text-xl text-primary mb-2">USDC Swaps</h5>
+<p class="text-sm text-on-surface-variant leading-relaxed">Learn how to manage liquidity between KES and stablecoins.</p>
+</div>
+<!-- Card 3 -->
+<div class="group p-8 bg-surface-container-lowest rounded-xl editorial-shadow hover:translate-y-[-4px] transition-all cursor-pointer">
+<div class="w-12 h-12 bg-surface-container-low rounded-lg flex items-center justify-center mb-6 group-hover:bg-primary group-hover:text-on-primary transition-colors">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+</div>
+<h5 class="font-headline text-xl text-primary mb-2">Cash Advance Eligibility</h5>
+<p class="text-sm text-on-surface-variant leading-relaxed">Check your merchant credit limits and repayment terms.</p>
+</div>
+<!-- Card 4 -->
+<div class="group p-8 bg-surface-container-lowest rounded-xl editorial-shadow hover:translate-y-[-4px] transition-all cursor-pointer">
+<div class="w-12 h-12 bg-surface-container-low rounded-lg flex items-center justify-center mb-6 group-hover:bg-primary group-hover:text-on-primary transition-colors">
+<span class="material-symbols-outlined">cast_for_education</span>
+</div>
+<h5 class="font-headline text-xl text-primary mb-2">Bulk Pay Tutorials</h5>
+<p class="text-sm text-on-surface-variant leading-relaxed">Video guides for processing thousands of payouts at once.</p>
+</div>
+</div>
+</section>
+<!-- FAQs and Contact: Asymmetric Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-12">
+<!-- FAQ Section (Left) -->
+<div class="lg:col-span-7">
+<h4 class="text-xs font-bold text-on-surface-variant uppercase tracking-[0.2em] mb-8">Common FAQs</h4>
+<div class="space-y-4">
+<div class="bg-surface-container-low p-6 rounded-xl group cursor-pointer hover:bg-surface-container transition-colors">
+<div class="flex justify-between items-center">
+<h6 class="font-semibold text-primary">How long do M-PESA collections take to reflect?</h6>
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">expand_more</span>
+</div>
+<p class="mt-4 text-sm text-on-surface-variant hidden">M-PESA B2B and C2B transactions typically reflect in your PayChain ledger within 2-5 minutes, subject to Safaricom network availability.</p>
+</div>
+<div class="bg-surface-container-low p-6 rounded-xl group cursor-pointer hover:bg-surface-container transition-colors">
+<div class="flex justify-between items-center">
+<h6 class="font-semibold text-primary">What are the fees for KES to USDC swaps?</h6>
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">expand_more</span>
+</div>
+</div>
+<div class="bg-surface-container-low p-6 rounded-xl group cursor-pointer hover:bg-surface-container transition-colors">
+<div class="flex justify-between items-center">
+<h6 class="font-semibold text-primary">How do I increase my Trust Score?</h6>
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">expand_more</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Contact Section (Right) -->
+<div class="lg:col-span-5">
+<div class="bg-primary text-on-primary p-10 rounded-xl editorial-shadow overflow-hidden relative">
+<!-- Decorative Gradient -->
+<div class="absolute -top-24 -right-24 w-64 h-64 bg-primary-container rounded-full blur-3xl opacity-50"></div>
+<div class="relative z-10">
+<h4 class="font-headline text-3xl mb-8">Talk to us</h4>
+<div class="space-y-8">
+<div class="flex items-start gap-4">
+<div class="w-10 h-10 bg-on-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-secondary-fixed">chat</span>
+</div>
+<div>
+<p class="text-xs font-bold text-primary-fixed-dim uppercase tracking-widest mb-1">WhatsApp Support</p>
+<p class="text-lg font-medium">+254 700 000 000</p>
+</div>
+</div>
+<div class="flex items-start gap-4">
+<div class="w-10 h-10 bg-on-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-secondary-fixed">phone_in_talk</span>
+</div>
+<div>
+<p class="text-xs font-bold text-primary-fixed-dim uppercase tracking-widest mb-1">Phone (24/7)</p>
+<p class="text-lg font-medium">0800 PAY CHAIN</p>
+</div>
+</div>
+<div class="flex items-start gap-4">
+<div class="w-10 h-10 bg-on-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-secondary-fixed">mail</span>
+</div>
+<div>
+<p class="text-xs font-bold text-primary-fixed-dim uppercase tracking-widest mb-1">Email</p>
+<p class="text-lg font-medium">merchants@paychain.africa</p>
+</div>
+</div>
+</div>
+<div class="mt-12 pt-10 border-t border-on-primary/10">
+<h4 class="font-headline text-2xl mb-6">Visit us</h4>
+<div class="flex items-start gap-4">
+<div class="w-10 h-10 bg-on-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-secondary-fixed">location_on</span>
+</div>
+<div>
+<p class="text-sm leading-relaxed opacity-80">
+                                            PayChain Plaza, 4th Floor<br/>
+                                            Westlands, Nairobi, Kenya
+                                        </p>
+<a class="inline-block mt-3 text-xs font-bold text-secondary-fixed uppercase tracking-widest hover:underline" href="#">View on Map</a>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Visual Footer Anchor -->
+<footer class="mt-32 pt-12 border-t border-outline-variant/10 flex flex-col md:flex-row justify-between items-center gap-6">
+<div class="flex items-center gap-6">
+<span class="font-headline text-2xl text-primary opacity-30">PayChain</span>
+<p class="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">© 2024 Financial Excellence. Built for Africa.</p>
+</div>
+<div class="flex gap-8">
+<a class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest hover:text-primary transition-colors" href="#">Privacy Policy</a>
+<a class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest hover:text-primary transition-colors" href="#">Terms of Service</a>
+<a class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest hover:text-primary transition-colors" href="#">API Status</a>
+</div>
+</footer>
+</div>
+</main>
+<!-- FAB Overlay (Suppressed as per rules for Support/Help Center focus) -->
+</body></html>
