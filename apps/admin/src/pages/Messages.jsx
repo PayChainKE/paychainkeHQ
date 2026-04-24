@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/layout/Layout';
+import api from '../api/api';
 
 const Messages = () => {
   const [data, setData] = useState([]);
@@ -12,15 +13,14 @@ const Messages = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch('/api/contact');
-        if (!response.ok) throw new Error('Failed to fetch messages');
-        const json = await response.json();
+        const response = await api.get('/api/contact');
+        const json = response.data;
         setData(json);
         if (json.length > 0 && !selectedMessage) {
           setSelectedMessage(json[0]);
         }
       } catch (err) {
-        setError(err.message);
+        setError(err.response?.data?.error || err.message);
       } finally {
         setLoading(false);
       }
