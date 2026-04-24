@@ -1,9 +1,10 @@
+require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const { Resend } = require('resend');
 const { getWelcomeEmailTemplate } = require('./email-templates');
-require('dotenv').config();
+const authRoutes = require('./routes/authRoutes');
 
 const app = express();
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -218,6 +219,9 @@ app.patch('/api/contact/:id/read', async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+// Standard Routes
+app.use('/api/admin/auth', authRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
