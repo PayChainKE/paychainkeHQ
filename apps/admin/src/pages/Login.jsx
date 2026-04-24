@@ -206,18 +206,5 @@ const Login = () => {
     </div>
   );
 };
-      </button>
-            
-            <div className="flex items-center justify-center gap-2 opacity-50 pt-8">
-              <p className="text-[9px] text-primary/60 uppercase font-black tracking-[0.2em]">
-                Secure Administrator Portal
-              </p>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 export default Login;
