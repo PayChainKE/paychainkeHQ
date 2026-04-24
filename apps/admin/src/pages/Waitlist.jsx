@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/layout/Layout';
-import api from '../api/config';
+import api from '../api/api';
 
 const Waitlist = () => {
   const [data, setData] = useState([]);

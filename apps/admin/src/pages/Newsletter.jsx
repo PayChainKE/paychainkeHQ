@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Layout from '../components/layout/Layout';
 import { exportCSV } from '../utils/exportCSV';
-import api from '../api/config';
+import api from '../api/api';
 
 export default function Newsletter() {
   const [subscribers, setSubscribers] = useState([]);
@@ -35,8 +35,8 @@ export default function Newsletter() {
               onClick={() => {
                 const cleaned = subscribers.map(s => ({
                   'Email Address': s.email,
-                  'Status': s.status || 'active',
-                  'Date Subscribed': new Date(s.subscribedAt).toLocaleString()
+                  'Status': s.active ? 'Active' : 'Inactive',
+                  'Date Subscribed': s.subscribedAt ? new Date(s.subscribedAt).toLocaleString() : 'N/A'
                 }));
                 exportCSV('newsletter_subscribers.csv', cleaned);
               }}
@@ -84,12 +84,12 @@ export default function Newsletter() {
                     <td className="px-6 py-4 font-bold text-[14px] text-on-surface tracking-tight">{s.email}</td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase ${
-                        s.status === 'active' ? 'bg-secondary-container/20 text-secondary' : 'bg-on-surface-variant/10 text-on-surface-variant'
+                        s.active ? 'bg-secondary-container/20 text-secondary' : 'bg-on-surface-variant/10 text-on-surface-variant'
                       }`}>
-                        {s.status || 'active'}
+                        {s.active ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-[13px] text-on-surface-variant/60">{new Date(s.subscribedAt).toLocaleDateString(undefined, { dateStyle: 'medium' })}</td>
+                    <td className="px-6 py-4 text-[13px] text-on-surface-variant/60">{s.subscribedAt ? new Date(s.subscribedAt).toLocaleDateString(undefined, { dateStyle: 'medium' }) : 'N/A'}</td>
                     <td className="px-6 py-4 text-right">
                       <button className="p-1.5 hover:bg-surface-container-high rounded-lg transition-colors opacity-0 group-hover:opacity-100 text-on-surface-variant/30">
                         <span className="material-symbols-outlined text-[18px]">more_vert</span>

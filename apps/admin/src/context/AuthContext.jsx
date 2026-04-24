@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../api/axiosConfig';
+import api from '../api/api';
 
 const AuthContext = createContext();
 
@@ -38,7 +38,8 @@ export function AuthProvider({ children }){
       return { success: false, error: 'Unexpected response' };
     } catch (err) {
       console.error('Login error:', err);
-      return { success: false, error: 'Connection error' };
+      const message = err.response?.data?.error || err.response?.data?.message || 'Connection error';
+      return { success: false, error: message };
     } finally {
       setIsLoading(false);
     }
@@ -51,8 +52,8 @@ export function AuthProvider({ children }){
       const data = response.data;
       
       if (data.success && data.token) {
-        setAdmin(data.adminUser);
-        localStorage.setItem('paychain_admin_session', JSON.stringify(data.adminUser));
+        setAdmin(data.admin);
+        localStorage.setItem('paychain_admin_session', JSON.stringify(data.admin));
         localStorage.setItem('paychain_admin_token', data.token);
         return { success: true };
       }
@@ -60,7 +61,8 @@ export function AuthProvider({ children }){
       return { success: false, error: data.error || 'Verification failed' };
     } catch (err) {
       console.error('OTP verification error:', err);
-      return { success: false, error: 'Connection error' };
+      const message = err.response?.data?.error || err.response?.data?.message || 'Connection error';
+      return { success: false, error: message };
     } finally {
       setIsLoading(false);
     }

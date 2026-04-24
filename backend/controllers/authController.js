@@ -1,96 +1,106 @@
-const User = require('../models/User');
-const Otp = require('../models/Otp');
-const jwt = require('jsonwebtoken');
-const { Resend } = require('resend');
+import Admin from '../models/Admin.js';
+import { sendOTP } from '../utils/resend.js';
+import generateToken from '../utils/generateToken.js';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// @desc    Stage 1: Identity Verification (Email/Password -> OTP)
+// @route   POST /api/auth/login
+// @access  Public
+export const login = async (req, res) => {
+  const { email, password } = req.body;
+  console.log(`🔑 Login attempt started for: ${email}`);
 
-exports.adminLogin = async (req, res) => {
   try {
-    const { email, password } = req.body;
-
-    const user = await User.findOne({ email });
-    if (!user || user.role !== 'admin') {
-      return res.status(401).json({ success: false, error: 'Invalid credentials or unauthorized access' });
+    // 1. Find Admin
+    const admin = await Admin.findOne({ email });
+    if (!admin) {
+      console.log(`❌ Admin not found: ${email}`);
+      return res.status(401).json({ error: 'Invalid credentials' });
     }
+    console.log(`✅ Admin found: ${email}`);
 
-    const isMatch = await user.comparePassword(password);
+    // 2. Compare Password
+    const isMatch = await admin.matchPassword(password);
     if (!isMatch) {
-      return res.status(401).json({ success: false, error: 'Invalid credentials' });
+      console.log(`❌ Password mismatch for: ${email}`);
+      return res.status(401).json({ error: 'Invalid credentials' });
     }
+    console.log(`✅ Password matched for: ${email}`);
 
-    // Generate 6-digit OTP
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    // 3. Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-    // Save/Update OTP in DB
-    await Otp.findOneAndUpdate(
-      { email },
-      { otpCode, createdAt: new Date() },
-      { upsert: true, new: true }
-    );
+    // 4. Save to DB
+    admin.otp = otp;
+    admin.otpExpires = otpExpires;
+    await admin.save();
+    console.log(`💾 OTP [${otp}] saved to DB for: ${email}`);
 
-    // Send OTP via Email
-    try {
-      await resend.emails.send({
-        from: 'PayChain Admin <security@paychain.co.ke>',
-        to: [email],
-        subject: 'Your Admin Verification Code',
-        html: `
-          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 40px; border: 1px solid #e5e7eb; border-radius: 16px;">
-            <h2 style="font-size: 24px; font-weight: 800; color: #00351d; margin-bottom: 16px;">Security Verification</h2>
-            <p style="color: #4b5563; font-size: 16px; margin-bottom: 24px;">Someone is attempting to log into the PayChain Admin Portal. If this is you, use the verification code below to complete your login. This code expires in 5 minutes.</p>
-            <div style="background: #f0fdf4; padding: 24px; border-radius: 12px; text-align: center; margin-bottom: 24px;">
-              <span style="font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #00351d;">${otpCode}</span>
-            </div>
-            <p style="color: #6b7280; font-size: 12px;">If you did not request this code, please secure your account immediately.</p>
-          </div>
-        `
-      });
-    } catch (emailErr) {
-      console.error('Error sending OTP email:', emailErr);
-      // In a real prod environment, we might want to fail the request here, but for now we'll proceed
+    // 5. Send via Resend
+    console.log(`📧 Attempting to send OTP via Resend to: ${admin.email}`);
+    await sendOTP(admin.email, otp);
+    console.log(`✅ Resend OTP call completed for: ${email}`);
+
+    // 6. Success Response
+    res.json({ 
+      success: true, 
+      mfaRequired: true, 
+      email,
+      message: 'OTP sent to your email. Proceed to Stage 2.' 
+    });
+  } catch (error) {
+    console.error('Login Error:', error);
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(val => val.message);
+      return res.status(400).json({ error: messages.join(', ') });
     }
-
-    res.json({ success: true, mfaRequired: true, email });
-  } catch (err) {
-    console.error('Login error:', err);
-    res.status(500).json({ success: false, error: 'Internal server error' });
+    res.status(500).json({ error: 'Server Error' });
   }
 };
 
-exports.verifyAdminOtp = async (req, res) => {
-  try {
-    const { email, otpCode } = req.body;
+// @desc    Stage 2: Possession Verification (OTP -> JWT)
+// @route   POST /api/auth/verify-otp
+// @access  Public
+export const verifyOTP = async (req, res) => {
+  const { email, otp, otpCode } = req.body;
+  const submittedOtp = otp || otpCode;
 
-    const otpRecord = await Otp.findOne({ email, otpCode });
-    if (!otpRecord) {
-      return res.status(401).json({ success: false, error: 'Invalid or expired verification code' });
+  try {
+    const admin = await Admin.findOne({ email });
+
+    if (!admin) {
+      return res.status(401).json({ error: 'Invalid request' });
     }
 
-    const user = await User.findOne({ email });
-    
-    // Generate JWT
-    const token = jwt.sign(
-      { id: user._id, email: user.email, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '24h' }
-    );
+    // Check if OTP exists and matches
+    if (!admin.otp || admin.otp !== submittedOtp) {
+      return res.status(401).json({ error: 'Invalid OTP' });
+    }
 
-    // Immediate cleanup
-    await Otp.deleteOne({ _id: otpRecord._id });
+    // Check if OTP is expired
+    if (new Date() > admin.otpExpires) {
+      return res.status(401).json({ error: 'OTP expired' });
+    }
+
+    // Valid OTP - Clear it and issue JWT
+    admin.otp = null;
+    admin.otpExpires = null;
+    await admin.save();
 
     res.json({
       success: true,
-      token,
-      adminUser: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role
-      }
+      admin: {
+        _id: admin._id,
+        email: admin.email
+      },
+      token: generateToken(admin._id)
     });
-  } catch (err) {
-    console.error('OTP verification error:', err);
-    res.status(500).json({ success: false, error: 'Internal server error' });
+  } catch (error) {
+    console.error('Verify OTP Error:', error);
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(val => val.message);
+      return res.status(400).json({ error: messages.join(', ') });
+    }
+    res.status(500).json({ error: 'Server Error' });
   }
 };
