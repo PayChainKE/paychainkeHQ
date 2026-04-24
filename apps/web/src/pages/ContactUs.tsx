@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { AxiosError } from "axios";
 import api from "@/lib/api";
 import styles from "./ContactUs.module.css";
 import Navbar from "@/components/Navbar";
@@ -17,14 +18,34 @@ import {
   CheckCircle,
   AlertCircle,
   Check,
+  LucideIcon,
 } from "lucide-react";
+
+interface ContactDetail {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+  href?: string;
+}
+
+interface CardData {
+  icon: LucideIcon;
+  label: string;
+  headline: string;
+  body: string;
+  response: string;
+  emailHref?: string;
+  phoneHref?: string;
+  secondary?: { label: string; href: string };
+  hint?: string;
+}
 
 // Contact page — frontend only. No backend calls.
 // TODO: Replace simulation with API call
 // POST /api/contact
 // Body: { name, email, phone, contactType, subject, message, referralSource }
 
-const CONTACT_DETAILS = [
+const CONTACT_DETAILS: ContactDetail[] = [
   {
     icon: Mail,
     label: "Email",
@@ -48,7 +69,7 @@ const CONTACT_DETAILS = [
   },
 ];
 
-const CARD_DATA = [
+const CARD_DATA: CardData[] = [
   {
     icon: MessageCircle,
     label: "Merchant Support",
@@ -189,9 +210,10 @@ export default function ContactUs() {
       try {
         await api.post('/api/contact', formData);
         setIsSuccess(true);
-      } catch (err: any) {
-        console.error('Contact error:', err);
-        const msg = err.response?.data?.error || 'Unable to send message. Please try again later.';
+      } catch (err) {
+        const axiosError = err as AxiosError<{ error?: string }>;
+        console.error('Contact error:', axiosError);
+        const msg = axiosError.response?.data?.error || 'Unable to send message. Please try again later.';
         setErrors({ form: msg });
       } finally {
         setIsSubmitting(false);
@@ -250,7 +272,7 @@ export default function ContactUs() {
       <section className={styles.detailsStrip}>
         <div className={styles.detailsInner}>
           {CONTACT_DETAILS.map((d) => {
-            const Icon = d.icon as any;
+            const Icon = d.icon;
             const content = (
               <div className={styles.detailBlock} key={d.label}>
                 <div className={styles.iconCircle}><Icon size={18} /></div>
@@ -278,7 +300,7 @@ export default function ContactUs() {
           <h2 className={styles.sectionHeadline}>Reach the Right Person Directly.</h2>
           <div className={styles.cardsGrid}>
             {CARD_DATA.map((card, idx) => {
-              const Icon = card.icon as any;
+              const Icon = card.icon;
               return (
                 <article key={idx} className={`${styles.card} ${styles['animate-on-scroll']}`} style={{ transitionDelay: `${idx * 100}ms` }}>
                   <div className={styles.cardTop}>
@@ -288,8 +310,8 @@ export default function ContactUs() {
                   <div className={styles.cardHeadline}>{card.headline}</div>
                   <div className={styles.cardBody}>{card.body}</div>
                   <div className={styles.cardResponse}><Clock size={12} /> <span>{card.response}</span></div>
-                  {(card as any).emailHref && (
-                    <a href={(card as any).emailHref} className={styles.cardPrimary}>{(card as any).emailHref.replace('mailto:', '')} <ArrowRight size={14} /></a>
+                  {card.emailHref && (
+                    <a href={card.emailHref} className={styles.cardPrimary}>{card.emailHref.replace('mailto:', '')} <ArrowRight size={14} /></a>
                   )}
                   {card.phoneHref && (
                     <a href={card.phoneHref} className={styles.cardPhone}><Phone size={14} /> +254 790 889 066</a>

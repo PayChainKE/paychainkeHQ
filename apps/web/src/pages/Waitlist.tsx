@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { AxiosError } from 'axios';
 import api from '@/lib/api';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -58,7 +59,10 @@ const Waitlist: React.FC = () => {
 
       setSuccess(true);
     } catch (err) {
-      setErrors({ form: 'Unable to submit. Please try again.' });
+      const axiosError = err as AxiosError<{ error?: string }>;
+      console.error('Waitlist error:', axiosError);
+      const msg = axiosError.response?.data?.error || 'Unable to submit. Please try again.';
+      setErrors({ form: msg });
     } finally {
       setLoading(false);
     }

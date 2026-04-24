@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AxiosError } from 'axios';
 import api from '@/lib/api';
 
 const NewsletterSignup: React.FC = () => {
@@ -21,9 +22,10 @@ const NewsletterSignup: React.FC = () => {
       } else {
         setStatus({ type: 'error', message: response.data.error || 'Failed to subscribe. Please try again.' });
       }
-    } catch (err: any) {
-      console.error('Newsletter error:', err);
-      const msg = err.response?.data?.error || 'Unable to connect to the server. Please check your connection.';
+    } catch (err) {
+      const axiosError = err as AxiosError<{ error?: string }>;
+      console.error('Newsletter error:', axiosError);
+      const msg = axiosError.response?.data?.error || 'Unable to connect to the server. Please check your connection.';
       setStatus({ type: 'error', message: msg });
     } finally {
       setLoading(false);
