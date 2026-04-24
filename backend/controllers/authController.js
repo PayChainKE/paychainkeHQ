@@ -13,6 +13,9 @@ export const login = async (req, res) => {
 
   try {
     // 1. Find Admin
+    const adminCount = await Admin.countDocuments();
+    console.log(`📊 Current Admin collection count: ${adminCount}`);
+    
     const admin = await Admin.findOne({ email });
     if (!admin) {
       console.log(`❌ Admin not found: ${email}`);
