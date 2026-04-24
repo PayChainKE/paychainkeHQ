@@ -27,7 +27,7 @@ const Login = () => {
   return (
     <main className="min-h-screen flex flex-col md:flex-row font-body bg-surface text-on-surface antialiased">
       {/* LEFT PANEL (45% on desktop) */}
-      <section className="hidden md:flex md:w-[45%] bg-primary flex-col justify-between p-12 lg:p-16 relative overflow-hidden shadow-editorial">
+      <section className="hidden md:flex md:w-[45%] bg-[#162723] flex-col justify-between p-12 lg:p-16 relative overflow-hidden shadow-editorial">
         {/* Decorative Grain/Texture */}
         <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuBkbIVBpVFriiy_rd7YYL4kemDwzYGeTUDO0RQnen84NwsFUQVpuM2241cltNtsgO6TfE7rdw0c7R3x90e9VgVgm_AAmnut033a9zakEyE7J3_ZFmLoVRXqQMYlSF0lR0pLnbjZiisBdueyyOfeh1kz1Vb2Lizj-LZqqEjg11O0KtLBPhTCb9MnC-aDrG3ycp5JAHD6Mgy970j1blU8BlPFWG0KRSlRTSejTWfy_JMYqSmMiV8iBKjlUF3i5rUa-byqmsDRFcgG76U')" }}></div>
         {/* Top Branding */}
