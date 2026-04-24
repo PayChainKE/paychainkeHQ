@@ -19,6 +19,7 @@ import Wallet from './pages/Wallet'
 import SendMoney from './pages/SendMoney'
 import RequestMoney from './pages/RequestMoney'
 import ToastHost from './components/ui/Toast'
+import { Analytics } from "@vercel/analytics/react"
 
 function Protected({ children }){
   const { isAuthenticated, isLoading, isFirstLogin } = useMerchantAuth()
@@ -55,6 +56,7 @@ export default function App(){
             <Route path="*" element={<Navigate to="/overview" replace />} />
           </Routes>
           <ToastHost />
+          <Analytics />
         </NotificationProvider>
       </MerchantAuthProvider>
     </BrowserRouter>
