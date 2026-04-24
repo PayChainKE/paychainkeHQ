@@ -14,7 +14,7 @@ const app = express();
 const resend = new Resend(process.env.RESEND_API_KEY);
 const PORT = process.env.PORT || 5000;
 
-// Middleware
+// Middleware - Hardened CORS for Vercel/Render (Step 2 & 3)
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:5174',
@@ -25,17 +25,9 @@ const allowedOrigins = [
   'https://paychain.co.ke'
 ];
 
-app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} - Origin: ${req.headers.origin}`);
-  next();
-});
-
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    
-    // Check if origin is in our allowed list
     const isAllowed = allowedOrigins.some(o => origin.startsWith(o));
     if (isAllowed) {
       callback(null, true);
@@ -46,8 +38,13 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 }));
+
+// Explicitly handle OPTIONS pre-flight for all routes (Ensures Render/Vercel compatibility)
+app.options('*', cors());
 app.use(express.json());
 
 // MongoDB Connection

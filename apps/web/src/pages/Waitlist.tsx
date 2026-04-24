@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import api from '@/lib/api';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { ShieldCheck, Users, TrendingUp, Banknote, LayoutDashboard, Check, AlertTriangle, TrendingDown, XCircle } from 'lucide-react';
@@ -46,25 +47,14 @@ const Waitlist: React.FC = () => {
     if (Object.keys(v).length) return;
     setLoading(true);
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || '';
-      const response = await fetch(`${apiUrl}/api/waitlist`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          fullName,
-          businessName,
-          phone,
-          email,
-          businessType,
-          challenge,
-        }),
+      await api.post('/api/waitlist', {
+        fullName,
+        businessName,
+        phone,
+        email,
+        businessType,
+        challenge,
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to submit');
-      }
 
       setSuccess(true);
     } catch (err) {
