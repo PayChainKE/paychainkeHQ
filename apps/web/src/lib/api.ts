@@ -11,6 +11,12 @@ const getBaseUrl = (): string => {
   // 1. Check environment variables first (Highest Priority)
   // We check both VITE_API_URL and VITE_API_BASE_URL for consistency
   const envUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL;
+
+  // Debug log for production diagnostics
+  if (import.meta.env.PROD) {
+    console.log("PayChain Web Diagnostic - Current API URL:", envUrl || "FALLBACK DIRECT TO WWW");
+  }
+
   if (envUrl) {
     return envUrl;
   }

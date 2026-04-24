@@ -1,5 +1,5 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useRef, useState } from "react";
+import api from "@/lib/api";
 import styles from "./ContactUs.module.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -187,22 +187,12 @@ export default function ContactUs() {
 
     const submitData = async () => {
       try {
-        const apiUrl = import.meta.env.VITE_API_URL || '';
-        const response = await fetch(`${apiUrl}/api/contact`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(formData),
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to send message');
-        }
-
+        await api.post('/api/contact', formData);
         setIsSuccess(true);
-      } catch (err) {
-        setErrors({ form: 'Unable to send message. Please try again later.' });
+      } catch (err: any) {
+        console.error('Contact error:', err);
+        const msg = err.response?.data?.error || 'Unable to send message. Please try again later.';
+        setErrors({ form: msg });
       } finally {
         setIsSubmitting(false);
       }

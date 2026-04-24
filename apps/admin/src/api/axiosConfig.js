@@ -10,15 +10,17 @@ const getBaseUrl = () => {
   const envUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL;
   
   // Debug log for production diagnostics (Step 1)
-  if (process.env.NODE_ENV === 'production') {
-    console.log("PayChain Diagnostic - Current API URL:", envUrl);
+  if (import.meta.env.PROD) {
+    console.log("PayChain Diagnostic - Current API URL:", envUrl || "FALLBACK DIRECT TO WWW");
   }
 
   if (envUrl) return envUrl;
 
   const hostname = window.location.hostname;
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return 'http://localhost:5000'; // Direct local backend
+    // Return empty string to use Vite Proxy in local development
+    // This resolves CORS issues and uses the proxy defined in vite.config.js
+    return ''; 
   }
 
   // Fallback for production if env isn't reachable

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import api from '@/lib/api';
 
 const NewsletterSignup: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -12,22 +13,18 @@ const NewsletterSignup: React.FC = () => {
     setStatus(null);
 
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || '';
-      const response = await fetch(`${apiUrl}/api/newsletter/subscribe`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
+      const response = await api.post('/api/newsletter/subscribe', { email });
 
-      const data = await response.json();
-      if (response.ok) {
+      if (response.status === 201 || response.status === 200) {
         setStatus({ type: 'success', message: 'Successfully subscribed to our newsletter!' });
         setEmail('');
       } else {
-        setStatus({ type: 'error', message: data.error || 'Failed to subscribe. Please try again.' });
+        setStatus({ type: 'error', message: response.data.error || 'Failed to subscribe. Please try again.' });
       }
-    } catch (err) {
-      setStatus({ type: 'error', message: 'Unable to connect to the server. Please check your connection.' });
+    } catch (err: any) {
+      console.error('Newsletter error:', err);
+      const msg = err.response?.data?.error || 'Unable to connect to the server. Please check your connection.';
+      setStatus({ type: 'error', message: msg });
     } finally {
       setLoading(false);
     }
