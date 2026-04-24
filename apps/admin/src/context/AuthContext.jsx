@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { API_BASE_URL } from '../utils/api';
+import api from '../api/config';
 
 const AuthContext = createContext();
 
@@ -24,12 +24,8 @@ export function AuthProvider({ children }){
   async function login(email, password) {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
-      const data = await response.json();
+      const response = await api.post('/api/admin/auth/login', { email, password });
+      const data = response.data;
       
       if (data.mfaRequired) {
         return { success: true, mfaRequired: true, email: data.email };
@@ -51,12 +47,8 @@ export function AuthProvider({ children }){
   async function verifyOtp(email, otpCode) {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/auth/verify-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, otpCode })
-      });
-      const data = await response.json();
+      const response = await api.post('/api/admin/auth/verify-otp', { email, otpCode });
+      const data = response.data;
       
       if (data.success && data.token) {
         setAdmin(data.adminUser);

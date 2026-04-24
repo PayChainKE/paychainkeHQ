@@ -4,14 +4,35 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const { Resend } = require('resend');
 const { getWelcomeEmailTemplate } = require('./email-templates');
+const { validateEnv } = require('./utils/envValidator');
 const authRoutes = require('./routes/authRoutes');
+
+// Validate environment variables before startup
+validateEnv();
 
 const app = express();
 const resend = new Resend(process.env.RESEND_API_KEY);
 const PORT = process.env.PORT || 5000;
 
 // Middleware
-app.use(cors());
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'https://paychain-admin.vercel.app',
+  'https://admin.paychain.co.ke',
+  'https://www.paychain.co.ke'
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
 app.use(express.json());
 
 // MongoDB Connection
@@ -61,12 +82,12 @@ const contactMessageSchema = new mongoose.Schema({
 const ContactMessage = mongoose.model('ContactMessage', contactMessageSchema);
 
 // Routes
-// Health check endpoint
+// Basic health check
 app.get('/api/health', (req, res) => {
-  const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
-  res.json({
-    status: 'ok',
-    database: dbStatus,
+  res.status(200).json({ 
+    status: 'healthy',
+    mode: process.env.NODE_ENV || 'development',
+    uptime: process.uptime(),
     timestamp: new Date().toISOString()
   });
 });
