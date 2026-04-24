@@ -19,7 +19,7 @@ const Sidebar = ({ isOpen, onClose }) => {
   ];
 
   return (
-    <aside className={`fixed left-0 top-0 h-full w-[240px] bg-[#00351d] flex flex-col py-6 px-4 z-50 transition-transform duration-300 lg:translate-x-0 ${isOpen ? 'translate-x-0 shadow-editorial' : '-translate-x-full'}`}>
+    <aside className={`fixed left-0 top-0 h-full w-[240px] bg-[#162723] flex flex-col py-6 px-4 z-50 transition-transform duration-300 lg:translate-x-0 ${isOpen ? 'translate-x-0 shadow-editorial' : '-translate-x-full'}`}>
       <div className="flex items-center justify-between mb-10 px-2 lg:justify-center">
         <div className="flex flex-col items-center gap-2">
           <img src={logo} alt="PayChain Logo" className="h-8 max-w-full w-auto object-contain" />
@@ -36,10 +36,10 @@ const Sidebar = ({ isOpen, onClose }) => {
             to={item.path}
             onClick={() => window.innerWidth < 1024 && onClose()}
             className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-[13px] font-body font-bold leading-[1.5] tracking-tight ${
+              `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-[13px] font-body font-bold leading-[1.5] tracking-tight relative group ${
                 isActive
-                  ? 'bg-secondary-container/20 text-white shadow-[0_0_15px_rgba(255,255,255,0.05)]'
-                  : 'text-slate-400 hover:text-white hover:bg-white/5'
+                  ? 'bg-[#0E3D2E] text-[#5EFEB3] shadow-[0_0_15px_rgba(94,254,179,0.05)] after:absolute after:left-0 after:top-1 after:bottom-1 after:w-1 after:bg-[#5EFEB3] after:rounded-full'
+                  : 'text-[#c0c9c0] hover:text-white hover:bg-emerald-900/40'
               }`
             }
           >
@@ -50,7 +50,7 @@ const Sidebar = ({ isOpen, onClose }) => {
       </nav>
       <div className="mt-auto pt-6 border-t border-white/10 space-y-4">
         <div className="space-y-2">
-          <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-widest text-slate-400/50 px-2 font-label">
+          <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-widest text-[#c0c9c0]/50 px-2 font-label">
             <span>System Status</span>
           </div>
           <div className="flex items-center gap-2 px-3 py-1.5 text-slate-400 text-[12px] font-medium font-body">
@@ -62,7 +62,7 @@ const Sidebar = ({ isOpen, onClose }) => {
             <span>Merchants: 18</span>
           </div>
           <div className="flex items-center gap-2 px-3 py-1.5 text-slate-400 text-[12px] font-medium font-body">
-            <span className="material-symbols-outlined text-[16px]">mail</span>
+            <span className="material-symbols-outlined text-[16px] opacity-60">mail</span>
             <span>Messages: 6</span>
           </div>
         </div>
