@@ -15,6 +15,7 @@ import UserDashboard from './pages/UserDashboard';
 import Newsletter from './pages/Newsletter';
 import { UsersProvider } from './context/UsersContext';
 import ToastHost from './components/ui/Toast';
+import { Analytics as VercelAnalytics } from "@vercel/analytics/react";
 
 function Protected({ children }){
   const { isAuthenticated, isLoading } = useAuth();
@@ -45,6 +46,7 @@ export default function App(){
             </Routes>
           </UsersProvider>
           <ToastHost />
+          <VercelAnalytics />
         </ToastProvider>
       </AuthProvider>
     </BrowserRouter>
