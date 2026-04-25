@@ -6,6 +6,7 @@ import authRoutes from './routes/authRoutes.js';
 import waitlistRoutes from './routes/waitlistRoutes.js';
 import newsletterRoutes from './routes/newsletterRoutes.js';
 import contactRoutes from './routes/contactRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 
 dotenv.config();
 
@@ -48,7 +49,8 @@ app.use(cors({
 app.use(express.json());
 
 // Routes
-app.use(['/api/auth', '/api/admin/auth'], authRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/waitlist', waitlistRoutes);
 app.use('/api/newsletter', newsletterRoutes);
 app.use('/api/contact', contactRoutes);
