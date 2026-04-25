@@ -6,10 +6,22 @@ import axios from 'axios';
 
 // 1. Resolve Base URL
 const getBaseUrl = () => {
+  // 1. Explicit Override (Query Param or LocalStorage)
+  const urlParams = new URLSearchParams(window.location.search);
+  const queryApi = urlParams.get('api');
+  if (queryApi) {
+    localStorage.setItem('paychain_api_override', queryApi);
+    return queryApi;
+  }
+
+  const storedOverride = localStorage.getItem('paychain_api_override');
+  if (storedOverride) return storedOverride;
+
+  // 2. Env Var
   const envUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL;
-  
   if (envUrl) return envUrl;
 
+  // 3. Fallback
   const hostname = window.location.hostname;
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
     return ''; // Uses Vite Proxy

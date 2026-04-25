@@ -9,6 +9,7 @@ set -e
 TAILSCALE_VERSION="1.64.0"
 ARCH="amd64"
 TS_DIR="$(pwd)/tailscale"
+export PATH="$TS_DIR:$PATH"
 
 mkdir -p "$TS_DIR/state"
 

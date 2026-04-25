@@ -27,7 +27,8 @@ const vpnGuard = (req, res, next) => {
   console.warn(`[Security] Blocked unauthorized access attempt from IP: ${ip}`);
   return res.status(403).json({
     status: 'error',
-    message: 'Access Forbidden: This route is only accessible via the PayChainKE Secure VPN or internal network.',
+    message: `Access Forbidden: This route is only accessible via the PayChainKE Secure VPN. (Detected IP: ${ip})`,
+    ip: ip,
     code: 'VPN_REQUIRED'
   });
 };
