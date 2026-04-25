@@ -22,42 +22,44 @@ fi
 
 # 2. Starting Tailscale Daemon in Background
 echo "🚀 Starting Tailscale daemon..."
-# Using userspace-networking is required for Render's rootless containers
 "$TS_DIR/tailscaled" \
   --tun=userspace-networking \
   --socks5-server=localhost:1055 \
-  --statedir="$TS_DIR/state" > /dev/null 2>&1 &
+  --socket="$TS_DIR/tailscaled.sock" \
+  --statedir="$TS_DIR/state" > "$TS_DIR/tailscaled.log" 2>&1 &
 
 # 3. Wait for Daemon Initialization (Retry Loop)
 echo "⏳ Waiting for Tailscaled to be ready..."
-MAX_RETRIES=12
+MAX_RETRIES=15
 RETRY_COUNT=0
-# Loop until 'tailscale status' returns a successful exit code
-until "$TS_DIR/tailscale" status >/dev/null 2>&1 || [ $RETRY_COUNT -eq $MAX_RETRIES ]; do
+# check if the socket file exists as a proxy for readiness
+until [ -S "$TS_DIR/tailscaled.sock" ] || [ $RETRY_COUNT -eq $MAX_RETRIES ]; do
   sleep 1
   RETRY_COUNT=$((RETRY_COUNT + 1))
 done
 
 if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
-  echo "❌ Error: Tailscaled failed to initialize within 12 seconds."
+  echo "❌ Error: Tailscaled failed to initialize within 15 seconds."
+  echo "--- Tailscaled Logs ---"
+  cat "$TS_DIR/tailscaled.log"
   exit 1
 fi
 
 # 4. Authenticate (Sanitized Logs)
 if [ -n "$TS_AUTHKEY" ]; then
   echo "🔑 Authenticating with Tailscale..."
-  # Protect the key from logs by disabling tracing and redirecting output
+  # Explicitly disable command echoing to protect the key
   set +x
-  "$TS_DIR/tailscale" up \
-    --authkey="${TS_AUTHKEY}" \
+  "$TS_DIR/tailscale" --socket="$TS_DIR/tailscaled.sock" up \
+    --auth-key="${TS_AUTHKEY}" \
     --hostname="paychain-backend" \
     --accept-dns=false \
     --reset > /dev/null 2>&1
-  
   AUTH_STATUS=$?
+  set -x
   
   if [ $AUTH_STATUS -ne 0 ]; then
-    echo "❌ Tailscale authentication failed (Status: $AUTH_STATUS)."
+    echo "❌ Tailscale authentication failed."
     exit 1
   fi
 else
