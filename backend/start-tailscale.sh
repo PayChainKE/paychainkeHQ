@@ -32,7 +32,11 @@ sleep 3
 # Authenticate
 if [ -n "$TS_AUTHKEY" ]; then
   echo "🔑 Authenticating with Tailscale..."
-  "$TS_DIR/tailscale" up --authkey="$TS_AUTHKEY" --hostname="paychain-backend" ${TS_EXTRA_ARGS}
+  "$TS_DIR/tailscale" up \
+    --auth-key="$TS_AUTHKEY" \
+    --hostname="paychain-backend" \
+    --accept-dns=false \
+    --reset ${TS_EXTRA_ARGS}
 else
   echo "⚠️ TS_AUTHKEY not set. Local VPN access may fail."
 fi
