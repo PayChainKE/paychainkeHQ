@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/layout/Layout';
+import api from '../api/api';
 
 const Overview = () => {
   const [waitlist, setWaitlist] = useState([]);
@@ -10,17 +11,16 @@ const Overview = () => {
     const fetchData = async () => {
       try {
         const [waitlistRes, messagesRes] = await Promise.all([
-          fetch('/api/waitlist'),
-          fetch('/api/contact')
+          api.get('/api/waitlist'),
+          api.get('/api/contact')
         ]);
-        const [waitlistJson, messagesJson] = await Promise.all([
-          waitlistRes.json(),
-          messagesRes.json()
-        ]);
-        setWaitlist(waitlistJson);
-        setMessages(messagesJson);
+        
+        setWaitlist(Array.isArray(waitlistRes.data) ? waitlistRes.data : []);
+        setMessages(Array.isArray(messagesRes.data) ? messagesRes.data : []);
       } catch (err) {
         console.error('Error fetching overview data:', err);
+        setWaitlist([]);
+        setMessages([]);
       } finally {
         setLoading(false);
       }
@@ -29,11 +29,11 @@ const Overview = () => {
   }, []);
 
   const stats = {
-    total: waitlist.length,
-    pending: waitlist.filter(w => w.status?.toLowerCase() === 'pending').length,
-    approved: waitlist.filter(w => w.status?.toLowerCase() === 'approved').length,
-    converted: waitlist.filter(w => w.status?.toLowerCase() === 'converted' || w.status?.toLowerCase() === 'active').length,
-    kyc: waitlist.filter(w => w.status?.toLowerCase() === 'kyc').length,
+    total: Array.isArray(waitlist) ? waitlist.length : 0,
+    pending: Array.isArray(waitlist) ? waitlist.filter(w => w.status?.toLowerCase() === 'pending').length : 0,
+    approved: Array.isArray(waitlist) ? waitlist.filter(w => w.status?.toLowerCase() === 'approved').length : 0,
+    converted: Array.isArray(waitlist) ? waitlist.filter(w => w.status?.toLowerCase() === 'converted' || w.status?.toLowerCase() === 'active').length : 0,
+    kyc: Array.isArray(waitlist) ? waitlist.filter(w => w.status?.toLowerCase() === 'kyc').length : 0,
   };
 
   const recentActivity = messages.slice(0, 5).map(m => ({

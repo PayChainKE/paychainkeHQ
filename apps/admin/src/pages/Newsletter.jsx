@@ -12,7 +12,7 @@ export default function Newsletter() {
     const fetchData = async () => {
       try {
         const response = await api.get('/api/newsletter');
-        setSubscribers(response.data);
+        setSubscribers(Array.isArray(response.data) ? response.data : []);
       } catch (err) {
         setError(err.message);
       } finally {

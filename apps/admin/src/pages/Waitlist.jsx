@@ -12,7 +12,7 @@ const Waitlist = () => {
     const fetchData = async () => {
       try {
         const response = await api.get('/api/waitlist');
-        const json = response.data;
+        const json = Array.isArray(response.data) ? response.data : [];
         // Map backend fields to frontend expected fields if necessary
         const mapped = json.map(item => ({
           id: item._id,
