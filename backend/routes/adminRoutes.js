@@ -1,11 +1,7 @@
 import express from 'express';
-import vpnGuard from '../middleware/vpnGuard.js';
 import authRoutes from './authRoutes.js';
 
 const router = express.Router();
-
-// Apply VPN Guard to all admin routes
-router.use(vpnGuard);
 
 // Admin Auth Routes
 router.use('/auth', authRoutes);
