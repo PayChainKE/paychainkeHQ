@@ -13,8 +13,6 @@ export const login = async (req, res) => {
 
   try {
     // 1. Find Admin
-    const adminCount = await Admin.countDocuments();
-    console.log(`📊 Current Admin collection count: ${adminCount}`);
     
     const admin = await Admin.findOne({ email });
     if (!admin) {
@@ -41,10 +39,11 @@ export const login = async (req, res) => {
     await admin.save();
     console.log(`💾 OTP [${otp}] saved to DB for: ${email}`);
 
-    // 5. Send via Resend
-    console.log(`📧 Attempting to send OTP via Resend to: ${admin.email}`);
-    await sendOTP(admin.email, otp);
-    console.log(`✅ Resend OTP call completed for: ${email}`);
+    // 5. Send via Resend (Non-blocking for faster response)
+    console.log(`📧 Dispatching OTP via Resend to: ${admin.email}`);
+    sendOTP(admin.email, otp).catch(err => {
+      console.error(`📧 Resend Error: Failed to send OTP to ${admin.email}:`, err);
+    });
 
     // 6. Success Response
     res.json({ 
