@@ -36,20 +36,19 @@ const Overview = () => {
     kyc: Array.isArray(waitlist) ? waitlist.filter(w => w.status?.toLowerCase() === 'kyc').length : 0,
   };
 
-  const recentActivity = messages.slice(0, 5).map(m => ({
+  const recentActivity = Array.isArray(messages) ? messages.slice(0, 5).map(m => ({
     type: 'Message',
-    label: m.subject,
-    entity: m.name,
-    time: new Date(m.createdAt).toLocaleDateString(),
+    label: m.subject || 'No Subject',
+    entity: m.name || 'Anonymous',
+    time: m.createdAt ? new Date(m.createdAt).toLocaleDateString() : 'N/A',
     color: 'bg-blue-500'
-  }));
+  })) : [];
 
-  const topMerchants = []; // Placeholder or fetch actual merchants if endpoint exists
+  const topMerchants = []; // Placeholder
 
   return (
     <Layout>
       <div className="space-y-10">
-        {/* Page Title Area */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 mb-8">
           <div>
             <h2 className="text-[28px] md:text-[32px] font-bold text-on-surface tracking-tighter font-headline">System Overview</h2>
@@ -63,7 +62,6 @@ const Overview = () => {
           </div>
         </div>
 
-        {/* Waitlist Stats Row */}
         <section>
           <div className="flex items-center gap-3 mb-4 text-slate-400">
             <span className="text-[11px] font-bold uppercase tracking-widest font-label">Waitlist Pipeline</span>
@@ -103,9 +101,7 @@ const Overview = () => {
           </div>
         </section>
 
-        {/* Charts Row */}
         <section className="grid grid-cols-1 lg:grid-cols-10 gap-6">
-          {/* Area Chart Placeholder */}
           <div className="lg:col-span-6 bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/10 shadow-editorial">
             <div className="flex items-center justify-between mb-8">
               <div>
@@ -132,7 +128,6 @@ const Overview = () => {
               <div className="flex-1 bg-primary h-[50%] rounded-t-sm"></div>
             </div>
           </div>
-          {/* Doughnut Chart Area */}
           <div className="lg:col-span-4 bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/10 shadow-editorial flex flex-col">
             <h3 className="text-[16px] font-semibold text-on-surface mb-6">Merchant Composition</h3>
             <div className="flex-1 flex items-center justify-center relative">
@@ -161,7 +156,6 @@ const Overview = () => {
           </div>
         </section>
 
-        {/* Pipeline Funnel */}
         <section>
           <div className="flex items-center gap-3 mb-4 text-slate-400">
             <span className="text-[11px] font-bold uppercase tracking-widest font-label">Pipeline Funnel</span>
@@ -177,9 +171,7 @@ const Overview = () => {
           </div>
         </section>
 
-        {/* Bottom Data Tables */}
         <section className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-          {/* Recent Activity */}
           <div>
             <div className="flex items-center justify-between mb-4 px-1">
               <h3 className="text-[16px] font-semibold text-on-surface">Recent activity</h3>
@@ -196,12 +188,16 @@ const Overview = () => {
                       <td className="px-5 py-4 text-[11px] text-on-surface-variant/40 font-bold uppercase tracking-widest text-right">{act.time}</td>
                     </tr>
                   ))}
+                  {recentActivity.length === 0 && (
+                    <tr>
+                      <td colSpan="4" className="px-5 py-8 text-center text-on-surface-variant/40">No recent activity detected.</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
           </div>
 
-          {/* Top Merchants */}
           <div>
             <div className="flex items-center justify-between mb-4 px-1">
               <h3 className="text-[16px] font-semibold text-on-surface">Top ranked merchants</h3>
@@ -244,6 +240,11 @@ const Overview = () => {
                       </td>
                     </tr>
                   ))}
+                  {topMerchants.length === 0 && (
+                    <tr>
+                      <td colSpan="4" className="px-6 py-8 text-center text-on-surface-variant/40">No high-ranking merchants identified yet.</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
