@@ -7,12 +7,7 @@ set -e
 
 TAILSCALE_VERSION="1.64.0"
 ARCH="amd64"
-TS_DIR="/home/render/tailscale" # Or relative path if outside /home/render
-
-# Fallback to current directory if not on Render home
-if [ ! -d "/home/render" ]; then
-  TS_DIR="$(pwd)/tailscale"
-fi
+TS_DIR="$(pwd)/tailscale"
 
 mkdir -p "$TS_DIR/state"
 
