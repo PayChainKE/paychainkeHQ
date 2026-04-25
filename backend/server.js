@@ -36,15 +36,22 @@ app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('vercel.app')) {
+    
+    const isAllowed = allowedOrigins.includes(origin) || (origin && origin.includes('vercel.app'));
+    
+    if (isAllowed) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      console.warn(`⚠️ CORS blocked for origin: ${origin}`);
+      // Returning false instead of an Error prevents the CORS middleware from 
+      // skipping the response headers, which helps avoid "No Access-Control-Allow-Origin" errors
+      callback(null, false);
     }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  optionsSuccessStatus: 200 // Some older browsers (IE11, various SmartTVs) choke on 204
 }));
 app.use(express.json());
 
