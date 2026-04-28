@@ -37,7 +37,7 @@ const item = {
 const CoreBenefits: React.FC = () => {
   return (
     <section className="bg-white text-[#0A192F]">
-      <div className="container mx-auto px-6 lg:px-8 py-12 md:py-20">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-20">
         <div className="max-w-3xl mx-auto text-center">
           <div className="inline-block text-xs font-semibold tracking-widest uppercase text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full mb-4">
             BENEFITS
@@ -48,7 +48,7 @@ const CoreBenefits: React.FC = () => {
           <p className="mt-3 text-sm text-slate-500">Convenience Redefined</p>
         </div>
 
-        <motion.div variants={container} initial="hidden" whileInView="show" viewport={{ once: true }} className="mt-10 grid gap-12 grid-cols-1 md:grid-cols-3">
+        <motion.div variants={container} initial="hidden" whileInView="show" viewport={{ once: true }} className="mt-10 grid gap-8 md:gap-12 grid-cols-1 md:grid-cols-3">
           {benefits.map((b) => (
             <motion.div
               key={b.title}

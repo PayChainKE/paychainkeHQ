@@ -3,102 +3,62 @@ import { ArrowRight } from 'lucide-react';
 
 const Hero: React.FC = () => (
   <section className="w-full bg-white overflow-hidden relative">
-    <div className="max-w-7xl mx-auto px-6 sm:px-10 lg:px-16 flex flex-col lg:flex-row items-center gap-10 lg:gap-0 py-12 sm:py-16 lg:py-20">
+    <div className="max-w-7xl mx-auto px-6 sm:px-10 lg:px-16 flex flex-col lg:flex-row items-center gap-12 lg:gap-8 py-12 sm:py-16 lg:py-20">
 
       {/* Left — text content */}
-      <div className="w-full lg:w-1/2 flex flex-col items-start lg:-ml-12 relative z-10">
-        <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-black leading-tight">
-          Simple tools for<br />a <span className="bitcount-prop-double-ink-001" style={{ color: '#00bf63' }}>secure</span> business.
+      <div className="w-full lg:w-1/2 flex flex-col items-start relative z-10">
+        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-black leading-tight">
+          Simple tools for<br />a <span className="text-[#00bf63]">secure</span> business.
         </h1>
-        <p className="mt-4 text-sm sm:text-base lg:text-lg text-gray-600 leading-relaxed max-w-lg">
+        <p className="mt-6 text-base sm:text-lg text-gray-600 leading-relaxed max-w-lg">
           <strong>Paychain</strong> makes it simple for your business to accept secure payments while providing inflation protection, bulk payouts, and automated business tools.
         </p>
 
-        {/* CTA Button — desktop only */}
-        <div className="hidden lg:block mt-6 self-start">
-          <div className="flex flex-row gap-4 mt-[0.5cm]">
-            <a
-              href="/waitlist"
-              className="inline-flex items-center justify-center px-6 py-3 text-sm sm:text-base rounded-lg bg-black text-white font-semibold hover:bg-gray-800 transition-colors cursor-pointer whitespace-nowrap"
-            >
-              Get Started <ArrowRight className="w-5 h-5 ml-2" />
-            </a>
-          </div>
+        {/* CTA Button */}
+        <div className="mt-8">
+          <a
+            href="/waitlist"
+            className="inline-flex items-center justify-center px-8 py-4 text-base rounded-xl bg-black text-white font-semibold hover:bg-gray-800 transition-colors cursor-pointer shadow-lg hover:shadow-xl"
+          >
+            Get Started <ArrowRight className="w-5 h-5 ml-2" />
+          </a>
         </div>
 
-        {/* Trusted by badge — desktop only (shown below button) */}
-        <div className="hidden lg:flex items-center gap-3 mt-6">
-          <div className="flex items-center gap-3 mt-[2cm]">
-            <div className="flex -space-x-3">
-              {['/Home page/merchant 1.png', '/Home page/merchant 2.png', '/Home page/merchant 3.png'].map((src, i) => (
-                <img
-                  key={i}
-                  src={src}
-                  alt={`Merchant ${i + 1}`}
-                  className="w-8 h-8 rounded-full border-2 border-white object-cover"
-                />
-              ))}
-            </div>
-            <div className="flex flex-col items-start ml-4">
-              <div className="flex gap-0.5">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <svg key={i} className="w-4 h-4 text-yellow-500 fill-yellow-500" viewBox="0 0 20 20">
-                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.957a1 1 0 00.95.69h4.162c.969 0 1.371 1.24.588 1.81l-3.37 2.448a1 1 0 00-.364 1.118l1.286 3.957c.3.921-.755 1.688-1.54 1.118l-3.37-2.448a1 1 0 00-1.175 0l-3.37 2.448c-.784.57-1.838-.197-1.539-1.118l1.286-3.957a1 1 0 00-.364-1.118L2.063 9.384c-.783-.57-.38-1.81.588-1.81h4.162a1 1 0 00.95-.69L9.049 2.927z" />
-                  </svg>
-                ))}
-              </div>
-              <span className="text-sm font-medium text-gray-700 whitespace-nowrap mt-2">
-                Trusted by <span className="font-bold text-black">5,000+</span> merchants &amp; enterprises
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Right — design image (mobile: in flow, desktop: absolute right edge) */}
-      <div className="w-full flex items-center justify-center relative z-0 mt-6 lg:mt-0 lg:absolute lg:right-[5cm] lg:top-0 lg:h-full lg:w-1/2 lg:justify-end">
-        <img
-          src="/Home page/design 1.png"
-          alt="Paychain app design"
-          className="w-full max-w-sm sm:max-w-md md:max-w-lg lg:h-full lg:w-auto lg:max-w-none h-auto object-contain transform scale-[1.5]"
-        />
-
-        {/* Mobile CTA — overlayed at bottom-center of the image */}
-        <div className="absolute bottom-6 left-4 transform translate-y-[2cm] z-20 lg:hidden">
-          <div className="flex flex-row gap-4 mt-[2.5cm]">
-            <a
-              href="/waitlist"
-              className="inline-flex items-center justify-center px-6 py-3 text-sm rounded-lg bg-black text-white font-semibold hover:bg-gray-800 transition-colors cursor-pointer whitespace-nowrap"
-            >
-              Get Started <ArrowRight className="w-5 h-5 ml-2" />
-            </a>
-          </div>
-        </div>
-      </div>
-
-      {/* Trusted by badge — mobile only (stack images above text, left-aligned on small screens) */}
-      <div className="flex lg:hidden flex-col items-start gap-3 w-full mt-[1.5cm] lg:mt-0">
-        <div className="flex -space-x-3">
-          {['/Home page/merchant 1.png', '/Home page/merchant 2.png', '/Home page/merchant 3.png'].map((src, i) => (
-            <img
-              key={i}
-              src={src}
-              alt={`Merchant ${i + 1}`}
-              className="w-8 h-8 rounded-full border-2 border-white object-cover"
-            />
-          ))}
-        </div>
-        <div className="flex flex-col gap-0.5 items-start">
-          <div className="flex gap-0.5">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <svg key={i} className="w-4 h-4 text-yellow-500 fill-yellow-500" viewBox="0 0 20 20">
-                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.957a1 1 0 00.95.69h4.162c.969 0 1.371 1.24.588 1.81l-3.37 2.448a1 1 0 00-.364 1.118l1.286 3.957c.3.921-.755 1.688-1.54 1.118l-3.37-2.448a1 1 0 00-1.175 0l-3.37 2.448c-.784.57-1.838-.197-1.539-1.118l1.286-3.957a1 1 0 00-.364-1.118L2.063 9.384c-.783-.57-.38-1.81.588-1.81h4.162a1 1 0 00.95-.69L9.049 2.927z" />
-              </svg>
+        {/* Trusted by badge */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mt-10">
+          <div className="flex -space-x-3">
+            {['/Home page/merchant 1.png', '/Home page/merchant 2.png', '/Home page/merchant 3.png'].map((src, i) => (
+              <img
+                key={i}
+                src={src}
+                alt={`Merchant ${i + 1}`}
+                className="w-10 h-10 rounded-full border-2 border-white object-cover shadow-sm"
+              />
             ))}
           </div>
-          <span className="text-sm font-medium text-gray-700 text-left">
-            Trusted by <span className="font-bold text-black">5,000+</span> merchants &amp; enterprises
-          </span>
+          <div className="flex flex-col items-start">
+            <div className="flex gap-1 mb-1">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <svg key={i} className="w-4 h-4 text-yellow-500 fill-yellow-500" viewBox="0 0 20 20">
+                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.957a1 1 0 00.95.69h4.162c.969 0 1.371 1.24.588 1.81l-3.37 2.448a1 1 0 00-.364 1.118l1.286 3.957c.3.921-.755 1.688-1.54 1.118l-3.37-2.448a1 1 0 00-1.175 0l-3.37 2.448c-.784.57-1.838-.197-1.539-1.118l1.286-3.957a1 1 0 00-.364-1.118L2.063 9.384c-.783-.57-.38-1.81.588-1.81h4.162a1 1 0 00.95-.69L9.049 2.927z" />
+                </svg>
+              ))}
+            </div>
+            <span className="text-sm font-medium text-gray-700">
+              Trusted by <span className="font-bold text-black">5,000+</span> merchants &amp; enterprises
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Right — design image */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center relative z-0 mt-8 lg:mt-0">
+        <div className="relative w-full max-w-lg lg:max-w-xl xl:max-w-2xl flex justify-center">
+          <img
+            src="/Home page/design 1.png"
+            alt="Paychain app design"
+            className="w-[120%] sm:w-[100%] h-auto object-contain object-center scale-[1.1] sm:scale-100"
+          />
         </div>
       </div>
 
