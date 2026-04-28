@@ -6,6 +6,7 @@ import Features from '@/components/Features';
 import ProblemSolution from '@/components/ProblemSolution';
 import CoreBenefits from '@/components/CoreBenefits';
 import ComparisonTable from '@/components/ComparisonTable';
+import MobileAppCTA from '@/components/MobileAppCTA';
 import TechnicalSpecs from '@/components/TechnicalSpecs';
 import Footer from '@/components/Footer';
 
@@ -17,6 +18,7 @@ const Index: React.FC = () => {
       <Features />
       <CoreBenefits />
       <ComparisonTable />
+      <MobileAppCTA />
       <ProblemSolution />
       <TechnicalSpecs />
       <Footer />
