@@ -22,7 +22,7 @@ const Hero: React.FC = () => {
   return (
     <section className="relative w-full flex items-center justify-center overflow-hidden bg-white bg-[url('/hero-bg.png')] bg-cover bg-top md:bg-[center_-200px] lg:bg-[center_-380px] bg-no-repeat">
       {/* Background Overlay for text readability */}
-      <div className="absolute inset-0 bg-gradient-to-r from-[#00bf63] via-[#00bf63]/90 to-transparent z-0"></div>
+      <div className="absolute inset-0 bg-gradient-to-r from-[#00351d] via-[#00351d]/90 to-transparent z-0"></div>
 
       <div className="relative z-10 w-full max-w-7xl mx-auto px-6 sm:px-10 lg:px-16 flex flex-col lg:flex-row items-center gap-16 py-16 lg:py-24">
         
@@ -35,8 +35,8 @@ const Hero: React.FC = () => {
         >
 
 
-          <motion.h1 variants={itemVariants} className="text-4xl sm:text-5xl lg:text-6xl font-bold text-emerald-900 leading-tight">
-            Simple tools for<br />a <span className="text-[#FBF8F1]">secure</span> business.
+          <motion.h1 variants={itemVariants} className="text-4xl sm:text-5xl lg:text-6xl font-bold text-[#FBF8F1] leading-tight">
+            Simple tools for<br />a <span className="text-emerald-400">secure</span> business.
           </motion.h1>
 
           <motion.p variants={itemVariants} className="mt-6 text-base sm:text-lg text-[#FBF8F1] leading-relaxed max-w-lg font-medium">
@@ -47,7 +47,7 @@ const Hero: React.FC = () => {
           <motion.div variants={itemVariants} className="mt-8 flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full sm:w-auto">
             <a
               href="/waitlist"
-              className="inline-flex items-center justify-center px-6 py-2.5 text-sm rounded-lg bg-black text-white font-semibold hover:bg-gray-800 transition-colors cursor-pointer shadow-lg hover:shadow-xl"
+              className="inline-flex items-center justify-center px-6 py-2.5 text-sm rounded-lg bg-emerald-400 text-emerald-950 font-extrabold hover:bg-emerald-300 transition-colors cursor-pointer shadow-lg hover:shadow-xl"
             >
               Start Growing Today <ArrowRight className="w-4 h-4 ml-1.5" />
             </a>

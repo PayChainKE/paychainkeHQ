@@ -90,7 +90,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
 
               {/* Logo */}
               <Link to="/" className="flex items-center gap-3" onClick={() => setIsMobileMenuOpen(false)}>
-                <img src="/logo.png" alt="PayChain KE Logo" className="h-6 md:h-8 w-auto border border-green-500" />
+                <img src="/Home page/paychain official logo.png" alt="PayChain KE Logo" className="h-6 md:h-8 w-auto mix-blend-multiply" />
               </Link>
             </div>
 

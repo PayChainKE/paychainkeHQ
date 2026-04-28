@@ -5,7 +5,7 @@ const MobileAppCTA: React.FC = () => {
   return (
     <section className="relative w-full py-24 bg-white overflow-hidden">
       <div className="max-w-7xl mx-auto px-6 sm:px-10 lg:px-16">
-        <div className="bg-emerald-900 rounded-3xl overflow-hidden shadow-2xl relative flex flex-col lg:flex-row items-center justify-between">
+        <div className="bg-[#00351d] rounded-3xl overflow-hidden shadow-2xl relative flex flex-col lg:flex-row items-center justify-between">
           
           {/* Professional Dot Pattern Overlay */}
           <div className="absolute inset-0 z-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(255,255,255,0.8) 1px, transparent 0)', backgroundSize: '24px 24px' }}></div>
