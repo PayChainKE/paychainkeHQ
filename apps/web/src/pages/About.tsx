@@ -4,6 +4,7 @@ import Footer from '@/components/Footer'
 import TrustBar from '@/components/TrustBar'
 import './about.css'
 import initAbout from './about.js'
+import AboutProblemSolution from '@/components/AboutProblemSolution'
 
 /*
   About.tsx
@@ -45,6 +46,17 @@ export default function About(): JSX.Element {
         sameAs: ['https://twitter.com/paychainke']
       })
       document.head.appendChild(ld)
+    }
+
+    // Handle anchor links (e.g. from the homepage)
+    if (window.location.hash) {
+      setTimeout(() => {
+        const id = window.location.hash.substring(1);
+        const element = document.getElementById(id);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 500); // Wait for initial render/animations to settle
     }
 
     // Preload display font for hero headline to avoid CLS
@@ -93,6 +105,8 @@ export default function About(): JSX.Element {
             <p>PayChain was not born in a boardroom. It was born out of proximity to that frustration. And it is being built to eliminate it — permanently.</p>
           </div>
         </section>
+
+        <AboutProblemSolution />
 
         {/* STATS */}
         <section className="about__stats" aria-labelledby="stats-heading">

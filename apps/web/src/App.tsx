@@ -29,6 +29,7 @@ import Checkout from "./pages/Checkout";
 import LoadingScreen from "./components/LoadingScreen";
 import ScrollToTop from "./components/ScrollToTop";
 import { CartProvider } from "./context/CartContext";
+import FloatingWhatsApp from "./components/FloatingWhatsApp";
 
 const queryClient = new QueryClient();
 
@@ -95,6 +96,7 @@ const App = () => {
               </BrowserRouter>
             </CartProvider>
             <Analytics />
+            <FloatingWhatsApp />
           </>
         )}
       </TooltipProvider>

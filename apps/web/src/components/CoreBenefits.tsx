@@ -1,73 +1,83 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Shield, Zap, Eye } from 'lucide-react';
+import { ShieldAlert, TrendingDown, Users, Landmark } from 'lucide-react';
 
-const benefits = [
+const fadeUp = {
+  hidden: { opacity: 0, y: 30 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] } }
+};
+
+const problems = [
   {
-    title: 'Security by Design',
-    desc: 'Our Sentinel AI and bank-grade encryption protocols ensure your transaction data and Truth Layer verification are protected at all times.',
-    icon: <Shield className="w-5 h-5 text-emerald-600" />,
+    title: 'Fake M-PESA payments.',
+    desc: 'Customers show you a screenshot claiming they paid. You have no way to verify it in real time. You release the goods. The money never arrives.',
+    icon: <ShieldAlert className="w-6 h-6" />,
+    color: 'bg-red-50 text-red-600',
   },
   {
-    title: 'Radical Transparency',
-    desc: 'Experience a unified, real-time view of your KES and USDC assets, anchored to an immutable ledger on the Base L2 blockchain.',
-    icon: <Eye className="w-5 h-5 text-emerald-600" />,
+    title: 'The shilling dropping.',
+    desc: 'You work hard, collect KES, and watch your purchasing power quietly disappear every month especially if you buy imported goods.',
+    icon: <TrendingDown className="w-6 h-6" />,
+    color: 'bg-orange-50 text-orange-600',
   },
   {
-    title: 'Industrial-Grade Reliability',
-    desc: "Engineered for 100% uptime with Jenga API v3 and Africa's Talking USSD fallbacks.",
-    icon: <Zap className="w-5 h-5 text-emerald-600" />,
+    title: 'Payroll chaos.',
+    desc: 'Every month you spend hours sending individual M-PESA transfers to your staff one by one. It is exhausting and prone to mistakes.',
+    icon: <Users className="w-6 h-6" />,
+    color: 'bg-yellow-50 text-yellow-600',
+  },
+  {
+    title: 'Banks saying no.',
+    desc: 'You go for a business loan. They ask for a title deed you do not have. Application rejected. Again.',
+    icon: <Landmark className="w-6 h-6" />,
+    color: 'bg-slate-100 text-slate-600',
   },
 ];
 
-const container = {
-  hidden: {},
-  show: {
-    transition: {
-      staggerChildren: 0.05,
-    },
-  },
-};
-
-const item = {
-  hidden: { opacity: 0, y: 12 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.45 } },
-};
-
 const CoreBenefits: React.FC = () => {
   return (
-    <section className="bg-white text-[#0A192F]">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-20">
-        <div className="max-w-3xl mx-auto text-center">
-          <div className="inline-block text-xs font-semibold tracking-widest uppercase text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full mb-4">
-            BENEFITS
-          </div>
-          <h2 className="text-3xl sm:text-4xl font-bold leading-tight">
-            Get the benefits of a Hybrid business OS
-          </h2>
-          <p className="mt-3 text-sm text-slate-500">Convenience Redefined</p>
-        </div>
+    <section className="relative py-16 sm:py-24 bg-gray-50 overflow-hidden">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+          
+          {/* Left Column: Headline */}
+          <motion.div 
+            initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp}
+            className="lg:col-span-5 lg:sticky lg:top-32"
+          >
+            <span className="inline-block px-4 py-1.5 rounded-full bg-red-100 text-red-800 text-sm font-bold tracking-wider uppercase border border-red-200 mb-6 shadow-sm">
+              The Reality
+            </span>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 leading-[1.1] tracking-tight mb-6">
+              PayChain is a financial dashboard built for Kenyan business owners.
+            </h2>
+            <p className="text-base sm:text-lg text-gray-600 leading-relaxed max-w-md">
+              Imagine you run a shop, restaurant, or any business in Kenya. Right now you probably deal with four frustrating problems every day:
+            </p>
+          </motion.div>
 
-        <motion.div variants={container} initial="hidden" whileInView="show" viewport={{ once: true }} className="mt-10 grid gap-8 md:gap-12 grid-cols-1 md:grid-cols-3">
-          {benefits.map((b) => (
-            <motion.div
-              key={b.title}
-              variants={item}
-              whileHover={{ y: -6, boxShadow: '0 30px 60px rgba(10,25,47,0.12)' }}
-              className="bg-white border border-transparent hover:border-emerald-100 transition-all duration-300 rounded-2xl p-6"
-            >
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-lg bg-emerald-50 flex items-center justify-center">
-                  {b.icon}
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-[#0A192F]">{b.title}</h3>
-                  <p className="mt-2 text-sm text-slate-600">{b.desc}</p>
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </motion.div>
+          {/* Right Column: The 4 Frustrations */}
+          <div className="lg:col-span-7">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+              {problems.map((p) => (
+                <motion.div 
+                  key={p.title}
+                  initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp}
+                  className="bg-white p-6 sm:p-8 rounded-[1.5rem] border border-gray-100 shadow-[0_4px_20px_rgb(0,0,0,0.03)] hover:shadow-lg transition-shadow relative overflow-hidden"
+                >
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-6 ${p.color}`}>
+                    {p.icon}
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-3">{p.title}</h3>
+                  <p className="text-sm sm:text-base text-gray-600 leading-relaxed font-medium">
+                    {p.desc}
+                  </p>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+
+        </div>
       </div>
     </section>
   );

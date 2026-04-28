@@ -36,7 +36,27 @@ const Hero: React.FC = () => {
 
 
           <motion.h1 variants={itemVariants} className="text-4xl sm:text-5xl lg:text-6xl font-bold text-[#FBF8F1] leading-tight">
-            Simple tools for<br />a <span className="text-emerald-400">secure</span> business.
+            Simple tools for<br />a{' '}
+            <span className="relative inline-block text-emerald-400">
+              secure
+              <svg
+                className="absolute left-0 -bottom-1 sm:-bottom-2 w-full h-3 sm:h-4 text-emerald-400"
+                viewBox="0 0 100 12"
+                preserveAspectRatio="none"
+              >
+                <motion.path
+                  d="M2,8 C30,2 70,2 98,8"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  initial={{ pathLength: 0, opacity: 0 }}
+                  animate={{ pathLength: 1, opacity: 1 }}
+                  transition={{ duration: 1, delay: 0.8, ease: "easeOut" }}
+                />
+              </svg>
+            </span>{' '}
+            business.
           </motion.h1>
 
           <motion.p variants={itemVariants} className="mt-6 text-base sm:text-lg text-[#FBF8F1] leading-relaxed max-w-lg font-medium">
@@ -77,7 +97,7 @@ const Hero: React.FC = () => {
                     ))}
                   </div>
                   <span className="text-sm font-medium text-[#FBF8F1]">
-                    <span className="font-bold text-[#FBF8F1]">5,000+</span> active merchants
+                    <span className="font-bold text-emerald-400">5,000+</span> active merchants
                   </span>
                 </div>
               </div>

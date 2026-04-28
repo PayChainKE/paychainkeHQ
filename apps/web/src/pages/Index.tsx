@@ -3,8 +3,6 @@ import Navbar from '@/components/Navbar';
 import Hero from '@/components/Hero';
 // TrustBar removed from homepage — moved to About page
 import Features from '@/components/Features';
-import ProblemSolution from '@/components/ProblemSolution';
-import CoreBenefits from '@/components/CoreBenefits';
 import ComparisonTable from '@/components/ComparisonTable';
 import MobileAppCTA from '@/components/MobileAppCTA';
 import TechnicalSpecs from '@/components/TechnicalSpecs';
@@ -16,10 +14,8 @@ const Index: React.FC = () => {
       <Navbar />
       <Hero />
       <Features />
-      <CoreBenefits />
       <ComparisonTable />
       <MobileAppCTA />
-      <ProblemSolution />
       <TechnicalSpecs />
       <Footer />
     </div>

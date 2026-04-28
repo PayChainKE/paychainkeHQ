@@ -46,7 +46,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
 
   const navItems = [
     { path: '/', label: 'Home', icon: Home },
-    { path: '/about', label: 'About Us', icon: FileCode },
+    { path: '/about', label: 'Who We Are', icon: FileCode },
     {
       path: '/products',
       label: 'Products',
