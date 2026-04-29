@@ -106,7 +106,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
                       <button
                         onClick={() => setIsResourcesDropdownOpen(!isResourcesDropdownOpen)}
                         className={cn(
-                          "flex items-center gap-2 px-3 py-2 text-sm font-medium transition-all duration-200",
+                          "flex items-center gap-2 px-3 py-2 text-sm font-bold transition-all duration-200",
                           "text-gray-700 hover:text-gray-900"
                         )}
                       >
@@ -132,7 +132,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
                               onClick={() => setIsResourcesDropdownOpen(false)}
                             >
                               <div>
-                                <div className="font-medium text-gray-900">{dropdownItem.label}</div>
+                                <div className="font-bold text-gray-900">{dropdownItem.label}</div>
                                 {dropdownItem.description && (
                                   <div className="text-sm text-gray-600">{dropdownItem.description}</div>
                                 )}
@@ -150,7 +150,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
                     key={item.path}
                     to={item.path}
                     className={cn(
-                      "flex items-center gap-2 px-3 py-2 text-sm font-medium transition-all duration-200",
+                      "flex items-center gap-2 px-3 py-2 text-sm font-bold transition-all duration-200",
                       isActive
                         ? "text-primary"
                         : "text-gray-700 hover:text-gray-900"
@@ -325,7 +325,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
                         }}
                       >
                         <div className="flex items-center">
-                          <span className="font-medium text-lg">{item.label}</span>
+                          <span className="font-bold text-lg">{item.label}</span>
                         </div>
                         <ChevronDown className={cn(
                           "w-4 h-4 transition-transform duration-200",
@@ -380,7 +380,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
                   >
                     <div className="flex items-center justify-between w-full">
                       <div className="flex items-center">
-                        <span className="font-medium text-lg">{item.label}</span>
+                        <span className="font-bold text-lg">{item.label}</span>
                       </div>
                       <ChevronRight className={cn(
                         "w-4 h-4 transition-transform duration-200",
