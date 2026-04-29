@@ -65,7 +65,7 @@ const VideoSection: React.FC = () => {
 
             
             <motion.h2 variants={itemVariants} className="text-3xl sm:text-4xl font-bold text-gray-900 mb-6 leading-tight">
-              Introducing PayChain
+              What is PayChain?
             </motion.h2>
             
             <motion.p variants={itemVariants} className="text-lg text-gray-600 mb-10 leading-relaxed">

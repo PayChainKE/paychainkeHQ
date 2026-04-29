@@ -87,7 +87,7 @@ export default function About(): JSX.Element {
             <span className="about__headline-line">We Saw What the System Was Doing to Kenya's Merchants.</span>
             <span className="about__headline-line">We Decided to Fix It.</span>
           </h1>
-          <p className="about__subhead">PayChain is a Nairobi-born fintech company on a mission to give every Kenyan merchant the financial infrastructure they deserve — verified, intelligent, and built entirely around how business actually works in Kenya.</p>
+          <p className="about__subhead">PayChain is a Nairobi-born fintech company on a mission to give every Kenyan merchant the financial infrastructure they deserve verified, intelligent, and built entirely around how business actually works in Kenya.</p>
         </div>
       </header>
 

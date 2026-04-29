@@ -41,7 +41,7 @@ const NewsletterSignup: React.FC = () => {
           onChange={(e) => setEmail(e.target.value)}
           placeholder="Enter your business email"
           required
-          className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:ring-2 focus:ring-primary outline-none transition-all placeholder:text-gray-500"
+          className="flex-1 bg-emerald-50/10 border border-emerald-50/20 rounded-xl px-4 py-3 text-sm text-emerald-50 focus:ring-2 focus:ring-primary outline-none transition-all placeholder:text-emerald-50/40"
         />
         <button
           type="submit"
