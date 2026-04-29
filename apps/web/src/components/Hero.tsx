@@ -69,7 +69,7 @@ const Hero: React.FC = () => {
               href="/waitlist"
               className="inline-flex items-center justify-center px-6 py-2.5 text-sm rounded-lg bg-emerald-400 text-emerald-950 font-extrabold hover:bg-emerald-300 transition-colors cursor-pointer shadow-lg hover:shadow-xl"
             >
-              Start Growing Today <ArrowRight className="w-4 h-4 ml-1.5" />
+              Get started today <ArrowRight className="w-4 h-4 ml-1.5" />
             </a>
           </motion.div>
 
@@ -97,7 +97,7 @@ const Hero: React.FC = () => {
                     ))}
                   </div>
                   <span className="text-sm font-medium text-[#FBF8F1]">
-                    <span className="font-bold text-emerald-400">5,000+</span> active merchants
+                    <span className="font-bold text-emerald-400">500+</span> merchants
                   </span>
                 </div>
               </div>

@@ -55,13 +55,13 @@ const VideoSection: React.FC = () => {
           <div className="flex flex-col">
 
             
-            <motion.h2 variants={itemVariants} className="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 leading-tight mb-6">
+            <motion.h2 variants={itemVariants} className="text-3xl sm:text-4xl font-bold text-gray-900 mb-6 leading-tight">
               Introducing PayChain
             </motion.h2>
             
             <motion.p variants={itemVariants} className="text-lg text-gray-600 mb-10 leading-relaxed">
               Tired of SMS payment fraud and shilling depreciation eating your profits? 
-              PayChain is a unified dashboard that gives you everything you need to collect, pay, swap, and grow—built on Safaricom M-PESA infrastructure and blockchain rails.
+              PayChain is a unified dashboard that gives you everything you need to collect, pay, swap, and grow built on Safaricom M-PESA infrastructure and blockchain rails.
             </motion.p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -71,7 +71,7 @@ const VideoSection: React.FC = () => {
                   variants={itemVariants}
                   className="flex gap-4 p-4 bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow"
                 >
-                  <div className="flex-shrink-0 w-10 h-10 bg-emerald-50 rounded-lg flex items-center justify-center">
+                  <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center">
                     <feature.icon className="w-5 h-5 text-emerald-600" />
                   </div>
                   <div>
@@ -82,11 +82,7 @@ const VideoSection: React.FC = () => {
               ))}
             </div>
 
-            <motion.div variants={itemVariants} className="mt-12 p-4 border-l-4 border-emerald-500 bg-emerald-50 rounded-r-xl">
-              <p className="text-emerald-900 font-medium italic">
-                "PayChain is not a bank. It's something better—a Truth Layer for Kenyan commerce."
-              </p>
-            </motion.div>
+
           </div>
 
           {/* Right Column: Video */}

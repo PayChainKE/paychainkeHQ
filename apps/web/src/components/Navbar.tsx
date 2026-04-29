@@ -161,6 +161,13 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
                 );
               })}
               
+              <Link
+                to="/book-demo"
+                className="hidden lg:inline-flex items-center justify-center px-4 py-2 text-sm font-bold text-white bg-[#00bf63] hover:bg-[#00a857] rounded-lg transition-colors shadow-sm ml-4"
+              >
+                Book a Demo
+              </Link>
+              
               {/* User Avatar Dropdown */}
               <div className="relative ml-4 pl-4 border-l border-gray-200 avatar-dropdown">
                   <button
@@ -386,6 +393,16 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
                   </Link>
                 );
               })}
+            </div>
+
+            <div className="mt-8">
+              <Link
+                to="/book-demo"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="flex items-center justify-center w-full px-4 py-3 text-sm font-bold text-white bg-[#00bf63] hover:bg-[#00a857] rounded-lg transition-colors shadow-sm"
+              >
+                Book a Demo
+              </Link>
             </div>
 
             {/* Footer */}

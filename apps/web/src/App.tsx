@@ -27,6 +27,7 @@ import Blog from "./pages/Blog";
 import BlogPost from "./pages/BlogPost";
 import LoadingScreen from "./components/LoadingScreen";
 import ScrollToTop from "./components/ScrollToTop";
+import BookDemo from "./pages/BookDemo";
 
 import FloatingWhatsApp from "./components/FloatingWhatsApp";
 
@@ -86,6 +87,7 @@ const App = () => {
                   <Route path="/contact" element={<ContactUs />} />
                   <Route path="/about" element={<About />} />
                   <Route path="/waitlist" element={<Waitlist />} />
+                  <Route path="/book-demo" element={<BookDemo />} />
                   <Route path="/terms-of-service" element={<TermsOfService />} />
                   <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                   <Route path="*" element={<NotFound />} />

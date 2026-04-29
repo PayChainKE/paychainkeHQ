@@ -107,7 +107,7 @@ const Features: React.FC = () => (
           initial="hidden" whileInView="visible" viewport={{ once: true }}
           className="hidden lg:block w-full max-w-[400px] lg:max-w-[600px] ml-auto relative z-0 pointer-events-none"
         >
-          <img src="/Home page/design 0.png" alt="" className="w-full h-auto object-contain scale-[1.5] lg:scale-[2.2] origin-center -translate-y-[100px]" />
+          <img src="/Home page/design 0.png" alt="" className="w-full h-auto object-contain scale-[1.5] lg:scale-[2.2] origin-center -translate-y-[20px]" />
         </motion.div>
       </div>
 
