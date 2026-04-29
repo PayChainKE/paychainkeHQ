@@ -312,52 +312,32 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
                 
                 if (item.hasDropdown) {
                   return (
-                    <div key={item.path} className="space-y-1">
-                      <button
-                        onClick={() => setIsMobileResourcesDropdownOpen(!isMobileResourcesDropdownOpen)}
-                        className={cn(
-                          "flex items-center justify-between w-full py-3 transition-all duration-200 group",
-                          "text-gray-700 hover:text-gray-900"
-                        )}
-                        style={{
-                          animationDelay: `${index * 50}ms`,
-                          animation: isMobileMenuOpen ? 'slideInFromRight 0.3s ease-out forwards' : 'none'
-                        }}
-                      >
-                        <div className="flex items-center">
-                          <span className="font-bold text-lg">{item.label}</span>
-                        </div>
-                        <ChevronDown className={cn(
-                          "w-4 h-4 transition-transform duration-200",
-                          isMobileResourcesDropdownOpen ? "rotate-180" : ""
-                        )} />
-                      </button>
-                      
-                      {isMobileResourcesDropdownOpen && (
-                        <div className="ml-8 space-y-1 border-l-2 border-gray-200 pl-4">
-                          {item.dropdownItems?.map((dropdownItem, dropdownIndex) => (
-                            <Link
-                              key={dropdownItem.path}
-                              to={dropdownItem.path}
-                              className={cn(
-                                "flex items-center gap-3 py-2 px-3 rounded-lg transition-all duration-200 text-sm",
-                                "text-gray-600 hover:text-gray-900 hover:bg-gray-50",
-                                dropdownItem.label === 'Contact Support' && "bg-gray-100 hover:bg-gray-200 font-medium"
-                              )}
-                              onClick={() => {
-                                setIsMobileMenuOpen(false);
-                                setIsMobileResourcesDropdownOpen(false);
-                              }}
-                              style={{
-                                animationDelay: `${(index * 50) + (dropdownIndex * 30) + 200}ms`,
-                                animation: isMobileMenuOpen ? 'slideInFromRight 0.3s ease-out forwards' : 'none'
-                              }}
-                            >
-                              <span>{dropdownItem.label}</span>
-                            </Link>
-                          ))}
-                        </div>
-                      )}
+                    <div key={item.path} className="space-y-2 mt-6 mb-4">
+                      <div className="px-1 mb-2">
+                        <span className="font-bold text-xs text-gray-400 uppercase tracking-widest">{item.label}</span>
+                      </div>
+                      <div className="space-y-2">
+                        {item.dropdownItems?.map((dropdownItem, dropdownIndex) => (
+                          <Link
+                            key={dropdownItem.path}
+                            to={dropdownItem.path}
+                            className={cn(
+                              "flex items-center py-2 px-2 transition-all duration-200 text-sm font-bold",
+                              "text-gray-600 hover:text-primary",
+                              dropdownItem.label === 'Contact Support' && "bg-gray-100 px-3 rounded-lg"
+                            )}
+                            onClick={() => {
+                              setIsMobileMenuOpen(false);
+                            }}
+                            style={{
+                              animationDelay: `${(index * 50) + (dropdownIndex * 30)}ms`,
+                              animation: isMobileMenuOpen ? 'slideInFromRight 0.3s ease-out forwards' : 'none'
+                            }}
+                          >
+                            <span>{dropdownItem.label}</span>
+                          </Link>
+                        ))}
+                      </div>
                     </div>
                   );
                 }
@@ -382,10 +362,6 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
                       <div className="flex items-center">
                         <span className="font-bold text-lg">{item.label}</span>
                       </div>
-                      <ChevronRight className={cn(
-                        "w-4 h-4 transition-transform duration-200",
-                        isActive ? "text-primary" : "text-gray-400 group-hover:translate-x-1"
-                      )} />
                     </div>
                   </Link>
                 );
