@@ -95,7 +95,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
             </div>
 
             {/* Desktop Nav Links and User Auth */}
-            <div className="hidden md:flex items-center gap-6 lg:gap-8">
+            <div className="hidden md:flex items-center gap-6 lg:gap-8 lg:translate-x-24">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.path;
@@ -305,7 +305,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
           </div>
 
           {/* Navigation Links */}
-          <div className="px-6 py-8 pb-20">
+          <div className="pl-24 pr-4 py-8 pb-20">
             <div className="space-y-2">
               {navItems.map((item, index) => {
                 const isActive = location.pathname === item.path;
