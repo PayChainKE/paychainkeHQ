@@ -308,7 +308,6 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
           <div className="px-6 py-8 pb-20">
             <div className="space-y-2">
               {navItems.map((item, index) => {
-                const Icon = item.icon;
                 const isActive = location.pathname === item.path;
                 
                 if (item.hasDropdown) {
@@ -325,9 +324,8 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
                           animation: isMobileMenuOpen ? 'slideInFromRight 0.3s ease-out forwards' : 'none'
                         }}
                       >
-                        <div className="flex items-center gap-3">
-                          <Icon className="w-5 h-5 text-gray-500" />
-                          <span className="font-medium">{item.label}</span>
+                        <div className="flex items-center">
+                          <span className="font-medium text-lg">{item.label}</span>
                         </div>
                         <ChevronDown className={cn(
                           "w-4 h-4 transition-transform duration-200",
@@ -381,9 +379,8 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
                     }}
                   >
                     <div className="flex items-center justify-between w-full">
-                      <div className="flex items-center gap-3">
-                        <Icon className="w-5 h-5 text-gray-500" />
-                        <span className="font-medium">{item.label}</span>
+                      <div className="flex items-center">
+                        <span className="font-medium text-lg">{item.label}</span>
                       </div>
                       <ChevronRight className={cn(
                         "w-4 h-4 transition-transform duration-200",

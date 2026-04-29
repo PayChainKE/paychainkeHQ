@@ -1,8 +1,17 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ShieldCheck, Zap, Globe, Wallet } from 'lucide-react';
 
 const VideoSection: React.FC = () => {
+  const [activeCardIndex, setActiveCardIndex] = useState<number>(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveCardIndex((prev) => (prev + 1) % 4);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -31,7 +40,7 @@ const VideoSection: React.FC = () => {
     },
     {
       title: "FX & Stablecoins",
-      description: "Swap KES to USDC instantly, hedge shilling depreciation.",
+      description: "Receive global payments in stablecoins and swap KES to USDC instantly to hedge shilling depreciation.",
       icon: Globe,
     },
     {
@@ -64,19 +73,39 @@ const VideoSection: React.FC = () => {
               PayChain is a unified dashboard that gives you everything you need to collect, pay, swap, and grow built on Safaricom M-PESA infrastructure and blockchain rails.
             </motion.p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="grid grid-cols-2 gap-3 sm:gap-6">
               {features.map((feature, index) => (
                 <motion.div 
                   key={index} 
                   variants={itemVariants}
-                  className="flex gap-4 p-4 bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow"
+                  className="group w-full h-40 sm:h-32 [perspective:1000px] cursor-pointer"
+                  onMouseEnter={() => setActiveCardIndex(index)}
                 >
-                  <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center">
-                    <feature.icon className="w-5 h-5 text-emerald-600" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-gray-900 mb-1">{feature.title}</h4>
-                    <p className="text-sm text-gray-500 leading-snug">{feature.description}</p>
+                  <div className={`relative w-full h-full transition-transform duration-700 [transform-style:preserve-3d] group-hover:[transform:rotateY(180deg)] ${activeCardIndex === index ? '[transform:rotateY(180deg)]' : ''}`}>
+                    {/* Front Face */}
+                    <div className="absolute inset-0 w-full h-full [backface-visibility:hidden] bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
+                      <div className="absolute inset-0 bg-[url('/hero-bg.png')] bg-cover bg-center opacity-[0.04]"></div>
+                      {/* Decorative Frame */}
+                      <div className="absolute inset-1.5 border-2 border-emerald-900/40 rounded-lg pointer-events-none"></div>
+                      <div className="relative z-10 w-full h-full p-2 sm:p-4 flex flex-col items-center justify-center gap-2 sm:gap-3">
+                        <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center relative">
+                          <div className="absolute inset-0 bg-emerald-200 rounded-full blur-md opacity-40"></div>
+                          <feature.icon className="relative z-10 w-6 h-6 sm:w-8 sm:h-8 text-emerald-600 drop-shadow-sm" />
+                        </div>
+                        <h4 className="relative z-10 text-sm sm:text-base font-bold text-gray-900 text-center leading-tight">{feature.title}</h4>
+                      </div>
+                    </div>
+                    
+                    {/* Back Face */}
+                    <div className="absolute inset-0 w-full h-full [backface-visibility:hidden] [transform:rotateY(180deg)] bg-emerald-800 rounded-xl shadow-xl overflow-hidden border border-emerald-500/50">
+                      <div className="absolute inset-0 bg-[url('/hero-bg.png')] bg-cover bg-center opacity-30 mix-blend-overlay"></div>
+                      <div className="absolute inset-0 bg-gradient-to-br from-emerald-600/90 to-emerald-900/90"></div>
+                      {/* Decorative Frame */}
+                      <div className="absolute inset-1.5 border-2 border-white/50 rounded-lg pointer-events-none z-10"></div>
+                      <div className="relative z-10 w-full h-full p-4 flex items-center justify-center text-center">
+                        <p className="text-sm text-white font-medium leading-relaxed drop-shadow-sm">{feature.description}</p>
+                      </div>
+                    </div>
                   </div>
                 </motion.div>
               ))}
