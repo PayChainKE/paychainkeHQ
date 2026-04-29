@@ -1,6 +1,7 @@
 import React from 'react';
 import Navbar from '@/components/Navbar';
 import Hero from '@/components/Hero';
+import VideoSection from '@/components/VideoSection';
 // TrustBar removed from homepage — moved to About page
 import Features from '@/components/Features';
 import ComparisonTable from '@/components/ComparisonTable';
@@ -13,6 +14,7 @@ const Index: React.FC = () => {
     <div className="min-h-screen bg-background pt-16">
       <Navbar />
       <Hero />
+      <VideoSection />
       <Features />
       <ComparisonTable />
       <MobileAppCTA />

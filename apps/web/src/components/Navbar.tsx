@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, LayoutDashboard, FileCode, GitBranch, Menu, X, ChevronRight, Copyright, ChevronDown, ShoppingBag, ShoppingCart, HelpCircle, Mail } from 'lucide-react';
+import { Home, LayoutDashboard, FileCode, GitBranch, Menu, X, ChevronRight, Copyright, ChevronDown, ShoppingBag, ShoppingCart, HelpCircle, Mail, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NavbarProps {
@@ -62,7 +62,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
     },
     // Removed Dashboard from nav bar
     { path: '/faq', label: 'FAQs', icon: HelpCircle },
-    { path: '/store', label: 'Merchandise', icon: ShoppingBag },
+    { path: '/blog', label: 'Blog', icon: BookOpen },
     { path: '/contact', label: 'Contact Us', icon: Mail },
     // Resources removed from nav bar
   ];
@@ -161,22 +161,8 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
                 );
               })}
               
-              {/* Cart or User Avatar Dropdown */}
-              {location.pathname === '/store' || location.pathname.startsWith('/product/') ? (
-                <div className="relative ml-4 pl-4 border-l border-gray-200">
-                  <Link to="/checkout" className="flex items-center gap-2 px-2 py-1 transition-colors duration-200">
-                    <div className="relative">
-                      <ShoppingCart className="w-6 h-6 text-gray-700 hover:text-gray-900" />
-                      {cartCount > 0 && (
-                        <span className="absolute -top-2 -right-2 bg-primary text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                          {cartCount}
-                        </span>
-                      )}
-                    </div>
-                  </Link>
-                </div>
-              ) : (
-                <div className="relative ml-4 pl-4 border-l border-gray-200 avatar-dropdown">
+              {/* User Avatar Dropdown */}
+              <div className="relative ml-4 pl-4 border-l border-gray-200 avatar-dropdown">
                   <button
                     onClick={() => setIsAvatarDropdownOpen(!isAvatarDropdownOpen)}
                     className="flex items-center gap-2 px-2 py-1 transition-colors duration-200"
@@ -221,25 +207,10 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
                     </div>
                   )}
                 </div>
-              )}
             </div>
 
-            {/* Mobile User Avatar or Cart */}
-            {location.pathname === '/store' || location.pathname.startsWith('/product/') ? (
-              <div className="md:hidden relative">
-                <Link to="/checkout" className="flex items-center gap-2 px-2 py-1 transition-colors duration-200">
-                  <div className="relative">
-                    <ShoppingCart className="w-6 h-6 text-gray-700" />
-                    {cartCount > 0 && (
-                      <span className="absolute -top-2 -right-2 bg-primary text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                        {cartCount}
-                      </span>
-                    )}
-                  </div>
-                </Link>
-              </div>
-            ) : (
-              <div className="md:hidden relative avatar-dropdown">
+            {/* Mobile User Avatar */}
+            <div className="md:hidden relative avatar-dropdown">
                 <button
                   onClick={() => setIsAvatarDropdownOpen(!isAvatarDropdownOpen)}
                   className="flex items-center gap-2 px-2 py-1 transition-colors duration-200"
@@ -284,7 +255,6 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
                   </div>
                 )}
               </div>
-            )}
           </div>
         </div>
       </nav>

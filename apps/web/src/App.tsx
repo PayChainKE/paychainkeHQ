@@ -23,12 +23,11 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import About from "./pages/About";
 import Waitlist from "./pages/Waitlist";
 import NotFound from "./pages/NotFound";
-import Store from "./pages/Store";
-import ProductDetail from "./pages/ProductDetail";
-import Checkout from "./pages/Checkout";
+import Blog from "./pages/Blog";
+import BlogPost from "./pages/BlogPost";
 import LoadingScreen from "./components/LoadingScreen";
 import ScrollToTop from "./components/ScrollToTop";
-import { CartProvider } from "./context/CartContext";
+
 import FloatingWhatsApp from "./components/FloatingWhatsApp";
 
 const queryClient = new QueryClient();
@@ -63,14 +62,13 @@ const App = () => {
           <>
             <Toaster />
             <Sonner />
-            <CartProvider>
               <BrowserRouter>
                 <ScrollToTop />
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/how-it-works" element={<HowItWorks />} />
                   <Route path="/docs" element={<Docs />} />
-                  <Route path="/store" element={<Store />} />
+                  <Route path="/blog" element={<Blog />} />
                   <Route path="/products" element={<Products />} />
                   <Route path="/overview" element={<Overview />} />
                   <Route path="/paychain-dashboard/*" element={<PaychainDashboardProxy />} />
@@ -83,8 +81,7 @@ const App = () => {
                   <Route path="/products/bulk-pay" element={<PaychainBulkPay />} />
                   <Route path="/products/operations-tools" element={<OperationsTools />} />
                   <Route path="/products/cash-advance" element={<CashAdvance />} />
-                  <Route path="/product/:id" element={<ProductDetail />} />
-                  <Route path="/checkout" element={<Checkout />} />
+                  <Route path="/blog/:id" element={<BlogPost />} />
                   <Route path="/faq" element={<FAQ />} />
                   <Route path="/contact" element={<ContactUs />} />
                   <Route path="/about" element={<About />} />
@@ -94,7 +91,6 @@ const App = () => {
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </BrowserRouter>
-            </CartProvider>
             <Analytics />
             <FloatingWhatsApp />
           </>
