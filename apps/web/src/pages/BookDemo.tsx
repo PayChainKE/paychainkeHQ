@@ -4,20 +4,27 @@ import Footer from '@/components/Footer';
 
 const BookDemo: React.FC = () => {
   useEffect(() => {
-    (function (C: any, A: any, L: any) {
-      let p = function (a: any, ar: any) { a.q.push(ar); };
-      let d = C.document;
-      C.Cal = C.Cal || function () {
-        let cal = C.Cal;
-        let ar = arguments;
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    (function (C: any, A: string, L: string) {
+      const p = function (a: any, ar: any) {
+        a.q.push(ar);
+      };
+      const d = C.document;
+      C.Cal = C.Cal || function (...args: any[]) {
+        const cal = C.Cal;
+        const ar = args;
         if (!cal.loaded) {
           cal.ns = {};
           cal.q = cal.q || [];
-          d.head.appendChild(d.createElement("script")).src = A;
+          const s = d.createElement("script");
+          s.src = A;
+          d.head.appendChild(s);
           cal.loaded = true;
         }
         if (ar[0] === L) {
-          const api = function () { p(api, arguments); };
+          const api = function (...apiArgs: any[]) {
+            p(api, apiArgs);
+          };
           const namespace = ar[1];
           api.q = api.q || [];
           if (typeof namespace === "string") {
@@ -29,18 +36,21 @@ const BookDemo: React.FC = () => {
         }
         p(cal, ar);
       };
-    })(window, "https://app.cal.com/embed/embed.js", "init");
+    })(window as any, "https://app.cal.com/embed/embed.js", "init");
 
     const Cal = (window as any).Cal;
-    Cal("init", "paychain-demo", { origin: "https://app.cal.com" });
+    if (Cal) {
+      Cal("init", "paychain-demo", { origin: "https://app.cal.com" });
 
-    Cal.ns["paychain-demo"]("inline", {
-      elementOrSelector: "#my-cal-inline-paychain-demo",
-      config: { "layout": "month_view", "useSlotsViewOnSmallScreen": "true" },
-      calLink: "paychain/paychain-demo",
-    });
+      Cal.ns["paychain-demo"]("inline", {
+        elementOrSelector: "#my-cal-inline-paychain-demo",
+        config: { "layout": "month_view", "useSlotsViewOnSmallScreen": "true" },
+        calLink: "paychain/paychain-demo",
+      });
 
-    Cal.ns["paychain-demo"]("ui", { "hideEventTypeDetails": false, "layout": "month_view", "theme": "dark" });
+      Cal.ns["paychain-demo"]("ui", { "hideEventTypeDetails": false, "layout": "month_view", "theme": "dark" });
+    }
+    /* eslint-enable @typescript-eslint/no-explicit-any */
   }, []);
 
   return (
