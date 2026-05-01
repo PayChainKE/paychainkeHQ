@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import './inflation-shield.css';
 import useInflationAnimations from './useInflationAnimations';
+import Breadcrumbs from '@/components/Breadcrumbs';
 
 const features = [
   { title: 'Instant KES → USDC Swaps', icon: Repeat, desc: 'Convert your KES balance to USDC in seconds from your dashboard. No queues, no negotiation.' },
@@ -25,6 +26,7 @@ const InflationShield: React.FC = () => {
       <Navbar />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <Breadcrumbs currentPage="The Inflation Shield" />
         {/* HERO */}
         <section className="inflation-hero grid lg:grid-cols-2 gap-10 items-center" aria-labelledby="inflation-hero-title" data-animate>
           <div>

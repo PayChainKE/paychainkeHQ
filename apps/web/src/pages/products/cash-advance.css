@@ -30,5 +30,5 @@
 @media (max-width: 768px) {
   .hero-headline .block { font-size: 32px }
   .offer-card { position:static; transform:none; opacity:1; margin-top:12px }
-  main { padding: 24px }
+  .cash-advance-page { padding: 24px }
 }

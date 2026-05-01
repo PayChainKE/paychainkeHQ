@@ -1,6 +1,7 @@
 import React from 'react'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
+import Breadcrumbs from '@/components/Breadcrumbs'
 
 export default function Products() {
   return (
@@ -8,6 +9,8 @@ export default function Products() {
       <Navbar />
 
       <main className="max-w-6xl mx-auto px-6 py-24">
+        <Breadcrumbs currentPage="Products" />
+        
         <header className="text-center mb-12">
           <h1 className="text-4xl font-extrabold">Products</h1>
           <p className="mt-3 text-slate-600 max-w-2xl mx-auto">Explore our product offerings. This page is a placeholder — I can build product listings if you want.</p>

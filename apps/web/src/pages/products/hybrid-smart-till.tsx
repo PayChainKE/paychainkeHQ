@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import './hybrid-smart-till.css';
 import useSmartTillAnimations from './useSmartTillAnimations';
+import Breadcrumbs from '@/components/Breadcrumbs';
 
 const features = [
   {
@@ -55,8 +56,10 @@ const HybridSmartTill: React.FC = () => {
       <Navbar />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <Breadcrumbs currentPage="Hybrid Smart Till" />
+        
         {/* HERO */}
-        <section className="smart-till__hero grid lg:grid-cols-2 gap-12 items-center md:mt-[2cm]" aria-labelledby="hst-hero-title">
+        <section className="smart-till__hero grid lg:grid-cols-2 gap-12 items-center md:mt-8" aria-labelledby="hst-hero-title">
           <div>
             <h1 id="hst-hero-title" className="mt-[1cm] text-3xl sm:text-4xl md:text-5xl font-extrabold leading-tight mb-4">Your Till. Verified. Secured. Intelligent.</h1>
             <p className="text-lg text-muted-foreground mb-6">The PayChain Hybrid Smart Till replaces your basic M-PESA till with a registered, aggregator-backed payment channel that kills SMS fraud, logs every shilling, and builds your business credit — automatically.</p>

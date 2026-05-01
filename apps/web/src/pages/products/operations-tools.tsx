@@ -17,6 +17,7 @@ import { Line } from "react-chartjs-2";
 import "chart.js/auto";
 import useOperationAnimations from "./useOperationAnimations";
 import "./operations-tools.css";
+import Breadcrumbs from "@/components/Breadcrumbs";
 
 const features = [
   {
@@ -91,7 +92,11 @@ const OperationsTools = () => {
     <div className="min-h-screen bg-gray-50 text-[#0A192F] font-sans">
       <Navbar />
       <main className="operations-page container mx-auto px-6 py-12" ref={containerRef}>
-      <section className="hero grid md:grid-cols-2 gap-8 items-center">
+        <div style={{ paddingTop: '80px' }}>
+          <Breadcrumbs currentPage="Operations tools" />
+        </div>
+        {/* HERO */}
+        <section className="hero grid md:grid-cols-2 gap-8 items-center">
         <div className="hero-copy">
           <h1 className="text-3xl md:text-5xl font-bold leading-tight">
             Run Your Entire Business from One Intelligent Dashboard.

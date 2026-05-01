@@ -13,7 +13,7 @@ const articles = [
     category: 'Industry Insights',
     date: 'Oct 15, 2026',
     readTime: '5 min read',
-    image: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&q=80&w=800',
+    image: '/happy_kenyan_merchant.png',
     featured: true,
   },
   {
@@ -23,7 +23,7 @@ const articles = [
     category: 'Product Updates',
     date: 'Oct 10, 2026',
     readTime: '4 min read',
-    image: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&q=80&w=800',
+    image: '/Home page/merchant 3.png',
   },
   {
     id: 'offline-first-pos',
@@ -32,7 +32,7 @@ const articles = [
     category: 'Technology',
     date: 'Oct 5, 2026',
     readTime: '6 min read',
-    image: 'https://images.unsplash.com/photo-1556740749-887f6717d7e4?auto=format&fit=crop&q=80&w=800',
+    image: '/happy_kenyan_merchant.png',
   },
   {
     id: 'bulk-pay-payroll',
@@ -41,7 +41,7 @@ const articles = [
     category: 'Case Studies',
     date: 'Sep 28, 2026',
     readTime: '3 min read',
-    image: 'https://images.unsplash.com/photo-1600880292203-757bb62b4baf?auto=format&fit=crop&q=80&w=800',
+    image: '/hero-bg.png',
   }
 ];
 
@@ -58,21 +58,21 @@ const Blog = () => {
     <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
       <Navbar />
       
-      <main className="flex-grow pt-24 pb-20">
+      <main className="flex-grow p-0 m-0">
         {/* Professional Dark Hero Section */}
-        <section className="relative overflow-hidden min-h-[450px] flex items-center text-white pt-24 pb-20 bg-[#0a0a0a]">
+        <section className="relative w-full overflow-hidden min-h-[450px] flex items-center text-white pt-32 pb-20 bg-[#0a0a0a]">
           {/* Background Image with High-Contrast Overlay */}
           <div className="absolute inset-0 -z-10">
             <img 
-              src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=2000" 
+              src="/hero-bg.png" 
               alt="Premium Architecture" 
-              className="w-full h-full object-cover opacity-50"
+              className="w-full h-full object-cover opacity-60"
             />
             <div className="absolute inset-0 bg-gradient-to-r from-[#0a0a0a] via-[#0a0a0a]/90 to-transparent" />
           </div>
           
-          <div className="container mx-auto px-6 lg:px-8 relative z-10">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+          <div className="w-full px-6 lg:px-12 relative z-10 flex flex-col items-center text-center">
+            <div className="max-w-4xl mx-auto">
               <motion.div
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -81,11 +81,11 @@ const Blog = () => {
                 <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6 leading-tight">
                   Knowledge for the <span className="text-[#00bf63]">Modern Merchant</span>
                 </h1>
-                <p className="text-lg text-gray-400 leading-relaxed mb-8 max-w-xl">
+                <p className="text-lg text-gray-400 leading-relaxed mb-8 max-w-xl mx-auto">
                   Authoritative research and deep technical analysis on the digital transformation of African retail and global fintech.
                 </p>
                 
-                <div className="flex flex-col sm:flex-row gap-4 items-center">
+                <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
                   <div className="relative w-full sm:w-auto flex-grow max-w-md">
                     <input 
                       type="email" 
@@ -99,43 +99,7 @@ const Blog = () => {
                 </div>
               </motion.div>
               
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.8, delay: 0.2 }}
-                className="hidden lg:block relative"
-              >
-                {/* Compact Featured Card */}
-                <div className="relative z-20 bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl">
-                  <div className="flex justify-between items-start mb-6">
-                    <div className="px-3 py-1 rounded-md bg-[#00bf63]/20 border border-[#00bf63]/30 text-[#00bf63] text-xs font-bold tracking-wider">
-                      TRENDING NOW
-                    </div>
-                    <Clock className="w-4 h-4 text-gray-500" />
-                  </div>
-                  <h3 className="text-xl font-bold mb-4 leading-snug">
-                    Stablecoin Settlement: The End of Delayed Payouts?
-                  </h3>
-                  <div className="flex items-center justify-between pt-6 border-t border-white/10">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#00bf63] to-green-300 overflow-hidden">
-                        <img 
-                          src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=facearea&facepad=2&w=100&h=100&q=80" 
-                          alt="Author" 
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                      <div className="text-sm">
-                        <div className="font-bold">David Chen</div>
-                        <div className="text-[#00bf63] text-xs">CTO, PayChain</div>
-                      </div>
-                    </div>
-                    <Link to="/blog" className="text-[#00bf63] hover:text-[#00d971] transition-colors">
-                      <ArrowRight className="w-5 h-5" />
-                    </Link>
-                  </div>
-                </div>
-              </motion.div>
+
             </div>
           </div>
 
@@ -183,9 +147,6 @@ const Blog = () => {
                   <div className="md:w-1/2 p-8 md:p-12 flex flex-col justify-center">
                     <div className="flex items-center gap-4 text-sm mb-4">
                       <span className="text-[#00bf63] font-semibold">{featuredArticle.category}</span>
-                      <span className="text-gray-400 flex items-center gap-1">
-                        <Calendar className="w-4 h-4" /> {featuredArticle.date}
-                      </span>
                     </div>
                     <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4 group-hover:text-[#00bf63] transition-colors">
                       {featuredArticle.title}
@@ -201,6 +162,54 @@ const Blog = () => {
               </Link>
             </div>
           )}
+
+          {/* Featured Videos Section */}
+          <div className="mb-20 mt-12">
+            <h2 className="text-2xl font-bold text-gray-900 mb-8 border-l-4 border-[#00bf63] pl-4 uppercase tracking-wider text-sm">Video Insights</h2>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+              {/* Video 1 */}
+              <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 flex flex-col transition-all duration-300 hover:shadow-md group">
+                <div className="relative aspect-video overflow-hidden">
+                  <iframe 
+                    className="absolute inset-0 w-full h-full"
+                    src="https://www.youtube.com/embed/MaKDVkrlHqs?si=zGtE7jtgNrEVKsVD" 
+                    title="Introducing PayChain The Merchant OS Built for Kenyan SMEs" 
+                    frameBorder="0" 
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+                    referrerPolicy="strict-origin-when-cross-origin" 
+                    allowFullScreen
+                  ></iframe>
+                </div>
+                <div className="p-6">
+                  <h3 className="text-lg font-bold text-gray-900 mb-3 group-hover:text-[#00bf63] transition-colors">Introducing PayChain: The Merchant OS Built for Kenyan SMEs</h3>
+                  <p className="text-gray-600 text-sm leading-relaxed">
+                    Tired of SMS payment fraud, shilling depreciation eating your profits, and banks turning you away for cash advance funds?
+                  </p>
+                </div>
+              </div>
+
+              {/* Video 2 */}
+              <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 flex flex-col transition-all duration-300 hover:shadow-md group">
+                <div className="relative aspect-video overflow-hidden">
+                  <iframe 
+                    className="absolute inset-0 w-full h-full"
+                    src="https://www.youtube.com/embed/odoTg2BWxZc?si=XL0W2IfEdFTohUsD" 
+                    title="Kenya's merchant financial operating system built for serious business owners." 
+                    frameBorder="0" 
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+                    referrerPolicy="strict-origin-when-cross-origin" 
+                    allowFullScreen
+                  ></iframe>
+                </div>
+                <div className="p-6">
+                  <h3 className="text-lg font-bold text-gray-900 mb-3 group-hover:text-[#00bf63] transition-colors">Kenya's merchant financial operating system built for serious business owners.</h3>
+                  <p className="text-gray-600 text-sm leading-relaxed">
+                    From Verified Collections to Bulk Pay, KES/USDC FX swaps, and Cash Advances, PayChain gives your business the financial infrastructure it deserves.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
 
           {/* Articles Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -231,7 +240,7 @@ const Blog = () => {
                       {article.excerpt}
                     </p>
                     <div className="mt-auto flex items-center text-sm text-gray-500 pt-4 border-t border-gray-50">
-                      <Calendar className="w-4 h-4 mr-2" /> {article.date}
+                      <Clock className="w-4 h-4 mr-2" /> {article.readTime}
                     </div>
                   </div>
                 </Link>

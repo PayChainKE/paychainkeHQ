@@ -16,9 +16,14 @@ import {
   Mail,
   Briefcase,
   UserPlus,
+  ArrowRight,
+  AlertCircle,
+  Clock,
+  MessageSquare,
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import { motion, AnimatePresence } from 'framer-motion';
 import './faqs.css';
 
 const ICON_MAP: Record<string, React.ComponentType<unknown>> = {
@@ -91,7 +96,6 @@ export default function FAQPage(): JSX.Element {
 
   useEffect(() => {
     if (searchMode) {
-      // collapse all
       setOpenItems({});
     }
   }, [searchMode]);
@@ -110,36 +114,37 @@ export default function FAQPage(): JSX.Element {
   }
 
   function scrollToSection(id: string) {
+    // If we're in search mode, exit it first so sections are rendered
+    if (searchMode) {
+      setSearchMode(false);
+      setQuery('');
+      const input = document.querySelector('.search-input') as HTMLInputElement;
+      if (input) input.value = '';
+      
+      // Small delay to allow React to render the sections before scrolling
+      setTimeout(() => performScroll(id), 50);
+    } else {
+      performScroll(id);
+    }
+  }
+
+  function performScroll(id: string) {
     const el = sectionsRef.current[id];
     if (!el) return;
-    // smooth scroll the section into view
+    
     el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    // update URL hash for deep-linking
+    
     try {
       history.replaceState(null, '', `#h-${id}`);
     } catch (e) {
       location.hash = `h-${id}`;
     }
-    // set active category in UI
+    
     setActiveCat(id);
 
-    // scroll the pill into view
     const pill = document.querySelector(`[data-pill="${id}"]`) as HTMLElement | null;
     if (pill) {
       pill.scrollIntoView({ behavior: 'smooth', inline: 'center' });
-    }
-
-    // open first question in the category and focus the question button
-    const cat = FAQ_DATA.find(c => c.id === id);
-    const firstQ = cat && cat.questions && cat.questions[0] && cat.questions[0].id;
-    if (firstQ) {
-      setOpenItems({ [firstQ]: true });
-      setTimeout(() => {
-        const btn = document.getElementById(`button-${firstQ}`) as HTMLElement | null;
-        if (btn) {
-          btn.focus();
-        }
-      }, 450);
     }
   }
 
@@ -148,7 +153,6 @@ export default function FAQPage(): JSX.Element {
     return <Comp className="icon" />;
   }
 
-  // Handle deep links on initial load (e.g., /faqs#h-bulk-pay)
   useEffect(() => {
     try {
       const hash = location.hash;
@@ -166,41 +170,105 @@ export default function FAQPage(): JSX.Element {
       <Navbar />
 
       <header className="faqs-hero">
-        <div className="faqs-hero-inner">
-          <div className="eyebrow">Help Centre</div>
-          <h1 className="headline">Everything You Need to Know About PayChain.</h1>
-          <p className="sub">Simple answers to the questions Kenyan merchants ask us most. Can't find what you're looking for? Reach us directly at <a href="tel:+254790889066" className="underline-link">+254 790 889 066</a></p>
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="faqs-hero-inner"
+        >
+          <span className="eyebrow">Institutional Knowledge Base</span>
+          <h1 className="headline">How Can We Help You Scale?</h1>
+          <p className="sub">
+            Comprehensive documentation and strategic technical analysis for merchants operating on the PayChain ecosystem. 
+            Can't find a solution? Reach us directly at <a href="tel:+254790889066" className="underline-link">+254 790 889 066</a> or <a href="mailto:support@paychain.co.ke" className="underline-link">support@paychain.co.ke</a>
+          </p>
 
           <div className="search-wrapper" role="search" aria-label="Search FAQ">
             <div className="search-box">
               <Search className="search-icon" />
-              <input aria-label="Search questions" className="search-input" placeholder="Search questions e.g. 'How does Cash Advance work?'" onChange={e => onSearch(e.target.value)} />
-              <button className="search-clear" onClick={() => { (document.querySelector('.search-input') as HTMLInputElement).value = ''; onSearch(''); }} style={{ display: undefined }}>Clear</button>
+              <input 
+                aria-label="Search knowledge base" 
+                className="search-input" 
+                placeholder="Search e.g. 'Cash Advance eligibility' or 'USDC swaps'..." 
+                onChange={e => onSearch(e.target.value)} 
+              />
+              <AnimatePresence>
+                {searchMode && (
+                  <motion.button 
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    className="search-clear" 
+                    onClick={() => { 
+                      const input = document.querySelector('.search-input') as HTMLInputElement;
+                      if (input) input.value = '';
+                      onSearch(''); 
+                    }}
+                  >
+                    Clear
+                  </motion.button>
+                )}
+              </AnimatePresence>
             </div>
           </div>
+        </motion.div>
+
+        {/* Cinematic High-End Separator */}
+        <div className="absolute bottom-0 left-0 w-full overflow-hidden leading-[0] z-10 pointer-events-none">
+          <svg viewBox="0 0 1440 120" className="relative block w-full h-[60px] md:h-[100px]" preserveAspectRatio="none">
+            <path 
+              d="M0,120 L1440,120 L1440,0 C1100,80 340,80 0,0 L0,120 Z" 
+              fill="#ffffff"
+            />
+          </svg>
         </div>
       </header>
 
-      <div className="pills-sticky" style={{ position: 'sticky', top: 'var(--header-height)', zIndex: 40 }}>
-        <div className="pills-row" ref={pillsRef}>
-          {FAQ_DATA.map(cat => {
-            const count = filtered ? filtered.filter(r => r.catId === cat.id).length : cat.questions.length;
-            return (
-              <button key={cat.id} data-pill={cat.id} className={`pill ${activeCat === cat.id ? 'active' : ''}`} onClick={() => { setSearchMode(false); scrollToSection(cat.id); }}>
-                <span className="pill-label">{cat.category}</span>
-                <span className="pill-count">{count}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      {!searchMode && (
+        <section className="category-carousel-wrapper">
+          <div className="carousel-track-wrapper">
+            <motion.div 
+              className="carousel-track"
+              animate={{
+                x: [0, -1500], // Adjust based on total width of categories
+              }}
+              transition={{
+                duration: 30,
+                ease: "linear",
+                repeat: Infinity,
+              }}
+              whileHover={{ animationPlayState: 'paused' }}
+            >
+              {/* Double the data for seamless looping */}
+              {[...FAQ_DATA, ...FAQ_DATA].map((cat, idx) => (
+                <div
+                  key={`${cat.id}-${idx}`}
+                  onClick={() => scrollToSection(cat.id)}
+                  className={`category-card ${activeCat === cat.id ? 'active' : ''}`}
+                >
+                  <div className="icon-box">
+                    {renderIcon(cat.icon)}
+                  </div>
+                  <h3>{cat.category}</h3>
+                  <span className="count">{cat.questions.length} Questions</span>
+                </div>
+              ))}
+            </motion.div>
+          </div>
+        </section>
+      )}
+
 
       <main className="faqs-main">
         <aside className="faqs-sidebar" aria-label="FAQ categories">
           <nav>
             <ul>
               {FAQ_DATA.map(cat => (
-                <li key={cat.id} className={`side-item ${activeCat === cat.id ? 'active' : ''}`} onClick={() => scrollToSection(cat.id)}>
+                <li 
+                  key={cat.id} 
+                  className={`side-item ${activeCat === cat.id ? 'active' : ''}`} 
+                  onClick={() => scrollToSection(cat.id)}
+                >
                   <span className="side-text">{cat.category}</span>
                   <span className="side-count">{cat.questions.length}</span>
                 </li>
@@ -210,48 +278,114 @@ export default function FAQPage(): JSX.Element {
         </aside>
 
         <section className="faqs-content">
-          {searchMode && (
-            <div className="search-results">
-              <div className="results-count">Showing {filtered ? filtered.length : 0} results for '{query}'</div>
-              <div className="results-list">
-                {filtered && filtered.length > 0 ? filtered.map(r => (
-                  <article key={r.qId} className="result-item" onClick={() => toggleItem(r.qId)}>
-                    <div className="result-breadcrumb">{r.catLabel}</div>
-                    <button className="result-question" dangerouslySetInnerHTML={{ __html: highlight(r.q, query) }} />
-                    <div className={`result-answer ${openItems[r.qId] ? 'open' : ''}`} dangerouslySetInnerHTML={{ __html: r.a }} />
-                  </article>
-                )) : <div className="no-results">No questions match '{query}'. Email us at <a href="mailto:support@paychain.co.ke">support@paychain.co.ke</a></div>}
-              </div>
-            </div>
-          )}
-
-          {!searchMode && FAQ_DATA.map(cat => (
-            <section key={cat.id} ref={el => (sectionsRef.current[cat.id] = el)} data-cat={cat.id} className="faq-category" aria-labelledby={`h-${cat.id}`} role="region">
-              <h2 id={`h-${cat.id}`} className="category-heading">{renderIcon(cat.icon)}<span>{cat.category}</span></h2>
-              <div className="accordion">
-                {cat.questions.map(q => (
-                  <div key={q.id} className="accordion-item">
-                    <button aria-expanded={!!openItems[q.id]} aria-controls={`panel-${q.id}`} id={`button-${q.id}`} className={`question-row ${openItems[q.id] ? 'open' : ''}`} onClick={() => toggleItem(q.id)}>
-                      <span className="question-text">{q.q}</span>
-                      <ChevronDown className={`chev ${openItems[q.id] ? 'rotated' : ''}`} />
-                    </button>
-                    <div id={`panel-${q.id}`} role="region" aria-labelledby={`button-${q.id}`} className={`answer-panel ${openItems[q.id] ? 'open' : ''}`} dangerouslySetInnerHTML={{ __html: q.a }} />
-                  </div>
+          <AnimatePresence mode="wait">
+            {searchMode ? (
+              <motion.div 
+                key="search-results"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="search-results"
+              >
+                <div className="results-count">Showing {filtered ? filtered.length : 0} results for "{query}"</div>
+                <div className="results-list">
+                  {filtered && filtered.length > 0 ? filtered.map(r => (
+                    <article key={r.qId} className="accordion-item" style={{ marginBottom: '16px' }}>
+                      <div className="p-6">
+                        <div className="result-breadcrumb">{r.catLabel}</div>
+                        <button className="question-row" onClick={() => toggleItem(r.qId)}>
+                          <span className="question-text" dangerouslySetInnerHTML={{ __html: highlight(r.q, query) }} />
+                          <ChevronDown className={`chev ${openItems[r.qId] ? 'rotated' : ''}`} />
+                        </button>
+                        <div className={`answer-panel ${openItems[r.qId] ? 'open' : ''}`}>
+                          <div dangerouslySetInnerHTML={{ __html: r.a }} />
+                        </div>
+                      </div>
+                    </article>
+                  )) : (
+                    <div className="no-results bg-gray-50 rounded-2xl p-12 text-center">
+                      <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                      <h3 className="text-lg font-bold text-gray-900 mb-2">No results match "{query}"</h3>
+                      <p className="text-gray-600">Try using different keywords or contact our support team directly.</p>
+                      <a href="mailto:support@paychain.co.ke" className="inline-flex items-center text-[#0B4D2E] font-semibold mt-4">
+                        Contact Support <ArrowRight size={14} className="ml-2" />
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div 
+                key="default-content"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                {FAQ_DATA.map(cat => (
+                  <section 
+                    key={cat.id} 
+                    ref={el => (sectionsRef.current[cat.id] = el)} 
+                    data-cat={cat.id} 
+                    className="faq-category" 
+                    aria-labelledby={`h-${cat.id}`}
+                  >
+                    <h2 id={`h-${cat.id}`} className="category-heading">
+                      {renderIcon(cat.icon)}
+                      <span>{cat.category}</span>
+                    </h2>
+                    <div className="accordion">
+                      {cat.questions.map(q => (
+                        <div key={q.id} className="accordion-item">
+                          <button 
+                            aria-expanded={!!openItems[q.id]} 
+                            aria-controls={`panel-${q.id}`} 
+                            id={`button-${q.id}`} 
+                            className={`question-row ${openItems[q.id] ? 'open' : ''}`} 
+                            onClick={() => toggleItem(q.id)}
+                          >
+                            <span className="question-text">{q.q}</span>
+                            <ChevronDown className={`chev ${openItems[q.id] ? 'rotated' : ''}`} />
+                          </button>
+                          <div id={`panel-${q.id}`} className={`answer-panel ${openItems[q.id] ? 'open' : ''}`}>
+                            <div dangerouslySetInnerHTML={{ __html: q.a }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
                 ))}
-              </div>
-            </section>
-          ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </section>
       </main>
 
       <section className="faqs-cta">
         <div className="cta-inner">
-          <h3>Still Have a Question We Haven't Answered?</h3>
-          <p>Our team is based in Nairobi and responds to every message personally. No bots. No automated responses. Just the PayChain team answering your questions directly.</p>
+          <h3>Still Have Questions?</h3>
+          <p>Our Nairobi-based team is ready to assist with technical deep-dives or general inquiries.</p>
           <div className="cta-cards">
-            <a href="mailto:support@paychain.co.ke" className="card"><Mail className="card-icon" /> <div><strong>General & Support</strong><div className="card-sub">support@paychain.co.ke</div></div></a>
-            <a href="mailto:partnerships@paychain.co.ke" className="card"><Briefcase className="card-icon" /> <div><strong>Partnership Enquiries</strong><div className="card-sub">partnerships@paychain.co.ke</div></div></a>
-            <Link to="/waitlist" className="card primary"><UserPlus className="card-icon" /> <div><strong>Join the Waitlist</strong><div className="card-sub">Limited beta spots</div></div></Link>
+            <a href="mailto:support@paychain.co.ke" className="card">
+              <div className="card-icon"><MessageSquare size={20} /></div>
+              <div>
+                <strong>Support & Inquiries</strong>
+                <div className="card-sub">support@paychain.co.ke</div>
+              </div>
+            </a>
+            <a href="mailto:info@paychain.co.ke" className="card">
+              <div className="card-icon"><Briefcase size={20} /></div>
+              <div>
+                <strong>Strategic Partnerships</strong>
+                <div className="card-sub">info@paychain.co.ke</div>
+              </div>
+            </a>
+            <Link to="/waitlist" className="card primary">
+              <div className="card-icon"><UserPlus size={20} /></div>
+              <div>
+                <strong>Join the Ecosystem</strong>
+                <div className="card-sub">Secure your beta spot</div>
+              </div>
+            </Link>
           </div>
         </div>
       </section>
@@ -260,4 +394,3 @@ export default function FAQPage(): JSX.Element {
     </div>
   );
 }
-

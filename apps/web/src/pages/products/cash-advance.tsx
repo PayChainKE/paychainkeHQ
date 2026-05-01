@@ -10,6 +10,7 @@ import {
   Eye,
   ShieldCheck,
 } from 'lucide-react';
+import Breadcrumbs from "@/components/Breadcrumbs";
 import useCashAdvanceAnimations from './useCashAdvanceAnimations';
 
 const CashAdvance: React.FC = () => {
@@ -38,7 +39,11 @@ const CashAdvance: React.FC = () => {
       <Navbar />
 
       <main className="max-w-[1200px] mx-auto px-6 py-12" ref={rootRef}>
-        <section className="hero grid md:grid-cols-2 gap-8 items-center" style={{ paddingTop: '100px' }}>
+        <div style={{ paddingTop: '80px' }}>
+          <Breadcrumbs currentPage="Cash Advance" />
+        </div>
+        
+        <section className="hero grid md:grid-cols-2 gap-8 items-center">
           <div className="hero-copy">
             <div className="eyebrow inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-sm animate-pulse">
               Unlocks after 3 months of verified PayChain transactions

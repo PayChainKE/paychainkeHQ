@@ -48,8 +48,15 @@ interface CardData {
 const CONTACT_DETAILS: ContactDetail[] = [
   {
     icon: Mail,
-    label: "Email",
-    value: "Reach us via the contact form",
+    label: "General Inquiry",
+    value: "info@paychain.co.ke",
+    href: "mailto:info@paychain.co.ke",
+  },
+  {
+    icon: Mail,
+    label: "Support",
+    value: "support@paychain.co.ke",
+    href: "mailto:support@paychain.co.ke",
   },
   {
     icon: Phone,
@@ -62,11 +69,6 @@ const CONTACT_DETAILS: ContactDetail[] = [
     label: "Office",
     value: "Nairobi, Kenya",
   },
-  {
-    icon: Clock,
-    label: "Hours",
-    value: "Mon — Fri: 9:00 — 17:00 EAT",
-  },
 ];
 
 const CARD_DATA: CardData[] = [
@@ -78,7 +80,7 @@ const CARD_DATA: CardData[] = [
     body:
       "Our support team is Nairobi-based and responds to every message personally. Whether you want to understand how Cash Advance eligibility works, need help with your waitlist application, or just want to know if PayChain is right for your business — ask us directly.",
     response: "We respond within 24 hours on business days.",
-    // email removed — use the contact form
+    emailHref: "mailto:support@paychain.co.ke",
     phoneHref: "tel:+254790889066",
     secondary: { label: "Or join the waitlist →", href: "/waitlist" },
   },
@@ -252,19 +254,29 @@ export default function ContactUs() {
   return (
     <>
       <Navbar />
-      <main className={styles.page}>
+      <main className={`${styles.page} p-0 m-0`}>
       {/* HERO */}
       <section className={styles.hero}>
         <div className={styles.heroInner}>
-          <div className={styles.eyebrow} style={{ animationDelay: "200ms" }}>Get in Touch</div>
+
           <h1 className={styles.headline}>
-            <span className={styles.line} style={{ animationDelay: "0ms" }}>We're a Real Team.</span>
-            <span className={styles.line} style={{ animationDelay: "200ms" }}>Based in Nairobi.</span>
-            <span className={styles.line} style={{ animationDelay: "400ms" }}>And We Actually Reply.</span>
+            <span className={styles.line} style={{ animationDelay: "0ms" }}>Global Infrastructure.</span>
+            <span className={styles.line} style={{ animationDelay: "200ms" }}>Local Expertise.</span>
+            <span className={styles.line} style={{ animationDelay: "400ms" }}>Personal Connection.</span>
           </h1>
           <p className={styles.subheadline}>
-            Whether you're a merchant with a question, an investor who sees what we see, a partner who wants to build with us, or a journalist covering Kenya's fintech story — reach out. Every message goes directly to the PayChain team. No bots. No ticket queues. No automated holding responses.
+            Whether you're a merchant with a question, an investor who sees what we see, a partner who wants to build with us, or a journalist covering Kenya's fintech story, reach out. Every message goes directly to the PayChain team. No bots. No ticket queues. No automated holding responses.
           </p>
+        </div>
+
+        {/* Premium Cinematic Separator */}
+        <div className="absolute bottom-0 left-0 w-full overflow-hidden leading-[0] z-10 pointer-events-none">
+          <svg viewBox="0 0 1440 120" className="relative block w-full h-[60px] md:h-[100px]" preserveAspectRatio="none">
+            <path 
+              d="M0,120 L1440,120 L1440,0 C1100,80 340,80 0,0 L0,120 Z" 
+              fill="#ffffff"
+            />
+          </svg>
         </div>
       </section>
 
@@ -293,39 +305,7 @@ export default function ContactUs() {
         </div>
       </section>
 
-      {/* CONTACT CARDS */}
-      <section className={`${styles.section} ${styles.cardsSection}`}>
-        <div className={styles.inner}> 
-          <div className={styles.sectionEyebrow}>How can we help?</div>
-          <h2 className={styles.sectionHeadline}>Reach the Right Person Directly.</h2>
-          <div className={styles.cardsGrid}>
-            {CARD_DATA.map((card, idx) => {
-              const Icon = card.icon;
-              return (
-                <article key={idx} className={`${styles.card} ${styles['animate-on-scroll']}`} style={{ transitionDelay: `${idx * 100}ms` }}>
-                  <div className={styles.cardTop}>
-                    <div className={styles.cardIcon}><Icon size={20} /></div>
-                    <div className={styles.cardPill}>{card.label}</div>
-                  </div>
-                  <div className={styles.cardHeadline}>{card.headline}</div>
-                  <div className={styles.cardBody}>{card.body}</div>
-                  <div className={styles.cardResponse}><Clock size={12} /> <span>{card.response}</span></div>
-                  {card.emailHref && (
-                    <a href={card.emailHref} className={styles.cardPrimary}>{card.emailHref.replace('mailto:', '')} <ArrowRight size={14} /></a>
-                  )}
-                  {card.phoneHref && (
-                    <a href={card.phoneHref} className={styles.cardPhone}><Phone size={14} /> +254 790 889 066</a>
-                  )}
-                  {card.secondary && (
-                    <a href={card.secondary.href} className={styles.cardSecondary}>{card.secondary.label}</a>
-                  )}
-                  {card.hint && <div className={styles.cardHint}>{card.hint}</div>}
-                </article>
-              );
-            })}
-          </div>
-        </div>
-      </section>
+
 
       {/* CONTACT FORM SECTION */}
       <section className={styles.formSection}>
@@ -333,9 +313,8 @@ export default function ContactUs() {
           <div className={styles.formColumns}>
             <div className={`${styles.formIntro} ${styles['animate-from-left']}`}>
               <h3 className={styles.formTitle}>Send Us a Message</h3>
-              <p className={styles.formSubtitle}>Fill in the form below and we will get back to you directly. No automated responses — a real member of the PayChain team will reply.</p>
+              <p className={styles.formSubtitle}>Fill in the form below and we will get back to you directly. No automated responses, a real member of the PayChain team will reply.</p>
               <div className={styles.reassurances}>
-                <div className={styles.reassure}><Check size={16} color="#1D9E75" /> <span>Real person replies — not a bot</span></div>
                 <div className={styles.reassure}><Check size={16} color="#1D9E75" /> <span>Within 24 hours on business days</span></div>
                 <div className={styles.reassure}><Check size={16} color="#1D9E75" /> <span>Your information is never shared</span></div>
               </div>
@@ -343,7 +322,8 @@ export default function ContactUs() {
               <div className={styles.directBlock}>
                 <div className={styles.smallLabel}>Or reach us directly</div>
                 <div className={styles.contactRows}>
-                  <div className={styles.contactRow}><Mail size={16} color="#1D9E75" /><div className={styles.directLink}>Use the contact form</div></div>
+                  <div className={styles.contactRow}><Mail size={16} color="#1D9E75" /><a href="mailto:info@paychain.co.ke" className={styles.directLink}>info@paychain.co.ke</a></div>
+                  <div className={styles.contactRow}><Mail size={16} color="#1D9E75" /><a href="mailto:support@paychain.co.ke" className={styles.directLink}>support@paychain.co.ke</a></div>
                   <div className={styles.contactRow}><Phone size={16} color="#1D9E75" /><a href="tel:+254790889066" className={styles.directLink}>+254 790 889 066</a></div>
                 </div>
                 <div className={styles.hoursRow}><Clock size={14} className={styles.mutedIcon} /><span className={styles.hoursText}>Mon — Fri, 9:00 — 17:00 EAT</span></div>
@@ -437,7 +417,8 @@ export default function ContactUs() {
                     <div className={styles.successTitle}>Message received.</div>
                     <div className={styles.successBody}>Thank you for reaching out. A member of the PayChain team will reply to <span style={{ fontWeight: 600 }}>{submittedEmail}</span> within 24 hours on business days.</div>
                     <div className={styles.successDirect}>Or reach us directly:</div>
-                    <div className={styles.successLink}>Use the contact form</div>
+                    <a href="mailto:info@paychain.co.ke" className={styles.successLink}>info@paychain.co.ke</a>
+                    <a href="mailto:support@paychain.co.ke" className={styles.successLink}>support@paychain.co.ke</a>
                     <a href="tel:+254790889066" className={styles.successLink}>+254 790 889 066</a>
                     <div className={styles.successCtas}>
                       <a href="/how-it-works" className={styles.successCta}>How PayChain Works →</a>
@@ -452,42 +433,41 @@ export default function ContactUs() {
         </div>
       </section>
 
-      {/* LOCATION, CAREERS, FINAL CTA sections simplified for brevity but presentationally accurate */}
-      <section className={`${styles.section} ${styles.locationSection}`}>
-        <div className={styles.innerLarge}>
-          <h3 className={styles.locHeadline}>Where to Find Us</h3>
-          <div className={styles.locGrid}>
-            <div className={styles.locCard}>
-              <div className={styles.wordmark}>PayChain</div>
-              <div className={styles.locTitle}>Nairobi, Kenya</div>
-              <hr className={styles.locDivider} />
-              <div className={styles.smallLabel}>Contact</div>
-              <div className={styles.contactRows}>
-                <div className={styles.contactRow}><Mail size={16} color="#1D9E75" /><div className={styles.directLink}>Use the contact form</div></div>
-                <div className={styles.contactRow}><Phone size={16} color="#1D9E75" /><a href="tel:+254790889066" className={styles.directLink}>+254 790 889 066</a></div>
-              </div>
-              <hr className={styles.locDivider} />
-              <div className={styles.smallLabel}>Working Hours</div>
-              <div className={styles.hoursGrid}>
-                <div className={styles.hoursRowLabel}>Mon — Fri</div><div className={styles.hoursRowVal}>9:00 AM — 5:00 PM EAT</div>
-                <div className={styles.hoursRowLabel}>Saturday</div><div className={styles.hoursRowValMuted}>Closed</div>
-                <div className={styles.hoursRowLabel}>Sunday</div><div className={styles.hoursRowValMuted}>Closed</div>
-              </div>
-            </div>
-            <div className={styles.mapCard} role="img" aria-label="Map showing PayChain's location in Nairobi, Kenya">
-              {/* Embedded Google Maps iframe for Kasarani, Nairobi — responsive */}
-              <iframe
-                title="PayChain location — Kasarani, Nairobi"
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d10044.977638023242!2d36.89127089494832!3d-1.2257800686405993!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x182f1591a2e9a35b%3A0x31a92b030cf1ccd5!2sKasarani%2C%20Nairobi!5e1!3m2!1sen!2ske!4v1773998385663!5m2!1sen!2ske"
-                className={styles.mapIframe}
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-                allowFullScreen
-              />
-            </div>
+      {/* CONTACT CARDS */}
+      <section className={`${styles.section} ${styles.cardsSection}`}>
+        <div className={styles.inner}> 
+          <div className={styles.sectionEyebrow}>How can we help?</div>
+          <h2 className={styles.sectionHeadline}>Reach the Right Person Directly.</h2>
+          <div className={styles.cardsGrid}>
+            {CARD_DATA.map((card, idx) => {
+              const Icon = card.icon;
+              return (
+                <article key={idx} className={`${styles.card} ${styles['animate-on-scroll']}`} style={{ transitionDelay: `${idx * 100}ms` }}>
+                  <div className={styles.cardTop}>
+                    <div className={styles.cardIcon}><Icon size={20} /></div>
+                    <div className={styles.cardPill}>{card.label}</div>
+                  </div>
+                  <div className={styles.cardHeadline}>{card.headline}</div>
+                  <div className={styles.cardBody}>{card.body}</div>
+                  <div className={styles.cardResponse}><Clock size={12} /> <span>{card.response}</span></div>
+                  {card.emailHref && (
+                    <a href={card.emailHref} className={styles.cardPrimary}>{card.emailHref.replace('mailto:', '')} <ArrowRight size={14} /></a>
+                  )}
+                  {card.phoneHref && (
+                    <a href={card.phoneHref} className={styles.cardPhone}><Phone size={14} /> +254 790 889 066</a>
+                  )}
+                  {card.secondary && (
+                    <a href={card.secondary.href} className={styles.cardSecondary}>{card.secondary.label}</a>
+                  )}
+                  {card.hint && <div className={styles.cardHint}>{card.hint}</div>}
+                </article>
+              );
+            })}
           </div>
         </div>
       </section>
+
+
 
       <section className={styles.careersStrip}>
         <div className={styles.careersInner}>
@@ -511,6 +491,37 @@ export default function ContactUs() {
           <p className={styles.finalBody}>If you're a Kenyan merchant and you're not sure which contact option is right for you — the waitlist is the best first step. Join in 60 seconds and our team will reach out to you directly before the Q2 2026 beta launch.</p>
           <a href="/waitlist" className={styles.finalBtn}>Join the Beta Waitlist <ArrowRight size={14} /></a>
           <div className={styles.finalMicro}>No credit card · No commitment · Limited beta spots available</div>
+        </div>
+      </section>
+
+      {/* LOCATION SECTION */}
+      <section className={`${styles.section} ${styles.locationSection}`}>
+        <div className={styles.innerLarge}>
+          <h3 className={styles.locHeadline}>Where to Find Us</h3>
+          <div className={styles.locGrid}>
+            <div className={styles.locCard}>
+              <div className={styles.wordmark}>PayChain</div>
+              <div className={styles.locTitle}>Nairobi, Kenya</div>
+              <hr className={styles.locDivider} />
+              <div className={styles.smallLabel}>Contact</div>
+              <div className={styles.contactRows}>
+                <div className={styles.contactRow}><Mail size={16} color="#1D9E75" /><a href="mailto:info@paychain.co.ke" className={styles.directLink}>info@paychain.co.ke</a></div>
+                <div className={styles.contactRow}><Mail size={16} color="#1D9E75" /><a href="mailto:support@paychain.co.ke" className={styles.directLink}>support@paychain.co.ke</a></div>
+                <div className={styles.contactRow}><Phone size={16} color="#1D9E75" /><a href="tel:+254790889066" className={styles.directLink}>+254 790 889 066</a></div>
+              </div>
+            </div>
+            <div className={styles.mapCard} role="img" aria-label="Map showing PayChain's location in Nairobi, Kenya">
+              <iframe
+                title="PayChain Nairobi HQ Location"
+                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d332066.4596756389!2d36.84739685!3d-1.3032089500000001!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x182f1172d84d49a7%3A0xf7cf0254b297924c!2sNairobi!5e1!3m2!1sen!2ske!4v1777640667213!5m2!1sen!2ske"
+                className={styles.mapIframe}
+                style={{ border: 0, minHeight: "450px" }}
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                allowFullScreen
+              />
+            </div>
+          </div>
         </div>
       </section>
       <Footer />

@@ -61,10 +61,6 @@ const BlogPost = () => {
               <span className="text-[#00bf63] font-semibold tracking-wide uppercase">{articleData.category}</span>
               <span className="text-gray-300">|</span>
               <span className="text-gray-500 flex items-center gap-1">
-                <Calendar className="w-4 h-4" /> {articleData.date}
-              </span>
-              <span className="text-gray-300 hidden md:inline">|</span>
-              <span className="text-gray-500 hidden md:flex items-center gap-1">
                 <Clock className="w-4 h-4" /> {articleData.readTime}
               </span>
             </div>
@@ -126,9 +122,6 @@ const BlogPost = () => {
                 <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-sm font-medium">Fintech</span>
                 <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-sm font-medium">Africa</span>
                 <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-sm font-medium">POS</span>
-              </div>
-              <div className="text-sm text-gray-500 font-medium">
-                Published on {articleData.date}
               </div>
             </div>
           </div>

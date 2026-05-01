@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { Users, Package, Zap, Calendar, FileText, CheckCircle } from 'lucide-react';
 import './paychain-bulk-pay.css';
 import useBulkPayAnimations from './useBulkPayAnimations';
+import Breadcrumbs from '@/components/Breadcrumbs';
 
 const features = [
   { title: 'Batch Payroll', icon: Users, desc: 'Upload staff list via CSV or build on dashboard. Run payroll for your entire team in one click with individual M-PESA confirmations sent automatically.' },
@@ -23,6 +24,7 @@ const PaychainBulkPay: React.FC = () => {
       <Navbar />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <Breadcrumbs currentPage="Paychain Bulk Pay" />
         {/* HERO */}
         <section className="bulk-hero grid lg:grid-cols-2 gap-10 items-center" aria-labelledby="bulk-hero-title" data-animate>
           <div>
