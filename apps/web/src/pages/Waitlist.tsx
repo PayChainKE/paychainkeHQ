@@ -101,7 +101,12 @@ const Waitlist: React.FC = () => {
       const axiosError = err as AxiosError<{ error?: string }>;
       console.error('Waitlist error:', axiosError);
       const msg = axiosError.response?.data?.error || 'Unable to submit. Please try again.';
-      setErrors({ form: msg });
+      
+      if (msg.toLowerCase().includes('email')) {
+        setErrors({ email: msg });
+      } else {
+        setErrors({ form: msg });
+      }
     } finally {
       setLoading(false);
     }
