@@ -20,7 +20,13 @@ const Hero: React.FC = () => {
   };
 
   return (
-    <section className="relative w-full flex items-center justify-center overflow-hidden bg-white bg-[url('/hero-bg.png')] bg-cover bg-top md:bg-[center_-200px] lg:bg-[center_-380px] bg-no-repeat">
+    <section className="relative w-full flex items-center justify-center overflow-hidden bg-white min-h-[600px] md:min-h-[800px]">
+      {/* Background Image - Flipped for Mobile, Normal for Desktop */}
+      <div className="absolute inset-0 z-0">
+        <div className="absolute inset-0 md:hidden bg-[url('/Home%20page/mobile%20home%20hero%20bg.png')] bg-cover bg-center scale-x-[-1]" />
+        <div className="absolute inset-0 hidden md:block bg-[url('/hero-bg.png')] bg-cover md:bg-top md:bg-[center_-200px] lg:bg-[center_-380px] bg-no-repeat" />
+      </div>
+
       {/* Background Overlay for text readability */}
       <div className="absolute inset-0 bg-gradient-to-r from-[#00351d] via-[#00351d]/90 to-transparent z-0"></div>
 
