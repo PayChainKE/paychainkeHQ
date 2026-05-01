@@ -78,7 +78,7 @@ const CARD_DATA: CardData[] = [
     headline:
       "Questions about your account, the waitlist, or how PayChain works?",
     body:
-      "Our support team is Nairobi-based and responds to every message personally. Whether you want to understand how Cash Advance eligibility works, need help with your waitlist application, or just want to know if PayChain is right for your business — ask us directly.",
+      "Our support team is Nairobi-based and responds to every message personally. Whether you want to understand how Cash Advance eligibility works, need help with your waitlist application, or just want to know if PayChain is right for your business, ask us directly.",
     response: "We respond within 24 hours on business days.",
     emailHref: "mailto:support@paychain.co.ke",
     phoneHref: "tel:+254790889066",
@@ -89,7 +89,7 @@ const CARD_DATA: CardData[] = [
     label: "Partnerships",
     headline: "Looking to partner, integrate, or build with PayChain?",
     body:
-      "We are actively pursuing partnerships with Kenyan trade associations, SACCOs, financial institutions, and any organization whose members would benefit from PayChain's infrastructure. If you work with Kenyan SMEs — let's talk.",
+      "We are actively pursuing partnerships with Kenyan trade associations, SACCOs, financial institutions, and any organization whose members would benefit from PayChain's infrastructure. If you work with Kenyan SMEs, let's talk.",
     response: "We respond within 48 hours.",
     hint: "We will follow up via the contact form",
   },
@@ -326,7 +326,7 @@ export default function ContactUs() {
                   <div className={styles.contactRow}><Mail size={16} color="#1D9E75" /><a href="mailto:support@paychain.co.ke" className={styles.directLink}>support@paychain.co.ke</a></div>
                   <div className={styles.contactRow}><Phone size={16} color="#1D9E75" /><a href="tel:+254790889066" className={styles.directLink}>+254 790 889 066</a></div>
                 </div>
-                <div className={styles.hoursRow}><Clock size={14} className={styles.mutedIcon} /><span className={styles.hoursText}>Mon — Fri, 9:00 — 17:00 EAT</span></div>
+                <div className={styles.hoursRow}><Clock size={14} className={styles.mutedIcon} /><span className={styles.hoursText}>Mon - Fri, 9:00 - 17:00 EAT</span></div>
               </div>
             </div>
 
@@ -474,7 +474,7 @@ export default function ContactUs() {
           <div>
             <div className={styles.careersEyebrow}>Join the Team</div>
             <div className={styles.careersHeadline}>Want to Build PayChain With Us?</div>
-            <div className={styles.careersBody}>We are a small, focused team building financial infrastructure that will matter in Kenya for a long time. If you are a talented engineer, business developer, compliance specialist, or community builder who believes Kenyan merchants deserve better — we want to hear from you.</div>
+            <div className={styles.careersBody}>We are a small, focused team building financial infrastructure that will matter in Kenya for a long time. If you are a talented engineer, business developer, compliance specialist, or community builder who believes Kenyan merchants deserve better, we want to hear from you.</div>
             <div className={styles.careersNote}>We review every application personally.</div>
           </div>
           <a href="#contact-form" className={styles.careersCard}>
@@ -486,9 +486,9 @@ export default function ContactUs() {
 
       <section className={styles.finalCta}>
         <div className={styles.finalInner}>
-          <div className={styles.pulseBadge}>Closed Beta — Q2 2026</div>
+          <div className={styles.pulseBadge}>Closed Beta | Q2 2026</div>
           <h2 className={styles.finalHeadline}>Not Sure Where to Start? Just Join the Waitlist.</h2>
-          <p className={styles.finalBody}>If you're a Kenyan merchant and you're not sure which contact option is right for you — the waitlist is the best first step. Join in 60 seconds and our team will reach out to you directly before the Q2 2026 beta launch.</p>
+          <p className={styles.finalBody}>If you're a Kenyan merchant and you're not sure which contact option is right for you, the waitlist is the best first step. Join in 60 seconds and our team will reach out to you directly before the Q2 2026 beta launch.</p>
           <a href="/waitlist" className={styles.finalBtn}>Join the Beta Waitlist <ArrowRight size={14} /></a>
           <div className={styles.finalMicro}>No credit card · No commitment · Limited beta spots available</div>
         </div>

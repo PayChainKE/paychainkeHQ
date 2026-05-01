@@ -93,7 +93,7 @@ const Waitlist: React.FC = () => {
     }
   };
 
-  const whatsappText = encodeURIComponent(`I just joined the PayChain beta waitlist — Kenya's new merchant payment OS. Join here: https://www.paychain.co.ke`);
+  const whatsappText = encodeURIComponent(`I just joined the PayChain beta waitlist, Kenya's new merchant payment OS. Join here: https://www.paychain.co.ke`);
   const whatsappHref = `https://wa.me/?text=${whatsappText}`;
 
   return (
