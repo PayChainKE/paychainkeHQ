@@ -70,7 +70,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
   return (
     <>
       <nav className="fixed top-0 left-0 right-0 z-50 border-b border-gray-200 bg-white transition-colors duration-300">
-        <div className="container mx-auto px-6 lg:px-8">
+        <div className="container mx-auto px-[0.4cm] md:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Logo and Mobile Menu Button */}
             <div className="flex items-center gap-4">
@@ -305,7 +305,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
           </div>
 
           {/* Navigation Links */}
-          <div className="pl-24 pr-4 py-8 pb-20">
+          <div className="pl-[0.4cm] pr-4 py-8 pb-20">
             <div className="space-y-2">
               {navItems.map((item, index) => {
                 const isActive = location.pathname === item.path;

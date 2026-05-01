@@ -82,7 +82,7 @@ const Hero: React.FC = () => {
           {/* Social Proof */}
           <motion.div variants={itemVariants} className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mt-10">
             <div className="flex flex-col">
-              <span className="text-sm font-medium text-[#FBF8F1] mb-2 uppercase tracking-wider">Trusted by industry leaders</span>
+              <span className="text-[10px] font-medium text-[#FBF8F1] mb-2 uppercase tracking-wider">Trusted by:</span>
               <div className="flex items-center gap-4">
                 <div className="flex -space-x-3">
                   {['/Home page/merchant 1.png', '/Home page/merchant 2.png', '/Home page/merchant 3.png'].map((src, i) => (
