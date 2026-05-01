@@ -60,9 +60,23 @@ const Waitlist: React.FC = () => {
     const e: Record<string,string> = {};
     if (!fullName.trim()) e.fullName = 'Full name is required';
     if (!businessName.trim()) e.businessName = 'Business name is required';
+    
+    // Phone Validation
     const digits = phoneSanitize(phone);
-    if (!digits) e.phone = 'Phone number is required';
-    else if (!(digits.length === 10 && digits.startsWith('07')) && !(digits.length === 12 && digits.startsWith('2547'))) e.phone = 'Enter a valid M-PESA number (07XX XXX XXX)';
+    if (!digits) {
+      e.phone = 'Phone number is required';
+    } else if (!((digits.length === 10 && digits.startsWith('07')) || (digits.length === 12 && digits.startsWith('2547')))) {
+      e.phone = 'Enter a valid M-PESA number (07XX XXX XXX)';
+    }
+
+    // Email Validation
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email.trim()) {
+      e.email = 'Email address is required';
+    } else if (!emailRe.test(email.trim())) {
+      e.email = 'Please enter a valid email address';
+    }
+    
     return e;
   };
 
@@ -205,6 +219,7 @@ const Waitlist: React.FC = () => {
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all outline-none bg-slate-50/50 text-sm" 
                             placeholder="john@example.com" 
                           />
+                          {errors.email && <p className="text-rose-500 text-[10px] font-medium ml-1">{errors.email}</p>}
                         </div>
 
                         <div className="space-y-1">
