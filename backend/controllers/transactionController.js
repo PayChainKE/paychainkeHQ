@@ -208,3 +208,56 @@ export const getLiveRate = async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch live rate' });
   }
 };
+
+// @desc    Simulate sending money (Move Money)
+// @route   POST /api/transactions/send-money
+// @access  Private
+export const sendMoney = async (req, res) => {
+  try {
+    const { destination, amount, fee, reference } = req.body;
+    const merchantId = req.merchant._id;
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ error: 'Valid amount is required.' });
+    }
+
+    const totalDeduction = Number(amount) + Number(fee || 0);
+
+    // Verify balance
+    const merchant = await Merchant.findById(merchantId);
+    if (!merchant) {
+      return res.status(404).json({ error: 'Merchant not found.' });
+    }
+
+    if (merchant.kesBalance < totalDeduction) {
+      return res.status(400).json({ error: 'Insufficient KES balance for this transfer.' });
+    }
+
+    // Deduct balance
+    merchant.kesBalance -= totalDeduction;
+    await merchant.save();
+
+    // Create Transaction Record
+    const transaction = await Transaction.create({
+      merchantId,
+      receiptNumber: `OUT-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
+      amount: totalDeduction,
+      kesAmount: totalDeduction,
+      type: 'outbound',
+      senderName: 'PayChain Merchant',
+      senderPhone: merchant.phone,
+      reference: reference || `Transfer to ${destination}`,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully transferred ${amount} KES.`,
+      transaction,
+      newBalance: merchant.kesBalance
+    });
+
+  } catch (error) {
+    console.error('❌ Error in sendMoney:', error);
+    res.status(500).json({ error: 'Server Error: Failed to process transfer' });
+  }
+};

@@ -1,11 +1,28 @@
+import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import axios from 'axios'
+import MerchantLayout from '../components/layout/MerchantLayout'
 import { useNotification } from '../context/NotificationContext'
+import { useMerchantAuth } from '../context/MerchantAuthContext'
+import { formatKES } from '../utils/formatCurrency'
 
 export default function SendMoney() {
   const navigate = useNavigate()
   const { addNotification } = useNotification()
+  const { merchant, refreshSession } = useMerchantAuth()
+  
   const [step, setStep] = useState(1)
   const [destination, setDestination] = useState('')
   const [showDestDropdown, setShowDestDropdown] = useState(false)
+  
+  // Payment Details State
+  const [amount, setAmount] = useState('')
+  const [recipientAccount, setRecipientAccount] = useState('')
+  const [reference, setReference] = useState('')
+  
+  // Confirmation State
+  const [pin, setPin] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
 
   const steps = [
     { id: 1, label: 'From / To' },
@@ -14,12 +31,16 @@ export default function SendMoney() {
   ]
 
   const destinations = [
-    { id: 'mpesa-primary', label: 'Send to primary mpesa phone', fee: 'Free' },
-    { id: 'bank', label: 'Send to Bank account', fee: 'KSh 50.00' },
-    { id: 'till', label: 'Send to Till', fee: 'KSh 50.00' },
-    { id: 'paybill', label: 'Send to paybill', fee: 'KSh 50.00' },
-    { id: 'mobile', label: 'Send to Mobile phone', fee: 'KSh 50.00' }
+    { id: 'mpesa-primary', label: 'Send to primary mpesa phone', fee: 0 },
+    { id: 'bank', label: 'Send to Bank account', fee: 50 },
+    { id: 'till', label: 'Send to Till', fee: 50 },
+    { id: 'paybill', label: 'Send to paybill', fee: 50 },
+    { id: 'mobile', label: 'Send to Mobile phone', fee: 50 }
   ]
+
+  const selectedDest = destinations.find(d => d.id === destination)
+  const fee = selectedDest?.fee || 0
+  const totalAmount = Number(amount || 0) + fee
 
   return (
     <MerchantLayout title="Send Money">
@@ -68,7 +89,7 @@ export default function SendMoney() {
                     </div>
                     <div className="min-w-0">
                       <p className="text-[10px] lg:text-xs font-black text-primary uppercase tracking-wider truncate">Available balance</p>
-                      <p className="text-lg lg:text-xl font-headline text-emerald-700 mt-0.5">KSh 10.00</p>
+                      <p className="text-lg lg:text-xl font-headline text-emerald-700 mt-0.5">{formatKES(merchant?.kesBalance || 0)}</p>
                     </div>
                   </div>
                   <span className="material-symbols-outlined text-slate-300 group-hover:text-emerald-600 transition-colors shrink-0">check_circle</span>
@@ -88,11 +109,11 @@ export default function SendMoney() {
                     </div>
                     <div className="min-w-0">
                       <p className={`text-[13px] lg:text-sm font-bold truncate ${destination ? 'text-primary' : 'text-slate-400'}`}>
-                        {destination ? destinations.find(d => d.id === destination)?.label : 'Select destination'}
+                        {selectedDest?.label || 'Select destination'}
                       </p>
                       {destination && (
                         <p className="text-[9px] lg:text-[10px] text-emerald-600 font-bold uppercase tracking-widest mt-0.5">
-                          Fee: {destinations.find(d => d.id === destination)?.fee}
+                          Fee: {fee === 0 ? 'Free' : formatKES(fee)}
                         </p>
                       )}
                     </div>
@@ -110,6 +131,7 @@ export default function SendMoney() {
                           onClick={() => {
                             setDestination(d.id)
                             setShowDestDropdown(false)
+                            setRecipientAccount(d.id === 'mpesa-primary' ? merchant?.phone || '' : '')
                           }}
                           className={`w-full text-left p-3 lg:p-4 rounded-xl transition-all flex items-center justify-between group ${destination === d.id ? 'bg-emerald-50' : 'hover:bg-slate-50'}`}
                         >
@@ -118,7 +140,7 @@ export default function SendMoney() {
                             <span className={`text-[12px] lg:text-[13px] font-bold truncate ${destination === d.id ? 'text-emerald-900' : 'text-slate-600'}`}>{d.label}</span>
                           </div>
                           <span className="text-[9px] lg:text-[10px] font-black text-emerald-600 opacity-60 group-hover:opacity-100 transition-opacity uppercase tracking-widest shrink-0 ml-2">
-                             {d.fee === 'Free' ? 'Free' : d.fee.split(' ')[1]}
+                             {d.fee === 0 ? 'Free' : formatKES(d.fee)}
                           </span>
                         </button>
                       ))}
@@ -129,13 +151,99 @@ export default function SendMoney() {
             </div>
           )}
 
-          {step > 1 && (
-            <div className="py-20 text-center">
-              <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                 <span className="material-symbols-outlined text-4xl text-emerald-600 animate-pulse">settings</span>
+          {step === 2 && (
+            <div className="space-y-6 animate-in slide-in-from-right duration-500">
+              <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100 flex items-start gap-3">
+                 <span className="material-symbols-outlined text-emerald-600">info</span>
+                 <p className="text-xs text-emerald-800 font-medium">Please enter the details for your transfer to <span className="font-bold">{selectedDest?.label}</span>. Transfers are processed instantly.</p>
               </div>
-              <h3 className="text-xl font-headline font-bold text-primary mb-2 whitespace-nowrap overflow-hidden text-ellipsis px-4">Step {step} Implementation in Progress...</h3>
-              <p className="text-on-surface-variant font-medium max-w-sm mx-auto opacity-70">The payment details and confirmation logic will be added in the next update.</p>
+
+              <div>
+                <label className="block text-[11px] font-black uppercase tracking-widest text-slate-400 mb-2">Recipient Details*</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 material-symbols-outlined">person</span>
+                  <input 
+                    type={destination.includes('mpesa') || destination === 'mobile' ? 'tel' : 'text'}
+                    value={recipientAccount}
+                    onChange={(e) => setRecipientAccount(e.target.value)}
+                    placeholder={destination.includes('mpesa') || destination === 'mobile' ? "07XX XXX XXX" : "Account or Till Number"}
+                    className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm font-bold rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 pl-12 py-3.5 outline-none transition-all"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-black uppercase tracking-widest text-slate-400 mb-2">Amount to Send (KES)*</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">KES</span>
+                  <input 
+                    type="number"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-lg font-headline font-bold rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 pl-14 py-3.5 outline-none transition-all"
+                    required
+                    min="10"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-black uppercase tracking-widest text-slate-400 mb-2">Reference / Reason (Optional)</label>
+                <input 
+                  type="text"
+                  value={reference}
+                  onChange={(e) => setReference(e.target.value)}
+                  placeholder="e.g. Supplier Payment"
+                  className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm font-medium rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 px-4 py-3.5 outline-none transition-all"
+                />
+              </div>
+            </div>
+          )}
+
+          {step === 3 && (
+            <div className="space-y-8 animate-in slide-in-from-right duration-500">
+              <div className="text-center">
+                <h3 className="font-headline text-2xl font-bold text-primary">Confirm Transfer</h3>
+                <p className="text-sm text-on-surface-variant mt-1">Review the details below before authorizing.</p>
+              </div>
+
+              <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 space-y-4">
+                <div className="flex justify-between items-center pb-4 border-b border-slate-200">
+                   <span className="text-xs text-slate-500 font-bold uppercase tracking-widest">To</span>
+                   <span className="text-sm font-bold text-primary text-right">
+                     {selectedDest?.label}<br/>
+                     <span className="text-xs text-on-surface-variant font-normal">{recipientAccount}</span>
+                   </span>
+                </div>
+                <div className="flex justify-between items-center pb-4 border-b border-slate-200">
+                   <span className="text-xs text-slate-500 font-bold uppercase tracking-widest">Amount</span>
+                   <span className="text-sm font-bold text-primary">{formatKES(amount || 0)}</span>
+                </div>
+                <div className="flex justify-between items-center pb-4 border-b border-slate-200">
+                   <span className="text-xs text-slate-500 font-bold uppercase tracking-widest">Transfer Fee</span>
+                   <span className="text-sm font-bold text-primary">{fee === 0 ? 'Free' : formatKES(fee)}</span>
+                </div>
+                <div className="flex justify-between items-center pt-2">
+                   <span className="text-xs text-primary font-black uppercase tracking-widest">Total Deduction</span>
+                   <span className="text-xl font-headline font-black text-emerald-700">{formatKES(totalAmount)}</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-black uppercase tracking-widest text-slate-400 mb-3 text-center">Enter 4-Digit Security PIN</label>
+                <div className="flex justify-center">
+                  <input 
+                    type="password"
+                    maxLength="4"
+                    value={pin}
+                    onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+                    placeholder="••••"
+                    className="w-32 bg-slate-50 border border-slate-200 text-slate-800 text-2xl tracking-[0.5em] text-center font-bold rounded-xl focus:ring-2 focus:ring-[#00351D]/20 focus:border-[#00351D] px-4 py-3 outline-none transition-all"
+                  />
+                </div>
+              </div>
             </div>
           )}
 
@@ -143,28 +251,51 @@ export default function SendMoney() {
             {step > 1 && (
               <button 
                 onClick={() => setStep(step - 1)}
-                className="flex-1 py-4 px-6 border border-slate-200 rounded-2xl text-[11px] font-black uppercase tracking-widest text-slate-400 hover:bg-slate-50 transition-all"
+                disabled={isLoading}
+                className="flex-1 py-4 px-6 border border-slate-200 rounded-2xl text-[11px] font-black uppercase tracking-widest text-slate-400 hover:bg-slate-50 transition-all disabled:opacity-50"
               >
                 Back
               </button>
             )}
             <button 
-              onClick={() => {
+              onClick={async () => {
                 if (step === 3) {
-                  addNotification({
-                    type: 'payment',
-                    message: `Sent payment to ${destinations.find(d => d.id === destination)?.label} successfully.`,
-                    title: 'Transfer Complete'
-                  })
-                  navigate('/overview')
+                  if (totalAmount > (merchant?.kesBalance || 0)) {
+                    addNotification({ title: 'Insufficient Balance', message: 'You do not have enough funds.', type: 'error' });
+                    return;
+                  }
+                  setIsLoading(true);
+                  try {
+                    await new Promise(r => setTimeout(r, 1500));
+                    const token = localStorage.getItem('paychain_merchant_token');
+                    const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+                    await axios.post(`${API_URL}/api/transactions/send-money`, {
+                      destination: selectedDest.label,
+                      amount: Number(amount),
+                      fee,
+                      reference
+                    }, { headers: { Authorization: `Bearer ${token}` } });
+                    
+                    addNotification({ title: 'Transfer Complete', message: `Successfully sent ${formatKES(amount)} to ${selectedDest.label}`, type: 'success' });
+                    await refreshSession();
+                    navigate('/overview');
+                  } catch (err) {
+                    addNotification({ title: 'Transfer Failed', message: err.response?.data?.error || 'Failed to process transfer.', type: 'error' });
+                  } finally {
+                    setIsLoading(false);
+                  }
                 } else {
-                  setStep(step + 1)
+                  setStep(step + 1);
                 }
               }}
-              disabled={step === 1 && !destination}
-              className={`flex-1 py-4 px-6 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all shadow-lg ${step === 1 && !destination ? 'bg-slate-100 text-slate-300 cursor-not-allowed shadow-none' : 'bg-[#00351D] text-white hover:brightness-110'}`}
+              disabled={(step === 1 && !destination) || (step === 2 && (!amount || !recipientAccount)) || (step === 3 && pin.length < 4) || isLoading}
+              className={`flex-1 py-4 px-6 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${((step === 1 && !destination) || (step === 2 && (!amount || !recipientAccount)) || (step === 3 && pin.length < 4) || isLoading) ? 'bg-slate-100 text-slate-300 cursor-not-allowed shadow-none' : 'bg-[#00351D] text-white shadow-xl shadow-emerald-900/20 active:scale-[0.98]'}`}
             >
-              {step === 3 ? 'Confirm & Send' : 'Continue'}
+              {isLoading ? (
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+              ) : (
+                step === 3 ? 'Confirm & Send' : 'Continue'
+              )}
             </button>
           </div>
         </div>
