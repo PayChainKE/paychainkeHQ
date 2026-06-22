@@ -17,6 +17,7 @@ export default function Overview() {
   const [trustData, setTrustData] = useState(null)
   const [activeTimeframe, setActiveTimeframe] = useState('7D')
   const [showMoveMoney, setShowMoveMoney] = useState(false)
+  const [showFundAccount, setShowFundAccount] = useState(false)
   const [showDigitalWallet, setShowDigitalWallet] = useState(() => localStorage.getItem('paychain_show_wallet') !== 'false')
 
   const toggleDigitalWallet = () => {
@@ -142,9 +143,9 @@ export default function Overview() {
 
           <div className="relative z-10 flex flex-col h-full">
             <div className="flex justify-between items-start mb-8 lg:mb-10">
-              <span className="bg-[#1F4D3C] text-[#5EFEB3] px-3 lg:px-4 py-1.5 rounded-full text-[8px] lg:text-[9px] font-black tracking-[0.15em] uppercase border border-white/10">Business Till Account</span>
+              <span className="bg-[#1F4D3C] text-[#5EFEB3] px-3 lg:px-4 py-1.5 rounded-full text-[8px] lg:text-[9px] font-black tracking-[0.15em] uppercase border border-white/10">Business Account</span>
               <div className="flex items-center gap-3 lg:gap-4 text-[8px] lg:text-[9px]">
-                <span className="text-white/40 uppercase font-bold tracking-[0.15em] hidden sm:inline">Paybill: 400200 | Acc: {merchant?.paybillAccount || '...'}</span>
+                <span className="text-white/40 uppercase font-bold tracking-[0.15em] hidden sm:inline">Acc: {merchant?.paybillAccount || '54921'}</span>
                 <button
                   onClick={togglePrivacy}
                   className="text-white/40 hover:text-white transition-colors p-1"
@@ -168,13 +169,80 @@ export default function Overview() {
 
             <div className="flex gap-3 lg:gap-4 mt-8 relative">
               <button 
-                onClick={() => setShowMoveMoney(!showMoveMoney)}
+                onClick={() => { setShowFundAccount(!showFundAccount); setShowMoveMoney(false); }}
+                className={`flex-1 py-3 px-4 ${showFundAccount ? 'bg-white text-[#00351D] shadow-[0_0_20px_rgba(255,255,255,0.3)]' : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-100'} rounded-[14px] text-[10px] font-black transition-all duration-300 border border-emerald-500/20 hover:border-emerald-500/40 uppercase tracking-widest leading-none flex items-center justify-center gap-2 z-50`}
+              >
+                Fund Account
+                <span className={`material-symbols-outlined text-sm leading-none transition-transform duration-500 ${showFundAccount ? 'rotate-180' : ''}`}>expand_more</span>
+              </button>
+
+              <button 
+                onClick={() => { setShowMoveMoney(!showMoveMoney); setShowFundAccount(false); }}
                 className={`flex-1 py-3 px-4 ${showMoveMoney ? 'bg-white text-[#00351D] shadow-[0_0_20px_rgba(255,255,255,0.3)]' : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-100'} rounded-[14px] text-[10px] font-black transition-all duration-300 border border-emerald-500/20 hover:border-emerald-500/40 uppercase tracking-widest leading-none flex items-center justify-center gap-2 z-50`}
               >
                 Move money
                 <span className={`material-symbols-outlined text-sm leading-none transition-transform duration-500 ${showMoveMoney ? 'rotate-180' : ''}`}>expand_more</span>
               </button>
               
+              {showFundAccount && (
+                <>
+                  <div className="fixed inset-0 z-40 bg-black/5 backdrop-blur-[2px]" onClick={() => setShowFundAccount(false)}></div>
+                  <div className="absolute left-0 sm:left-auto sm:right-auto top-full mt-4 w-[calc(100vw-4rem)] sm:w-[280px] bg-white rounded-[20px] shadow-[0_25px_70px_rgba(0,0,0,0.4)] border border-slate-200 z-[100] animate-in fade-in zoom-in-95 slide-in-from-top-4 duration-300 ease-out overflow-hidden">
+                    <div className="bg-[#F8FAFC] px-4 py-2 border-b border-slate-100 flex justify-between items-center">
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Top-up Methods</span>
+                      <span className="text-[8px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">Secure</span>
+                    </div>
+                    
+                    <div className="p-1.5 space-y-0.5">
+                      <button onClick={() => {}} className="w-full text-left p-3 hover:bg-emerald-50/50 rounded-xl transition-all group relative overflow-hidden">
+                        <div className="flex items-center gap-3 relative z-10">
+                          <div className="w-10 h-10 rounded-xl bg-[#00351D] text-[#5EFEB3] flex items-center justify-center shrink-0 shadow-lg group-hover:scale-105 transition-transform">
+                            <span className="material-symbols-outlined text-lg">phone_iphone</span>
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between mb-0.5">
+                              <p className="text-[10px] font-black uppercase tracking-widest text-[#00351D]">Mobile Money</p>
+                              <span className="material-symbols-outlined text-slate-300 text-xs group-hover:translate-x-1 transition-transform">arrow_forward</span>
+                            </div>
+                            <p className="text-[9px] text-slate-500 font-medium leading-tight line-clamp-1">M-Pesa, Airtel Money</p>
+                          </div>
+                        </div>
+                      </button>
+
+                      <button onClick={() => {}} className="w-full text-left p-3 hover:bg-emerald-50/50 rounded-xl transition-all group relative overflow-hidden">
+                        <div className="flex items-center gap-3 relative z-10">
+                          <div className="w-10 h-10 rounded-xl bg-[#0D2444] text-blue-300 flex items-center justify-center shrink-0 shadow-lg group-hover:scale-105 transition-transform">
+                            <span className="material-symbols-outlined text-lg">credit_card</span>
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between mb-0.5">
+                              <p className="text-[10px] font-black uppercase tracking-widest text-[#00351D]">Card Top-up</p>
+                              <span className="material-symbols-outlined text-slate-300 text-xs group-hover:translate-x-1 transition-transform">arrow_forward</span>
+                            </div>
+                            <p className="text-[9px] text-slate-500 font-medium leading-tight line-clamp-1">Visa / Mastercard</p>
+                          </div>
+                        </div>
+                      </button>
+
+                      <button onClick={() => {}} className="w-full text-left p-3 hover:bg-emerald-50/50 rounded-xl transition-all group relative overflow-hidden">
+                        <div className="flex items-center gap-3 relative z-10">
+                          <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 shadow-lg group-hover:scale-105 transition-transform">
+                            <span className="material-symbols-outlined text-lg">account_balance</span>
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between mb-0.5">
+                              <p className="text-[10px] font-black uppercase tracking-widest text-[#00351D]">Bank Account</p>
+                              <span className="material-symbols-outlined text-slate-300 text-xs group-hover:translate-x-1 transition-transform">arrow_forward</span>
+                            </div>
+                            <p className="text-[9px] text-slate-500 font-medium leading-tight line-clamp-1">Direct Bank Transfer</p>
+                          </div>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+
               {showMoveMoney && (
                 <>
                   {/* Backdrop for closing */}
