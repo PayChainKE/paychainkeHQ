@@ -76,31 +76,48 @@ export default function TrustScore() {
         </div>
 
         {/* Section 2: Milestone Journey */}
-        <div className="bg-surface-container-lowest p-8 md:p-12 rounded-[32px] border border-outline-variant/10 editorial-shadow">
-          <div className="flex items-center justify-between mb-10">
-            <h3 className="font-headline text-xl text-primary">Your Growth Journey</h3>
-            <span className="text-xs font-bold text-on-surface-variant">{100 - score} points to Prime status</span>
+        <div className="bg-white p-5 md:p-6 rounded-2xl lg:rounded-3xl border border-outline-variant/10 shadow-sm editorial-shadow relative overflow-hidden group max-w-4xl mx-auto">
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+            <div>
+              <h3 className="font-headline text-lg md:text-xl text-primary tracking-tight">Your Growth Journey</h3>
+              <p className="text-[9px] md:text-[10px] text-on-surface-variant font-bold uppercase tracking-[0.2em] mt-1 opacity-60">Path to unlocking premium tiers</p>
+            </div>
+            <div className="bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-full border border-emerald-100 flex items-center gap-1.5 shadow-sm">
+              <span className="material-symbols-outlined text-xs">trending_up</span>
+              <span className="text-[9px] font-black uppercase tracking-widest">{100 - score} points to Prime</span>
+            </div>
           </div>
-          <div className="relative flex items-center justify-between">
-            {/* Connection Line */}
-            <div className="absolute top-6 left-0 right-0 h-1 bg-surface-container-highest rounded-full -z-0">
+          
+          <div className="relative flex flex-col md:flex-row items-start md:items-center justify-between gap-6 md:gap-0">
+            {/* Desktop Connection Line */}
+            <div className="hidden md:block absolute top-5 left-[5%] right-[5%] h-1 bg-surface-container-high rounded-full overflow-hidden">
               <div 
-                className="h-full bg-primary rounded-full transition-all duration-1000" 
+                className="h-full bg-primary rounded-full transition-all duration-1000 ease-out" 
                 style={{ width: `${(score / 95) * 100 > 100 ? 100 : (score / 95) * 100}%` }}
               ></div>
             </div>
+            {/* Mobile Connection Line */}
+            <div className="block md:hidden absolute left-[19px] top-6 bottom-6 w-1 bg-surface-container-high rounded-full overflow-hidden">
+              <div 
+                className="w-full bg-primary rounded-full transition-all duration-1000 ease-out" 
+                style={{ height: `${(score / 95) * 100 > 100 ? 100 : (score / 95) * 100}%` }}
+              ></div>
+            </div>
+
             {milestones.map((m, i) => (
-              <div key={i} className="relative z-10 flex flex-col items-center gap-4">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
-                  m.completed ? 'bg-primary text-white shadow-lg' : 'bg-surface-container-highest text-on-surface-variant'
+              <div key={i} className="relative z-10 flex md:flex-col items-center gap-4 w-full md:w-auto">
+                <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center transition-all duration-500 border-2 ${
+                  m.completed 
+                    ? 'bg-primary border-primary text-white shadow-md md:-translate-y-1' 
+                    : 'bg-white border-outline-variant/20 text-on-surface-variant/60 hover:border-primary/20 hover:text-primary'
                 }`}>
-                  <span className="material-symbols-outlined text-xl" style={{fontVariationSettings: m.completed ? "'FILL' 1" : ""}}>
+                  <span className="material-symbols-outlined text-xl md:text-2xl" style={{fontVariationSettings: m.completed ? "'FILL' 1" : ""}}>
                     {m.icon}
                   </span>
                 </div>
-                <div className="text-center">
-                  <p className={`text-xs font-bold ${m.completed ? 'text-primary' : 'text-on-surface-variant'}`}>{m.label}</p>
-                  <p className="text-[10px] font-medium text-on-surface-variant/60">{m.score} pts</p>
+                <div className="text-left md:text-center flex-1 md:flex-initial">
+                  <p className={`text-xs md:text-sm font-headline font-bold tracking-wide ${m.completed ? 'text-primary' : 'text-on-surface-variant/60'}`}>{m.label}</p>
+                  <p className={`text-[9px] md:text-[10px] font-black uppercase tracking-widest mt-0.5 ${m.completed ? 'text-emerald-600' : 'text-on-surface-variant/40'}`}>{m.score} pts</p>
                 </div>
               </div>
             ))}
