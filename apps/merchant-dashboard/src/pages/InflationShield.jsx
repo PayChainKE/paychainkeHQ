@@ -2,7 +2,6 @@ import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import { formatKES, formatUSDC } from '../utils/formatCurrency'
-import { transactionsData } from '../mockData/transactions'
 import { formatDateISO } from '../utils/formatDate'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 
@@ -13,7 +12,7 @@ export default function InflationShield() {
   const feeRate = 0.005
   const usdcAmount = (kesAmount * (1 - feeRate) / rate).toFixed(2)
 
-  const swapHistory = transactionsData.filter(tx => tx.type === 'fx_swap')
+  const swapHistory = []
 
   return (
     <MerchantLayout title="Inflation Shield">
@@ -43,7 +42,7 @@ export default function InflationShield() {
               <div>
                 <p className="text-[10px] md:text-[11px] text-emerald-400 font-bold uppercase tracking-[0.2em] mb-2">Local Revenue</p>
                 <h4 className="text-[10px] md:text-[11px] text-white/40 font-bold uppercase tracking-widest mb-1">KES Balance</h4>
-                <p className={`font-headline text-2xl md:text-3xl lg:text-4xl tracking-tighter tabular-nums transition-all duration-300 ${!showAmounts && 'blur-md'}`}>{formatKES(184250)}</p>
+                <p className={`font-headline text-2xl md:text-3xl lg:text-4xl tracking-tighter tabular-nums transition-all duration-300 ${!showAmounts && 'blur-md'}`}>{formatKES(0)}</p>
               </div>
               <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl md:rounded-3xl bg-white/10 flex items-center justify-center text-emerald-300 border border-white/10 backdrop-blur-md shrink-0">
                 <span className="material-symbols-outlined text-2xl md:text-3xl" style={{fontVariationSettings: "'FILL' 1"}}>account_balance</span>
@@ -56,7 +55,7 @@ export default function InflationShield() {
               <div>
                 <p className="text-[10px] md:text-[11px] text-blue-300 font-bold uppercase tracking-[0.2em] mb-2">Shield Protection</p>
                 <h4 className="text-[10px] md:text-[11px] text-white/40 font-bold uppercase tracking-widest mb-1">USDC Assets</h4>
-                <p className={`font-headline text-2xl md:text-3xl lg:text-4xl tracking-tighter tabular-nums text-white transition-all duration-300 ${!showAmounts && 'blur-md'}`}>{formatUSDC(312.50)}</p>
+                <p className={`font-headline text-2xl md:text-3xl lg:text-4xl tracking-tighter tabular-nums text-white transition-all duration-300 ${!showAmounts && 'blur-md'}`}>{formatUSDC(0)}</p>
               </div>
               <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl md:rounded-3xl bg-white/10 flex items-center justify-center text-blue-300 border border-white/10 backdrop-blur-md shrink-0">
                 <span className="material-symbols-outlined text-2xl md:text-3xl text-white" style={{fontVariationSettings: "'FILL' 1"}}>security</span>
@@ -96,7 +95,7 @@ export default function InflationShield() {
               <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:border-emerald-500/30 transition-colors">
                 <div className="flex justify-between items-center mb-4">
                   <span className="text-[11px] text-gray-500 font-bold uppercase tracking-widest">You Send</span>
-                  <span className={`text-[11px] text-gray-600 font-medium transition-all duration-300 ${!showAmounts && 'blur-sm'}`}>Balance: {formatKES(184250)}</span>
+                  <span className={`text-[11px] text-gray-600 font-medium transition-all duration-300 ${!showAmounts && 'blur-sm'}`}>Balance: {formatKES(0)}</span>
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="flex shrink-0 items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-200">
@@ -171,7 +170,11 @@ export default function InflationShield() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-surface-container">
-                  {swapHistory.map((tx) => (
+                  {swapHistory.length === 0 ? (
+                    <tr>
+                      <td colSpan="4" className="text-center py-8 text-on-surface-variant font-medium">No swap history yet.</td>
+                    </tr>
+                  ) : swapHistory.map((tx) => (
                     <tr key={tx.id} className="hover:bg-surface-container-low/30 transition-colors">
                       <td className="px-8 py-5">
                         <p className="text-sm font-bold text-primary">{formatDateISO(tx.timestamp).split(',')[0]}</p>
@@ -198,7 +201,9 @@ export default function InflationShield() {
 
             {/* Mobile Card List View */}
             <div className="block md:hidden divide-y divide-surface-container">
-              {swapHistory.map((tx) => (
+              {swapHistory.length === 0 ? (
+                <div className="text-center py-8 text-on-surface-variant font-medium">No swap history yet.</div>
+              ) : swapHistory.map((tx) => (
                 <div key={tx.id} className="p-6 space-y-4">
                   <div className="flex justify-between items-start">
                     <div>

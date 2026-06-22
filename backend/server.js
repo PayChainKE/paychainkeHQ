@@ -7,6 +7,10 @@ import waitlistRoutes from './routes/waitlistRoutes.js';
 import newsletterRoutes from './routes/newsletterRoutes.js';
 import contactRoutes from './routes/contactRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import bulkPayRoutes from './routes/bulkPayRoutes.js';
+import transactionRoutes from './routes/transactionRoutes.js';
+import mpesaRoutes from './routes/mpesaRoutes.js';
+import trustScoreRoutes from './routes/trustScoreRoutes.js';
 
 dotenv.config();
 
@@ -25,10 +29,12 @@ const allowedOrigins = [
   'https://app.paychain.co.ke',
   'http://localhost:5173',
   'http://localhost:5174',
+  'http://localhost:5175',
   'http://localhost:5000',
   'http://localhost:8080',
   'http://127.0.0.1:5173',
   'http://127.0.0.1:5174',
+  'http://127.0.0.1:5175',
   'http://127.0.0.1:5000',
 ];
 
@@ -61,10 +67,20 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/waitlist', waitlistRoutes);
 app.use('/api/newsletter', newsletterRoutes);
 app.use('/api/contact', contactRoutes);
+app.use('/api/bulkpay', bulkPayRoutes);
+app.use('/api/transactions', transactionRoutes);
+app.use('/api/mpesa', mpesaRoutes);
+app.use('/api/trust-score', trustScoreRoutes);
 
 // Basic Route
 app.get('/', (req, res) => {
   res.send('PayChainKE API is running...');
+});
+
+// Global Error Handler to always return JSON (e.g. for Multer boundary errors)
+app.use((err, req, res, next) => {
+  console.error('Unhandled Error:', err);
+  res.status(500).json({ error: err.message || 'An unexpected server error occurred' });
 });
 
 const PORT = process.env.PORT || 5000;

@@ -1,27 +1,86 @@
 import React, { useState } from 'react'
 import MerchantLayout from '../components/layout/MerchantLayout'
-import { mockMerchant } from '../mockData/merchant'
 import { useToast } from '../context/NotificationContext'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
+import { useMerchantAuth } from '../context/MerchantAuthContext'
+import axios from 'axios'
 
 export default function Profile() {
   const { showAmounts } = usePrivacyMode()
-  const [name, setName] = useState(mockMerchant.name)
-  const [email, setEmail] = useState(mockMerchant.email)
-  const [autoSettle, setAutoSettle] = useState(true)
+  const { merchant } = useMerchantAuth()
+  const [name, setName] = useState(merchant?.name || 'Admin')
+  const [email, setEmail] = useState(merchant?.email || 'admin@paychain.ke')
+  const [kraPin, setKraPin] = useState(merchant?.kraPin || '')
+  const [businessNumber, setBusinessNumber] = useState(merchant?.businessNumber || '')
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false)
   const [showQuestions, setShowQuestions] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [isUpdatingSecurity, setIsUpdatingSecurity] = useState(false)
+  const [kraPinLocked, setKraPinLocked] = useState(!!merchant?.kraPin)
+  const [businessNumberLocked, setBusinessNumberLocked] = useState(!!merchant?.businessNumber)
   const toast = useToast()
 
   async function save() {
-    await new Promise(r => setTimeout(r, 700))
-    toast.push({ message: 'Profile updated' })
+    setIsUpdatingProfile(true)
+    try {
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+      const res = await axios.put(`${API_URL}/api/auth/merchant/profile`, {
+        kraPin,
+        businessNumber
+      })
+
+      if (res.data.success) {
+        toast.push({ message: 'Profile updated successfully', type: 'success' })
+        // Need to wait slightly for the UI to show success before refreshing context
+        setTimeout(() => window.location.reload(), 1000)
+      }
+    } catch (err) {
+      toast.push({ message: err.response?.data?.error || 'Failed to update profile', type: 'error' })
+    } finally {
+      setIsUpdatingProfile(false)
+    }
   }
 
-  const loginHistory = [
-    { device: 'iPhone 15 Pro', location: 'Nairobi, KE', time: 'Active now' },
-    { device: 'MacBook Pro 16"', location: 'Nairobi, KE', time: '2 hours ago' },
-    { device: 'Chrome on Windows', location: 'Mombasa, KE', time: 'Yesterday' },
-  ]
+  async function handleSecurityUpdate() {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      toast.push({ message: 'Please fill out all password fields', type: 'error' })
+      return
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast.push({ message: 'New password and confirm password do not match', type: 'error' })
+      return
+    }
+
+    if (newPassword.length < 8) {
+      toast.push({ message: 'New password must be at least 8 characters long', type: 'error' })
+      return
+    }
+
+    setIsUpdatingSecurity(true)
+    try {
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+      const res = await axios.put(`${API_URL}/api/auth/merchant/change-password`, {
+        currentPassword,
+        newPassword
+      })
+
+      if (res.data.success) {
+        toast.push({ message: 'Password updated successfully', type: 'success' })
+        setCurrentPassword('')
+        setNewPassword('')
+        setConfirmPassword('')
+      }
+    } catch (err) {
+      toast.push({ message: err.response?.data?.error || 'Failed to update password', type: 'error' })
+    } finally {
+      setIsUpdatingSecurity(false)
+    }
+  }
+
+  const loginHistory = []
 
   return (
     <MerchantLayout title="Settings">
@@ -51,14 +110,14 @@ export default function Profile() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-y-6 lg:gap-y-8 gap-x-12">
                 {[
-                  { label: "Name", value: "Kamau General Store", locked: true },
-                  { label: "Email", value: "jameskamau@gmail.com", locked: false },
-                  { label: "Phone", value: "+254712345678", locked: true },
+                  { label: "Name", value: merchant?.businessName || "N/A", locked: true },
+                  { label: "Email", value: merchant?.email || "N/A", locked: false },
+                  { label: "Phone", value: merchant?.phone || "N/A", locked: true, badge: "Username" },
                   { label: "Role", value: "Administrator", badge: "Primary" },
                   { label: "Primary contact", value: "Yes", status: true },
-                  { label: "Created at", value: "19 March 2026", sub: "Member since" },
-                  { label: "Last sign in", value: "10 April 2026, 00:36:49", sub: "Security timestamp" },
-                  { label: "Sign in count", value: "6", sub: "Access frequency" },
+                  { label: "Created at", value: merchant?.createdAt ? new Date(merchant.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }), sub: "Member since" },
+                  { label: "Last sign in", value: merchant?.lastLogin ? new Date(merchant.lastLogin).toLocaleString('en-GB') : new Date().toLocaleString('en-GB'), sub: "Security timestamp" },
+                  { label: "Sign in count", value: merchant?.loginCount?.toString() || "1", sub: "Access frequency" },
                   { label: "SMS/USSD activated", value: "No", status: false },
                   { label: "2FA Setup", value: "Yes", status: true },
                 ].map((item, idx) => (
@@ -77,15 +136,85 @@ export default function Profile() {
                   </div>
                 ))}
               </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-y-6 lg:gap-y-8 gap-x-12 mt-8 border-t border-slate-100 pt-8">
+                <div className="space-y-2 group">
+                  <div className="flex justify-between items-center pr-1">
+                    <label className="text-[9px] text-on-surface-variant font-black uppercase tracking-[0.2em] pl-1 opacity-50 group-hover:opacity-100 transition-opacity">KRA PIN</label>
+                    {kraPinLocked && (
+                      <button type="button" onClick={() => setKraPinLocked(false)} className="text-[9px] font-black uppercase tracking-widest text-emerald-600 hover:text-emerald-700 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[10px]">edit</span> Edit
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <input 
+                      type="text"
+                      value={kraPin}
+                      onChange={(e) => setKraPin(e.target.value.toUpperCase())}
+                      placeholder="e.g. P123456789A"
+                      disabled={kraPinLocked}
+                      className={`w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none ${kraPinLocked ? 'opacity-60 bg-slate-50 cursor-not-allowed pr-32' : 'pr-32'}`}
+                    />
+                    {kraPinLocked && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-primary/40 pointer-events-none">
+                        <span className="material-symbols-outlined text-sm">lock</span>
+                      </div>
+                    )}
+                    {!kraPinLocked && merchant?.isKRAVerified && merchant?.kraPin === kraPin && (
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 bg-emerald-50 text-emerald-600 px-2 py-1.5 rounded-lg border border-emerald-100 shadow-[0_2px_10px_rgba(16,185,129,0.1)] pointer-events-none">
+                        <span className="material-symbols-outlined text-[14px]">verified_user</span>
+                        <span className="text-[8px] font-black uppercase tracking-widest">eTIMS Verified</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2 group">
+                  <div className="flex justify-between items-center pr-1">
+                    <label className="text-[9px] text-on-surface-variant font-black uppercase tracking-[0.2em] pl-1 opacity-50 group-hover:opacity-100 transition-opacity">Business / License Number</label>
+                    {businessNumberLocked && (
+                      <button type="button" onClick={() => setBusinessNumberLocked(false)} className="text-[9px] font-black uppercase tracking-widest text-emerald-600 hover:text-emerald-700 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[10px]">edit</span> Edit
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <input 
+                      type="text"
+                      value={businessNumber}
+                      onChange={(e) => setBusinessNumber(e.target.value.toUpperCase())}
+                      placeholder="e.g. PVT-XXXXXX"
+                      disabled={businessNumberLocked}
+                      className={`w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none ${businessNumberLocked ? 'opacity-60 bg-slate-50 cursor-not-allowed pr-10' : ''}`}
+                    />
+                    {businessNumberLocked && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-primary/40 pointer-events-none">
+                        <span className="material-symbols-outlined text-sm">lock</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
               
               <div className="mt-10 lg:mt-12 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 pt-8 border-t border-slate-100">
                 <p className="text-[10px] text-on-surface-variant font-medium max-w-[240px]">Last USSD PIN failed attempts: <span className="text-primary font-black">0</span> • PIN Blocked: <span className="text-red-500 font-black">No</span></p>
                 <button 
                   onClick={save}
-                  className="w-full md:w-auto bg-[#06201B] text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:opacity-90 transition-all flex items-center justify-center gap-2 active:scale-95"
+                  disabled={isUpdatingProfile}
+                  className="w-full md:w-auto bg-[#06201B] text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:opacity-90 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <span className="material-symbols-outlined text-base">sync</span>
-                  Update Global Profile
+                  {isUpdatingProfile ? (
+                    <>
+                      <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>
+                      Updating...
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-base">sync</span>
+                      Update Global Profile
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -112,18 +241,36 @@ export default function Profile() {
                        Change your password
                     </h4>
                     
-                    <div className="space-y-4">
-                      {['Current password', 'New password', 'Confirm new password'].map((label, i) => (
-                        <div key={i} className="space-y-2">
-                          <label className="text-[9px] text-white/40 font-black uppercase tracking-widest pl-1">{label}</label>
-                          <input 
-                            type="password"
-                            placeholder="••••••••••••"
-                            className="w-full bg-white/5 border border-white/10 rounded-xl py-3.5 px-5 text-sm font-medium text-white focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 outline-none transition-all placeholder:text-white/10"
-                          />
-                        </div>
-                      ))}
-                    </div>
+                      <div className="space-y-2">
+                        <label className="text-[9px] text-white/40 font-black uppercase tracking-widest pl-1">Current password</label>
+                        <input 
+                          type="password"
+                          value={currentPassword}
+                          onChange={(e) => setCurrentPassword(e.target.value)}
+                          placeholder="••••••••••••"
+                          className="w-full bg-white/5 border border-white/10 rounded-xl py-3.5 px-5 text-sm font-medium text-white focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 outline-none transition-all placeholder:text-white/10"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[9px] text-white/40 font-black uppercase tracking-widest pl-1">New password</label>
+                        <input 
+                          type="password"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="••••••••••••"
+                          className="w-full bg-white/5 border border-white/10 rounded-xl py-3.5 px-5 text-sm font-medium text-white focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 outline-none transition-all placeholder:text-white/10"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[9px] text-white/40 font-black uppercase tracking-widest pl-1">Confirm new password</label>
+                        <input 
+                          type="password"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="••••••••••••"
+                          className="w-full bg-white/5 border border-white/10 rounded-xl py-3.5 px-5 text-sm font-medium text-white focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 outline-none transition-all placeholder:text-white/10"
+                        />
+                      </div>
                   </div>
 
                   {/* Advanced Auth Sub-section */}
@@ -164,8 +311,19 @@ export default function Profile() {
                 </div>
 
                 <div className="mt-12 flex justify-end">
-                  <button className="bg-emerald-500 text-[#06201B] px-10 py-5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl hover:bg-white transition-all active:scale-95">
-                    Update Security Vault
+                  <button 
+                    onClick={handleSecurityUpdate}
+                    disabled={isUpdatingSecurity}
+                    className="bg-emerald-500 text-[#06201B] px-10 py-5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl hover:bg-white transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {isUpdatingSecurity ? (
+                      <>
+                        <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>
+                        Updating Vault...
+                      </>
+                    ) : (
+                      'Update Security Vault'
+                    )}
                   </button>
                 </div>
               </div>
@@ -248,7 +406,7 @@ export default function Profile() {
                   <span className="material-symbols-outlined text-2xl">id_card</span>
                 </div>
                 <h4 className="text-[10px] text-blue-200/60 font-bold uppercase tracking-widest mb-1">Merchant Identity</h4>
-                <p className={`font-headline text-2xl lg:text-3xl mb-1 transition-all duration-300 ${!showAmounts && 'blur-md'}`}>{mockMerchant.tillNumber}</p>
+                <p className={`font-headline text-2xl lg:text-3xl mb-1 transition-all duration-300 ${!showAmounts && 'blur-md'}`}>ACC: {merchant?.paybillAccount || '84729'}</p>
                 <p className="text-sm text-blue-100/60 font-medium">Verified Merchant since Oct 2025</p>
                 <div className="mt-8 pt-8 border-t border-white/10 flex items-center gap-2">
                   <span className="material-symbols-outlined text-emerald-400 text-sm" style={{fontVariationSettings: "'FILL' 1"}}>check_circle</span>
@@ -261,19 +419,23 @@ export default function Profile() {
             <div className="bg-surface-container-lowest p-8 rounded-[32px] border border-outline-variant/10 shadow-sm editorial-shadow">
               <h3 className="font-headline font-bold text-lg text-primary mb-6">Security History</h3>
               <div className="space-y-6">
-                {loginHistory.map((log, i) => (
-                  <div key={i} className="flex items-center gap-4">
-                    <div className="w-8 h-8 rounded-lg bg-surface-container-low flex items-center justify-center text-on-surface-variant">
-                      <span className="material-symbols-outlined text-sm">{log.device.includes('iPhone') ? 'smartphone' : 'laptop_mac'}</span>
+                {loginHistory.length === 0 ? (
+                  <p className="text-sm text-on-surface-variant font-medium text-center py-4 opacity-70">No recent security events.</p>
+                ) : (
+                  loginHistory.map((log, i) => (
+                    <div key={i} className="flex items-center gap-4">
+                      <div className="w-8 h-8 rounded-lg bg-surface-container-low flex items-center justify-center text-on-surface-variant">
+                        <span className="material-symbols-outlined text-sm">{log.device.includes('iPhone') ? 'smartphone' : 'laptop_mac'}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-on-surface truncate">{log.device}</p>
+                        <p className="text-[10px] text-on-surface-variant font-medium">{log.location} • {log.time}</p>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-on-surface truncate">{log.device}</p>
-                      <p className="text-[10px] text-on-surface-variant font-medium">{log.location} • {log.time}</p>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
-              <button className="w-full mt-8 py-3.5 rounded-xl bg-emerald-500 text-[#06201B] text-xs font-black uppercase tracking-widest shadow-md hover:bg-[#06201B] hover:text-emerald-400 hover:shadow-xl transition-all duration-300 active:scale-95">
+              <button className="w-full mt-8 py-3.5 rounded-xl bg-emerald-500 text-[#06201B] text-xs font-black uppercase tracking-widest shadow-md hover:bg-[#06201B] hover:text-emerald-400 hover:shadow-xl transition-all duration-300 active:scale-95 disabled:opacity-50" disabled={loginHistory.length === 0}>
                 Sign Out All Devices
               </button>
             </div>

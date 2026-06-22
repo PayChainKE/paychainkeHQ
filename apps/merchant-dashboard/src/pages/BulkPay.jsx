@@ -1,8 +1,9 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { jsPDF } from 'jspdf'
 import domtoimage from 'dom-to-image'
+import { useNavigate } from 'react-router-dom'
 import MerchantLayout from '../components/layout/MerchantLayout'
-import { payees, bulkPayHistory } from '../mockData/bulkPay'
+import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { formatKES } from '../utils/formatCurrency'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useNotification } from '../context/NotificationContext'
@@ -11,7 +12,27 @@ import paychainLogo from '../../images/logo.png'
 export default function BulkPay() {
   const { showAmounts } = usePrivacyMode()
   const { addNotification } = useNotification()
-  const [payeesList, setPayeesList] = useState(payees)
+  const { merchant } = useMerchantAuth()
+  const [payeesList, setPayeesList] = useState([])
+  const navigate = useNavigate()
+  
+  const isProfileComplete = Boolean(merchant?.kraPin && merchant?.businessNumber)
+  
+  useEffect(() => {
+    const fetchPayees = async () => {
+      try {
+        const token = localStorage.getItem('merchantToken')
+        if (!token) return;
+        const res = await axios.get('/api/bulkpay/payees', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        setPayeesList(res.data)
+      } catch (error) {
+        console.error('Error fetching payees:', error)
+      }
+    }
+    fetchPayees()
+  }, [])
   const [activeFilter, setActiveFilter] = useState('All')
   const [step, setStep] = useState(1)
   
@@ -22,13 +43,8 @@ export default function BulkPay() {
   const [isEditing, setIsEditing] = useState(false)
   const [editingId, setEditingId] = useState(null)
   
-  const [selectedPayees, setSelectedPayees] = useState(
-    payees.slice(0, 3).reduce((acc, p) => ({ ...acc, [p.id]: true }), {})
-  )
-
-  const [payoutAmounts, setPayoutAmounts] = useState(
-    payees.reduce((acc, p) => ({ ...acc, [p.id]: p.salary || p.amount || 0 }), {})
-  )
+  const [selectedPayees, setSelectedPayees] = useState({})
+  const [payoutAmounts, setPayoutAmounts] = useState({})
 
   const [newPayee, setNewPayee] = useState({ 
     name: '', 
@@ -42,7 +58,13 @@ export default function BulkPay() {
     bankName: '',
     paybillNumber: '',
     businessAccount: '',
-    tillNumber: ''
+    tillNumber: '',
+    kraPin: '',
+    idNumber: '',
+    nssfNumber: '',
+    shifNumber: '',
+    etimsInvoiceNumber: '',
+    cuNumber: ''
   })
 
   // Filter payees based on active tab
@@ -79,7 +101,13 @@ export default function BulkPay() {
       bankName: p.bankName || '',
       paybillNumber: p.paybillNumber || '',
       businessAccount: p.businessAccount || '',
-      tillNumber: p.tillNumber || ''
+      tillNumber: p.tillNumber || '',
+      kraPin: p.kraPin || '',
+      idNumber: p.idNumber || '',
+      nssfNumber: p.nssfNumber || '',
+      shifNumber: p.shifNumber || '',
+      etimsInvoiceNumber: p.etimsInvoiceNumber || '',
+      cuNumber: p.cuNumber || ''
     });
     setEditingId(p.id);
     setIsEditing(true);
@@ -87,49 +115,66 @@ export default function BulkPay() {
     setShowAddModal(true);
   }
 
-  const handleSavePayee = () => {
+  const handleSavePayee = async () => {
     if (!newPayee.name) return;
     const numericAmount = parseFloat(newPayee.amount.replace(/,/g, '')) || 0;
 
-    if (isEditing) {
-      setPayeesList(prev => prev.map(p => p.id === editingId ? { 
-        ...p, 
-        ...newPayee, 
-        type: newPayee.type.toLowerCase(),
-        utilityType: newPayee.utilityType,
-        salary: numericAmount,
-        amount: numericAmount
-      } : p));
-      setPayoutAmounts(prev => ({ ...prev, [editingId]: numericAmount }));
-      addNotification({
-        title: 'Payee Updated',
-        message: `${newPayee.name}'s details have been saved.`,
-        type: 'success'
-      });
-    } else {
-      const id = `payee_${Date.now()}`;
-      const entry = {
-        id,
+    try {
+      const token = localStorage.getItem('merchantToken');
+      const payload = {
         ...newPayee,
         type: newPayee.type.toLowerCase(),
-        utilityType: newPayee.utilityType,
-        salary: numericAmount,
-        amount: numericAmount,
-        isActive: true
+        defaultAmount: numericAmount
       };
-      setPayeesList(prev => [...prev, entry]);
-      setPayoutAmounts(prev => ({ ...prev, [id]: numericAmount }));
+
+      if (isEditing) {
+        // Placeholder for editing, for now just update locally as backend edit is not fully implemented
+        setPayeesList(prev => prev.map(p => p.id === editingId ? { 
+          ...p, 
+          ...newPayee, 
+          type: newPayee.type.toLowerCase(),
+          salary: numericAmount,
+          amount: numericAmount
+        } : p));
+        setPayoutAmounts(prev => ({ ...prev, [editingId]: numericAmount }));
+        addNotification({
+          title: 'Payee Updated',
+          message: `${newPayee.name}'s details have been saved.`,
+          type: 'success'
+        });
+      } else {
+        const res = await axios.post('/api/bulkpay/payees', payload, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        const entry = {
+          ...res.data,
+          id: res.data._id, // map mongo id
+          salary: res.data.defaultAmount,
+          amount: res.data.defaultAmount
+        };
+        
+        setPayeesList(prev => [entry, ...prev]);
+        setPayoutAmounts(prev => ({ ...prev, [entry.id]: numericAmount }));
+        addNotification({
+          title: 'Payee Added',
+          message: `${newPayee.name} has been added to your ${newPayee.type} list.`,
+          type: 'success'
+        });
+      }
+
+      setShowAddModal(false);
+      setIsEditing(false);
+      setEditingId(null);
+      setAddStep(1);
+    } catch (error) {
       addNotification({
-        title: 'Payee Added',
-        message: `${newPayee.name} has been added to your ${newPayee.type} list.`,
-        type: 'success'
+        title: 'Error',
+        message: error.response?.data?.message || 'Failed to save payee',
+        type: 'error'
       });
     }
 
-    setShowAddModal(false);
-    setIsEditing(false);
-    setEditingId(null);
-    setAddStep(1);
     setNewPayee({ 
       name: '', 
       type: 'Employee', 
@@ -142,9 +187,44 @@ export default function BulkPay() {
       bankName: '',
       paybillNumber: '',
       businessAccount: '',
-      tillNumber: ''
+      tillNumber: '',
+      kraPin: '',
+      idNumber: '',
+      nssfNumber: '',
+      shifNumber: '',
+      etimsInvoiceNumber: '',
+      cuNumber: ''
     });
   }
+
+  const csvInputRef = React.useRef(null);
+  const [csvPreview, setCsvPreview] = useState(null);
+
+  const handleCSVUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    addNotification({ title: 'Processing CSV', message: 'Analyzing batch payment data...', type: 'info' });
+    
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const token = localStorage.getItem('merchantToken');
+      const res = await axios.post('/api/bulkpay/upload-csv', formData, {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      
+      setCsvPreview(res.data);
+      addNotification({ title: 'CSV Loaded', message: res.data.message, type: 'success' });
+      setStep(1); // Reset step or jump to a special review step
+    } catch (error) {
+      addNotification({ title: 'Upload Failed', message: error.response?.data?.message || 'Could not process CSV', type: 'error' });
+    }
+  };
 
   // Invoice Feature State
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -274,12 +354,7 @@ export default function BulkPay() {
     setShowLinkModal(false);
   };
 
-  const [invoicesList, setInvoicesList] = useState([
-    { id: 'INV-420915', customer: 'Acme Corp', amount: 154000, date: '12 Apr 2026', status: 'Sent' },
-    { id: 'INV-883102', customer: 'Zeta Technologies', amount: 84000, date: '11 Apr 2026', status: 'Sent' },
-    { id: 'INV-109482', customer: 'Nexus Imports', amount: 32000, date: '13 Apr 2026', status: 'Draft' },
-    { id: 'INV-551029', customer: 'Local Retailer Ltd', amount: 110500, date: '10 Apr 2026', status: 'Draft' },
-  ]);
+  const [invoicesList, setInvoicesList] = useState([]);
   const [invoiceFilter, setInvoiceFilter] = useState('All');
 
   // Fund Account Modal State
@@ -321,38 +396,71 @@ export default function BulkPay() {
     .filter((id) => selectedPayees[id])
     .reduce((sum, id) => sum + (payoutAmounts[id] || 0), 0)
 
-  const balance = 184250
+  const balance = merchant?.kesBalance ?? 0
   const isLiquidityLow = batchTotal > balance
 
   const [authorizedReceipts, setAuthorizedReceipts] = useState([])
 
-  const handleAuthorize = () => {
-    // Generate unique receipts for all selected payees
-    const newReceipts = payeesList
-      .filter(p => selectedPayees[p.id])
-      .map(p => ({
-        id: `TX${Math.random().toString(36).substr(2, 8).toUpperCase()}`,
-        name: p.name,
-        amount: payoutAmounts[p.id],
-        method: p.paymentMethod,
-        phone: p.phone || p.paybillNumber || p.accountNumber || '...',
-        reference: `MAY_PAYOUT_24_${p.id.split('_')[1] || '001'}`,
+  const handleAuthorize = async () => {
+    try {
+      addNotification({ title: 'Processing', message: 'Authorizing batch...', type: 'info' });
+      const token = localStorage.getItem('merchantToken');
+
+      let batchRows = [];
+      if (csvPreview) {
+        batchRows = csvPreview.rows;
+      } else {
+        batchRows = payeesList
+          .filter(p => selectedPayees[p.id])
+          .map(p => ({
+            payeeMatch: p.id,
+            name: p.name,
+            type: p.type,
+            phone: p.phone,
+            grossAmount: payoutAmounts[p.id] || 0,
+            netAmount: payoutAmounts[p.id] || 0, // Mocked for UI, actual tax comes from backend on real employee runs
+          }));
+      }
+
+      const res = await axios.post('/api/bulkpay/authorize', {
+        batchRows,
+        fundingSource: selectedTill || 'Main Business Till'
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      const processedBatch = res.data.batch;
+
+      // Transform response to match frontend receipts
+      const newReceipts = processedBatch.transactions.map(tx => ({
+        id: tx.receiptNumber,
+        name: tx.name,
+        amount: tx.amount,
+        method: tx.method,
+        phone: tx.accountReference,
+        reference: processedBatch.batchReference,
         timestamp: new Date().toLocaleString('en-KE', { 
-          day: '2-digit', 
-          month: 'short', 
-          year: 'numeric', 
-          hour: '2-digit', 
-          minute: '2-digit' 
+          day: '2-digit', month: 'short', year: 'numeric', 
+          hour: '2-digit', minute: '2-digit' 
         })
       }));
-    
-    setAuthorizedReceipts(newReceipts);
-    setStep(4);
-    addNotification({
-      title: 'Batch Processed',
-      message: `Successfully disbursed KES ${batchTotal.toLocaleString()} to ${newReceipts.length} recipients.`,
-      type: 'success'
-    });
+
+      setAuthorizedReceipts(newReceipts);
+      setStep(4);
+      setCsvPreview(null); // Clear preview
+
+      addNotification({
+        title: 'Batch Processed',
+        message: res.data.message,
+        type: 'success'
+      });
+    } catch (error) {
+      addNotification({
+        title: 'Authorization Failed',
+        message: error.response?.data?.message || 'Could not process batch',
+        type: 'error'
+      });
+    }
   }
 
   const downloadReceipt = async (receipt) => {
@@ -447,7 +555,29 @@ export default function BulkPay() {
 
   return (
     <MerchantLayout title="Bulk Payments">
-      <div className="px-1 lg:px-0 max-w-7xl mx-auto flex flex-col lg:flex-row gap-6 lg:gap-8 relative">
+      <div className="relative">
+        {!isProfileComplete && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-[#0A2540]/90 backdrop-blur-xl p-8 md:p-12 rounded-[32px] md:rounded-[40px] text-center shadow-2xl max-w-lg w-full border border-white/10 animate-fade-in-up">
+              <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center mx-auto mb-6 text-white/50">
+                <span className="material-symbols-outlined text-3xl">lock</span>
+              </div>
+              <h2 className="font-headline text-2xl md:text-3xl font-bold text-white mb-3">Profile Incomplete</h2>
+              <p className="text-sm md:text-base text-white/70 mb-8 leading-relaxed">
+                To unlock Bulk Payments and ensure full regulatory compliance, please add your KRA PIN and Business License Number to your profile.
+              </p>
+              <button 
+                onClick={() => navigate('/profile')}
+                className="w-full bg-emerald-500 text-[#06201B] px-8 py-4 rounded-xl font-black text-[11px] uppercase tracking-widest shadow-xl hover:bg-white transition-all active:scale-95 flex items-center justify-center gap-2"
+              >
+                Complete Profile Now
+                <span className="material-symbols-outlined text-sm">arrow_forward</span>
+              </button>
+            </div>
+          </div>
+        )}
+        
+        <div className={`px-1 lg:px-0 max-w-7xl mx-auto flex flex-col lg:flex-row gap-6 lg:gap-8 relative transition-all duration-500 ${!isProfileComplete ? 'blur-md pointer-events-none opacity-40 select-none' : ''}`}>
         
         {/* Add/Edit Payee Modal Overlay */}
         {showAddModal && (
@@ -543,6 +673,56 @@ export default function BulkPay() {
                                 {u}
                               </button>
                             ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {newPayee.type === 'Employee' && (
+                        <div className="space-y-4 pt-4 animate-in fade-in duration-500 bg-emerald-50/30 p-4 rounded-2xl border border-emerald-500/10">
+                          <h4 className="text-[10px] text-emerald-700 font-black uppercase tracking-widest mb-2 flex items-center gap-2">
+                            <span className="material-symbols-outlined text-[14px]">badge</span>
+                            KRA Payroll Details
+                          </h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">KRA PIN *</label>
+                              <input type="text" value={newPayee.kraPin} onChange={(e) => setNewPayee({...newPayee, kraPin: e.target.value})} placeholder="A000000000A" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 uppercase" />
+                            </div>
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">ID Number *</label>
+                              <input type="text" value={newPayee.idNumber} onChange={(e) => setNewPayee({...newPayee, idNumber: e.target.value})} placeholder="e.g. 12345678" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50" />
+                            </div>
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">NSSF Number</label>
+                              <input type="text" value={newPayee.nssfNumber} onChange={(e) => setNewPayee({...newPayee, nssfNumber: e.target.value})} placeholder="e.g. 123456789" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50" />
+                            </div>
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">SHIF / NHIF Number</label>
+                              <input type="text" value={newPayee.shifNumber} onChange={(e) => setNewPayee({...newPayee, shifNumber: e.target.value})} placeholder="e.g. 1234567" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50" />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {newPayee.type === 'Supplier' && (
+                        <div className="space-y-4 pt-4 animate-in fade-in duration-500 bg-purple-50/30 p-4 rounded-2xl border border-purple-500/10">
+                          <h4 className="text-[10px] text-purple-700 font-black uppercase tracking-widest mb-2 flex items-center gap-2">
+                            <span className="material-symbols-outlined text-[14px]">receipt_long</span>
+                            KRA eTIMS Details
+                          </h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Supplier KRA PIN *</label>
+                              <input type="text" value={newPayee.kraPin} onChange={(e) => setNewPayee({...newPayee, kraPin: e.target.value})} placeholder="P000000000A" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-purple-500/50 uppercase" />
+                            </div>
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">eTIMS Invoice No. *</label>
+                              <input type="text" value={newPayee.etimsInvoiceNumber} onChange={(e) => setNewPayee({...newPayee, etimsInvoiceNumber: e.target.value})} placeholder="e.g. INV-123" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-purple-500/50" />
+                            </div>
+                            <div className="space-y-1.5 sm:col-span-2">
+                              <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Control Unit (CU) No.</label>
+                              <input type="text" value={newPayee.cuNumber} onChange={(e) => setNewPayee({...newPayee, cuNumber: e.target.value})} placeholder="e.g. 123456789" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-purple-500/50" />
+                            </div>
                           </div>
                         </div>
                       )}
@@ -857,9 +1037,27 @@ export default function BulkPay() {
 
           {/* Batch Selection View */}
           <div className="bg-white rounded-[32px] overflow-hidden shadow-[0_20px_80px_rgba(0,0,0,0.06)] border border-outline-variant/10">
-            <div className="p-6 md:p-10 border-b border-outline-variant/5">
-              <h3 className="font-headline text-xl md:text-3xl text-primary tracking-tight font-bold">Create Payment Batch</h3>
-              <p className="text-[10px] md:text-sm text-on-surface-variant font-medium mt-1 md:mt-1.5 opacity-60 italic">Define specific liquidity distribution for this cycle.</p>
+            <div className="p-6 md:p-10 border-b border-outline-variant/5 flex justify-between items-center">
+              <div>
+                <h3 className="font-headline text-xl md:text-3xl text-primary tracking-tight font-bold">Create Payment Batch</h3>
+                <p className="text-[10px] md:text-sm text-on-surface-variant font-medium mt-1 md:mt-1.5 opacity-60 italic">Define specific liquidity distribution for this cycle.</p>
+              </div>
+              <div>
+                <input 
+                  type="file" 
+                  accept=".csv" 
+                  ref={csvInputRef} 
+                  onChange={handleCSVUpload} 
+                  style={{ display: 'none' }} 
+                />
+                <button 
+                  onClick={() => csvInputRef.current.click()}
+                  className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-[14px]">upload_file</span>
+                  Upload CSV
+                </button>
+              </div>
             </div>
             <div className="p-0">
               {/* Desktop Table */}
@@ -980,8 +1178,7 @@ export default function BulkPay() {
                   <h4 className="text-sm font-bold text-primary uppercase tracking-widest mb-6">Select Funding Source</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {[
-                      { id: 'TILL_1', name: 'Main Business Till', balance: 184250, number: '852300' },
-                      { id: 'TILL_2', name: 'Nairobi Branch Till', balance: 45000, number: '852301' },
+                      { id: 'TILL_1', name: merchant?.businessName || 'Main Business Till', balance: merchant?.kesBalance ?? 0, number: merchant?.paybillAccount || '852300' },
                     ].map(till => (
                       <div 
                         key={till.id}
@@ -1204,7 +1401,7 @@ export default function BulkPay() {
                         </div>
                       </div>
                     </div>
-                    <p className="font-headline text-xl font-black text-primary group-hover:scale-105 origin-right transition-transform">12,450</p>
+                    <p className="font-headline text-xl font-black text-primary group-hover:scale-105 origin-right transition-transform">0</p>
                  </div>
                </div>
 
@@ -1212,7 +1409,13 @@ export default function BulkPay() {
                <div className="mt-8">
                  <h4 className="text-xs font-black uppercase tracking-widest text-on-surface-variant opacity-50 mb-4">Recent Activity</h4>
                  <div className="flex flex-col gap-3">
-                   {invoicesList.filter(inv => invoiceFilter === 'All' || inv.status === (invoiceFilter === 'Drafts' ? 'Draft' : invoiceFilter)).map(inv => (
+                   {invoicesList.length === 0 ? (
+                     <div className="p-8 rounded-[20px] bg-surface-container-lowest border border-outline-variant/10 text-center flex flex-col items-center">
+                       <span className="material-symbols-outlined text-4xl text-on-surface-variant/40 mb-3">receipt_long</span>
+                       <p className="text-sm font-bold text-primary mb-1">No recent invoices</p>
+                       <p className="text-xs text-on-surface-variant opacity-70">Generate your first professional e-invoice to start getting paid.</p>
+                     </div>
+                   ) : invoicesList.filter(inv => invoiceFilter === 'All' || inv.status === (invoiceFilter === 'Drafts' ? 'Draft' : invoiceFilter)).map(inv => (
                      <div key={inv.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-[20px] bg-surface-container-lowest border border-outline-variant/10 shadow-sm hover:border-emerald-500/20 transition-all group gap-4">
                        <div className="flex items-center gap-4">
                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${inv.status === 'Sent' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
@@ -1766,6 +1969,7 @@ export default function BulkPay() {
         )}
       </div>
 
+      </div>
     </MerchantLayout>
   )
 }

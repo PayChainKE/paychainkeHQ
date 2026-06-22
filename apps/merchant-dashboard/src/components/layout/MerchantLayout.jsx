@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import MerchantSidebar from './MerchantSidebar'
 import MerchantHeader from './MerchantHeader'
+import BiometricSetupModal from '../auth/BiometricSetupModal'
 import poweredByLogo from '../../assets/poweredby-logo.png'
 
 export default function MerchantLayout({ children, title = 'Overview' }) {
@@ -10,6 +11,7 @@ export default function MerchantLayout({ children, title = 'Overview' }) {
 
   return (
     <div className="flex min-h-screen bg-[#F0FDF4] overflow-x-hidden">
+      <BiometricSetupModal />
       {/* Sidebar - Responsive Drawer */}
       <MerchantSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       

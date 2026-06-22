@@ -25,6 +25,15 @@ export function MerchantAuthProvider({ children }) {
         setMerchant(JSON.parse(rawMerchant));
         setToken(rawToken);
         axios.defaults.headers.common['Authorization'] = `Bearer ${rawToken}`;
+
+        axios.get(`${API_URL}/api/auth/merchant/me`)
+          .then(res => {
+            if (res.data.success && res.data.merchant) {
+              setMerchant(res.data.merchant);
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(res.data.merchant));
+            }
+          })
+          .catch(err => console.error("Failed to fetch fresh merchant session", err));
       } catch (e) {
         console.error("Failed to parse local session", e);
       }
@@ -35,9 +44,7 @@ export function MerchantAuthProvider({ children }) {
 
   async function signup(formData) {
     try {
-      const res = await axios.post(`${API_URL}/api/auth/merchant/register`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      const res = await axios.post(`${API_URL}/api/auth/merchant/register`, formData);
       return { success: true, email: res.data.email, message: res.data.message };
     } catch (err) {
       return { success: false, error: err.response?.data?.error || 'Registration failed' };
@@ -50,6 +57,23 @@ export function MerchantAuthProvider({ children }) {
       return { success: true, email: res.data.email, mfaRequired: res.data.mfaRequired };
     } catch (err) {
       return { success: false, error: err.response?.data?.error || 'Login failed' };
+    }
+  }
+
+  async function biometricLogin(email) {
+    try {
+      const res = await axios.post(`${API_URL}/api/auth/merchant/biometric-login`, { email });
+      const { merchant: userData, token: jwt } = res.data;
+      
+      setMerchant(userData);
+      setToken(jwt);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
+      localStorage.setItem(TOKEN_KEY, jwt);
+      axios.defaults.headers.common['Authorization'] = `Bearer ${jwt}`;
+      
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.response?.data?.error || 'Biometric Login failed' };
     }
   }
 
@@ -68,6 +92,15 @@ export function MerchantAuthProvider({ children }) {
       return { success: true };
     } catch (err) {
       return { success: false, error: err.response?.data?.error || 'OTP Verification failed' };
+    }
+  }
+
+  async function resendOTP(email) {
+    try {
+      const res = await axios.post(`${API_URL}/api/auth/merchant/resend-otp`, { email });
+      return { success: true, message: res.data.message };
+    } catch (err) {
+      return { success: false, error: err.response?.data?.error || 'Failed to resend OTP' };
     }
   }
 
@@ -104,8 +137,10 @@ export function MerchantAuthProvider({ children }) {
       isLoading, 
       isAuthenticated: !!merchant, 
       login, 
+      biometricLogin,
       signup,
       verifyOTP,
+      resendOTP,
       forgotPassword,
       resetPassword,
       logout 

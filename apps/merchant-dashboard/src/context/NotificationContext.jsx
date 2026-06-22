@@ -1,10 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
-import { mockMerchant } from '../mockData/merchant'
 
 const NotificationContext = createContext()
 
 export function NotificationProvider({ children }) {
-  const [notifications, setNotifications] = useState(mockMerchant.notifications)
+  const [notifications, setNotifications] = useState([])
   const [toasts, setToasts] = useState([])
 
   // Derived state for unread count
@@ -23,9 +22,6 @@ export function NotificationProvider({ children }) {
 
     // Add to persistent list
     setNotifications(prev => [newNotif, ...prev])
-    
-    // Sync with mock data for demo persistence across page reloads (simulated)
-    mockMerchant.notifications = [newNotif, ...mockMerchant.notifications]
 
     // Trigger ephemeral toast
     const toastId = `t_${Date.now()}`
@@ -40,18 +36,14 @@ export function NotificationProvider({ children }) {
 
   const markAsRead = (id) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n))
-    const n = mockMerchant.notifications.find(item => item.id === id)
-    if (n) n.isRead = true
   }
 
   const markAllAsRead = () => {
     setNotifications(prev => prev.map(n => ({ ...n, isRead: true })))
-    mockMerchant.notifications.forEach(n => n.isRead = true)
   }
 
   const deleteNotification = (id) => {
     setNotifications(prev => prev.filter(n => n.id !== id))
-    mockMerchant.notifications = mockMerchant.notifications.filter(n => n.id !== id)
   }
 
   // Backward compatibility alias for useToast

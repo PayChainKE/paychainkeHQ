@@ -23,6 +23,18 @@ const merchantSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Please add a business name'],
   },
+  businessNumber: {
+    type: String,
+    default: null,
+  },
+  kraPin: {
+    type: String,
+    default: null,
+  },
+  isKRAVerified: {
+    type: Boolean,
+    default: false,
+  },
   password: {
     type: String,
     required: [true, 'Please add a password'],
@@ -37,6 +49,16 @@ const merchantSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  paybillAccount: {
+    type: String,
+    unique: true,
+    minlength: 5,
+    maxlength: 5,
+  },
+  kesBalance: {
+    type: Number,
+    default: 0,
+  },
   otp: {
     type: String,
     default: null,
@@ -45,14 +67,22 @@ const merchantSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  lastLogin: {
+    type: Date,
+    default: null,
+  },
+  loginCount: {
+    type: Number,
+    default: 0,
+  },
 }, {
   timestamps: true
 });
 
 // Encrypt password using bcrypt
-merchantSchema.pre('save', async function(next) {
+merchantSchema.pre('save', async function() {
   if (!this.isModified('password')) {
-    next();
+    return;
   }
 
   const salt = await bcrypt.genSalt(10);
