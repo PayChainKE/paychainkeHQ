@@ -198,7 +198,6 @@ export default function Wallet() {
         {/* Hero Section: Balances */}
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in-up">
           {merchant?.stellarPublicKey ? (
-            {/* Premium Crypto Wallet Card (Global USDC) */}
             <div className="bg-gradient-to-br from-[#0F141E] to-[#0A0D14] text-white p-5 md:p-6 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative overflow-hidden group border border-[#1E2532] mx-auto w-full max-w-[340px] flex flex-col justify-between min-h-[214px]">
               {/* Glowing Orb Effects */}
               <div className="absolute top-0 right-0 w-72 h-72 bg-[#2775CA]/20 rounded-full -mr-20 -mt-20 blur-[80px] group-hover:scale-110 group-hover:bg-[#2775CA]/30 transition-all duration-1000 ease-out pointer-events-none"></div>
@@ -283,7 +282,6 @@ export default function Wallet() {
               </div>
             </div>
           ) : (
-            {/* Activate Wallet Placeholder */}
             <div className="bg-gradient-to-br from-[#0F141E] to-[#0A0D14] text-white p-6 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-[#1E2532] mx-auto w-full max-w-[340px] flex flex-col items-center justify-center min-h-[214px] text-center">
               <div className="w-16 h-16 rounded-full bg-[#1A212D] flex items-center justify-center border border-[#2A3441] mb-4 shadow-lg">
                 <span className="material-symbols-outlined text-3xl text-[#2775CA]">account_balance_wallet</span>
