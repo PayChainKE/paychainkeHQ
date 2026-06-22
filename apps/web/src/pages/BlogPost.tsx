@@ -5,41 +5,72 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 
 // Dummy content - in a real app this would be fetched based on the ID
-const articleData = {
-  id: 'future-of-payments-africa',
-  title: 'The Future of Digital Payments in East Africa',
-  category: 'Industry Insights',
-  date: 'Oct 15, 2026',
-  readTime: '5 min read',
-  author: {
-    name: 'Sarah Kimani',
-    role: 'Head of Product Strategy',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
+const allArticlesData: Record<string, any> = {
+  'future-of-payments-africa': {
+    id: 'future-of-payments-africa',
+    title: 'The Future of Digital Payments in East Africa',
+    category: 'Industry Insights',
+    date: 'Oct 15, 2026',
+    readTime: '5 min read',
+    author: {
+      name: 'Sarah Kimani',
+      role: 'Head of Product Strategy',
+      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
+    },
+    image: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&q=80&w=1200',
+    content: `
+      <p class="lead">The retail landscape in East Africa is undergoing a profound transformation. As internet penetration deepens and mobile-first populations mature, the expectation for seamless, instant transactions is no longer a luxury—it's the baseline.</p>
+      
+      <h2>The Evolution of Point of Sale</h2>
+      <p>Historically, merchants relied on fragmented systems: a traditional cash register, a separate card terminal, and a personal phone for mobile money transfers. This fragmentation led to reconciliation nightmares at the end of every business day.</p>
+      <p>Today, we're seeing the convergence of these tools into unified platforms. The modern smart till isn't just a payment acceptor; it's a comprehensive business management tool that handles inventory, payroll, and tax compliance automatically.</p>
+
+      <blockquote>
+        "The next wave of fintech innovation isn't about creating new ways to pay. It's about unifying the ways we already pay into a single, cohesive experience for the merchant."
+      </blockquote>
+
+      <h2>Addressing Infrastructure Challenges</h2>
+      <p>Despite rapid digitization, infrastructure reliability remains a challenge. Power outages and internet connectivity drops can halt business operations instantly. This is why <strong>offline-first architecture</strong> has become the critical differentiator for payment solutions in emerging markets.</p>
+      <p>When a system can securely queue transactions locally and sync automatically when connectivity is restored, merchants never have to turn away a customer. It provides the reliability of cash with the security of digital rails.</p>
+
+      <h2>Looking Ahead: Stablecoins and Settlement</h2>
+      <p>Perhaps the most exciting development on the horizon is the integration of stablecoin settlements. By bypassing traditional correspondent banking networks, cross-border commerce becomes instantaneous and significantly cheaper.</p>
+      <p>As we move towards 2027, the focus will shift from consumer adoption to merchant empowerment. The platforms that win will be those that abstract the complexity of money movement and simply give business owners their time back.</p>
+    `,
   },
-  image: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&q=80&w=1200',
-  content: `
-    <p class="lead">The retail landscape in East Africa is undergoing a profound transformation. As internet penetration deepens and mobile-first populations mature, the expectation for seamless, instant transactions is no longer a luxury—it's the baseline.</p>
-    
-    <h2>The Evolution of Point of Sale</h2>
-    <p>Historically, merchants relied on fragmented systems: a traditional cash register, a separate card terminal, and a personal phone for mobile money transfers. This fragmentation led to reconciliation nightmares at the end of every business day.</p>
-    <p>Today, we're seeing the convergence of these tools into unified platforms. The modern smart till isn't just a payment acceptor; it's a comprehensive business management tool that handles inventory, payroll, and tax compliance automatically.</p>
+  'paychain-official-registration': {
+    id: 'paychain-official-registration',
+    title: 'PayChain Financial Services Ltd Officially Registered in Kenya',
+    category: 'Company News',
+    date: 'May 28, 2026',
+    readTime: '3 min read',
+    author: {
+      name: 'Corporate Communications',
+      role: 'PayChain KE',
+      avatar: '/avator.png',
+    },
+    image: '/merchant-dashboard-teaser.png',
+    content: `
+      <p class="lead"><strong>NAIROBI, KENYA — May 28, 2026</strong> — PayChain Financial Services Ltd today announced its official registration and incorporation in Kenya, marking a pivotal moment in the company's mission to revolutionize the financial infrastructure for merchants across East Africa.</p>
+      
+      <h2>A New Era for Merchant Services</h2>
+      <p>The official registration solidifies PayChain's position as a compliant and forward-thinking financial technology provider. This milestone empowers the company to accelerate the deployment of its unified merchant operating system, designed to seamlessly integrate payments, point-of-sale management, and capital advancement.</p>
+      
+      <blockquote>
+        "Our registration in Kenya is a testament to our commitment to regulatory compliance and our dedication to the local market. We are building the rails that will power the next generation of African commerce."
+      </blockquote>
 
-    <blockquote>
-      "The next wave of fintech innovation isn't about creating new ways to pay. It's about unifying the ways we already pay into a single, cohesive experience for the merchant."
-    </blockquote>
-
-    <h2>Addressing Infrastructure Challenges</h2>
-    <p>Despite rapid digitization, infrastructure reliability remains a challenge. Power outages and internet connectivity drops can halt business operations instantly. This is why <strong>offline-first architecture</strong> has become the critical differentiator for payment solutions in emerging markets.</p>
-    <p>When a system can securely queue transactions locally and sync automatically when connectivity is restored, merchants never have to turn away a customer. It provides the reliability of cash with the security of digital rails.</p>
-
-    <h2>Looking Ahead: Stablecoins and Settlement</h2>
-    <p>Perhaps the most exciting development on the horizon is the integration of stablecoin settlements. By bypassing traditional correspondent banking networks, cross-border commerce becomes instantaneous and significantly cheaper.</p>
-    <p>As we move towards 2027, the focus will shift from consumer adoption to merchant empowerment. The platforms that win will be those that abstract the complexity of money movement and simply give business owners their time back.</p>
-  `,
+      <h2>Commitment to the Kenyan Market</h2>
+      <p>Kenya remains one of the most dynamic and innovative fintech markets globally. By establishing a formalized presence, PayChain Financial Services Ltd is uniquely positioned to address the complex challenges faced by modern merchants, including high transaction costs, currency volatility, and lack of access to working capital.</p>
+      <p>With this regulatory milestone achieved, PayChain will begin scaling its flagship products, including the Hybrid Smart Till and the Inflation Shield, providing Kenyan businesses with the robust, secure, and offline-capable tools they need to thrive.</p>
+    `,
+  }
 };
 
 const BlogPost = () => {
   const { id } = useParams();
+  
+  const articleData = id && allArticlesData[id] ? allArticlesData[id] : allArticlesData['paychain-official-registration'];
 
   useEffect(() => {
     window.scrollTo(0, 0);

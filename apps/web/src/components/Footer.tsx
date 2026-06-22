@@ -83,7 +83,7 @@ const Footer: React.FC = () => {
         {/* Bottom Bar */}
         <div className="mt-12 pt-6 border-t border-emerald-900/20 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-[10px] font-bold text-emerald-100/50 tracking-[0.2em] uppercase">
-            © 2026 PAYCHAIN KE.
+            © 2026 PayChain Financial Services Ltd. All rights reserved.
           </p>
           <div className="flex items-center gap-6 text-[10px] font-bold tracking-widest uppercase text-emerald-100/50">
             <Link to="/privacy-policy" className="hover:text-emerald-400 transition-colors">Privacy</Link>

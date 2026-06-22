@@ -201,14 +201,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
                           onClick={() => setIsAvatarDropdownOpen(false)}
                           className="w-full block px-4 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition-colors duration-200 rounded-md border border-gray-200 text-center"
                         >
-                          Sign In
-                        </Link>
-                        <Link
-                          to="/waitlist"
-                          onClick={() => setIsAvatarDropdownOpen(false)}
-                          className="w-full block px-4 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition-colors duration-200 rounded-md border border-gray-200 text-center"
-                        >
-                          Sign Up
+                          Join our waitlist
                         </Link>
                       </div>
                     </div>
@@ -249,14 +242,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
                         onClick={() => setIsAvatarDropdownOpen(false)}
                         className="w-full block px-4 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition-colors duration-200 rounded-md border border-gray-200 text-center"
                       >
-                        Sign In
-                      </Link>
-                      <Link
-                        to="/waitlist"
-                        onClick={() => setIsAvatarDropdownOpen(false)}
-                        className="w-full block px-4 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition-colors duration-200 rounded-md border border-gray-200 text-center"
-                      >
-                        Sign Up
+                        Join our waitlist
                       </Link>
                     </div>
                   </div>

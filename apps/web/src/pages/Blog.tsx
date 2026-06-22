@@ -7,6 +7,16 @@ import { motion } from 'framer-motion';
 
 const articles = [
   {
+    id: 'paychain-official-registration',
+    title: 'PayChain Financial Services Ltd Officially Registered in Kenya',
+    excerpt: 'Marking a significant milestone in East African fintech, PayChain announces its official incorporation as a registered entity in Kenya, paving the way for next-generation merchant solutions.',
+    category: 'Company News',
+    date: 'May 28, 2026',
+    readTime: '3 min read',
+    image: '/merchant-dashboard-teaser.png',
+    featured: false,
+  },
+  {
     id: 'future-of-payments-africa',
     title: 'The Future of Digital Payments in East Africa',
     excerpt: 'How mobile money and smart POS systems are transforming the retail landscape across Kenya and beyond.',
@@ -14,7 +24,7 @@ const articles = [
     date: 'Oct 15, 2026',
     readTime: '5 min read',
     image: '/happy_kenyan_merchant.png',
-    featured: true,
+    featured: false,
   },
   {
     id: 'inflation-shield-stablecoins',
