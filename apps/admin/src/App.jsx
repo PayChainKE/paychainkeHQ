@@ -13,6 +13,7 @@ import Team from './pages/Team';
 import Ledger from './pages/Ledger';
 import UserDashboard from './pages/UserDashboard';
 import Newsletter from './pages/Newsletter';
+import WalletAudit from './pages/WalletAudit';
 import { UsersProvider } from './context/UsersContext';
 import ToastHost from './components/ui/Toast';
 import { Analytics as VercelAnalytics } from "@vercel/analytics/react";
@@ -42,6 +43,7 @@ export default function App(){
             <Route path="/analytics" element={<Protected><Analytics/></Protected>} />
             <Route path="/messages" element={<Protected><Messages/></Protected>} />
             <Route path="/ledger" element={<Protected><Ledger/></Protected>} />
+            <Route path="/wallet-audit" element={<Protected><WalletAudit/></Protected>} />
             <Route path="/settings" element={<Protected><Settings/></Protected>} />
             </Routes>
           </UsersProvider>

@@ -15,6 +15,7 @@ const Sidebar = ({ isOpen, onClose }) => {
     { icon: 'newspaper', label: 'Newsletter', path: '/newsletter' },
     { icon: 'badge', label: 'Team', path: '/team' },
     { icon: 'account_balance', label: 'Ledger', path: '/ledger' },
+    { icon: 'security', label: 'Wallet Audit', path: '/wallet-audit' },
     { icon: 'settings', label: 'Settings', path: '/settings' },
   ];
 

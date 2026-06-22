@@ -13,7 +13,7 @@ import Merchant from './models/Merchant.js';
 const USDC_TESTNET_ISSUER = 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5';
 const USDC_ASSET_CODE = 'USDC';
 const HORIZON_URL = process.env.STELLAR_HORIZON_URL || 'https://horizon-testnet.stellar.org';
-const MONGODB_URI = process.env.MONGODB_URI;
+const MONGODB_URI = process.env.MONGO_URI || process.env.MONGODB_URI;
 
 const server = new StellarSdk.Horizon.Server(HORIZON_URL);
 
@@ -66,7 +66,10 @@ const run = async () => {
   console.table(rows);
 
   const active = rows.filter(r => r.Status.includes('Active')).length;
-  const totalUsdc = rows.reduce((sum, r) => sum + parseFloat(r['USDC Balance'] || 0), 0);
+  const totalUsdc = rows.reduce((sum, r) => {
+    const balance = r['USDC Balance'];
+    return sum + (balance === '-' ? 0 : parseFloat(balance || 0));
+  }, 0);
 
   console.log(`\n📊 Summary:`);
   console.log(`   Total Merchants  : ${merchants.length}`);
