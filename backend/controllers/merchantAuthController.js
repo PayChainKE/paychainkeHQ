@@ -1,6 +1,8 @@
 import Merchant from '../models/Merchant.js';
 import { sendOTP, sendWelcomeEmail } from '../utils/resend.js';
 import generateToken from '../utils/generateToken.js';
+import { provisionMerchantWallet, getWalletBalance } from '../utils/stellarHelper.js';
+import { encryptKey } from '../utils/cryptoHelper.js';
 
 // Helper to generate unique 5-digit account number
 const generateUniquePaybillAccount = async () => {
@@ -46,6 +48,9 @@ export const registerMerchant = async (req, res) => {
       otpExpires,
       paybillAccount,
       kesBalance: 0,
+      usdcBalance: 0,
+      stellarPublicKey: null,
+      stellarEncryptedSecretKey: null,
       isVerified: true // The user requested immediate login redirection, setting isVerified true for smoother flow.
     });
 
@@ -115,6 +120,8 @@ export const verifyMerchantOTP = async (req, res) => {
         businessName: merchant.businessName,
         paybillAccount: merchant.paybillAccount,
         kesBalance: merchant.kesBalance,
+        usdcBalance: merchant.usdcBalance,
+        stellarPublicKey: merchant.stellarPublicKey,
         isVerified: merchant.isVerified,
         createdAt: merchant.createdAt,
         lastLogin: merchant.lastLogin,
@@ -152,63 +159,24 @@ export const loginMerchant = async (req, res) => {
       return res.status(401).json({ error: 'Invalid email/phone or password' });
     }
 
-    // Check if account has been logged in within the last 3 days
-    const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
-    const now = new Date();
-    const needsOTP = !merchant.lastLogin || (now - new Date(merchant.lastLogin)) > THREE_DAYS_MS;
+    // Always require OTP verification for every login (removed 3-day bypass)
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
 
-    if (needsOTP) {
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
-
-      merchant.otp = otp;
-      merchant.otpExpires = otpExpires;
-      await merchant.save();
-
-      console.log(`📧 Dispatching OTP via Resend to: ${merchant.email}`);
-      sendOTP(merchant.email, otp).catch(err => {
-        console.error(`📧 Resend Error: Failed to send OTP to ${merchant.email}:`, err);
-      });
-
-      return res.json({ 
-        success: true, 
-        mfaRequired: true, 
-        email: merchant.email,
-        message: 'OTP sent to your email. Proceed to Stage 2.' 
-      });
-    }
-
-    // Direct login (within 3 days)
-    merchant.loginCount = (merchant.loginCount || 0) + 1;
-    merchant.lastLogin = now;
-    
-    merchant.loginHistory = merchant.loginHistory || [];
-    merchant.loginHistory.unshift({
-      timestamp: now,
-      device: req.headers['user-agent']?.substring(0, 40) || 'Unknown Device',
-      ip: req.ip || req.connection.remoteAddress,
-      location: 'Nairobi, KE' // Mock
-    });
-    if (merchant.loginHistory.length > 10) {
-      merchant.loginHistory = merchant.loginHistory.slice(0, 10);
-    }
-    
+    merchant.otp = otp;
+    merchant.otpExpires = otpExpires;
     await merchant.save();
 
-    res.json({
-      success: true,
-      mfaRequired: false,
-      merchant: {
-        _id: merchant._id,
-        name: merchant.name,
-        email: merchant.email,
-        phone: merchant.phone,
-        businessName: merchant.businessName,
-        paybillAccount: merchant.paybillAccount,
-        status: merchant.status,
-        loginCount: merchant.loginCount
-      },
-      token: generateToken(merchant._id)
+    console.log(`📧 Dispatching OTP via Resend to: ${merchant.email}`);
+    sendOTP(merchant.email, otp).catch(err => {
+      console.error(`📧 Resend Error: Failed to send OTP to ${merchant.email}:`, err);
+    });
+
+    return res.json({ 
+      success: true, 
+      mfaRequired: true, 
+      email: merchant.email,
+      message: 'OTP sent to your email. Proceed to Stage 2.' 
     });
   } catch (error) {
     console.error('Login Merchant Error:', error);
@@ -266,6 +234,9 @@ export const biometricLogin = async (req, res) => {
         phone: merchant.phone,
         businessName: merchant.businessName,
         paybillAccount: merchant.paybillAccount,
+        kesBalance: merchant.kesBalance,
+        usdcBalance: merchant.usdcBalance,
+        stellarPublicKey: merchant.stellarPublicKey,
         status: merchant.status,
         loginCount: merchant.loginCount
       },
@@ -411,6 +382,19 @@ export const getMerchantMe = async (req, res) => {
       return res.status(404).json({ error: 'Merchant not found' });
     }
 
+    // Sync on-chain USDC balance if wallet exists
+    if (merchant.stellarPublicKey) {
+      try {
+        const liveBalance = await getWalletBalance(merchant.stellarPublicKey);
+        if (liveBalance !== merchant.usdcBalance) {
+          merchant.usdcBalance = liveBalance;
+          await merchant.save();
+        }
+      } catch (e) {
+        console.warn('⚠️ Failed to sync live USDC balance:', e.message);
+      }
+    }
+
     res.json({
       success: true,
       merchant: {
@@ -421,6 +405,8 @@ export const getMerchantMe = async (req, res) => {
         businessName: merchant.businessName,
         paybillAccount: merchant.paybillAccount,
         kesBalance: merchant.kesBalance,
+        usdcBalance: merchant.usdcBalance,
+        stellarPublicKey: merchant.stellarPublicKey,
         isVerified: merchant.isVerified,
         createdAt: merchant.createdAt,
         lastLogin: merchant.lastLogin,
@@ -478,6 +464,8 @@ export const updateMerchantProfile = async (req, res) => {
         businessName: merchant.businessName,
         paybillAccount: merchant.paybillAccount,
         kesBalance: merchant.kesBalance,
+        usdcBalance: merchant.usdcBalance,
+        stellarPublicKey: merchant.stellarPublicKey,
         isVerified: merchant.isVerified,
         createdAt: merchant.createdAt,
         lastLogin: merchant.lastLogin,

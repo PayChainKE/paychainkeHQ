@@ -2,6 +2,8 @@ import axios from 'axios';
 import Transaction from '../models/Transaction.js';
 import Merchant from '../models/Merchant.js';
 import { sendSMS } from '../utils/sms.js';
+import { settleInflationShield } from '../utils/stellarHelper.js';
+import { getLiveKesToUsdcRate } from '../utils/rateEngine.js';
 
 // Configuration from environment variables
 const consumerKey = process.env.MPESA_CONSUMER_KEY;
@@ -156,8 +158,46 @@ export const confirmationURL = async (req, res) => {
       }
     });
 
-    // Update merchant's real-time KES balance
-    merchant.kesBalance = (merchant.kesBalance || 0) + amount;
+    // Inflation Shield: Automatically convert KES to USDC and settle on-chain
+    const PLATFORM_FEE_PERCENTAGE = 0; // Configurable fee (0% for demo)
+    
+    const netKESAmount = amount - (amount * PLATFORM_FEE_PERCENTAGE);
+    const liveRate = await getLiveKesToUsdcRate();
+    const usdcPayoutValue = (netKESAmount * liveRate).toFixed(7);
+
+    if (merchant.stellarPublicKey) {
+      try {
+        console.log(`🛡️ Executing Inflation Shield for Acc ${accountNumber}:`);
+        console.log(`   - Gross M-Pesa KES: ${amount}`);
+        console.log(`   - Live KES/USDC Rate (Fractional): ${liveRate}`);
+        console.log(`   - Exact On-Chain Payout: ${usdcPayoutValue} USDC`);
+
+        const txHash = await settleInflationShield(merchant.stellarPublicKey, usdcPayoutValue);
+        
+        // Log the blockchain settlement transaction
+        await Transaction.create({
+          merchantId: merchant._id,
+          accountNumber: merchant.paybillAccount,
+          type: 'settlement',
+          amount: parseFloat(usdcPayoutValue),
+          kesAmount: netKESAmount,
+          currency: 'USDC',
+          status: 'completed',
+          reference: txHash,
+          sender: { name: 'PayChain Settlement', id: 'MASTER_WALLET' },
+          recipient: { name: merchant.businessName, id: merchant.stellarPublicKey }
+        });
+
+      } catch (e) {
+        console.error(`❌ Inflation Shield failed for ${accountNumber}:`, e.message);
+        // If settlement fails, funds remain as KES balance
+        merchant.kesBalance = (merchant.kesBalance || 0) + netKESAmount;
+      }
+    } else {
+      // If no Stellar wallet, just add to KES balance
+      merchant.kesBalance = (merchant.kesBalance || 0) + netKESAmount;
+    }
+
     await merchant.save();
 
     console.log(`✅ Successfully processed M-PESA payment of KES ${amount} for account ${accountNumber}`);

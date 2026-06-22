@@ -1642,8 +1642,9 @@ export default function BulkPay() {
                         <div className="flex justify-between items-start mb-16">
                            <div>
                               <img src={paychainLogo} alt="PayChain Logo" className="h-10 mb-4 object-contain contrast-125 saturate-150" />
-                              <h2 className="font-headline text-lg font-bold text-primary">PayChain</h2>
-                              <p className="text-xs text-on-surface-variant mt-1 max-w-[150px]">123 Tech Park, Nairobi, Kenya</p>
+                              <h2 className="font-headline text-lg font-bold text-primary">{merchant?.businessName || 'PayChain'}</h2>
+                              <p className="text-xs text-on-surface-variant mt-1 max-w-[150px] break-words">{merchant?.email || 'Nairobi, Kenya'}</p>
+                              <p className="text-xs text-on-surface-variant max-w-[150px]">{merchant?.phone}</p>
                            </div>
                            <div className="text-right">
                               <h1 className="font-headline tracking-[0.2em] text-3xl font-black text-[#00351D] opacity-20 uppercase mb-2">Invoice</h1>

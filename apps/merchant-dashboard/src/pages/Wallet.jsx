@@ -8,7 +8,7 @@ import { useToast } from '../context/NotificationContext'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 
 export default function Wallet() {
-  const { merchant } = useMerchantAuth()
+  const { merchant, refreshSession } = useMerchantAuth()
   const { showAmounts } = usePrivacyMode()
   const { addToast } = useToast()
   const withdrawalDestinations = [
@@ -17,6 +17,7 @@ export default function Wallet() {
   ]
   const [withdrawAmount, setWithdrawAmount] = useState('')
   const [destination, setDestination] = useState(withdrawalDestinations[0].id)
+  const [destinationAccountValue, setDestinationAccountValue] = useState('')
   const [isWithdrawing, setIsWithdrawing] = useState(false)
   
   // QR Features
@@ -39,6 +40,8 @@ export default function Wallet() {
 
   const [liveTransactions, setLiveTransactions] = useState([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isSwapping, setIsSwapping] = useState(false)
+  const [isActivatingWallet, setIsActivatingWallet] = useState(false)
 
   useEffect(() => {
     const fetchTransactions = async () => {
@@ -56,50 +59,167 @@ export default function Wallet() {
     else setIsLoading(false)
   }, [merchant])
 
-  const handleWithdraw = (e) => {
+  const handleWithdraw = async (e) => {
     e.preventDefault()
-    if (!withdrawAmount || Number(withdrawAmount) <= 0) return
-
+    if(!withdrawAmount || isNaN(withdrawAmount)) return
+    if(!destinationAccountValue) {
+      addToast({ title: 'Missing Account Details', message: 'Please input the correct values for your destination field.', type: 'error' })
+      return
+    }
     setIsWithdrawing(true)
-    setTimeout(() => {
-      setIsWithdrawing(false)
-      addToast({
-        title: 'Withdrawal Initiated',
-        message: `KES ${Number(withdrawAmount).toLocaleString()} is being sent to your selected destination.`,
-        type: 'success'
+    try {
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+      const token = localStorage.getItem('paychain_merchant_token')
+      await axios.post(`${API_URL}/api/transactions/send-money`, {
+        amount: Number(withdrawAmount),
+        destination: destination,
+        reference: `Withdrawal to ${destinationAccountValue}`
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
       })
+      addToast({ title: 'Withdrawal Initiated', message: `KES ${withdrawAmount} sent to destination.`, type: 'success' })
       setWithdrawAmount('')
-    }, 1500)
+      await refreshSession()
+    } catch (err) {
+      addToast({ title: 'Withdrawal Failed', message: err.response?.data?.error || 'Failed to withdraw funds', type: 'error' })
+    } finally {
+      setIsWithdrawing(false)
+    }
+  }
+
+  // Then further down, the JSX changes:
+
+  const [showSwapModal, setShowSwapModal] = useState(false)
+  const [swapAmount, setSwapAmount] = useState('')
+  const [liveRate, setLiveRate] = useState(132.45)
+
+  useEffect(() => {
+    const fetchRate = async () => {
+      try {
+        const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+        const token = localStorage.getItem('paychain_merchant_token')
+        const res = await axios.get(`${API_URL}/api/transactions/live-rate`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        if (res.data?.rate) {
+          setLiveRate(res.data.rate)
+        }
+      } catch (e) {
+        console.error('Failed to fetch rate', e)
+      }
+    }
+    fetchRate()
+  }, [])
+
+  const handleSwapKES = async () => {
+    if (!merchant?.stellarPublicKey) {
+      return addToast({ title: 'Wallet Not Activated', message: 'Please activate your Digital Wallet first.', type: 'error' });
+    }
+    setShowSwapModal(true)
+  }
+
+  const executeSwap = async () => {
+    const amount = parseFloat(swapAmount);
+    if (isNaN(amount) || amount <= 0) {
+      return addToast({ title: 'Invalid Amount', message: 'Please enter a valid number.', type: 'error' });
+    }
+    if (amount > (merchant?.kesBalance || 0)) {
+      return addToast({ title: 'Insufficient Balance', message: 'You do not have enough KES.', type: 'error' });
+    }
+
+    setIsSwapping(true);
+    try {
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      const token = localStorage.getItem('paychain_merchant_token');
+      const res = await axios.post(`${API_URL}/api/transactions/swap`, { amount }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      addToast({ title: 'Swap Successful', message: `Successfully swapped ${amount} KES to USDC!`, type: 'success' });
+      await refreshSession();
+      setShowSwapModal(false);
+      setSwapAmount('');
+    } catch (err) {
+      addToast({ title: 'Swap Failed', message: err.response?.data?.error || 'Failed to swap KES', type: 'error' });
+    } finally {
+      setIsSwapping(false);
+    }
+  }
+
+  const handleActivateWallet = async () => {
+    setIsActivatingWallet(true);
+    try {
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      const token = localStorage.getItem('paychain_merchant_token');
+      await axios.post(`${API_URL}/api/transactions/activate-wallet`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      addToast({ title: 'Wallet Activated', message: 'Your Web3 Digital Wallet has been provisioned!', type: 'success' });
+      await refreshSession();
+    } catch (err) {
+      addToast({ title: 'Activation Failed', message: err.response?.data?.error || 'Failed to activate wallet', type: 'error' });
+    } finally {
+      setIsActivatingWallet(false);
+    }
   }
 
   // QR Logic
-  const qrData = `paychain://pay?till=${merchant?.paybillAccount || '84729'}&name=${encodeURIComponent(merchant?.businessName || 'Merchant')}`
+  const qrData = `https://www.paychain.co.ke/pay/${merchant?.paybillAccount || '84729'}`
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrData)}&margin=10&bgcolor=FFFFFF&color=00351D`
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     setIsDownloading(true)
-    setTimeout(() => {
+    try {
+      const response = await fetch(qrUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `PayChain-QR-${merchant?.paybillAccount || '84729'}.png`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      addToast({ title: 'QR Code Downloaded', message: 'Your payment QR code has been downloaded.', type: 'success' })
+    } catch (e) {
+      addToast({ title: 'Download Failed', message: 'Could not download the QR image.', type: 'error' })
+    } finally {
       setIsDownloading(false)
-      addToast({
-        title: 'QR Code Ready',
-        message: 'Your payment QR code is ready for download.',
-        type: 'success'
-      })
-    }, 1000)
+    }
   }
 
   const handleDownloadPDF = () => {
     setIsGeneratingPDF(true)
     setTimeout(() => {
       setIsGeneratingPDF(false)
-      addToast({
-        title: 'PDF Generated',
-        message: 'Your payment QR has been converted to a print-ready PDF.',
-        type: 'success'
-      })
-      // Simulating PDF generation by opening print dialog on a hidden element
-      window.print()
-    }, 1500)
+      const printWindow = window.open('', '', 'width=600,height=800');
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>PayChain Settlement QR</title>
+            <style>
+              body { font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #0B0E14; color: white; }
+              img { width: 300px; height: 300px; border-radius: 16px; margin-bottom: 20px; border: 4px solid #fff; padding: 10px; background: white; }
+              .text { text-align: center; max-width: 400px; }
+              h1 { font-size: 24px; color: #2775CA; margin: 0 0 10px 0; text-transform: uppercase; letter-spacing: 0.2em; }
+              p { font-size: 16px; margin: 5px 0; letter-spacing: 0.1em; }
+            </style>
+          </head>
+          <body>
+            <img src="${qrUrl}" alt="Settlement QR" />
+            <div class="text">
+              <h1>Settlement QR</h1>
+              <p>ACC: ${merchant?.paybillAccount || '84729'}</p>
+              <p>MERCHANT: ${merchant?.businessName || 'Merchant'}</p>
+            </div>
+            <script>
+              window.onload = () => { setTimeout(() => { window.print(); window.close(); }, 500); }
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      addToast({ title: 'PDF Generated', message: 'Your payment QR is ready for printing.', type: 'success' })
+    }, 800)
   }
 
   const handleShare = async () => {
@@ -128,7 +248,7 @@ export default function Wallet() {
     setIsGeneratingLink(true)
     setTimeout(() => {
       setIsGeneratingLink(false)
-      const link = `https://pay.paychain.ke/pay/${merchant?.paybillAccount || '84729'}/${paymentLinkAmount}`
+      const link = `https://www.paychain.co.ke/pay/${merchant?.paybillAccount || '84729'}/${paymentLinkAmount}`
       setGeneratedLink(link)
       addToast({
         title: 'Payment Link Created',
@@ -152,82 +272,112 @@ export default function Wallet() {
         
         {/* Hero Section: Balances */}
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in-up">
-          {/* Premium Crypto Wallet Card (Global USDC) */}
-          <div className="bg-gradient-to-br from-[#0F141E] to-[#0A0D14] text-white p-5 md:p-6 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative overflow-hidden group border border-[#1E2532] mx-auto w-full max-w-[340px] flex flex-col justify-between min-h-[214px]">
-            {/* Glowing Orb Effects */}
-            <div className="absolute top-0 right-0 w-72 h-72 bg-[#2775CA]/20 rounded-full -mr-20 -mt-20 blur-[80px] group-hover:scale-110 group-hover:bg-[#2775CA]/30 transition-all duration-1000 ease-out pointer-events-none"></div>
-            <div className="absolute bottom-0 left-0 w-56 h-56 bg-[#2775CA]/10 rounded-full -ml-20 -mb-20 blur-[60px] pointer-events-none"></div>
-            
-            {/* Mesh Pattern Overlay */}
-            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjEiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wNSkiLz48L3N2Zz4=')] opacity-50 mix-blend-overlay pointer-events-none"></div>
+          {merchant?.stellarPublicKey ? (
+            <div className="bg-gradient-to-br from-[#0F141E] to-[#0A0D14] text-white p-5 rounded-[24px] md:rounded-[32px] shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative overflow-hidden group border border-[#1E2532] w-full flex flex-col justify-between h-full">
+              {/* Glowing Orb Effects */}
+              <div className="absolute top-0 right-0 w-72 h-72 bg-[#2775CA]/20 rounded-full -mr-20 -mt-20 blur-[80px] group-hover:scale-110 group-hover:bg-[#2775CA]/30 transition-all duration-1000 ease-out pointer-events-none"></div>
+              <div className="absolute bottom-0 left-0 w-56 h-56 bg-[#2775CA]/10 rounded-full -ml-20 -mb-20 blur-[60px] pointer-events-none"></div>
+              
+              {/* Mesh Pattern Overlay */}
+              <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjEiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wNSkiLz48L3N2Zz4=')] opacity-50 mix-blend-overlay pointer-events-none"></div>
 
-            <div className="relative z-10 flex flex-col h-full">
-              {/* Header */}
-              <div className="flex justify-between items-center mb-8">
-                <div className="flex items-center gap-2 bg-[#1A212D] border border-[#2A3441] rounded-full px-3 py-1.5 shadow-inner">
-                   <div className="w-4 h-4 rounded-full bg-[#2775CA] flex items-center justify-center shadow-[0_0_10px_rgba(39,117,202,0.5)]">
-                     <span className="text-[10px] text-white font-black leading-none">$</span>
-                   </div>
-                   <span className="text-[9px] font-bold tracking-[0.2em] uppercase text-[#8B98A9]">USDC Network</span>
+              <div className="relative z-10 flex flex-col h-full">
+                {/* Header */}
+                <div className="flex justify-between items-center mb-5">
+                  <div className="flex items-center gap-2 bg-[#1A212D] border border-[#2A3441] rounded-full px-3 py-1.5 shadow-inner">
+                     <div className="w-4 h-4 rounded-full bg-[#2775CA] flex items-center justify-center shadow-[0_0_10px_rgba(39,117,202,0.5)]">
+                       <span className="text-[10px] text-white font-black leading-none">$</span>
+                     </div>
+                     <span className="text-[9px] font-bold tracking-[0.2em] uppercase text-[#8B98A9]">USDC Network</span>
+                  </div>
+                  <div className="w-8 h-8 rounded-full bg-[#1A212D] flex items-center justify-center border border-[#2A3441] shadow-lg backdrop-blur-md hover:bg-[#202936] transition-colors cursor-pointer group/icon">
+                     <span className="material-symbols-outlined text-sm text-[#8B98A9] group-hover/icon:text-white transition-colors">qr_code_scanner</span>
+                  </div>
                 </div>
-                <div className="w-10 h-10 rounded-full bg-[#1A212D] flex items-center justify-center border border-[#2A3441] shadow-lg backdrop-blur-md hover:bg-[#202936] transition-colors cursor-pointer group/icon">
-                   <span className="material-symbols-outlined text-lg text-[#8B98A9] group-hover/icon:text-white transition-colors">qr_code_scanner</span>
-                </div>
-              </div>
 
-              {/* Balance Area */}
-              <div className="mb-8">
-                <p className="text-[#8B98A9] text-[10px] font-black uppercase tracking-[0.2em] mb-2">Global Settlement Balance</p>
-                <div className="flex items-baseline gap-2">
-                  <h3 className={`font-headline font-black text-4xl md:text-5xl tracking-tighter tabular-nums transition-all duration-300 text-transparent bg-clip-text bg-gradient-to-r from-white to-[#8B98A9] ${!showAmounts && 'blur-xl text-white bg-none'}`}>
-                    {merchant?.usdcBalance?.toLocaleString(undefined, { minimumFractionDigits: 2 }) || '0.00'}
-                  </h3>
-                  <span className="text-xl font-bold text-[#2775CA]">USDC</span>
+                {/* Balance Area */}
+                <div className="mb-5 flex-1">
+                  <p className="text-[#8B98A9] text-[10px] font-black uppercase tracking-[0.2em] mb-1">Global Settlement Balance</p>
+                  <div className="flex items-baseline gap-2">
+                    <h3 className={`font-headline font-black text-3xl md:text-4xl tracking-tighter tabular-nums transition-all duration-300 text-transparent bg-clip-text bg-gradient-to-r from-white to-[#8B98A9] ${!showAmounts && 'blur-xl text-white bg-none'}`}>
+                      {merchant?.usdcBalance?.toLocaleString(undefined, { minimumFractionDigits: 2 }) || '0.00'}
+                    </h3>
+                    <span className="text-lg font-bold text-[#2775CA]">USDC</span>
+                  </div>
+                  
+                  {/* Wallet Address Pill */}
+                  <div 
+                    onClick={() => {
+                      const address = merchant?.stellarPublicKey || '0x84728fB0...9xK2';
+                      navigator.clipboard.writeText(address)
+                      addToast({ title: 'Address Copied', message: 'Wallet address copied to clipboard', type: 'success' })
+                    }}
+                    className="inline-flex items-center gap-2 mt-2 px-3 py-1 bg-[#1A212D]/80 hover:bg-[#202936] rounded-full border border-[#2A3441] cursor-pointer transition-all active:scale-95 group/pill backdrop-blur-md"
+                  >
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#35D07F] shadow-[0_0_8px_rgba(53,208,127,0.6)] animate-pulse"></div>
+                    <span className="text-[10px] text-[#8B98A9] font-mono tracking-wider group-hover/pill:text-white transition-colors">
+                      {merchant?.stellarPublicKey ? `${merchant.stellarPublicKey.slice(0, 6)}...${merchant.stellarPublicKey.slice(-4)}` : '0x8472...9xK2'}
+                    </span>
+                    <span className="material-symbols-outlined text-[12px] text-[#8B98A9] group-hover/pill:text-white transition-colors">content_copy</span>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="grid grid-cols-2 gap-3 mt-auto">
+                  <button 
+                    onClick={handleSwapKES}
+                    disabled={isSwapping}
+                    className="py-2.5 bg-[#1A212D] hover:bg-[#202936] text-white rounded-xl text-[10px] font-black transition-all border border-[#2A3441] uppercase tracking-[0.1em] flex items-center justify-center gap-2 group/btn shadow-sm disabled:opacity-50"
+                  >
+                    {isSwapping ? (
+                      <span className="material-symbols-outlined text-base text-[#8B98A9] animate-spin">refresh</span>
+                    ) : (
+                      <span className="material-symbols-outlined text-base text-[#8B98A9] group-hover/btn:text-white transition-colors">swap_horiz</span>
+                    )}
+                    {isSwapping ? 'Swapping...' : 'Swap KES'}
+                  </button>
+                  <button 
+                    onClick={() => setShowTopUpSelection(true)}
+                    className="py-2.5 bg-gradient-to-b from-[#2775CA] to-[#1A5AA3] hover:from-[#2C84E3] hover:to-[#1C64B4] text-white rounded-xl text-[10px] font-black transition-all shadow-md border border-[#3E8BE0]/50 uppercase tracking-[0.1em] flex items-center justify-center gap-2 active:scale-95"
+                  >
+                    <span className="material-symbols-outlined text-base text-white">add</span>
+                    Top Up
+                  </button>
                 </div>
                 
-                {/* Wallet Address Pill */}
-                <div 
-                  onClick={() => {
-                    navigator.clipboard.writeText('0x84728fB0...9xK2')
-                    addToast({ title: 'Address Copied', message: 'Wallet address copied to clipboard', type: 'success' })
-                  }}
-                  className="inline-flex items-center gap-2 mt-4 px-3 py-1.5 bg-[#1A212D]/80 hover:bg-[#202936] rounded-full border border-[#2A3441] cursor-pointer transition-all active:scale-95 group/pill backdrop-blur-md"
-                >
-                  <div className="w-2 h-2 rounded-full bg-[#35D07F] shadow-[0_0_8px_rgba(53,208,127,0.6)] animate-pulse"></div>
-                  <span className="text-[11px] text-[#8B98A9] font-mono tracking-wider group-hover/pill:text-white transition-colors">
-                    0x8472...9xK2
-                  </span>
-                  <span className="material-symbols-outlined text-[14px] text-[#8B98A9] group-hover/pill:text-white transition-colors">content_copy</span>
+                {/* Networks Footer */}
+                <div className="flex items-center justify-between gap-3 mt-4 pt-3 border-t border-[#1E2532]/50">
+                   <span className="text-[8px] font-black uppercase tracking-[0.2em] text-[#8B98A9]/40">Supported Networks</span>
+                   <div className="flex items-center gap-2">
+                      <img src="https://cryptologos.cc/logos/stellar-xlm-logo.svg?v=032" alt="Stellar" className="w-3.5 h-3.5 transition-all cursor-help brightness-0 invert" title="Stellar" />
+                      <img src="https://cryptologos.cc/logos/usd-coin-usdc-logo.svg?v=032" alt="USDC" className="w-3.5 h-3.5 transition-all cursor-help" title="USDC Native" />
+                      <img src="https://cryptologos.cc/logos/polygon-matic-logo.svg?v=032" alt="Polygon" className="w-3.5 h-3.5 transition-all cursor-help" title="Polygon" />
+                      <img src="https://cryptologos.cc/logos/celo-celo-logo.svg?v=032" alt="Celo" className="w-3.5 h-3.5 transition-all cursor-help" title="Celo" />
+                   </div>
                 </div>
               </div>
-
-              {/* Action Buttons */}
-              <div className="grid grid-cols-2 gap-3 mt-auto">
-                <button className="py-3.5 bg-[#1A212D] hover:bg-[#202936] text-white rounded-2xl text-[10px] font-black transition-all border border-[#2A3441] uppercase tracking-[0.15em] flex flex-col items-center justify-center gap-1.5 group/btn shadow-lg">
-                  <span className="material-symbols-outlined text-xl text-[#8B98A9] group-hover/btn:text-white transition-colors">swap_horiz</span>
-                  Swap KES
-                </button>
-                <button 
-                  onClick={() => setShowTopUpSelection(true)}
-                  className="py-3.5 bg-gradient-to-b from-[#2775CA] to-[#1A5AA3] hover:from-[#2C84E3] hover:to-[#1C64B4] text-white rounded-2xl text-[10px] font-black transition-all shadow-[0_0_20px_rgba(39,117,202,0.3)] hover:shadow-[0_0_25px_rgba(39,117,202,0.5)] border border-[#3E8BE0]/50 uppercase tracking-[0.15em] flex flex-col items-center justify-center gap-1.5 active:scale-95"
-                >
-                  <span className="material-symbols-outlined text-xl text-white">add</span>
-                  Top Up
-                </button>
-              </div>
-              
-              {/* Networks Footer */}
-              <div className="flex items-center justify-center gap-3 mt-6 pt-5 border-t border-[#1E2532]/50">
-                 <span className="text-[8px] font-black uppercase tracking-[0.2em] text-[#8B98A9]/40">Supported Networks</span>
-                 <div className="flex items-center gap-2">
-                    <img src="https://cryptologos.cc/logos/usd-coin-usdc-logo.svg?v=032" alt="USDC" className="w-3.5 h-3.5 opacity-40 grayscale hover:grayscale-0 hover:opacity-100 transition-all cursor-help" title="USDC Native" />
-                    <img src="https://cryptologos.cc/logos/polygon-matic-logo.svg?v=032" alt="Polygon" className="w-3.5 h-3.5 opacity-40 grayscale hover:grayscale-0 hover:opacity-100 transition-all cursor-help" title="Polygon" />
-                    <img src="https://cryptologos.cc/logos/celo-celo-logo.svg?v=032" alt="Celo" className="w-3.5 h-3.5 opacity-40 grayscale hover:grayscale-0 hover:opacity-100 transition-all cursor-help" title="Celo" />
-                 </div>
-              </div>
-
             </div>
-          </div>
+          ) : (
+            <div className="bg-gradient-to-br from-[#0F141E] to-[#0A0D14] text-white p-6 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-[#1E2532] mx-auto w-full max-w-[340px] flex flex-col items-center justify-center min-h-[214px] text-center">
+              <div className="w-16 h-16 rounded-full bg-[#1A212D] flex items-center justify-center border border-[#2A3441] mb-4 shadow-lg">
+                <span className="material-symbols-outlined text-3xl text-[#2775CA]">account_balance_wallet</span>
+              </div>
+              <h3 className="text-sm font-bold text-white mb-2">Digital Wallet Inactive</h3>
+              <p className="text-[10px] text-[#8B98A9] mb-6 max-w-[200px]">Activate your Web3 wallet to enable USDC settlements and the Inflation Shield.</p>
+              <button 
+                onClick={handleActivateWallet}
+                disabled={isActivatingWallet}
+                className="w-full py-3 bg-gradient-to-b from-[#2775CA] to-[#1A5AA3] hover:from-[#2C84E3] hover:to-[#1C64B4] text-white rounded-xl text-[11px] font-black transition-all shadow-[0_0_20px_rgba(39,117,202,0.3)] border border-[#3E8BE0]/50 uppercase tracking-[0.15em] flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+              >
+                {isActivatingWallet ? (
+                  <span className="material-symbols-outlined text-lg animate-spin">refresh</span>
+                ) : (
+                  <span className="material-symbols-outlined text-lg">bolt</span>
+                )}
+                {isActivatingWallet ? 'Activating...' : 'Activate Now'}
+              </button>
+            </div>
+          )}
 
           {/* KES Balance Card (Local) */}
           <div className="bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-outline-variant/10 relative overflow-hidden group editorial-shadow mx-auto w-full max-w-[340px] flex flex-col justify-between h-full min-h-[214px]">
@@ -281,44 +431,78 @@ export default function Wallet() {
 
               <div className="space-y-3">
                 <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Destination</label>
-                <div className="grid grid-cols-1 gap-3">
+                <div className="grid grid-cols-2 gap-4">
                   {withdrawalDestinations.map((dest) => (
                     <div 
                       key={dest.id}
                       onClick={() => setDestination(dest.id)}
-                      className={`p-5 rounded-2xl border cursor-pointer transition-all flex items-center justify-between group ${
+                      className={`relative p-4 md:p-5 rounded-2xl md:rounded-3xl border cursor-pointer transition-all duration-300 flex flex-col items-start gap-4 overflow-hidden group ${
                         destination === dest.id 
-                        ? 'border-primary bg-primary/5 shadow-md' 
-                        : 'border-outline-variant/10 bg-surface-container-low hover:bg-emerald-50'
+                        ? 'border-primary bg-primary/[0.03] shadow-[0_8px_30px_rgba(0,53,29,0.08)] scale-[1.02]' 
+                        : 'border-outline-variant/10 bg-white hover:border-primary/30 hover:bg-surface-container-low hover:shadow-md'
                       }`}
                     >
-                      <div className="flex items-center gap-4">
-                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
-                            destination === dest.id ? 'bg-primary text-white' : 'bg-white text-on-surface-variant'
-                         }`}>
-                            <span className="material-symbols-outlined text-xl">
-                               {dest.type === 'Till' ? 'point_of_sale' : 'account_balance'}
-                            </span>
-                         </div>
-                         <div>
-                            <p className={`text-sm font-bold ${destination === dest.id ? 'text-primary' : 'text-on-surface'}`}>{dest.label}</p>
-                            <p className="text-[10px] text-on-surface-variant font-medium opacity-60 capitalize">{dest.type} Account</p>
+                      {/* Premium Accent Line */}
+                      {destination === dest.id && (
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-emerald-400"></div>
+                      )}
+                      
+                      <div className="w-full flex justify-between items-start">
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 ${
+                           destination === dest.id 
+                           ? 'bg-primary text-white shadow-lg' 
+                           : 'bg-primary/10 text-primary group-hover:bg-primary/20'
+                        }`}>
+                           <span className="material-symbols-outlined text-[22px]">
+                              {dest.type === 'Till' ? 'point_of_sale' : dest.type === 'Mobile' ? 'smartphone' : 'account_balance'}
+                           </span>
+                        </div>
+                        {dest.verified && (
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center ${destination === dest.id ? 'bg-emerald-100' : 'bg-surface-container-low'}`}>
+                            <span className="material-symbols-outlined text-emerald-600 text-[14px]" style={{fontVariationSettings: "'FILL' 1"}}>verified</span>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="w-full mt-2">
+                         <p className={`text-sm md:text-base font-bold truncate transition-colors duration-300 ${destination === dest.id ? 'text-primary' : 'text-on-surface'}`}>{dest.name}</p>
+                         <div className="flex items-center gap-2 mt-1">
+                           <p className="text-[11px] text-on-surface-variant font-medium opacity-80 capitalize">{dest.type}</p>
+                           <div className="w-1 h-1 rounded-full bg-outline-variant/30"></div>
+                           <p className="text-[10px] font-mono text-on-surface-variant/60 tracking-wider truncate">{dest.acc}</p>
                          </div>
                       </div>
-                      {dest.verified && (
-                        <span className="material-symbols-outlined text-emerald-600 text-lg" style={{fontVariationSettings: "'FILL' 1"}}>verified</span>
-                      )}
                     </div>
                   ))}
                 </div>
               </div>
 
               {selectedDest && (
+                <div className="space-y-3 mt-4 animate-scale-in">
+                  <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">
+                    {selectedDest.type === 'Bank' ? 'Bank Account Number' : 'M-PESA Number'}
+                  </label>
+                  <div className="relative group">
+                    <div className="absolute left-5 top-1/2 -translate-y-1/2 text-primary/40 flex items-center justify-center">
+                      <span className="material-symbols-outlined text-xl">{selectedDest.type === 'Bank' ? 'account_balance' : 'smartphone'}</span>
+                    </div>
+                    <input 
+                      type={selectedDest.type === 'Bank' ? 'text' : 'tel'}
+                      value={destinationAccountValue}
+                      onChange={(e) => setDestinationAccountValue(e.target.value)}
+                      placeholder={selectedDest.type === 'Bank' ? 'e.g. 1122334455' : 'e.g. 0712345678'}
+                      className="w-full bg-surface-container-low border border-outline-variant/5 rounded-2xl md:rounded-3xl py-4 md:py-6 pl-14 md:pl-16 pr-6 text-xl md:text-2xl font-headline text-primary focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {selectedDest && (
                 <div className="p-5 bg-[#F0FDF4] rounded-2xl border border-emerald-100 flex items-start gap-4 animate-scale-in">
                    <span className="material-symbols-outlined text-emerald-600 mt-0.5">info</span>
                    <div>
                       <p className="text-[11px] text-emerald-900 font-medium leading-relaxed">
-                        Withdrawals to <strong>{selectedDest.label}</strong> are typically processed within <span className="font-bold">15 minutes</span>.
+                        Withdrawals are typically processed within <span className="font-bold">minutes</span>.
                       </p>
                    </div>
                 </div>
@@ -341,205 +525,219 @@ export default function Wallet() {
             </form>
           </section>
 
-          <section className="col-span-12 lg:col-span-12 xl:col-span-7 bg-white p-6 md:p-8 lg:p-10 rounded-[32px] lg:rounded-[40px] border border-outline-variant/10 shadow-2xl editorial-shadow animate-fade-in-up [animation-delay:150ms]">
-                <div className="flex flex-col md:flex-row justify-between items-stretch gap-10">
-                  <div className="flex-1 w-full space-y-6 md:space-y-8">
+          <section className="col-span-12 lg:col-span-12 xl:col-span-7 bg-[#0B0E14] text-white p-6 md:p-8 lg:p-10 rounded-[32px] lg:rounded-[40px] border border-[#1E2532] shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative overflow-hidden animate-fade-in-up [animation-delay:150ms]">
+            {/* Subtle background glow */}
+            <div className="absolute top-0 right-0 w-96 h-96 bg-[#2775CA]/5 rounded-full blur-[100px] pointer-events-none"></div>
+
+            <div className="flex flex-col md:flex-row justify-between items-stretch gap-10 relative z-10">
+              <div className="flex-1 w-full space-y-6 md:space-y-8">
+                <div>
+                  <h3 className="font-headline text-2xl md:text-3xl text-white tracking-tight">MY QR</h3>
+                  <p className="text-[9px] md:text-[10px] text-[#8B98A9] font-bold uppercase tracking-[0.2em] mt-1">Professional Settlement Tool</p>
+                </div>
+
+                {/* Blockchain Settlement Address Block */}
+                <div className="bg-[#131722] border border-[#1E2532] p-5 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 hover:border-[#2775CA]/30 transition-colors">
+                  <div className="flex items-start gap-4 w-full flex-1">
+                    <div className="w-10 h-10 rounded-full bg-[#1A212D] text-[#2775CA] flex items-center justify-center border border-[#1E2532] shrink-0 mt-1 sm:mt-0 shadow-inner">
+                        <span className="material-symbols-outlined text-xl">account_balance_wallet</span>
+                    </div>
+                    <div className="flex-1 w-full min-w-0 flex flex-col gap-3">
+                      <div>
+                        <p className="text-[10px] text-[#8B98A9] font-black uppercase tracking-widest opacity-80 mb-1 leading-snug break-words">Blockchain Settlement: <span className="text-white italic">PayChain Wallet</span></p>
+                        {merchant?.stellarPublicKey
+                              ? <span className="text-sm md:text-base font-mono text-white font-bold tracking-wider block">{merchant.stellarPublicKey.slice(0, 8)}...{merchant.stellarPublicKey.slice(-6)}</span>
+                              : <span className="text-sm md:text-base font-mono text-amber-500 font-bold tracking-wider">&mdash; Not Activated &mdash;</span>}
+                      </div>
+                      <div className="flex items-center gap-2 px-3 py-1.5 bg-[#0B0E14] rounded-full border border-[#1E2532] w-fit">
+                          <span className="text-[7px] font-black uppercase tracking-widest text-[#8B98A9] leading-none">Supported by</span>
+                          <div className="flex items-center gap-1.5">
+                            <img src="https://cryptologos.cc/logos/stellar-xlm-logo.svg?v=032" alt="Stellar" className="w-3.5 h-3.5 brightness-0 invert" title="Stellar" />
+                            <img src="https://cryptologos.cc/logos/celo-celo-logo.svg?v=032" alt="Celo" className="w-3.5 h-3.5" title="Celo" />
+                            <div className="w-3.5 h-3.5 rounded-full bg-[#0052FF] flex items-center justify-center" title="Base">
+                              <div className="w-1.5 h-1.5 rounded-full bg-white"></div>
+                            </div>
+                            <img src="https://cryptologos.cc/logos/polygon-matic-logo.svg?v=032" alt="Polygon" className="w-3.5 h-3.5" title="Polygon" />
+                          </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="w-full sm:w-auto flex shrink-0">
+                    <button 
+                      onClick={() => {
+                        const addr = merchant?.stellarPublicKey;
+                        if (!addr) { addToast({ title: 'Wallet Not Activated', message: 'Activate your digital wallet first.', type: 'error' }); return; }
+                        navigator.clipboard.writeText(addr);
+                        addToast({ title: 'Address Copied', message: 'Full wallet address copied to clipboard', type: 'success' });
+                      }}
+                      className="w-full sm:w-auto px-2.5 py-1 bg-[#2775CA]/10 border border-[#2775CA]/20 text-[#2775CA] hover:bg-[#2775CA] hover:text-white rounded text-[9px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1"
+                    >
+                        <span className="material-symbols-outlined text-[11px]">content_copy</span>
+                        Copy Address
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex-1"></div>
+
+                {/* Four action buttons - dark sophisticated grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-[#1E2532]">
+                  <div className="space-y-2">
+                    <button 
+                      onClick={handleDownload}
+                      disabled={isDownloading}
+                      className="w-full py-4 bg-[#131722] text-[#8B98A9] rounded-2xl text-[10px] font-black transition-all shadow-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-[#2775CA] hover:text-white group border border-[#1E2532] text-center px-2 hover:border-[#2775CA]"
+                    >
+                      <span className="material-symbols-outlined text-base">download</span>
+                    </button>
+                    <p className="text-[8px] text-center font-black uppercase text-[#8B98A9] tracking-widest">PNG Image</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <button 
+                      onClick={handleDownloadPDF}
+                      disabled={isGeneratingPDF}
+                      className="w-full py-4 bg-[#131722] text-[#8B98A9] rounded-2xl text-[10px] font-black transition-all shadow-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-red-500 hover:text-white group border border-[#1E2532] text-center px-2 hover:border-red-500"
+                    >
+                      <span className="material-symbols-outlined text-base">picture_as_pdf</span>
+                    </button>
+                    <p className="text-[8px] text-center font-black uppercase text-[#8B98A9] tracking-widest">PDF Export</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <button 
+                      onClick={handleShare}
+                      className="w-full py-4 bg-[#131722] text-[#8B98A9] rounded-2xl text-[10px] font-black transition-all shadow-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-emerald-500 hover:text-white group border border-[#1E2532] text-center px-2 hover:border-emerald-500"
+                    >
+                      <span className="material-symbols-outlined text-base">share</span>
+                    </button>
+                    <p className="text-[8px] text-center font-black uppercase text-[#8B98A9] tracking-widest">Share QR</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <button 
+                      onClick={() => {
+                        navigator.clipboard.writeText(qrData)
+                        addToast({ title: 'Link Copied', message: 'Payment link copied to clipboard.', type: 'success' })
+                      }}
+                      className="w-full py-4 bg-[#131722] text-[#8B98A9] rounded-2xl text-[10px] font-black transition-all shadow-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-amber-500 hover:text-white group border border-[#1E2532] text-center px-2 hover:border-amber-500"
+                    >
+                      <span className="material-symbols-outlined text-base">content_copy</span>
+                    </button>
+                    <p className="text-[8px] text-center font-black uppercase text-[#8B98A9] tracking-widest">Copy Link</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* QR Code Container */}
+              <div className="w-full md:w-56 shrink-0 flex justify-center self-start md:self-center mt-2 md:mt-0">
+                <div className="bg-[#131722] p-5 rounded-[24px] flex flex-col items-center justify-center border border-[#1E2532] shadow-[0_8px_30px_rgba(0,0,0,0.6)] relative group w-full h-fit">
+                  <div className="bg-white p-2.5 rounded-[16px] shadow-lg mb-5 relative z-10 transition-transform group-hover:scale-[1.02] w-[160px] h-[160px] flex items-center justify-center shrink-0 border border-white/10">
+                    <img 
+                      src={qrUrl} 
+                      alt="Payment QR" 
+                      className="max-w-full max-h-full rounded-xl object-contain"
+                    />
+                  </div>
+                  
+                  <div className="text-center relative z-10 w-full flex flex-col items-center">
+                    <div className="inline-block px-2.5 py-1 bg-[#2775CA]/10 border border-[#2775CA]/20 rounded-md mb-2.5">
+                      <p className="text-[#2775CA] text-[9px] font-black uppercase tracking-[0.2em] leading-none">Settlement QR</p>
+                    </div>
+                    <div className="space-y-1.5 w-full">
+                      <p className="text-white text-[15px] font-mono font-bold tracking-widest leading-none">ACC: {merchant?.paybillAccount || '84729'}</p>
+                      <p className="text-[#8B98A9] text-[8px] font-bold uppercase tracking-widest leading-tight break-words px-1 opacity-80">MERCHANT: {merchant?.businessName || 'Merchant'}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Payment Link Generator Feature */}
+            <div className="mt-12 pt-8 border-t border-[#1E2532] relative z-10">
+              <div className="bg-[#131722] p-6 md:p-8 rounded-[24px] md:rounded-[32px] border border-[#1E2532] shadow-inner relative overflow-hidden group">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-[#2775CA]/5 rounded-full blur-2xl -mr-16 -mt-16 group-hover:scale-150 transition-transform"></div>
+                
+                <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-[#0B0E14] flex items-center justify-center text-[#2775CA] border border-[#1E2532] shrink-0 shadow-inner">
+                      <span className="material-symbols-outlined text-2xl">add_link</span>
+                    </div>
                     <div>
-                      <h3 className="font-headline text-2xl md:text-3xl text-primary tracking-tight">MY QR</h3>
-                      <p className="text-[9px] md:text-[10px] text-on-surface-variant font-bold uppercase tracking-[0.2em] mt-1 opacity-60">Professional Settlement Tool</p>
-                    </div>
-
-                    <div className="bg-surface-container-low border border-outline-variant/10 p-5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
-                      <div className="flex items-start sm:items-center gap-3 w-full sm:w-auto overflow-hidden">
-                        <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100 shrink-0 mt-1 sm:mt-0">
-                           <span className="material-symbols-outlined text-xl">account_balance_wallet</span>
-                        </div>
-                        <div className="overflow-hidden">
-                          <p className="text-[10px] text-on-surface-variant font-black uppercase tracking-widest opacity-40">Blockchain Settlement: <span className="text-emerald-600 italic">PayChain Wallet</span></p>
-                          <p className="text-sm font-mono text-primary font-bold tracking-wider">0x8472...9xK2</p>
-                        </div>
-                      </div>
-                      <div className="w-full md:w-auto flex flex-col items-center sm:items-end gap-2 shrink-0">
-                        <button 
-                          onClick={() => {
-                            navigator.clipboard.writeText('0x8472...9xK2')
-                            addToast({ title: 'Address Copied', message: 'Wallet address copied to clipboard', type: 'success' })
-                          }}
-                          className="w-full sm:w-auto px-5 py-3 bg-white border border-outline-variant/10 text-primary rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm hover:bg-emerald-50 transition-all flex items-center justify-center gap-2 self-stretch sm:self-auto"
-                        >
-                           <span className="material-symbols-outlined text-sm">content_copy</span>
-                           Copy Address
-                        </button>
-                        <div className="flex items-center gap-2 px-2 py-1 bg-surface-container-high rounded-full border border-outline-variant/5">
-                           <span className="text-[7px] font-black uppercase tracking-widest text-primary/40 leading-none">Supported by</span>
-                           <div className="flex items-center gap-1.5">
-                              <span className="w-2 h-2 rounded-full bg-[#35D07F]" title="Celo"></span>
-                              <span className="w-2 h-2 rounded-full bg-[#0052FF]" title="Base"></span>
-                              <span className="w-2 h-2 rounded-full bg-[#8247E5]" title="Polygon"></span>
-                              <span className="text-[8px] font-bold text-primary/60">Celo, Base, Polygon</span>
-                           </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex-1">
-                      {/* Space for other tools if needed later */}
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4">
-                      <div className="space-y-2">
-                        <button 
-                          onClick={handleDownload}
-                          disabled={isDownloading}
-                          className="w-full py-4 bg-surface-container-high text-primary rounded-2xl text-[10px] font-black transition-all shadow-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-emerald-500 hover:text-white group border border-outline-variant/5 text-center px-2"
-                        >
-                          <span className="material-symbols-outlined text-base">download</span>
-                        </button>
-                        <p className="text-[8px] text-center font-black uppercase text-on-surface-variant/60 tracking-widest">PNG Image</p>
-                      </div>
-
-                      <div className="space-y-2">
-                        <button 
-                          onClick={handleDownloadPDF}
-                          disabled={isGeneratingPDF}
-                          className="w-full py-4 bg-surface-container-high text-primary rounded-2xl text-[10px] font-black transition-all shadow-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-red-500 hover:text-white group border border-outline-variant/5 text-center px-2"
-                        >
-                          <span className="material-symbols-outlined text-base">picture_as_pdf</span>
-                        </button>
-                        <p className="text-[8px] text-center font-black uppercase text-on-surface-variant/60 tracking-widest">PDF Export</p>
-                      </div>
-
-                      <div className="space-y-2">
-                        <button 
-                          onClick={handleShare}
-                          className="w-full py-4 bg-surface-container-high text-primary rounded-2xl text-[10px] font-black transition-all shadow-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-blue-500 hover:text-white group border border-outline-variant/5 text-center px-2"
-                        >
-                          <span className="material-symbols-outlined text-base">share</span>
-                        </button>
-                        <p className="text-[8px] text-center font-black uppercase text-on-surface-variant/60 tracking-widest">Share QR</p>
-                      </div>
-
-                      <div className="space-y-2">
-                        <button 
-                          onClick={() => {
-                            navigator.clipboard.writeText(qrUrl)
-                            addToast({ title: 'Link Copied', message: 'Payment link copied to clipboard.', type: 'success' })
-                          }}
-                          className="w-full py-4 bg-surface-container-high text-primary rounded-2xl text-[10px] font-black transition-all shadow-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-emerald-500 hover:text-white group border border-outline-variant/5 text-center px-2"
-                        >
-                          <span className="material-symbols-outlined text-base">content_copy</span>
-                        </button>
-                        <p className="text-[8px] text-center font-black uppercase text-on-surface-variant/60 tracking-widest">Copy Link</p>
-                      </div>
+                      <h4 className="font-headline text-xl md:text-2xl text-white tracking-tight">Generate Payment Link</h4>
+                      <p className="text-[10px] text-[#8B98A9] font-medium mt-1 leading-relaxed max-w-sm">
+                        Create a secure payment link to share directly with your customers via WhatsApp, Email, or SMS.
+                      </p>
                     </div>
                   </div>
 
-                  <div className="w-full md:w-64 shrink-0 flex">
-                    <div className="bg-[#0A2540] p-6 rounded-[32px] flex flex-col items-center justify-center border border-white/5 shadow-2xl relative overflow-hidden group w-full editorial-shadow min-h-[360px]">
-                      <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full -mr-16 -mt-16 blur-2xl group-hover:scale-150 transition-transform"></div>
-                      <div className="absolute bottom-0 left-0 w-24 h-24 bg-blue-500/10 rounded-full -ml-12 -mb-12 blur-2xl"></div>
-                      
-                      <div className="bg-white p-5 rounded-[32px] shadow-2xl mb-8 relative z-10 transition-transform group-hover:scale-105">
-                        <img 
-                          src={qrUrl} 
-                          alt="Payment QR" 
-                          className="w-full aspect-square rounded-2xl"
-                        />
+                  <div className="w-full lg:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                    <div className="relative flex-1 sm:w-56 bg-[#0B0E14] rounded-2xl border border-[#1E2532] shadow-inner focus-within:border-[#2775CA]/50 focus-within:ring-1 focus-within:ring-[#2775CA]/30 transition-all">
+                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <span className="text-[10px] font-black text-[#8B98A9] uppercase">KES</span>
                       </div>
-                      
-                      <div className="text-center relative z-10 w-full px-4">
-                        <p className="text-emerald-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2 opacity-80">Settlement QR</p>
-                        <div className="space-y-1">
-                          <p className="text-white text-xl font-headline tracking-widest">ACC: {merchant?.paybillAccount || '84729'}</p>
-                          <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest leading-relaxed mt-2">Merchant: {merchant?.businessName || 'Merchant'}</p>
-                        </div>
-                      </div>
+                      <input 
+                        type="number"
+                        value={paymentLinkAmount}
+                        onChange={(e) => setPaymentLinkAmount(e.target.value)}
+                        placeholder="0.00"
+                        className="w-full bg-transparent border-none py-4 pl-12 pr-4 text-right text-lg font-mono font-bold text-white outline-none focus:ring-0 placeholder-[#1E2532]"
+                      />
                     </div>
+                    <button 
+                      onClick={generatePaymentLink}
+                      disabled={isGeneratingLink || !paymentLinkAmount}
+                      className={`px-8 py-4 bg-[#2775CA] text-white rounded-2xl text-[11px] font-bold shadow-[0_0_20px_rgba(39,117,202,0.3)] transition-all flex items-center justify-center gap-2 border border-[#3E8BE0]/50 disabled:opacity-50 disabled:grayscale ${!isGeneratingLink && paymentLinkAmount ? 'hover:bg-[#2C84E3] active:scale-95' : ''}`}
+                    >
+                      {isGeneratingLink ? (
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      ) : (
+                        <>
+                          <span className="material-symbols-outlined text-[14px]">link</span>
+                          Generate Link
+                        </>
+                      )}
+                    </button>
                   </div>
                 </div>
 
-                {/* Payment Link Generator Feature */}
-                <div className="mt-12 pt-10 border-t border-outline-variant/10">
-                  <div className="bg-surface-container-lowest p-6 md:p-8 rounded-[24px] md:rounded-[32px] border border-outline-variant/10 shadow-sm relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl -mr-16 -mt-16 group-hover:scale-150 transition-transform"></div>
-                    
-                    <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-                      <div className="flex items-start gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100 shrink-0">
-                          <span className="material-symbols-outlined text-2xl">add_link</span>
-                        </div>
-                        <div>
-                          <h4 className="font-headline text-xl md:text-2xl text-primary tracking-tight">Generate Payment Link</h4>
-                          <p className="text-[10px] text-on-surface-variant font-medium mt-1 leading-relaxed max-w-sm">
-                            Create a secure payment link to share directly with your customers via WhatsApp, Email, or SMS.
-                          </p>
-                        </div>
+                {generatedLink && (
+                   <div className="mt-6 pt-6 border-t border-[#1E2532] relative z-10 animate-fade-in">
+                      <div className="bg-[#0B0E14] p-4 md:p-5 rounded-2xl border border-[#1E2532] flex flex-col md:flex-row items-center justify-between gap-4">
+                         <div className="flex items-center gap-3 w-full md:w-auto overflow-hidden">
+                            <div className="w-10 h-10 rounded-xl bg-[#131722] flex items-center justify-center text-[#2775CA] shadow-inner shrink-0 border border-[#1E2532]">
+                               <span className="material-symbols-outlined text-lg">check_circle</span>
+                            </div>
+                            <div className="overflow-hidden">
+                              <p className="text-[10px] font-bold text-[#8B98A9] uppercase tracking-widest mb-0.5">Link Ready</p>
+                              <p className="text-sm font-mono text-white tracking-wider truncate max-w-[200px] md:max-w-md">{generatedLink}</p>
+                            </div>
+                         </div>
+                         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
+                            <button 
+                               onClick={() => {
+                                 navigator.clipboard.writeText(generatedLink)
+                                 addToast({ title: 'Copied', message: 'Payment link copied to clipboard.', type: 'success' })
+                               }}
+                               className="px-5 py-3 bg-[#131722] border border-[#1E2532] text-white rounded-xl text-[10px] font-bold hover:bg-[#1A212D] transition-all flex items-center justify-center gap-2 shadow-sm"
+                            >
+                               <span className="material-symbols-outlined text-[14px]">content_copy</span>
+                               Copy
+                            </button>
+                            <button 
+                               onClick={() => window.open(`whatsapp://send?text=${encodeURIComponent(`Please pay me KES ${paymentLinkAmount} via PayChain: ${generatedLink}`)}`)}
+                               className="px-5 py-3 bg-[#25D366] text-white rounded-xl text-[10px] font-bold hover:bg-[#1DA851] transition-all shadow-md flex items-center justify-center gap-2"
+                            >
+                               <span className="material-symbols-outlined text-[14px]" style={{fontVariationSettings: "'FILL' 1"}}>send</span>
+                               Share on WhatsApp
+                            </button>
+                         </div>
                       </div>
-
-                      <div className="w-full lg:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                        <div className="relative flex-1 sm:w-56 bg-white rounded-2xl border border-outline-variant/10 shadow-sm focus-within:border-emerald-500/30 focus-within:ring-2 focus-within:ring-emerald-500/10 transition-all">
-                          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                            <span className="text-[10px] font-black text-on-surface-variant/40 uppercase">KES</span>
-                          </div>
-                          <input 
-                            type="number"
-                            value={paymentLinkAmount}
-                            onChange={(e) => setPaymentLinkAmount(e.target.value)}
-                            placeholder="0.00"
-                            className="w-full bg-transparent border-none py-4 pl-12 pr-4 text-right text-lg font-headline text-primary outline-none focus:ring-0 placeholder-on-surface-variant/20"
-                          />
-                        </div>
-                        <button 
-                          onClick={generatePaymentLink}
-                          disabled={isGeneratingLink || !paymentLinkAmount}
-                          className={`px-8 py-4 bg-[#00351D] text-white rounded-2xl text-[11px] font-bold shadow-xl transition-all flex items-center justify-center gap-2 border border-white/5 disabled:opacity-50 disabled:grayscale ${!isGeneratingLink && paymentLinkAmount ? 'hover:bg-[#004d2b] active:scale-95' : ''}`}
-                        >
-                          {isGeneratingLink ? (
-                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                          ) : (
-                            <>
-                              <span className="material-symbols-outlined text-[14px]">link</span>
-                              Generate Link
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-
-                    {generatedLink && (
-                       <div className="mt-6 pt-6 border-t border-outline-variant/10 relative z-10 animate-fade-in">
-                          <div className="bg-emerald-50 p-4 md:p-5 rounded-2xl border border-emerald-100 flex flex-col md:flex-row items-center justify-between gap-4">
-                             <div className="flex items-center gap-3 w-full md:w-auto overflow-hidden">
-                                <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-emerald-600 shadow-sm shrink-0 border border-emerald-100/50">
-                                   <span className="material-symbols-outlined text-lg">check_circle</span>
-                                </div>
-                                <div className="overflow-hidden">
-                                  <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-widest mb-0.5">Link Ready</p>
-                                  <p className="text-sm font-medium text-emerald-900 truncate max-w-[200px] md:max-w-md">{generatedLink}</p>
-                                </div>
-                             </div>
-                             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
-                                <button 
-                                   onClick={copyPaymentLink}
-                                   className="px-5 py-3 bg-white border border-emerald-200 text-emerald-700 rounded-xl text-[10px] font-bold hover:bg-emerald-50 transition-all flex items-center justify-center gap-2 shadow-sm"
-                                >
-                                   <span className="material-symbols-outlined text-[14px]">content_copy</span>
-                                   Copy
-                                </button>
-                                <button 
-                                   onClick={() => window.open(`whatsapp://send?text=${encodeURIComponent(`Please pay me KES ${paymentLinkAmount} via PayChain: ${generatedLink}`)}`)}
-                                   className="px-5 py-3 bg-[#25D366] text-white rounded-xl text-[10px] font-bold hover:bg-[#1DA851] transition-all shadow-md flex items-center justify-center gap-2"
-                                >
-                                   <span className="material-symbols-outlined text-[14px]" style={{fontVariationSettings: "'FILL' 1"}}>send</span>
-                                   Share on WhatsApp
-                                </button>
-                             </div>
-                          </div>
-                       </div>
-                    )}
-                  </div>
-                </div>
-              </section>
+                   </div>
+                )}
+              </div>
+            </div>
+          </section>
 
               {/* Wallet History */}
               <section className="col-span-12 lg:col-span-12 bg-white rounded-[32px] lg:rounded-[40px] border border-outline-variant/5 shadow-sm overflow-hidden editorial-shadow animate-fade-in-up [animation-delay:200ms]">
@@ -762,16 +960,31 @@ export default function Wallet() {
                     </div>
 
                     <button 
-                      onClick={() => {
+                      onClick={async () => {
                         if (!topUpAmount) return
                         setIsProcessingTopUp(true)
-                        setTimeout(() => {
-                          setIsProcessingTopUp(false)
-                          addToast({ title: 'Push Sent', message: 'Please complete the transaction on your mobile phone.', type: 'success' })
+                        try {
+                          await new Promise(r => setTimeout(r, 1000))
+                          const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+                          const token = localStorage.getItem('paychain_merchant_token')
+                          await axios.post(`${API_URL}/api/transactions/simulate`, {
+                            accountNumber: merchant?.paybillAccount,
+                            amount: Number(topUpAmount),
+                            senderName: 'Mobile Money Top-up',
+                            senderPhone: merchant?.phone || '0700000000'
+                          }, {
+                            headers: { Authorization: `Bearer ${token}` }
+                          })
+                          addToast({ title: 'Top Up Successful', message: `Successfully funded ${topUpAmount} KES.`, type: 'success' })
+                          await refreshSession()
                           setShowTopUpSelection(false)
                           setSelectedFundingMethod(null)
                           setTopUpAmount('')
-                        }, 2000)
+                        } catch (err) {
+                          addToast({ title: 'Top Up Failed', message: err.response?.data?.error || 'Failed to process top up.', type: 'error' })
+                        } finally {
+                          setIsProcessingTopUp(false)
+                        }
                       }}
                       disabled={isProcessingTopUp || !topUpAmount}
                       className="w-full bg-[#00351D] text-white py-5 rounded-3xl font-bold text-lg shadow-2xl hover:bg-[#004d2b] active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-white/5 disabled:opacity-20"
@@ -829,10 +1042,40 @@ export default function Wallet() {
                     </div>
 
                     <button 
-                      onClick={() => setShowTopUpSelection(false)}
-                      className="w-full bg-primary text-white py-5 rounded-3xl font-bold text-lg shadow-xl hover:bg-primary-dark transition-all"
+                      onClick={async () => {
+                        if (!topUpAmount) return
+                        setIsProcessingTopUp(true)
+                        try {
+                          await new Promise(r => setTimeout(r, 1500))
+                          const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+                          const token = localStorage.getItem('paychain_merchant_token')
+                          await axios.post(`${API_URL}/api/transactions/simulate`, {
+                            accountNumber: merchant?.paybillAccount,
+                            amount: Number(topUpAmount),
+                            senderName: merchant?.name || 'Card Top-up',
+                            senderPhone: 'CARD_PAYMENT'
+                          }, {
+                            headers: { Authorization: `Bearer ${token}` }
+                          })
+                          addToast({ title: 'Top Up Successful', message: `Successfully funded ${topUpAmount} KES.`, type: 'success' })
+                          await refreshSession()
+                          setShowTopUpSelection(false)
+                          setSelectedFundingMethod(null)
+                          setTopUpAmount('')
+                        } catch (err) {
+                          addToast({ title: 'Top Up Failed', message: err.response?.data?.error || 'Failed to process top up.', type: 'error' })
+                        } finally {
+                          setIsProcessingTopUp(false)
+                        }
+                      }}
+                      disabled={isProcessingTopUp || !topUpAmount}
+                      className="w-full bg-primary text-white py-5 rounded-3xl font-bold text-lg shadow-xl hover:bg-primary-dark transition-all flex items-center justify-center gap-3 disabled:opacity-50"
                     >
-                      Top Up KES {topUpAmount ? Number(topUpAmount).toLocaleString() : '0'}
+                      {isProcessingTopUp ? (
+                        <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      ) : (
+                        <>Top Up KES {topUpAmount ? Number(topUpAmount).toLocaleString() : '0'}</>
+                      )}
                     </button>
                   </div>
                 </div>
@@ -850,6 +1093,102 @@ export default function Wallet() {
           </div>
         </div>
         )}
+
+      {/* Swap Modal Overlay */}
+      {showSwapModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 animate-fade-in backdrop-blur-xl bg-primary/10">
+          <div className="absolute inset-0 bg-[#00351D]/80" onClick={() => setShowSwapModal(false)}></div>
+          
+          <div className="bg-white w-full max-w-lg rounded-[32px] md:rounded-[40px] shadow-2xl relative z-10 overflow-hidden animate-scale-in">
+            {/* Modal Header */}
+            <div className="p-6 md:p-8 border-b border-outline-variant/10 flex items-center justify-between bg-surface-container-low">
+              <div>
+                <h3 className="font-headline text-2xl md:text-3xl text-primary tracking-tight">
+                  Swap to USDC
+                </h3>
+                <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-[0.2em] mt-1 opacity-60">
+                  Convert KES directly to USDC
+                </p>
+              </div>
+              <button 
+                onClick={() => setShowSwapModal(false)}
+                className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-primary/40 hover:text-primary transition-colors border border-outline-variant/10"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 md:p-10 space-y-6">
+              <div className="bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-emerald-800/60 mb-1">Available KES Balance</p>
+                  <p className="text-xl font-headline font-bold text-emerald-900">{formatKES(merchant?.kesBalance || 0)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-emerald-800/60 mb-1">Live Rate</p>
+                  <p className="text-sm font-bold text-emerald-900">1 USDC = KES {liveRate.toFixed(2)}</p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Amount to Swap (KES)</label>
+                <div className="relative group">
+                  <div className="absolute left-6 top-1/2 -translate-y-1/2 text-primary/40 font-bold text-lg">KES</div>
+                  <input 
+                    type="number"
+                    value={swapAmount}
+                    onChange={(e) => setSwapAmount(e.target.value)}
+                    placeholder="0.00"
+                    max={merchant?.kesBalance || 0}
+                    className="w-full bg-surface-container-low border border-outline-variant/5 rounded-3xl py-6 pl-16 pr-6 text-2xl font-headline text-primary focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
+                  />
+                  <button 
+                    onClick={() => setSwapAmount((merchant?.kesBalance || 0).toString())}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-emerald-200 transition-colors"
+                  >
+                    Max
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex justify-center -my-2 relative z-10">
+                <div className="w-10 h-10 bg-white border border-outline-variant/10 rounded-full flex items-center justify-center shadow-sm text-primary">
+                  <span className="material-symbols-outlined text-lg">swap_vert</span>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">You Will Receive (Estimated)</label>
+                <div className="relative group">
+                  <div className="absolute left-6 top-1/2 -translate-y-1/2 text-primary/40 font-bold text-lg">USDC</div>
+                  <input 
+                    type="text"
+                    value={swapAmount ? (Number(swapAmount) / liveRate).toFixed(4) : '0.0000'}
+                    readOnly
+                    className="w-full bg-surface-container-low border border-outline-variant/5 rounded-3xl py-6 pl-20 pr-6 text-2xl font-headline text-primary outline-none opacity-80"
+                  />
+                </div>
+              </div>
+
+              <button 
+                onClick={executeSwap}
+                disabled={isSwapping || !swapAmount || Number(swapAmount) <= 0 || Number(swapAmount) > (merchant?.kesBalance || 0)}
+                className="w-full bg-[#00351D] text-white py-5 rounded-3xl font-bold text-lg shadow-2xl hover:bg-[#004d2b] active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-white/5 disabled:opacity-50"
+              >
+                {isSwapping ? (
+                  <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
+                ) : (
+                  <>
+                    Confirm Swap
+                    <span className="material-symbols-outlined">currency_exchange</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       </>
     </MerchantLayout>
   )

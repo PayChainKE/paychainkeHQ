@@ -59,7 +59,7 @@ export default function CashAdvance() {
             </div>
             <h3 className="text-2xl font-headline font-bold text-primary mb-3">Keep building your Trust Score</h3>
             <p className="text-[15px] text-on-surface-variant font-medium max-w-md mx-auto leading-relaxed opacity-80 mb-6">
-              You need a Trust Score of at least 60 to unlock Cash Advances. Keep processing payments through your Paybill to increase your score!
+              You need a Trust Score of at least 85 to unlock Cash Advances. Keep processing payments through your Paybill to increase your score!
             </p>
             <a href="/trust-score" className="bg-primary text-white px-8 py-3 rounded-xl font-bold text-sm shadow-md hover:shadow-lg active:scale-95 transition-all">
               View Trust Score

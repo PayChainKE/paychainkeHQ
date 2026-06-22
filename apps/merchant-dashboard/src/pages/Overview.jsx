@@ -6,6 +6,7 @@ import { formatKES } from '../utils/formatCurrency'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { useNavigate } from 'react-router-dom'
+import FundAccountModal from '../components/modals/FundAccountModal'
 
 export default function Overview() {
   const navigate = useNavigate()
@@ -18,6 +19,7 @@ export default function Overview() {
   const [activeTimeframe, setActiveTimeframe] = useState('7D')
   const [showMoveMoney, setShowMoveMoney] = useState(false)
   const [showFundAccount, setShowFundAccount] = useState(false)
+  const [activeFundMethod, setActiveFundMethod] = useState(null)
   const [showDigitalWallet, setShowDigitalWallet] = useState(() => localStorage.getItem('paychain_show_wallet') !== 'false')
 
   const toggleDigitalWallet = () => {
@@ -128,18 +130,18 @@ export default function Overview() {
       {/* Section 1: Balance Cards Row */}
       <section className={`grid grid-cols-1 ${showDigitalWallet ? 'lg:grid-cols-2' : ''} gap-8 animate-fade-in-up [animation-delay:100ms] relative z-20`}>
         {/* KES Balance Card */}
-        <div className="bg-gradient-to-br from-[#00351D] via-[#022916] to-[#011C0F] text-white p-6 lg:p-8 rounded-[24px] shadow-[0_20px_40px_-15px_rgba(0,53,29,0.5)] relative z-20 group border border-emerald-900/50 hover:border-emerald-500/30 transition-all duration-500 overflow-hidden">
+        <div className="bg-gradient-to-br from-[#00351D] via-[#022916] to-[#011C0F] text-white p-6 lg:p-8 rounded-[24px] shadow-[0_20px_40px_-15px_rgba(0,53,29,0.5)] relative z-20 group border border-emerald-900/50 hover:border-emerald-500/30 transition-all duration-500">
           {/* Ambient Glow */}
-          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-[24px]">
             <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-400/10 rounded-full -mr-20 -mt-20 blur-[80px] group-hover:scale-110 transition-transform duration-1000"></div>
             <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-600/10 rounded-full -ml-20 -mb-20 blur-[60px] group-hover:scale-110 transition-transform duration-1000"></div>
           </div>
           
           {/* Card Texture/Pattern */}
-          <div className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-overlay" style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '16px 16px' }}></div>
+          <div className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-overlay rounded-[24px] overflow-hidden" style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '16px 16px' }}></div>
           
           {/* Glass Top Highlight */}
-          <div className="absolute top-0 inset-x-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-400/30 to-transparent"></div>
+          <div className="absolute top-0 inset-x-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-400/30 to-transparent rounded-t-[24px]"></div>
 
           <div className="relative z-10 flex flex-col h-full">
             <div className="flex justify-between items-start mb-8 lg:mb-10">
@@ -194,7 +196,7 @@ export default function Overview() {
                     </div>
                     
                     <div className="p-1.5 space-y-0.5">
-                      <button onClick={() => {}} className="w-full text-left p-3 hover:bg-emerald-50/50 rounded-xl transition-all group relative overflow-hidden">
+                      <button onClick={() => { setActiveFundMethod('mobile'); setShowFundAccount(false); }} className="w-full text-left p-3 hover:bg-emerald-50/50 rounded-xl transition-all group relative overflow-hidden">
                         <div className="flex items-center gap-3 relative z-10">
                           <div className="w-10 h-10 rounded-xl bg-[#00351D] text-[#5EFEB3] flex items-center justify-center shrink-0 shadow-lg group-hover:scale-105 transition-transform">
                             <span className="material-symbols-outlined text-lg">phone_iphone</span>
@@ -209,7 +211,7 @@ export default function Overview() {
                         </div>
                       </button>
 
-                      <button onClick={() => {}} className="w-full text-left p-3 hover:bg-emerald-50/50 rounded-xl transition-all group relative overflow-hidden">
+                      <button onClick={() => { setActiveFundMethod('card'); setShowFundAccount(false); }} className="w-full text-left p-3 hover:bg-emerald-50/50 rounded-xl transition-all group relative overflow-hidden">
                         <div className="flex items-center gap-3 relative z-10">
                           <div className="w-10 h-10 rounded-xl bg-[#0D2444] text-blue-300 flex items-center justify-center shrink-0 shadow-lg group-hover:scale-105 transition-transform">
                             <span className="material-symbols-outlined text-lg">credit_card</span>
@@ -224,7 +226,7 @@ export default function Overview() {
                         </div>
                       </button>
 
-                      <button onClick={() => {}} className="w-full text-left p-3 hover:bg-emerald-50/50 rounded-xl transition-all group relative overflow-hidden">
+                      <button onClick={() => { setActiveFundMethod('bank'); setShowFundAccount(false); }} className="w-full text-left p-3 hover:bg-emerald-50/50 rounded-xl transition-all group relative overflow-hidden">
                         <div className="flex items-center gap-3 relative z-10">
                           <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 shadow-lg group-hover:scale-105 transition-transform">
                             <span className="material-symbols-outlined text-lg">account_balance</span>
@@ -280,18 +282,18 @@ export default function Overview() {
 
         {/* USDC Balance Card */}
         {showDigitalWallet && (
-          <div className="bg-gradient-to-br from-[#0A162B] via-[#050B14] to-[#02050A] text-white p-6 lg:p-8 rounded-[24px] shadow-[0_20px_40px_-15px_rgba(10,22,43,0.6)] relative z-10 overflow-hidden group border border-blue-900/30 hover:border-blue-500/30 transition-all duration-500 animate-in fade-in zoom-in duration-500">
+          <div className="bg-gradient-to-br from-[#0A162B] via-[#050B14] to-[#02050A] text-white p-6 lg:p-8 rounded-[24px] shadow-[0_20px_40px_-15px_rgba(10,22,43,0.6)] relative z-10 group border border-blue-900/30 hover:border-blue-500/30 transition-all duration-500 animate-in fade-in zoom-in duration-500">
             {/* Ambient Glow */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-[24px]">
               <div className="absolute top-0 left-0 w-96 h-96 bg-blue-500/10 rounded-full -ml-20 -mt-20 blur-[80px] group-hover:scale-110 transition-transform duration-1000"></div>
               <div className="absolute bottom-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full -mr-20 -mb-20 blur-[60px] group-hover:scale-110 transition-transform duration-1000"></div>
             </div>
 
             {/* Card Texture/Pattern */}
-            <div className="absolute inset-0 opacity-[0.02] pointer-events-none mix-blend-overlay" style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '16px 16px' }}></div>
+            <div className="absolute inset-0 opacity-[0.02] pointer-events-none mix-blend-overlay rounded-[24px] overflow-hidden" style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '16px 16px' }}></div>
             
             {/* Glass Top Highlight */}
-            <div className="absolute top-0 inset-x-0 h-[1px] bg-gradient-to-r from-transparent via-blue-400/30 to-transparent"></div>
+            <div className="absolute top-0 inset-x-0 h-[1px] bg-gradient-to-r from-transparent via-blue-400/30 to-transparent rounded-t-[24px]"></div>
 
             <div className="relative z-10 flex flex-col h-full">
               <div className="flex justify-between items-start mb-8 lg:mb-10">
@@ -431,6 +433,11 @@ export default function Overview() {
           </section>
         </div>
       </div>
+
+      {/* Render Modal */}
+      {activeFundMethod && (
+        <FundAccountModal method={activeFundMethod} onClose={() => setActiveFundMethod(null)} />
+      )}
     </MerchantLayout>
   )
 }

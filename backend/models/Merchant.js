@@ -59,6 +59,21 @@ const merchantSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  stellarPublicKey: {
+    type: String,
+    unique: true,
+    sparse: true,
+    default: null,
+  },
+  stellarEncryptedSecretKey: {
+    type: String,
+    select: false,
+    default: null,
+  },
+  usdcBalance: {
+    type: Number,
+    default: 0,
+  },
   otp: {
     type: String,
     default: null,

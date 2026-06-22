@@ -42,6 +42,18 @@ export function MerchantAuthProvider({ children }) {
     setIsLoading(false);
   }, []);
 
+  async function refreshSession() {
+    try {
+      const res = await axios.get(`${API_URL}/api/auth/merchant/me`);
+      if (res.data.success && res.data.merchant) {
+        setMerchant(res.data.merchant);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(res.data.merchant));
+      }
+    } catch (err) {
+      console.error("Failed to refresh session", err);
+    }
+  }
+
   async function signup(formData) {
     try {
       const res = await axios.post(`${API_URL}/api/auth/merchant/register`, formData);
@@ -54,6 +66,16 @@ export function MerchantAuthProvider({ children }) {
   async function login(email, password) {
     try {
       const res = await axios.post(`${API_URL}/api/auth/merchant/login`, { email, password });
+      
+      if (!res.data.mfaRequired) {
+        const { merchant: userData, token: jwt } = res.data;
+        setMerchant(userData);
+        setToken(jwt);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
+        localStorage.setItem(TOKEN_KEY, jwt);
+        axios.defaults.headers.common['Authorization'] = `Bearer ${jwt}`;
+      }
+      
       return { success: true, email: res.data.email, mfaRequired: res.data.mfaRequired };
     } catch (err) {
       return { success: false, error: err.response?.data?.error || 'Login failed' };
@@ -143,7 +165,8 @@ export function MerchantAuthProvider({ children }) {
       resendOTP,
       forgotPassword,
       resetPassword,
-      logout 
+      logout,
+      refreshSession
     }}>
       {children}
     </MerchantAuthContext.Provider>
