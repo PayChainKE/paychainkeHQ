@@ -430,14 +430,18 @@ export default function Wallet() {
                         </div>
                         <div className="overflow-hidden">
                           <p className="text-[10px] text-on-surface-variant font-black uppercase tracking-widest opacity-40">Blockchain Settlement: <span className="text-emerald-600 italic">PayChain Wallet</span></p>
-                          <p className="text-sm font-mono text-primary font-bold tracking-wider">0x8472...9xK2</p>
+                          {merchant?.stellarPublicKey
+                               ? <span className="text-sm font-mono text-primary font-bold tracking-wider truncate block max-w-[200px]">{merchant.stellarPublicKey.slice(0, 8)}...{merchant.stellarPublicKey.slice(-6)}</span>
+                               : <span className="text-sm font-mono text-amber-500 font-bold tracking-wider">&mdash; Not Activated &mdash;</span>}
                         </div>
                       </div>
                       <div className="w-full md:w-auto flex flex-col items-center sm:items-end gap-2 shrink-0">
                         <button 
                           onClick={() => {
-                            navigator.clipboard.writeText('0x8472...9xK2')
-                            addToast({ title: 'Address Copied', message: 'Wallet address copied to clipboard', type: 'success' })
+                            const addr = merchant?.stellarPublicKey;
+                            if (!addr) { addToast({ title: 'Wallet Not Activated', message: 'Activate your digital wallet first.', type: 'error' }); return; }
+                            navigator.clipboard.writeText(addr);
+                            addToast({ title: 'Address Copied', message: 'Full wallet address copied to clipboard', type: 'success' });
                           }}
                           className="w-full sm:w-auto px-5 py-3 bg-white border border-outline-variant/10 text-primary rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm hover:bg-emerald-50 transition-all flex items-center justify-center gap-2 self-stretch sm:self-auto"
                         >

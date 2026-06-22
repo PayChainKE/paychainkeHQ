@@ -3,6 +3,7 @@ import Merchant from '../models/Merchant.js';
 import { settleInflationShield, provisionMerchantWallet } from '../utils/stellarHelper.js';
 import { encryptKey } from '../utils/cryptoHelper.js';
 import { getLiveKesToUsdcRate } from '../utils/rateEngine.js';
+import { sendWalletActivationEmail } from '../utils/resend.js';
 
 // @desc    Get merchant transactions
 // @route   GET /api/transactions
@@ -175,6 +176,12 @@ export const activateWallet = async (req, res) => {
     merchant.stellarPublicKey = stellarWallet.publicKey;
     merchant.stellarEncryptedSecretKey = encryptKey(stellarWallet.secretKey);
     await merchant.save();
+
+    // Send congratulations email with the newly activated wallet address
+    console.log(`📧 Dispatching Wallet Activation Congratulations Email to: ${merchant.email}`);
+    sendWalletActivationEmail(merchant.email, merchant.name, merchant.stellarPublicKey).catch(err => {
+      console.error(`📧 Resend Error: Failed to send wallet activation email to ${merchant.email}:`, err);
+    });
 
     res.status(200).json({
       success: true,

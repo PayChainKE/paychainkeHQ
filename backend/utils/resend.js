@@ -111,6 +111,101 @@ export const sendNewsletterConfirmation = async (email) => {
   }
 };
 
+// Send Wallet Activation Congratulations Email
+export const sendWalletActivationEmail = async (email, name, stellarPublicKey) => {
+  try {
+    const shortAddress = stellarPublicKey
+      ? `${stellarPublicKey.slice(0, 8)}...${stellarPublicKey.slice(-6)}`
+      : 'N/A';
+
+    const data = await resend.emails.send({
+      from: 'PayChain Wallet <info@paychain.co.ke>',
+      to: [email],
+      subject: '🎉 Congratulations! Your PayChain Digital Wallet is Live',
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 620px; margin: auto; border-radius: 20px; overflow: hidden; background: #fff; border: 1px solid #eee;">
+          <!-- Hero Banner -->
+          <div style="background: linear-gradient(135deg, #0F141E 0%, #0a2540 60%, #00351D 100%); padding: 60px 30px; text-align: center; color: #fff; position: relative;">
+            <div style="display: inline-block; background: rgba(53,208,127,0.15); border: 1px solid rgba(53,208,127,0.3); border-radius: 50px; padding: 8px 20px; margin-bottom: 20px;">
+              <span style="color: #35D07F; font-size: 12px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase;">Blockchain Wallet Activated</span>
+            </div>
+            <h1 style="margin: 0; font-size: 36px; font-weight: 900; letter-spacing: -1px; line-height: 1.1;">Congratulations, ${name}! 🎉</h1>
+            <p style="margin: 14px 0 0; color: rgba(255,255,255,0.7); font-size: 16px; line-height: 1.6;">Your Web3 Digital Wallet is now live on the PayChain network.</p>
+          </div>
+
+          <!-- Main Content -->
+          <div style="padding: 40px 30px;">
+            <p style="color: #444; font-size: 16px; line-height: 1.7; margin: 0 0 28px;">Your unique blockchain wallet has been provisioned and is ready for global USDC settlements. Below is your official wallet address — keep it safe and share it to receive payments from anywhere in the world.</p>
+
+            <!-- Wallet Address Card -->
+            <div style="background: #0F141E; border-radius: 16px; padding: 28px; margin-bottom: 28px; position: relative; overflow: hidden;">
+              <div style="position: absolute; top: -30px; right: -30px; width: 120px; height: 120px; background: rgba(39,117,202,0.15); border-radius: 50%; filter: blur(30px);"></div>
+              <p style="color: #8B98A9; font-size: 10px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; margin: 0 0 12px;">Your Wallet Address</p>
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <div style="width: 10px; height: 10px; border-radius: 50%; background: #35D07F; box-shadow: 0 0 12px rgba(53,208,127,0.6);"></div>
+                <p style="color: #fff; font-family: 'Courier New', Courier, monospace; font-size: 14px; font-weight: 700; letter-spacing: 1px; margin: 0; word-break: break-all;">${stellarPublicKey}</p>
+              </div>
+              <p style="color: #8B98A9; font-size: 11px; margin: 12px 0 0;">Short address: <strong style="color: #2775CA;">${shortAddress}</strong></p>
+            </div>
+
+            <!-- Supported Networks -->
+            <div style="background: #f8faff; border-radius: 14px; padding: 22px; border: 1px solid #eef2ff; margin-bottom: 28px;">
+              <p style="color: #0052b4; font-size: 11px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; margin: 0 0 14px;">Supported Networks</p>
+              <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 8px; background: white; border: 1px solid #dbeafe; border-radius: 30px; padding: 8px 14px;">
+                  <div style="width: 10px; height: 10px; border-radius: 50%; background: #35D07F;"></div>
+                  <span style="color: #1e40af; font-size: 12px; font-weight: 700;">Celo</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; background: white; border: 1px solid #dbeafe; border-radius: 30px; padding: 8px 14px;">
+                  <div style="width: 10px; height: 10px; border-radius: 50%; background: #0052FF;"></div>
+                  <span style="color: #1e40af; font-size: 12px; font-weight: 700;">Base</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; background: white; border: 1px solid #dbeafe; border-radius: 30px; padding: 8px 14px;">
+                  <div style="width: 10px; height: 10px; border-radius: 50%; background: #8247E5;"></div>
+                  <span style="color: #1e40af; font-size: 12px; font-weight: 700;">Polygon</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; background: white; border: 1px solid #dbeafe; border-radius: 30px; padding: 8px 14px;">
+                  <div style="width: 10px; height: 10px; border-radius: 50%; background: #2775CA;"></div>
+                  <span style="color: #1e40af; font-size: 12px; font-weight: 700;">Stellar / USDC</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- What You Can Do Now -->
+            <div style="margin-bottom: 32px;">
+              <p style="color: #111; font-size: 16px; font-weight: 700; margin: 0 0 14px;">What you can do now:</p>
+              <div style="color: #555; font-size: 14px; line-height: 2;">
+                <p style="margin: 4px 0;">🔄 <strong>Swap KES to USDC</strong> — Convert your M-PESA collections instantly</p>
+                <p style="margin: 4px 0;">🛡️ <strong>Inflation Shield</strong> — Protect your earnings from currency devaluation</p>
+                <p style="margin: 4px 0;">🌍 <strong>Global Settlements</strong> — Send & receive USDC from anywhere in the world</p>
+                <p style="margin: 4px 0;">📊 <strong>QR Settlement Tool</strong> — Share your wallet QR for easy payments</p>
+              </div>
+            </div>
+
+            <!-- CTA Button -->
+            <div style="text-align: center; margin-top: 36px;">
+              <a href="https://merchant.paychain.co.ke/wallet" style="display: inline-block; background: linear-gradient(135deg, #00351D 0%, #005c30 100%); color: #fff; padding: 18px 40px; text-decoration: none; border-radius: 14px; font-weight: 800; font-size: 16px; letter-spacing: 0.5px; box-shadow: 0 8px 24px rgba(0,53,29,0.3);">
+                Open My Wallet Dashboard →
+              </a>
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div style="padding: 28px 30px; background: #fafafa; border-top: 1px solid #eee; text-align: center;">
+            <p style="margin: 0; color: #aaa; font-size: 11px;">This is a <strong>no-reply</strong> email. For assistance, contact <a href="mailto:support@paychain.co.ke" style="color: #00351D; text-decoration: none;">support@paychain.co.ke</a> or call <strong>0790889066</strong></p>
+            <p style="margin: 8px 0 0; color: #bbb; font-size: 10px;">&copy; 2026 PayChainKE. Empowering the next generation of African merchants.</p>
+          </div>
+        </div>
+      `
+    });
+    console.log(`📧 Wallet Activation Email sent to ${email}`);
+    return data;
+  } catch (error) {
+    console.error('❌ Resend Wallet Activation Email Error:', error);
+    throw new Error('Failed to send wallet activation email');
+  }
+};
+
 // Send Welcome Email with Credentials
 export const sendWelcomeEmail = async (email, name, password, phone, paybillAccount) => {
   try {
