@@ -120,6 +120,8 @@ export const verifyMerchantOTP = async (req, res) => {
         businessName: merchant.businessName,
         paybillAccount: merchant.paybillAccount,
         kesBalance: merchant.kesBalance,
+        usdcBalance: merchant.usdcBalance,
+        stellarPublicKey: merchant.stellarPublicKey,
         isVerified: merchant.isVerified,
         createdAt: merchant.createdAt,
         lastLogin: merchant.lastLogin,
@@ -232,6 +234,9 @@ export const biometricLogin = async (req, res) => {
         phone: merchant.phone,
         businessName: merchant.businessName,
         paybillAccount: merchant.paybillAccount,
+        kesBalance: merchant.kesBalance,
+        usdcBalance: merchant.usdcBalance,
+        stellarPublicKey: merchant.stellarPublicKey,
         status: merchant.status,
         loginCount: merchant.loginCount
       },
