@@ -426,33 +426,47 @@ export default function Wallet() {
 
               <div className="space-y-3">
                 <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Destination</label>
-                <div className="grid grid-cols-1 gap-3">
+                <div className="grid grid-cols-2 gap-4">
                   {withdrawalDestinations.map((dest) => (
                     <div 
                       key={dest.id}
                       onClick={() => setDestination(dest.id)}
-                      className={`p-5 rounded-2xl border cursor-pointer transition-all flex items-center justify-between group ${
+                      className={`relative p-4 md:p-5 rounded-2xl md:rounded-3xl border cursor-pointer transition-all duration-300 flex flex-col items-start gap-4 overflow-hidden group ${
                         destination === dest.id 
-                        ? 'border-primary bg-primary/5 shadow-md' 
-                        : 'border-outline-variant/10 bg-surface-container-low hover:bg-emerald-50'
+                        ? 'border-primary bg-primary/[0.03] shadow-[0_8px_30px_rgba(0,53,29,0.08)] scale-[1.02]' 
+                        : 'border-outline-variant/10 bg-white hover:border-primary/30 hover:bg-surface-container-low hover:shadow-md'
                       }`}
                     >
-                      <div className="flex items-center gap-4">
-                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
-                            destination === dest.id ? 'bg-primary text-white' : 'bg-white text-on-surface-variant'
-                         }`}>
-                            <span className="material-symbols-outlined text-xl">
-                               {dest.type === 'Till' ? 'point_of_sale' : dest.type === 'Mobile' ? 'smartphone' : 'account_balance'}
-                            </span>
-                         </div>
-                         <div>
-                            <p className={`text-sm font-bold ${destination === dest.id ? 'text-primary' : 'text-on-surface'}`}>{dest.name}</p>
-                            <p className="text-[10px] text-on-surface-variant font-medium opacity-60 capitalize">{dest.type} Account</p>
+                      {/* Premium Accent Line */}
+                      {destination === dest.id && (
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-emerald-400"></div>
+                      )}
+                      
+                      <div className="w-full flex justify-between items-start">
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 ${
+                           destination === dest.id 
+                           ? 'bg-primary text-white shadow-lg' 
+                           : 'bg-surface-container-low text-primary/60 group-hover:bg-primary/10 group-hover:text-primary'
+                        }`}>
+                           <span className="material-symbols-outlined text-[22px]">
+                              {dest.type === 'Till' ? 'point_of_sale' : dest.type === 'Mobile' ? 'smartphone' : 'account_balance'}
+                           </span>
+                        </div>
+                        {dest.verified && (
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center ${destination === dest.id ? 'bg-emerald-100' : 'bg-surface-container-low'}`}>
+                            <span className="material-symbols-outlined text-emerald-600 text-[14px]" style={{fontVariationSettings: "'FILL' 1"}}>verified</span>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="w-full mt-2">
+                         <p className={`text-sm md:text-base font-bold truncate transition-colors duration-300 ${destination === dest.id ? 'text-primary' : 'text-on-surface'}`}>{dest.name}</p>
+                         <div className="flex items-center gap-2 mt-1">
+                           <p className="text-[11px] text-on-surface-variant font-medium opacity-80 capitalize">{dest.type}</p>
+                           <div className="w-1 h-1 rounded-full bg-outline-variant/30"></div>
+                           <p className="text-[10px] font-mono text-on-surface-variant/60 tracking-wider truncate">{dest.acc}</p>
                          </div>
                       </div>
-                      {dest.verified && (
-                        <span className="material-symbols-outlined text-emerald-600 text-lg" style={{fontVariationSettings: "'FILL' 1"}}>verified</span>
-                      )}
                     </div>
                   ))}
                 </div>
