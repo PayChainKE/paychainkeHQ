@@ -129,50 +129,52 @@ export default function Wallet() {
         {/* Hero Section: Balances */}
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in-up">
           {/* USDC Balance Card (Global) */}
-          <div className="bg-[#0A2540] text-white p-6 md:p-8 lg:p-12 rounded-[32px] lg:rounded-[40px] shadow-2xl relative overflow-hidden group border border-white/5">
-            <div className="absolute top-0 right-0 w-64 md:w-96 h-64 md:h-96 bg-blue-500/10 rounded-full -mr-32 md:-mr-48 -mt-32 md:-mt-48 blur-[80px] md:blur-[100px] group-hover:scale-125 transition-transform duration-1000"></div>
-            <div className="relative z-10">
-              <div className="flex justify-between items-start mb-6 md:mb-10">
-                <span className="bg-blue-500/10 text-blue-400 px-3 md:px-4 py-2 rounded-full text-[9px] md:text-[10px] font-black tracking-[0.2em] uppercase border border-blue-400/20 backdrop-blur-md">Stablecoin Assets</span>
-                <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center border border-white/10 backdrop-blur-md">
-                   <span className="material-symbols-outlined text-2xl text-white">account_balance_wallet</span>
+          <div className="bg-[#0A2540] text-white p-5 md:p-6 rounded-2xl lg:rounded-3xl shadow-2xl relative overflow-hidden group border border-white/5 mx-auto w-full max-w-sm">
+            <div className="absolute top-0 right-0 w-48 md:w-64 h-48 md:h-64 bg-blue-500/10 rounded-full -mr-24 -mt-24 blur-[60px] group-hover:scale-125 transition-transform duration-1000"></div>
+            <div className="relative z-10 flex flex-col h-full justify-between">
+              <div>
+                <div className="flex justify-between items-start mb-5">
+                  <span className="bg-blue-500/10 text-blue-400 px-2.5 py-1.5 rounded-full text-[8px] md:text-[9px] font-black tracking-[0.2em] uppercase border border-blue-400/20 backdrop-blur-md">Stablecoin Assets</span>
+                  <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 backdrop-blur-md">
+                     <span className="material-symbols-outlined text-xl text-white">account_balance_wallet</span>
+                  </div>
+                </div>
+                <p className="text-white/40 text-[9px] md:text-[10px] font-bold uppercase tracking-widest mb-1">Global Settlement Balance</p>
+                <h3 className={`font-headline font-bold text-2xl md:text-3xl lg:text-4xl tracking-tighter tabular-nums mb-3 transition-all duration-300 ${!showAmounts && 'blur-xl'}`}>
+                  {formatUSDC(mockMerchant.financials.usdcBalance)}
+                </h3>
+                <div 
+                  onClick={() => {
+                    navigator.clipboard.writeText(mockMerchant.fullWalletAddress)
+                    addToast({ title: 'Address Copied', message: 'Wallet address copied to clipboard', type: 'success' })
+                  }}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white/5 hover:bg-white/10 rounded-full border border-white/5 cursor-pointer transition-all active:scale-95 group mb-2"
+                >
+                  <span className="text-[9px] text-white/40 font-mono tracking-wider">
+                    <span className="font-bold text-white/20 mr-1 italic">Wallet:</span>
+                    {mockMerchant.walletAddress}
+                  </span>
+                  <span className="material-symbols-outlined text-xs text-white/20 group-hover:text-white/60 transition-colors shrink-0">content_copy</span>
+                </div>
+                <div className="flex items-center gap-2 mt-1 opacity-40">
+                  <span className="text-[7px] font-black uppercase tracking-widest text-white/60">Supported by</span>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded-full bg-[#35D07F] border border-white/20" title="Celo Network"></div>
+                    <div className="w-3 h-3 rounded-full bg-[#0052FF] border border-white/20" title="Base Network"></div>
+                    <div className="w-3 h-3 rounded-full bg-[#8247E5] border border-white/20" title="Polygon Network"></div>
+                  </div>
                 </div>
               </div>
-              <p className="text-white/40 text-[11px] font-bold uppercase tracking-widest mb-1">Global Settlement Balance</p>
-              <h3 className={`font-headline font-bold text-3xl md:text-5xl lg:text-6xl tracking-tighter tabular-nums mb-4 transition-all duration-300 ${!showAmounts && 'blur-xl'}`}>
-                {formatUSDC(mockMerchant.financials.usdcBalance)}
-              </h3>
-              <div 
-                onClick={() => {
-                  navigator.clipboard.writeText(mockMerchant.fullWalletAddress)
-                  addToast({ title: 'Address Copied', message: 'Wallet address copied to clipboard', type: 'success' })
-                }}
-                className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-full border border-white/5 cursor-pointer transition-all active:scale-95 group mb-2"
-              >
-                <span className="text-[10px] text-white/40 font-mono tracking-wider">
-                  <span className="font-bold text-white/20 mr-1 italic">PayChain Wallet:</span>
-                  {mockMerchant.walletAddress}
-                </span>
-                <span className="material-symbols-outlined text-sm text-white/20 group-hover:text-white/60 transition-colors shrink-0">content_copy</span>
-              </div>
-              <div className="flex items-center gap-3 mt-1 opacity-40">
-                <span className="text-[8px] font-black uppercase tracking-widest text-white/60">Supported by</span>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded-full bg-[#35D07F] border border-white/20" title="Celo Network"></div>
-                  <div className="w-4 h-4 rounded-full bg-[#0052FF] border border-white/20" title="Base Network"></div>
-                  <div className="w-4 h-4 rounded-full bg-[#8247E5] border border-white/20" title="Polygon Network"></div>
-                </div>
-              </div>
-              <div className="flex items-center gap-4 mt-8">
-                <button className="flex-1 py-4 bg-white/10 hover:bg-white/20 text-white rounded-2xl text-xs font-bold transition-all border border-white/10 uppercase tracking-widest flex items-center justify-center gap-2">
-                  <span className="material-symbols-outlined text-sm">swap_horiz</span>
+              <div className="flex items-center gap-3 mt-6">
+                <button className="flex-1 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-[10px] font-bold transition-all border border-white/10 uppercase tracking-widest flex items-center justify-center gap-1.5">
+                  <span className="material-symbols-outlined text-xs">swap_horiz</span>
                   Swap KES
                 </button>
                 <button 
                   onClick={() => setShowTopUpSelection(true)}
-                  className="flex-1 py-4 bg-emerald-500 text-[#0A2540] hover:bg-emerald-400 rounded-2xl text-xs font-bold transition-all shadow-xl uppercase tracking-widest flex items-center justify-center gap-2"
+                  className="flex-1 py-2.5 bg-emerald-500 text-[#0A2540] hover:bg-emerald-400 rounded-xl text-[10px] font-bold transition-all shadow-xl uppercase tracking-widest flex items-center justify-center gap-1.5"
                 >
-                  <span className="material-symbols-outlined text-sm">add</span>
+                  <span className="material-symbols-outlined text-xs">add</span>
                   Top Up
                 </button>
               </div>
@@ -180,27 +182,27 @@ export default function Wallet() {
           </div>
 
           {/* KES Balance Card (Local) */}
-          <div className="bg-white p-6 md:p-8 lg:p-12 rounded-[32px] lg:rounded-[40px] shadow-sm border border-outline-variant/10 relative overflow-hidden group editorial-shadow">
-             <div className="absolute bottom-0 left-0 w-64 md:w-80 h-64 md:h-80 bg-emerald-50 rounded-full -ml-32 md:-ml-40 -mb-32 md:-mb-40 blur-[60px] md:blur-[80px]"></div>
+          <div className="bg-white p-5 md:p-6 rounded-2xl lg:rounded-3xl shadow-sm border border-outline-variant/10 relative overflow-hidden group editorial-shadow mx-auto w-full max-w-sm flex flex-col justify-between h-full">
+             <div className="absolute bottom-0 left-0 w-48 md:w-64 h-48 md:h-64 bg-emerald-50 rounded-full -ml-24 -mb-24 blur-[40px] md:blur-[60px]"></div>
              <div className="relative z-10">
-                <div className="flex justify-between items-start mb-6 md:mb-10">
-                  <span className="bg-emerald-50 text-emerald-700 px-3 md:px-4 py-2 rounded-full text-[9px] md:text-[10px] font-black tracking-[0.2em] uppercase border border-emerald-100">Local Liquidity</span>
-                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center border border-emerald-100">
-                     <span className="material-symbols-outlined text-2xl text-emerald-600">payments</span>
+                <div className="flex justify-between items-start mb-5">
+                  <span className="bg-emerald-50 text-emerald-700 px-2.5 py-1.5 rounded-full text-[8px] md:text-[9px] font-black tracking-[0.2em] uppercase border border-emerald-100">Local Liquidity</span>
+                  <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center border border-emerald-100">
+                     <span className="material-symbols-outlined text-xl text-emerald-600">payments</span>
                   </div>
                 </div>
-                <p className="text-on-surface-variant/40 text-[11px] font-bold uppercase tracking-widest mb-1">Available for Withdrawal</p>
-                <h3 className={`font-headline font-bold text-3xl md:text-5xl lg:text-6xl tracking-tighter tabular-nums text-primary transition-all duration-300 ${!showAmounts && 'blur-xl'}`}>
+                <p className="text-on-surface-variant/40 text-[9px] md:text-[10px] font-bold uppercase tracking-widest mb-1">Available for Withdrawal</p>
+                <h3 className={`font-headline font-bold text-2xl md:text-3xl lg:text-4xl tracking-tighter tabular-nums text-primary transition-all duration-300 ${!showAmounts && 'blur-xl'}`}>
                   {formatKES(mockMerchant.financials.kesBalance)}
                 </h3>
-                <div className="flex gap-4 mt-8">
-                  <div className="flex-1 p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 flex items-center gap-3">
-                     <span className="material-symbols-outlined text-emerald-600">shield</span>
-                     <div>
-                        <p className="text-[10px] text-emerald-800 font-bold uppercase tracking-wider">Inflation Shield</p>
-                        <p className="text-[11px] text-emerald-900 font-medium">Protect KES now</p>
-                     </div>
-                  </div>
+             </div>
+             <div className="flex gap-3 mt-6 relative z-10">
+                <div className="flex-1 p-3 bg-emerald-50/50 rounded-xl border border-emerald-100 flex items-center gap-2.5">
+                   <span className="material-symbols-outlined text-emerald-600 text-sm">shield</span>
+                   <div>
+                      <p className="text-[9px] text-emerald-800 font-bold uppercase tracking-wider">Inflation Shield</p>
+                      <p className="text-[10px] text-emerald-900 font-medium leading-none mt-0.5">Protect KES now</p>
+                   </div>
                 </div>
              </div>
           </div>
@@ -410,58 +412,84 @@ export default function Wallet() {
 
                 {/* Payment Link Generator Feature */}
                 <div className="mt-12 pt-10 border-t border-outline-variant/10">
-                   <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 mb-8">
-                      <div>
-                         <h4 className="font-headline text-2xl text-primary tracking-tight">Generate Payment Link</h4>
-                         <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-[0.2em] mt-1 opacity-60">Send Direct via WhatsApp/Email</p>
+                  <div className="bg-surface-container-lowest p-6 md:p-8 rounded-[24px] md:rounded-[32px] border border-outline-variant/10 shadow-sm relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl -mr-16 -mt-16 group-hover:scale-150 transition-transform"></div>
+                    
+                    <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+                      <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100 shrink-0">
+                          <span className="material-symbols-outlined text-2xl">add_link</span>
+                        </div>
+                        <div>
+                          <h4 className="font-headline text-xl md:text-2xl text-primary tracking-tight">Generate Payment Link</h4>
+                          <p className="text-[10px] text-on-surface-variant font-medium mt-1 leading-relaxed max-w-sm">
+                            Create a secure payment link to share directly with your customers via WhatsApp, Email, or SMS.
+                          </p>
+                        </div>
                       </div>
-                      <div className="w-full xl:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                         <div className="relative flex-1 sm:w-48">
-                            <input 
-                               type="number"
-                               value={paymentLinkAmount}
-                               onChange={(e) => setPaymentLinkAmount(e.target.value)}
-                               placeholder="Enter Amount"
-                               className="w-full bg-surface-container-low border border-outline-variant/5 rounded-2xl py-4 pl-4 pr-12 text-sm font-bold text-primary outline-none focus:ring-2 focus:ring-primary/20 transition-all font-headline"
-                            />
-                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-primary/40 uppercase">KES</span>
-                         </div>
-                         <button 
-                            onClick={generatePaymentLink}
-                            disabled={isGeneratingLink}
-                            className={`px-8 py-4 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl transition-all active:scale-95 ${isGeneratingLink ? 'opacity-50 grayscale' : 'hover:bg-primary-dark'} editorial-shadow`}
-                         >
-                            {isGeneratingLink ? 'Creating...' : 'Generate link'}
-                         </button>
-                      </div>
-                   </div>
 
-                   {generatedLink && (
-                      <div className="bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100 flex flex-col md:flex-row items-center justify-between gap-4 animate-scale-in">
-                         <div className="flex items-center gap-3 w-full md:w-auto">
-                            <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-600">
-                               <span className="material-symbols-outlined text-sm">link</span>
-                            </div>
-                            <p className="text-xs font-medium text-emerald-900 truncate max-w-[200px] md:max-w-md">{generatedLink}</p>
-                         </div>
-                         <div className="flex items-center gap-2 w-full md:w-auto">
-                            <button 
-                               onClick={copyPaymentLink}
-                               className="flex-1 md:flex-none px-4 py-2.5 bg-white border border-emerald-200 text-emerald-700 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-emerald-100 transition-all flex items-center justify-center gap-2"
-                            >
-                               <span className="material-symbols-outlined text-xs">content_copy</span>
-                               Copy Link
-                            </button>
-                            <button 
-                               onClick={() => window.open(`whatsapp://send?text=${encodeURIComponent(`Please pay me KES ${paymentLinkAmount} via PayChain: ${generatedLink}`)}`)}
-                               className="flex-1 md:flex-none px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-md flex items-center justify-center gap-2"
-                            >
-                               <span className="material-symbols-outlined text-xs" style={{fontVariationSettings: "'FILL' 1"}}>send</span>
-                               Share Link
-                            </button>
-                         </div>
+                      <div className="w-full lg:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                        <div className="relative flex-1 sm:w-56 bg-white rounded-2xl border border-outline-variant/10 shadow-sm focus-within:border-emerald-500/30 focus-within:ring-2 focus-within:ring-emerald-500/10 transition-all">
+                          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                            <span className="text-[10px] font-black text-on-surface-variant/40 uppercase">KES</span>
+                          </div>
+                          <input 
+                            type="number"
+                            value={paymentLinkAmount}
+                            onChange={(e) => setPaymentLinkAmount(e.target.value)}
+                            placeholder="0.00"
+                            className="w-full bg-transparent border-none py-4 pl-12 pr-4 text-right text-lg font-headline text-primary outline-none focus:ring-0 placeholder-on-surface-variant/20"
+                          />
+                        </div>
+                        <button 
+                          onClick={generatePaymentLink}
+                          disabled={isGeneratingLink || !paymentLinkAmount}
+                          className={`px-8 py-4 bg-[#00351D] text-white rounded-2xl text-[11px] font-bold shadow-xl transition-all flex items-center justify-center gap-2 border border-white/5 disabled:opacity-50 disabled:grayscale ${!isGeneratingLink && paymentLinkAmount ? 'hover:bg-[#004d2b] active:scale-95' : ''}`}
+                        >
+                          {isGeneratingLink ? (
+                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                          ) : (
+                            <>
+                              <span className="material-symbols-outlined text-[14px]">link</span>
+                              Generate Link
+                            </>
+                          )}
+                        </button>
                       </div>
-                   )}
+                    </div>
+
+                    {generatedLink && (
+                       <div className="mt-6 pt-6 border-t border-outline-variant/10 relative z-10 animate-fade-in">
+                          <div className="bg-emerald-50 p-4 md:p-5 rounded-2xl border border-emerald-100 flex flex-col md:flex-row items-center justify-between gap-4">
+                             <div className="flex items-center gap-3 w-full md:w-auto overflow-hidden">
+                                <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-emerald-600 shadow-sm shrink-0 border border-emerald-100/50">
+                                   <span className="material-symbols-outlined text-lg">check_circle</span>
+                                </div>
+                                <div className="overflow-hidden">
+                                  <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-widest mb-0.5">Link Ready</p>
+                                  <p className="text-sm font-medium text-emerald-900 truncate max-w-[200px] md:max-w-md">{generatedLink}</p>
+                                </div>
+                             </div>
+                             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
+                                <button 
+                                   onClick={copyPaymentLink}
+                                   className="px-5 py-3 bg-white border border-emerald-200 text-emerald-700 rounded-xl text-[10px] font-bold hover:bg-emerald-50 transition-all flex items-center justify-center gap-2 shadow-sm"
+                                >
+                                   <span className="material-symbols-outlined text-[14px]">content_copy</span>
+                                   Copy
+                                </button>
+                                <button 
+                                   onClick={() => window.open(`whatsapp://send?text=${encodeURIComponent(`Please pay me KES ${paymentLinkAmount} via PayChain: ${generatedLink}`)}`)}
+                                   className="px-5 py-3 bg-[#25D366] text-white rounded-xl text-[10px] font-bold hover:bg-[#1DA851] transition-all shadow-md flex items-center justify-center gap-2"
+                                >
+                                   <span className="material-symbols-outlined text-[14px]" style={{fontVariationSettings: "'FILL' 1"}}>send</span>
+                                   Share on WhatsApp
+                                </button>
+                             </div>
+                          </div>
+                       </div>
+                    )}
+                  </div>
                 </div>
               </section>
 

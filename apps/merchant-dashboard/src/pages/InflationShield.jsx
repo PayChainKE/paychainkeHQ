@@ -77,70 +77,77 @@ export default function InflationShield() {
         {/* Section 3: Swap Interface & History Grid */}
         <div className="grid grid-cols-12 gap-8 items-start">
           {/* Swap Card */}
-          <div className="col-span-12 lg:col-span-12 xl:col-span-5 bg-surface-container-lowest p-6 md:p-10 rounded-[32px] lg:rounded-[40px] border border-outline-variant/10 shadow-2xl editorial-shadow relative overflow-hidden animate-fade-in-up [animation-delay:200ms]">
-            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-emerald-500 to-blue-600"></div>
-            <div className="mb-6 md:mb-10">
-              <h3 className="font-headline text-2xl md:text-3xl text-primary tracking-tight">Swap Engine</h3>
-              <p className="text-[9px] md:text-[10px] text-on-surface-variant font-bold uppercase tracking-[0.2em] mt-1 opacity-60">Verified Settlement Path</p>
+          <div className="col-span-12 lg:col-span-12 xl:col-span-5 bg-gradient-to-br from-[#0f172a] to-[#020617] text-white p-6 md:p-10 rounded-[32px] lg:rounded-[40px] border border-white/10 shadow-[0_0_40px_rgba(16,185,129,0.1)] relative overflow-hidden animate-fade-in-up [animation-delay:200ms] group">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl -mr-32 -mt-32 transition-transform duration-1000 group-hover:scale-110"></div>
+            <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl -ml-32 -mb-32 transition-transform duration-1000 group-hover:scale-110"></div>
+            
+            <div className="relative z-10 mb-6 md:mb-10 flex items-center justify-between">
+              <div>
+                <h3 className="font-headline text-2xl md:text-3xl text-white tracking-tight">Swap Engine</h3>
+                <p className="text-[9px] md:text-[10px] text-emerald-400 font-bold uppercase tracking-[0.2em] mt-1">Verified Settlement Path</p>
+              </div>
+              <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center backdrop-blur-md">
+                <span className="material-symbols-outlined text-white/70 text-sm">currency_exchange</span>
+              </div>
             </div>
             
-            <div className="space-y-4">
+            <div className="relative z-10 space-y-4">
               {/* You Send */}
-              <div className="bg-surface-container-low p-6 rounded-2xl border border-outline-variant/5">
+              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:border-emerald-500/30 transition-colors">
                 <div className="flex justify-between items-center mb-4">
-                  <span className="text-[11px] text-on-surface-variant font-bold uppercase tracking-widest">You Send</span>
-                  <span className={`text-[11px] text-on-surface-variant font-medium transition-all duration-300 ${!showAmounts && 'blur-sm'}`}>Balance: {formatKES(184250)}</span>
+                  <span className="text-[11px] text-gray-500 font-bold uppercase tracking-widest">You Send</span>
+                  <span className={`text-[11px] text-gray-600 font-medium transition-all duration-300 ${!showAmounts && 'blur-sm'}`}>Balance: {formatKES(184250)}</span>
                 </div>
                 <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2 bg-surface-container-lowest px-3 py-1.5 rounded-full border border-outline-variant/10">
-                    <div className="w-5 h-5 rounded-full bg-emerald-600 flex items-center justify-center text-[10px] text-white font-bold">K</div>
-                    <span className="text-sm font-bold text-primary">KES</span>
+                  <div className="flex shrink-0 items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-200">
+                    <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center text-[10px] text-white font-bold shadow-sm">K</div>
+                    <span className="text-sm font-bold text-gray-900">KES</span>
                   </div>
                   <input 
                     type="number" 
                     value={kesAmount} 
                     onChange={(e) => setKesAmount(Number(e.target.value))}
-                    className="flex-1 bg-transparent border-none text-right font-headline text-2xl md:text-3xl text-primary focus:ring-0 p-0"
+                    className="flex-1 min-w-0 w-full bg-transparent border-none text-right font-headline text-2xl md:text-3xl text-gray-900 focus:ring-0 p-0 placeholder-gray-300 outline-none"
                   />
                 </div>
               </div>
 
               {/* Swap Icon */}
-              <div className="flex justify-center -my-3 relative z-10">
-                <div className="bg-primary text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg border-4 border-surface-container-lowest">
-                  <span className="material-symbols-outlined text-lg">south</span>
+              <div className="flex justify-center -my-3 relative z-20">
+                <div className="bg-[#0f172a] text-emerald-400 w-12 h-12 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.2)] border-4 border-[#0a0f1a] hover:rotate-180 transition-transform duration-500 cursor-pointer">
+                  <span className="material-symbols-outlined text-xl">swap_vert</span>
                 </div>
               </div>
 
               {/* You Receive */}
-              <div className="bg-surface-container-low p-6 rounded-2xl border border-outline-variant/5">
+              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:border-blue-500/30 transition-colors">
                 <div className="flex justify-between items-center mb-4">
-                  <span className="text-[11px] text-on-surface-variant font-bold uppercase tracking-widest">You Receive</span>
-                  <span className="text-[11px] text-on-surface-variant font-medium">Slippage: 0.1%</span>
+                  <span className="text-[11px] text-gray-500 font-bold uppercase tracking-widest">You Receive</span>
+                  <span className="text-[11px] text-gray-500 font-medium">Slippage: 0.1%</span>
                 </div>
                 <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2 bg-surface-container-lowest px-3 py-1.5 rounded-full border border-outline-variant/10">
-                    <div className="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center text-[10px] text-white font-bold">U</div>
-                    <span className="text-sm font-bold text-primary">USDC</span>
+                  <div className="flex shrink-0 items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-200">
+                    <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-[10px] text-white font-bold shadow-sm">U</div>
+                    <span className="text-sm font-bold text-gray-900">USDC</span>
                   </div>
-                  <p className="flex-1 text-right font-headline text-2xl md:text-3xl text-primary">{usdcAmount}</p>
+                  <p className="flex-1 min-w-0 w-full text-right font-headline text-2xl md:text-3xl text-gray-900 truncate">{usdcAmount}</p>
                 </div>
               </div>
             </div>
 
             {/* Breakdown */}
-            <div className="mt-8 space-y-3 pt-6 border-t border-outline-variant/10 text-on-surface">
+            <div className="relative z-10 mt-8 space-y-3 pt-6 border-t border-white/10">
               <div className="flex justify-between text-xs font-medium">
-                <span className="text-on-surface-variant">Fee (0.5%)</span>
-                <span>{formatKES(kesAmount * feeRate)}</span>
+                <span className="text-white/50">Fee (0.5%)</span>
+                <span className="text-white/80">{formatKES(kesAmount * feeRate)}</span>
               </div>
               <div className="flex justify-between text-xs font-bold">
-                <span className="text-on-surface-variant">Estimated Value Protection</span>
-                <span className="text-emerald-600">+12.4% / yr</span>
+                <span className="text-white/70">Estimated Value Protection</span>
+                <span className="text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]">+12.4% / yr</span>
               </div>
             </div>
 
-            <button className="w-full bg-[#00351D] text-white py-5 rounded-2xl font-bold text-lg shadow-2xl hover:bg-[#004d2b] active:scale-[0.98] transition-all mt-8 flex items-center justify-center gap-3 group border border-white/5">
+            <button className="relative z-10 w-full bg-gradient-to-r from-emerald-600 to-emerald-400 text-white py-5 rounded-2xl font-bold text-lg shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] active:scale-[0.98] transition-all mt-8 flex items-center justify-center gap-3 group border border-emerald-400/20">
               Confirm Protection Swap
               <span className="material-symbols-outlined group-hover:rotate-180 transition-transform duration-700">sync</span>
             </button>

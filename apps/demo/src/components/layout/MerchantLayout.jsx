@@ -32,7 +32,7 @@ export default function MerchantLayout({ children, title = 'Overview' }) {
         <footer className="w-full bg-[#FAFAF9] border-t border-emerald-900/10 py-4 mt-auto transition-colors">
           <div className="px-4 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-2 max-w-[1400px] mx-auto">
             <p className="text-emerald-900/60 text-[9px] lg:text-[10px] font-bold tracking-tight">
-              &copy; {new Date().getFullYear()} PayChain KE. All rights reserved.
+              &copy; {new Date().getFullYear()} PayChain Financial Services Ltd. All rights reserved.
             </p>
             <div className="flex items-center gap-1.5 opacity-60">
               <span className="text-emerald-900/40 text-[8px] lg:text-[9px] uppercase tracking-[0.2em] font-black">Powered by</span>
