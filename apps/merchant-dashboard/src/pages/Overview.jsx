@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from 'react'
+import axios from 'axios'
 import MerchantLayout from '../components/layout/MerchantLayout'
-import StatCard from '../components/ui/StatCard'
 import RevenueChart from '../components/charts/RevenueChart'
-import { mockMerchant } from '../mockData/merchant'
-import { revenueByDay } from '../mockData/analytics'
-import { transactionsData, getTransactionStats } from '../mockData/transactions'
 import { formatKES } from '../utils/formatCurrency'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
@@ -14,38 +11,70 @@ export default function Overview() {
   const navigate = useNavigate()
   const { showAmounts, togglePrivacy } = usePrivacyMode()
   const { merchant } = useMerchantAuth()
-  const [stats, setStats] = useState(getTransactionStats())
-  const [fraudAlerts, setFraudAlerts] = useState(0) // Logic scaffolding
-  const [settlementBalance, setSettlementBalance] = useState(0) // Logic scaffolding
+  
+  const [liveTransactions, setLiveTransactions] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [trustData, setTrustData] = useState(null)
   const [activeTimeframe, setActiveTimeframe] = useState('7D')
   const [showMoveMoney, setShowMoveMoney] = useState(false)
 
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+        const [txRes, trustRes] = await Promise.all([
+          axios.get(`${API_URL}/api/transactions`),
+          axios.get(`${API_URL}/api/trust-score`).catch(() => ({ data: { current: 0, eligibleForAdvance: false } }))
+        ])
+        setLiveTransactions(txRes.data)
+        setTrustData(trustRes.data)
+      } catch (err) {
+        console.error('Failed to fetch dashboard data', err)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    if (merchant) {
+      fetchData()
+    } else {
+      setIsLoading(false)
+    }
+  }, [merchant])
+
+  // Dynamic calculations
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const monthAgo = new Date(today)
+  monthAgo.setMonth(today.getMonth() - 1)
+
+  const todaysRevenue = liveTransactions
+    .filter(t => t.type === 'inbound' && new Date(t.createdAt) >= today)
+    .reduce((s, t) => s + (t.kesAmount || t.amount || 0), 0)
+
+  const thisMonthRevenue = liveTransactions
+    .filter(t => t.type === 'inbound' && new Date(t.createdAt) >= monthAgo)
+    .reduce((s, t) => s + (t.kesAmount || t.amount || 0), 0)
+
+  const totalTransactionsCount = liveTransactions.length
+  
+  const recentTx = liveTransactions.filter(t => t.type === 'inbound').slice(0, 5)
+
+  // Chart Logic scaffolding (empty if no data)
+  const hasData = liveTransactions.length > 0
   const timeframes = {
     '7D': {
       labels: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'],
-      data: revenueByDay.data
+      data: hasData ? [0, 0, 0, 0, 0, todaysRevenue, todaysRevenue] : [0,0,0,0,0,0,0] // Simplified for mock removal
     },
     '30D': {
       labels: ['WEEK 1', 'WEEK 2', 'WEEK 3', 'WEEK 4'],
-      data: [84000, 72000, 95000, 110000]
+      data: hasData ? [0, 0, 0, thisMonthRevenue] : [0,0,0,0]
     },
     '6M': {
       labels: ['OCT', 'NOV', 'DEC', 'JAN', 'FEB', 'MAR'],
-      data: [240000, 280000, 310000, 290000, 350000, 420000]
+      data: [0, 0, 0, 0, 0, 0]
     }
   }
-
-  useEffect(() => {
-    // Logic scaffolding: Simulate data loading or calculation
-    const totalTransactions = mockMerchant.financials.totalTransactions
-    const alerts = 0 // In a real app, this would come from an API
-    const settlement = mockMerchant.financials.kesBalance + (mockMerchant.financials.usdcBalance * 130)
-
-    setFraudAlerts(alerts)
-    setSettlementBalance(settlement)
-  }, [])
-
-  const recentTx = transactionsData.filter(t => t.type === 'inbound').slice(0, 5)
 
   const getGreeting = () => {
     const hour = new Date().getHours()
@@ -54,14 +83,24 @@ export default function Overview() {
     return 'Good evening'
   }
 
+  if (isLoading) {
+    return (
+      <MerchantLayout title="Overview">
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      </MerchantLayout>
+    )
+  }
+
   return (
     <MerchantLayout title="Overview">
       {/* Greeting */}
       <section className="mb-6 px-1 lg:px-0 overflow-hidden">
         <h2 className="font-headline font-bold text-[24px] sm:text-3xl lg:text-4xl text-primary tracking-tight leading-tight whitespace-nowrap">
-          {getGreeting()}, {merchant?.name?.split(' ')[0] || mockMerchant.name.split(' ')[0]}. 👋
+          {getGreeting()}, {merchant?.businessName?.split(' ')[0] || 'Merchant'}. 👋
         </h2>
-        <p className="text-on-surface-variant text-[11px] lg:text-sm mt-1.5 opacity-80 font-medium leading-relaxed">Here's how {merchant?.businessName || mockMerchant.businessName} is doing today.</p>
+        <p className="text-on-surface-variant text-[11px] lg:text-sm mt-1.5 opacity-80 font-medium leading-relaxed">Here's how your business is doing today.</p>
       </section>
 
       {/* Section 1: Balance Cards Row */}
@@ -75,7 +114,7 @@ export default function Overview() {
             <div className="flex justify-between items-start mb-8 lg:mb-10">
               <span className="bg-[#1F4D3C] text-[#5EFEB3] px-3 lg:px-4 py-1.5 rounded-full text-[8px] lg:text-[9px] font-black tracking-[0.15em] uppercase border border-white/10">Business Till Account</span>
               <div className="flex items-center gap-3 lg:gap-4 text-[8px] lg:text-[9px]">
-                <span className="text-white/40 uppercase font-bold tracking-[0.15em] hidden sm:inline">Paybill: 400200 | Acc: {merchant?.paybillAccount || mockMerchant.tillNumber}</span>
+                <span className="text-white/40 uppercase font-bold tracking-[0.15em] hidden sm:inline">Paybill: 400200 | Acc: {merchant?.paybillAccount || '...'}</span>
                 <button
                   onClick={togglePrivacy}
                   className="text-white/40 hover:text-white transition-colors p-1"
@@ -88,10 +127,12 @@ export default function Overview() {
             </div>
             
             <div className="flex-1">
-              <h3 className={`font-headline font-bold text-3xl lg:text-4xl tracking-tighter tabular-nums mb-1 transition-all duration-300 ${!showAmounts && 'blur-lg grayscale'}`}>KES 184,250</h3>
+              <h3 className={`font-headline font-bold text-3xl lg:text-4xl tracking-tighter tabular-nums mb-1 transition-all duration-300 ${!showAmounts && 'blur-lg grayscale'}`}>
+                {formatKES(merchant?.kesBalance || 0)}
+              </h3>
               <div className={`flex items-center gap-2 text-[#5EFEB3] font-bold text-[9px] lg:text-[10px] tracking-wide transition-all duration-300 ${!showAmounts && 'blur-sm grayscale'}`}>
                 <span className="material-symbols-outlined text-[10px]" style={{ fontVariationSettings: "'FILL' 1" }}>trending_up</span>
-                <span>+KES 18,450 today</span>
+                <span>+{formatKES(todaysRevenue)} today</span>
               </div>
             </div>
 
@@ -107,10 +148,7 @@ export default function Overview() {
               {showMoveMoney && (
                 <>
                   {/* Backdrop for closing */}
-                  <div 
-                    className="fixed inset-0 z-40 bg-black/5 backdrop-blur-[2px]" 
-                    onClick={() => setShowMoveMoney(false)}
-                  ></div>
+                  <div className="fixed inset-0 z-40 bg-black/5 backdrop-blur-[2px]" onClick={() => setShowMoveMoney(false)}></div>
                   
                   {/* Floating Action Menu */}
                   <div className="absolute left-0 sm:left-auto sm:right-0 top-full mt-4 w-[calc(100vw-4rem)] sm:w-[280px] bg-white rounded-[20px] shadow-[0_25px_70px_rgba(0,0,0,0.4)] border border-slate-200 z-[100] animate-in fade-in zoom-in-95 slide-in-from-top-4 duration-300 ease-out overflow-hidden">
@@ -120,10 +158,7 @@ export default function Overview() {
                     </div>
                     
                     <div className="p-1.5 space-y-0.5">
-                      <button 
-                        onClick={() => navigate('/send-money')}
-                        className="w-full text-left p-3 hover:bg-emerald-50/50 rounded-xl transition-all group relative overflow-hidden"
-                      >
+                      <button onClick={() => navigate('/send-money')} className="w-full text-left p-3 hover:bg-emerald-50/50 rounded-xl transition-all group relative overflow-hidden">
                         <div className="flex items-center gap-3 relative z-10">
                           <div className="w-10 h-10 rounded-xl bg-[#00351D] text-[#5EFEB3] flex items-center justify-center shrink-0 shadow-lg group-hover:scale-105 transition-transform">
                             <span className="material-symbols-outlined text-lg">send_money</span>
@@ -137,30 +172,6 @@ export default function Overview() {
                           </div>
                         </div>
                       </button>
-                      
-                      <div className="h-px bg-slate-100 mx-3 my-0.5"></div>
-                      
-                      <button 
-                        onClick={() => navigate('/request-money')}
-                        className="w-full text-left p-3 hover:bg-emerald-50/50 rounded-xl transition-all group"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center shrink-0 group-hover:bg-amber-100 transition-colors">
-                            <span className="material-symbols-outlined text-lg">payments</span>
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between mb-0.5">
-                              <p className="text-[10px] font-black uppercase tracking-widest text-[#00351D]">Request Money</p>
-                              <span className="material-symbols-outlined text-slate-300 text-xs group-hover:translate-x-1 transition-transform">arrow_forward</span>
-                            </div>
-                            <p className="text-[9px] text-slate-500 font-medium leading-tight line-clamp-1">STK push or payment link.</p>
-                          </div>
-                        </div>
-                      </button>
-                    </div>
-                    
-                    <div className="px-4 py-2 bg-slate-50/50 border-t border-slate-100 text-center">
-                       <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest leading-none">Limit: KES 250,000</p>
                     </div>
                   </div>
                 </>
@@ -175,24 +186,20 @@ export default function Overview() {
           <div className="relative z-10 flex flex-col h-full">
             <div className="flex justify-between items-start mb-8 lg:mb-10">
               <span className="bg-[#243B5C] text-[#A6C8FF] px-3 lg:px-4 py-1.5 rounded-full text-[8px] lg:text-[9px] font-black tracking-[0.15em] uppercase border border-white/10">Business Digital wallet</span>
-              <button
-                onClick={togglePrivacy}
-                className="text-white/40 hover:text-white transition-colors p-1"
-              >
-                <span className="material-symbols-outlined text-base lg:text-lg leading-none">
-                  {showAmounts ? 'visibility' : 'visibility_off'}
-                </span>
+              <button onClick={togglePrivacy} className="text-white/40 hover:text-white transition-colors p-1">
+                <span className="material-symbols-outlined text-base lg:text-lg leading-none">{showAmounts ? 'visibility' : 'visibility_off'}</span>
               </button>
             </div>
             <div className="flex-1">
-              <h3 className={`font-headline font-bold text-3xl lg:text-4xl tracking-tighter tabular-nums mb-2 lg:mb-3 transition-all duration-300 ${!showAmounts && 'blur-lg grayscale'}`}>312.50 USDC</h3>
-              <p className={`text-white/40 text-[9px] lg:text-[10px] font-bold tracking-tight opacity-70 uppercase transition-all duration-300 ${!showAmounts && 'blur-sm grayscale'}`}>≈ {formatKES(mockMerchant.financials.usdcBalance * 130)}</p>
+              <h3 className={`font-headline font-bold text-3xl lg:text-4xl tracking-tighter tabular-nums mb-2 lg:mb-3 transition-all duration-300 ${!showAmounts && 'blur-lg grayscale'}`}>
+                {merchant?.usdcBalance || '0.00'} USDC
+              </h3>
+              <p className={`text-white/40 text-[9px] lg:text-[10px] font-bold tracking-tight opacity-70 uppercase transition-all duration-300 ${!showAmounts && 'blur-sm grayscale'}`}>
+                ≈ {formatKES((merchant?.usdcBalance || 0) * 130)}
+              </p>
             </div>
             <div className="flex gap-3 lg:gap-4 mt-6 lg:mt-8">
-              <button 
-                onClick={() => navigate('/inflation-shield')}
-                className="flex-1 py-3.5 px-3 lg:px-4 bg-white/5 hover:bg-white/10 text-white rounded-xl text-[9px] lg:text-[10px] font-black transition-all border border-white/10 uppercase tracking-widest leading-none"
-              >
+              <button onClick={() => navigate('/inflation-shield')} className="flex-1 py-3.5 px-3 lg:px-4 bg-white/5 hover:bg-white/10 text-white rounded-xl text-[9px] lg:text-[10px] font-black transition-all border border-white/10 uppercase tracking-widest leading-none">
                 Swap
               </button>
             </div>
@@ -203,10 +210,10 @@ export default function Overview() {
       {/* Section 2: Stats Row */}
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 animate-fade-in-up [animation-delay:200ms] relative z-10">
         {[
-          { label: "Today's Revenue", value: "KES 18,450", trend: "12 payments", trendColor: "text-on-surface-variant" },
-          { label: "This Month", value: "KES 284,500", trend: "↓ 14% vs last", trendColor: "text-red-500" },
-          { label: "Total Transactions", value: "847", trend: "Since Oct 2025", trendColor: "text-on-surface-variant" },
-          { label: "Trust Score", value: "74/100", trend: "Eligible ✔", trendColor: "text-emerald-600", showBadge: true }
+          { label: "Today's Revenue", value: formatKES(todaysRevenue), trend: "", trendColor: "text-on-surface-variant" },
+          { label: "This Month", value: formatKES(thisMonthRevenue), trend: "", trendColor: "text-emerald-600" },
+          { label: "Total Transactions", value: totalTransactionsCount, trend: "", trendColor: "text-on-surface-variant" },
+          { label: "Trust Score", value: `${trustData?.current || 0}/100`, trend: trustData?.eligibleForAdvance ? "Eligible ✔" : "Building", trendColor: "text-emerald-600", showBadge: true }
         ].map((stat, i) => (
           <div key={i} className="bg-white p-6 lg:p-8 rounded-[12px] border border-[#E5E7EB] shadow-sm editorial-shadow transition-all group">
             <div className="flex justify-between items-center mb-4 lg:mb-6">
@@ -228,10 +235,7 @@ export default function Overview() {
               <button
                 key={period}
                 onClick={() => setActiveTimeframe(period)}
-                className={`px-2 lg:px-3 py-0.5 text-[8px] lg:text-[9px] font-bold rounded-md transition-all uppercase tracking-wider ${activeTimeframe === period
-                    ? 'bg-white text-emerald-800 shadow-sm'
-                    : 'text-emerald-800/40 hover:text-emerald-800'
-                  }`}
+                className={`px-2 lg:px-3 py-0.5 text-[8px] lg:text-[9px] font-bold rounded-md transition-all uppercase tracking-wider ${activeTimeframe === period ? 'bg-white text-emerald-800 shadow-sm' : 'text-emerald-800/40 hover:text-emerald-800'}`}
               >
                 {period}
               </button>
@@ -248,83 +252,60 @@ export default function Overview() {
         </div>
       </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-20">
         {/* Section 4: Recent Collections */}
         <section className="lg:col-span-2 bg-white rounded-[16px] border border-slate-300 shadow-sm editorial-shadow overflow-hidden">
-          <div className="p-8 border-b border-slate-300">
+          <div className="p-8 border-b border-slate-300 flex justify-between items-center">
             <h3 className="font-headline font-bold text-3xl text-primary">Recent Transactions</h3>
           </div>
           <div className="flex flex-col">
-            {[
-              { id: 1, name: 'Mary Wanjiku', ref: 'QJX8472KL', amount: 4250, time: '2 min ago', initials: 'MW', color: 'bg-emerald-100' },
-              { id: 2, name: 'John Okoth', ref: 'ZXC9021MM', amount: 1200, time: '15 min ago', initials: 'JO', color: 'bg-blue-100' },
-              { id: 3, name: 'Sarah Njoki', ref: 'BNM3382LL', amount: 850, time: '42 min ago', initials: 'SN', color: 'bg-amber-100' },
-              { id: 4, name: 'Evans Kiprono', ref: 'PLM992OSS', amount: 12500, time: '1 hour ago', initials: 'EK', color: 'bg-indigo-100' },
-              { id: 5, name: 'Alice Nyambura', ref: 'VFR4451PP', amount: 2100, time: '2 hours ago', initials: 'AN', color: 'bg-purple-100' }
-            ].map(tx => (
-              <div key={tx.id} className="px-4 lg:px-8 py-4 lg:py-5 flex items-center justify-between hover:bg-[#00351D] transition-all group cursor-pointer border-b border-slate-300">
-                <div className="flex items-center gap-3 lg:gap-4 flex-1 min-w-0">
-                  <div className={`w-10 h-10 lg:w-12 lg:h-12 rounded-full ${tx.color} flex items-center justify-center overflow-hidden font-black text-primary text-[10px] lg:text-xs border border-white/20 shadow-sm group-hover:bg-white/10 group-hover:text-amber-400 group-hover:border-amber-400/20 transition-all duration-300 shrink-0`}>
-                    {tx.initials}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[13px] lg:text-sm font-black text-primary leading-tight group-hover:text-white transition-colors truncate">{tx.name}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <p className="text-[9px] lg:text-[10px] text-on-surface-variant font-black uppercase tracking-widest opacity-40 group-hover:text-white/40 group-hover:opacity-100 transition-colors truncate">REF: {tx.ref}</p>
-                      <div className="flex lg:hidden items-center gap-1 text-emerald-600 group-hover:text-emerald-400 transition-colors">
-                        <span className="material-symbols-outlined text-[10px]" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
+            {recentTx.length === 0 ? (
+              <div className="p-12 text-center text-on-surface-variant font-medium">
+                No recent transactions found.
+              </div>
+            ) : (
+              recentTx.map(tx => (
+                <div key={tx._id || tx.id} className="px-4 lg:px-8 py-4 lg:py-5 flex items-center justify-between hover:bg-[#00351D] transition-all group cursor-pointer border-b border-slate-300">
+                  <div className="flex items-center gap-3 lg:gap-4 flex-1 min-w-0">
+                    <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-full bg-emerald-100 flex items-center justify-center overflow-hidden font-black text-primary text-[10px] lg:text-xs border border-white/20 shadow-sm transition-all duration-300 shrink-0">
+                      {tx.senderName ? tx.senderName.substring(0, 2).toUpperCase() : 'TX'}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px] lg:text-sm font-black text-primary leading-tight group-hover:text-white transition-colors truncate">{tx.senderName || 'Customer'}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <p className="text-[9px] lg:text-[10px] text-on-surface-variant font-black uppercase tracking-widest opacity-40 group-hover:text-white/40 group-hover:opacity-100 transition-colors truncate">REF: {tx.receiptNumber || tx.reference}</p>
                       </div>
                     </div>
                   </div>
-                </div>
-                
-                <div className="flex items-center gap-4 lg:gap-10 text-right shrink-0">
-                  <div className="hidden lg:flex items-center gap-1.5 text-emerald-600 group-hover:text-[#5EFEB3] transition-colors">
-                    <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
-                    <span className="text-[9px] font-black uppercase tracking-[0.1em]">Verified</span>
-                  </div>
-                  <div className="flex flex-col items-end">
+                  
+                  <div className="flex flex-col items-end shrink-0">
                     <p className="text-[13px] lg:text-sm font-black text-emerald-700 group-hover:text-[#5EFEB3] transition-colors leading-none mb-1">
-                      +{formatKES(tx.amount)}
+                      +{formatKES(tx.kesAmount || tx.amount || 0)}
                     </p>
                     <p className="text-[9px] lg:text-[10px] text-on-surface-variant font-black opacity-30 tracking-widest group-hover:text-white/30 transition-colors uppercase">
-                      {tx.time}
+                      {new Date(tx.createdAt || tx.timestamp).toLocaleDateString()}
                     </p>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
           <div className="p-6 text-center bg-surface-container-low/30 border-t border-slate-300">
-            <button className="text-[10px] font-bold text-primary uppercase tracking-[0.2em] hover:underline transition-all">View All Transactions</button>
+            <button onClick={() => navigate('/transactions')} className="text-[10px] font-bold text-primary uppercase tracking-[0.2em] hover:underline transition-all">View All Transactions</button>
           </div>
         </section>
 
         {/* Section 5: Cash Advance & Tips */}
         <div className="space-y-6">
-          <section className="bg-white p-8 rounded-[16px] border border-[#E5E7EB] border-t-4 border-t-[#00351D] shadow-sm editorial-shadow">
-            <div className="flex justify-between items-center mb-8">
-              <p className="text-primary text-[10px] font-black uppercase tracking-[0.2em]">Active Cash Advance</p>
-              <span className="material-symbols-outlined text-primary text-lg" style={{ fontVariationSettings: "'wght' 300" }}>account_balance_wallet</span>
+          <section className="bg-white p-8 rounded-[16px] border border-[#E5E7EB] border-t-4 border-t-[#00351D] shadow-sm editorial-shadow text-center">
+            <div className="w-16 h-16 bg-surface-container-low rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="material-symbols-outlined text-3xl text-emerald-600/50">account_balance_wallet</span>
             </div>
-            <h4 className="font-headline text-4xl text-primary mb-8">KES 150,000</h4>
-            <div className="space-y-6">
-              <div className="w-full bg-[#F0FDF4] h-2 rounded-full overflow-hidden border border-emerald-50">
-                <div className="bg-emerald-500 h-full rounded-full transition-all duration-1000 ease-out" style={{ width: '45%' }}></div>
-              </div>
-              <div className="flex justify-between items-center">
-                <p className="text-[10px] font-bold text-on-surface-variant opacity-70">KES 67,500 repaid</p>
-                <p className="text-[10px] font-extrabold text-emerald-700 uppercase tracking-wider">45% complete</p>
-              </div>
-              <div className="p-4 bg-[#F0FDF4]/50 rounded-xl border border-emerald-100/50">
-                <p className="text-[10px] text-on-surface-variant leading-relaxed font-medium">
-                  Repayment rate is set to <span className="text-emerald-800 font-bold">8% of daily collections</span>. You are on track to finish 4 days early.
-                </p>
-              </div>
-              <button className="w-full py-4 bg-[#00351D] text-white rounded-xl text-[11px] font-bold hover:brightness-110 transition-all shadow-lg uppercase tracking-widest">
-                Manage Advance
-              </button>
-            </div>
+            <h4 className="font-headline text-xl font-bold text-primary mb-2">Unlock Cash Advances</h4>
+            <p className="text-sm text-on-surface-variant mb-6">Process payments through your Paybill to build your Trust Score and unlock instant liquidity.</p>
+            <button onClick={() => navigate('/cash-advance')} className="w-full py-3 bg-[#00351D] text-white rounded-xl text-[11px] font-bold hover:brightness-110 transition-all shadow-lg uppercase tracking-widest">
+              Learn More
+            </button>
           </section>
 
           <section className="bg-[#E6FFFA] p-6 rounded-2xl border border-emerald-100 shadow-sm flex items-start gap-4">
@@ -333,28 +314,11 @@ export default function Overview() {
             </div>
             <div>
               <p className="text-[9px] font-bold text-emerald-800 uppercase tracking-[0.2em] mb-1">Growth Tip</p>
-              <p className="text-[11px] text-emerald-900 leading-snug font-medium opacity-80">Boost your trust score to 80 to unlock KES 250,000 limits.</p>
+              <p className="text-[11px] text-emerald-900 leading-snug font-medium opacity-80">Instruct your customers to use Paybill {merchant?.paybillAccount || '...'} to increase your daily volume.</p>
             </div>
           </section>
         </div>
       </div>
-
-      {/* Section 6: Quick Actions Row */}
-      <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 pb-20">
-        {[
-          { icon: 'add_card', label: 'Request Advance' },
-          { icon: 'send_money', label: 'Send Bulk Payments' },
-          { icon: 'swap_horiz', label: 'Swap USDC' },
-          { icon: 'insights', label: 'Trust Score' }
-        ].map((action, idx) => (
-          <button key={idx} className="flex flex-col items-center justify-center p-6 lg:p-8 bg-white rounded-[16px] lg:rounded-[20px] border border-[#E5E7EB] border-t-2 border-t-[#00351D] shadow-sm hover:bg-[#00351D] hover:border-[#00351D] transition-all group active:scale-95">
-            <div className="w-10 h-10 lg:w-14 lg:h-14 rounded-full bg-[#F0FDF4] mb-3 lg:mb-4 flex items-center justify-center border border-emerald-50 group-hover:bg-white/10 transition-colors">
-              <span className="material-symbols-outlined text-primary group-hover:text-[#5EFEB3] text-xl lg:text-2xl group-hover:scale-110 transition-all">{action.icon}</span>
-            </div>
-            <span className="text-[9px] lg:text-[11px] font-bold text-primary uppercase tracking-widest leading-none group-hover:text-white transition-colors">{action.label}</span>
-          </button>
-        ))}
-      </section>
     </MerchantLayout>
   )
 }

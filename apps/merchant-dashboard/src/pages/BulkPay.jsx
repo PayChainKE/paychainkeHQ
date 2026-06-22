@@ -4,7 +4,6 @@ import domtoimage from 'dom-to-image'
 import axios from 'axios'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
-import { payees, bulkPayHistory } from '../mockData/bulkPay'
 import { formatKES } from '../utils/formatCurrency'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useNotification } from '../context/NotificationContext'
@@ -41,13 +40,8 @@ export default function BulkPay() {
   const [isEditing, setIsEditing] = useState(false)
   const [editingId, setEditingId] = useState(null)
   
-  const [selectedPayees, setSelectedPayees] = useState(
-    payees.slice(0, 3).reduce((acc, p) => ({ ...acc, [p.id]: true }), {})
-  )
-
-  const [payoutAmounts, setPayoutAmounts] = useState(
-    payees.reduce((acc, p) => ({ ...acc, [p.id]: p.salary || p.amount || 0 }), {})
-  )
+  const [selectedPayees, setSelectedPayees] = useState({})
+  const [payoutAmounts, setPayoutAmounts] = useState({})
 
   const [newPayee, setNewPayee] = useState({ 
     name: '', 
@@ -357,12 +351,7 @@ export default function BulkPay() {
     setShowLinkModal(false);
   };
 
-  const [invoicesList, setInvoicesList] = useState([
-    { id: 'INV-420915', customer: 'Acme Corp', amount: 154000, date: '12 Apr 2026', status: 'Sent' },
-    { id: 'INV-883102', customer: 'Zeta Technologies', amount: 84000, date: '11 Apr 2026', status: 'Sent' },
-    { id: 'INV-109482', customer: 'Nexus Imports', amount: 32000, date: '13 Apr 2026', status: 'Draft' },
-    { id: 'INV-551029', customer: 'Local Retailer Ltd', amount: 110500, date: '10 Apr 2026', status: 'Draft' },
-  ]);
+  const [invoicesList, setInvoicesList] = useState([]);
   const [invoiceFilter, setInvoiceFilter] = useState('All');
 
   // Fund Account Modal State
@@ -1396,7 +1385,13 @@ export default function BulkPay() {
                <div className="mt-8">
                  <h4 className="text-xs font-black uppercase tracking-widest text-on-surface-variant opacity-50 mb-4">Recent Activity</h4>
                  <div className="flex flex-col gap-3">
-                   {invoicesList.filter(inv => invoiceFilter === 'All' || inv.status === (invoiceFilter === 'Drafts' ? 'Draft' : invoiceFilter)).map(inv => (
+                   {invoicesList.length === 0 ? (
+                     <div className="p-8 rounded-[20px] bg-surface-container-lowest border border-outline-variant/10 text-center flex flex-col items-center">
+                       <span className="material-symbols-outlined text-4xl text-on-surface-variant/40 mb-3">receipt_long</span>
+                       <p className="text-sm font-bold text-primary mb-1">No recent invoices</p>
+                       <p className="text-xs text-on-surface-variant opacity-70">Generate your first professional e-invoice to start getting paid.</p>
+                     </div>
+                   ) : invoicesList.filter(inv => invoiceFilter === 'All' || inv.status === (invoiceFilter === 'Drafts' ? 'Draft' : invoiceFilter)).map(inv => (
                      <div key={inv.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-[20px] bg-surface-container-lowest border border-outline-variant/10 shadow-sm hover:border-emerald-500/20 transition-all group gap-4">
                        <div className="flex items-center gap-4">
                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${inv.status === 'Sent' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>

@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useNotification } from '../../context/NotificationContext'
 import { useMerchantAuth } from '../../context/MerchantAuthContext'
-import { mockMerchant } from '../../mockData/merchant'
 import userIcon from '../../assets/user-icon.png'
 
 export default function MerchantHeader({ title, onMenuClick }) {
@@ -76,8 +75,8 @@ export default function MerchantHeader({ title, onMenuClick }) {
                   <img src={userIcon} alt="Avatar" className="w-full h-full object-cover" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-xs font-black text-primary uppercase tracking-widest mb-0.5 truncate">{merchant?.businessName || mockMerchant.businessName}</p>
-                  <p className="text-[10px] text-on-surface-variant font-medium opacity-60 truncate">{merchant?.email || mockMerchant.email}</p>
+                  <p className="text-xs font-black text-primary uppercase tracking-widest mb-0.5 truncate">{merchant?.businessName || 'Admin'}</p>
+                  <p className="text-[10px] text-on-surface-variant font-medium opacity-60 truncate">{merchant?.email || 'admin@paychain.ke'}</p>
                 </div>
               </div>
               

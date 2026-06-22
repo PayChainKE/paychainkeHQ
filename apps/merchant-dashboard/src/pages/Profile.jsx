@@ -1,6 +1,5 @@
 import React, { useState } from 'react'
 import MerchantLayout from '../components/layout/MerchantLayout'
-import { mockMerchant } from '../mockData/merchant'
 import { useToast } from '../context/NotificationContext'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
@@ -8,8 +7,8 @@ import { useMerchantAuth } from '../context/MerchantAuthContext'
 export default function Profile() {
   const { showAmounts } = usePrivacyMode()
   const { merchant } = useMerchantAuth()
-  const [name, setName] = useState(merchant?.name || mockMerchant.name)
-  const [email, setEmail] = useState(merchant?.email || mockMerchant.email)
+  const [name, setName] = useState(merchant?.name || 'Admin')
+  const [email, setEmail] = useState(merchant?.email || 'admin@paychain.ke')
   const [autoSettle, setAutoSettle] = useState(true)
   const [showQuestions, setShowQuestions] = useState(false)
   const toast = useToast()
@@ -19,11 +18,7 @@ export default function Profile() {
     toast.push({ message: 'Profile updated' })
   }
 
-  const loginHistory = [
-    { device: 'iPhone 15 Pro', location: 'Nairobi, KE', time: 'Active now' },
-    { device: 'MacBook Pro 16"', location: 'Nairobi, KE', time: '2 hours ago' },
-    { device: 'Chrome on Windows', location: 'Mombasa, KE', time: 'Yesterday' },
-  ]
+  const loginHistory = []
 
   return (
     <MerchantLayout title="Settings">
@@ -251,7 +246,7 @@ export default function Profile() {
                 </div>
                 <h4 className="text-[10px] text-blue-200/60 font-bold uppercase tracking-widest mb-1">Merchant Identity</h4>
                 <p className={`font-headline text-2xl lg:text-3xl mb-1 transition-all duration-300 ${!showAmounts && 'blur-md'}`}>PAYBILL: 400200</p>
-                <p className={`font-headline text-2xl lg:text-3xl mb-1 transition-all duration-300 ${!showAmounts && 'blur-md'}`}>ACC: {merchant?.paybillAccount || mockMerchant.tillNumber}</p>
+                <p className={`font-headline text-2xl lg:text-3xl mb-1 transition-all duration-300 ${!showAmounts && 'blur-md'}`}>ACC: {merchant?.paybillAccount || '84729'}</p>
                 <p className="text-sm text-blue-100/60 font-medium">Verified Merchant since Oct 2025</p>
                 <div className="mt-8 pt-8 border-t border-white/10 flex items-center gap-2">
                   <span className="material-symbols-outlined text-emerald-400 text-sm" style={{fontVariationSettings: "'FILL' 1"}}>check_circle</span>
@@ -264,19 +259,23 @@ export default function Profile() {
             <div className="bg-surface-container-lowest p-8 rounded-[32px] border border-outline-variant/10 shadow-sm editorial-shadow">
               <h3 className="font-headline font-bold text-lg text-primary mb-6">Security History</h3>
               <div className="space-y-6">
-                {loginHistory.map((log, i) => (
-                  <div key={i} className="flex items-center gap-4">
-                    <div className="w-8 h-8 rounded-lg bg-surface-container-low flex items-center justify-center text-on-surface-variant">
-                      <span className="material-symbols-outlined text-sm">{log.device.includes('iPhone') ? 'smartphone' : 'laptop_mac'}</span>
+                {loginHistory.length === 0 ? (
+                  <p className="text-sm text-on-surface-variant font-medium text-center py-4 opacity-70">No recent security events.</p>
+                ) : (
+                  loginHistory.map((log, i) => (
+                    <div key={i} className="flex items-center gap-4">
+                      <div className="w-8 h-8 rounded-lg bg-surface-container-low flex items-center justify-center text-on-surface-variant">
+                        <span className="material-symbols-outlined text-sm">{log.device.includes('iPhone') ? 'smartphone' : 'laptop_mac'}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-on-surface truncate">{log.device}</p>
+                        <p className="text-[10px] text-on-surface-variant font-medium">{log.location} • {log.time}</p>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-on-surface truncate">{log.device}</p>
-                      <p className="text-[10px] text-on-surface-variant font-medium">{log.location} • {log.time}</p>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
-              <button className="w-full mt-8 py-3.5 rounded-xl bg-emerald-500 text-[#06201B] text-xs font-black uppercase tracking-widest shadow-md hover:bg-[#06201B] hover:text-emerald-400 hover:shadow-xl transition-all duration-300 active:scale-95">
+              <button className="w-full mt-8 py-3.5 rounded-xl bg-emerald-500 text-[#06201B] text-xs font-black uppercase tracking-widest shadow-md hover:bg-[#06201B] hover:text-emerald-400 hover:shadow-xl transition-all duration-300 active:scale-95 disabled:opacity-50" disabled={loginHistory.length === 0}>
                 Sign Out All Devices
               </button>
             </div>

@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react'
 import axios from 'axios'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
-import { transactionsData } from '../mockData/transactions'
 import { formatDateISO } from '../utils/formatDate'
 import { formatKES, formatUSDC } from '../utils/formatCurrency'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
@@ -27,11 +26,10 @@ export default function Transactions() {
       try {
         const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
         const res = await axios.get(`${API_URL}/api/transactions`);
-        // If empty, we fallback to mock for demo purposes if desired, but let's show real data
-        setLiveTransactions(res.data.length > 0 ? res.data : transactionsData);
+        setLiveTransactions(res.data);
       } catch (err) {
         console.error('Failed to load transactions', err);
-        setLiveTransactions(transactionsData);
+        setLiveTransactions([]);
       } finally {
         setIsLoading(false);
       }
@@ -40,7 +38,7 @@ export default function Transactions() {
     if (merchant) {
       fetchTransactions();
     } else {
-      setLiveTransactions(transactionsData);
+      setLiveTransactions([]);
       setIsLoading(false);
     }
   }, [merchant]);
@@ -304,6 +302,20 @@ export default function Transactions() {
     setCurrentPage(1)
   }, [activeTab, searchQuery])
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const weekAgo = new Date(today);
+  weekAgo.setDate(today.getDate() - 7);
+  const monthAgo = new Date(today);
+  monthAgo.setMonth(today.getMonth() - 1);
+
+  const stats = {
+    today: liveTransactions.filter(t => new Date(t.createdAt || t.timestamp) >= today).reduce((s, t) => s + (t.kesAmount || t.amount || 0), 0),
+    week: liveTransactions.filter(t => new Date(t.createdAt || t.timestamp) >= weekAgo).reduce((s, t) => s + (t.kesAmount || t.amount || 0), 0),
+    month: liveTransactions.filter(t => new Date(t.createdAt || t.timestamp) >= monthAgo).reduce((s, t) => s + (t.kesAmount || t.amount || 0), 0),
+    allTime: liveTransactions.reduce((s, t) => s + (t.kesAmount || t.amount || 0), 0)
+  };
+
   return (
     <MerchantLayout title="Transactions">
       <div className="px-1 lg:px-0 max-w-7xl mx-auto w-full">
@@ -313,20 +325,32 @@ export default function Transactions() {
           <p className="text-on-surface-variant text-[11px] lg:text-sm font-medium mt-1.5 opacity-80">All verified inbound payments to Till 84729</p>
         </div>
 
-        {/* Section 1: Summary Strip */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6 mb-8 lg:mb-12 animate-fade-in-up [animation-delay:100ms]">
-          {[
-            { label: 'Today', value: 'KES 12,450.00', text: 'text-emerald-700 font-bold' },
-            { label: 'This Week', value: 'KES 84,920.50', text: 'text-emerald-700 font-bold' },
-            { label: 'This Month', value: 'KES 245,100.00', text: 'text-emerald-700 font-bold' },
-            { label: 'All Time', value: 'KES 1.84M', text: 'text-emerald-700 font-bold' },
-          ].map((stat, i) => (
-            <div key={i} className="bg-white p-6 lg:p-8 rounded-[24px] lg:rounded-[32px] border border-outline-variant/10 shadow-sm transition-transform hover:scale-105 group">
-              <p className="text-[9px] lg:text-[10px] text-on-surface-variant font-black uppercase tracking-widest mb-1 lg:mb-2">{stat.label}</p>
-              <p className={`${stat.text} font-headline font-bold text-lg lg:text-2xl transition-all duration-300 ${!showAmounts && 'blur-md'}`}>{stat.value}</p>
+        {liveTransactions.length === 0 ? (
+          <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/10 editorial-shadow p-12 lg:p-20 flex flex-col items-center justify-center text-center animate-fade-in-up mt-8">
+            <div className="w-24 h-24 bg-surface-container-low rounded-full flex items-center justify-center mb-6 border border-slate-200">
+              <span className="material-symbols-outlined text-5xl text-emerald-600/50">receipt_long</span>
             </div>
-          ))}
-        </div>
+            <h3 className="text-2xl font-headline font-bold text-primary mb-3">No Transactions Yet</h3>
+            <p className="text-[15px] text-on-surface-variant font-medium max-w-md mx-auto leading-relaxed opacity-80">
+              Real-time payments made to your Paybill account will appear here instantly. Instruct your customers to use <strong>Paybill 400200</strong> and your account number <strong className="text-primary">{merchant?.paybillAccount || '84729'}</strong>.
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Section 1: Summary Strip */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6 mb-8 lg:mb-12 animate-fade-in-up [animation-delay:100ms]">
+              {[
+                { label: 'Today', value: formatKES(stats.today), text: 'text-emerald-700 font-bold' },
+                { label: 'This Week', value: formatKES(stats.week), text: 'text-emerald-700 font-bold' },
+                { label: 'This Month', value: formatKES(stats.month), text: 'text-emerald-700 font-bold' },
+                { label: 'All Time', value: formatKES(stats.allTime), text: 'text-emerald-700 font-bold' },
+              ].map((stat, i) => (
+                <div key={i} className="bg-white p-6 lg:p-8 rounded-[24px] lg:rounded-[32px] border border-outline-variant/10 shadow-sm transition-transform hover:scale-105 group">
+                  <p className="text-[9px] lg:text-[10px] text-on-surface-variant font-black uppercase tracking-widest mb-1 lg:mb-2">{stat.label}</p>
+                  <p className={`${stat.text} font-headline font-bold text-lg lg:text-2xl transition-all duration-300 ${!showAmounts && 'blur-md'}`}>{stat.value}</p>
+                </div>
+              ))}
+            </div>
 
         {/* Section 2: Filter Bar */}
         <div className="flex flex-col md:flex-row gap-4 items-center justify-between mb-8">
@@ -369,18 +393,6 @@ export default function Transactions() {
         <div className="grid grid-cols-12 gap-8 items-start">
           {/* Section 3: Transaction List & Pagination */}
           <div className="col-span-12 space-y-4">
-            {liveTransactions.length === 0 ? (
-              <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/10 editorial-shadow p-12 lg:p-20 flex flex-col items-center justify-center text-center animate-fade-in-up">
-                <div className="w-24 h-24 bg-surface-container-low rounded-full flex items-center justify-center mb-6 border border-slate-200">
-                  <span className="material-symbols-outlined text-5xl text-emerald-600/50">receipt_long</span>
-                </div>
-                <h3 className="text-2xl font-headline font-bold text-primary mb-3">No Transactions Yet</h3>
-                <p className="text-[15px] text-on-surface-variant font-medium max-w-md mx-auto leading-relaxed opacity-80">
-                  Real-time payments made to your Paybill account will appear here instantly. Instruct your customers to use <strong>Paybill 400200</strong> and your account number <strong className="text-primary">{merchant?.paybillAccount || '84729'}</strong>.
-                </p>
-              </div>
-            ) : (
-              <>
             {/* Desktop Table View */}
             <div className="hidden lg:block bg-surface-container-lowest rounded-2xl shadow-sm overflow-hidden border border-outline-variant/10 editorial-shadow">
               <div className="overflow-x-auto text-on-surface">
@@ -525,8 +537,10 @@ export default function Transactions() {
                 </button>
               </div>
             </div>
-              </>
-            )}
+              </div>
+            </div>
+          </>
+        )}
           </div>
 
           {/* Section 4: Detail Panel (Side-Slide Drawer) */}
@@ -631,8 +645,6 @@ export default function Transactions() {
               </div>
             </div>
           )}
-        </div>
-      </div>
     </MerchantLayout>
   )
 }

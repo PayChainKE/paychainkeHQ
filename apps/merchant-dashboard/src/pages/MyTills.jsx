@@ -1,7 +1,6 @@
 import React, { useState } from 'react'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
-import { mockMerchant } from '../mockData/merchant'
 
 export default function MyTills() {
   const { merchant } = useMerchantAuth()
@@ -11,11 +10,11 @@ export default function MyTills() {
   const tillsData = [
     {
       service: 'PayChain',
-      accountNumber: merchant?.paybillAccount || mockMerchant.tillNumber,
+      accountNumber: merchant?.paybillAccount || '84729',
       type: 'Account',
-      name: merchant?.businessName || mockMerchant.businessName,
+      name: merchant?.businessName || 'Merchant',
       linkedTransferAccount: '—',
-      manager: merchant?.name || mockMerchant.name,
+      manager: merchant?.name || 'Owner',
       status: 'Active'
     }
   ]

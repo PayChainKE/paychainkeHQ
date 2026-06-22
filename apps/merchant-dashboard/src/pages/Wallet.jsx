@@ -1,8 +1,7 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import axios from 'axios'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import { formatKES, formatUSDC } from '../utils/formatCurrency'
-import { mockMerchant } from '../mockData/merchant'
-import { walletStats, walletHistory } from '../mockData/wallet'
 import { formatDateISO } from '../utils/formatDate'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useToast } from '../context/NotificationContext'
@@ -12,8 +11,12 @@ export default function Wallet() {
   const { merchant } = useMerchantAuth()
   const { showAmounts } = usePrivacyMode()
   const { addToast } = useToast()
+  const withdrawalDestinations = [
+    { id: 'bank-1', name: 'KCB Bank', type: 'Bank', acc: '**** 5283', img: 'account_balance' },
+    { id: 'mpesa-1', name: 'M-PESA Number', type: 'Mobile', acc: '0712***890', img: 'smartphone' }
+  ]
   const [withdrawAmount, setWithdrawAmount] = useState('')
-  const [destination, setDestination] = useState(walletStats.withdrawalDestinations[0].id)
+  const [destination, setDestination] = useState(withdrawalDestinations[0].id)
   const [isWithdrawing, setIsWithdrawing] = useState(false)
   
   // QR Features
@@ -34,6 +37,25 @@ export default function Wallet() {
   // Primary Ledger Actions
   const [showMoveMoney, setShowMoveMoney] = useState(false)
 
+  const [liveTransactions, setLiveTransactions] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchTransactions = async () => {
+      try {
+        const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+        const res = await axios.get(`${API_URL}/api/transactions`)
+        setLiveTransactions(res.data)
+      } catch (err) {
+        console.error('Failed to fetch transactions', err)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    if (merchant) fetchTransactions()
+    else setIsLoading(false)
+  }, [merchant])
+
   const handleWithdraw = (e) => {
     e.preventDefault()
     if (!withdrawAmount || Number(withdrawAmount) <= 0) return
@@ -51,7 +73,7 @@ export default function Wallet() {
   }
 
   // QR Logic
-  const qrData = `paychain://pay?till=${merchant?.paybillAccount || mockMerchant.tillNumber}&name=${encodeURIComponent(merchant?.businessName || mockMerchant.businessName)}`
+  const qrData = `paychain://pay?till=${merchant?.paybillAccount || '84729'}&name=${encodeURIComponent(merchant?.businessName || 'Merchant')}`
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrData)}&margin=10&bgcolor=FFFFFF&color=00351D`
 
   const handleDownload = () => {
@@ -84,8 +106,8 @@ export default function Wallet() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `Pay ${merchant?.businessName || mockMerchant.businessName}`,
-          text: `Scan to pay ${merchant?.businessName || mockMerchant.businessName} on PayChain`,
+          title: `Pay ${merchant?.businessName || 'Merchant'}`,
+          text: `Scan to pay ${merchant?.businessName || 'Merchant'} on PayChain`,
           url: qrData
         })
       } catch (err) {
@@ -106,7 +128,7 @@ export default function Wallet() {
     setIsGeneratingLink(true)
     setTimeout(() => {
       setIsGeneratingLink(false)
-      const link = `https://pay.paychain.ke/400200/${merchant?.paybillAccount || mockMerchant.tillNumber}/${paymentLinkAmount}`
+      const link = `https://pay.paychain.ke/400200/${merchant?.paybillAccount || '84729'}/${paymentLinkAmount}`
       setGeneratedLink(link)
       addToast({
         title: 'Payment Link Created',
@@ -121,7 +143,7 @@ export default function Wallet() {
     addToast({ title: 'Link Copied', message: 'Payment link copied to clipboard.', type: 'success' })
   }
 
-  const selectedDest = walletStats.withdrawalDestinations.find(d => d.id === destination)
+  const selectedDest = withdrawalDestinations.find(d => d.id === destination)
 
   return (
     <MerchantLayout title="Digital Wallet">
@@ -143,18 +165,18 @@ export default function Wallet() {
                 </div>
                 <p className="text-white/40 text-[9px] md:text-[10px] font-bold uppercase tracking-widest mb-1">Global Settlement Balance</p>
                 <h3 className={`font-headline font-bold text-2xl md:text-3xl lg:text-4xl tracking-tighter tabular-nums mb-3 transition-all duration-300 ${!showAmounts && 'blur-xl'}`}>
-                  {formatUSDC(mockMerchant.financials.usdcBalance)}
+                  {merchant?.usdcBalance?.toLocaleString(undefined, { minimumFractionDigits: 2 }) || '0.00'} USDC
                 </h3>
                 <div 
                   onClick={() => {
-                    navigator.clipboard.writeText(mockMerchant.fullWalletAddress)
+                    navigator.clipboard.writeText('0x8472...9xK2')
                     addToast({ title: 'Address Copied', message: 'Wallet address copied to clipboard', type: 'success' })
                   }}
                   className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white/5 hover:bg-white/10 rounded-full border border-white/5 cursor-pointer transition-all active:scale-95 group mb-2"
                 >
                   <span className="text-[9px] text-white/40 font-mono tracking-wider">
                     <span className="font-bold text-white/20 mr-1 italic">Wallet:</span>
-                    {mockMerchant.walletAddress}
+                    0x8472...9xK2
                   </span>
                   <span className="material-symbols-outlined text-xs text-white/20 group-hover:text-white/60 transition-colors shrink-0">content_copy</span>
                 </div>
@@ -195,7 +217,7 @@ export default function Wallet() {
                 </div>
                 <p className="text-on-surface-variant/40 text-[9px] md:text-[10px] font-bold uppercase tracking-widest mb-1">Available for Withdrawal</p>
                 <h3 className={`font-headline font-bold text-2xl md:text-3xl lg:text-4xl tracking-tighter tabular-nums text-primary transition-all duration-300 ${!showAmounts && 'blur-xl'}`}>
-                  {formatKES(mockMerchant.financials.kesBalance)}
+                  {formatKES(merchant?.kesBalance || 0)}
                 </h3>
              </div>
              <div className="flex gap-3 mt-6 relative z-10">
@@ -236,7 +258,7 @@ export default function Wallet() {
               <div className="space-y-3">
                 <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Destination</label>
                 <div className="grid grid-cols-1 gap-3">
-                  {walletStats.withdrawalDestinations.map((dest) => (
+                  {withdrawalDestinations.map((dest) => (
                     <div 
                       key={dest.id}
                       onClick={() => setDestination(dest.id)}
@@ -310,13 +332,13 @@ export default function Wallet() {
                         </div>
                         <div className="overflow-hidden">
                           <p className="text-[10px] text-on-surface-variant font-black uppercase tracking-widest opacity-40">Blockchain Settlement: <span className="text-emerald-600 italic">PayChain Wallet</span></p>
-                          <p className="text-sm font-mono text-primary font-bold tracking-wider">{mockMerchant.walletAddress}</p>
+                          <p className="text-sm font-mono text-primary font-bold tracking-wider">0x8472...9xK2</p>
                         </div>
                       </div>
                       <div className="w-full md:w-auto flex flex-col items-center sm:items-end gap-2 shrink-0">
                         <button 
                           onClick={() => {
-                            navigator.clipboard.writeText(mockMerchant.fullWalletAddress)
+                            navigator.clipboard.writeText('0x8472...9xK2')
                             addToast({ title: 'Address Copied', message: 'Wallet address copied to clipboard', type: 'success' })
                           }}
                           className="w-full sm:w-auto px-5 py-3 bg-white border border-outline-variant/10 text-primary rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm hover:bg-emerald-50 transition-all flex items-center justify-center gap-2 self-stretch sm:self-auto"
@@ -405,8 +427,8 @@ export default function Wallet() {
                         <p className="text-emerald-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2 opacity-80">Settlement QR</p>
                         <div className="space-y-1">
                           <p className="text-white text-xl font-headline tracking-widest">PAYBILL: 400200</p>
-                          <p className="text-white text-xl font-headline tracking-widest">ACC: {merchant?.paybillAccount || mockMerchant.tillNumber}</p>
-                          <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest leading-relaxed mt-2">Merchant: {merchant?.businessName || mockMerchant.businessName}</p>
+                          <p className="text-white text-xl font-headline tracking-widest">ACC: {merchant?.paybillAccount || '84729'}</p>
+                          <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest leading-relaxed mt-2">Merchant: {merchant?.businessName || 'Merchant'}</p>
                         </div>
                       </div>
                     </div>
@@ -503,7 +525,11 @@ export default function Wallet() {
               <button className="text-[9px] md:text-[10px] font-bold text-primary uppercase tracking-[0.2em] hover:opacity-60 transition-opacity">View All</button>
             </div>
             <div className="flex flex-col">
-              {walletHistory.map((tx, idx) => (
+              {liveTransactions.length === 0 ? (
+                <div className="p-8 text-center">
+                  <p className="text-sm font-medium text-on-surface-variant">No transaction history yet.</p>
+                </div>
+              ) : liveTransactions.slice(0, 5).map((tx, idx) => (
                 <div key={tx.id} className="px-4 md:px-8 py-6 flex items-center justify-between hover:bg-surface-container-low/30 transition-all group border-b border-surface-container last:border-0">
                   <div className="flex items-center gap-3 md:gap-4">
                     <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center text-lg md:text-xl shadow-sm border ${
