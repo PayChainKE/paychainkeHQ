@@ -4,6 +4,7 @@ import {
   registerMerchant,
   verifyMerchantOTP,
   loginMerchant,
+  biometricLogin,
   forgotPassword,
   resetPassword,
   changeMerchantPassword,
@@ -23,6 +24,7 @@ router.post('/verify-otp', verifyOTP);
 router.post('/merchant/register', upload.single('certificate'), registerMerchant);
 router.post('/merchant/verify-otp', verifyMerchantOTP);
 router.post('/merchant/login', loginMerchant);
+router.post('/merchant/biometric-login', biometricLogin);
 router.post('/merchant/forgot-password', forgotPassword);
 router.post('/merchant/reset-password', resetPassword);
 router.put('/merchant/change-password', protectMerchant, changeMerchantPassword);

@@ -17,7 +17,7 @@ const KENYAN_COUNTIES = [
 ]
 
 export default function Login() {
-  const { login, signup, verifyOTP, forgotPassword, resetPassword } = useMerchantAuth()
+  const { login, biometricLogin, signup, verifyOTP, forgotPassword, resetPassword } = useMerchantAuth()
   const { addNotification } = useNotification()
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
@@ -50,6 +50,7 @@ export default function Login() {
   const [isSignupPasswordStep, setIsSignupPasswordStep] = useState(false)
   const [otpFlowType, setOtpFlowType] = useState('') // 'login' or 'reset'
   const [authEmail, setAuthEmail] = useState('') // Captured from backend for OTP verification
+  const [hasBiometrics, setHasBiometrics] = useState(!!localStorage.getItem('last_biometric_user'))
   
   // Real-time security validation
   useEffect(() => {
@@ -77,6 +78,51 @@ export default function Login() {
       }
     } else {
       setErr(res.error)
+    }
+  }
+
+  async function handleBiometricSignIn() {
+    setErr('')
+    try {
+      if (!window.PublicKeyCredential) {
+        setErr("Biometrics are not supported on this device.")
+        return
+      }
+
+      const challenge = new Uint8Array(32)
+      window.crypto.getRandomValues(challenge)
+
+      // Physically triggers OS-level Face ID / Touch ID prompt
+      const assertion = await navigator.credentials.get({
+        publicKey: {
+          challenge: challenge,
+          timeout: 60000,
+          userVerification: "required"
+        }
+      })
+
+      if (assertion) {
+        // OS verified the user physically. 
+        // We log them in bypassing the password check on the backend for demo purposes.
+        const userEmail = localStorage.getItem('last_biometric_user')
+        if (!userEmail) {
+          setErr("No registered biometric user found.")
+          return
+        }
+
+        setLoading(true)
+        const res = await biometricLogin(userEmail)
+        setLoading(false)
+
+        if (res.success) {
+          nav('/overview')
+        } else {
+          setErr(res.error)
+        }
+      }
+    } catch (error) {
+      console.error(error)
+      setErr("Biometric authentication cancelled or failed.")
     }
   }
 
@@ -574,19 +620,39 @@ export default function Login() {
               </div>
 
               <form onSubmit={handleLogin} className="space-y-5 lg:space-y-6">
+                
+                {hasBiometrics && (
+                  <div className="mb-6 animate-fade-in-up">
+                    <button 
+                      type="button"
+                      onClick={handleBiometricSignIn}
+                      className="w-full bg-emerald-50 text-emerald-700 py-4 lg:py-5 rounded-2xl font-black text-sm lg:text-base shadow-sm hover:bg-emerald-100 active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-emerald-200"
+                    >
+                      <span className="material-symbols-outlined text-2xl">fingerprint</span>
+                      Sign in with Passkey / Biometrics
+                    </button>
+                    
+                    <div className="flex items-center gap-4 my-6 opacity-40">
+                      <div className="flex-1 h-px bg-primary"></div>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-primary">Or use password</span>
+                      <div className="flex-1 h-px bg-primary"></div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-2">
-                  <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Email or Phone Number</label>
+                  <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Mobile Number</label>
                   <div className="flex group">
                     <div className="bg-surface-container-low border border-outline-variant/15 border-r-0 rounded-l-2xl px-4 lg:px-5 flex items-center justify-center text-primary/40 group-focus-within:border-primary transition-colors">
-                      <span className="material-symbols-outlined text-xl">person</span>
+                      <span className="material-symbols-outlined text-xl">phone_iphone</span>
                     </div>
                     <input 
                       className="flex-1 bg-white border border-outline-variant/15 rounded-r-2xl py-3 lg:py-4 px-4 lg:px-5 text-lg font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40"
                       value={phone} 
-                      onChange={e => setPhone(e.target.value)} 
-                      placeholder="john@example.com or 0712..."
-                      type="text"
-                      autoComplete="username"
+                      onChange={e => setPhone(e.target.value.replace(/\D/g, ''))} 
+                      placeholder="0712 345 678"
+                      type="tel"
+                      autoComplete="tel-national"
                       required
                     />
                   </div>

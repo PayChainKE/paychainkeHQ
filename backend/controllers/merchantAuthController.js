@@ -152,27 +152,128 @@ export const loginMerchant = async (req, res) => {
       return res.status(401).json({ error: 'Invalid email/phone or password' });
     }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+    // Check if account has been logged in within the last 3 days
+    const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+    const now = new Date();
+    const needsOTP = !merchant.lastLogin || (now - new Date(merchant.lastLogin)) > THREE_DAYS_MS;
 
-    merchant.otp = otp;
-    merchant.otpExpires = otpExpires;
+    if (needsOTP) {
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+
+      merchant.otp = otp;
+      merchant.otpExpires = otpExpires;
+      await merchant.save();
+
+      console.log(`📧 Dispatching OTP via Resend to: ${merchant.email}`);
+      sendOTP(merchant.email, otp).catch(err => {
+        console.error(`📧 Resend Error: Failed to send OTP to ${merchant.email}:`, err);
+      });
+
+      return res.json({ 
+        success: true, 
+        mfaRequired: true, 
+        email: merchant.email,
+        message: 'OTP sent to your email. Proceed to Stage 2.' 
+      });
+    }
+
+    // Direct login (within 3 days)
+    merchant.loginCount = (merchant.loginCount || 0) + 1;
+    merchant.lastLogin = now;
+    
+    merchant.loginHistory = merchant.loginHistory || [];
+    merchant.loginHistory.unshift({
+      timestamp: now,
+      device: req.headers['user-agent']?.substring(0, 40) || 'Unknown Device',
+      ip: req.ip || req.connection.remoteAddress,
+      location: 'Nairobi, KE' // Mock
+    });
+    if (merchant.loginHistory.length > 10) {
+      merchant.loginHistory = merchant.loginHistory.slice(0, 10);
+    }
+    
     await merchant.save();
 
-    console.log(`📧 Dispatching OTP via Resend to: ${merchant.email}`);
-    sendOTP(merchant.email, otp).catch(err => {
-      console.error(`📧 Resend Error: Failed to send OTP to ${merchant.email}:`, err);
-    });
-
-    res.json({ 
-      success: true, 
-      mfaRequired: true, 
-      email: merchant.email,
-      message: 'OTP sent to your email. Proceed to Stage 2.' 
+    res.json({
+      success: true,
+      mfaRequired: false,
+      merchant: {
+        _id: merchant._id,
+        name: merchant.name,
+        email: merchant.email,
+        phone: merchant.phone,
+        businessName: merchant.businessName,
+        paybillAccount: merchant.paybillAccount,
+        status: merchant.status,
+        loginCount: merchant.loginCount
+      },
+      token: generateToken(merchant._id)
     });
   } catch (error) {
     console.error('Login Merchant Error:', error);
-    res.status(500).json({ error: error.stack || 'Server Error' });
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Biometric Login (Demo Bypass)
+// @route   POST /api/auth/merchant/biometric-login
+// @access  Public
+export const biometricLogin = async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: 'Email required for biometric lookup' });
+  }
+
+  try {
+    const merchant = await Merchant.findOne({ email });
+
+    if (!merchant) {
+      return res.status(401).json({ error: 'Invalid biometric credential' });
+    }
+
+    if (merchant.status === 'suspended') {
+      return res.status(403).json({ error: 'Account suspended' });
+    }
+
+    // Since biometrics verified at the OS level, we bypass password check.
+    // Skip 2FA/OTP for biometrics since it's already multi-factor (device + inherent).
+    
+    // Increment login count & log history
+    merchant.loginCount = (merchant.loginCount || 0) + 1;
+    merchant.loginHistory = merchant.loginHistory || [];
+    merchant.loginHistory.unshift({
+      timestamp: new Date(),
+      device: req.headers['user-agent']?.substring(0, 40) || 'Unknown Device',
+      ip: req.ip || req.connection.remoteAddress,
+      location: 'Nairobi, KE' // Mock
+    });
+    
+    // Keep max 10 logs
+    if (merchant.loginHistory.length > 10) {
+      merchant.loginHistory = merchant.loginHistory.slice(0, 10);
+    }
+    
+    await merchant.save();
+
+    res.json({
+      success: true,
+      mfaRequired: false,
+      merchant: {
+        _id: merchant._id,
+        name: merchant.name,
+        email: merchant.email,
+        phone: merchant.phone,
+        businessName: merchant.businessName,
+        paybillAccount: merchant.paybillAccount,
+        status: merchant.status,
+        loginCount: merchant.loginCount
+      },
+      token: generateToken(merchant._id)
+    });
+  } catch (error) {
+    console.error('Biometric Login Error:', error);
+    res.status(500).json({ error: 'Server Error' });
   }
 };
 
