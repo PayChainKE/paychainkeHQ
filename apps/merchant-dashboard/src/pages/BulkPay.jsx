@@ -823,9 +823,10 @@ export default function BulkPay() {
                               <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-300">
                                 <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">M-PESA Number</label>
                                 <input 
-                                  type="text"
+                                  type="tel"
                                   value={newPayee.phone}
-                                  onChange={(e) => setNewPayee({...newPayee, phone: e.target.value})}
+                                  onChange={(e) => setNewPayee({...newPayee, phone: e.target.value.replace(/\D/g, '')})}
+                                  maxLength={10}
                                   placeholder="07XX XXX XXX"
                                   className="w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 md:px-6 md:py-4 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none"
                                 />
@@ -837,9 +838,10 @@ export default function BulkPay() {
                                 <div className="space-y-1.5">
                                   <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Paybill Number</label>
                                   <input 
-                                    type="text"
+                                    type="tel"
                                     value={newPayee.paybillNumber}
-                                    onChange={(e) => setNewPayee({...newPayee, paybillNumber: e.target.value})}
+                                    onChange={(e) => setNewPayee({...newPayee, paybillNumber: e.target.value.replace(/\D/g, '')})}
+                                    maxLength={7}
                                     placeholder="e.g. 290290"
                                     className="w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 md:px-6 md:py-4 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none"
                                   />
@@ -861,9 +863,10 @@ export default function BulkPay() {
                               <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-300">
                                 <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Till Number</label>
                                 <input 
-                                  type="text"
+                                  type="tel"
                                   value={newPayee.tillNumber}
-                                  onChange={(e) => setNewPayee({...newPayee, tillNumber: e.target.value})}
+                                  onChange={(e) => setNewPayee({...newPayee, tillNumber: e.target.value.replace(/\D/g, '')})}
+                                  maxLength={8}
                                   placeholder="e.g. 567890"
                                   className="w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 md:px-6 md:py-4 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none"
                                 />
@@ -886,9 +889,10 @@ export default function BulkPay() {
                             <div className="space-y-1.5">
                               <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Account No.</label>
                               <input 
-                                type="text"
+                                type="tel"
                                 value={newPayee.accountNumber}
-                                onChange={(e) => setNewPayee({...newPayee, accountNumber: e.target.value})}
+                                onChange={(e) => setNewPayee({...newPayee, accountNumber: e.target.value.replace(/\D/g, '')})}
+                                maxLength={14}
                                 placeholder="0123 XXX XXX"
                                 className="w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 md:px-6 md:py-4 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none"
                               />
