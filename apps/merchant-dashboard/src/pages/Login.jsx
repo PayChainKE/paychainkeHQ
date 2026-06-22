@@ -115,11 +115,13 @@ export default function Login() {
   }
 
   const handleOtpChange = (element, index) => {
-    if (isNaN(element.value)) return false
+    const val = element.value.replace(/\D/g, '')
+    if (element.value !== '' && val === '') return // Reject if they typed a non-number
+    
     const newOtp = [...otp]
-    newOtp[index] = element.value
+    newOtp[index] = val
     setOtp(newOtp)
-    if (element.nextSibling && element.value) {
+    if (element.nextSibling && val) {
       element.nextSibling.focus()
     }
   }
@@ -261,6 +263,7 @@ export default function Login() {
                           value={newPassword} 
                           onChange={e => setNewPasswordInput(e.target.value)} 
                           placeholder="••••••••••••"
+                          autoComplete="new-password"
                           autoFocus
                         />
                         <button 
@@ -304,6 +307,7 @@ export default function Login() {
                           value={confirmPassword} 
                           onChange={e => setConfirmPassword(e.target.value)} 
                           placeholder="Verify password"
+                          autoComplete="new-password"
                         />
                         <button 
                           type="button"
@@ -349,11 +353,11 @@ export default function Login() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Your Name *</label>
-                    <input required className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" placeholder="John Doe" />
+                    <input required autoComplete="name" className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" placeholder="John Doe" />
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Your Email *</label>
-                    <input required type="email" className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" placeholder="john@example.com" />
+                    <input required type="email" autoComplete="email" className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" placeholder="john@example.com" />
                   </div>
                 </div>
 
@@ -362,12 +366,12 @@ export default function Login() {
                     <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Your Phone *</label>
                     <div className="flex group">
                       <div className="bg-surface-container-low border border-outline-variant/15 border-r-0 rounded-l-xl px-3 flex items-center justify-center text-xs font-black text-primary/40 group-focus-within:border-primary transition-colors">+254</div>
-                      <input required className="flex-1 w-full bg-white border border-outline-variant/15 rounded-r-xl py-3 px-3 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" placeholder="712 345 678" type="tel" />
+                      <input required autoComplete="tel-national" className="flex-1 w-full bg-white border border-outline-variant/15 rounded-r-xl py-3 px-3 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" placeholder="712 345 678" type="tel" pattern="[0-9]{9,10}" title="Enter a valid 9 or 10 digit phone number" onInput={(e) => { e.target.value = e.target.value.replace(/\D/g, '') }} />
                     </div>
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Business Name *</label>
-                    <input required className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" placeholder="Acme Corp" />
+                    <input required autoComplete="organization" className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" placeholder="Acme Corp" />
                   </div>
                 </div>
 
@@ -476,7 +480,7 @@ export default function Login() {
                <form onSubmit={(e) => { e.preventDefault(); setOtpFlowType('reset'); setIsOTPMode(true); setActiveTab('login'); }} className="space-y-5 lg:space-y-6">
                 <div className="space-y-2">
                   <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Email or Phone Number</label>
-                  <input className="w-full bg-white border border-outline-variant/15 rounded-2xl py-3 lg:py-4 px-4 lg:px-5 text-lg font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" placeholder="john@example.com or 0712..." type="text" required />
+                  <input className="w-full bg-white border border-outline-variant/15 rounded-2xl py-3 lg:py-4 px-4 lg:px-5 text-lg font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" placeholder="john@example.com or 0712..." type="text" autoComplete="username" required />
                 </div>
                 <button className="w-full bg-[#06201B] text-white py-4 lg:py-5 rounded-2xl font-black text-lg shadow-2xl hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-3 group border border-white/5">
                   Send Recovery Code <span className="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_forward</span>
@@ -503,9 +507,12 @@ export default function Login() {
                     <input 
                       className="flex-1 bg-white border border-outline-variant/15 rounded-r-2xl py-3 lg:py-4 px-4 lg:px-5 text-lg font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40"
                       value={phone} 
-                      onChange={e => setPhone(e.target.value)} 
+                      onChange={e => setPhone(e.target.value.replace(/\D/g, ''))} 
                       placeholder="712 345 678"
                       type="tel"
+                      autoComplete="username tel"
+                      pattern="[0-9]{9,10}"
+                      title="Enter a valid 9 or 10 digit phone number"
                     />
                   </div>
                 </div>
@@ -522,6 +529,7 @@ export default function Login() {
                       value={password} 
                       onChange={e => setPassword(e.target.value)} 
                       placeholder="••••••••"
+                      autoComplete="current-password"
                     />
                     <button 
                       type="button"
@@ -581,6 +589,9 @@ export default function Login() {
                     <input
                       key={index}
                       type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      autoComplete={index === 0 ? "one-time-code" : "off"}
                       maxLength="1"
                       className="w-full aspect-square bg-slate-50 border-2 border-outline-variant/10 rounded-xl lg:rounded-2xl text-center text-xl lg:text-2xl font-black text-primary focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all"
                       value={data}
@@ -638,6 +649,7 @@ export default function Login() {
                       value={newPassword} 
                       onChange={e => setNewPasswordInput(e.target.value)} 
                       placeholder="••••••••••••"
+                      autoComplete="new-password"
                       autoFocus
                     />
                     <button 
@@ -682,6 +694,7 @@ export default function Login() {
                       value={confirmPassword} 
                       onChange={e => setConfirmPassword(e.target.value)} 
                       placeholder="Verify password"
+                      autoComplete="new-password"
                     />
                     <button 
                       type="button"
