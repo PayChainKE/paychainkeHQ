@@ -4,7 +4,6 @@ import { MerchantAuthProvider, useMerchantAuth } from './context/MerchantAuthCon
 import { NotificationProvider } from './context/NotificationContext'
 import ScrollToTop from './components/utils/ScrollToTop'
 import Login from './pages/Login'
-import SetPassword from './pages/SetPassword'
 import Overview from './pages/Overview'
 import Transactions from './pages/Transactions'
 import BulkPay from './pages/BulkPay'
@@ -21,10 +20,9 @@ import RequestMoney from './pages/RequestMoney'
 import ToastHost from './components/ui/Toast'
 
 function Protected({ children }){
-  const { isAuthenticated, isLoading, isFirstLogin } = useMerchantAuth()
+  const { isAuthenticated, isLoading } = useMerchantAuth()
   if (isLoading) return <div style={{padding:40}}>Loading...</div>
-  if (!isAuthenticated && !isFirstLogin) return <Navigate to="/login" />
-  if (isFirstLogin) return <Navigate to="/set-password" />
+  if (!isAuthenticated) return <Navigate to="/login" />
   return children
 }
 
@@ -36,7 +34,6 @@ export default function App(){
         <NotificationProvider>
           <Routes>
             <Route path="/login" element={<Login/>} />
-            <Route path="/set-password" element={<SetPassword/>} />
             <Route path="/" element={<Navigate to="/overview" replace />} />
             <Route path="/overview" element={<Protected><Overview/></Protected>} />
             <Route path="/transactions" element={<Protected><Transactions/></Protected>} />

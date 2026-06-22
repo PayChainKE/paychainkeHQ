@@ -45,8 +45,9 @@ export function MerchantAuthProvider({ children }){
     const norm = normalizePhone(phone)
     const saved = JSON.parse(localStorage.getItem(CRED_KEY) || JSON.stringify({phone:TEST_PHONE,password:TEST_TEMP_PW,first:true}))
     
-    // If using the INITIAL DEMO CREDENTIALS, always trigger reset flow
     if (norm === TEST_PHONE && password === TEST_TEMP_PW) {
+      setMerchant(mockMerchant)
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(mockMerchant))
       setIsFirstLogin(true)
       return { success:true, firstLogin:true }
     }
@@ -69,9 +70,6 @@ export function MerchantAuthProvider({ children }){
     saved.password = newPassword
     saved.first = false
     localStorage.setItem(CRED_KEY, JSON.stringify(saved))
-    setMerchant(mockMerchant)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(mockMerchant))
-    setIsFirstLogin(false)
     return { success:true }
   }
 
