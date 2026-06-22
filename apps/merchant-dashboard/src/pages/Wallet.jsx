@@ -299,9 +299,9 @@ export default function Wallet() {
                 <div className="flex items-center justify-center gap-3 mt-6 pt-5 border-t border-[#1E2532]/50">
                    <span className="text-[8px] font-black uppercase tracking-[0.2em] text-[#8B98A9]/40">Supported Networks</span>
                    <div className="flex items-center gap-2">
-                      <img src="https://cryptologos.cc/logos/usd-coin-usdc-logo.svg?v=032" alt="USDC" className="w-3.5 h-3.5 opacity-40 grayscale hover:grayscale-0 hover:opacity-100 transition-all cursor-help" title="USDC Native" />
-                      <img src="https://cryptologos.cc/logos/polygon-matic-logo.svg?v=032" alt="Polygon" className="w-3.5 h-3.5 opacity-40 grayscale hover:grayscale-0 hover:opacity-100 transition-all cursor-help" title="Polygon" />
-                      <img src="https://cryptologos.cc/logos/celo-celo-logo.svg?v=032" alt="Celo" className="w-3.5 h-3.5 opacity-40 grayscale hover:grayscale-0 hover:opacity-100 transition-all cursor-help" title="Celo" />
+                      <img src="https://cryptologos.cc/logos/usd-coin-usdc-logo.svg?v=032" alt="USDC" className="w-4 h-4 transition-all cursor-help" title="USDC Native" />
+                      <img src="https://cryptologos.cc/logos/polygon-matic-logo.svg?v=032" alt="Polygon" className="w-4 h-4 transition-all cursor-help" title="Polygon" />
+                      <img src="https://cryptologos.cc/logos/celo-celo-logo.svg?v=032" alt="Celo" className="w-4 h-4 transition-all cursor-help" title="Celo" />
                    </div>
                 </div>
               </div>
