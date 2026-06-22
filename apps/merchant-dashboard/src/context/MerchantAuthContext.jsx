@@ -25,6 +25,15 @@ export function MerchantAuthProvider({ children }) {
         setMerchant(JSON.parse(rawMerchant));
         setToken(rawToken);
         axios.defaults.headers.common['Authorization'] = `Bearer ${rawToken}`;
+
+        axios.get(`${API_URL}/api/auth/merchant/me`)
+          .then(res => {
+            if (res.data.success && res.data.merchant) {
+              setMerchant(res.data.merchant);
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(res.data.merchant));
+            }
+          })
+          .catch(err => console.error("Failed to fetch fresh merchant session", err));
       } catch (e) {
         console.error("Failed to parse local session", e);
       }

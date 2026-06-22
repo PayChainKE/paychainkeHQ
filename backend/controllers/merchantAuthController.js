@@ -264,3 +264,35 @@ export const changeMerchantPassword = async (req, res) => {
     res.status(500).json({ error: 'Server Error' });
   }
 };
+
+// @desc    Get current merchant profile
+// @route   GET /api/auth/merchant/me
+// @access  Private (Merchant)
+export const getMerchantMe = async (req, res) => {
+  try {
+    const merchant = await Merchant.findById(req.merchant._id);
+    if (!merchant) {
+      return res.status(404).json({ error: 'Merchant not found' });
+    }
+
+    res.json({
+      success: true,
+      merchant: {
+        _id: merchant._id,
+        name: merchant.name,
+        email: merchant.email,
+        phone: merchant.phone,
+        businessName: merchant.businessName,
+        paybillAccount: merchant.paybillAccount,
+        kesBalance: merchant.kesBalance,
+        isVerified: merchant.isVerified,
+        createdAt: merchant.createdAt,
+        lastLogin: merchant.lastLogin,
+        loginCount: merchant.loginCount
+      }
+    });
+  } catch (error) {
+    console.error('Get Merchant Me Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};

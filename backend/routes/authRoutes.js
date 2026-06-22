@@ -6,7 +6,8 @@ import {
   loginMerchant,
   forgotPassword,
   resetPassword,
-  changeMerchantPassword
+  changeMerchantPassword,
+  getMerchantMe
 } from '../controllers/merchantAuthController.js';
 import { protectMerchant } from '../middleware/authMiddleware.js';
 import { upload } from '../utils/cloudinary.js';
@@ -24,5 +25,6 @@ router.post('/merchant/login', loginMerchant);
 router.post('/merchant/forgot-password', forgotPassword);
 router.post('/merchant/reset-password', resetPassword);
 router.put('/merchant/change-password', protectMerchant, changeMerchantPassword);
+router.get('/merchant/me', protectMerchant, getMerchantMe);
 
 export default router;
