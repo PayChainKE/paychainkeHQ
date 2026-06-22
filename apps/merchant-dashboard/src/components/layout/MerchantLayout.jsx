@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import MerchantSidebar from './MerchantSidebar'
 import MerchantHeader from './MerchantHeader'
-import BiometricSetupModal from './auth/BiometricSetupModal'
+import BiometricSetupModal from '../auth/BiometricSetupModal'
 import poweredByLogo from '../../assets/poweredby-logo.png'
 
 export default function MerchantLayout({ children, title = 'Overview' }) {
