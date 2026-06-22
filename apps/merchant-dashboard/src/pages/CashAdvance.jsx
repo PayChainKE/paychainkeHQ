@@ -1,12 +1,76 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
+import axios from 'axios'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import { mockMerchant } from '../mockData/merchant'
 import { formatKES } from '../utils/formatCurrency'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
+import { useMerchantAuth } from '../context/MerchantAuthContext'
 
 export default function CashAdvance() {
+  const { merchant } = useMerchantAuth()
   const { showAmounts } = usePrivacyMode()
   const adv = mockMerchant.cashAdvance.currentAdvance
+
+  const [trustData, setTrustData] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchScore = async () => {
+      try {
+        const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+        const res = await axios.get(`${API_URL}/api/trust-score`)
+        setTrustData(res.data)
+      } catch (err) {
+        console.error('Failed to fetch trust score', err)
+        setTrustData({ eligibleForAdvance: false })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    if (merchant) {
+      fetchScore()
+    } else {
+      setIsLoading(false)
+    }
+  }, [merchant])
+
+  if (isLoading || !trustData) {
+    return (
+      <MerchantLayout title="Cash Advance">
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      </MerchantLayout>
+    )
+  }
+
+  // If not eligible, show locked state
+  if (!trustData.eligibleForAdvance) {
+    return (
+      <MerchantLayout title="Cash Advance">
+        <div className="px-1 lg:px-0 max-w-4xl mx-auto w-full space-y-8 lg:space-y-12">
+          <div className="mb-6 lg:mb-10">
+            <h2 className="font-headline font-bold text-3xl lg:text-4xl text-primary tracking-tight leading-tight">Cash Advance</h2>
+            <p className="text-on-surface-variant text-[11px] lg:text-sm font-medium mt-1.5 opacity-80 leading-relaxed max-w-2xl">
+              Access liquidity against your future collections. Your repayment is automated based on your daily revenue.
+            </p>
+          </div>
+          <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/10 editorial-shadow p-12 lg:p-20 flex flex-col items-center justify-center text-center animate-fade-in-up">
+            <div className="w-24 h-24 bg-surface-container-low rounded-full flex items-center justify-center mb-6 border border-slate-200">
+              <span className="material-symbols-outlined text-5xl text-amber-600/50">lock</span>
+            </div>
+            <h3 className="text-2xl font-headline font-bold text-primary mb-3">Keep building your Trust Score</h3>
+            <p className="text-[15px] text-on-surface-variant font-medium max-w-md mx-auto leading-relaxed opacity-80 mb-6">
+              You need a Trust Score of at least 60 to unlock Cash Advances. Keep processing payments through your Paybill to increase your score!
+            </p>
+            <a href="/trust-score" className="bg-primary text-white px-8 py-3 rounded-xl font-bold text-sm shadow-md hover:shadow-lg active:scale-95 transition-all">
+              View Trust Score
+            </a>
+          </div>
+        </div>
+      </MerchantLayout>
+    )
+  }
 
   return (
     <MerchantLayout title="Cash Advance">

@@ -10,6 +10,7 @@ import adminRoutes from './routes/adminRoutes.js';
 import bulkPayRoutes from './routes/bulkPayRoutes.js';
 import transactionRoutes from './routes/transactionRoutes.js';
 import mpesaRoutes from './routes/mpesaRoutes.js';
+import trustScoreRoutes from './routes/trustScoreRoutes.js';
 
 dotenv.config();
 
@@ -69,6 +70,7 @@ app.use('/api/contact', contactRoutes);
 app.use('/api/bulkpay', bulkPayRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/mpesa', mpesaRoutes);
+app.use('/api/trust-score', trustScoreRoutes);
 
 // Basic Route
 app.get('/', (req, res) => {

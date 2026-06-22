@@ -1,12 +1,51 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
+import axios from 'axios'
 import MerchantLayout from '../components/layout/MerchantLayout'
-import { mockMerchant } from '../mockData/merchant'
+import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 
 export default function TrustScore() {
+  const { merchant } = useMerchantAuth()
   const { showAmounts } = usePrivacyMode()
-  const score = mockMerchant.trustScore.current
-  const eligible = mockMerchant.trustScore.eligibleForAdvance
+  const [trustData, setTrustData] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchScore = async () => {
+      try {
+        const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+        const res = await axios.get(`${API_URL}/api/trust-score`)
+        setTrustData(res.data)
+      } catch (err) {
+        console.error('Failed to fetch trust score', err)
+        setTrustData({
+          current: 0,
+          eligibleForAdvance: false,
+          factors: { transactionVolume: 0, consistency: 0, revenueGrowth: 0, tenure: 0 }
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    if (merchant) {
+      fetchScore()
+    } else {
+      setIsLoading(false)
+    }
+  }, [merchant])
+
+  if (isLoading || !trustData) {
+    return (
+      <MerchantLayout title="Trust Score">
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      </MerchantLayout>
+    )
+  }
+
+  const score = trustData.current
+  const eligible = trustData.eligibleForAdvance
   
   // SVG Ring Constants
   const radius = 80
@@ -23,10 +62,10 @@ export default function TrustScore() {
   ]
 
   const factors = [
-    { title: 'Transaction Volume', value: `${mockMerchant.trustScore.factors.transactionVolume}%`, color: 'bg-green-500', icon: 'payments' },
-    { title: 'Consistency', value: `${mockMerchant.trustScore.factors.consistency}%`, color: 'bg-blue-500', icon: 'calendar_month' },
-    { title: 'Growth Rate', value: `${mockMerchant.trustScore.factors.revenueGrowth}%`, color: 'bg-amber-500', icon: 'show_chart' },
-    { title: 'Tenure', value: `${mockMerchant.trustScore.factors.tenure}%`, color: 'bg-purple-500', icon: 'history' },
+    { title: 'Transaction Volume', value: `${trustData.factors.transactionVolume}%`, color: 'bg-green-500', icon: 'payments' },
+    { title: 'Consistency', value: `${trustData.factors.consistency}%`, color: 'bg-blue-500', icon: 'calendar_month' },
+    { title: 'Frequency', value: `${trustData.factors.revenueGrowth}%`, color: 'bg-amber-500', icon: 'show_chart' },
+    { title: 'Tenure', value: `${trustData.factors.tenure}%`, color: 'bg-purple-500', icon: 'history' },
   ]
 
   return (
@@ -63,7 +102,7 @@ export default function TrustScore() {
               <span className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest mt-1">Trust Score</span>
             </div>
           </div>
-          <h2 className="font-headline text-3xl text-primary tracking-tight">You're doing great, {mockMerchant.name.split(' ')[0]}!</h2>
+          <h2 className="font-headline text-3xl text-primary tracking-tight">You're doing great, {merchant?.businessName?.split(' ')[0] || 'Merchant'}!</h2>
           <p className="text-on-surface-variant font-medium max-w-md mt-2">
             Your trust score is based on your transaction history and business health. High scores unlock lower interest rates and higher advance limits.
           </p>
