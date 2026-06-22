@@ -8,7 +8,7 @@ import { useToast } from '../context/NotificationContext'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 
 export default function Wallet() {
-  const { merchant } = useMerchantAuth()
+  const { merchant, refreshSession } = useMerchantAuth()
   const { showAmounts } = usePrivacyMode()
   const { addToast } = useToast()
   const withdrawalDestinations = [
@@ -92,7 +92,7 @@ export default function Wallet() {
       });
       addToast({ title: 'Swap Successful', message: `Successfully swapped ${amount} KES to USDC!`, type: 'success' });
       // In a real app, we'd trigger a context refresh here to update the balances
-      setTimeout(() => window.location.reload(), 1500);
+      await refreshSession();
     } catch (err) {
       addToast({ title: 'Swap Failed', message: err.response?.data?.error || 'Failed to swap KES', type: 'error' });
     } finally {
@@ -109,7 +109,7 @@ export default function Wallet() {
         headers: { Authorization: `Bearer ${token}` }
       });
       addToast({ title: 'Wallet Activated', message: 'Your Web3 Digital Wallet has been provisioned!', type: 'success' });
-      setTimeout(() => window.location.reload(), 1500);
+      await refreshSession();
     } catch (err) {
       addToast({ title: 'Activation Failed', message: err.response?.data?.error || 'Failed to activate wallet', type: 'error' });
     } finally {
