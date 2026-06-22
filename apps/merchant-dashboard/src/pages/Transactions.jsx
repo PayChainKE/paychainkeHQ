@@ -104,7 +104,7 @@ export default function Transactions() {
     
     doc.setFontSize(10)
     doc.setFont('helvetica', 'normal')
-    const narrative = `This document serves as the official transaction summary for Till 84729. It provides a comprehensive record of all financial movements, including inbound payments, outbound settlements, and currency swaps. These records are cryptographically verified and stored on the PayChainKE immutable ledger for your business security.`
+    const narrative = `This document serves as the official transaction summary for Till ${merchant?.paybillAccount || '84729'}. It provides a comprehensive record of all financial movements, including inbound payments, outbound settlements, and currency swaps. These records are cryptographically verified and stored on the PayChainKE immutable ledger for your business security.`
     const lines = doc.splitTextToSize(narrative, pageWidth - 30)
     doc.text(lines, 15, 62)
 
@@ -322,7 +322,7 @@ export default function Transactions() {
         {/* Page Title & Subtext */}
         <div className="mb-6 lg:mb-8">
           <h2 className="font-headline font-bold text-3xl lg:text-4xl text-primary tracking-tight">Transactions</h2>
-          <p className="text-on-surface-variant text-[11px] lg:text-sm font-medium mt-1.5 opacity-80">All verified inbound payments to Till 84729</p>
+          <p className="text-on-surface-variant text-[11px] lg:text-sm font-medium mt-1.5 opacity-80">All verified inbound payments to Till {merchant?.paybillAccount || '84729'}</p>
         </div>
 
         {liveTransactions.length === 0 ? (
