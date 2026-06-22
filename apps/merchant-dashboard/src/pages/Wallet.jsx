@@ -143,7 +143,7 @@ export default function Wallet() {
   }
 
   // QR Logic
-  const qrData = `https://pay.paychain.ke/pay/${merchant?.paybillAccount || '84729'}`
+  const qrData = `https://www.paychain.co.ke/pay/${merchant?.paybillAccount || '84729'}`
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrData)}&margin=10&bgcolor=FFFFFF&color=00351D`
 
   const handleDownload = async () => {
@@ -228,7 +228,7 @@ export default function Wallet() {
     setIsGeneratingLink(true)
     setTimeout(() => {
       setIsGeneratingLink(false)
-      const link = `https://pay.paychain.ke/pay/${merchant?.paybillAccount || '84729'}/${paymentLinkAmount}`
+      const link = `https://www.paychain.co.ke/pay/${merchant?.paybillAccount || '84729'}/${paymentLinkAmount}`
       setGeneratedLink(link)
       addToast({
         title: 'Payment Link Created',
@@ -483,19 +483,32 @@ export default function Wallet() {
                 </div>
 
                 {/* Blockchain Settlement Address Block */}
-                <div className="bg-[#131722] border border-[#1E2532] p-5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 hover:border-[#2775CA]/30 transition-colors">
-                  <div className="flex items-start sm:items-center gap-4 w-full sm:w-auto overflow-hidden">
+                <div className="bg-[#131722] border border-[#1E2532] p-5 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 hover:border-[#2775CA]/30 transition-colors">
+                  <div className="flex items-start gap-4 w-full flex-1">
                     <div className="w-10 h-10 rounded-full bg-[#1A212D] text-[#2775CA] flex items-center justify-center border border-[#1E2532] shrink-0 mt-1 sm:mt-0 shadow-inner">
                         <span className="material-symbols-outlined text-xl">account_balance_wallet</span>
                     </div>
-                    <div className="overflow-hidden">
-                      <p className="text-[10px] text-[#8B98A9] font-black uppercase tracking-widest opacity-80 mb-1">Blockchain Settlement: <span className="text-white italic">PayChain Wallet</span></p>
-                      {merchant?.stellarPublicKey
-                            ? <span className="text-sm font-mono text-white font-bold tracking-wider truncate block max-w-[200px]">{merchant.stellarPublicKey.slice(0, 8)}...{merchant.stellarPublicKey.slice(-6)}</span>
-                            : <span className="text-sm font-mono text-amber-500 font-bold tracking-wider">&mdash; Not Activated &mdash;</span>}
+                    <div className="flex-1 w-full min-w-0 flex flex-col gap-3">
+                      <div>
+                        <p className="text-[10px] text-[#8B98A9] font-black uppercase tracking-widest opacity-80 mb-1 leading-snug break-words">Blockchain Settlement: <span className="text-white italic">PayChain Wallet</span></p>
+                        {merchant?.stellarPublicKey
+                              ? <span className="text-sm md:text-base font-mono text-white font-bold tracking-wider block">{merchant.stellarPublicKey.slice(0, 8)}...{merchant.stellarPublicKey.slice(-6)}</span>
+                              : <span className="text-sm md:text-base font-mono text-amber-500 font-bold tracking-wider">&mdash; Not Activated &mdash;</span>}
+                      </div>
+                      <div className="flex items-center gap-2 px-3 py-1.5 bg-[#0B0E14] rounded-full border border-[#1E2532] w-fit">
+                          <span className="text-[7px] font-black uppercase tracking-widest text-[#8B98A9] leading-none">Supported by</span>
+                          <div className="flex items-center gap-1.5">
+                            <img src="https://cryptologos.cc/logos/stellar-xlm-logo.svg?v=032" alt="Stellar" className="w-3.5 h-3.5 brightness-0 invert" title="Stellar" />
+                            <img src="https://cryptologos.cc/logos/celo-celo-logo.svg?v=032" alt="Celo" className="w-3.5 h-3.5" title="Celo" />
+                            <div className="w-3.5 h-3.5 rounded-full bg-[#0052FF] flex items-center justify-center" title="Base">
+                              <div className="w-1.5 h-1.5 rounded-full bg-white"></div>
+                            </div>
+                            <img src="https://cryptologos.cc/logos/polygon-matic-logo.svg?v=032" alt="Polygon" className="w-3.5 h-3.5" title="Polygon" />
+                          </div>
+                      </div>
                     </div>
                   </div>
-                  <div className="w-full md:w-auto flex flex-col items-center sm:items-end gap-3 shrink-0">
+                  <div className="w-full sm:w-auto flex shrink-0">
                     <button 
                       onClick={() => {
                         const addr = merchant?.stellarPublicKey;
@@ -503,23 +516,11 @@ export default function Wallet() {
                         navigator.clipboard.writeText(addr);
                         addToast({ title: 'Address Copied', message: 'Full wallet address copied to clipboard', type: 'success' });
                       }}
-                      className="w-full sm:w-auto px-4 py-2 bg-[#2775CA]/10 border border-[#2775CA]/20 text-[#2775CA] hover:bg-[#2775CA] hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm transition-all flex items-center justify-center gap-2 self-stretch sm:self-auto"
+                      className="w-full sm:w-auto px-2.5 py-1 bg-[#2775CA]/10 border border-[#2775CA]/20 text-[#2775CA] hover:bg-[#2775CA] hover:text-white rounded text-[9px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1"
                     >
-                        <span className="material-symbols-outlined text-sm">content_copy</span>
+                        <span className="material-symbols-outlined text-[11px]">content_copy</span>
                         Copy Address
                     </button>
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-[#0B0E14] rounded-full border border-[#1E2532]">
-                        <span className="text-[7px] font-black uppercase tracking-widest text-[#8B98A9] leading-none">Supported by</span>
-                        <div className="flex items-center gap-1.5">
-                          <img src="https://cryptologos.cc/logos/stellar-xlm-logo.svg?v=032" alt="Stellar" className="w-3.5 h-3.5 brightness-0 invert" title="Stellar" />
-                          <img src="https://cryptologos.cc/logos/celo-celo-logo.svg?v=032" alt="Celo" className="w-3.5 h-3.5" title="Celo" />
-                          <div className="w-3.5 h-3.5 rounded-full bg-[#0052FF] flex items-center justify-center" title="Base">
-                            <div className="w-1.5 h-1.5 rounded-full bg-white"></div>
-                          </div>
-                          <img src="https://cryptologos.cc/logos/polygon-matic-logo.svg?v=032" alt="Polygon" className="w-3.5 h-3.5" title="Polygon" />
-                          <span className="text-[8px] font-bold text-[#8B98A9] ml-0.5">Stellar, Celo, Base, Polygon</span>
-                        </div>
-                    </div>
                   </div>
                 </div>
 
