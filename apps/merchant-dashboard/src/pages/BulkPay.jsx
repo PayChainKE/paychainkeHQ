@@ -118,9 +118,46 @@ export default function BulkPay() {
   }
 
   const handleSavePayee = async () => {
-    if (!newPayee.name) return;
-    const numericAmount = parseFloat(newPayee.amount.replace(/,/g, '')) || 0;
+    if (!newPayee.name) {
+      addNotification({ title: 'Missing Info', message: 'Recipient name is required.', type: 'error' });
+      return;
+    }
 
+    // Professional Settlement Format Validation
+    if (newPayee.paymentMethod === 'Mobile Money') {
+      if (newPayee.mobileMoneyType === 'Personal Number') {
+        const phoneRegex = /^(?:254|\+254|0)?(7[0-9]{8}|1[0-9]{8})$/;
+        if (!phoneRegex.test(newPayee.phone?.replace(/\s+/g, ''))) {
+          addNotification({ title: 'Invalid Format', message: 'Please enter a valid 10-digit Kenyan phone number.', type: 'error' });
+          return;
+        }
+      } else if (newPayee.mobileMoneyType === 'Paybill') {
+        if (!/^\d{5,7}$/.test(newPayee.paybillNumber?.trim())) {
+          addNotification({ title: 'Invalid Format', message: 'Paybill Number must be exactly 5 to 7 digits.', type: 'error' });
+          return;
+        }
+        if (!newPayee.businessAccount?.trim() || newPayee.businessAccount.length > 20) {
+          addNotification({ title: 'Invalid Format', message: 'Account Number is required and must not exceed 20 characters.', type: 'error' });
+          return;
+        }
+      } else if (newPayee.mobileMoneyType === 'Buy Goods') {
+        if (!/^\d{6,8}$/.test(newPayee.tillNumber?.trim())) {
+          addNotification({ title: 'Invalid Format', message: 'Till Number must be exactly 6 to 8 digits.', type: 'error' });
+          return;
+        }
+      }
+    } else if (newPayee.paymentMethod === 'Bank') {
+      if (!newPayee.bankName?.trim()) {
+        addNotification({ title: 'Invalid Format', message: 'Bank Name is required.', type: 'error' });
+        return;
+      }
+      if (!/^\d{8,14}$/.test(newPayee.accountNumber?.trim())) {
+        addNotification({ title: 'Invalid Format', message: 'Bank Account Number must be between 8 and 14 digits.', type: 'error' });
+        return;
+      }
+    }
+
+    const numericAmount = parseFloat(newPayee.amount.replace(/,/g, '')) || 0;
     try {
       const token = localStorage.getItem('paychain_merchant_token');
       const payload = {
