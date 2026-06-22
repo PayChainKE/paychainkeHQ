@@ -464,6 +464,8 @@ export const updateMerchantProfile = async (req, res) => {
         businessName: merchant.businessName,
         paybillAccount: merchant.paybillAccount,
         kesBalance: merchant.kesBalance,
+        usdcBalance: merchant.usdcBalance,
+        stellarPublicKey: merchant.stellarPublicKey,
         isVerified: merchant.isVerified,
         createdAt: merchant.createdAt,
         lastLogin: merchant.lastLogin,
