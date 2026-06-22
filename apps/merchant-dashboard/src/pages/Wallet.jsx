@@ -17,6 +17,7 @@ export default function Wallet() {
   ]
   const [withdrawAmount, setWithdrawAmount] = useState('')
   const [destination, setDestination] = useState(withdrawalDestinations[0].id)
+  const [destinationAccountValue, setDestinationAccountValue] = useState('')
   const [isWithdrawing, setIsWithdrawing] = useState(false)
   
   // QR Features
@@ -61,6 +62,10 @@ export default function Wallet() {
   const handleWithdraw = async (e) => {
     e.preventDefault()
     if(!withdrawAmount || isNaN(withdrawAmount)) return
+    if(!destinationAccountValue) {
+      addToast({ title: 'Missing Account Details', message: 'Please input the correct values for your destination field.', type: 'error' })
+      return
+    }
     setIsWithdrawing(true)
     try {
       const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
@@ -68,7 +73,7 @@ export default function Wallet() {
       await axios.post(`${API_URL}/api/transactions/send-money`, {
         amount: Number(withdrawAmount),
         destination: destination,
-        reference: `Withdrawal to ${destination}`
+        reference: `Withdrawal to ${destinationAccountValue}`
       }, {
         headers: { Authorization: `Bearer ${token}` }
       })
@@ -446,7 +451,7 @@ export default function Wallet() {
                         <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 ${
                            destination === dest.id 
                            ? 'bg-primary text-white shadow-lg' 
-                           : 'bg-surface-container-low text-primary/60 group-hover:bg-primary/10 group-hover:text-primary'
+                           : 'bg-primary/10 text-primary group-hover:bg-primary/20'
                         }`}>
                            <span className="material-symbols-outlined text-[22px]">
                               {dest.type === 'Till' ? 'point_of_sale' : dest.type === 'Mobile' ? 'smartphone' : 'account_balance'}
@@ -473,11 +478,31 @@ export default function Wallet() {
               </div>
 
               {selectedDest && (
+                <div className="space-y-3 mt-4 animate-scale-in">
+                  <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">
+                    {selectedDest.type === 'Bank' ? 'Bank Account Number' : 'M-PESA Number'}
+                  </label>
+                  <div className="relative group">
+                    <div className="absolute left-5 top-1/2 -translate-y-1/2 text-primary/40 flex items-center justify-center">
+                      <span className="material-symbols-outlined text-xl">{selectedDest.type === 'Bank' ? 'account_balance' : 'smartphone'}</span>
+                    </div>
+                    <input 
+                      type={selectedDest.type === 'Bank' ? 'text' : 'tel'}
+                      value={destinationAccountValue}
+                      onChange={(e) => setDestinationAccountValue(e.target.value)}
+                      placeholder={selectedDest.type === 'Bank' ? 'e.g. 1122334455' : 'e.g. 0712345678'}
+                      className="w-full bg-surface-container-low border border-outline-variant/5 rounded-2xl md:rounded-3xl py-4 md:py-6 pl-14 md:pl-16 pr-6 text-xl md:text-2xl font-headline text-primary focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {selectedDest && (
                 <div className="p-5 bg-[#F0FDF4] rounded-2xl border border-emerald-100 flex items-start gap-4 animate-scale-in">
                    <span className="material-symbols-outlined text-emerald-600 mt-0.5">info</span>
                    <div>
                       <p className="text-[11px] text-emerald-900 font-medium leading-relaxed">
-                        Withdrawals to <strong>{selectedDest.name}</strong> are typically processed within <span className="font-bold">minutes</span>.
+                        Withdrawals are typically processed within <span className="font-bold">minutes</span>.
                       </p>
                    </div>
                 </div>
