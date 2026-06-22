@@ -69,17 +69,41 @@ export default function Wallet() {
     }, 1500)
   }
 
+  const [showSwapModal, setShowSwapModal] = useState(false)
+  const [swapAmount, setSwapAmount] = useState('')
+  const [liveRate, setLiveRate] = useState(132.45)
+
+  useEffect(() => {
+    const fetchRate = async () => {
+      try {
+        const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+        const token = localStorage.getItem('paychain_merchant_token')
+        const res = await axios.get(`${API_URL}/api/transactions/live-rate`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        if (res.data?.rate) {
+          setLiveRate(res.data.rate)
+        }
+      } catch (e) {
+        console.error('Failed to fetch rate', e)
+      }
+    }
+    fetchRate()
+  }, [])
+
   const handleSwapKES = async () => {
     if (!merchant?.stellarPublicKey) {
       return addToast({ title: 'Wallet Not Activated', message: 'Please activate your Digital Wallet first.', type: 'error' });
     }
-    const amountStr = window.prompt(`Enter amount of KES to swap to USDC (Max: ${merchant?.kesBalance})`);
-    if (!amountStr) return;
-    const amount = parseFloat(amountStr);
+    setShowSwapModal(true)
+  }
+
+  const executeSwap = async () => {
+    const amount = parseFloat(swapAmount);
     if (isNaN(amount) || amount <= 0) {
       return addToast({ title: 'Invalid Amount', message: 'Please enter a valid number.', type: 'error' });
     }
-    if (amount > merchant?.kesBalance) {
+    if (amount > (merchant?.kesBalance || 0)) {
       return addToast({ title: 'Insufficient Balance', message: 'You do not have enough KES.', type: 'error' });
     }
 
@@ -91,8 +115,9 @@ export default function Wallet() {
         headers: { Authorization: `Bearer ${token}` }
       });
       addToast({ title: 'Swap Successful', message: `Successfully swapped ${amount} KES to USDC!`, type: 'success' });
-      // In a real app, we'd trigger a context refresh here to update the balances
       await refreshSession();
+      setShowSwapModal(false);
+      setSwapAmount('');
     } catch (err) {
       addToast({ title: 'Swap Failed', message: err.response?.data?.error || 'Failed to swap KES', type: 'error' });
     } finally {
@@ -840,16 +865,31 @@ export default function Wallet() {
                     </div>
 
                     <button 
-                      onClick={() => {
+                      onClick={async () => {
                         if (!topUpAmount) return
                         setIsProcessingTopUp(true)
-                        setTimeout(() => {
-                          setIsProcessingTopUp(false)
-                          addToast({ title: 'Push Sent', message: 'Please complete the transaction on your mobile phone.', type: 'success' })
+                        try {
+                          await new Promise(r => setTimeout(r, 1000))
+                          const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+                          const token = localStorage.getItem('paychain_merchant_token')
+                          await axios.post(`${API_URL}/api/transactions/simulate`, {
+                            accountNumber: merchant?.paybillAccount,
+                            amount: Number(topUpAmount),
+                            senderName: 'Mobile Money Top-up',
+                            senderPhone: merchant?.phone || '0700000000'
+                          }, {
+                            headers: { Authorization: `Bearer ${token}` }
+                          })
+                          addToast({ title: 'Top Up Successful', message: `Successfully funded ${topUpAmount} KES.`, type: 'success' })
+                          await refreshSession()
                           setShowTopUpSelection(false)
                           setSelectedFundingMethod(null)
                           setTopUpAmount('')
-                        }, 2000)
+                        } catch (err) {
+                          addToast({ title: 'Top Up Failed', message: err.response?.data?.error || 'Failed to process top up.', type: 'error' })
+                        } finally {
+                          setIsProcessingTopUp(false)
+                        }
                       }}
                       disabled={isProcessingTopUp || !topUpAmount}
                       className="w-full bg-[#00351D] text-white py-5 rounded-3xl font-bold text-lg shadow-2xl hover:bg-[#004d2b] active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-white/5 disabled:opacity-20"
@@ -907,10 +947,40 @@ export default function Wallet() {
                     </div>
 
                     <button 
-                      onClick={() => setShowTopUpSelection(false)}
-                      className="w-full bg-primary text-white py-5 rounded-3xl font-bold text-lg shadow-xl hover:bg-primary-dark transition-all"
+                      onClick={async () => {
+                        if (!topUpAmount) return
+                        setIsProcessingTopUp(true)
+                        try {
+                          await new Promise(r => setTimeout(r, 1500))
+                          const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+                          const token = localStorage.getItem('paychain_merchant_token')
+                          await axios.post(`${API_URL}/api/transactions/simulate`, {
+                            accountNumber: merchant?.paybillAccount,
+                            amount: Number(topUpAmount),
+                            senderName: merchant?.name || 'Card Top-up',
+                            senderPhone: 'CARD_PAYMENT'
+                          }, {
+                            headers: { Authorization: `Bearer ${token}` }
+                          })
+                          addToast({ title: 'Top Up Successful', message: `Successfully funded ${topUpAmount} KES.`, type: 'success' })
+                          await refreshSession()
+                          setShowTopUpSelection(false)
+                          setSelectedFundingMethod(null)
+                          setTopUpAmount('')
+                        } catch (err) {
+                          addToast({ title: 'Top Up Failed', message: err.response?.data?.error || 'Failed to process top up.', type: 'error' })
+                        } finally {
+                          setIsProcessingTopUp(false)
+                        }
+                      }}
+                      disabled={isProcessingTopUp || !topUpAmount}
+                      className="w-full bg-primary text-white py-5 rounded-3xl font-bold text-lg shadow-xl hover:bg-primary-dark transition-all flex items-center justify-center gap-3 disabled:opacity-50"
                     >
-                      Top Up KES {topUpAmount ? Number(topUpAmount).toLocaleString() : '0'}
+                      {isProcessingTopUp ? (
+                        <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      ) : (
+                        <>Top Up KES {topUpAmount ? Number(topUpAmount).toLocaleString() : '0'}</>
+                      )}
                     </button>
                   </div>
                 </div>
@@ -928,6 +998,102 @@ export default function Wallet() {
           </div>
         </div>
         )}
+
+      {/* Swap Modal Overlay */}
+      {showSwapModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 animate-fade-in backdrop-blur-xl bg-primary/10">
+          <div className="absolute inset-0 bg-[#00351D]/80" onClick={() => setShowSwapModal(false)}></div>
+          
+          <div className="bg-white w-full max-w-lg rounded-[32px] md:rounded-[40px] shadow-2xl relative z-10 overflow-hidden animate-scale-in">
+            {/* Modal Header */}
+            <div className="p-6 md:p-8 border-b border-outline-variant/10 flex items-center justify-between bg-surface-container-low">
+              <div>
+                <h3 className="font-headline text-2xl md:text-3xl text-primary tracking-tight">
+                  Swap to USDC
+                </h3>
+                <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-[0.2em] mt-1 opacity-60">
+                  Convert KES directly to USDC
+                </p>
+              </div>
+              <button 
+                onClick={() => setShowSwapModal(false)}
+                className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-primary/40 hover:text-primary transition-colors border border-outline-variant/10"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 md:p-10 space-y-6">
+              <div className="bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-emerald-800/60 mb-1">Available KES Balance</p>
+                  <p className="text-xl font-headline font-bold text-emerald-900">{formatKES(merchant?.kesBalance || 0)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-emerald-800/60 mb-1">Live Rate</p>
+                  <p className="text-sm font-bold text-emerald-900">1 USDC = KES {liveRate.toFixed(2)}</p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Amount to Swap (KES)</label>
+                <div className="relative group">
+                  <div className="absolute left-6 top-1/2 -translate-y-1/2 text-primary/40 font-bold text-lg">KES</div>
+                  <input 
+                    type="number"
+                    value={swapAmount}
+                    onChange={(e) => setSwapAmount(e.target.value)}
+                    placeholder="0.00"
+                    max={merchant?.kesBalance || 0}
+                    className="w-full bg-surface-container-low border border-outline-variant/5 rounded-3xl py-6 pl-16 pr-6 text-2xl font-headline text-primary focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
+                  />
+                  <button 
+                    onClick={() => setSwapAmount((merchant?.kesBalance || 0).toString())}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-emerald-200 transition-colors"
+                  >
+                    Max
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex justify-center -my-2 relative z-10">
+                <div className="w-10 h-10 bg-white border border-outline-variant/10 rounded-full flex items-center justify-center shadow-sm text-primary">
+                  <span className="material-symbols-outlined text-lg">swap_vert</span>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">You Will Receive (Estimated)</label>
+                <div className="relative group">
+                  <div className="absolute left-6 top-1/2 -translate-y-1/2 text-primary/40 font-bold text-lg">USDC</div>
+                  <input 
+                    type="text"
+                    value={swapAmount ? (Number(swapAmount) / liveRate).toFixed(4) : '0.0000'}
+                    readOnly
+                    className="w-full bg-surface-container-low border border-outline-variant/5 rounded-3xl py-6 pl-20 pr-6 text-2xl font-headline text-primary outline-none opacity-80"
+                  />
+                </div>
+              </div>
+
+              <button 
+                onClick={executeSwap}
+                disabled={isSwapping || !swapAmount || Number(swapAmount) <= 0 || Number(swapAmount) > (merchant?.kesBalance || 0)}
+                className="w-full bg-[#00351D] text-white py-5 rounded-3xl font-bold text-lg shadow-2xl hover:bg-[#004d2b] active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-white/5 disabled:opacity-50"
+              >
+                {isSwapping ? (
+                  <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
+                ) : (
+                  <>
+                    Confirm Swap
+                    <span className="material-symbols-outlined">currency_exchange</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       </>
     </MerchantLayout>
   )
