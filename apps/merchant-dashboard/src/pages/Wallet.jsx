@@ -442,11 +442,11 @@ export default function Wallet() {
                             destination === dest.id ? 'bg-primary text-white' : 'bg-white text-on-surface-variant'
                          }`}>
                             <span className="material-symbols-outlined text-xl">
-                               {dest.type === 'Till' ? 'point_of_sale' : 'account_balance'}
+                               {dest.type === 'Till' ? 'point_of_sale' : dest.type === 'Mobile' ? 'smartphone' : 'account_balance'}
                             </span>
                          </div>
                          <div>
-                            <p className={`text-sm font-bold ${destination === dest.id ? 'text-primary' : 'text-on-surface'}`}>{dest.label}</p>
+                            <p className={`text-sm font-bold ${destination === dest.id ? 'text-primary' : 'text-on-surface'}`}>{dest.name}</p>
                             <p className="text-[10px] text-on-surface-variant font-medium opacity-60 capitalize">{dest.type} Account</p>
                          </div>
                       </div>
@@ -463,7 +463,7 @@ export default function Wallet() {
                    <span className="material-symbols-outlined text-emerald-600 mt-0.5">info</span>
                    <div>
                       <p className="text-[11px] text-emerald-900 font-medium leading-relaxed">
-                        Withdrawals to <strong>{selectedDest.label}</strong> are typically processed within <span className="font-bold">15 minutes</span>.
+                        Withdrawals to <strong>{selectedDest.name}</strong> are typically processed within <span className="font-bold">minutes</span>.
                       </p>
                    </div>
                 </div>
