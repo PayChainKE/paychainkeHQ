@@ -119,81 +119,79 @@ export const sendWalletActivationEmail = async (email, name, stellarPublicKey) =
       : 'N/A';
 
     const data = await resend.emails.send({
-      from: 'PayChain Wallet <info@paychain.co.ke>',
+      from: 'PayChain Web3 <info@paychain.co.ke>',
       to: [email],
-      subject: '🎉 Congratulations! Your PayChain Digital Wallet is Live',
+      subject: 'Welcome to Web3: Your PayChain Wallet is Ready',
       html: `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 620px; margin: auto; border-radius: 20px; overflow: hidden; background: #fff; border: 1px solid #eee;">
-          <!-- Hero Banner -->
-          <div style="background: linear-gradient(135deg, #0F141E 0%, #0a2540 60%, #00351D 100%); padding: 60px 30px; text-align: center; color: #fff; position: relative;">
-            <div style="display: inline-block; background: rgba(53,208,127,0.15); border: 1px solid rgba(53,208,127,0.3); border-radius: 50px; padding: 8px 20px; margin-bottom: 20px;">
-              <span style="color: #35D07F; font-size: 12px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase;">Blockchain Wallet Activated</span>
+        <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #0B0E14; color: #E5E7EB; border-radius: 8px; overflow: hidden; border: 1px solid #1F2937;">
+          
+          <!-- Header -->
+          <div style="padding: 30px 40px; text-align: center; border-bottom: 1px solid #1F2937;">
+            <div style="font-size: 24px; font-weight: 800; color: #FCD535; letter-spacing: 1px; display: flex; align-items: center; justify-content: center; gap: 10px;">
+              <span style="display: inline-block; width: 24px; height: 24px; background: #FCD535; border-radius: 4px;"></span>
+              PAYCHAIN
             </div>
-            <h1 style="margin: 0; font-size: 36px; font-weight: 900; letter-spacing: -1px; line-height: 1.1;">Congratulations, ${name}! 🎉</h1>
-            <p style="margin: 14px 0 0; color: rgba(255,255,255,0.7); font-size: 16px; line-height: 1.6;">Your Web3 Digital Wallet is now live on the PayChain network.</p>
           </div>
 
-          <!-- Main Content -->
-          <div style="padding: 40px 30px;">
-            <p style="color: #444; font-size: 16px; line-height: 1.7; margin: 0 0 28px;">Your unique blockchain wallet has been provisioned and is ready for global USDC settlements. Below is your official wallet address — keep it safe and share it to receive payments from anywhere in the world.</p>
+          <!-- Body -->
+          <div style="padding: 40px;">
+            <h1 style="font-size: 24px; font-weight: 700; color: #FFFFFF; margin: 0 0 20px 0;">Wallet Successfully Activated</h1>
+            
+            <p style="font-size: 15px; line-height: 1.6; color: #9CA3AF; margin: 0 0 30px 0;">
+              Dear ${name},<br><br>
+              Congratulations! Your PayChain Web3 Wallet has been successfully provisioned on the blockchain. You can now securely manage your digital assets, receive global settlements, and utilize our Inflation Shield.
+            </p>
 
-            <!-- Wallet Address Card -->
-            <div style="background: #0F141E; border-radius: 16px; padding: 28px; margin-bottom: 28px; position: relative; overflow: hidden;">
-              <div style="position: absolute; top: -30px; right: -30px; width: 120px; height: 120px; background: rgba(39,117,202,0.15); border-radius: 50%; filter: blur(30px);"></div>
-              <p style="color: #8B98A9; font-size: 10px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; margin: 0 0 12px;">Your Wallet Address</p>
-              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                <div style="width: 10px; height: 10px; border-radius: 50%; background: #35D07F; box-shadow: 0 0 12px rgba(53,208,127,0.6);"></div>
-                <p style="color: #fff; font-family: 'Courier New', Courier, monospace; font-size: 14px; font-weight: 700; letter-spacing: 1px; margin: 0; word-break: break-all;">${stellarPublicKey}</p>
-              </div>
-              <p style="color: #8B98A9; font-size: 11px; margin: 12px 0 0;">Short address: <strong style="color: #2775CA;">${shortAddress}</strong></p>
-            </div>
-
-            <!-- Supported Networks -->
-            <div style="background: #f8faff; border-radius: 14px; padding: 22px; border: 1px solid #eef2ff; margin-bottom: 28px;">
-              <p style="color: #0052b4; font-size: 11px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; margin: 0 0 14px;">Supported Networks</p>
-              <div style="display: flex; gap: 16px; flex-wrap: wrap;">
-                <div style="display: flex; align-items: center; gap: 8px; background: white; border: 1px solid #dbeafe; border-radius: 30px; padding: 8px 14px;">
-                  <div style="width: 10px; height: 10px; border-radius: 50%; background: #35D07F;"></div>
-                  <span style="color: #1e40af; font-size: 12px; font-weight: 700;">Celo</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 8px; background: white; border: 1px solid #dbeafe; border-radius: 30px; padding: 8px 14px;">
-                  <div style="width: 10px; height: 10px; border-radius: 50%; background: #0052FF;"></div>
-                  <span style="color: #1e40af; font-size: 12px; font-weight: 700;">Base</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 8px; background: white; border: 1px solid #dbeafe; border-radius: 30px; padding: 8px 14px;">
-                  <div style="width: 10px; height: 10px; border-radius: 50%; background: #8247E5;"></div>
-                  <span style="color: #1e40af; font-size: 12px; font-weight: 700;">Polygon</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 8px; background: white; border: 1px solid #dbeafe; border-radius: 30px; padding: 8px 14px;">
-                  <div style="width: 10px; height: 10px; border-radius: 50%; background: #2775CA;"></div>
-                  <span style="color: #1e40af; font-size: 12px; font-weight: 700;">Stellar / USDC</span>
-                </div>
+            <!-- Address Box -->
+            <div style="background-color: #111827; border: 1px solid #374151; border-radius: 8px; padding: 24px; margin-bottom: 30px;">
+              <p style="font-size: 12px; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 10px 0;">Your Official Wallet Address</p>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="width: 8px; height: 8px; background-color: #10B981; border-radius: 50%; box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);"></div>
+                <p style="font-family: 'Courier New', Courier, monospace; font-size: 14px; font-weight: 700; color: #FFFFFF; margin: 0; word-break: break-all;">
+                  ${stellarPublicKey}
+                </p>
               </div>
             </div>
 
-            <!-- What You Can Do Now -->
-            <div style="margin-bottom: 32px;">
-              <p style="color: #111; font-size: 16px; font-weight: 700; margin: 0 0 14px;">What you can do now:</p>
-              <div style="color: #555; font-size: 14px; line-height: 2;">
-                <p style="margin: 4px 0;">🔄 <strong>Swap KES to USDC</strong> — Convert your M-PESA collections instantly</p>
-                <p style="margin: 4px 0;">🛡️ <strong>Inflation Shield</strong> — Protect your earnings from currency devaluation</p>
-                <p style="margin: 4px 0;">🌍 <strong>Global Settlements</strong> — Send & receive USDC from anywhere in the world</p>
-                <p style="margin: 4px 0;">📊 <strong>QR Settlement Tool</strong> — Share your wallet QR for easy payments</p>
+            <!-- Features -->
+            <div style="margin-bottom: 30px;">
+              <h2 style="font-size: 16px; font-weight: 600; color: #FFFFFF; margin: 0 0 16px 0;">Supported Networks</h2>
+              <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <span style="background: #1F2937; color: #D1D5DB; padding: 6px 12px; border-radius: 4px; font-size: 12px; font-weight: 600;">Stellar (USDC)</span>
+                <span style="background: #1F2937; color: #D1D5DB; padding: 6px 12px; border-radius: 4px; font-size: 12px; font-weight: 600;">Polygon</span>
+                <span style="background: #1F2937; color: #D1D5DB; padding: 6px 12px; border-radius: 4px; font-size: 12px; font-weight: 600;">Base</span>
+                <span style="background: #1F2937; color: #D1D5DB; padding: 6px 12px; border-radius: 4px; font-size: 12px; font-weight: 600;">Celo</span>
               </div>
             </div>
 
-            <!-- CTA Button -->
-            <div style="text-align: center; margin-top: 36px;">
-              <a href="https://merchant.paychain.co.ke/wallet" style="display: inline-block; background: linear-gradient(135deg, #00351D 0%, #005c30 100%); color: #fff; padding: 18px 40px; text-decoration: none; border-radius: 14px; font-weight: 800; font-size: 16px; letter-spacing: 0.5px; box-shadow: 0 8px 24px rgba(0,53,29,0.3);">
-                Open My Wallet Dashboard →
+            <!-- CTA -->
+            <div style="text-align: center; margin-top: 40px; margin-bottom: 40px;">
+              <a href="https://merchant.paychain.co.ke/wallet" style="display: inline-block; background-color: #FCD535; color: #111827; text-decoration: none; font-weight: 700; font-size: 16px; padding: 14px 32px; border-radius: 4px; transition: background-color 0.2s;">
+                Go to Dashboard
               </a>
+            </div>
+
+            <!-- Security Tips -->
+            <div style="border-top: 1px solid #1F2937; padding-top: 30px;">
+              <h3 style="font-size: 14px; font-weight: 600; color: #FFFFFF; margin: 0 0 16px 0; display: flex; align-items: center; gap: 8px;">
+                <span style="color: #FCD535;">🛡️</span> Security Reminders
+              </h3>
+              <ul style="font-size: 13px; color: #9CA3AF; line-height: 1.6; padding-left: 20px; margin: 0;">
+                <li style="margin-bottom: 8px;">PayChain staff will <strong>never</strong> ask for your passwords or private keys.</li>
+                <li style="margin-bottom: 8px;">Always verify you are on <strong>merchant.paychain.co.ke</strong> before logging in.</li>
+                <li>Do not share your screen with anyone claiming to provide support.</li>
+              </ul>
             </div>
           </div>
 
           <!-- Footer -->
-          <div style="padding: 28px 30px; background: #fafafa; border-top: 1px solid #eee; text-align: center;">
-            <p style="margin: 0; color: #aaa; font-size: 11px;">This is a <strong>no-reply</strong> email. For assistance, contact <a href="mailto:support@paychain.co.ke" style="color: #00351D; text-decoration: none;">support@paychain.co.ke</a> or call <strong>0790889066</strong></p>
-            <p style="margin: 8px 0 0; color: #bbb; font-size: 10px;">&copy; 2026 PayChainKE. Empowering the next generation of African merchants.</p>
+          <div style="background-color: #000000; padding: 30px 40px; text-align: center;">
+            <p style="font-size: 12px; color: #6B7280; margin: 0 0 10px 0;">
+              This is an automated message. Please do not reply.
+            </p>
+            <p style="font-size: 12px; color: #4B5563; margin: 0;">
+              &copy; ${new Date().getFullYear()} PayChainKE. All rights reserved.
+            </p>
           </div>
         </div>
       `
