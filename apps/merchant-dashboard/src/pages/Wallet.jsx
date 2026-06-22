@@ -268,7 +268,7 @@ export default function Wallet() {
         {/* Hero Section: Balances */}
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in-up">
           {merchant?.stellarPublicKey ? (
-            <div className="bg-gradient-to-br from-[#0F141E] to-[#0A0D14] text-white p-5 md:p-6 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative overflow-hidden group border border-[#1E2532] mx-auto w-full max-w-[340px] flex flex-col justify-between min-h-[214px]">
+            <div className="bg-gradient-to-br from-[#0F141E] to-[#0A0D14] text-white p-5 rounded-[24px] md:rounded-[32px] shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative overflow-hidden group border border-[#1E2532] w-full flex flex-col justify-between h-full">
               {/* Glowing Orb Effects */}
               <div className="absolute top-0 right-0 w-72 h-72 bg-[#2775CA]/20 rounded-full -mr-20 -mt-20 blur-[80px] group-hover:scale-110 group-hover:bg-[#2775CA]/30 transition-all duration-1000 ease-out pointer-events-none"></div>
               <div className="absolute bottom-0 left-0 w-56 h-56 bg-[#2775CA]/10 rounded-full -ml-20 -mb-20 blur-[60px] pointer-events-none"></div>
@@ -278,26 +278,26 @@ export default function Wallet() {
 
               <div className="relative z-10 flex flex-col h-full">
                 {/* Header */}
-                <div className="flex justify-between items-center mb-8">
+                <div className="flex justify-between items-center mb-5">
                   <div className="flex items-center gap-2 bg-[#1A212D] border border-[#2A3441] rounded-full px-3 py-1.5 shadow-inner">
                      <div className="w-4 h-4 rounded-full bg-[#2775CA] flex items-center justify-center shadow-[0_0_10px_rgba(39,117,202,0.5)]">
                        <span className="text-[10px] text-white font-black leading-none">$</span>
                      </div>
                      <span className="text-[9px] font-bold tracking-[0.2em] uppercase text-[#8B98A9]">USDC Network</span>
                   </div>
-                  <div className="w-10 h-10 rounded-full bg-[#1A212D] flex items-center justify-center border border-[#2A3441] shadow-lg backdrop-blur-md hover:bg-[#202936] transition-colors cursor-pointer group/icon">
-                     <span className="material-symbols-outlined text-lg text-[#8B98A9] group-hover/icon:text-white transition-colors">qr_code_scanner</span>
+                  <div className="w-8 h-8 rounded-full bg-[#1A212D] flex items-center justify-center border border-[#2A3441] shadow-lg backdrop-blur-md hover:bg-[#202936] transition-colors cursor-pointer group/icon">
+                     <span className="material-symbols-outlined text-sm text-[#8B98A9] group-hover/icon:text-white transition-colors">qr_code_scanner</span>
                   </div>
                 </div>
 
                 {/* Balance Area */}
-                <div className="mb-8">
-                  <p className="text-[#8B98A9] text-[10px] font-black uppercase tracking-[0.2em] mb-2">Global Settlement Balance</p>
+                <div className="mb-5 flex-1">
+                  <p className="text-[#8B98A9] text-[10px] font-black uppercase tracking-[0.2em] mb-1">Global Settlement Balance</p>
                   <div className="flex items-baseline gap-2">
-                    <h3 className={`font-headline font-black text-4xl md:text-5xl tracking-tighter tabular-nums transition-all duration-300 text-transparent bg-clip-text bg-gradient-to-r from-white to-[#8B98A9] ${!showAmounts && 'blur-xl text-white bg-none'}`}>
+                    <h3 className={`font-headline font-black text-3xl md:text-4xl tracking-tighter tabular-nums transition-all duration-300 text-transparent bg-clip-text bg-gradient-to-r from-white to-[#8B98A9] ${!showAmounts && 'blur-xl text-white bg-none'}`}>
                       {merchant?.usdcBalance?.toLocaleString(undefined, { minimumFractionDigits: 2 }) || '0.00'}
                     </h3>
-                    <span className="text-xl font-bold text-[#2775CA]">USDC</span>
+                    <span className="text-lg font-bold text-[#2775CA]">USDC</span>
                   </div>
                   
                   {/* Wallet Address Pill */}
@@ -307,13 +307,13 @@ export default function Wallet() {
                       navigator.clipboard.writeText(address)
                       addToast({ title: 'Address Copied', message: 'Wallet address copied to clipboard', type: 'success' })
                     }}
-                    className="inline-flex items-center gap-2 mt-4 px-3 py-1.5 bg-[#1A212D]/80 hover:bg-[#202936] rounded-full border border-[#2A3441] cursor-pointer transition-all active:scale-95 group/pill backdrop-blur-md"
+                    className="inline-flex items-center gap-2 mt-2 px-3 py-1 bg-[#1A212D]/80 hover:bg-[#202936] rounded-full border border-[#2A3441] cursor-pointer transition-all active:scale-95 group/pill backdrop-blur-md"
                   >
-                    <div className="w-2 h-2 rounded-full bg-[#35D07F] shadow-[0_0_8px_rgba(53,208,127,0.6)] animate-pulse"></div>
-                    <span className="text-[11px] text-[#8B98A9] font-mono tracking-wider group-hover/pill:text-white transition-colors">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#35D07F] shadow-[0_0_8px_rgba(53,208,127,0.6)] animate-pulse"></div>
+                    <span className="text-[10px] text-[#8B98A9] font-mono tracking-wider group-hover/pill:text-white transition-colors">
                       {merchant?.stellarPublicKey ? `${merchant.stellarPublicKey.slice(0, 6)}...${merchant.stellarPublicKey.slice(-4)}` : '0x8472...9xK2'}
                     </span>
-                    <span className="material-symbols-outlined text-[14px] text-[#8B98A9] group-hover/pill:text-white transition-colors">content_copy</span>
+                    <span className="material-symbols-outlined text-[12px] text-[#8B98A9] group-hover/pill:text-white transition-colors">content_copy</span>
                   </div>
                 </div>
 
@@ -322,32 +322,32 @@ export default function Wallet() {
                   <button 
                     onClick={handleSwapKES}
                     disabled={isSwapping}
-                    className="py-3.5 bg-[#1A212D] hover:bg-[#202936] text-white rounded-2xl text-[10px] font-black transition-all border border-[#2A3441] uppercase tracking-[0.15em] flex flex-col items-center justify-center gap-1.5 group/btn shadow-lg disabled:opacity-50"
+                    className="py-2.5 bg-[#1A212D] hover:bg-[#202936] text-white rounded-xl text-[10px] font-black transition-all border border-[#2A3441] uppercase tracking-[0.1em] flex items-center justify-center gap-2 group/btn shadow-sm disabled:opacity-50"
                   >
                     {isSwapping ? (
-                      <span className="material-symbols-outlined text-xl text-[#8B98A9] animate-spin">refresh</span>
+                      <span className="material-symbols-outlined text-base text-[#8B98A9] animate-spin">refresh</span>
                     ) : (
-                      <span className="material-symbols-outlined text-xl text-[#8B98A9] group-hover/btn:text-white transition-colors">swap_horiz</span>
+                      <span className="material-symbols-outlined text-base text-[#8B98A9] group-hover/btn:text-white transition-colors">swap_horiz</span>
                     )}
                     {isSwapping ? 'Swapping...' : 'Swap KES'}
                   </button>
                   <button 
                     onClick={() => setShowTopUpSelection(true)}
-                    className="py-3.5 bg-gradient-to-b from-[#2775CA] to-[#1A5AA3] hover:from-[#2C84E3] hover:to-[#1C64B4] text-white rounded-2xl text-[10px] font-black transition-all shadow-[0_0_20px_rgba(39,117,202,0.3)] hover:shadow-[0_0_25px_rgba(39,117,202,0.5)] border border-[#3E8BE0]/50 uppercase tracking-[0.15em] flex flex-col items-center justify-center gap-1.5 active:scale-95"
+                    className="py-2.5 bg-gradient-to-b from-[#2775CA] to-[#1A5AA3] hover:from-[#2C84E3] hover:to-[#1C64B4] text-white rounded-xl text-[10px] font-black transition-all shadow-md border border-[#3E8BE0]/50 uppercase tracking-[0.1em] flex items-center justify-center gap-2 active:scale-95"
                   >
-                    <span className="material-symbols-outlined text-xl text-white">add</span>
+                    <span className="material-symbols-outlined text-base text-white">add</span>
                     Top Up
                   </button>
                 </div>
                 
                 {/* Networks Footer */}
-                <div className="flex items-center justify-center gap-3 mt-6 pt-5 border-t border-[#1E2532]/50">
+                <div className="flex items-center justify-between gap-3 mt-4 pt-3 border-t border-[#1E2532]/50">
                    <span className="text-[8px] font-black uppercase tracking-[0.2em] text-[#8B98A9]/40">Supported Networks</span>
                    <div className="flex items-center gap-2">
-                      <img src="https://cryptologos.cc/logos/stellar-xlm-logo.svg?v=032" alt="Stellar" className="w-4 h-4 transition-all cursor-help brightness-0 invert" title="Stellar" />
-                      <img src="https://cryptologos.cc/logos/usd-coin-usdc-logo.svg?v=032" alt="USDC" className="w-4 h-4 transition-all cursor-help" title="USDC Native" />
-                      <img src="https://cryptologos.cc/logos/polygon-matic-logo.svg?v=032" alt="Polygon" className="w-4 h-4 transition-all cursor-help" title="Polygon" />
-                      <img src="https://cryptologos.cc/logos/celo-celo-logo.svg?v=032" alt="Celo" className="w-4 h-4 transition-all cursor-help" title="Celo" />
+                      <img src="https://cryptologos.cc/logos/stellar-xlm-logo.svg?v=032" alt="Stellar" className="w-3.5 h-3.5 transition-all cursor-help brightness-0 invert" title="Stellar" />
+                      <img src="https://cryptologos.cc/logos/usd-coin-usdc-logo.svg?v=032" alt="USDC" className="w-3.5 h-3.5 transition-all cursor-help" title="USDC Native" />
+                      <img src="https://cryptologos.cc/logos/polygon-matic-logo.svg?v=032" alt="Polygon" className="w-3.5 h-3.5 transition-all cursor-help" title="Polygon" />
+                      <img src="https://cryptologos.cc/logos/celo-celo-logo.svg?v=032" alt="Celo" className="w-3.5 h-3.5 transition-all cursor-help" title="Celo" />
                    </div>
                 </div>
               </div>
