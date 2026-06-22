@@ -17,8 +17,8 @@ const KENYAN_COUNTIES = [
 
 export default function Login() {
   const { login, signup, verifyOTP, forgotPassword, resetPassword } = useMerchantAuth()
-  const [phone, setPhone] = useState('0712345678')
-  const [password, setPassword] = useState('Paychain2026')
+  const [phone, setPhone] = useState('')
+  const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [err, setErr] = useState('')
