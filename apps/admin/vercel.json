@@ -1,4 +1,6 @@
 {
+  "buildCommand": "npm run build:production",
+  "outputDirectory": "dist",
   "rewrites": [
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]

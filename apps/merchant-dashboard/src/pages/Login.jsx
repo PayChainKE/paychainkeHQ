@@ -16,7 +16,7 @@ const KENYAN_COUNTIES = [
 ]
 
 export default function Login() {
-  const { login, setNewPassword } = useMerchantAuth()
+  const { login, signup, verifyOTP, forgotPassword, resetPassword } = useMerchantAuth()
   const [phone, setPhone] = useState('0712345678')
   const [password, setPassword] = useState('Paychain2026')
   const [showPassword, setShowPassword] = useState(false)
@@ -24,6 +24,13 @@ export default function Login() {
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(false)
   const nav = useNavigate()
+
+  // Signup Flow States
+  const [signupName, setSignupName] = useState('')
+  const [signupEmail, setSignupEmail] = useState('')
+  const [signupPhone, setSignupPhone] = useState('')
+  const [signupBusinessName, setSignupBusinessName] = useState('')
+  const [signupCertificate, setSignupCertificate] = useState(null)
 
   // Reset Flow States
   const [isResetMode, setIsResetMode] = useState(false)
@@ -40,6 +47,7 @@ export default function Login() {
   const [isSignupSuccess, setIsSignupSuccess] = useState(false)
   const [isSignupPasswordStep, setIsSignupPasswordStep] = useState(false)
   const [otpFlowType, setOtpFlowType] = useState('') // 'login' or 'reset'
+  const [authEmail, setAuthEmail] = useState('') // Captured from backend for OTP verification
   
   // Real-time security validation
   useEffect(() => {
@@ -58,9 +66,10 @@ export default function Login() {
     const res = await login(phone, password)
     setLoading(false)
     if (res.success) {
-      if (res.firstLogin) {
+      setAuthEmail(res.email)
+      if (res.mfaRequired) {
         setOtpFlowType('login')
-        setIsOTPMode(true) // Start with OTP for first login
+        setIsOTPMode(true)
       } else {
         nav('/overview')
       }
@@ -81,9 +90,10 @@ export default function Login() {
     }
 
     setLoading(true)
-    // Simulate setting password
-    const res = await setNewPassword(newPassword)
+    const code = otp.join('')
+    const res = await resetPassword(authEmail, code, newPassword)
     setLoading(false)
+    
     if (res.success) {
       setIsResetMode(false)
       setActiveTab('login')
@@ -101,17 +111,36 @@ export default function Login() {
     if (code.length < 6) return
     
     setLoading(true)
-    // Simulate verification
-    await new Promise(r => setTimeout(r, 1000))
+    const res = await verifyOTP(authEmail, code)
     setLoading(false)
     
-    setIsOTPMode(false)
-    if (otpFlowType === 'login') {
-      nav('/overview')
+    if (res.success) {
+      setIsOTPMode(false)
+      if (otpFlowType === 'login' || otpFlowType === 'signup') {
+        nav('/overview')
+      } else {
+        setIsResetMode(true) // Move to Reset Password after OTP
+      }
+      setErr('')
     } else {
-      setIsResetMode(true) // Move to Reset Password after OTP
+      setErr(res.error)
     }
-    setErr('')
+  }
+
+  async function handleForgotPassword(e) {
+    e.preventDefault()
+    const loginInput = e.target[0].value
+    setLoading(true)
+    const res = await forgotPassword(loginInput)
+    setLoading(false)
+    if (res.success) {
+      setAuthEmail(loginInput)
+      setOtpFlowType('reset')
+      setIsOTPMode(true)
+      setActiveTab('login')
+    } else {
+      setErr(res.error)
+    }
   }
 
   const handleOtpChange = (element, index) => {
@@ -128,21 +157,40 @@ export default function Login() {
 
   async function handleSignup(e) {
     e.preventDefault()
-    setLoading(true)
-    // Simulate API call for form submission
-    await new Promise(r => setTimeout(r, 1000))
-    setLoading(false)
     setIsSignupPasswordStep(true)
   }
 
   async function handleSignupCreateAccount(e) {
     e.preventDefault()
+    if (!Object.values(strength).every(v => v)) {
+      setErr('Please meet all security requirements.')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setErr('Passwords do not match.')
+      return
+    }
+
     setLoading(true)
-    // Simulate API call for account creation
-    await new Promise(r => setTimeout(r, 1000))
+    const formData = new FormData()
+    formData.append('name', signupName)
+    formData.append('email', signupEmail)
+    formData.append('phone', signupPhone)
+    formData.append('businessName', signupBusinessName)
+    formData.append('password', newPassword)
+    if (signupCertificate) {
+      formData.append('certificate', signupCertificate)
+    }
+
+    const res = await signup(formData)
     setLoading(false)
-    setIsSignupPasswordStep(false)
-    setIsSignupSuccess(true)
+    
+    if (res.success) {
+      setIsSignupPasswordStep(false)
+      setIsSignupSuccess(true)
+    } else {
+      setErr(res.error)
+    }
   }
 
   const SecurityRequirement = ({ met, label }) => (
@@ -353,11 +401,11 @@ export default function Login() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Your Name *</label>
-                    <input required autoComplete="name" className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" placeholder="John Doe" />
+                    <input required autoComplete="name" value={signupName} onChange={e => setSignupName(e.target.value)} className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" placeholder="John Doe" />
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Your Email *</label>
-                    <input required type="email" autoComplete="email" className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" placeholder="john@example.com" />
+                    <input required type="email" autoComplete="email" value={signupEmail} onChange={e => setSignupEmail(e.target.value)} className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" placeholder="john@example.com" />
                   </div>
                 </div>
 
@@ -366,12 +414,12 @@ export default function Login() {
                     <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Your Phone *</label>
                     <div className="flex group">
                       <div className="bg-surface-container-low border border-outline-variant/15 border-r-0 rounded-l-xl px-3 flex items-center justify-center text-xs font-black text-primary/40 group-focus-within:border-primary transition-colors">+254</div>
-                      <input required autoComplete="tel-national" className="flex-1 w-full bg-white border border-outline-variant/15 rounded-r-xl py-3 px-3 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" placeholder="712 345 678" type="tel" pattern="[0-9]{9,10}" title="Enter a valid 9 or 10 digit phone number" onInput={(e) => { e.target.value = e.target.value.replace(/\D/g, '') }} />
+                      <input required autoComplete="tel-national" value={signupPhone} onChange={e => setSignupPhone(e.target.value.replace(/\D/g, ''))} className="flex-1 w-full bg-white border border-outline-variant/15 rounded-r-xl py-3 px-3 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" placeholder="712 345 678" type="tel" pattern="[0-9]{9,10}" title="Enter a valid 9 or 10 digit phone number" />
                     </div>
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Business Name *</label>
-                    <input required autoComplete="organization" className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" placeholder="Acme Corp" />
+                    <input required autoComplete="organization" value={signupBusinessName} onChange={e => setSignupBusinessName(e.target.value)} className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" placeholder="Acme Corp" />
                   </div>
                 </div>
 
@@ -448,7 +496,7 @@ export default function Login() {
                         <span className="material-symbols-outlined text-primary/40 mb-1 group-hover:text-emerald-500 transition-colors">cloud_upload</span>
                         <p className="text-xs text-primary/60 font-medium group-hover:text-emerald-700 transition-colors">Click to upload file</p>
                       </div>
-                      <input type="file" className="hidden" required />
+                      <input type="file" className="hidden" onChange={e => setSignupCertificate(e.target.files[0])} />
                     </label>
                   </div>
                 </div>
@@ -477,7 +525,7 @@ export default function Login() {
                    Enter your registered phone number or email address to receive a recovery code.
                  </p>
               </div>
-               <form onSubmit={(e) => { e.preventDefault(); setOtpFlowType('reset'); setIsOTPMode(true); setActiveTab('login'); }} className="space-y-5 lg:space-y-6">
+               <form onSubmit={handleForgotPassword} className="space-y-5 lg:space-y-6">
                 <div className="space-y-2">
                   <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Email or Phone Number</label>
                   <input className="w-full bg-white border border-outline-variant/15 rounded-2xl py-3 lg:py-4 px-4 lg:px-5 text-lg font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" placeholder="john@example.com or 0712..." type="text" autoComplete="username" required />

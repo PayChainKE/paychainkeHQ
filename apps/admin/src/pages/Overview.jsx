@@ -5,18 +5,21 @@ import api from '../api/api';
 const Overview = () => {
   const [waitlist, setWaitlist] = useState([]);
   const [messages, setMessages] = useState([]);
+  const [merchantAnalytics, setMerchantAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [waitlistRes, messagesRes] = await Promise.all([
+        const [waitlistRes, messagesRes, analyticsRes] = await Promise.all([
           api.get('/api/waitlist'),
-          api.get('/api/contact')
+          api.get('/api/contact'),
+          api.get('/api/admin/merchants/analytics').catch(() => ({ data: { data: null } }))
         ]);
         
         setWaitlist(Array.isArray(waitlistRes.data) ? waitlistRes.data : []);
         setMessages(Array.isArray(messagesRes.data) ? messagesRes.data : []);
+        setMerchantAnalytics(analyticsRes.data?.data || null);
       } catch (err) {
         console.error('Error fetching overview data:', err);
         setWaitlist([]);
@@ -134,23 +137,23 @@ const Overview = () => {
               <div className="w-40 h-40 rounded-full border-[16px] border-primary flex items-center justify-center relative">
                 <div className="absolute inset-[-16px] w-40 h-40 rounded-full border-[16px] border-transparent border-t-secondary border-r-secondary-container rotate-[45deg]"></div>
                 <div className="text-center font-body">
-                  <span className="block text-xl font-bold tracking-tight">18</span>
+                  <span className="block text-xl font-bold tracking-tight">{merchantAnalytics?.totalMerchants || 0}</span>
                   <span className="text-[10px] uppercase font-bold text-on-surface-variant/40 tracking-widest">Total</span>
                 </div>
               </div>
             </div>
             <div className="mt-6 space-y-2">
               <div className="flex items-center justify-between text-[12px] font-medium">
-                <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-primary"></span> Retail</div>
-                <span className="font-bold">45%</span>
+                <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-primary"></span> Verified Accounts</div>
+                <span className="font-bold">{merchantAnalytics?.verifiedMerchants || 0}</span>
               </div>
               <div className="flex items-center justify-between text-[12px] font-medium">
-                <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-secondary"></span> Hospitality</div>
-                <span className="font-bold">25%</span>
+                <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-secondary"></span> Unverified Accounts</div>
+                <span className="font-bold">{merchantAnalytics?.unverifiedMerchants || 0}</span>
               </div>
               <div className="flex items-center justify-between text-[12px] font-medium">
-                <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-secondary-container"></span> Import/Export</div>
-                <span className="font-bold">30%</span>
+                <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-secondary-container"></span> Signups (Last 7 Days)</div>
+                <span className="font-bold">{merchantAnalytics?.recentMerchants || 0}</span>
               </div>
             </div>
           </div>

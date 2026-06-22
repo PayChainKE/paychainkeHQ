@@ -1,8 +1,42 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Layout from '../components/layout/Layout';
-import { merchantsData, merchantStats } from '../mockData/merchants';
+import api from '../api/api';
 
 const Merchants = () => {
+  const [merchantsData, setMerchantsData] = useState([]);
+  const [merchantStats, setMerchantStats] = useState({
+    active: 0,
+    suspended: 0,
+    underReview: 0,
+    kycVerified: 0,
+    total: 0,
+    cashAdvanceEligible: 0
+  });
+
+  useEffect(() => {
+    const fetchMerchants = async () => {
+      try {
+        const res = await api.get('/api/admin/merchants');
+        if (res.data?.success) {
+          const mData = res.data.data;
+          setMerchantsData(mData);
+          
+          setMerchantStats({
+            total: mData.length,
+            active: mData.filter(m => m.isVerified).length,
+            suspended: 0,
+            underReview: mData.filter(m => !m.isVerified).length,
+            kycVerified: mData.filter(m => m.isVerified).length,
+            cashAdvanceEligible: 0
+          });
+        }
+      } catch (err) {
+        console.error('Failed to fetch merchants:', err);
+      }
+    };
+    fetchMerchants();
+  }, []);
+
   return (
     <Layout>
       <div className="space-y-8">
@@ -89,66 +123,52 @@ const Merchants = () => {
             <table className="w-full text-left border-collapse font-body">
               <thead>
                 <tr className="bg-surface-container-low/50">
-                  <th className="py-3 px-4 border-b border-outline-variant/10 w-10">
-                    <input className="rounded border-outline-variant text-secondary focus:ring-secondary" type="checkbox" />
-                  </th>
-                  <th className="py-3 px-2 border-b border-outline-variant/10 text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/40">#</th>
+                  <th className="py-3 px-4 border-b border-outline-variant/10 text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/40">#</th>
                   <th className="py-3 px-4 border-b border-outline-variant/10 text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/40">Merchant</th>
-                  <th className="py-3 px-4 border-b border-outline-variant/10 text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/40">Phone</th>
-                  <th className="py-3 px-4 border-b border-outline-variant/10 text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/40">Type</th>
-                  <th className="py-3 px-4 border-b border-outline-variant/10 text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/40">Till #</th>
-                  <th className="py-3 px-4 border-b border-outline-variant/10 text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/40">KYC</th>
-                  <th className="py-3 px-4 border-b border-outline-variant/10 text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/40">Trust Score</th>
-                  <th className="py-3 px-4 border-b border-outline-variant/10 text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/40">Revenue (KES)</th>
+                  <th className="py-3 px-4 border-b border-outline-variant/10 text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/40">Phone/Email</th>
                   <th className="py-3 px-4 border-b border-outline-variant/10 text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/40">Status</th>
+                  <th className="py-3 px-4 border-b border-outline-variant/10 text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/40">Certificate</th>
+                  <th className="py-3 px-4 border-b border-outline-variant/10 text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/40">Registered</th>
                   <th className="py-3 px-4 border-b border-outline-variant/10 text-right"></th>
                 </tr>
               </thead>
               <tbody className="text-[13px]">
                 {merchantsData.map((m, i) => (
-                  <tr key={m.id} className="hover:bg-secondary-container/5 transition-colors group">
-                    <td className="py-3 px-4 border-b border-outline-variant/5"><input className="rounded border-outline-variant text-secondary focus:ring-secondary" type="checkbox" /></td>
-                    <td className="py-3 px-2 text-on-surface-variant/40 border-b border-outline-variant/5">{String(i + 1).padStart(2, '0')}</td>
+                  <tr key={m._id || i} className="hover:bg-secondary-container/5 transition-colors group">
+                    <td className="py-3 px-4 text-on-surface-variant/40 border-b border-outline-variant/5">{String(i + 1).padStart(2, '0')}</td>
                     <td className="py-3 px-4 border-b border-outline-variant/5">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-primary-fixed-dim text-on-primary-fixed flex items-center justify-center font-bold text-[10px] ring-2 ring-white shadow-sm">
-                          {m.businessName.split(' ')[0][0]}{m.businessName.split(' ')[1]?.[0] || 'M'}
+                        <div className="w-8 h-8 rounded-full bg-primary-fixed-dim text-on-primary-fixed flex items-center justify-center font-bold text-[10px] ring-2 ring-white shadow-sm uppercase">
+                          {m.businessName ? m.businessName.substring(0, 2) : 'M'}
                         </div>
                         <div>
-                          <p className="font-bold text-on-surface tracking-tight">{m.businessName}</p>
-                          <p className="text-[11px] text-on-surface-variant/60">{m.name}</p>
+                          <p className="font-bold text-on-surface tracking-tight">{m.businessName || 'N/A'}</p>
+                          <p className="text-[11px] text-on-surface-variant/60">{m.name || 'Unknown'}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-on-surface-variant/80 font-medium border-b border-outline-variant/5">{m.phone}</td>
-                    <td className="py-3 px-4 border-b border-outline-variant/5"><span className="px-2 py-0.5 rounded bg-surface-container text-on-surface-variant text-[11px] font-bold uppercase tracking-tight">{m.businessType}</span></td>
-                    <td className="py-3 px-4 font-mono text-on-surface-variant/60 border-b border-outline-variant/5">{m.tillNumber || 'N/A'}</td>
                     <td className="py-3 px-4 border-b border-outline-variant/5">
-                      <div className={`flex items-center gap-1.5 font-bold text-[11px] tracking-tight ${m.kycStatus === 'verified' ? 'text-secondary' : 'text-amber-600'}`}>
-                        <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-                          {m.kycStatus === 'verified' ? 'verified' : 'hourglass_top'}
-                        </span>
-                        {m.kycStatus.charAt(0)?.toUpperCase() + m.kycStatus.slice(1)}
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 border-b border-outline-variant/5">
-                      <div className="w-[56px] h-1.5 bg-surface-container rounded-full overflow-hidden">
-                        <div className={`h-full ${m.trustScore.current > 70 ? 'bg-secondary' : 'bg-amber-500'}`} style={{ width: `${m.trustScore.current}%` }}></div>
-                      </div>
-                      <p className={`text-[10px] mt-1 font-bold ${m.trustScore.current > 70 ? 'text-secondary' : 'text-amber-600'}`}>
-                         ({m.trustScore.current})
-                      </p>
-                    </td>
-                    <td className="py-3 px-4 border-b border-outline-variant/5">
-                      <p className="font-bold text-on-surface tracking-tight">{m.financials.totalCollected.toLocaleString()}</p>
-                      <p className="text-[11px] text-on-surface-variant/40 leading-tight">~KES {Math.floor(m.financials.monthlyAvgRevenue / 1000)}K/mo</p>
+                      <p className="text-on-surface-variant/80 font-medium">{m.phone}</p>
+                      <p className="text-[11px] text-on-surface-variant/60">{m.email}</p>
                     </td>
                     <td className="py-3 px-4 border-b border-outline-variant/5">
                       <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border tracking-tight uppercase ${
-                        m.accountStatus === 'active' ? 'bg-secondary-container/20 text-secondary border-secondary-container/50' : 'bg-error-container/20 text-error border-error-container/50'
+                        m.isVerified ? 'bg-secondary-container/20 text-secondary border-secondary-container/50' : 'bg-amber-100 text-amber-700 border-amber-200'
                       }`}>
-                        {m.accountStatus}
+                        {m.isVerified ? 'Verified' : 'Unverified'}
                       </span>
+                    </td>
+                    <td className="py-3 px-4 border-b border-outline-variant/5">
+                      {m.certificateUrl ? (
+                        <a href={m.certificateUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-secondary hover:underline text-[12px] font-bold">
+                          <span className="material-symbols-outlined text-[14px]">description</span> View Doc
+                        </a>
+                      ) : (
+                        <span className="text-[11px] text-on-surface-variant/40 italic">Not Uploaded</span>
+                      )}
+                    </td>
+                    <td className="py-3 px-4 border-b border-outline-variant/5 text-on-surface-variant/60">
+                      {new Date(m.createdAt).toLocaleDateString()}
                     </td>
                     <td className="py-3 px-4 text-right border-b border-outline-variant/5">
                       <button className="p-1 hover:bg-surface-container-high rounded-lg text-on-surface-variant/30 hover:text-secondary transition-colors">
@@ -157,6 +177,11 @@ const Merchants = () => {
                     </td>
                   </tr>
                 ))}
+                {merchantsData.length === 0 && (
+                  <tr>
+                    <td colSpan="7" className="py-8 text-center text-on-surface-variant/40">No merchants found.</td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
