@@ -48,14 +48,14 @@ export default function Profile() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-y-6 lg:gap-y-8 gap-x-12">
                 {[
-                  { label: "Name", value: merchant?.businessName || "Kamau General Store", locked: true },
-                  { label: "Email", value: merchant?.email || "jameskamau@gmail.com", locked: false },
+                  { label: "Name", value: merchant?.businessName || "PayChain Financial Services Limited", locked: true },
+                  { label: "Email", value: merchant?.email || "brandonomutiti05@gmail.com", locked: false },
                   { label: "Phone", value: merchant?.phone || "+254712345678", locked: true },
                   { label: "Role", value: "Administrator", badge: "Primary" },
                   { label: "Primary contact", value: "Yes", status: true },
-                  { label: "Created at", value: "19 March 2026", sub: "Member since" },
-                  { label: "Last sign in", value: "10 April 2026, 00:36:49", sub: "Security timestamp" },
-                  { label: "Sign in count", value: "6", sub: "Access frequency" },
+                  { label: "Created at", value: merchant?.createdAt ? new Date(merchant.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : "19 March 2026", sub: "Member since" },
+                  { label: "Last sign in", value: merchant?.lastLogin ? new Date(merchant.lastLogin).toLocaleString('en-GB') : "10 April 2026, 00:36:49", sub: "Security timestamp" },
+                  { label: "Sign in count", value: merchant?.loginCount?.toString() || "6", sub: "Access frequency" },
                   { label: "SMS/USSD activated", value: "No", status: false },
                   { label: "2FA Setup", value: "Yes", status: true },
                 ].map((item, idx) => (
