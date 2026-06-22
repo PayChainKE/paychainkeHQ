@@ -329,6 +329,7 @@ export default function Wallet() {
                 <div className="flex items-center justify-center gap-3 mt-6 pt-5 border-t border-[#1E2532]/50">
                    <span className="text-[8px] font-black uppercase tracking-[0.2em] text-[#8B98A9]/40">Supported Networks</span>
                    <div className="flex items-center gap-2">
+                      <img src="https://cryptologos.cc/logos/stellar-xlm-logo.svg?v=032" alt="Stellar" className="w-4 h-4 transition-all cursor-help brightness-0 invert" title="Stellar" />
                       <img src="https://cryptologos.cc/logos/usd-coin-usdc-logo.svg?v=032" alt="USDC" className="w-4 h-4 transition-all cursor-help" title="USDC Native" />
                       <img src="https://cryptologos.cc/logos/polygon-matic-logo.svg?v=032" alt="Polygon" className="w-4 h-4 transition-all cursor-help" title="Polygon" />
                       <img src="https://cryptologos.cc/logos/celo-celo-logo.svg?v=032" alt="Celo" className="w-4 h-4 transition-all cursor-help" title="Celo" />
@@ -510,12 +511,13 @@ export default function Wallet() {
                     <div className="flex items-center gap-2 px-3 py-1.5 bg-[#0B0E14] rounded-full border border-[#1E2532]">
                         <span className="text-[7px] font-black uppercase tracking-widest text-[#8B98A9] leading-none">Supported by</span>
                         <div className="flex items-center gap-1.5">
+                          <img src="https://cryptologos.cc/logos/stellar-xlm-logo.svg?v=032" alt="Stellar" className="w-3.5 h-3.5 brightness-0 invert" title="Stellar" />
                           <img src="https://cryptologos.cc/logos/celo-celo-logo.svg?v=032" alt="Celo" className="w-3.5 h-3.5" title="Celo" />
                           <div className="w-3.5 h-3.5 rounded-full bg-[#0052FF] flex items-center justify-center" title="Base">
                             <div className="w-1.5 h-1.5 rounded-full bg-white"></div>
                           </div>
                           <img src="https://cryptologos.cc/logos/polygon-matic-logo.svg?v=032" alt="Polygon" className="w-3.5 h-3.5" title="Polygon" />
-                          <span className="text-[8px] font-bold text-[#8B98A9] ml-0.5">Celo, Base, Polygon</span>
+                          <span className="text-[8px] font-bold text-[#8B98A9] ml-0.5">Stellar, Celo, Base, Polygon</span>
                         </div>
                     </div>
                   </div>
