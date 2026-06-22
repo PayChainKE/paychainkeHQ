@@ -143,7 +143,7 @@ export default function Wallet() {
   }
 
   // QR Logic
-  const qrData = `paychain://pay?till=${merchant?.paybillAccount || '84729'}&name=${encodeURIComponent(merchant?.businessName || 'Merchant')}`
+  const qrData = `https://pay.paychain.ke/pay/${merchant?.paybillAccount || '84729'}`
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrData)}&margin=10&bgcolor=FFFFFF&color=00351D`
 
   const handleDownload = async () => {
@@ -562,7 +562,7 @@ export default function Wallet() {
                   <div className="space-y-2">
                     <button 
                       onClick={() => {
-                        navigator.clipboard.writeText(qrUrl)
+                        navigator.clipboard.writeText(qrData)
                         addToast({ title: 'Link Copied', message: 'Payment link copied to clipboard.', type: 'success' })
                       }}
                       className="w-full py-4 bg-[#131722] text-[#8B98A9] rounded-2xl text-[10px] font-black transition-all shadow-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-amber-500 hover:text-white group border border-[#1E2532] text-center px-2 hover:border-amber-500"
