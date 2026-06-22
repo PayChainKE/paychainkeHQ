@@ -17,6 +17,13 @@ export default function Overview() {
   const [trustData, setTrustData] = useState(null)
   const [activeTimeframe, setActiveTimeframe] = useState('7D')
   const [showMoveMoney, setShowMoveMoney] = useState(false)
+  const [showDigitalWallet, setShowDigitalWallet] = useState(() => localStorage.getItem('paychain_show_wallet') !== 'false')
+
+  const toggleDigitalWallet = () => {
+    const newVal = !showDigitalWallet
+    setShowDigitalWallet(newVal)
+    localStorage.setItem('paychain_show_wallet', newVal)
+  }
 
   useEffect(() => {
     const fetchData = async () => {
@@ -96,15 +103,29 @@ export default function Overview() {
   return (
     <MerchantLayout title="Overview">
       {/* Greeting */}
-      <section className="mb-6 px-1 lg:px-0 overflow-hidden">
-        <h2 className="font-headline font-bold text-[24px] sm:text-3xl lg:text-4xl text-primary tracking-tight leading-tight whitespace-nowrap">
-          {getGreeting()}, {merchant?.businessName?.split(' ')[0] || 'Merchant'}. 👋
-        </h2>
-        <p className="text-on-surface-variant text-[11px] lg:text-sm mt-1.5 opacity-80 font-medium leading-relaxed">Here's how your business is doing today.</p>
+      <section className="mb-6 px-1 lg:px-0 overflow-hidden flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
+        <div>
+          <h2 className="font-headline font-bold text-[24px] sm:text-3xl lg:text-4xl text-primary tracking-tight leading-tight whitespace-nowrap">
+            {getGreeting()}, {merchant?.businessName?.split(' ')[0] || 'Merchant'}. 👋
+          </h2>
+          <p className="text-on-surface-variant text-[11px] lg:text-sm mt-1.5 opacity-80 font-medium leading-relaxed">Here's how your business is doing today.</p>
+        </div>
+        
+        <button 
+          onClick={toggleDigitalWallet}
+          className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-[#E5E7EB] hover:bg-surface-container-low transition-all shadow-sm group"
+        >
+          <span className={`material-symbols-outlined text-[16px] transition-colors ${showDigitalWallet ? 'text-primary/60 group-hover:text-red-500' : 'text-emerald-500'}`}>
+            {showDigitalWallet ? 'visibility_off' : 'account_balance_wallet'}
+          </span>
+          <span className="text-[10px] font-bold text-primary opacity-80 uppercase tracking-widest">
+            {showDigitalWallet ? 'Hide Wallet' : 'Show Wallet'}
+          </span>
+        </button>
       </section>
 
       {/* Section 1: Balance Cards Row */}
-      <section className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in-up [animation-delay:100ms] relative z-20">
+      <section className={`grid grid-cols-1 ${showDigitalWallet ? 'lg:grid-cols-2' : ''} gap-8 animate-fade-in-up [animation-delay:100ms] relative z-20`}>
         {/* KES Balance Card */}
         <div className="bg-[#00351D] text-white p-6 lg:p-7 rounded-[16px] shadow-2xl relative z-20 group border border-white/5">
           <div className="absolute inset-0 overflow-hidden rounded-[16px] pointer-events-none">
@@ -181,30 +202,32 @@ export default function Overview() {
         </div>
 
         {/* USDC Balance Card */}
-        <div className="bg-[#0D2444] text-white p-6 lg:p-7 rounded-[16px] shadow-2xl relative z-10 overflow-hidden group border border-white/5">
-          <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/10 rounded-full -ml-32 -mb-32 blur-3xl"></div>
-          <div className="relative z-10 flex flex-col h-full">
-            <div className="flex justify-between items-start mb-8 lg:mb-10">
-              <span className="bg-[#243B5C] text-[#A6C8FF] px-3 lg:px-4 py-1.5 rounded-full text-[8px] lg:text-[9px] font-black tracking-[0.15em] uppercase border border-white/10">Business Digital wallet</span>
-              <button onClick={togglePrivacy} className="text-white/40 hover:text-white transition-colors p-1">
-                <span className="material-symbols-outlined text-base lg:text-lg leading-none">{showAmounts ? 'visibility' : 'visibility_off'}</span>
-              </button>
-            </div>
-            <div className="flex-1">
-              <h3 className={`font-headline font-bold text-3xl lg:text-4xl tracking-tighter tabular-nums mb-2 lg:mb-3 transition-all duration-300 ${!showAmounts && 'blur-lg grayscale'}`}>
-                {merchant?.usdcBalance || '0.00'} USDC
-              </h3>
-              <p className={`text-white/40 text-[9px] lg:text-[10px] font-bold tracking-tight opacity-70 uppercase transition-all duration-300 ${!showAmounts && 'blur-sm grayscale'}`}>
-                ≈ {formatKES((merchant?.usdcBalance || 0) * 130)}
-              </p>
-            </div>
-            <div className="flex gap-3 lg:gap-4 mt-6 lg:mt-8">
-              <button onClick={() => navigate('/inflation-shield')} className="flex-1 py-3.5 px-3 lg:px-4 bg-white/5 hover:bg-white/10 text-white rounded-xl text-[9px] lg:text-[10px] font-black transition-all border border-white/10 uppercase tracking-widest leading-none">
-                Swap
-              </button>
+        {showDigitalWallet && (
+          <div className="bg-[#0D2444] text-white p-6 lg:p-7 rounded-[16px] shadow-2xl relative z-10 overflow-hidden group border border-white/5 animate-in fade-in zoom-in duration-500">
+            <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/10 rounded-full -ml-32 -mb-32 blur-3xl"></div>
+            <div className="relative z-10 flex flex-col h-full">
+              <div className="flex justify-between items-start mb-8 lg:mb-10">
+                <span className="bg-[#243B5C] text-[#A6C8FF] px-3 lg:px-4 py-1.5 rounded-full text-[8px] lg:text-[9px] font-black tracking-[0.15em] uppercase border border-white/10">Business Digital wallet</span>
+                <button onClick={togglePrivacy} className="text-white/40 hover:text-white transition-colors p-1">
+                  <span className="material-symbols-outlined text-base lg:text-lg leading-none">{showAmounts ? 'visibility' : 'visibility_off'}</span>
+                </button>
+              </div>
+              <div className="flex-1">
+                <h3 className={`font-headline font-bold text-3xl lg:text-4xl tracking-tighter tabular-nums mb-2 lg:mb-3 transition-all duration-300 ${!showAmounts && 'blur-lg grayscale'}`}>
+                  {merchant?.usdcBalance || '0.00'} USDC
+                </h3>
+                <p className={`text-white/40 text-[9px] lg:text-[10px] font-bold tracking-tight opacity-70 uppercase transition-all duration-300 ${!showAmounts && 'blur-sm grayscale'}`}>
+                  ≈ {formatKES((merchant?.usdcBalance || 0) * 130)}
+                </p>
+              </div>
+              <div className="flex gap-3 lg:gap-4 mt-6 lg:mt-8">
+                <button onClick={() => navigate('/inflation-shield')} className="flex-1 py-3.5 px-3 lg:px-4 bg-white/5 hover:bg-white/10 text-white rounded-xl text-[9px] lg:text-[10px] font-black transition-all border border-white/10 uppercase tracking-widest leading-none">
+                  Swap
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </section>
 
       {/* Section 2: Stats Row */}
