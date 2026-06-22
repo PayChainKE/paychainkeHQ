@@ -17,7 +17,7 @@ const KENYAN_COUNTIES = [
 ]
 
 export default function Login() {
-  const { login, biometricLogin, signup, verifyOTP, resendOTP, forgotPassword, resetPassword } = useMerchantAuth()
+  const { login, biometricLogin, signup, verifyOTP, resendOTP, forgotPassword, resetPassword, isAuthenticated } = useMerchantAuth()
   const { addNotification } = useNotification()
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
@@ -26,6 +26,12 @@ export default function Login() {
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(false)
   const nav = useNavigate()
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      nav('/overview')
+    }
+  }, [isAuthenticated, nav])
 
   // Signup Flow States
   const [signupName, setSignupName] = useState('')
@@ -748,7 +754,7 @@ export default function Login() {
                     <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
                   ) : (
                     <>
-                      Verify Account
+                      Sign In
                       <span className="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_forward</span>
                     </>
                   )}
