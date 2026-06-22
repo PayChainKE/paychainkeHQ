@@ -152,61 +152,85 @@ export default function Wallet() {
         
         {/* Hero Section: Balances */}
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in-up">
-          {/* USDC Balance Card (Global) */}
-          <div className="bg-[#0A2540] text-white p-5 md:p-6 rounded-2xl lg:rounded-3xl shadow-2xl relative overflow-hidden group border border-white/5 mx-auto w-full max-w-sm">
-            <div className="absolute top-0 right-0 w-48 md:w-64 h-48 md:h-64 bg-blue-500/10 rounded-full -mr-24 -mt-24 blur-[60px] group-hover:scale-125 transition-transform duration-1000"></div>
-            <div className="relative z-10 flex flex-col h-full justify-between">
-              <div>
-                <div className="flex justify-between items-start mb-5">
-                  <span className="bg-blue-500/10 text-blue-400 px-2.5 py-1.5 rounded-full text-[8px] md:text-[9px] font-black tracking-[0.2em] uppercase border border-blue-400/20 backdrop-blur-md">Stablecoin Assets</span>
-                  <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 backdrop-blur-md">
-                     <span className="material-symbols-outlined text-xl text-white">account_balance_wallet</span>
-                  </div>
+          {/* Premium Crypto Wallet Card (Global USDC) */}
+          <div className="bg-gradient-to-br from-[#0F141E] to-[#0A0D14] text-white p-5 md:p-6 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative overflow-hidden group border border-[#1E2532] mx-auto w-full max-w-[340px] flex flex-col justify-between min-h-[214px]">
+            {/* Glowing Orb Effects */}
+            <div className="absolute top-0 right-0 w-72 h-72 bg-[#2775CA]/20 rounded-full -mr-20 -mt-20 blur-[80px] group-hover:scale-110 group-hover:bg-[#2775CA]/30 transition-all duration-1000 ease-out pointer-events-none"></div>
+            <div className="absolute bottom-0 left-0 w-56 h-56 bg-[#2775CA]/10 rounded-full -ml-20 -mb-20 blur-[60px] pointer-events-none"></div>
+            
+            {/* Mesh Pattern Overlay */}
+            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjEiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wNSkiLz48L3N2Zz4=')] opacity-50 mix-blend-overlay pointer-events-none"></div>
+
+            <div className="relative z-10 flex flex-col h-full">
+              {/* Header */}
+              <div className="flex justify-between items-center mb-8">
+                <div className="flex items-center gap-2 bg-[#1A212D] border border-[#2A3441] rounded-full px-3 py-1.5 shadow-inner">
+                   <div className="w-4 h-4 rounded-full bg-[#2775CA] flex items-center justify-center shadow-[0_0_10px_rgba(39,117,202,0.5)]">
+                     <span className="text-[10px] text-white font-black leading-none">$</span>
+                   </div>
+                   <span className="text-[9px] font-bold tracking-[0.2em] uppercase text-[#8B98A9]">USDC Network</span>
                 </div>
-                <p className="text-white/40 text-[9px] md:text-[10px] font-bold uppercase tracking-widest mb-1">Global Settlement Balance</p>
-                <h3 className={`font-headline font-bold text-2xl md:text-3xl lg:text-4xl tracking-tighter tabular-nums mb-3 transition-all duration-300 ${!showAmounts && 'blur-xl'}`}>
-                  {merchant?.usdcBalance?.toLocaleString(undefined, { minimumFractionDigits: 2 }) || '0.00'} USDC
-                </h3>
-                <div 
-                  onClick={() => {
-                    navigator.clipboard.writeText('0x8472...9xK2')
-                    addToast({ title: 'Address Copied', message: 'Wallet address copied to clipboard', type: 'success' })
-                  }}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white/5 hover:bg-white/10 rounded-full border border-white/5 cursor-pointer transition-all active:scale-95 group mb-2"
-                >
-                  <span className="text-[9px] text-white/40 font-mono tracking-wider">
-                    <span className="font-bold text-white/20 mr-1 italic">Wallet:</span>
-                    0x8472...9xK2
-                  </span>
-                  <span className="material-symbols-outlined text-xs text-white/20 group-hover:text-white/60 transition-colors shrink-0">content_copy</span>
-                </div>
-                <div className="flex items-center gap-2 mt-1 opacity-40">
-                  <span className="text-[7px] font-black uppercase tracking-widest text-white/60">Supported by</span>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-3 rounded-full bg-[#35D07F] border border-white/20" title="Celo Network"></div>
-                    <div className="w-3 h-3 rounded-full bg-[#0052FF] border border-white/20" title="Base Network"></div>
-                    <div className="w-3 h-3 rounded-full bg-[#8247E5] border border-white/20" title="Polygon Network"></div>
-                  </div>
+                <div className="w-10 h-10 rounded-full bg-[#1A212D] flex items-center justify-center border border-[#2A3441] shadow-lg backdrop-blur-md hover:bg-[#202936] transition-colors cursor-pointer group/icon">
+                   <span className="material-symbols-outlined text-lg text-[#8B98A9] group-hover/icon:text-white transition-colors">qr_code_scanner</span>
                 </div>
               </div>
-              <div className="flex items-center gap-3 mt-6">
-                <button className="flex-1 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-[10px] font-bold transition-all border border-white/10 uppercase tracking-widest flex items-center justify-center gap-1.5">
-                  <span className="material-symbols-outlined text-xs">swap_horiz</span>
+
+              {/* Balance Area */}
+              <div className="mb-8">
+                <p className="text-[#8B98A9] text-[10px] font-black uppercase tracking-[0.2em] mb-2">Global Settlement Balance</p>
+                <div className="flex items-baseline gap-2">
+                  <h3 className={`font-headline font-black text-4xl md:text-5xl tracking-tighter tabular-nums transition-all duration-300 text-transparent bg-clip-text bg-gradient-to-r from-white to-[#8B98A9] ${!showAmounts && 'blur-xl text-white bg-none'}`}>
+                    {merchant?.usdcBalance?.toLocaleString(undefined, { minimumFractionDigits: 2 }) || '0.00'}
+                  </h3>
+                  <span className="text-xl font-bold text-[#2775CA]">USDC</span>
+                </div>
+                
+                {/* Wallet Address Pill */}
+                <div 
+                  onClick={() => {
+                    navigator.clipboard.writeText('0x84728fB0...9xK2')
+                    addToast({ title: 'Address Copied', message: 'Wallet address copied to clipboard', type: 'success' })
+                  }}
+                  className="inline-flex items-center gap-2 mt-4 px-3 py-1.5 bg-[#1A212D]/80 hover:bg-[#202936] rounded-full border border-[#2A3441] cursor-pointer transition-all active:scale-95 group/pill backdrop-blur-md"
+                >
+                  <div className="w-2 h-2 rounded-full bg-[#35D07F] shadow-[0_0_8px_rgba(53,208,127,0.6)] animate-pulse"></div>
+                  <span className="text-[11px] text-[#8B98A9] font-mono tracking-wider group-hover/pill:text-white transition-colors">
+                    0x8472...9xK2
+                  </span>
+                  <span className="material-symbols-outlined text-[14px] text-[#8B98A9] group-hover/pill:text-white transition-colors">content_copy</span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="grid grid-cols-2 gap-3 mt-auto">
+                <button className="py-3.5 bg-[#1A212D] hover:bg-[#202936] text-white rounded-2xl text-[10px] font-black transition-all border border-[#2A3441] uppercase tracking-[0.15em] flex flex-col items-center justify-center gap-1.5 group/btn shadow-lg">
+                  <span className="material-symbols-outlined text-xl text-[#8B98A9] group-hover/btn:text-white transition-colors">swap_horiz</span>
                   Swap KES
                 </button>
                 <button 
                   onClick={() => setShowTopUpSelection(true)}
-                  className="flex-1 py-2.5 bg-emerald-500 text-[#0A2540] hover:bg-emerald-400 rounded-xl text-[10px] font-bold transition-all shadow-xl uppercase tracking-widest flex items-center justify-center gap-1.5"
+                  className="py-3.5 bg-gradient-to-b from-[#2775CA] to-[#1A5AA3] hover:from-[#2C84E3] hover:to-[#1C64B4] text-white rounded-2xl text-[10px] font-black transition-all shadow-[0_0_20px_rgba(39,117,202,0.3)] hover:shadow-[0_0_25px_rgba(39,117,202,0.5)] border border-[#3E8BE0]/50 uppercase tracking-[0.15em] flex flex-col items-center justify-center gap-1.5 active:scale-95"
                 >
-                  <span className="material-symbols-outlined text-xs">add</span>
+                  <span className="material-symbols-outlined text-xl text-white">add</span>
                   Top Up
                 </button>
               </div>
+              
+              {/* Networks Footer */}
+              <div className="flex items-center justify-center gap-3 mt-6 pt-5 border-t border-[#1E2532]/50">
+                 <span className="text-[8px] font-black uppercase tracking-[0.2em] text-[#8B98A9]/40">Supported Networks</span>
+                 <div className="flex items-center gap-2">
+                    <img src="https://cryptologos.cc/logos/usd-coin-usdc-logo.svg?v=032" alt="USDC" className="w-3.5 h-3.5 opacity-40 grayscale hover:grayscale-0 hover:opacity-100 transition-all cursor-help" title="USDC Native" />
+                    <img src="https://cryptologos.cc/logos/polygon-matic-logo.svg?v=032" alt="Polygon" className="w-3.5 h-3.5 opacity-40 grayscale hover:grayscale-0 hover:opacity-100 transition-all cursor-help" title="Polygon" />
+                    <img src="https://cryptologos.cc/logos/celo-celo-logo.svg?v=032" alt="Celo" className="w-3.5 h-3.5 opacity-40 grayscale hover:grayscale-0 hover:opacity-100 transition-all cursor-help" title="Celo" />
+                 </div>
+              </div>
+
             </div>
           </div>
 
           {/* KES Balance Card (Local) */}
-          <div className="bg-white p-5 md:p-6 rounded-2xl lg:rounded-3xl shadow-sm border border-outline-variant/10 relative overflow-hidden group editorial-shadow mx-auto w-full max-w-sm flex flex-col justify-between h-full">
+          <div className="bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-outline-variant/10 relative overflow-hidden group editorial-shadow mx-auto w-full max-w-[340px] flex flex-col justify-between h-full min-h-[214px]">
              <div className="absolute bottom-0 left-0 w-48 md:w-64 h-48 md:h-64 bg-emerald-50 rounded-full -ml-24 -mb-24 blur-[40px] md:blur-[60px]"></div>
              <div className="relative z-10">
                 <div className="flex justify-between items-start mb-5">
