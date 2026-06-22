@@ -2,6 +2,7 @@ import Transaction from '../models/Transaction.js';
 import Merchant from '../models/Merchant.js';
 import { settleInflationShield, provisionMerchantWallet } from '../utils/stellarHelper.js';
 import { encryptKey } from '../utils/cryptoHelper.js';
+import { getLiveKesToUsdcRate } from '../utils/rateEngine.js';
 
 // @desc    Get merchant transactions
 // @route   GET /api/transactions
@@ -100,24 +101,24 @@ export const swapKesToUsdc = async (req, res) => {
     }
 
     // Process Swap
-    const MOCK_EXCHANGE_RATE = 130; // 1 USD = 130 KES
-    const usdcAmount = amount / MOCK_EXCHANGE_RATE;
+    const liveRate = await getLiveKesToUsdcRate();
+    const usdcPayoutValue = (amount * liveRate).toFixed(7);
 
-    console.log(`💱 Manual Swap: Converting ${amount} KES to ${usdcAmount.toFixed(2)} USDC for ${merchant.paybillAccount}`);
+    console.log(`💱 Manual Swap: Converting ${amount} KES to ${usdcPayoutValue} USDC for ${merchant.paybillAccount}`);
     
     // Deduct immediately to prevent double spending
     merchant.kesBalance -= amount;
     await merchant.save();
 
     try {
-      const txHash = await settleInflationShield(merchant.stellarPublicKey, usdcAmount.toFixed(2));
+      const txHash = await settleInflationShield(merchant.stellarPublicKey, usdcPayoutValue);
       
       // Log the transaction
       await Transaction.create({
         merchantId: merchant._id,
         accountNumber: merchant.paybillAccount,
         type: 'swap',
-        amount: usdcAmount,
+        amount: parseFloat(usdcPayoutValue),
         kesAmount: amount,
         currency: 'USDC',
         status: 'completed',
@@ -127,7 +128,7 @@ export const swapKesToUsdc = async (req, res) => {
       });
 
       // Update USDC balance cache
-      merchant.usdcBalance = (merchant.usdcBalance || 0) + usdcAmount;
+      merchant.usdcBalance = (merchant.usdcBalance || 0) + parseFloat(usdcPayoutValue);
       await merchant.save();
 
       res.status(200).json({

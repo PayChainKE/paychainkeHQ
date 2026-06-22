@@ -3,6 +3,7 @@ import Transaction from '../models/Transaction.js';
 import Merchant from '../models/Merchant.js';
 import { sendSMS } from '../utils/sms.js';
 import { settleInflationShield } from '../utils/stellarHelper.js';
+import { getLiveKesToUsdcRate } from '../utils/rateEngine.js';
 
 // Configuration from environment variables
 const consumerKey = process.env.MPESA_CONSUMER_KEY;
@@ -159,22 +160,26 @@ export const confirmationURL = async (req, res) => {
 
     // Inflation Shield: Automatically convert KES to USDC and settle on-chain
     const PLATFORM_FEE_PERCENTAGE = 0; // Configurable fee (0% for demo)
-    const MOCK_EXCHANGE_RATE = 130; // 1 USD = 130 KES
     
     const netKESAmount = amount - (amount * PLATFORM_FEE_PERCENTAGE);
-    const usdcAmount = netKESAmount / MOCK_EXCHANGE_RATE;
+    const liveRate = await getLiveKesToUsdcRate();
+    const usdcPayoutValue = (netKESAmount * liveRate).toFixed(7);
 
     if (merchant.stellarPublicKey) {
       try {
-        console.log(`🛡️ Executing Inflation Shield for Acc ${accountNumber}: Converting ${netKESAmount} KES to ${usdcAmount.toFixed(2)} USDC...`);
-        const txHash = await settleInflationShield(merchant.stellarPublicKey, usdcAmount.toFixed(2));
+        console.log(`🛡️ Executing Inflation Shield for Acc ${accountNumber}:`);
+        console.log(`   - Gross M-Pesa KES: ${amount}`);
+        console.log(`   - Live KES/USDC Rate (Fractional): ${liveRate}`);
+        console.log(`   - Exact On-Chain Payout: ${usdcPayoutValue} USDC`);
+
+        const txHash = await settleInflationShield(merchant.stellarPublicKey, usdcPayoutValue);
         
         // Log the blockchain settlement transaction
         await Transaction.create({
           merchantId: merchant._id,
           accountNumber: merchant.paybillAccount,
           type: 'settlement',
-          amount: usdcAmount,
+          amount: parseFloat(usdcPayoutValue),
           kesAmount: netKESAmount,
           currency: 'USDC',
           status: 'completed',
