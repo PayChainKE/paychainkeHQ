@@ -4,8 +4,22 @@ import { ArrowLeft, Calendar, Clock, Share2, Twitter, Linkedin, Facebook } from 
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 
-// Dummy content - in a real app this would be fetched based on the ID
-const allArticlesData: Record<string, any> = {
+interface ArticleData {
+  id: string;
+  title: string;
+  category: string;
+  date: string;
+  readTime: string;
+  author: {
+    name: string;
+    role: string;
+    avatar: string;
+  };
+  image: string;
+  content: string;
+}
+
+const allArticlesData: Record<string, ArticleData> = {
   'future-of-payments-africa': {
     id: 'future-of-payments-africa',
     title: 'The Future of Digital Payments in East Africa',
