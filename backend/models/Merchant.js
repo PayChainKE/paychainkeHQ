@@ -23,6 +23,14 @@ const merchantSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Please add a business name'],
   },
+  businessNumber: {
+    type: String,
+    default: null,
+  },
+  kraPin: {
+    type: String,
+    default: null,
+  },
   password: {
     type: String,
     required: [true, 'Please add a password'],

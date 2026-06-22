@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { jsPDF } from 'jspdf'
 import domtoimage from 'dom-to-image'
-import axios from 'axios'
+import { useNavigate } from 'react-router-dom'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { formatKES } from '../utils/formatCurrency'
@@ -14,6 +14,9 @@ export default function BulkPay() {
   const { addNotification } = useNotification()
   const { merchant } = useMerchantAuth()
   const [payeesList, setPayeesList] = useState([])
+  const navigate = useNavigate()
+  
+  const isProfileComplete = Boolean(merchant?.kraPin && merchant?.businessNumber)
   
   useEffect(() => {
     const fetchPayees = async () => {
@@ -552,7 +555,29 @@ export default function BulkPay() {
 
   return (
     <MerchantLayout title="Bulk Payments">
-      <div className="px-1 lg:px-0 max-w-7xl mx-auto flex flex-col lg:flex-row gap-6 lg:gap-8 relative">
+      <div className="relative">
+        {!isProfileComplete && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-[#0A2540]/90 backdrop-blur-xl p-8 md:p-12 rounded-[32px] md:rounded-[40px] text-center shadow-2xl max-w-lg w-full border border-white/10 animate-fade-in-up">
+              <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center mx-auto mb-6 text-white/50">
+                <span className="material-symbols-outlined text-3xl">lock</span>
+              </div>
+              <h2 className="font-headline text-2xl md:text-3xl font-bold text-white mb-3">Profile Incomplete</h2>
+              <p className="text-sm md:text-base text-white/70 mb-8 leading-relaxed">
+                To unlock Bulk Payments and ensure full regulatory compliance, please add your KRA PIN and Business License Number to your profile.
+              </p>
+              <button 
+                onClick={() => navigate('/profile')}
+                className="w-full bg-emerald-500 text-[#06201B] px-8 py-4 rounded-xl font-black text-[11px] uppercase tracking-widest shadow-xl hover:bg-white transition-all active:scale-95 flex items-center justify-center gap-2"
+              >
+                Complete Profile Now
+                <span className="material-symbols-outlined text-sm">arrow_forward</span>
+              </button>
+            </div>
+          </div>
+        )}
+        
+        <div className={`px-1 lg:px-0 max-w-7xl mx-auto flex flex-col lg:flex-row gap-6 lg:gap-8 relative transition-all duration-500 ${!isProfileComplete ? 'blur-md pointer-events-none opacity-40 select-none' : ''}`}>
         
         {/* Add/Edit Payee Modal Overlay */}
         {showAddModal && (
@@ -1944,6 +1969,7 @@ export default function BulkPay() {
         )}
       </div>
 
+      </div>
     </MerchantLayout>
   )
 }

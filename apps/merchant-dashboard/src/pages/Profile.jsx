@@ -10,7 +10,9 @@ export default function Profile() {
   const { merchant } = useMerchantAuth()
   const [name, setName] = useState(merchant?.name || 'Admin')
   const [email, setEmail] = useState(merchant?.email || 'admin@paychain.ke')
-  const [autoSettle, setAutoSettle] = useState(true)
+  const [kraPin, setKraPin] = useState(merchant?.kraPin || '')
+  const [businessNumber, setBusinessNumber] = useState(merchant?.businessNumber || '')
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false)
   const [showQuestions, setShowQuestions] = useState(false)
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -19,8 +21,24 @@ export default function Profile() {
   const toast = useToast()
 
   async function save() {
-    await new Promise(r => setTimeout(r, 700))
-    toast.push({ message: 'Profile updated' })
+    setIsUpdatingProfile(true)
+    try {
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+      const res = await axios.put(`${API_URL}/api/auth/merchant/profile`, {
+        kraPin,
+        businessNumber
+      })
+
+      if (res.data.success) {
+        toast.push({ message: 'Profile updated successfully', type: 'success' })
+        // Need to wait slightly for the UI to show success before refreshing context
+        setTimeout(() => window.location.reload(), 1000)
+      }
+    } catch (err) {
+      toast.push({ message: err.response?.data?.error || 'Failed to update profile', type: 'error' })
+    } finally {
+      setIsUpdatingProfile(false)
+    }
   }
 
   async function handleSecurityUpdate() {
@@ -116,15 +134,48 @@ export default function Profile() {
                   </div>
                 ))}
               </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-y-6 lg:gap-y-8 gap-x-12 mt-8 border-t border-slate-100 pt-8">
+                <div className="space-y-2 group">
+                  <label className="text-[9px] text-on-surface-variant font-black uppercase tracking-[0.2em] pl-1 opacity-50 group-hover:opacity-100 transition-opacity">KRA PIN</label>
+                  <input 
+                    type="text"
+                    value={kraPin}
+                    onChange={(e) => setKraPin(e.target.value.toUpperCase())}
+                    placeholder="e.g. A123456789Z"
+                    className="w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none"
+                  />
+                </div>
+                <div className="space-y-2 group">
+                  <label className="text-[9px] text-on-surface-variant font-black uppercase tracking-[0.2em] pl-1 opacity-50 group-hover:opacity-100 transition-opacity">Business / License Number</label>
+                  <input 
+                    type="text"
+                    value={businessNumber}
+                    onChange={(e) => setBusinessNumber(e.target.value.toUpperCase())}
+                    placeholder="e.g. PVT-XXXXXX"
+                    className="w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none"
+                  />
+                </div>
+              </div>
               
               <div className="mt-10 lg:mt-12 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 pt-8 border-t border-slate-100">
                 <p className="text-[10px] text-on-surface-variant font-medium max-w-[240px]">Last USSD PIN failed attempts: <span className="text-primary font-black">0</span> • PIN Blocked: <span className="text-red-500 font-black">No</span></p>
                 <button 
                   onClick={save}
-                  className="w-full md:w-auto bg-[#06201B] text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:opacity-90 transition-all flex items-center justify-center gap-2 active:scale-95"
+                  disabled={isUpdatingProfile}
+                  className="w-full md:w-auto bg-[#06201B] text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:opacity-90 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <span className="material-symbols-outlined text-base">sync</span>
-                  Update Global Profile
+                  {isUpdatingProfile ? (
+                    <>
+                      <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>
+                      Updating...
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-base">sync</span>
+                      Update Global Profile
+                    </>
+                  )}
                 </button>
               </div>
             </div>
