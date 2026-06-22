@@ -403,31 +403,29 @@ export default function Wallet() {
 
         <div className="grid grid-cols-12 gap-8 items-start lg:items-stretch">
           {/* Withdrawal Interface */}
-          <section className="col-span-12 lg:col-span-12 xl:col-span-5 bg-[#0B0E14] p-6 md:p-8 lg:p-10 rounded-[32px] lg:rounded-[40px] border border-[#1E2532] shadow-[0_20px_50px_rgba(0,0,0,0.5)] animate-fade-in-up [animation-delay:100ms] flex flex-col relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-[#2775CA]/5 rounded-full blur-[100px] pointer-events-none"></div>
-            
-            <div className="mb-6 md:mb-10 relative z-10">
-              <h3 className="font-headline text-2xl md:text-3xl text-white tracking-tight">Withdraw Funds</h3>
-              <p className="text-[9px] md:text-[10px] text-[#8B98A9] font-bold uppercase tracking-[0.2em] mt-1">Settlement Destination</p>
+          <section className="col-span-12 lg:col-span-12 xl:col-span-5 bg-white p-6 md:p-8 lg:p-10 rounded-[32px] lg:rounded-[40px] border border-outline-variant/10 shadow-2xl editorial-shadow animate-fade-in-up [animation-delay:100ms] flex flex-col">
+            <div className="mb-6 md:mb-10">
+              <h3 className="font-headline text-2xl md:text-3xl text-primary tracking-tight">Withdraw Funds</h3>
+              <p className="text-[9px] md:text-[10px] text-on-surface-variant font-bold uppercase tracking-[0.2em] mt-1 opacity-60">Settlement Destination</p>
             </div>
 
-            <form onSubmit={handleWithdraw} className="space-y-6 relative z-10">
+            <form onSubmit={handleWithdraw} className="space-y-6">
               <div className="space-y-3">
-                <label className="text-[11px] font-black uppercase tracking-widest text-[#8B98A9] pl-1">Amount to Withdraw</label>
+                <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Amount to Withdraw</label>
                 <div className="relative group">
-                  <div className="absolute left-5 top-1/2 -translate-y-1/2 text-[#8B98A9] font-bold text-sm">KES</div>
+                  <div className="absolute left-5 top-1/2 -translate-y-1/2 text-primary/40 font-bold text-sm">KES</div>
                   <input 
                     type="number"
                     value={withdrawAmount}
                     onChange={(e) => setWithdrawAmount(e.target.value)}
                     placeholder="0.00"
-                    className="w-full bg-[#131722] border border-[#1E2532] rounded-2xl md:rounded-3xl py-4 md:py-6 pl-14 md:pl-16 pr-6 text-2xl md:text-3xl font-headline text-white focus:ring-2 focus:ring-[#2775CA] focus:bg-[#1A212D] transition-all outline-none"
+                    className="w-full bg-surface-container-low border border-outline-variant/5 rounded-2xl md:rounded-3xl py-4 md:py-6 pl-14 md:pl-16 pr-6 text-2xl md:text-3xl font-headline text-primary focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
                   />
                 </div>
               </div>
 
               <div className="space-y-3">
-                <label className="text-[11px] font-black uppercase tracking-widest text-[#8B98A9] pl-1">Destination</label>
+                <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Destination</label>
                 <div className="grid grid-cols-1 gap-3">
                   {withdrawalDestinations.map((dest) => (
                     <div 
@@ -435,25 +433,25 @@ export default function Wallet() {
                       onClick={() => setDestination(dest.id)}
                       className={`p-5 rounded-2xl border cursor-pointer transition-all flex items-center justify-between group ${
                         destination === dest.id 
-                        ? 'border-[#2775CA] bg-[#2775CA]/10 shadow-md' 
-                        : 'border-[#1E2532] bg-[#131722] hover:bg-[#1A212D]'
+                        ? 'border-primary bg-primary/5 shadow-md' 
+                        : 'border-outline-variant/10 bg-surface-container-low hover:bg-emerald-50'
                       }`}
                     >
                       <div className="flex items-center gap-4">
                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
-                            destination === dest.id ? 'bg-[#2775CA] text-white' : 'bg-[#1A212D] text-[#8B98A9]'
+                            destination === dest.id ? 'bg-primary text-white' : 'bg-white text-on-surface-variant'
                          }`}>
                             <span className="material-symbols-outlined text-xl">
                                {dest.type === 'Till' ? 'point_of_sale' : 'account_balance'}
                             </span>
                          </div>
                          <div>
-                            <p className={`text-sm font-bold ${destination === dest.id ? 'text-white' : 'text-[#8B98A9]'}`}>{dest.label}</p>
-                            <p className="text-[10px] text-[#8B98A9] font-medium opacity-60 capitalize">{dest.type} Account</p>
+                            <p className={`text-sm font-bold ${destination === dest.id ? 'text-primary' : 'text-on-surface'}`}>{dest.label}</p>
+                            <p className="text-[10px] text-on-surface-variant font-medium opacity-60 capitalize">{dest.type} Account</p>
                          </div>
                       </div>
                       {dest.verified && (
-                        <span className="material-symbols-outlined text-[#2775CA] text-lg" style={{fontVariationSettings: "'FILL' 1"}}>verified</span>
+                        <span className="material-symbols-outlined text-emerald-600 text-lg" style={{fontVariationSettings: "'FILL' 1"}}>verified</span>
                       )}
                     </div>
                   ))}
@@ -461,11 +459,11 @@ export default function Wallet() {
               </div>
 
               {selectedDest && (
-                <div className="p-5 bg-[#131722] rounded-2xl border border-[#2775CA]/20 flex items-start gap-4 animate-scale-in">
-                   <span className="material-symbols-outlined text-[#2775CA] mt-0.5">info</span>
+                <div className="p-5 bg-[#F0FDF4] rounded-2xl border border-emerald-100 flex items-start gap-4 animate-scale-in">
+                   <span className="material-symbols-outlined text-emerald-600 mt-0.5">info</span>
                    <div>
-                      <p className="text-[11px] text-[#8B98A9] font-medium leading-relaxed">
-                        Withdrawals to <strong>{selectedDest.label}</strong> are typically processed within <span className="font-bold text-white">15 minutes</span>.
+                      <p className="text-[11px] text-emerald-900 font-medium leading-relaxed">
+                        Withdrawals to <strong>{selectedDest.label}</strong> are typically processed within <span className="font-bold">15 minutes</span>.
                       </p>
                    </div>
                 </div>
@@ -474,7 +472,7 @@ export default function Wallet() {
               <button 
                 type="submit"
                 disabled={isWithdrawing || !withdrawAmount}
-                className="w-full bg-gradient-to-r from-[#2775CA] to-[#1A5B9E] text-white py-5 rounded-3xl font-bold text-lg shadow-[0_0_20px_rgba(39,117,202,0.3)] hover:shadow-[0_0_30px_rgba(39,117,202,0.5)] active:scale-[0.98] transition-all flex items-center justify-center gap-3 group border border-[#2775CA]/20 disabled:opacity-20 disabled:grayscale"
+                className="w-full bg-[#00351D] text-white py-5 rounded-3xl font-bold text-lg shadow-2xl hover:bg-[#004d2b] active:scale-[0.98] transition-all flex items-center justify-center gap-3 group border border-white/5 disabled:opacity-20 disabled:grayscale"
               >
                 {isWithdrawing ? (
                   <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
