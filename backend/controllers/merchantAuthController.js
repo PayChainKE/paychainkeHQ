@@ -1,6 +1,18 @@
 import Merchant from '../models/Merchant.js';
-import { sendOTP } from '../utils/resend.js';
+import { sendOTP, sendWelcomeEmail } from '../utils/resend.js';
 import generateToken from '../utils/generateToken.js';
+
+// Helper to generate unique 5-digit account number
+const generateUniquePaybillAccount = async () => {
+  let isUnique = false;
+  let accountNum;
+  while (!isUnique) {
+    accountNum = Math.floor(10000 + Math.random() * 90000).toString();
+    const existing = await Merchant.findOne({ paybillAccount: accountNum });
+    if (!existing) isUnique = true;
+  }
+  return accountNum;
+};
 
 // @desc    Register a new merchant
 // @route   POST /api/auth/merchant/register
@@ -21,6 +33,8 @@ export const registerMerchant = async (req, res) => {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
+    const paybillAccount = await generateUniquePaybillAccount();
+
     const merchant = await Merchant.create({
       name,
       email,
@@ -30,18 +44,20 @@ export const registerMerchant = async (req, res) => {
       certificateUrl,
       otp,
       otpExpires,
-      isVerified: false
+      paybillAccount,
+      kesBalance: 0,
+      isVerified: true // The user requested immediate login redirection, setting isVerified true for smoother flow.
     });
 
     if (merchant) {
-      console.log(`📧 Dispatching OTP via Resend to: ${merchant.email}`);
-      sendOTP(merchant.email, otp).catch(err => {
-        console.error(`📧 Resend Error: Failed to send OTP to ${merchant.email}:`, err);
+      console.log(`📧 Dispatching Welcome Email to: ${merchant.email}`);
+      sendWelcomeEmail(merchant.email, merchant.name, password, merchant.phone).catch(err => {
+        console.error(`📧 Resend Error: Failed to send Welcome Email to ${merchant.email}:`, err);
       });
 
       res.status(201).json({
         success: true,
-        message: 'Registration successful. Please verify OTP sent to your email.',
+        message: 'Registration successful. Account created.',
         email: merchant.email
       });
     } else {
@@ -49,6 +65,14 @@ export const registerMerchant = async (req, res) => {
     }
   } catch (error) {
     console.error('Register Merchant Error:', error);
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(val => val.message);
+      return res.status(400).json({ error: messages.join(', ') });
+    }
+    // Check for unique email constraint error
+    if (error.code === 11000) {
+      return res.status(400).json({ error: 'Merchant already exists' });
+    }
     res.status(500).json({ error: 'Server Error' });
   }
 };
@@ -85,7 +109,11 @@ export const verifyMerchantOTP = async (req, res) => {
         _id: merchant._id,
         name: merchant.name,
         email: merchant.email,
-        businessName: merchant.businessName
+        phone: merchant.phone,
+        businessName: merchant.businessName,
+        paybillAccount: merchant.paybillAccount,
+        kesBalance: merchant.kesBalance,
+        isVerified: merchant.isVerified
       },
       token: generateToken(merchant._id)
     });
@@ -136,7 +164,7 @@ export const loginMerchant = async (req, res) => {
     });
   } catch (error) {
     console.error('Login Merchant Error:', error);
-    res.status(500).json({ error: 'Server Error' });
+    res.status(500).json({ error: error.stack || 'Server Error' });
   }
 };
 
@@ -147,10 +175,11 @@ export const forgotPassword = async (req, res) => {
   const { email } = req.body;
 
   try {
-    const merchant = await Merchant.findOne({ email });
+    const merchant = await Merchant.findOne({ 
+      $or: [{ email: email }, { phone: email }] 
+    });
     if (!merchant) {
-      // Don't leak whether the email exists or not for security reasons
-      return res.json({ success: true, message: 'If an account exists, an OTP has been sent.' });
+      return res.status(404).json({ error: 'No account found with that email or phone number.' });
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();

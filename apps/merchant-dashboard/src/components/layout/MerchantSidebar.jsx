@@ -2,6 +2,7 @@ import React from 'react'
 import { NavLink } from 'react-router-dom'
 import { mockMerchant } from '../../mockData/merchant'
 import { usePrivacyMode } from '../../hooks/usePrivacyMode'
+import { useMerchantAuth } from '../../context/MerchantAuthContext'
 import userIcon from '../../assets/user-icon.png'
 import logo from '../../assets/logo2.png'
 
@@ -141,6 +142,7 @@ function NavItem({ item, depth = 0 }) {
 
 export default function MerchantSidebar({ isOpen, onClose }) {
   const { showAmounts } = usePrivacyMode()
+  const { merchant } = useMerchantAuth()
 
   return (
     <aside className={`fixed left-0 top-0 h-full w-[240px] z-[50] bg-[#162723] flex flex-col overflow-y-auto transition-transform duration-300 ease-in-out lg:translate-x-0 ${isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}`}>
@@ -169,8 +171,8 @@ export default function MerchantSidebar({ isOpen, onClose }) {
             />
           </div>
           <div>
-            <p className="text-white text-xs font-bold leading-tight truncate w-[130px]">{mockMerchant.businessName}</p>
-            <p className="text-[#a8b3a8] text-[9px] uppercase tracking-wider mt-0.5">TILL: {mockMerchant.tillNumber} • TRUST: {mockMerchant.trustScore.current}/100</p>
+            <p className="text-white text-xs font-bold leading-tight truncate w-[130px]">{merchant?.businessName || mockMerchant.businessName}</p>
+            <p className="text-[#a8b3a8] text-[9px] uppercase tracking-wider mt-0.5">TILL: {merchant?.paybillAccount || mockMerchant.tillNumber} • TRUST: {mockMerchant.trustScore.current}/100</p>
           </div>
         </div>
 
@@ -189,8 +191,8 @@ export default function MerchantSidebar({ isOpen, onClose }) {
       <div className="p-6 mt-auto">
         <div className="bg-[#0D241E] rounded-[16px] p-5 mb-8 border border-white/5">
           <p className="text-[#5EFEB3] text-[9px] font-bold uppercase tracking-widest mb-2">Available Funds</p>
-          <p className={`text-white font-headline text-2xl tracking-tight mb-0.5 transition-all duration-300 ${!showAmounts && 'blur-md'}`}>KES {new Intl.NumberFormat().format(mockMerchant.financials.kesBalance)}</p>
-          <p className={`text-[#a8b3a8] text-[10px] transition-all duration-300 ${!showAmounts && 'blur-sm'}`}>{mockMerchant.financials.usdcBalance.toFixed(2)} USDC</p>
+          <p className={`text-white font-headline text-2xl tracking-tight mb-0.5 transition-all duration-300 ${!showAmounts && 'blur-md'}`}>KES {new Intl.NumberFormat().format(merchant?.kesBalance ?? mockMerchant.financials.kesBalance)}</p>
+          <p className={`text-[#a8b3a8] text-[10px] transition-all duration-300 ${!showAmounts && 'blur-sm'}`}>{(merchant?.kesBalance ? (merchant.kesBalance / 130).toFixed(2) : mockMerchant.financials.usdcBalance.toFixed(2))} USDC</p>
         </div>
         
         <div className="space-y-1 pt-4 border-t border-white/5">

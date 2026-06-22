@@ -1,7 +1,9 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { jsPDF } from 'jspdf'
 import domtoimage from 'dom-to-image'
+import axios from 'axios'
 import MerchantLayout from '../components/layout/MerchantLayout'
+import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { payees, bulkPayHistory } from '../mockData/bulkPay'
 import { formatKES } from '../utils/formatCurrency'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
@@ -11,7 +13,24 @@ import paychainLogo from '../../images/logo.png'
 export default function BulkPay() {
   const { showAmounts } = usePrivacyMode()
   const { addNotification } = useNotification()
-  const [payeesList, setPayeesList] = useState(payees)
+  const { merchant } = useMerchantAuth()
+  const [payeesList, setPayeesList] = useState([])
+  
+  useEffect(() => {
+    const fetchPayees = async () => {
+      try {
+        const token = localStorage.getItem('merchantToken')
+        if (!token) return;
+        const res = await axios.get('/api/bulkpay/payees', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        setPayeesList(res.data)
+      } catch (error) {
+        console.error('Error fetching payees:', error)
+      }
+    }
+    fetchPayees()
+  }, [])
   const [activeFilter, setActiveFilter] = useState('All')
   const [step, setStep] = useState(1)
   
@@ -42,7 +61,13 @@ export default function BulkPay() {
     bankName: '',
     paybillNumber: '',
     businessAccount: '',
-    tillNumber: ''
+    tillNumber: '',
+    kraPin: '',
+    idNumber: '',
+    nssfNumber: '',
+    shifNumber: '',
+    etimsInvoiceNumber: '',
+    cuNumber: ''
   })
 
   // Filter payees based on active tab
@@ -79,7 +104,13 @@ export default function BulkPay() {
       bankName: p.bankName || '',
       paybillNumber: p.paybillNumber || '',
       businessAccount: p.businessAccount || '',
-      tillNumber: p.tillNumber || ''
+      tillNumber: p.tillNumber || '',
+      kraPin: p.kraPin || '',
+      idNumber: p.idNumber || '',
+      nssfNumber: p.nssfNumber || '',
+      shifNumber: p.shifNumber || '',
+      etimsInvoiceNumber: p.etimsInvoiceNumber || '',
+      cuNumber: p.cuNumber || ''
     });
     setEditingId(p.id);
     setIsEditing(true);
@@ -87,49 +118,66 @@ export default function BulkPay() {
     setShowAddModal(true);
   }
 
-  const handleSavePayee = () => {
+  const handleSavePayee = async () => {
     if (!newPayee.name) return;
     const numericAmount = parseFloat(newPayee.amount.replace(/,/g, '')) || 0;
 
-    if (isEditing) {
-      setPayeesList(prev => prev.map(p => p.id === editingId ? { 
-        ...p, 
-        ...newPayee, 
-        type: newPayee.type.toLowerCase(),
-        utilityType: newPayee.utilityType,
-        salary: numericAmount,
-        amount: numericAmount
-      } : p));
-      setPayoutAmounts(prev => ({ ...prev, [editingId]: numericAmount }));
-      addNotification({
-        title: 'Payee Updated',
-        message: `${newPayee.name}'s details have been saved.`,
-        type: 'success'
-      });
-    } else {
-      const id = `payee_${Date.now()}`;
-      const entry = {
-        id,
+    try {
+      const token = localStorage.getItem('merchantToken');
+      const payload = {
         ...newPayee,
         type: newPayee.type.toLowerCase(),
-        utilityType: newPayee.utilityType,
-        salary: numericAmount,
-        amount: numericAmount,
-        isActive: true
+        defaultAmount: numericAmount
       };
-      setPayeesList(prev => [...prev, entry]);
-      setPayoutAmounts(prev => ({ ...prev, [id]: numericAmount }));
+
+      if (isEditing) {
+        // Placeholder for editing, for now just update locally as backend edit is not fully implemented
+        setPayeesList(prev => prev.map(p => p.id === editingId ? { 
+          ...p, 
+          ...newPayee, 
+          type: newPayee.type.toLowerCase(),
+          salary: numericAmount,
+          amount: numericAmount
+        } : p));
+        setPayoutAmounts(prev => ({ ...prev, [editingId]: numericAmount }));
+        addNotification({
+          title: 'Payee Updated',
+          message: `${newPayee.name}'s details have been saved.`,
+          type: 'success'
+        });
+      } else {
+        const res = await axios.post('/api/bulkpay/payees', payload, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        const entry = {
+          ...res.data,
+          id: res.data._id, // map mongo id
+          salary: res.data.defaultAmount,
+          amount: res.data.defaultAmount
+        };
+        
+        setPayeesList(prev => [entry, ...prev]);
+        setPayoutAmounts(prev => ({ ...prev, [entry.id]: numericAmount }));
+        addNotification({
+          title: 'Payee Added',
+          message: `${newPayee.name} has been added to your ${newPayee.type} list.`,
+          type: 'success'
+        });
+      }
+
+      setShowAddModal(false);
+      setIsEditing(false);
+      setEditingId(null);
+      setAddStep(1);
+    } catch (error) {
       addNotification({
-        title: 'Payee Added',
-        message: `${newPayee.name} has been added to your ${newPayee.type} list.`,
-        type: 'success'
+        title: 'Error',
+        message: error.response?.data?.message || 'Failed to save payee',
+        type: 'error'
       });
     }
 
-    setShowAddModal(false);
-    setIsEditing(false);
-    setEditingId(null);
-    setAddStep(1);
     setNewPayee({ 
       name: '', 
       type: 'Employee', 
@@ -142,9 +190,44 @@ export default function BulkPay() {
       bankName: '',
       paybillNumber: '',
       businessAccount: '',
-      tillNumber: ''
+      tillNumber: '',
+      kraPin: '',
+      idNumber: '',
+      nssfNumber: '',
+      shifNumber: '',
+      etimsInvoiceNumber: '',
+      cuNumber: ''
     });
   }
+
+  const csvInputRef = React.useRef(null);
+  const [csvPreview, setCsvPreview] = useState(null);
+
+  const handleCSVUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    addNotification({ title: 'Processing CSV', message: 'Analyzing batch payment data...', type: 'info' });
+    
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const token = localStorage.getItem('merchantToken');
+      const res = await axios.post('/api/bulkpay/upload-csv', formData, {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      
+      setCsvPreview(res.data);
+      addNotification({ title: 'CSV Loaded', message: res.data.message, type: 'success' });
+      setStep(1); // Reset step or jump to a special review step
+    } catch (error) {
+      addNotification({ title: 'Upload Failed', message: error.response?.data?.message || 'Could not process CSV', type: 'error' });
+    }
+  };
 
   // Invoice Feature State
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -326,33 +409,66 @@ export default function BulkPay() {
 
   const [authorizedReceipts, setAuthorizedReceipts] = useState([])
 
-  const handleAuthorize = () => {
-    // Generate unique receipts for all selected payees
-    const newReceipts = payeesList
-      .filter(p => selectedPayees[p.id])
-      .map(p => ({
-        id: `TX${Math.random().toString(36).substr(2, 8).toUpperCase()}`,
-        name: p.name,
-        amount: payoutAmounts[p.id],
-        method: p.paymentMethod,
-        phone: p.phone || p.paybillNumber || p.accountNumber || '...',
-        reference: `MAY_PAYOUT_24_${p.id.split('_')[1] || '001'}`,
+  const handleAuthorize = async () => {
+    try {
+      addNotification({ title: 'Processing', message: 'Authorizing batch...', type: 'info' });
+      const token = localStorage.getItem('merchantToken');
+
+      let batchRows = [];
+      if (csvPreview) {
+        batchRows = csvPreview.rows;
+      } else {
+        batchRows = payeesList
+          .filter(p => selectedPayees[p.id])
+          .map(p => ({
+            payeeMatch: p.id,
+            name: p.name,
+            type: p.type,
+            phone: p.phone,
+            grossAmount: payoutAmounts[p.id] || 0,
+            netAmount: payoutAmounts[p.id] || 0, // Mocked for UI, actual tax comes from backend on real employee runs
+          }));
+      }
+
+      const res = await axios.post('/api/bulkpay/authorize', {
+        batchRows,
+        fundingSource: selectedTill || 'Main Business Till'
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      const processedBatch = res.data.batch;
+
+      // Transform response to match frontend receipts
+      const newReceipts = processedBatch.transactions.map(tx => ({
+        id: tx.receiptNumber,
+        name: tx.name,
+        amount: tx.amount,
+        method: tx.method,
+        phone: tx.accountReference,
+        reference: processedBatch.batchReference,
         timestamp: new Date().toLocaleString('en-KE', { 
-          day: '2-digit', 
-          month: 'short', 
-          year: 'numeric', 
-          hour: '2-digit', 
-          minute: '2-digit' 
+          day: '2-digit', month: 'short', year: 'numeric', 
+          hour: '2-digit', minute: '2-digit' 
         })
       }));
-    
-    setAuthorizedReceipts(newReceipts);
-    setStep(4);
-    addNotification({
-      title: 'Batch Processed',
-      message: `Successfully disbursed KES ${batchTotal.toLocaleString()} to ${newReceipts.length} recipients.`,
-      type: 'success'
-    });
+
+      setAuthorizedReceipts(newReceipts);
+      setStep(4);
+      setCsvPreview(null); // Clear preview
+
+      addNotification({
+        title: 'Batch Processed',
+        message: res.data.message,
+        type: 'success'
+      });
+    } catch (error) {
+      addNotification({
+        title: 'Authorization Failed',
+        message: error.response?.data?.message || 'Could not process batch',
+        type: 'error'
+      });
+    }
   }
 
   const downloadReceipt = async (receipt) => {
@@ -543,6 +659,56 @@ export default function BulkPay() {
                                 {u}
                               </button>
                             ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {newPayee.type === 'Employee' && (
+                        <div className="space-y-4 pt-4 animate-in fade-in duration-500 bg-emerald-50/30 p-4 rounded-2xl border border-emerald-500/10">
+                          <h4 className="text-[10px] text-emerald-700 font-black uppercase tracking-widest mb-2 flex items-center gap-2">
+                            <span className="material-symbols-outlined text-[14px]">badge</span>
+                            KRA Payroll Details
+                          </h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">KRA PIN *</label>
+                              <input type="text" value={newPayee.kraPin} onChange={(e) => setNewPayee({...newPayee, kraPin: e.target.value})} placeholder="A000000000A" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 uppercase" />
+                            </div>
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">ID Number *</label>
+                              <input type="text" value={newPayee.idNumber} onChange={(e) => setNewPayee({...newPayee, idNumber: e.target.value})} placeholder="e.g. 12345678" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50" />
+                            </div>
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">NSSF Number</label>
+                              <input type="text" value={newPayee.nssfNumber} onChange={(e) => setNewPayee({...newPayee, nssfNumber: e.target.value})} placeholder="e.g. 123456789" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50" />
+                            </div>
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">SHIF / NHIF Number</label>
+                              <input type="text" value={newPayee.shifNumber} onChange={(e) => setNewPayee({...newPayee, shifNumber: e.target.value})} placeholder="e.g. 1234567" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50" />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {newPayee.type === 'Supplier' && (
+                        <div className="space-y-4 pt-4 animate-in fade-in duration-500 bg-purple-50/30 p-4 rounded-2xl border border-purple-500/10">
+                          <h4 className="text-[10px] text-purple-700 font-black uppercase tracking-widest mb-2 flex items-center gap-2">
+                            <span className="material-symbols-outlined text-[14px]">receipt_long</span>
+                            KRA eTIMS Details
+                          </h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Supplier KRA PIN *</label>
+                              <input type="text" value={newPayee.kraPin} onChange={(e) => setNewPayee({...newPayee, kraPin: e.target.value})} placeholder="P000000000A" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-purple-500/50 uppercase" />
+                            </div>
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">eTIMS Invoice No. *</label>
+                              <input type="text" value={newPayee.etimsInvoiceNumber} onChange={(e) => setNewPayee({...newPayee, etimsInvoiceNumber: e.target.value})} placeholder="e.g. INV-123" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-purple-500/50" />
+                            </div>
+                            <div className="space-y-1.5 sm:col-span-2">
+                              <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Control Unit (CU) No.</label>
+                              <input type="text" value={newPayee.cuNumber} onChange={(e) => setNewPayee({...newPayee, cuNumber: e.target.value})} placeholder="e.g. 123456789" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-purple-500/50" />
+                            </div>
                           </div>
                         </div>
                       )}
@@ -857,9 +1023,27 @@ export default function BulkPay() {
 
           {/* Batch Selection View */}
           <div className="bg-white rounded-[32px] overflow-hidden shadow-[0_20px_80px_rgba(0,0,0,0.06)] border border-outline-variant/10">
-            <div className="p-6 md:p-10 border-b border-outline-variant/5">
-              <h3 className="font-headline text-xl md:text-3xl text-primary tracking-tight font-bold">Create Payment Batch</h3>
-              <p className="text-[10px] md:text-sm text-on-surface-variant font-medium mt-1 md:mt-1.5 opacity-60 italic">Define specific liquidity distribution for this cycle.</p>
+            <div className="p-6 md:p-10 border-b border-outline-variant/5 flex justify-between items-center">
+              <div>
+                <h3 className="font-headline text-xl md:text-3xl text-primary tracking-tight font-bold">Create Payment Batch</h3>
+                <p className="text-[10px] md:text-sm text-on-surface-variant font-medium mt-1 md:mt-1.5 opacity-60 italic">Define specific liquidity distribution for this cycle.</p>
+              </div>
+              <div>
+                <input 
+                  type="file" 
+                  accept=".csv" 
+                  ref={csvInputRef} 
+                  onChange={handleCSVUpload} 
+                  style={{ display: 'none' }} 
+                />
+                <button 
+                  onClick={() => csvInputRef.current.click()}
+                  className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-[14px]">upload_file</span>
+                  Upload CSV
+                </button>
+              </div>
             </div>
             <div className="p-0">
               {/* Desktop Table */}

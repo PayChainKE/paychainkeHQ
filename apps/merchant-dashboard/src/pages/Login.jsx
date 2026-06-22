@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
+import { useNotification } from '../context/NotificationContext'
 import mainLogo from '../assets/signin-logo.png'
 import footerBrandsLogo from '../assets/signin-footer-logo.png'
 import poweredByLogo from '../assets/poweredby-logo.png'
@@ -17,6 +18,7 @@ const KENYAN_COUNTIES = [
 
 export default function Login() {
   const { login, signup, verifyOTP, forgotPassword, resetPassword } = useMerchantAuth()
+  const { addNotification } = useNotification()
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -187,7 +189,13 @@ export default function Login() {
     
     if (res.success) {
       setIsSignupPasswordStep(false)
-      setIsSignupSuccess(true)
+      setActiveTab('login')
+      setPhone(signupPhone)
+      addNotification({
+        title: 'Account Created',
+        message: 'Your account was created successfully. Please login.',
+        type: 'success'
+      })
     } else {
       setErr(res.error)
     }
@@ -368,6 +376,12 @@ export default function Login() {
                     </div>
 
                     <div className="pt-4">
+                      {err && (
+                        <div className="bg-red-50 border border-red-200 p-4 rounded-xl flex items-center gap-3 text-red-700 animate-shake mb-4">
+                          <span className="material-symbols-outlined text-lg">error_outline</span>
+                          <p className="text-xs font-bold">{err}</p>
+                        </div>
+                      )}
                       <button 
                         className="w-full bg-[#06201B] text-white py-4 lg:py-5 rounded-2xl font-black text-lg shadow-2xl hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-white/10 disabled:opacity-30 disabled:grayscale" 
                         disabled={loading || !Object.values(strength).every(v=>v) || !confirmPassword || newPassword !== confirmPassword}
@@ -530,9 +544,23 @@ export default function Login() {
                   <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Email or Phone Number</label>
                   <input className="w-full bg-white border border-outline-variant/15 rounded-2xl py-3 lg:py-4 px-4 lg:px-5 text-lg font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" placeholder="john@example.com or 0712..." type="text" autoComplete="username" required />
                 </div>
-                <button className="w-full bg-[#06201B] text-white py-4 lg:py-5 rounded-2xl font-black text-lg shadow-2xl hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-3 group border border-white/5">
-                  Send Recovery Code <span className="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_forward</span>
-                </button>
+                <div className="space-y-4">
+                  {err && (
+                    <div className="bg-red-50 border border-red-200 p-4 rounded-xl flex items-center gap-3 text-red-700 animate-shake">
+                      <span className="material-symbols-outlined text-lg">error_outline</span>
+                      <p className="text-xs font-bold">{err}</p>
+                    </div>
+                  )}
+                  <button className="w-full bg-[#06201B] text-white py-4 lg:py-5 rounded-2xl font-black text-lg shadow-2xl hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-3 group border border-white/5 disabled:opacity-50" disabled={loading}>
+                    {loading ? (
+                      <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    ) : (
+                      <>
+                        Send Recovery Code <span className="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_forward</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </form>
             </div>
           ) : !isResetMode && !isOTPMode ? (
@@ -547,20 +575,19 @@ export default function Login() {
 
               <form onSubmit={handleLogin} className="space-y-5 lg:space-y-6">
                 <div className="space-y-2">
-                  <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">M-PESA Phone Number</label>
+                  <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Email or Phone Number</label>
                   <div className="flex group">
-                    <div className="bg-surface-container-low border border-outline-variant/15 border-r-0 rounded-l-2xl px-4 lg:px-5 flex items-center justify-center text-sm font-black text-primary/40 group-focus-within:border-primary transition-colors">
-                      +254
+                    <div className="bg-surface-container-low border border-outline-variant/15 border-r-0 rounded-l-2xl px-4 lg:px-5 flex items-center justify-center text-primary/40 group-focus-within:border-primary transition-colors">
+                      <span className="material-symbols-outlined text-xl">person</span>
                     </div>
                     <input 
                       className="flex-1 bg-white border border-outline-variant/15 rounded-r-2xl py-3 lg:py-4 px-4 lg:px-5 text-lg font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40"
                       value={phone} 
-                      onChange={e => setPhone(e.target.value.replace(/\D/g, ''))} 
-                      placeholder="712 345 678"
-                      type="tel"
-                      autoComplete="username tel"
-                      pattern="[0-9]{9,10}"
-                      title="Enter a valid 9 or 10 digit phone number"
+                      onChange={e => setPhone(e.target.value)} 
+                      placeholder="john@example.com or 0712..."
+                      type="text"
+                      autoComplete="username"
+                      required
                     />
                   </div>
                 </div>

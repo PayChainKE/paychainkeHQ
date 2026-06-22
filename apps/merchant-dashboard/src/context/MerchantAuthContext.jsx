@@ -35,9 +35,7 @@ export function MerchantAuthProvider({ children }) {
 
   async function signup(formData) {
     try {
-      const res = await axios.post(`${API_URL}/api/auth/merchant/register`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      const res = await axios.post(`${API_URL}/api/auth/merchant/register`, formData);
       return { success: true, email: res.data.email, message: res.data.message };
     } catch (err) {
       return { success: false, error: err.response?.data?.error || 'Registration failed' };

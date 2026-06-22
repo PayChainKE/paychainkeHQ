@@ -7,11 +7,13 @@ import { revenueByDay } from '../mockData/analytics'
 import { transactionsData, getTransactionStats } from '../mockData/transactions'
 import { formatKES } from '../utils/formatCurrency'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
+import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { useNavigate } from 'react-router-dom'
 
 export default function Overview() {
   const navigate = useNavigate()
   const { showAmounts, togglePrivacy } = usePrivacyMode()
+  const { merchant } = useMerchantAuth()
   const [stats, setStats] = useState(getTransactionStats())
   const [fraudAlerts, setFraudAlerts] = useState(0) // Logic scaffolding
   const [settlementBalance, setSettlementBalance] = useState(0) // Logic scaffolding
@@ -57,9 +59,9 @@ export default function Overview() {
       {/* Greeting */}
       <section className="mb-6 px-1 lg:px-0 overflow-hidden">
         <h2 className="font-headline font-bold text-[24px] sm:text-3xl lg:text-4xl text-primary tracking-tight leading-tight whitespace-nowrap">
-          {getGreeting()}, {mockMerchant.name.split(' ')[0]}. 👋
+          {getGreeting()}, {merchant?.name?.split(' ')[0] || mockMerchant.name.split(' ')[0]}. 👋
         </h2>
-        <p className="text-on-surface-variant text-[11px] lg:text-sm mt-1.5 opacity-80 font-medium leading-relaxed">Here's how {mockMerchant.businessName} is doing today.</p>
+        <p className="text-on-surface-variant text-[11px] lg:text-sm mt-1.5 opacity-80 font-medium leading-relaxed">Here's how {merchant?.businessName || mockMerchant.businessName} is doing today.</p>
       </section>
 
       {/* Section 1: Balance Cards Row */}

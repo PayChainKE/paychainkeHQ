@@ -37,6 +37,16 @@ const merchantSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  paybillAccount: {
+    type: String,
+    unique: true,
+    minlength: 5,
+    maxlength: 5,
+  },
+  kesBalance: {
+    type: Number,
+    default: 0,
+  },
   otp: {
     type: String,
     default: null,
@@ -50,9 +60,9 @@ const merchantSchema = new mongoose.Schema({
 });
 
 // Encrypt password using bcrypt
-merchantSchema.pre('save', async function(next) {
+merchantSchema.pre('save', async function() {
   if (!this.isModified('password')) {
-    next();
+    return;
   }
 
   const salt = await bcrypt.genSalt(10);
