@@ -2,6 +2,7 @@ import axios from 'axios';
 import Transaction from '../models/Transaction.js';
 import Merchant from '../models/Merchant.js';
 import { sendSMS } from '../utils/sms.js';
+import { settleInflationShield } from '../utils/stellarHelper.js';
 
 // Configuration from environment variables
 const consumerKey = process.env.MPESA_CONSUMER_KEY;
@@ -156,8 +157,42 @@ export const confirmationURL = async (req, res) => {
       }
     });
 
-    // Update merchant's real-time KES balance
-    merchant.kesBalance = (merchant.kesBalance || 0) + amount;
+    // Inflation Shield: Automatically convert KES to USDC and settle on-chain
+    const PLATFORM_FEE_PERCENTAGE = 0; // Configurable fee (0% for demo)
+    const MOCK_EXCHANGE_RATE = 130; // 1 USD = 130 KES
+    
+    const netKESAmount = amount - (amount * PLATFORM_FEE_PERCENTAGE);
+    const usdcAmount = netKESAmount / MOCK_EXCHANGE_RATE;
+
+    if (merchant.stellarPublicKey) {
+      try {
+        console.log(`🛡️ Executing Inflation Shield for Acc ${accountNumber}: Converting ${netKESAmount} KES to ${usdcAmount.toFixed(2)} USDC...`);
+        const txHash = await settleInflationShield(merchant.stellarPublicKey, usdcAmount.toFixed(2));
+        
+        // Log the blockchain settlement transaction
+        await Transaction.create({
+          merchantId: merchant._id,
+          accountNumber: merchant.paybillAccount,
+          type: 'settlement',
+          amount: usdcAmount,
+          kesAmount: netKESAmount,
+          currency: 'USDC',
+          status: 'completed',
+          reference: txHash,
+          sender: { name: 'PayChain Settlement', id: 'MASTER_WALLET' },
+          recipient: { name: merchant.businessName, id: merchant.stellarPublicKey }
+        });
+
+      } catch (e) {
+        console.error(`❌ Inflation Shield failed for ${accountNumber}:`, e.message);
+        // If settlement fails, funds remain as KES balance
+        merchant.kesBalance = (merchant.kesBalance || 0) + netKESAmount;
+      }
+    } else {
+      // If no Stellar wallet, just add to KES balance
+      merchant.kesBalance = (merchant.kesBalance || 0) + netKESAmount;
+    }
+
     await merchant.save();
 
     console.log(`✅ Successfully processed M-PESA payment of KES ${amount} for account ${accountNumber}`);

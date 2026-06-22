@@ -1,6 +1,8 @@
 import Merchant from '../models/Merchant.js';
 import { sendOTP, sendWelcomeEmail } from '../utils/resend.js';
 import generateToken from '../utils/generateToken.js';
+import { provisionMerchantWallet, getWalletBalance } from '../utils/stellarHelper.js';
+import { encryptKey } from '../utils/cryptoHelper.js';
 
 // Helper to generate unique 5-digit account number
 const generateUniquePaybillAccount = async () => {
@@ -35,6 +37,17 @@ export const registerMerchant = async (req, res) => {
 
     const paybillAccount = await generateUniquePaybillAccount();
 
+    let stellarPublicKey = null;
+    let stellarEncryptedSecretKey = null;
+
+    try {
+      const stellarWallet = await provisionMerchantWallet();
+      stellarPublicKey = stellarWallet.publicKey;
+      stellarEncryptedSecretKey = encryptKey(stellarWallet.secretKey);
+    } catch (e) {
+      console.warn('⚠️ Could not provision stellar wallet during onboarding:', e.message);
+    }
+
     const merchant = await Merchant.create({
       name,
       email,
@@ -46,6 +59,9 @@ export const registerMerchant = async (req, res) => {
       otpExpires,
       paybillAccount,
       kesBalance: 0,
+      usdcBalance: 0,
+      stellarPublicKey,
+      stellarEncryptedSecretKey,
       isVerified: true // The user requested immediate login redirection, setting isVerified true for smoother flow.
     });
 
@@ -411,6 +427,19 @@ export const getMerchantMe = async (req, res) => {
       return res.status(404).json({ error: 'Merchant not found' });
     }
 
+    // Sync on-chain USDC balance if wallet exists
+    if (merchant.stellarPublicKey) {
+      try {
+        const liveBalance = await getWalletBalance(merchant.stellarPublicKey);
+        if (liveBalance !== merchant.usdcBalance) {
+          merchant.usdcBalance = liveBalance;
+          await merchant.save();
+        }
+      } catch (e) {
+        console.warn('⚠️ Failed to sync live USDC balance:', e.message);
+      }
+    }
+
     res.json({
       success: true,
       merchant: {
@@ -421,6 +450,8 @@ export const getMerchantMe = async (req, res) => {
         businessName: merchant.businessName,
         paybillAccount: merchant.paybillAccount,
         kesBalance: merchant.kesBalance,
+        usdcBalance: merchant.usdcBalance,
+        stellarPublicKey: merchant.stellarPublicKey,
         isVerified: merchant.isVerified,
         createdAt: merchant.createdAt,
         lastLogin: merchant.lastLogin,

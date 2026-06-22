@@ -39,6 +39,7 @@ export default function Wallet() {
 
   const [liveTransactions, setLiveTransactions] = useState([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isSwapping, setIsSwapping] = useState(false)
 
   useEffect(() => {
     const fetchTransactions = async () => {
@@ -58,18 +59,41 @@ export default function Wallet() {
 
   const handleWithdraw = (e) => {
     e.preventDefault()
-    if (!withdrawAmount || Number(withdrawAmount) <= 0) return
-
+    if(!withdrawAmount || isNaN(withdrawAmount)) return
     setIsWithdrawing(true)
     setTimeout(() => {
       setIsWithdrawing(false)
-      addToast({
-        title: 'Withdrawal Initiated',
-        message: `KES ${Number(withdrawAmount).toLocaleString()} is being sent to your selected destination.`,
-        type: 'success'
-      })
+      addToast({ title: 'Withdrawal Initiated', message: `KES ${withdrawAmount} sent to destination.`, type: 'success' })
       setWithdrawAmount('')
     }, 1500)
+  }
+
+  const handleSwapKES = async () => {
+    const amountStr = window.prompt(`Enter amount of KES to swap to USDC (Max: ${merchant?.kesBalance})`);
+    if (!amountStr) return;
+    const amount = parseFloat(amountStr);
+    if (isNaN(amount) || amount <= 0) {
+      return addToast({ title: 'Invalid Amount', message: 'Please enter a valid number.', type: 'error' });
+    }
+    if (amount > merchant?.kesBalance) {
+      return addToast({ title: 'Insufficient Balance', message: 'You do not have enough KES.', type: 'error' });
+    }
+
+    setIsSwapping(true);
+    try {
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      const token = localStorage.getItem('merchantToken');
+      const res = await axios.post(`${API_URL}/api/transactions/swap`, { amount }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      addToast({ title: 'Swap Successful', message: `Successfully swapped ${amount} KES to USDC!`, type: 'success' });
+      // In a real app, we'd trigger a context refresh here to update the balances
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (err) {
+      addToast({ title: 'Swap Failed', message: err.response?.data?.error || 'Failed to swap KES', type: 'error' });
+    } finally {
+      setIsSwapping(false);
+    }
   }
 
   // QR Logic
@@ -188,14 +212,15 @@ export default function Wallet() {
                 {/* Wallet Address Pill */}
                 <div 
                   onClick={() => {
-                    navigator.clipboard.writeText('0x84728fB0...9xK2')
+                    const address = merchant?.stellarPublicKey || '0x84728fB0...9xK2';
+                    navigator.clipboard.writeText(address)
                     addToast({ title: 'Address Copied', message: 'Wallet address copied to clipboard', type: 'success' })
                   }}
                   className="inline-flex items-center gap-2 mt-4 px-3 py-1.5 bg-[#1A212D]/80 hover:bg-[#202936] rounded-full border border-[#2A3441] cursor-pointer transition-all active:scale-95 group/pill backdrop-blur-md"
                 >
                   <div className="w-2 h-2 rounded-full bg-[#35D07F] shadow-[0_0_8px_rgba(53,208,127,0.6)] animate-pulse"></div>
                   <span className="text-[11px] text-[#8B98A9] font-mono tracking-wider group-hover/pill:text-white transition-colors">
-                    0x8472...9xK2
+                    {merchant?.stellarPublicKey ? `${merchant.stellarPublicKey.slice(0, 6)}...${merchant.stellarPublicKey.slice(-4)}` : '0x8472...9xK2'}
                   </span>
                   <span className="material-symbols-outlined text-[14px] text-[#8B98A9] group-hover/pill:text-white transition-colors">content_copy</span>
                 </div>
@@ -203,9 +228,17 @@ export default function Wallet() {
 
               {/* Action Buttons */}
               <div className="grid grid-cols-2 gap-3 mt-auto">
-                <button className="py-3.5 bg-[#1A212D] hover:bg-[#202936] text-white rounded-2xl text-[10px] font-black transition-all border border-[#2A3441] uppercase tracking-[0.15em] flex flex-col items-center justify-center gap-1.5 group/btn shadow-lg">
-                  <span className="material-symbols-outlined text-xl text-[#8B98A9] group-hover/btn:text-white transition-colors">swap_horiz</span>
-                  Swap KES
+                <button 
+                  onClick={handleSwapKES}
+                  disabled={isSwapping}
+                  className="py-3.5 bg-[#1A212D] hover:bg-[#202936] text-white rounded-2xl text-[10px] font-black transition-all border border-[#2A3441] uppercase tracking-[0.15em] flex flex-col items-center justify-center gap-1.5 group/btn shadow-lg disabled:opacity-50"
+                >
+                  {isSwapping ? (
+                    <span className="material-symbols-outlined text-xl text-[#8B98A9] animate-spin">refresh</span>
+                  ) : (
+                    <span className="material-symbols-outlined text-xl text-[#8B98A9] group-hover/btn:text-white transition-colors">swap_horiz</span>
+                  )}
+                  {isSwapping ? 'Swapping...' : 'Swap KES'}
                 </button>
                 <button 
                   onClick={() => setShowTopUpSelection(true)}
