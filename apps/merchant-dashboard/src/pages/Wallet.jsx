@@ -575,11 +575,9 @@ export default function Wallet() {
               </div>
 
               {/* QR Code Container */}
-              <div className="w-full md:w-72 shrink-0 flex">
-                <div className="bg-[#131722] p-6 rounded-[32px] flex flex-col items-center justify-center border border-[#1E2532] shadow-[0_10px_30px_rgba(0,0,0,0.5)] relative overflow-hidden group w-full min-h-[380px]">
-                  <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none"></div>
-                  
-                  <div className="bg-white p-3 rounded-2xl shadow-xl mb-6 relative z-10 transition-transform group-hover:scale-105 border-4 border-white/10 w-[180px] h-[180px] flex items-center justify-center shrink-0">
+              <div className="w-full md:w-56 shrink-0 flex justify-center self-start md:self-center mt-2 md:mt-0">
+                <div className="bg-[#131722] p-5 rounded-[24px] flex flex-col items-center justify-center border border-[#1E2532] shadow-[0_8px_30px_rgba(0,0,0,0.6)] relative group w-full h-fit">
+                  <div className="bg-white p-2.5 rounded-[16px] shadow-lg mb-5 relative z-10 transition-transform group-hover:scale-[1.02] w-[160px] h-[160px] flex items-center justify-center shrink-0 border border-white/10">
                     <img 
                       src={qrUrl} 
                       alt="Payment QR" 
@@ -587,13 +585,13 @@ export default function Wallet() {
                     />
                   </div>
                   
-                  <div className="text-center relative z-10 w-full px-2 flex flex-col items-center">
-                    <div className="inline-block px-3 py-1 bg-[#2775CA]/10 border border-[#2775CA]/20 rounded-full mb-3">
-                      <p className="text-[#2775CA] text-[10px] font-black uppercase tracking-[0.2em] leading-none">Settlement QR</p>
+                  <div className="text-center relative z-10 w-full flex flex-col items-center">
+                    <div className="inline-block px-2.5 py-1 bg-[#2775CA]/10 border border-[#2775CA]/20 rounded-md mb-2.5">
+                      <p className="text-[#2775CA] text-[9px] font-black uppercase tracking-[0.2em] leading-none">Settlement QR</p>
                     </div>
                     <div className="space-y-1.5 w-full">
-                      <p className="text-white text-lg font-mono font-bold tracking-widest leading-none">ACC: {merchant?.paybillAccount || '84729'}</p>
-                      <p className="text-[#8B98A9] text-[9px] font-bold uppercase tracking-wider leading-snug break-words px-1">MERCHANT: {merchant?.businessName || 'Merchant'}</p>
+                      <p className="text-white text-[15px] font-mono font-bold tracking-widest leading-none">ACC: {merchant?.paybillAccount || '84729'}</p>
+                      <p className="text-[#8B98A9] text-[8px] font-bold uppercase tracking-widest leading-tight break-words px-1 opacity-80">MERCHANT: {merchant?.businessName || 'Merchant'}</p>
                     </div>
                   </div>
                 </div>
