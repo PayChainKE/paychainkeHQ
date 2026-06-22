@@ -8,6 +8,7 @@ import { formatKES } from '../utils/formatCurrency'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useNotification } from '../context/NotificationContext'
 import paychainLogo from '../../images/logo.png'
+import axios from 'axios'
 
 export default function BulkPay() {
   const { showAmounts } = usePrivacyMode()
@@ -23,7 +24,8 @@ export default function BulkPay() {
       try {
         const token = localStorage.getItem('merchantToken')
         if (!token) return;
-        const res = await axios.get('/api/bulkpay/payees', {
+        const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+        const res = await axios.get(`${API_URL}/api/bulkpay/payees`, {
           headers: { Authorization: `Bearer ${token}` }
         })
         setPayeesList(res.data)
@@ -143,7 +145,8 @@ export default function BulkPay() {
           type: 'success'
         });
       } else {
-        const res = await axios.post('/api/bulkpay/payees', payload, {
+        const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+        const res = await axios.post(`${API_URL}/api/bulkpay/payees`, payload, {
           headers: { Authorization: `Bearer ${token}` }
         });
         
@@ -211,7 +214,8 @@ export default function BulkPay() {
 
     try {
       const token = localStorage.getItem('merchantToken');
-      const res = await axios.post('/api/bulkpay/upload-csv', formData, {
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+      const res = await axios.post(`${API_URL}/api/bulkpay/upload-csv`, formData, {
         headers: { 
           Authorization: `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'
@@ -422,7 +426,8 @@ export default function BulkPay() {
           }));
       }
 
-      const res = await axios.post('/api/bulkpay/authorize', {
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+      const res = await axios.post(`${API_URL}/api/bulkpay/authorize`, {
         batchRows,
         fundingSource: selectedTill || 'Main Business Till'
       }, {
