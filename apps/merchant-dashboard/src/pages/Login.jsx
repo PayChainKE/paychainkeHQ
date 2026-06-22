@@ -17,7 +17,7 @@ const KENYAN_COUNTIES = [
 ]
 
 export default function Login() {
-  const { login, biometricLogin, signup, verifyOTP, forgotPassword, resetPassword } = useMerchantAuth()
+  const { login, biometricLogin, signup, verifyOTP, resendOTP, forgotPassword, resetPassword } = useMerchantAuth()
   const { addNotification } = useNotification()
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
@@ -32,7 +32,9 @@ export default function Login() {
   const [signupEmail, setSignupEmail] = useState('')
   const [signupPhone, setSignupPhone] = useState('')
   const [signupBusinessName, setSignupBusinessName] = useState('')
-  const [signupCertificate, setSignupCertificate] = useState(null)
+  const [signupEcommerce, setSignupEcommerce] = useState('yes')
+  const [signupCounty, setSignupCounty] = useState('')
+  const [countySearch, setCountySearch] = useState('')
 
   // Reset Flow States
   const [isResetMode, setIsResetMode] = useState(false)
@@ -51,6 +53,7 @@ export default function Login() {
   const [otpFlowType, setOtpFlowType] = useState('') // 'login' or 'reset'
   const [authEmail, setAuthEmail] = useState('') // Captured from backend for OTP verification
   const [hasBiometrics, setHasBiometrics] = useState(!!localStorage.getItem('last_biometric_user'))
+  const [resendTimer, setResendTimer] = useState(59)
   
   // Real-time security validation
   useEffect(() => {
@@ -61,6 +64,16 @@ export default function Login() {
       symbol: /[^A-Za-z0-9]/.test(newPassword)
     })
   }, [newPassword])
+
+  // Countdown Timer Logic
+  useEffect(() => {
+    if (isOTPMode && resendTimer > 0) {
+      const interval = setInterval(() => {
+        setResendTimer(prev => prev - 1)
+      }, 1000)
+      return () => clearInterval(interval)
+    }
+  }, [isOTPMode, resendTimer])
 
   async function handleLogin(e) {
     if (e) e.preventDefault()
@@ -73,6 +86,7 @@ export default function Login() {
       if (res.mfaRequired) {
         setOtpFlowType('login')
         setIsOTPMode(true)
+        setResendTimer(59)
       } else {
         nav('/overview')
       }
@@ -185,7 +199,25 @@ export default function Login() {
       setAuthEmail(loginInput)
       setOtpFlowType('reset')
       setIsOTPMode(true)
+      setResendTimer(59)
       setActiveTab('login')
+    } else {
+      setErr(res.error)
+    }
+  }
+
+  async function handleResendOTP() {
+    if (resendTimer > 0) return
+    setLoading(true)
+    const res = await resendOTP(authEmail)
+    setLoading(false)
+    if (res.success) {
+      setResendTimer(59)
+      addNotification({
+        title: 'Code Sent',
+        message: 'A new security code has been dispatched.',
+        type: 'success'
+      })
     } else {
       setErr(res.error)
     }
@@ -219,17 +251,15 @@ export default function Login() {
       return
     }
 
-    setLoading(true)
     const formData = new FormData()
     formData.append('name', signupName)
     formData.append('email', signupEmail)
     formData.append('phone', signupPhone)
     formData.append('businessName', signupBusinessName)
     formData.append('password', newPassword)
-    if (signupCertificate) {
-      formData.append('certificate', signupCertificate)
-    }
+    formData.append('ecommerce', signupEcommerce)
 
+    setLoading(true)
     const res = await signup(formData)
     setLoading(false)
     
@@ -498,28 +528,41 @@ export default function Login() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">County *</label>
-                    <div className="relative">
-                      <input 
-                        list="kenya-counties"
-                        required 
-                        placeholder="Search or select..." 
-                        className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 pl-4 pr-10 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all"
-                      />
-                      <datalist id="kenya-counties">
-                        {KENYAN_COUNTIES.map(county => (
-                          <option key={county} value={county} />
-                        ))}
-                      </datalist>
-                      <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-primary/40 pointer-events-none">search</span>
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">County *</label>
+                  <div className="bg-white border border-outline-variant/15 rounded-2xl p-2 lg:p-3 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all">
+                    <div className="relative mb-3">
+                       <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-primary/40 pointer-events-none text-sm">search</span>
+                       <input 
+                         className="w-full bg-slate-50 rounded-xl py-2 pl-9 pr-4 text-xs font-headline text-primary outline-none placeholder:text-outline-variant/40"
+                         placeholder="Search your county..."
+                         value={countySearch}
+                         onChange={e => setCountySearch(e.target.value)}
+                       />
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 max-h-40 overflow-y-auto pr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-outline-variant/20 [&::-webkit-scrollbar-thumb]:rounded-full">
+                      {KENYAN_COUNTIES.filter(c => c.toLowerCase().includes(countySearch.toLowerCase())).map(county => (
+                        <button
+                          key={county}
+                          type="button"
+                          onClick={() => setSignupCounty(county)}
+                          className={`py-3 px-3 rounded-xl border text-xs font-bold transition-all text-left truncate flex items-center justify-between group ${
+                            signupCounty === county 
+                            ? 'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-sm' 
+                            : 'bg-white border-outline-variant/10 text-primary hover:border-emerald-200 hover:bg-emerald-50/30'
+                          }`}
+                        >
+                          <span className="truncate">{county}</span>
+                          {signupCounty === county && <span className="material-symbols-outlined text-[14px]">check_circle</span>}
+                        </button>
+                      ))}
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Area/Location *</label>
-                    <input required className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" placeholder="Westlands" />
-                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Area/Location *</label>
+                  <input required className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" placeholder="Westlands" />
                 </div>
 
                 <div className="space-y-2">
@@ -544,19 +587,6 @@ export default function Login() {
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-primary hover:text-emerald-600 transition-colors">
                       <input type="radio" name="ecommerce" value="no" className="w-4 h-4 text-emerald-600 focus:ring-emerald-500" required /> No
-                    </label>
-                  </div>
-                </div>
-
-                <div className="space-y-2 pt-2 pb-4">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Upload Certificate/Permit/Licence *</label>
-                  <div className="flex items-center justify-center w-full">
-                    <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-outline-variant/15 border-dashed rounded-xl cursor-pointer bg-slate-50 hover:bg-emerald-50/50 hover:border-emerald-200 transition-all group">
-                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                        <span className="material-symbols-outlined text-primary/40 mb-1 group-hover:text-emerald-500 transition-colors">cloud_upload</span>
-                        <p className="text-xs text-primary/60 font-medium group-hover:text-emerald-700 transition-colors">Click to upload file</p>
-                      </div>
-                      <input type="file" className="hidden" onChange={e => setSignupCertificate(e.target.files[0])} />
                     </label>
                   </div>
                 </div>
@@ -640,20 +670,39 @@ export default function Login() {
                   </div>
                 )}
 
-                <div className="space-y-2">
+                {/* Mobile Login Field (Mobile Number Only) */}
+                <div className="space-y-2 lg:hidden">
                   <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Mobile Number</label>
                   <div className="flex group">
-                    <div className="bg-surface-container-low border border-outline-variant/15 border-r-0 rounded-l-2xl px-4 lg:px-5 flex items-center justify-center text-primary/40 group-focus-within:border-primary transition-colors">
+                    <div className="bg-surface-container-low border border-outline-variant/15 border-r-0 rounded-l-2xl px-4 flex items-center justify-center text-primary/40 group-focus-within:border-primary transition-colors">
                       <span className="material-symbols-outlined text-xl">phone_iphone</span>
                     </div>
                     <input 
-                      className="flex-1 bg-white border border-outline-variant/15 rounded-r-2xl py-3 lg:py-4 px-4 lg:px-5 text-lg font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40"
+                      className="flex-1 bg-white border border-outline-variant/15 rounded-r-2xl py-3 px-4 text-lg font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40"
                       value={phone} 
                       onChange={e => setPhone(e.target.value.replace(/\D/g, ''))} 
                       placeholder="0712 345 678"
                       type="tel"
                       autoComplete="tel-national"
                       required
+                    />
+                  </div>
+                </div>
+
+                {/* Desktop Login Field (Email or Phone Number) */}
+                <div className="space-y-2 hidden lg:block">
+                  <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Email or Phone Number</label>
+                  <div className="flex group">
+                    <div className="bg-surface-container-low border border-outline-variant/15 border-r-0 rounded-l-2xl px-5 flex items-center justify-center text-primary/40 group-focus-within:border-primary transition-colors">
+                      <span className="material-symbols-outlined text-xl">person</span>
+                    </div>
+                    <input 
+                      className="flex-1 bg-white border border-outline-variant/15 rounded-r-2xl py-4 px-5 text-lg font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40"
+                      value={phone} 
+                      onChange={e => setPhone(e.target.value)} 
+                      placeholder="john@example.com or 0712..."
+                      type="text"
+                      autoComplete="username"
                     />
                   </div>
                 </div>
@@ -763,8 +812,13 @@ export default function Login() {
                       </>
                     )}
                   </button>
-                  <button type="button" className="w-full text-center text-[10px] uppercase font-black tracking-[0.2em] text-primary/40 hover:text-emerald-600 transition-colors">
-                    Resend Code (59s)
+                  <button 
+                    type="button" 
+                    onClick={handleResendOTP}
+                    disabled={resendTimer > 0 || loading}
+                    className="w-full text-center text-[10px] uppercase font-black tracking-[0.2em] text-primary/40 hover:text-emerald-600 transition-colors disabled:opacity-50 disabled:hover:text-primary/40 disabled:cursor-not-allowed"
+                  >
+                    {resendTimer > 0 ? `Resend Code (${resendTimer}s)` : 'Resend Code'}
                   </button>
                 </div>
               </form>

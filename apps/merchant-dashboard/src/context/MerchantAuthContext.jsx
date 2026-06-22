@@ -95,6 +95,15 @@ export function MerchantAuthProvider({ children }) {
     }
   }
 
+  async function resendOTP(email) {
+    try {
+      const res = await axios.post(`${API_URL}/api/auth/merchant/resend-otp`, { email });
+      return { success: true, message: res.data.message };
+    } catch (err) {
+      return { success: false, error: err.response?.data?.error || 'Failed to resend OTP' };
+    }
+  }
+
   async function forgotPassword(email) {
     try {
       const res = await axios.post(`${API_URL}/api/auth/merchant/forgot-password`, { email });
@@ -131,6 +140,7 @@ export function MerchantAuthProvider({ children }) {
       biometricLogin,
       signup,
       verifyOTP,
+      resendOTP,
       forgotPassword,
       resetPassword,
       logout 

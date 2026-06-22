@@ -127,7 +127,7 @@ export const verifyMerchantOTP = async (req, res) => {
     });
   } catch (error) {
     console.error('Verify Merchant OTP Error:', error);
-    res.status(500).json({ error: 'Server Error' });
+    res.status(500).json({ error: error.message || 'Server Error' });
   }
 };
 
@@ -212,7 +212,7 @@ export const loginMerchant = async (req, res) => {
     });
   } catch (error) {
     console.error('Login Merchant Error:', error);
-    res.status(500).json({ error: 'Server Error' });
+    res.status(500).json({ error: error.message || 'Server Error' });
   }
 };
 
@@ -274,6 +274,38 @@ export const biometricLogin = async (req, res) => {
   } catch (error) {
     console.error('Biometric Login Error:', error);
     res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Resend Merchant OTP
+// @route   POST /api/auth/merchant/resend-otp
+// @access  Public
+export const resendMerchantOTP = async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    const merchant = await Merchant.findOne({ email });
+
+    if (!merchant) {
+      return res.status(401).json({ error: 'Invalid request' });
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+
+    merchant.otp = otp;
+    merchant.otpExpires = otpExpires;
+    await merchant.save();
+
+    console.log(`📧 Dispatching Resend OTP via Resend to: ${merchant.email}`);
+    sendOTP(merchant.email, otp).catch(err => {
+      console.error(`📧 Resend Error: Failed to resend OTP to ${merchant.email}:`, err);
+    });
+
+    res.json({ success: true, message: 'New security code sent successfully.' });
+  } catch (error) {
+    console.error('Resend OTP Error:', error);
+    res.status(500).json({ error: error.message || 'Server Error' });
   }
 };
 

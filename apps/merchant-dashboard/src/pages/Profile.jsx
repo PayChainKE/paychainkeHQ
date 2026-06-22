@@ -18,6 +18,8 @@ export default function Profile() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isUpdatingSecurity, setIsUpdatingSecurity] = useState(false)
+  const [kraPinLocked, setKraPinLocked] = useState(!!merchant?.kraPin)
+  const [businessNumberLocked, setBusinessNumberLocked] = useState(!!merchant?.businessNumber)
   const toast = useToast()
 
   async function save() {
@@ -137,16 +139,29 @@ export default function Profile() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-y-6 lg:gap-y-8 gap-x-12 mt-8 border-t border-slate-100 pt-8">
                 <div className="space-y-2 group">
-                  <label className="text-[9px] text-on-surface-variant font-black uppercase tracking-[0.2em] pl-1 opacity-50 group-hover:opacity-100 transition-opacity">KRA PIN</label>
+                  <div className="flex justify-between items-center pr-1">
+                    <label className="text-[9px] text-on-surface-variant font-black uppercase tracking-[0.2em] pl-1 opacity-50 group-hover:opacity-100 transition-opacity">KRA PIN</label>
+                    {kraPinLocked && (
+                      <button type="button" onClick={() => setKraPinLocked(false)} className="text-[9px] font-black uppercase tracking-widest text-emerald-600 hover:text-emerald-700 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[10px]">edit</span> Edit
+                      </button>
+                    )}
+                  </div>
                   <div className="relative">
                     <input 
                       type="text"
                       value={kraPin}
                       onChange={(e) => setKraPin(e.target.value.toUpperCase())}
                       placeholder="e.g. P123456789A"
-                      className="w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none pr-32"
+                      disabled={kraPinLocked}
+                      className={`w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none ${kraPinLocked ? 'opacity-60 bg-slate-50 cursor-not-allowed pr-32' : 'pr-32'}`}
                     />
-                    {merchant?.isKRAVerified && merchant?.kraPin === kraPin && (
+                    {kraPinLocked && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-primary/40 pointer-events-none">
+                        <span className="material-symbols-outlined text-sm">lock</span>
+                      </div>
+                    )}
+                    {!kraPinLocked && merchant?.isKRAVerified && merchant?.kraPin === kraPin && (
                       <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 bg-emerald-50 text-emerald-600 px-2 py-1.5 rounded-lg border border-emerald-100 shadow-[0_2px_10px_rgba(16,185,129,0.1)] pointer-events-none">
                         <span className="material-symbols-outlined text-[14px]">verified_user</span>
                         <span className="text-[8px] font-black uppercase tracking-widest">eTIMS Verified</span>
@@ -154,15 +169,31 @@ export default function Profile() {
                     )}
                   </div>
                 </div>
+
                 <div className="space-y-2 group">
-                  <label className="text-[9px] text-on-surface-variant font-black uppercase tracking-[0.2em] pl-1 opacity-50 group-hover:opacity-100 transition-opacity">Business / License Number</label>
-                  <input 
-                    type="text"
-                    value={businessNumber}
-                    onChange={(e) => setBusinessNumber(e.target.value.toUpperCase())}
-                    placeholder="e.g. PVT-XXXXXX"
-                    className="w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none"
-                  />
+                  <div className="flex justify-between items-center pr-1">
+                    <label className="text-[9px] text-on-surface-variant font-black uppercase tracking-[0.2em] pl-1 opacity-50 group-hover:opacity-100 transition-opacity">Business / License Number</label>
+                    {businessNumberLocked && (
+                      <button type="button" onClick={() => setBusinessNumberLocked(false)} className="text-[9px] font-black uppercase tracking-widest text-emerald-600 hover:text-emerald-700 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[10px]">edit</span> Edit
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <input 
+                      type="text"
+                      value={businessNumber}
+                      onChange={(e) => setBusinessNumber(e.target.value.toUpperCase())}
+                      placeholder="e.g. PVT-XXXXXX"
+                      disabled={businessNumberLocked}
+                      className={`w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none ${businessNumberLocked ? 'opacity-60 bg-slate-50 cursor-not-allowed pr-10' : ''}`}
+                    />
+                    {businessNumberLocked && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-primary/40 pointer-events-none">
+                        <span className="material-symbols-outlined text-sm">lock</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
               
