@@ -146,30 +146,60 @@ export default function Wallet() {
   const qrData = `paychain://pay?till=${merchant?.paybillAccount || '84729'}&name=${encodeURIComponent(merchant?.businessName || 'Merchant')}`
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrData)}&margin=10&bgcolor=FFFFFF&color=00351D`
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     setIsDownloading(true)
-    setTimeout(() => {
+    try {
+      const response = await fetch(qrUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `PayChain-QR-${merchant?.paybillAccount || '84729'}.png`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      addToast({ title: 'QR Code Downloaded', message: 'Your payment QR code has been downloaded.', type: 'success' })
+    } catch (e) {
+      addToast({ title: 'Download Failed', message: 'Could not download the QR image.', type: 'error' })
+    } finally {
       setIsDownloading(false)
-      addToast({
-        title: 'QR Code Ready',
-        message: 'Your payment QR code is ready for download.',
-        type: 'success'
-      })
-    }, 1000)
+    }
   }
 
   const handleDownloadPDF = () => {
     setIsGeneratingPDF(true)
     setTimeout(() => {
       setIsGeneratingPDF(false)
-      addToast({
-        title: 'PDF Generated',
-        message: 'Your payment QR has been converted to a print-ready PDF.',
-        type: 'success'
-      })
-      // Simulating PDF generation by opening print dialog on a hidden element
-      window.print()
-    }, 1500)
+      const printWindow = window.open('', '', 'width=600,height=800');
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>PayChain Settlement QR</title>
+            <style>
+              body { font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #0B0E14; color: white; }
+              img { width: 300px; height: 300px; border-radius: 16px; margin-bottom: 20px; border: 4px solid #fff; padding: 10px; background: white; }
+              .text { text-align: center; max-width: 400px; }
+              h1 { font-size: 24px; color: #2775CA; margin: 0 0 10px 0; text-transform: uppercase; letter-spacing: 0.2em; }
+              p { font-size: 16px; margin: 5px 0; letter-spacing: 0.1em; }
+            </style>
+          </head>
+          <body>
+            <img src="${qrUrl}" alt="Settlement QR" />
+            <div class="text">
+              <h1>Settlement QR</h1>
+              <p>ACC: ${merchant?.paybillAccount || '84729'}</p>
+              <p>MERCHANT: ${merchant?.businessName || 'Merchant'}</p>
+            </div>
+            <script>
+              window.onload = () => { setTimeout(() => { window.print(); window.close(); }, 500); }
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      addToast({ title: 'PDF Generated', message: 'Your payment QR is ready for printing.', type: 'success' })
+    }, 800)
   }
 
   const handleShare = async () => {
@@ -541,25 +571,25 @@ export default function Wallet() {
               </div>
 
               {/* QR Code Container */}
-              <div className="w-full md:w-64 shrink-0 flex">
-                <div className="bg-[#131722] p-6 rounded-[32px] flex flex-col items-center justify-center border border-[#1E2532] shadow-[0_10px_30px_rgba(0,0,0,0.5)] relative overflow-hidden group w-full min-h-[360px]">
+              <div className="w-full md:w-72 shrink-0 flex">
+                <div className="bg-[#131722] p-6 rounded-[32px] flex flex-col items-center justify-center border border-[#1E2532] shadow-[0_10px_30px_rgba(0,0,0,0.5)] relative overflow-hidden group w-full min-h-[380px]">
                   <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none"></div>
                   
-                  <div className="bg-white p-4 rounded-2xl shadow-xl mb-8 relative z-10 transition-transform group-hover:scale-105 border-4 border-white/10">
+                  <div className="bg-white p-3 rounded-2xl shadow-xl mb-6 relative z-10 transition-transform group-hover:scale-105 border-4 border-white/10 w-[180px] h-[180px] flex items-center justify-center shrink-0">
                     <img 
                       src={qrUrl} 
                       alt="Payment QR" 
-                      className="w-full aspect-square rounded-xl"
+                      className="max-w-full max-h-full rounded-xl object-contain"
                     />
                   </div>
                   
-                  <div className="text-center relative z-10 w-full px-4">
+                  <div className="text-center relative z-10 w-full px-2 flex flex-col items-center">
                     <div className="inline-block px-3 py-1 bg-[#2775CA]/10 border border-[#2775CA]/20 rounded-full mb-3">
-                      <p className="text-[#2775CA] text-[10px] font-black uppercase tracking-[0.2em]">Settlement QR</p>
+                      <p className="text-[#2775CA] text-[10px] font-black uppercase tracking-[0.2em] leading-none">Settlement QR</p>
                     </div>
-                    <div className="space-y-1">
-                      <p className="text-white text-xl font-mono font-bold tracking-widest">ACC: {merchant?.paybillAccount || '84729'}</p>
-                      <p className="text-[#8B98A9] text-[10px] font-bold uppercase tracking-widest leading-relaxed mt-2 truncate">MERCHANT: {merchant?.businessName || 'Merchant'}</p>
+                    <div className="space-y-1.5 w-full">
+                      <p className="text-white text-lg font-mono font-bold tracking-widest leading-none">ACC: {merchant?.paybillAccount || '84729'}</p>
+                      <p className="text-[#8B98A9] text-[9px] font-bold uppercase tracking-wider leading-snug break-words px-1">MERCHANT: {merchant?.businessName || 'Merchant'}</p>
                     </div>
                   </div>
                 </div>
