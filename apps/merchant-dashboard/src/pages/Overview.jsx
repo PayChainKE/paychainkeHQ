@@ -127,10 +127,19 @@ export default function Overview() {
       {/* Section 1: Balance Cards Row */}
       <section className={`grid grid-cols-1 ${showDigitalWallet ? 'lg:grid-cols-2' : ''} gap-8 animate-fade-in-up [animation-delay:100ms] relative z-20`}>
         {/* KES Balance Card */}
-        <div className="bg-[#00351D] text-white p-6 lg:p-7 rounded-[16px] shadow-2xl relative z-20 group border border-white/5">
-          <div className="absolute inset-0 overflow-hidden rounded-[16px] pointer-events-none">
-            <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full -mr-40 -mt-40 blur-3xl group-hover:scale-125 transition-transform duration-1000"></div>
+        <div className="bg-gradient-to-br from-[#00351D] via-[#022916] to-[#011C0F] text-white p-6 lg:p-8 rounded-[24px] shadow-[0_20px_40px_-15px_rgba(0,53,29,0.5)] relative z-20 group border border-emerald-900/50 hover:border-emerald-500/30 transition-all duration-500 overflow-hidden">
+          {/* Ambient Glow */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-400/10 rounded-full -mr-20 -mt-20 blur-[80px] group-hover:scale-110 transition-transform duration-1000"></div>
+            <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-600/10 rounded-full -ml-20 -mb-20 blur-[60px] group-hover:scale-110 transition-transform duration-1000"></div>
           </div>
+          
+          {/* Card Texture/Pattern */}
+          <div className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-overlay" style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '16px 16px' }}></div>
+          
+          {/* Glass Top Highlight */}
+          <div className="absolute top-0 inset-x-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-400/30 to-transparent"></div>
+
           <div className="relative z-10 flex flex-col h-full">
             <div className="flex justify-between items-start mb-8 lg:mb-10">
               <span className="bg-[#1F4D3C] text-[#5EFEB3] px-3 lg:px-4 py-1.5 rounded-full text-[8px] lg:text-[9px] font-black tracking-[0.15em] uppercase border border-white/10">Business Till Account</span>
@@ -157,13 +166,13 @@ export default function Overview() {
               </div>
             </div>
 
-            <div className="flex gap-3 lg:gap-4 mt-6 lg:mt-8 relative">
+            <div className="flex gap-3 lg:gap-4 mt-8 relative">
               <button 
                 onClick={() => setShowMoveMoney(!showMoveMoney)}
-                className={`flex-1 py-2 px-4 ${showMoveMoney ? 'bg-white text-[#00351D]' : 'bg-white/5 hover:bg-white/10 text-white'} rounded-xl text-[9px] lg:text-[10px] font-black transition-all border border-white/10 uppercase tracking-widest leading-none flex items-center justify-center gap-2 z-50`}
+                className={`flex-1 py-3 px-4 ${showMoveMoney ? 'bg-white text-[#00351D] shadow-[0_0_20px_rgba(255,255,255,0.3)]' : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-100'} rounded-[14px] text-[10px] font-black transition-all duration-300 border border-emerald-500/20 hover:border-emerald-500/40 uppercase tracking-widest leading-none flex items-center justify-center gap-2 z-50`}
               >
                 Move money
-                <span className={`material-symbols-outlined text-xs leading-none transition-transform duration-300 ${showMoveMoney ? 'rotate-180' : ''}`}>expand_more</span>
+                <span className={`material-symbols-outlined text-sm leading-none transition-transform duration-500 ${showMoveMoney ? 'rotate-180' : ''}`}>expand_more</span>
               </button>
               
               {showMoveMoney && (
@@ -203,8 +212,19 @@ export default function Overview() {
 
         {/* USDC Balance Card */}
         {showDigitalWallet && (
-          <div className="bg-[#0D2444] text-white p-6 lg:p-7 rounded-[16px] shadow-2xl relative z-10 overflow-hidden group border border-white/5 animate-in fade-in zoom-in duration-500">
-            <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/10 rounded-full -ml-32 -mb-32 blur-3xl"></div>
+          <div className="bg-gradient-to-br from-[#0A162B] via-[#050B14] to-[#02050A] text-white p-6 lg:p-8 rounded-[24px] shadow-[0_20px_40px_-15px_rgba(10,22,43,0.6)] relative z-10 overflow-hidden group border border-blue-900/30 hover:border-blue-500/30 transition-all duration-500 animate-in fade-in zoom-in duration-500">
+            {/* Ambient Glow */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+              <div className="absolute top-0 left-0 w-96 h-96 bg-blue-500/10 rounded-full -ml-20 -mt-20 blur-[80px] group-hover:scale-110 transition-transform duration-1000"></div>
+              <div className="absolute bottom-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full -mr-20 -mb-20 blur-[60px] group-hover:scale-110 transition-transform duration-1000"></div>
+            </div>
+
+            {/* Card Texture/Pattern */}
+            <div className="absolute inset-0 opacity-[0.02] pointer-events-none mix-blend-overlay" style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '16px 16px' }}></div>
+            
+            {/* Glass Top Highlight */}
+            <div className="absolute top-0 inset-x-0 h-[1px] bg-gradient-to-r from-transparent via-blue-400/30 to-transparent"></div>
+
             <div className="relative z-10 flex flex-col h-full">
               <div className="flex justify-between items-start mb-8 lg:mb-10">
                 <span className="bg-[#243B5C] text-[#A6C8FF] px-3 lg:px-4 py-1.5 rounded-full text-[8px] lg:text-[9px] font-black tracking-[0.15em] uppercase border border-white/10">Business Digital wallet</span>
@@ -220,8 +240,9 @@ export default function Overview() {
                   ≈ {formatKES((merchant?.usdcBalance || 0) * 130)}
                 </p>
               </div>
-              <div className="flex gap-3 lg:gap-4 mt-6 lg:mt-8">
-                <button onClick={() => navigate('/inflation-shield')} className="flex-1 py-3.5 px-3 lg:px-4 bg-white/5 hover:bg-white/10 text-white rounded-xl text-[9px] lg:text-[10px] font-black transition-all border border-white/10 uppercase tracking-widest leading-none">
+              <div className="flex gap-3 lg:gap-4 mt-8">
+                <button onClick={() => navigate('/inflation-shield')} className="flex-1 py-3 px-4 bg-blue-500/10 hover:bg-blue-500/20 text-blue-100 rounded-[14px] text-[10px] font-black transition-all duration-300 border border-blue-500/20 hover:border-blue-500/40 uppercase tracking-widest leading-none flex items-center justify-center gap-2">
+                  <span className="material-symbols-outlined text-sm">currency_exchange</span>
                   Swap
                 </button>
               </div>
