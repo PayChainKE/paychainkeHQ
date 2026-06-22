@@ -1,6 +1,7 @@
 import Transaction from '../models/Transaction.js';
 import Merchant from '../models/Merchant.js';
-import { settleInflationShield } from '../utils/stellarHelper.js';
+import { settleInflationShield, provisionMerchantWallet } from '../utils/stellarHelper.js';
+import { encryptKey } from '../utils/cryptoHelper.js';
 
 // @desc    Get merchant transactions
 // @route   GET /api/transactions
@@ -148,5 +149,40 @@ export const swapKesToUsdc = async (req, res) => {
   } catch (error) {
     console.error('❌ Error swapping KES:', error);
     res.status(500).json({ error: 'Server Error: Failed to swap KES' });
+  }
+};
+
+// @desc    Activate Digital Wallet (Provision Stellar)
+// @route   POST /api/transactions/activate-wallet
+// @access  Private
+export const activateWallet = async (req, res) => {
+  try {
+    const merchant = await Merchant.findById(req.merchant._id);
+
+    if (!merchant) {
+      return res.status(404).json({ error: 'Merchant not found' });
+    }
+
+    if (merchant.stellarPublicKey) {
+      return res.status(400).json({ error: 'Wallet is already activated' });
+    }
+
+    console.log(`🌟 Activating digital wallet for ${merchant.paybillAccount}...`);
+    
+    const stellarWallet = await provisionMerchantWallet();
+    
+    merchant.stellarPublicKey = stellarWallet.publicKey;
+    merchant.stellarEncryptedSecretKey = encryptKey(stellarWallet.secretKey);
+    await merchant.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Wallet activated successfully',
+      stellarPublicKey: merchant.stellarPublicKey
+    });
+
+  } catch (error) {
+    console.error('❌ Error activating wallet:', error.message);
+    res.status(500).json({ error: 'Failed to activate digital wallet' });
   }
 };

@@ -37,17 +37,6 @@ export const registerMerchant = async (req, res) => {
 
     const paybillAccount = await generateUniquePaybillAccount();
 
-    let stellarPublicKey = null;
-    let stellarEncryptedSecretKey = null;
-
-    try {
-      const stellarWallet = await provisionMerchantWallet();
-      stellarPublicKey = stellarWallet.publicKey;
-      stellarEncryptedSecretKey = encryptKey(stellarWallet.secretKey);
-    } catch (e) {
-      console.warn('⚠️ Could not provision stellar wallet during onboarding:', e.message);
-    }
-
     const merchant = await Merchant.create({
       name,
       email,
@@ -60,8 +49,8 @@ export const registerMerchant = async (req, res) => {
       paybillAccount,
       kesBalance: 0,
       usdcBalance: 0,
-      stellarPublicKey,
-      stellarEncryptedSecretKey,
+      stellarPublicKey: null,
+      stellarEncryptedSecretKey: null,
       isVerified: true // The user requested immediate login redirection, setting isVerified true for smoother flow.
     });
 
