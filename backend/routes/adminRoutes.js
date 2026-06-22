@@ -1,12 +1,14 @@
 import express from 'express';
 import authRoutes from './authRoutes.js';
+import { getMerchants, getMerchantAnalytics } from '../controllers/adminController.js';
 
 const router = express.Router();
 
 // Admin Auth Routes
 router.use('/auth', authRoutes);
 
-// Add other admin-specific routes here as the project grows
-// router.use('/dashboard', dashboardRoutes);
+// Merchant Management Routes
+router.get('/merchants', getMerchants);
+router.get('/merchants/analytics', getMerchantAnalytics);
 
 export default router;

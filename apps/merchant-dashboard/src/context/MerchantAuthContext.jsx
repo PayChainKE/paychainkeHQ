@@ -1,96 +1,120 @@
-import React, { createContext, useContext, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { mockMerchant } from '../mockData/merchant'
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
-const MerchantAuthContext = createContext()
+const MerchantAuthContext = createContext();
 
-const STORAGE_KEY = 'paychain_merchant_session'
-const CRED_KEY = 'paychain_merchant_creds'
+const STORAGE_KEY = 'paychain_merchant_session';
+const TOKEN_KEY = 'paychain_merchant_token';
 
-// Initial test credentials (first-time temp password)
-const TEST_PHONE = '+254712345678'
-const TEST_TEMP_PW = 'Paychain2026'
+// Use the Vercel staging or production API URL based on environment
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
-export function MerchantAuthProvider({ children }){
-  const [merchant, setMerchant] = useState(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isFirstLogin, setIsFirstLogin] = useState(false)
-  const navigate = useNavigate()
+export function MerchantAuthProvider({ children }) {
+  const [merchant, setMerchant] = useState(null);
+  const [token, setToken] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
 
-  useEffect(()=>{
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw){
-      try{ setMerchant(JSON.parse(raw)); setIsFirstLogin(false) }catch(e){}
-    }
+  useEffect(() => {
+    const rawMerchant = localStorage.getItem(STORAGE_KEY);
+    const rawToken = localStorage.getItem(TOKEN_KEY);
     
-    // Reset stale credentials if they don't match the new demo defaults
-    const saved = localStorage.getItem(CRED_KEY)
-    if (saved) {
+    if (rawMerchant && rawToken) {
       try {
-        const parsed = JSON.parse(saved)
-        if (parsed.phone !== TEST_PHONE && parsed.phone === '+254712847291') {
-          localStorage.removeItem(CRED_KEY)
-        }
-      } catch (e) {}
+        setMerchant(JSON.parse(rawMerchant));
+        setToken(rawToken);
+        axios.defaults.headers.common['Authorization'] = `Bearer ${rawToken}`;
+      } catch (e) {
+        console.error("Failed to parse local session", e);
+      }
     }
     
-    setIsLoading(false)
-  },[])
+    setIsLoading(false);
+  }, []);
 
-  function normalizePhone(p){return p.replace(/\s|\+|-/g,'').replace(/^254/,'+254').replace(/^0/, '+254')}
-
-  async function login(phone, password){
-    // simulate API delay
-    await new Promise(r=>setTimeout(r,800))
-    const norm = normalizePhone(phone)
-    const saved = JSON.parse(localStorage.getItem(CRED_KEY) || JSON.stringify({phone:TEST_PHONE,password:TEST_TEMP_PW,first:true}))
-    
-    if (norm === TEST_PHONE && password === TEST_TEMP_PW) {
-      setMerchant(mockMerchant)
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(mockMerchant))
-      setIsFirstLogin(true)
-      return { success:true, firstLogin:true }
+  async function signup(formData) {
+    try {
+      const res = await axios.post(`${API_URL}/api/auth/merchant/register`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      return { success: true, email: res.data.email, message: res.data.message };
+    } catch (err) {
+      return { success: false, error: err.response?.data?.error || 'Registration failed' };
     }
-
-    // If using SAVED CUSTOM CREDENTIALS, allow direct dashboard access
-    if (norm === saved.phone && password === saved.password){
-      setMerchant(mockMerchant)
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(mockMerchant))
-      setIsFirstLogin(false)
-      return { success:true }
-    }
-
-    return { success:false, error:'Invalid phone number or password.' }
   }
 
-  async function setNewPassword(newPassword){
-    await new Promise(r=>setTimeout(r,800))
-    // persist mock credential change
-    const saved = JSON.parse(localStorage.getItem(CRED_KEY) || JSON.stringify({phone:TEST_PHONE,password:TEST_TEMP_PW,first:true}))
-    saved.password = newPassword
-    saved.first = false
-    localStorage.setItem(CRED_KEY, JSON.stringify(saved))
-    return { success:true }
+  async function login(email, password) {
+    try {
+      const res = await axios.post(`${API_URL}/api/auth/merchant/login`, { email, password });
+      return { success: true, email: res.data.email, mfaRequired: res.data.mfaRequired };
+    } catch (err) {
+      return { success: false, error: err.response?.data?.error || 'Login failed' };
+    }
   }
 
-  function logout(){
-    localStorage.removeItem(STORAGE_KEY)
-    setMerchant(null)
-    navigate('/login')
+  async function verifyOTP(email, otp) {
+    try {
+      const res = await axios.post(`${API_URL}/api/auth/merchant/verify-otp`, { email, otp });
+      
+      const { merchant: userData, token: jwt } = res.data;
+      
+      setMerchant(userData);
+      setToken(jwt);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
+      localStorage.setItem(TOKEN_KEY, jwt);
+      axios.defaults.headers.common['Authorization'] = `Bearer ${jwt}`;
+      
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.response?.data?.error || 'OTP Verification failed' };
+    }
+  }
+
+  async function forgotPassword(email) {
+    try {
+      const res = await axios.post(`${API_URL}/api/auth/merchant/forgot-password`, { email });
+      return { success: true, message: res.data.message };
+    } catch (err) {
+      return { success: false, error: err.response?.data?.error || 'Failed to request reset' };
+    }
+  }
+
+  async function resetPassword(email, otp, newPassword) {
+    try {
+      const res = await axios.post(`${API_URL}/api/auth/merchant/reset-password`, { email, otp, newPassword });
+      return { success: true, message: res.data.message };
+    } catch (err) {
+      return { success: false, error: err.response?.data?.error || 'Failed to reset password' };
+    }
+  }
+
+  function logout() {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(TOKEN_KEY);
+    delete axios.defaults.headers.common['Authorization'];
+    setMerchant(null);
+    setToken(null);
+    navigate('/login');
   }
 
   return (
-    <MerchantAuthContext.Provider value={{ merchant, isLoading, isAuthenticated:!!merchant, isFirstLogin, login, setNewPassword, logout }}>
+    <MerchantAuthContext.Provider value={{ 
+      merchant, 
+      isLoading, 
+      isAuthenticated: !!merchant, 
+      login, 
+      signup,
+      verifyOTP,
+      forgotPassword,
+      resetPassword,
+      logout 
+    }}>
       {children}
     </MerchantAuthContext.Provider>
-  )
+  );
 }
 
-export function useMerchantAuth(){ return useContext(MerchantAuthContext) }
+export function useMerchantAuth() { return useContext(MerchantAuthContext); }
 
-export default MerchantAuthContext
-
-// TODO: Replace mock auth with real API endpoints:
-// POST /api/merchant/auth/login
-// POST /api/merchant/auth/set-password
-// GET /api/merchant/auth/me
+export default MerchantAuthContext;
