@@ -3,11 +3,13 @@ import MerchantLayout from '../components/layout/MerchantLayout'
 import { mockMerchant } from '../mockData/merchant'
 import { useToast } from '../context/NotificationContext'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
+import { useMerchantAuth } from '../context/MerchantAuthContext'
 
 export default function Profile() {
   const { showAmounts } = usePrivacyMode()
-  const [name, setName] = useState(mockMerchant.name)
-  const [email, setEmail] = useState(mockMerchant.email)
+  const { merchant } = useMerchantAuth()
+  const [name, setName] = useState(merchant?.name || mockMerchant.name)
+  const [email, setEmail] = useState(merchant?.email || mockMerchant.email)
   const [autoSettle, setAutoSettle] = useState(true)
   const [showQuestions, setShowQuestions] = useState(false)
   const toast = useToast()
@@ -51,9 +53,9 @@ export default function Profile() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-y-6 lg:gap-y-8 gap-x-12">
                 {[
-                  { label: "Name", value: "Kamau General Store", locked: true },
-                  { label: "Email", value: "jameskamau@gmail.com", locked: false },
-                  { label: "Phone", value: "+254712345678", locked: true },
+                  { label: "Name", value: merchant?.businessName || "Kamau General Store", locked: true },
+                  { label: "Email", value: merchant?.email || "jameskamau@gmail.com", locked: false },
+                  { label: "Phone", value: merchant?.phone || "+254712345678", locked: true },
                   { label: "Role", value: "Administrator", badge: "Primary" },
                   { label: "Primary contact", value: "Yes", status: true },
                   { label: "Created at", value: "19 March 2026", sub: "Member since" },
@@ -248,7 +250,8 @@ export default function Profile() {
                   <span className="material-symbols-outlined text-2xl">id_card</span>
                 </div>
                 <h4 className="text-[10px] text-blue-200/60 font-bold uppercase tracking-widest mb-1">Merchant Identity</h4>
-                <p className={`font-headline text-2xl lg:text-3xl mb-1 transition-all duration-300 ${!showAmounts && 'blur-md'}`}>{mockMerchant.tillNumber}</p>
+                <p className={`font-headline text-2xl lg:text-3xl mb-1 transition-all duration-300 ${!showAmounts && 'blur-md'}`}>PAYBILL: 400200</p>
+                <p className={`font-headline text-2xl lg:text-3xl mb-1 transition-all duration-300 ${!showAmounts && 'blur-md'}`}>ACC: {merchant?.paybillAccount || mockMerchant.tillNumber}</p>
                 <p className="text-sm text-blue-100/60 font-medium">Verified Merchant since Oct 2025</p>
                 <div className="mt-8 pt-8 border-t border-white/10 flex items-center gap-2">
                   <span className="material-symbols-outlined text-emerald-400 text-sm" style={{fontVariationSettings: "'FILL' 1"}}>check_circle</span>

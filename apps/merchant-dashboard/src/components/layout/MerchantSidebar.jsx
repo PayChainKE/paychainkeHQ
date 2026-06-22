@@ -172,7 +172,7 @@ export default function MerchantSidebar({ isOpen, onClose }) {
           </div>
           <div>
             <p className="text-white text-xs font-bold leading-tight truncate w-[130px]">{merchant?.businessName || mockMerchant.businessName}</p>
-            <p className="text-[#a8b3a8] text-[9px] uppercase tracking-wider mt-0.5">TILL: {merchant?.paybillAccount || mockMerchant.tillNumber} • TRUST: {mockMerchant.trustScore.current}/100</p>
+            <p className="text-[#a8b3a8] text-[9px] uppercase tracking-wider mt-0.5">PAYBILL: 400200 • ACC: {merchant?.paybillAccount || mockMerchant.tillNumber}</p>
           </div>
         </div>
 

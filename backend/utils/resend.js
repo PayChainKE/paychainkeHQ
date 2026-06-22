@@ -112,7 +112,7 @@ export const sendNewsletterConfirmation = async (email) => {
 };
 
 // Send Welcome Email with Credentials
-export const sendWelcomeEmail = async (email, name, password, phone) => {
+export const sendWelcomeEmail = async (email, name, password, phone, paybillAccount) => {
   try {
     const data = await resend.emails.send({
       from: 'PayChain <info@paychain.co.ke>',
@@ -127,10 +127,21 @@ export const sendWelcomeEmail = async (email, name, password, phone) => {
           <div style="padding: 40px 30px;">
             <h2 style="margin: 0 0 20px; color: #111; font-size: 22px;">Hi ${name},</h2>
             <p style="color: #444; line-height: 1.7; font-size: 16px;">We are thrilled to welcome you to PayChain. Your merchant dashboard has been provisioned and is ready for use.</p>
-            <p style="color: #444; line-height: 1.7; font-size: 16px;">For your records, here are your login credentials. We highly recommend keeping this information secure.</p>
-            <div style="margin-top: 30px; padding: 25px; background: #f0fdf4; border-radius: 12px; border: 1px solid #bbf7d0;">
-              <h3 style="margin: 0 0 15px; color: #166534; font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Access Credentials</h3>
+            <p style="color: #444; line-height: 1.7; font-size: 16px;">To start collecting payments for your business, instruct your customers to go to the M-PESA menu, select <strong>Lipa na M-PESA</strong>, choose <strong>Paybill</strong>, and enter the following details. All payments will instantly reflect on your PayChain dashboard.</p>
+            <div style="margin-top: 20px; padding: 25px; background: #f0fdf4; border-radius: 12px; border: 1px solid #bbf7d0;">
+              <h3 style="margin: 0 0 15px; color: #166534; font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Payment Collection Details</h3>
               <div style="color: #14532d; font-size: 15px; line-height: 1.8;">
+                <p style="margin: 8px 0;"><strong>Main Paybill:</strong> 400200</p>
+                <p style="margin: 8px 0;"><strong>Account Number:</strong> ${paybillAccount}</p>
+              </div>
+            </div>
+            
+            <div style="margin-top: 20px; padding: 20px; background: #fffbeb; border-radius: 12px; border: 1px solid #fde68a;">
+              <p style="margin: 0; color: #92400e; font-size: 15px; line-height: 1.6;"><strong>🚀 Unlock Cash Advances:</strong> Keep your account active by regularly receiving payments through your PayChain account number. Consistent daily activity builds your Trust Score and automatically makes your business eligible for instant Cash Advances to fuel your growth!</p>
+            </div>
+            <div style="margin-top: 30px; padding: 25px; background: #f8faff; border-radius: 12px; border: 1px solid #eef2ff;">
+              <h3 style="margin: 0 0 15px; color: #0066FF; font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Dashboard Access Credentials</h3>
+              <div style="color: #003399; font-size: 15px; line-height: 1.8;">
                 <p style="margin: 8px 0;"><strong>Username:</strong> ${email} <span style="opacity: 0.7; font-size: 13px;">or</span> ${phone}</p>
                 <p style="margin: 8px 0;"><strong>Password:</strong> ${password}</p>
               </div>

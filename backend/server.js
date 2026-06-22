@@ -8,6 +8,8 @@ import newsletterRoutes from './routes/newsletterRoutes.js';
 import contactRoutes from './routes/contactRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import bulkPayRoutes from './routes/bulkPayRoutes.js';
+import transactionRoutes from './routes/transactionRoutes.js';
+import mpesaRoutes from './routes/mpesaRoutes.js';
 
 dotenv.config();
 
@@ -65,6 +67,8 @@ app.use('/api/waitlist', waitlistRoutes);
 app.use('/api/newsletter', newsletterRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/bulkpay', bulkPayRoutes);
+app.use('/api/transactions', transactionRoutes);
+app.use('/api/mpesa', mpesaRoutes);
 
 // Basic Route
 app.get('/', (req, res) => {

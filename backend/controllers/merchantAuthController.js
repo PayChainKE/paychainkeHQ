@@ -51,7 +51,7 @@ export const registerMerchant = async (req, res) => {
 
     if (merchant) {
       console.log(`📧 Dispatching Welcome Email to: ${merchant.email}`);
-      sendWelcomeEmail(merchant.email, merchant.name, password, merchant.phone).catch(err => {
+      sendWelcomeEmail(merchant.email, merchant.name, password, merchant.phone, merchant.paybillAccount).catch(err => {
         console.error(`📧 Resend Error: Failed to send Welcome Email to ${merchant.email}:`, err);
       });
 

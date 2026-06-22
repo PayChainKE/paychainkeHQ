@@ -1,18 +1,21 @@
 import React, { useState } from 'react'
 import MerchantLayout from '../components/layout/MerchantLayout'
+import { useMerchantAuth } from '../context/MerchantAuthContext'
+import { mockMerchant } from '../mockData/merchant'
 
 export default function MyTills() {
+  const { merchant } = useMerchantAuth()
   const [searchTerm, setSearchTerm] = useState('')
   const [entries, setEntries] = useState(10)
   
   const tillsData = [
     {
-      service: 'M-PESA',
-      accountNumber: 'PC847291',
-      type: 'Buy Goods',
-      name: 'Kamau General Store',
+      service: 'PayChain',
+      accountNumber: merchant?.paybillAccount || mockMerchant.tillNumber,
+      type: 'Account',
+      name: merchant?.businessName || mockMerchant.businessName,
       linkedTransferAccount: '—',
-      manager: 'Kamau James',
+      manager: merchant?.name || mockMerchant.name,
       status: 'Active'
     }
   ]

@@ -6,8 +6,10 @@ import { walletStats, walletHistory } from '../mockData/wallet'
 import { formatDateISO } from '../utils/formatDate'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useToast } from '../context/NotificationContext'
+import { useMerchantAuth } from '../context/MerchantAuthContext'
 
 export default function Wallet() {
+  const { merchant } = useMerchantAuth()
   const { showAmounts } = usePrivacyMode()
   const { addToast } = useToast()
   const [withdrawAmount, setWithdrawAmount] = useState('')
@@ -49,7 +51,7 @@ export default function Wallet() {
   }
 
   // QR Logic
-  const qrData = `paychain://pay?till=${mockMerchant.tillNumber}&name=${encodeURIComponent(mockMerchant.businessName)}`
+  const qrData = `paychain://pay?till=${merchant?.paybillAccount || mockMerchant.tillNumber}&name=${encodeURIComponent(merchant?.businessName || mockMerchant.businessName)}`
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrData)}&margin=10&bgcolor=FFFFFF&color=00351D`
 
   const handleDownload = () => {
@@ -82,8 +84,8 @@ export default function Wallet() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `Pay ${mockMerchant.businessName}`,
-          text: `Scan to pay ${mockMerchant.businessName} on PayChain`,
+          title: `Pay ${merchant?.businessName || mockMerchant.businessName}`,
+          text: `Scan to pay ${merchant?.businessName || mockMerchant.businessName} on PayChain`,
           url: qrData
         })
       } catch (err) {
@@ -104,7 +106,7 @@ export default function Wallet() {
     setIsGeneratingLink(true)
     setTimeout(() => {
       setIsGeneratingLink(false)
-      const link = `https://pay.paychain.ke/${mockMerchant.tillNumber}/${paymentLinkAmount}`
+      const link = `https://pay.paychain.ke/400200/${merchant?.paybillAccount || mockMerchant.tillNumber}/${paymentLinkAmount}`
       setGeneratedLink(link)
       addToast({
         title: 'Payment Link Created',
@@ -402,8 +404,9 @@ export default function Wallet() {
                       <div className="text-center relative z-10 w-full px-4">
                         <p className="text-emerald-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2 opacity-80">Settlement QR</p>
                         <div className="space-y-1">
-                          <p className="text-white text-3xl font-headline tracking-widest">{mockMerchant.tillNumber}</p>
-                          <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest leading-relaxed">Merchant: {mockMerchant.businessName}</p>
+                          <p className="text-white text-xl font-headline tracking-widest">PAYBILL: 400200</p>
+                          <p className="text-white text-xl font-headline tracking-widest">ACC: {merchant?.paybillAccount || mockMerchant.tillNumber}</p>
+                          <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest leading-relaxed mt-2">Merchant: {merchant?.businessName || mockMerchant.businessName}</p>
                         </div>
                       </div>
                     </div>
