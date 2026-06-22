@@ -120,7 +120,8 @@ export const verifyMerchantOTP = async (req, res) => {
         lastLogin: merchant.lastLogin,
         loginCount: merchant.loginCount,
         kraPin: merchant.kraPin,
-        businessNumber: merchant.businessNumber
+        businessNumber: merchant.businessNumber,
+        isKRAVerified: merchant.isKRAVerified
       },
       token: generateToken(merchant._id)
     });
@@ -292,7 +293,8 @@ export const getMerchantMe = async (req, res) => {
         lastLogin: merchant.lastLogin,
         loginCount: merchant.loginCount,
         kraPin: merchant.kraPin,
-        businessNumber: merchant.businessNumber
+        businessNumber: merchant.businessNumber,
+        isKRAVerified: merchant.isKRAVerified
       }
     });
   } catch (error) {
@@ -313,7 +315,22 @@ export const updateMerchantProfile = async (req, res) => {
 
     const { kraPin, businessNumber } = req.body;
     
-    if (kraPin !== undefined) merchant.kraPin = kraPin;
+    // Validate KRA Pin and Mock eTIMS API
+    if (kraPin !== undefined && kraPin !== merchant.kraPin) {
+      // Simulate external API network latency
+      await new Promise(r => setTimeout(r, 1500));
+      
+      const kraRegex = /^[AP][0-9]{9}[A-Z]$/i;
+      if (!kraRegex.test(kraPin)) {
+        return res.status(400).json({ 
+          error: 'eTIMS Verification Failed: The KRA PIN provided is invalid or not registered with KRA. Format expected: P123456789A' 
+        });
+      }
+      
+      merchant.kraPin = kraPin.toUpperCase();
+      merchant.isKRAVerified = true;
+    }
+
     if (businessNumber !== undefined) merchant.businessNumber = businessNumber;
 
     await merchant.save();
@@ -333,7 +350,8 @@ export const updateMerchantProfile = async (req, res) => {
         lastLogin: merchant.lastLogin,
         loginCount: merchant.loginCount,
         kraPin: merchant.kraPin,
-        businessNumber: merchant.businessNumber
+        businessNumber: merchant.businessNumber,
+        isKRAVerified: merchant.isKRAVerified
       }
     });
   } catch (error) {

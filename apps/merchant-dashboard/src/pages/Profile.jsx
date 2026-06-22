@@ -138,13 +138,21 @@ export default function Profile() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-y-6 lg:gap-y-8 gap-x-12 mt-8 border-t border-slate-100 pt-8">
                 <div className="space-y-2 group">
                   <label className="text-[9px] text-on-surface-variant font-black uppercase tracking-[0.2em] pl-1 opacity-50 group-hover:opacity-100 transition-opacity">KRA PIN</label>
-                  <input 
-                    type="text"
-                    value={kraPin}
-                    onChange={(e) => setKraPin(e.target.value.toUpperCase())}
-                    placeholder="e.g. A123456789Z"
-                    className="w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none"
-                  />
+                  <div className="relative">
+                    <input 
+                      type="text"
+                      value={kraPin}
+                      onChange={(e) => setKraPin(e.target.value.toUpperCase())}
+                      placeholder="e.g. P123456789A"
+                      className="w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none pr-32"
+                    />
+                    {merchant?.isKRAVerified && merchant?.kraPin === kraPin && (
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 bg-emerald-50 text-emerald-600 px-2 py-1.5 rounded-lg border border-emerald-100 shadow-[0_2px_10px_rgba(16,185,129,0.1)] pointer-events-none">
+                        <span className="material-symbols-outlined text-[14px]">verified_user</span>
+                        <span className="text-[8px] font-black uppercase tracking-widest">eTIMS Verified</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-2 group">
                   <label className="text-[9px] text-on-surface-variant font-black uppercase tracking-[0.2em] pl-1 opacity-50 group-hover:opacity-100 transition-opacity">Business / License Number</label>

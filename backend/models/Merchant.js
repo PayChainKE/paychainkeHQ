@@ -31,6 +31,10 @@ const merchantSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
+  isKRAVerified: {
+    type: Boolean,
+    default: false,
+  },
   password: {
     type: String,
     required: [true, 'Please add a password'],
