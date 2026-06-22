@@ -86,7 +86,7 @@ export default function Wallet() {
     setIsSwapping(true);
     try {
       const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
-      const token = localStorage.getItem('merchantToken');
+      const token = localStorage.getItem('paychain_merchant_token');
       const res = await axios.post(`${API_URL}/api/transactions/swap`, { amount }, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -104,7 +104,7 @@ export default function Wallet() {
     setIsActivatingWallet(true);
     try {
       const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
-      const token = localStorage.getItem('merchantToken');
+      const token = localStorage.getItem('paychain_merchant_token');
       await axios.post(`${API_URL}/api/transactions/activate-wallet`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
