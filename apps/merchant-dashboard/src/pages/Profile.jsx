@@ -3,6 +3,7 @@ import MerchantLayout from '../components/layout/MerchantLayout'
 import { useToast } from '../context/NotificationContext'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
+import axios from 'axios'
 
 export default function Profile() {
   const { showAmounts } = usePrivacyMode()
@@ -11,11 +12,52 @@ export default function Profile() {
   const [email, setEmail] = useState(merchant?.email || 'admin@paychain.ke')
   const [autoSettle, setAutoSettle] = useState(true)
   const [showQuestions, setShowQuestions] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [isUpdatingSecurity, setIsUpdatingSecurity] = useState(false)
   const toast = useToast()
 
   async function save() {
     await new Promise(r => setTimeout(r, 700))
     toast.push({ message: 'Profile updated' })
+  }
+
+  async function handleSecurityUpdate() {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      toast.push({ message: 'Please fill out all password fields', type: 'error' })
+      return
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast.push({ message: 'New password and confirm password do not match', type: 'error' })
+      return
+    }
+
+    if (newPassword.length < 8) {
+      toast.push({ message: 'New password must be at least 8 characters long', type: 'error' })
+      return
+    }
+
+    setIsUpdatingSecurity(true)
+    try {
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+      const res = await axios.put(`${API_URL}/api/auth/merchant/change-password`, {
+        currentPassword,
+        newPassword
+      })
+
+      if (res.data.success) {
+        toast.push({ message: 'Password updated successfully', type: 'success' })
+        setCurrentPassword('')
+        setNewPassword('')
+        setConfirmPassword('')
+      }
+    } catch (err) {
+      toast.push({ message: err.response?.data?.error || 'Failed to update password', type: 'error' })
+    } finally {
+      setIsUpdatingSecurity(false)
+    }
   }
 
   const loginHistory = []
@@ -109,18 +151,36 @@ export default function Profile() {
                        Change your password
                     </h4>
                     
-                    <div className="space-y-4">
-                      {['Current password', 'New password', 'Confirm new password'].map((label, i) => (
-                        <div key={i} className="space-y-2">
-                          <label className="text-[9px] text-white/40 font-black uppercase tracking-widest pl-1">{label}</label>
-                          <input 
-                            type="password"
-                            placeholder="••••••••••••"
-                            className="w-full bg-white/5 border border-white/10 rounded-xl py-3.5 px-5 text-sm font-medium text-white focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 outline-none transition-all placeholder:text-white/10"
-                          />
-                        </div>
-                      ))}
-                    </div>
+                      <div className="space-y-2">
+                        <label className="text-[9px] text-white/40 font-black uppercase tracking-widest pl-1">Current password</label>
+                        <input 
+                          type="password"
+                          value={currentPassword}
+                          onChange={(e) => setCurrentPassword(e.target.value)}
+                          placeholder="••••••••••••"
+                          className="w-full bg-white/5 border border-white/10 rounded-xl py-3.5 px-5 text-sm font-medium text-white focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 outline-none transition-all placeholder:text-white/10"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[9px] text-white/40 font-black uppercase tracking-widest pl-1">New password</label>
+                        <input 
+                          type="password"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="••••••••••••"
+                          className="w-full bg-white/5 border border-white/10 rounded-xl py-3.5 px-5 text-sm font-medium text-white focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 outline-none transition-all placeholder:text-white/10"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[9px] text-white/40 font-black uppercase tracking-widest pl-1">Confirm new password</label>
+                        <input 
+                          type="password"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="••••••••••••"
+                          className="w-full bg-white/5 border border-white/10 rounded-xl py-3.5 px-5 text-sm font-medium text-white focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 outline-none transition-all placeholder:text-white/10"
+                        />
+                      </div>
                   </div>
 
                   {/* Advanced Auth Sub-section */}
@@ -161,8 +221,19 @@ export default function Profile() {
                 </div>
 
                 <div className="mt-12 flex justify-end">
-                  <button className="bg-emerald-500 text-[#06201B] px-10 py-5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl hover:bg-white transition-all active:scale-95">
-                    Update Security Vault
+                  <button 
+                    onClick={handleSecurityUpdate}
+                    disabled={isUpdatingSecurity}
+                    className="bg-emerald-500 text-[#06201B] px-10 py-5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl hover:bg-white transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {isUpdatingSecurity ? (
+                      <>
+                        <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>
+                        Updating Vault...
+                      </>
+                    ) : (
+                      'Update Security Vault'
+                    )}
                   </button>
                 </div>
               </div>

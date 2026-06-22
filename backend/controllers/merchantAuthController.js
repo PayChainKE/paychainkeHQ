@@ -237,3 +237,30 @@ export const resetPassword = async (req, res) => {
     res.status(500).json({ error: 'Server Error' });
   }
 };
+
+// @desc    Change Password (Authenticated)
+// @route   PUT /api/auth/merchant/change-password
+// @access  Private (Merchant)
+export const changeMerchantPassword = async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+
+  try {
+    const merchant = await Merchant.findById(req.merchant._id).select('+password');
+    if (!merchant) {
+      return res.status(401).json({ error: 'Merchant not found' });
+    }
+
+    const isMatch = await merchant.matchPassword(currentPassword);
+    if (!isMatch) {
+      return res.status(400).json({ error: 'Current password is incorrect' });
+    }
+
+    merchant.password = newPassword;
+    await merchant.save();
+
+    res.json({ success: true, message: 'Password updated successfully' });
+  } catch (error) {
+    console.error('Change Password Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};

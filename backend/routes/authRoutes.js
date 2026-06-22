@@ -5,8 +5,10 @@ import {
   verifyMerchantOTP,
   loginMerchant,
   forgotPassword,
-  resetPassword
+  resetPassword,
+  changeMerchantPassword
 } from '../controllers/merchantAuthController.js';
+import { protectMerchant } from '../middleware/authMiddleware.js';
 import { upload } from '../utils/cloudinary.js';
 
 const router = express.Router();
@@ -21,5 +23,6 @@ router.post('/merchant/verify-otp', verifyMerchantOTP);
 router.post('/merchant/login', loginMerchant);
 router.post('/merchant/forgot-password', forgotPassword);
 router.post('/merchant/reset-password', resetPassword);
+router.put('/merchant/change-password', protectMerchant, changeMerchantPassword);
 
 export default router;

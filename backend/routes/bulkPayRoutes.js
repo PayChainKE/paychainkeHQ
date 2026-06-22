@@ -1,7 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import { getPayees, addPayee, uploadCSV, authorizeBatch } from '../controllers/bulkPayController.js';
-import { protect } from '../middleware/authMiddleware.js';
+import { protectMerchant } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
@@ -9,7 +9,7 @@ const router = express.Router();
 const upload = multer({ dest: 'uploads/' });
 
 // Protect all bulk pay routes with Merchant Auth
-router.use(protect);
+router.use(protectMerchant);
 
 router.route('/payees')
   .get(getPayees)
