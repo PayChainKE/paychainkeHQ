@@ -440,209 +440,217 @@ export default function Wallet() {
             </form>
           </section>
 
-          <section className="col-span-12 lg:col-span-12 xl:col-span-7 bg-white p-6 md:p-8 lg:p-10 rounded-[32px] lg:rounded-[40px] border border-outline-variant/10 shadow-2xl editorial-shadow animate-fade-in-up [animation-delay:150ms]">
-                <div className="flex flex-col md:flex-row justify-between items-stretch gap-10">
-                  <div className="flex-1 w-full space-y-6 md:space-y-8">
+          <section className="col-span-12 lg:col-span-12 xl:col-span-7 bg-[#0B0E14] text-white p-6 md:p-8 lg:p-10 rounded-[32px] lg:rounded-[40px] border border-[#1E2532] shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative overflow-hidden animate-fade-in-up [animation-delay:150ms]">
+            {/* Subtle background glow */}
+            <div className="absolute top-0 right-0 w-96 h-96 bg-[#2775CA]/5 rounded-full blur-[100px] pointer-events-none"></div>
+
+            <div className="flex flex-col md:flex-row justify-between items-stretch gap-10 relative z-10">
+              <div className="flex-1 w-full space-y-6 md:space-y-8">
+                <div>
+                  <h3 className="font-headline text-2xl md:text-3xl text-white tracking-tight">MY QR</h3>
+                  <p className="text-[9px] md:text-[10px] text-[#8B98A9] font-bold uppercase tracking-[0.2em] mt-1">Professional Settlement Tool</p>
+                </div>
+
+                {/* Blockchain Settlement Address Block */}
+                <div className="bg-[#131722] border border-[#1E2532] p-5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 hover:border-[#2775CA]/30 transition-colors">
+                  <div className="flex items-start sm:items-center gap-4 w-full sm:w-auto overflow-hidden">
+                    <div className="w-10 h-10 rounded-full bg-[#1A212D] text-[#2775CA] flex items-center justify-center border border-[#1E2532] shrink-0 mt-1 sm:mt-0 shadow-inner">
+                        <span className="material-symbols-outlined text-xl">account_balance_wallet</span>
+                    </div>
+                    <div className="overflow-hidden">
+                      <p className="text-[10px] text-[#8B98A9] font-black uppercase tracking-widest opacity-80 mb-1">Blockchain Settlement: <span className="text-white italic">PayChain Wallet</span></p>
+                      {merchant?.stellarPublicKey
+                            ? <span className="text-sm font-mono text-white font-bold tracking-wider truncate block max-w-[200px]">{merchant.stellarPublicKey.slice(0, 8)}...{merchant.stellarPublicKey.slice(-6)}</span>
+                            : <span className="text-sm font-mono text-amber-500 font-bold tracking-wider">&mdash; Not Activated &mdash;</span>}
+                    </div>
+                  </div>
+                  <div className="w-full md:w-auto flex flex-col items-center sm:items-end gap-3 shrink-0">
+                    <button 
+                      onClick={() => {
+                        const addr = merchant?.stellarPublicKey;
+                        if (!addr) { addToast({ title: 'Wallet Not Activated', message: 'Activate your digital wallet first.', type: 'error' }); return; }
+                        navigator.clipboard.writeText(addr);
+                        addToast({ title: 'Address Copied', message: 'Full wallet address copied to clipboard', type: 'success' });
+                      }}
+                      className="w-full sm:w-auto px-4 py-2 bg-[#2775CA]/10 border border-[#2775CA]/20 text-[#2775CA] hover:bg-[#2775CA] hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm transition-all flex items-center justify-center gap-2 self-stretch sm:self-auto"
+                    >
+                        <span className="material-symbols-outlined text-sm">content_copy</span>
+                        Copy Address
+                    </button>
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-[#0B0E14] rounded-full border border-[#1E2532]">
+                        <span className="text-[7px] font-black uppercase tracking-widest text-[#8B98A9] leading-none">Supported by</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-[#35D07F] shadow-[0_0_8px_rgba(53,208,127,0.4)]" title="Celo"></span>
+                          <span className="w-2 h-2 rounded-full bg-[#0052FF] shadow-[0_0_8px_rgba(0,82,255,0.4)]" title="Base"></span>
+                          <span className="w-2 h-2 rounded-full bg-[#8247E5] shadow-[0_0_8px_rgba(130,71,229,0.4)]" title="Polygon"></span>
+                          <span className="text-[8px] font-bold text-[#8B98A9]">Celo, Base, Polygon</span>
+                        </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex-1"></div>
+
+                {/* Four action buttons - dark sophisticated grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-[#1E2532]">
+                  <div className="space-y-2">
+                    <button 
+                      onClick={handleDownload}
+                      disabled={isDownloading}
+                      className="w-full py-4 bg-[#131722] text-[#8B98A9] rounded-2xl text-[10px] font-black transition-all shadow-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-[#2775CA] hover:text-white group border border-[#1E2532] text-center px-2 hover:border-[#2775CA]"
+                    >
+                      <span className="material-symbols-outlined text-base">download</span>
+                    </button>
+                    <p className="text-[8px] text-center font-black uppercase text-[#8B98A9] tracking-widest">PNG Image</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <button 
+                      onClick={handleDownloadPDF}
+                      disabled={isGeneratingPDF}
+                      className="w-full py-4 bg-[#131722] text-[#8B98A9] rounded-2xl text-[10px] font-black transition-all shadow-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-red-500 hover:text-white group border border-[#1E2532] text-center px-2 hover:border-red-500"
+                    >
+                      <span className="material-symbols-outlined text-base">picture_as_pdf</span>
+                    </button>
+                    <p className="text-[8px] text-center font-black uppercase text-[#8B98A9] tracking-widest">PDF Export</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <button 
+                      onClick={handleShare}
+                      className="w-full py-4 bg-[#131722] text-[#8B98A9] rounded-2xl text-[10px] font-black transition-all shadow-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-emerald-500 hover:text-white group border border-[#1E2532] text-center px-2 hover:border-emerald-500"
+                    >
+                      <span className="material-symbols-outlined text-base">share</span>
+                    </button>
+                    <p className="text-[8px] text-center font-black uppercase text-[#8B98A9] tracking-widest">Share QR</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <button 
+                      onClick={() => {
+                        navigator.clipboard.writeText(qrUrl)
+                        addToast({ title: 'Link Copied', message: 'Payment link copied to clipboard.', type: 'success' })
+                      }}
+                      className="w-full py-4 bg-[#131722] text-[#8B98A9] rounded-2xl text-[10px] font-black transition-all shadow-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-amber-500 hover:text-white group border border-[#1E2532] text-center px-2 hover:border-amber-500"
+                    >
+                      <span className="material-symbols-outlined text-base">content_copy</span>
+                    </button>
+                    <p className="text-[8px] text-center font-black uppercase text-[#8B98A9] tracking-widest">Copy Link</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* QR Code Container */}
+              <div className="w-full md:w-64 shrink-0 flex">
+                <div className="bg-[#131722] p-6 rounded-[32px] flex flex-col items-center justify-center border border-[#1E2532] shadow-[0_10px_30px_rgba(0,0,0,0.5)] relative overflow-hidden group w-full min-h-[360px]">
+                  <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none"></div>
+                  
+                  <div className="bg-white p-4 rounded-2xl shadow-xl mb-8 relative z-10 transition-transform group-hover:scale-105 border-4 border-white/10">
+                    <img 
+                      src={qrUrl} 
+                      alt="Payment QR" 
+                      className="w-full aspect-square rounded-xl"
+                    />
+                  </div>
+                  
+                  <div className="text-center relative z-10 w-full px-4">
+                    <div className="inline-block px-3 py-1 bg-[#2775CA]/10 border border-[#2775CA]/20 rounded-full mb-3">
+                      <p className="text-[#2775CA] text-[10px] font-black uppercase tracking-[0.2em]">Settlement QR</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-white text-xl font-mono font-bold tracking-widest">ACC: {merchant?.paybillAccount || '84729'}</p>
+                      <p className="text-[#8B98A9] text-[10px] font-bold uppercase tracking-widest leading-relaxed mt-2 truncate">MERCHANT: {merchant?.businessName || 'Merchant'}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Payment Link Generator Feature */}
+            <div className="mt-12 pt-8 border-t border-[#1E2532] relative z-10">
+              <div className="bg-[#131722] p-6 md:p-8 rounded-[24px] md:rounded-[32px] border border-[#1E2532] shadow-inner relative overflow-hidden group">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-[#2775CA]/5 rounded-full blur-2xl -mr-16 -mt-16 group-hover:scale-150 transition-transform"></div>
+                
+                <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-[#0B0E14] flex items-center justify-center text-[#2775CA] border border-[#1E2532] shrink-0 shadow-inner">
+                      <span className="material-symbols-outlined text-2xl">add_link</span>
+                    </div>
                     <div>
-                      <h3 className="font-headline text-2xl md:text-3xl text-primary tracking-tight">MY QR</h3>
-                      <p className="text-[9px] md:text-[10px] text-on-surface-variant font-bold uppercase tracking-[0.2em] mt-1 opacity-60">Professional Settlement Tool</p>
-                    </div>
-
-                    <div className="bg-surface-container-low border border-outline-variant/10 p-5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
-                      <div className="flex items-start sm:items-center gap-3 w-full sm:w-auto overflow-hidden">
-                        <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100 shrink-0 mt-1 sm:mt-0">
-                           <span className="material-symbols-outlined text-xl">account_balance_wallet</span>
-                        </div>
-                        <div className="overflow-hidden">
-                          <p className="text-[10px] text-on-surface-variant font-black uppercase tracking-widest opacity-40">Blockchain Settlement: <span className="text-emerald-600 italic">PayChain Wallet</span></p>
-                          {merchant?.stellarPublicKey
-                               ? <span className="text-sm font-mono text-primary font-bold tracking-wider truncate block max-w-[200px]">{merchant.stellarPublicKey.slice(0, 8)}...{merchant.stellarPublicKey.slice(-6)}</span>
-                               : <span className="text-sm font-mono text-amber-500 font-bold tracking-wider">&mdash; Not Activated &mdash;</span>}
-                        </div>
-                      </div>
-                      <div className="w-full md:w-auto flex flex-col items-center sm:items-end gap-2 shrink-0">
-                        <button 
-                          onClick={() => {
-                            const addr = merchant?.stellarPublicKey;
-                            if (!addr) { addToast({ title: 'Wallet Not Activated', message: 'Activate your digital wallet first.', type: 'error' }); return; }
-                            navigator.clipboard.writeText(addr);
-                            addToast({ title: 'Address Copied', message: 'Full wallet address copied to clipboard', type: 'success' });
-                          }}
-                          className="w-full sm:w-auto px-5 py-3 bg-white border border-outline-variant/10 text-primary rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm hover:bg-emerald-50 transition-all flex items-center justify-center gap-2 self-stretch sm:self-auto"
-                        >
-                           <span className="material-symbols-outlined text-sm">content_copy</span>
-                           Copy Address
-                        </button>
-                        <div className="flex items-center gap-2 px-2 py-1 bg-surface-container-high rounded-full border border-outline-variant/5">
-                           <span className="text-[7px] font-black uppercase tracking-widest text-primary/40 leading-none">Supported by</span>
-                           <div className="flex items-center gap-1.5">
-                              <span className="w-2 h-2 rounded-full bg-[#35D07F]" title="Celo"></span>
-                              <span className="w-2 h-2 rounded-full bg-[#0052FF]" title="Base"></span>
-                              <span className="w-2 h-2 rounded-full bg-[#8247E5]" title="Polygon"></span>
-                              <span className="text-[8px] font-bold text-primary/60">Celo, Base, Polygon</span>
-                           </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex-1">
-                      {/* Space for other tools if needed later */}
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4">
-                      <div className="space-y-2">
-                        <button 
-                          onClick={handleDownload}
-                          disabled={isDownloading}
-                          className="w-full py-4 bg-surface-container-high text-primary rounded-2xl text-[10px] font-black transition-all shadow-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-emerald-500 hover:text-white group border border-outline-variant/5 text-center px-2"
-                        >
-                          <span className="material-symbols-outlined text-base">download</span>
-                        </button>
-                        <p className="text-[8px] text-center font-black uppercase text-on-surface-variant/60 tracking-widest">PNG Image</p>
-                      </div>
-
-                      <div className="space-y-2">
-                        <button 
-                          onClick={handleDownloadPDF}
-                          disabled={isGeneratingPDF}
-                          className="w-full py-4 bg-surface-container-high text-primary rounded-2xl text-[10px] font-black transition-all shadow-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-red-500 hover:text-white group border border-outline-variant/5 text-center px-2"
-                        >
-                          <span className="material-symbols-outlined text-base">picture_as_pdf</span>
-                        </button>
-                        <p className="text-[8px] text-center font-black uppercase text-on-surface-variant/60 tracking-widest">PDF Export</p>
-                      </div>
-
-                      <div className="space-y-2">
-                        <button 
-                          onClick={handleShare}
-                          className="w-full py-4 bg-surface-container-high text-primary rounded-2xl text-[10px] font-black transition-all shadow-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-blue-500 hover:text-white group border border-outline-variant/5 text-center px-2"
-                        >
-                          <span className="material-symbols-outlined text-base">share</span>
-                        </button>
-                        <p className="text-[8px] text-center font-black uppercase text-on-surface-variant/60 tracking-widest">Share QR</p>
-                      </div>
-
-                      <div className="space-y-2">
-                        <button 
-                          onClick={() => {
-                            navigator.clipboard.writeText(qrUrl)
-                            addToast({ title: 'Link Copied', message: 'Payment link copied to clipboard.', type: 'success' })
-                          }}
-                          className="w-full py-4 bg-surface-container-high text-primary rounded-2xl text-[10px] font-black transition-all shadow-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-emerald-500 hover:text-white group border border-outline-variant/5 text-center px-2"
-                        >
-                          <span className="material-symbols-outlined text-base">content_copy</span>
-                        </button>
-                        <p className="text-[8px] text-center font-black uppercase text-on-surface-variant/60 tracking-widest">Copy Link</p>
-                      </div>
+                      <h4 className="font-headline text-xl md:text-2xl text-white tracking-tight">Generate Payment Link</h4>
+                      <p className="text-[10px] text-[#8B98A9] font-medium mt-1 leading-relaxed max-w-sm">
+                        Create a secure payment link to share directly with your customers via WhatsApp, Email, or SMS.
+                      </p>
                     </div>
                   </div>
 
-                  <div className="w-full md:w-64 shrink-0 flex">
-                    <div className="bg-[#0A2540] p-6 rounded-[32px] flex flex-col items-center justify-center border border-white/5 shadow-2xl relative overflow-hidden group w-full editorial-shadow min-h-[360px]">
-                      <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full -mr-16 -mt-16 blur-2xl group-hover:scale-150 transition-transform"></div>
-                      <div className="absolute bottom-0 left-0 w-24 h-24 bg-blue-500/10 rounded-full -ml-12 -mb-12 blur-2xl"></div>
-                      
-                      <div className="bg-white p-5 rounded-[32px] shadow-2xl mb-8 relative z-10 transition-transform group-hover:scale-105">
-                        <img 
-                          src={qrUrl} 
-                          alt="Payment QR" 
-                          className="w-full aspect-square rounded-2xl"
-                        />
+                  <div className="w-full lg:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                    <div className="relative flex-1 sm:w-56 bg-[#0B0E14] rounded-2xl border border-[#1E2532] shadow-inner focus-within:border-[#2775CA]/50 focus-within:ring-1 focus-within:ring-[#2775CA]/30 transition-all">
+                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <span className="text-[10px] font-black text-[#8B98A9] uppercase">KES</span>
                       </div>
-                      
-                      <div className="text-center relative z-10 w-full px-4">
-                        <p className="text-emerald-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2 opacity-80">Settlement QR</p>
-                        <div className="space-y-1">
-                          <p className="text-white text-xl font-headline tracking-widest">ACC: {merchant?.paybillAccount || '84729'}</p>
-                          <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest leading-relaxed mt-2">Merchant: {merchant?.businessName || 'Merchant'}</p>
-                        </div>
-                      </div>
+                      <input 
+                        type="number"
+                        value={paymentLinkAmount}
+                        onChange={(e) => setPaymentLinkAmount(e.target.value)}
+                        placeholder="0.00"
+                        className="w-full bg-transparent border-none py-4 pl-12 pr-4 text-right text-lg font-mono font-bold text-white outline-none focus:ring-0 placeholder-[#1E2532]"
+                      />
                     </div>
+                    <button 
+                      onClick={generatePaymentLink}
+                      disabled={isGeneratingLink || !paymentLinkAmount}
+                      className={`px-8 py-4 bg-[#2775CA] text-white rounded-2xl text-[11px] font-bold shadow-[0_0_20px_rgba(39,117,202,0.3)] transition-all flex items-center justify-center gap-2 border border-[#3E8BE0]/50 disabled:opacity-50 disabled:grayscale ${!isGeneratingLink && paymentLinkAmount ? 'hover:bg-[#2C84E3] active:scale-95' : ''}`}
+                    >
+                      {isGeneratingLink ? (
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      ) : (
+                        <>
+                          <span className="material-symbols-outlined text-[14px]">link</span>
+                          Generate Link
+                        </>
+                      )}
+                    </button>
                   </div>
                 </div>
 
-                {/* Payment Link Generator Feature */}
-                <div className="mt-12 pt-10 border-t border-outline-variant/10">
-                  <div className="bg-surface-container-lowest p-6 md:p-8 rounded-[24px] md:rounded-[32px] border border-outline-variant/10 shadow-sm relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl -mr-16 -mt-16 group-hover:scale-150 transition-transform"></div>
-                    
-                    <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-                      <div className="flex items-start gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100 shrink-0">
-                          <span className="material-symbols-outlined text-2xl">add_link</span>
-                        </div>
-                        <div>
-                          <h4 className="font-headline text-xl md:text-2xl text-primary tracking-tight">Generate Payment Link</h4>
-                          <p className="text-[10px] text-on-surface-variant font-medium mt-1 leading-relaxed max-w-sm">
-                            Create a secure payment link to share directly with your customers via WhatsApp, Email, or SMS.
-                          </p>
-                        </div>
+                {generatedLink && (
+                   <div className="mt-6 pt-6 border-t border-[#1E2532] relative z-10 animate-fade-in">
+                      <div className="bg-[#0B0E14] p-4 md:p-5 rounded-2xl border border-[#1E2532] flex flex-col md:flex-row items-center justify-between gap-4">
+                         <div className="flex items-center gap-3 w-full md:w-auto overflow-hidden">
+                            <div className="w-10 h-10 rounded-xl bg-[#131722] flex items-center justify-center text-[#2775CA] shadow-inner shrink-0 border border-[#1E2532]">
+                               <span className="material-symbols-outlined text-lg">check_circle</span>
+                            </div>
+                            <div className="overflow-hidden">
+                              <p className="text-[10px] font-bold text-[#8B98A9] uppercase tracking-widest mb-0.5">Link Ready</p>
+                              <p className="text-sm font-mono text-white tracking-wider truncate max-w-[200px] md:max-w-md">{generatedLink}</p>
+                            </div>
+                         </div>
+                         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
+                            <button 
+                               onClick={() => {
+                                 navigator.clipboard.writeText(generatedLink)
+                                 addToast({ title: 'Copied', message: 'Payment link copied to clipboard.', type: 'success' })
+                               }}
+                               className="px-5 py-3 bg-[#131722] border border-[#1E2532] text-white rounded-xl text-[10px] font-bold hover:bg-[#1A212D] transition-all flex items-center justify-center gap-2 shadow-sm"
+                            >
+                               <span className="material-symbols-outlined text-[14px]">content_copy</span>
+                               Copy
+                            </button>
+                            <button 
+                               onClick={() => window.open(`whatsapp://send?text=${encodeURIComponent(`Please pay me KES ${paymentLinkAmount} via PayChain: ${generatedLink}`)}`)}
+                               className="px-5 py-3 bg-[#25D366] text-white rounded-xl text-[10px] font-bold hover:bg-[#1DA851] transition-all shadow-md flex items-center justify-center gap-2"
+                            >
+                               <span className="material-symbols-outlined text-[14px]" style={{fontVariationSettings: "'FILL' 1"}}>send</span>
+                               Share on WhatsApp
+                            </button>
+                         </div>
                       </div>
-
-                      <div className="w-full lg:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                        <div className="relative flex-1 sm:w-56 bg-white rounded-2xl border border-outline-variant/10 shadow-sm focus-within:border-emerald-500/30 focus-within:ring-2 focus-within:ring-emerald-500/10 transition-all">
-                          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                            <span className="text-[10px] font-black text-on-surface-variant/40 uppercase">KES</span>
-                          </div>
-                          <input 
-                            type="number"
-                            value={paymentLinkAmount}
-                            onChange={(e) => setPaymentLinkAmount(e.target.value)}
-                            placeholder="0.00"
-                            className="w-full bg-transparent border-none py-4 pl-12 pr-4 text-right text-lg font-headline text-primary outline-none focus:ring-0 placeholder-on-surface-variant/20"
-                          />
-                        </div>
-                        <button 
-                          onClick={generatePaymentLink}
-                          disabled={isGeneratingLink || !paymentLinkAmount}
-                          className={`px-8 py-4 bg-[#00351D] text-white rounded-2xl text-[11px] font-bold shadow-xl transition-all flex items-center justify-center gap-2 border border-white/5 disabled:opacity-50 disabled:grayscale ${!isGeneratingLink && paymentLinkAmount ? 'hover:bg-[#004d2b] active:scale-95' : ''}`}
-                        >
-                          {isGeneratingLink ? (
-                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                          ) : (
-                            <>
-                              <span className="material-symbols-outlined text-[14px]">link</span>
-                              Generate Link
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-
-                    {generatedLink && (
-                       <div className="mt-6 pt-6 border-t border-outline-variant/10 relative z-10 animate-fade-in">
-                          <div className="bg-emerald-50 p-4 md:p-5 rounded-2xl border border-emerald-100 flex flex-col md:flex-row items-center justify-between gap-4">
-                             <div className="flex items-center gap-3 w-full md:w-auto overflow-hidden">
-                                <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-emerald-600 shadow-sm shrink-0 border border-emerald-100/50">
-                                   <span className="material-symbols-outlined text-lg">check_circle</span>
-                                </div>
-                                <div className="overflow-hidden">
-                                  <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-widest mb-0.5">Link Ready</p>
-                                  <p className="text-sm font-medium text-emerald-900 truncate max-w-[200px] md:max-w-md">{generatedLink}</p>
-                                </div>
-                             </div>
-                             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
-                                <button 
-                                   onClick={copyPaymentLink}
-                                   className="px-5 py-3 bg-white border border-emerald-200 text-emerald-700 rounded-xl text-[10px] font-bold hover:bg-emerald-50 transition-all flex items-center justify-center gap-2 shadow-sm"
-                                >
-                                   <span className="material-symbols-outlined text-[14px]">content_copy</span>
-                                   Copy
-                                </button>
-                                <button 
-                                   onClick={() => window.open(`whatsapp://send?text=${encodeURIComponent(`Please pay me KES ${paymentLinkAmount} via PayChain: ${generatedLink}`)}`)}
-                                   className="px-5 py-3 bg-[#25D366] text-white rounded-xl text-[10px] font-bold hover:bg-[#1DA851] transition-all shadow-md flex items-center justify-center gap-2"
-                                >
-                                   <span className="material-symbols-outlined text-[14px]" style={{fontVariationSettings: "'FILL' 1"}}>send</span>
-                                   Share on WhatsApp
-                                </button>
-                             </div>
-                          </div>
-                       </div>
-                    )}
-                  </div>
-                </div>
-              </section>
+                   </div>
+                )}
+              </div>
+            </div>
+          </section>
 
               {/* Wallet History */}
               <section className="col-span-12 lg:col-span-12 bg-white rounded-[32px] lg:rounded-[40px] border border-outline-variant/5 shadow-sm overflow-hidden editorial-shadow animate-fade-in-up [animation-delay:200ms]">
