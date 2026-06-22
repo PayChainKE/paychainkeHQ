@@ -27,13 +27,24 @@ export const getMerchantAnalytics = async (req, res) => {
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     const recentMerchants = await Merchant.countDocuments({ createdAt: { $gte: sevenDaysAgo } });
 
+    // Digital Wallet Stats
+    const activeWallets = await Merchant.countDocuments({ stellarPublicKey: { $ne: null } });
+    
+    // Total USDC Locked (Sum of all usdcBalance)
+    const usdcAggregation = await Merchant.aggregate([
+      { $group: { _id: null, totalUsdc: { $sum: "$usdcBalance" } } }
+    ]);
+    const totalUsdcLocked = usdcAggregation.length > 0 ? usdcAggregation[0].totalUsdc : 0;
+
     res.json({
       success: true,
       data: {
         totalMerchants,
         verifiedMerchants,
         unverifiedMerchants,
-        recentMerchants
+        recentMerchants,
+        activeWallets,
+        totalUsdcLocked
       }
     });
   } catch (error) {

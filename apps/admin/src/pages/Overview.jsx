@@ -104,6 +104,74 @@ const Overview = () => {
           </div>
         </section>
 
+        {/* Digital Wallet Stats Section */}
+        <section>
+          <div className="flex items-center gap-3 mb-4 text-slate-400">
+            <span className="text-[11px] font-bold uppercase tracking-widest font-label">Digital Wallet Ecosystem</span>
+            <div className="flex-1 h-[1px] bg-outline-variant/10"></div>
+            <div className="flex items-center gap-1.5 bg-[#0F141E] border border-[#1E2532] rounded-full px-3 py-1">
+              <div className="w-1.5 h-1.5 rounded-full bg-[#35D07F] animate-pulse shadow-[0_0_6px_rgba(53,208,127,0.6)]"></div>
+              <span className="text-[9px] font-black uppercase tracking-widest text-[#35D07F]">Stellar Testnet Live</span>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+            {/* Active Wallets */}
+            <div className="bg-gradient-to-br from-[#0F141E] to-[#0A0D14] p-5 rounded-xl border border-[#1E2532] flex flex-col gap-1 relative overflow-hidden group hover:border-[#2775CA]/40 transition-all">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-[#2775CA]/10 rounded-full -mr-8 -mt-8 blur-2xl group-hover:bg-[#2775CA]/20 transition-all pointer-events-none"></div>
+              <span className="text-[11px] font-bold text-[#8B98A9] uppercase tracking-widest">Active Wallets</span>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="text-[32px] font-bold text-white tracking-tighter">{merchantAnalytics?.activeWallets ?? 0}</span>
+                <span className="text-[11px] font-bold text-[#2775CA]">Merchants</span>
+              </div>
+              <p className="text-[10px] text-[#8B98A9]/60 mt-1">Unique Stellar wallets provisioned</p>
+            </div>
+
+            {/* Total USDC Locked */}
+            <div className="bg-gradient-to-br from-[#0F141E] to-[#0A0D14] p-5 rounded-xl border border-[#1E2532] flex flex-col gap-1 relative overflow-hidden group hover:border-[#35D07F]/40 transition-all">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-[#35D07F]/10 rounded-full -mr-8 -mt-8 blur-2xl group-hover:bg-[#35D07F]/20 transition-all pointer-events-none"></div>
+              <span className="text-[11px] font-bold text-[#8B98A9] uppercase tracking-widest">Total USDC Locked</span>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="text-[32px] font-bold text-white tracking-tighter">
+                  {(merchantAnalytics?.totalUsdcLocked ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+                <span className="text-[11px] font-bold text-[#35D07F]">USDC</span>
+              </div>
+              <p className="text-[10px] text-[#8B98A9]/60 mt-1">Settled via Inflation Shield</p>
+            </div>
+
+            {/* Wallet Activation Rate */}
+            <div className="bg-gradient-to-br from-[#0F141E] to-[#0A0D14] p-5 rounded-xl border border-[#1E2532] flex flex-col gap-1 relative overflow-hidden group hover:border-[#F0B429]/40 transition-all">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-[#F0B429]/10 rounded-full -mr-8 -mt-8 blur-2xl group-hover:bg-[#F0B429]/20 transition-all pointer-events-none"></div>
+              <span className="text-[11px] font-bold text-[#8B98A9] uppercase tracking-widest">Activation Rate</span>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="text-[32px] font-bold text-white tracking-tighter">
+                  {merchantAnalytics?.totalMerchants > 0
+                    ? ((merchantAnalytics.activeWallets / merchantAnalytics.totalMerchants) * 100).toFixed(1)
+                    : '0.0'}%
+                </span>
+              </div>
+              <div className="mt-2 w-full h-1.5 bg-[#1A212D] rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-[#F0B429] to-[#35D07F] rounded-full transition-all duration-700"
+                  style={{ width: `${merchantAnalytics?.totalMerchants > 0 ? (merchantAnalytics.activeWallets / merchantAnalytics.totalMerchants) * 100 : 0}%` }}
+                ></div>
+              </div>
+            </div>
+
+            {/* Wallets Without Activation */}
+            <div className="bg-gradient-to-br from-[#0F141E] to-[#0A0D14] p-5 rounded-xl border border-[#1E2532] flex flex-col gap-1 relative overflow-hidden group hover:border-[#8B98A9]/30 transition-all">
+              <span className="text-[11px] font-bold text-[#8B98A9] uppercase tracking-widest">Pending Activation</span>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="text-[32px] font-bold text-white tracking-tighter">
+                  {(merchantAnalytics?.totalMerchants ?? 0) - (merchantAnalytics?.activeWallets ?? 0)}
+                </span>
+                <span className="text-[11px] font-bold text-[#8B98A9]">Merchants</span>
+              </div>
+              <p className="text-[10px] text-[#8B98A9]/60 mt-1">Yet to activate digital wallet</p>
+            </div>
+          </div>
+        </section>
+
         <section className="grid grid-cols-1 lg:grid-cols-10 gap-6">
           <div className="lg:col-span-6 bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/10 shadow-editorial">
             <div className="flex items-center justify-between mb-8">
