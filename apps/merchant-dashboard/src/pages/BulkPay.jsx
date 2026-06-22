@@ -393,7 +393,7 @@ export default function BulkPay() {
     .filter((id) => selectedPayees[id])
     .reduce((sum, id) => sum + (payoutAmounts[id] || 0), 0)
 
-  const balance = 184250
+  const balance = merchant?.kesBalance ?? 0
   const isLiquidityLow = batchTotal > balance
 
   const [authorizedReceipts, setAuthorizedReceipts] = useState([])
@@ -1153,8 +1153,7 @@ export default function BulkPay() {
                   <h4 className="text-sm font-bold text-primary uppercase tracking-widest mb-6">Select Funding Source</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {[
-                      { id: 'TILL_1', name: 'Main Business Till', balance: 184250, number: '852300' },
-                      { id: 'TILL_2', name: 'Nairobi Branch Till', balance: 45000, number: '852301' },
+                      { id: 'TILL_1', name: merchant?.businessName || 'Main Business Till', balance: merchant?.kesBalance ?? 0, number: merchant?.paybillAccount || '852300' },
                     ].map(till => (
                       <div 
                         key={till.id}
@@ -1377,7 +1376,7 @@ export default function BulkPay() {
                         </div>
                       </div>
                     </div>
-                    <p className="font-headline text-xl font-black text-primary group-hover:scale-105 origin-right transition-transform">12,450</p>
+                    <p className="font-headline text-xl font-black text-primary group-hover:scale-105 origin-right transition-transform">0</p>
                  </div>
                </div>
 
