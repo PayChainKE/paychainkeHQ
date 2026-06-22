@@ -22,7 +22,7 @@ export default function BulkPay() {
   useEffect(() => {
     const fetchPayees = async () => {
       try {
-        const token = localStorage.getItem('merchantToken')
+        const token = localStorage.getItem('paychain_merchant_token')
         if (!token) return;
         const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
         const res = await axios.get(`${API_URL}/api/bulkpay/payees`, {
@@ -122,7 +122,7 @@ export default function BulkPay() {
     const numericAmount = parseFloat(newPayee.amount.replace(/,/g, '')) || 0;
 
     try {
-      const token = localStorage.getItem('merchantToken');
+      const token = localStorage.getItem('paychain_merchant_token');
       const payload = {
         ...newPayee,
         type: newPayee.type.toLowerCase(),
@@ -213,7 +213,7 @@ export default function BulkPay() {
     formData.append('file', file);
 
     try {
-      const token = localStorage.getItem('merchantToken');
+      const token = localStorage.getItem('paychain_merchant_token');
       const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
       const res = await axios.post(`${API_URL}/api/bulkpay/upload-csv`, formData, {
         headers: { 
@@ -408,7 +408,7 @@ export default function BulkPay() {
   const handleAuthorize = async () => {
     try {
       addNotification({ title: 'Processing', message: 'Authorizing batch...', type: 'info' });
-      const token = localStorage.getItem('merchantToken');
+      const token = localStorage.getItem('paychain_merchant_token');
 
       let batchRows = [];
       if (csvPreview) {
