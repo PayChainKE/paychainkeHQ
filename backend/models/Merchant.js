@@ -55,6 +55,14 @@ const merchantSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  lastLogin: {
+    type: Date,
+    default: null,
+  },
+  loginCount: {
+    type: Number,
+    default: 0,
+  },
 }, {
   timestamps: true
 });

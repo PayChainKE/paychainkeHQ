@@ -101,6 +101,8 @@ export const verifyMerchantOTP = async (req, res) => {
     merchant.otp = null;
     merchant.otpExpires = null;
     merchant.isVerified = true;
+    merchant.loginCount = (merchant.loginCount || 0) + 1;
+    merchant.lastLogin = new Date();
     await merchant.save();
 
     res.json({
@@ -113,7 +115,10 @@ export const verifyMerchantOTP = async (req, res) => {
         businessName: merchant.businessName,
         paybillAccount: merchant.paybillAccount,
         kesBalance: merchant.kesBalance,
-        isVerified: merchant.isVerified
+        isVerified: merchant.isVerified,
+        createdAt: merchant.createdAt,
+        lastLogin: merchant.lastLogin,
+        loginCount: merchant.loginCount
       },
       token: generateToken(merchant._id)
     });
