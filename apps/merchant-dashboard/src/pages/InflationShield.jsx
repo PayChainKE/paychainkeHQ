@@ -1,5 +1,6 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import axios from 'axios'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import { formatKES, formatUSDC } from '../utils/formatCurrency'
 import { formatDateISO } from '../utils/formatDate'
@@ -8,9 +9,24 @@ import { usePrivacyMode } from '../hooks/usePrivacyMode'
 export default function InflationShield() {
   const { showAmounts } = usePrivacyMode()
   const [kesAmount, setKesAmount] = useState(10000)
-  const rate = 132.45
+  const [rate, setRate] = useState(132.45)
   const feeRate = 0.005
   const usdcAmount = (kesAmount * (1 - feeRate) / rate).toFixed(2)
+
+  useEffect(() => {
+    const fetchLiveRate = async () => {
+      try {
+        const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+        const res = await axios.get(`${API_URL}/api/transactions/live-rate`)
+        if (res.data.success && res.data.rate) {
+          setRate(res.data.rate)
+        }
+      } catch (err) {
+        console.error('Failed to fetch live exchange rate', err)
+      }
+    }
+    fetchLiveRate()
+  }, [])
 
   const swapHistory = []
 

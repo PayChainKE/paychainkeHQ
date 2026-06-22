@@ -194,3 +194,17 @@ export const activateWallet = async (req, res) => {
     res.status(500).json({ error: 'Failed to activate digital wallet' });
   }
 };
+
+// @desc    Get live KES to USDC rate
+// @route   GET /api/transactions/live-rate
+// @access  Private
+export const getLiveRate = async (req, res) => {
+  try {
+    const rateUsdcPerKes = await getLiveKesToUsdcRate();
+    const rateKesPerUsdc = 1 / rateUsdcPerKes;
+    res.json({ success: true, rate: rateKesPerUsdc });
+  } catch (error) {
+    console.error('❌ Error fetching live rate:', error.message);
+    res.status(500).json({ error: 'Failed to fetch live rate' });
+  }
+};
