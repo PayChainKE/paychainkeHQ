@@ -510,10 +510,12 @@ export default function Wallet() {
                     <div className="flex items-center gap-2 px-3 py-1.5 bg-[#0B0E14] rounded-full border border-[#1E2532]">
                         <span className="text-[7px] font-black uppercase tracking-widest text-[#8B98A9] leading-none">Supported by</span>
                         <div className="flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full bg-[#35D07F] shadow-[0_0_8px_rgba(53,208,127,0.4)]" title="Celo"></span>
-                          <span className="w-2 h-2 rounded-full bg-[#0052FF] shadow-[0_0_8px_rgba(0,82,255,0.4)]" title="Base"></span>
-                          <span className="w-2 h-2 rounded-full bg-[#8247E5] shadow-[0_0_8px_rgba(130,71,229,0.4)]" title="Polygon"></span>
-                          <span className="text-[8px] font-bold text-[#8B98A9]">Celo, Base, Polygon</span>
+                          <img src="https://cryptologos.cc/logos/celo-celo-logo.svg?v=032" alt="Celo" className="w-3.5 h-3.5" title="Celo" />
+                          <div className="w-3.5 h-3.5 rounded-full bg-[#0052FF] flex items-center justify-center" title="Base">
+                            <div className="w-1.5 h-1.5 rounded-full bg-white"></div>
+                          </div>
+                          <img src="https://cryptologos.cc/logos/polygon-matic-logo.svg?v=032" alt="Polygon" className="w-3.5 h-3.5" title="Polygon" />
+                          <span className="text-[8px] font-bold text-[#8B98A9] ml-0.5">Celo, Base, Polygon</span>
                         </div>
                     </div>
                   </div>
