@@ -303,9 +303,9 @@ export default function Overview() {
             </div>
             <h4 className="font-headline text-xl font-bold text-primary mb-2">Unlock Cash Advances</h4>
             <p className="text-sm text-on-surface-variant mb-6">Process payments through your Paybill to build your Trust Score and unlock instant liquidity.</p>
-            <button onClick={() => navigate('/cash-advance')} className="w-full py-3 bg-[#00351D] text-white rounded-xl text-[11px] font-bold hover:brightness-110 transition-all shadow-lg uppercase tracking-widest">
+            <a href="https://www.paychain.co.ke/products/cash-advance" target="_blank" rel="noopener noreferrer" className="block w-full py-3 bg-[#00351D] text-white rounded-xl text-[11px] font-bold hover:brightness-110 transition-all shadow-lg uppercase tracking-widest text-center">
               Learn More
-            </button>
+            </a>
           </section>
 
           <section className="bg-[#E6FFFA] p-6 rounded-2xl border border-emerald-100 shadow-sm flex items-start gap-4">
