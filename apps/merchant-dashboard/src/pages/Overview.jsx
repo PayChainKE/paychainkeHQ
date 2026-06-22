@@ -6,6 +6,7 @@ import { formatKES } from '../utils/formatCurrency'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { useNavigate } from 'react-router-dom'
+import FundAccountModal from '../components/modals/FundAccountModal'
 
 export default function Overview() {
   const navigate = useNavigate()
@@ -18,6 +19,7 @@ export default function Overview() {
   const [activeTimeframe, setActiveTimeframe] = useState('7D')
   const [showMoveMoney, setShowMoveMoney] = useState(false)
   const [showFundAccount, setShowFundAccount] = useState(false)
+  const [activeFundMethod, setActiveFundMethod] = useState(null)
   const [showDigitalWallet, setShowDigitalWallet] = useState(() => localStorage.getItem('paychain_show_wallet') !== 'false')
 
   const toggleDigitalWallet = () => {
@@ -194,7 +196,7 @@ export default function Overview() {
                     </div>
                     
                     <div className="p-1.5 space-y-0.5">
-                      <button onClick={() => {}} className="w-full text-left p-3 hover:bg-emerald-50/50 rounded-xl transition-all group relative overflow-hidden">
+                      <button onClick={() => { setActiveFundMethod('mobile'); setShowFundAccount(false); }} className="w-full text-left p-3 hover:bg-emerald-50/50 rounded-xl transition-all group relative overflow-hidden">
                         <div className="flex items-center gap-3 relative z-10">
                           <div className="w-10 h-10 rounded-xl bg-[#00351D] text-[#5EFEB3] flex items-center justify-center shrink-0 shadow-lg group-hover:scale-105 transition-transform">
                             <span className="material-symbols-outlined text-lg">phone_iphone</span>
@@ -209,7 +211,7 @@ export default function Overview() {
                         </div>
                       </button>
 
-                      <button onClick={() => {}} className="w-full text-left p-3 hover:bg-emerald-50/50 rounded-xl transition-all group relative overflow-hidden">
+                      <button onClick={() => { setActiveFundMethod('card'); setShowFundAccount(false); }} className="w-full text-left p-3 hover:bg-emerald-50/50 rounded-xl transition-all group relative overflow-hidden">
                         <div className="flex items-center gap-3 relative z-10">
                           <div className="w-10 h-10 rounded-xl bg-[#0D2444] text-blue-300 flex items-center justify-center shrink-0 shadow-lg group-hover:scale-105 transition-transform">
                             <span className="material-symbols-outlined text-lg">credit_card</span>
@@ -224,7 +226,7 @@ export default function Overview() {
                         </div>
                       </button>
 
-                      <button onClick={() => {}} className="w-full text-left p-3 hover:bg-emerald-50/50 rounded-xl transition-all group relative overflow-hidden">
+                      <button onClick={() => { setActiveFundMethod('bank'); setShowFundAccount(false); }} className="w-full text-left p-3 hover:bg-emerald-50/50 rounded-xl transition-all group relative overflow-hidden">
                         <div className="flex items-center gap-3 relative z-10">
                           <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 shadow-lg group-hover:scale-105 transition-transform">
                             <span className="material-symbols-outlined text-lg">account_balance</span>
@@ -431,6 +433,11 @@ export default function Overview() {
           </section>
         </div>
       </div>
+
+      {/* Render Modal */}
+      {activeFundMethod && (
+        <FundAccountModal method={activeFundMethod} onClose={() => setActiveFundMethod(null)} />
+      )}
     </MerchantLayout>
   )
 }
