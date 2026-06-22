@@ -332,7 +332,7 @@ export default function Transactions() {
             </div>
             <h3 className="text-2xl font-headline font-bold text-primary mb-3">No Transactions Yet</h3>
             <p className="text-[15px] text-on-surface-variant font-medium max-w-md mx-auto leading-relaxed opacity-80">
-              Real-time payments made to your Paybill account will appear here instantly. Instruct your customers to use <strong>Paybill 400200</strong> and your account number <strong className="text-primary">{merchant?.paybillAccount || '84729'}</strong>.
+              Real-time payments made to your business account will appear here instantly. Instruct your customers to use your account number <strong className="text-primary">{merchant?.paybillAccount || '84729'}</strong>.
             </p>
           </div>
         ) : (

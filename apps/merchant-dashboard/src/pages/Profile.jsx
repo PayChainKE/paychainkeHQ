@@ -375,7 +375,6 @@ export default function Profile() {
                   <span className="material-symbols-outlined text-2xl">id_card</span>
                 </div>
                 <h4 className="text-[10px] text-blue-200/60 font-bold uppercase tracking-widest mb-1">Merchant Identity</h4>
-                <p className={`font-headline text-2xl lg:text-3xl mb-1 transition-all duration-300 ${!showAmounts && 'blur-md'}`}>PAYBILL: 400200</p>
                 <p className={`font-headline text-2xl lg:text-3xl mb-1 transition-all duration-300 ${!showAmounts && 'blur-md'}`}>ACC: {merchant?.paybillAccount || '84729'}</p>
                 <p className="text-sm text-blue-100/60 font-medium">Verified Merchant since Oct 2025</p>
                 <div className="mt-8 pt-8 border-t border-white/10 flex items-center gap-2">

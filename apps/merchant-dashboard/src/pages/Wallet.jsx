@@ -128,7 +128,7 @@ export default function Wallet() {
     setIsGeneratingLink(true)
     setTimeout(() => {
       setIsGeneratingLink(false)
-      const link = `https://pay.paychain.ke/400200/${merchant?.paybillAccount || '84729'}/${paymentLinkAmount}`
+      const link = `https://pay.paychain.ke/pay/${merchant?.paybillAccount || '84729'}/${paymentLinkAmount}`
       setGeneratedLink(link)
       addToast({
         title: 'Payment Link Created',
@@ -426,7 +426,6 @@ export default function Wallet() {
                       <div className="text-center relative z-10 w-full px-4">
                         <p className="text-emerald-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2 opacity-80">Settlement QR</p>
                         <div className="space-y-1">
-                          <p className="text-white text-xl font-headline tracking-widest">PAYBILL: 400200</p>
                           <p className="text-white text-xl font-headline tracking-widest">ACC: {merchant?.paybillAccount || '84729'}</p>
                           <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest leading-relaxed mt-2">Merchant: {merchant?.businessName || 'Merchant'}</p>
                         </div>

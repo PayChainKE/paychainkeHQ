@@ -1,6 +1,7 @@
 import axios from 'axios';
 import Transaction from '../models/Transaction.js';
 import Merchant from '../models/Merchant.js';
+import { sendSMS } from '../utils/sms.js';
 
 // Configuration from environment variables
 const consumerKey = process.env.MPESA_CONSUMER_KEY;
@@ -160,6 +161,12 @@ export const confirmationURL = async (req, res) => {
     await merchant.save();
 
     console.log(`✅ Successfully processed M-PESA payment of KES ${amount} for account ${accountNumber}`);
+
+    // Send SMS notification to the customer
+    if (MSISDN) {
+      const smsMessage = `Confirmed. Ksh${amount.toLocaleString()} paid to ${merchant.businessName} (Acc: ${merchant.paybillAccount}). Ref: ${TransID}. Thank you for your payment.`;
+      await sendSMS(MSISDN, smsMessage);
+    }
 
   } catch (error) {
     console.error('❌ M-PESA Confirmation Webhook Error:', error);
