@@ -33,6 +33,8 @@ export default function Wallet() {
   const [showTopUpSelection, setShowTopUpSelection] = useState(false)
   const [selectedFundingMethod, setSelectedFundingMethod] = useState(null)
   const [topUpAmount, setTopUpAmount] = useState('')
+  const [topUpPhone, setTopUpPhone] = useState('')
+  const [stkStatusText, setStkStatusText] = useState('')
   const [isProcessingTopUp, setIsProcessingTopUp] = useState(false)
 
   // Primary Ledger Actions
@@ -780,7 +782,7 @@ export default function Wallet() {
                     <div>
                       <p className="text-xs md:text-sm font-bold text-primary capitalize">{tx.type === 'withdrawal' ? 'Funds Withdrawal' : 'Currency Swap'}</p>
                       <div className="flex items-center gap-2 mt-0.5">
-                        <p className="text-[9px] md:text-[10px] text-on-surface-variant font-medium opacity-60">{formatDateISO(tx.timestamp)}</p>
+                        <p className="text-[9px] md:text-[10px] text-on-surface-variant font-medium opacity-60">{formatDateISO(tx.createdAt || tx.timestamp)}</p>
                         <span className="text-[9px] md:text-[10px] text-on-surface-variant/20 block md:hidden">•</span>
                         <p className="hidden md:block text-[9px] text-on-surface-variant uppercase font-black tracking-widest opacity-40">{tx.destination || 'Internal Account'}</p>
                       </div>
@@ -969,7 +971,9 @@ export default function Wallet() {
                       <div className="relative group">
                         <div className="absolute left-6 top-1/2 -translate-y-1/2 text-primary/40 font-bold text-lg">+254</div>
                         <input 
-                          type="number"
+                          type="tel"
+                          value={topUpPhone}
+                          onChange={(e) => setTopUpPhone(e.target.value)}
                           placeholder="712 345 678"
                           className="w-full bg-surface-container-low border border-outline-variant/5 rounded-3xl py-6 pl-16 pr-6 text-2xl font-headline text-primary focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
                         />
@@ -978,36 +982,76 @@ export default function Wallet() {
 
                     <button 
                       onClick={async () => {
-                        if (!topUpAmount) return
+                        if (!topUpAmount || !topUpPhone) return
                         setIsProcessingTopUp(true)
+                        setStkStatusText('Initiating STK Push...')
                         try {
-                          await new Promise(r => setTimeout(r, 1000))
                           const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
                           const token = localStorage.getItem('paychain_merchant_token')
-                          await axios.post(`${API_URL}/api/transactions/simulate`, {
-                            accountNumber: merchant?.paybillAccount,
+                          
+                          // 1. Send STK Push
+                          const pushRes = await axios.post(`${API_URL}/api/callbacks/stk-push`, {
                             amount: Number(topUpAmount),
-                            senderName: 'Mobile Money Top-up',
-                            senderPhone: merchant?.phone || '0700000000'
+                            phone: topUpPhone,
+                            merchantId: merchant._id
                           }, {
                             headers: { Authorization: `Bearer ${token}` }
                           })
-                          addToast({ title: 'Top Up Successful', message: `Successfully funded ${topUpAmount} KES.`, type: 'success' })
-                          await refreshSession()
-                          setShowTopUpSelection(false)
-                          setSelectedFundingMethod(null)
-                          setTopUpAmount('')
+                          
+                          const checkoutId = pushRes.data.checkoutRequestId
+                          setStkStatusText('Awaiting PIN on phone...')
+
+                          // 2. Poll Status
+                          let attempts = 0
+                          const maxAttempts = 20 // 20 * 3s = 60s
+                          
+                          const pollInterval = setInterval(async () => {
+                            attempts++
+                            try {
+                              const statusRes = await axios.get(`${API_URL}/api/callbacks/stk-status/${checkoutId}`, {
+                                headers: { Authorization: `Bearer ${token}` }
+                              })
+                              
+                              if (statusRes.data.status === 'success') {
+                                clearInterval(pollInterval)
+                                addToast({ title: 'Top Up Successful', message: `Successfully funded ${topUpAmount} KES via M-Pesa.`, type: 'success' })
+                                await refreshSession()
+                                setShowTopUpSelection(false)
+                                setSelectedFundingMethod(null)
+                                setTopUpAmount('')
+                                setTopUpPhone('')
+                                setStkStatusText('')
+                                setIsProcessingTopUp(false)
+                              } else if (statusRes.data.status === 'failed') {
+                                clearInterval(pollInterval)
+                                addToast({ title: 'Top Up Failed', message: statusRes.data.resultDesc || 'User cancelled or request failed.', type: 'error' })
+                                setStkStatusText('')
+                                setIsProcessingTopUp(false)
+                              } else if (attempts >= maxAttempts) {
+                                clearInterval(pollInterval)
+                                addToast({ title: 'Timeout', message: 'The request timed out. Please try again.', type: 'error' })
+                                setStkStatusText('')
+                                setIsProcessingTopUp(false)
+                              }
+                            } catch (e) {
+                              console.error('Polling error', e)
+                            }
+                          }, 3000)
+
                         } catch (err) {
-                          addToast({ title: 'Top Up Failed', message: err.response?.data?.error || 'Failed to process top up.', type: 'error' })
-                        } finally {
+                          addToast({ title: 'Request Failed', message: err.response?.data?.error || 'Failed to send STK Push.', type: 'error' })
+                          setStkStatusText('')
                           setIsProcessingTopUp(false)
                         }
                       }}
-                      disabled={isProcessingTopUp || !topUpAmount}
+                      disabled={isProcessingTopUp || !topUpAmount || !topUpPhone}
                       className="w-full bg-[#00351D] text-white py-5 rounded-3xl font-bold text-lg shadow-2xl hover:bg-[#004d2b] active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-white/5 disabled:opacity-20"
                     >
                       {isProcessingTopUp ? (
-                        <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        <div className="flex items-center gap-3">
+                          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                          <span className="text-sm font-medium">{stkStatusText}</span>
+                        </div>
                       ) : (
                         <>
                           Request STK Push

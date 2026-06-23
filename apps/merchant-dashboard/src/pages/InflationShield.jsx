@@ -5,13 +5,14 @@ import MerchantLayout from '../components/layout/MerchantLayout'
 import { formatKES, formatUSDC } from '../utils/formatCurrency'
 import { formatDateISO } from '../utils/formatDate'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
-
+import { useMerchantAuth } from '../context/MerchantAuthContext'
+import { useToast } from '../context/NotificationContext'
 export default function InflationShield() {
   const { showAmounts } = usePrivacyMode()
-  const [kesAmount, setKesAmount] = useState(10000)
+  const [kesAmount, setKesAmount] = useState('')
   const [rate, setRate] = useState(132.45)
   const feeRate = 0.005
-  const usdcAmount = (kesAmount * (1 - feeRate) / rate).toFixed(2)
+  const usdcAmount = kesAmount ? (Number(kesAmount) * (1 - feeRate) / rate).toFixed(2) : '0.00'
 
   useEffect(() => {
     const fetchLiveRate = async () => {
@@ -27,6 +28,39 @@ export default function InflationShield() {
     }
     fetchLiveRate()
   }, [])
+
+  const { merchant, refreshSession } = useMerchantAuth()
+  const { addToast } = useToast()
+  const [isSwapping, setIsSwapping] = useState(false)
+
+  const handleSwap = async () => {
+    const amount = Number(kesAmount);
+    if (!amount || amount <= 0) {
+      return addToast({ title: 'Invalid Amount', message: 'Please enter a valid amount to swap.', type: 'error' });
+    }
+    if (amount > (merchant?.kesBalance || 0)) {
+      return addToast({ title: 'Insufficient Balance', message: 'You do not have enough KES.', type: 'error' });
+    }
+    if (!merchant?.stellarPublicKey) {
+      return addToast({ title: 'Wallet Not Activated', message: 'Please activate your Digital Wallet first.', type: 'error' });
+    }
+
+    setIsSwapping(true);
+    try {
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      const token = localStorage.getItem('paychain_merchant_token');
+      await axios.post(`${API_URL}/api/transactions/swap`, { amount }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      addToast({ title: 'Swap Successful', message: `Successfully swapped ${amount} KES to USDC!`, type: 'success' });
+      await refreshSession();
+      setKesAmount('');
+    } catch (err) {
+      addToast({ title: 'Swap Failed', message: err.response?.data?.error || 'Failed to swap KES', type: 'error' });
+    } finally {
+      setIsSwapping(false);
+    }
+  }
 
   const swapHistory = []
 
@@ -121,8 +155,9 @@ export default function InflationShield() {
                   <input 
                     type="number" 
                     value={kesAmount} 
-                    onChange={(e) => setKesAmount(Number(e.target.value))}
+                    onChange={(e) => setKesAmount(e.target.value === '' ? '' : e.target.value)}
                     className="flex-1 min-w-0 w-full bg-transparent border-none text-right font-headline text-2xl md:text-3xl text-gray-900 focus:ring-0 p-0 placeholder-gray-300 outline-none"
+                    placeholder="0"
                   />
                 </div>
               </div>
@@ -162,9 +197,13 @@ export default function InflationShield() {
               </div>
             </div>
 
-            <button className="relative z-10 w-full bg-gradient-to-r from-emerald-600 to-emerald-400 text-white py-5 rounded-2xl font-bold text-lg shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] active:scale-[0.98] transition-all mt-8 flex items-center justify-center gap-3 group border border-emerald-400/20">
-              Confirm Protection Swap
-              <span className="material-symbols-outlined group-hover:rotate-180 transition-transform duration-700">sync</span>
+            <button 
+              onClick={handleSwap}
+              disabled={isSwapping}
+              className="relative z-10 w-full bg-gradient-to-r from-emerald-600 to-emerald-400 text-white py-5 rounded-2xl font-bold text-lg shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] active:scale-[0.98] transition-all mt-8 flex items-center justify-center gap-3 group border border-emerald-400/20 disabled:opacity-50 disabled:grayscale"
+            >
+              {isSwapping ? 'Processing Swap...' : 'Confirm Protection Swap'}
+              <span className={`material-symbols-outlined transition-transform duration-700 ${isSwapping ? 'animate-spin' : 'group-hover:rotate-180'}`}>sync</span>
             </button>
           </div>
 

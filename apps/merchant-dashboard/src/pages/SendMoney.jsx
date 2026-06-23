@@ -266,17 +266,17 @@ export default function SendMoney() {
                   }
                   setIsLoading(true);
                   try {
-                    await new Promise(r => setTimeout(r, 1500));
                     const token = localStorage.getItem('paychain_merchant_token');
                     const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
-                    await axios.post(`${API_URL}/api/transactions/send-money`, {
-                      destination: selectedDest.label,
+                    await axios.post(`${API_URL}/api/callbacks/b2c-request`, {
+                      phone: recipientAccount,
                       amount: Number(amount),
+                      destination: selectedDest.label,
                       fee,
                       reference
                     }, { headers: { Authorization: `Bearer ${token}` } });
                     
-                    addNotification({ title: 'Transfer Complete', message: `Successfully sent ${formatKES(amount)} to ${selectedDest.label}`, type: 'success' });
+                    addNotification({ title: 'Transfer Complete', message: `Successfully dispatched ${formatKES(amount)} via M-Pesa.`, type: 'success' });
                     await refreshSession();
                     navigate('/overview');
                   } catch (err) {

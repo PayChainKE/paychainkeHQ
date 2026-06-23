@@ -32,9 +32,12 @@ export default function Overview() {
     const fetchData = async () => {
       try {
         const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+        const token = localStorage.getItem('paychain_merchant_token')
+        const config = { headers: { Authorization: `Bearer ${token}` } }
+        
         const [txRes, trustRes] = await Promise.all([
-          axios.get(`${API_URL}/api/transactions`),
-          axios.get(`${API_URL}/api/trust-score`).catch(() => ({ data: { current: 0, eligibleForAdvance: false } }))
+          axios.get(`${API_URL}/api/transactions`, config),
+          axios.get(`${API_URL}/api/trust-score`, config).catch(() => ({ data: { current: 0, eligibleForAdvance: false } }))
         ])
         setLiveTransactions(txRes.data)
         setTrustData(trustRes.data)
@@ -67,24 +70,75 @@ export default function Overview() {
 
   const totalTransactionsCount = liveTransactions.length
   
-  const recentTx = liveTransactions.filter(t => t.type === 'inbound').slice(0, 5)
+  const recentTx = [...liveTransactions]
+    .filter(t => t.type === 'inbound')
+    .sort((a, b) => new Date(b.createdAt || b.timestamp) - new Date(a.createdAt || a.timestamp))
+    .slice(0, 5)
 
-  // Chart Logic scaffolding (empty if no data)
-  const hasData = liveTransactions.length > 0
-  const timeframes = {
-    '7D': {
-      labels: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'],
-      data: hasData ? [0, 0, 0, 0, 0, todaysRevenue, todaysRevenue] : [0,0,0,0,0,0,0] // Simplified for mock removal
-    },
-    '30D': {
-      labels: ['WEEK 1', 'WEEK 2', 'WEEK 3', 'WEEK 4'],
-      data: hasData ? [0, 0, 0, thisMonthRevenue] : [0,0,0,0]
-    },
-    '6M': {
-      labels: ['OCT', 'NOV', 'DEC', 'JAN', 'FEB', 'MAR'],
-      data: [0, 0, 0, 0, 0, 0]
+  // --- Dynamic Chart Data Aggregation ---
+  const generateChartData = () => {
+    const inboundTxs = liveTransactions.filter(t => t.type === 'inbound');
+    const now = new Date();
+    
+    // Helper to format date
+    const getDayName = (date) => ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][date.getDay()];
+    const getMonthName = (date) => ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'][date.getMonth()];
+
+    // 1. 7D Data
+    const labels7D = [];
+    const data7D = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      labels7D.push(getDayName(d));
+      const daySum = inboundTxs
+        .filter(t => new Date(t.createdAt).toDateString() === d.toDateString())
+        .reduce((sum, t) => sum + (t.kesAmount || t.amount || 0), 0);
+      data7D.push(daySum);
     }
-  }
+
+    // 2. 30D Data (Last 4 weeks basically)
+    const labels30D = ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
+    const data30D = [0, 0, 0, 0];
+    const thirtyDaysAgo = new Date(now);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 28);
+    
+    inboundTxs.forEach(t => {
+      const txDate = new Date(t.createdAt);
+      if (txDate >= thirtyDaysAgo) {
+        const diffTime = Math.abs(now - txDate);
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        const weekIndex = 3 - Math.floor(diffDays / 7);
+        if (weekIndex >= 0 && weekIndex < 4) {
+          data30D[weekIndex] += (t.kesAmount || t.amount || 0);
+        }
+      }
+    });
+
+    // 3. 6M Data
+    const labels6M = [];
+    const data6M = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now);
+      d.setMonth(d.getMonth() - i);
+      labels6M.push(getMonthName(d));
+      const monthSum = inboundTxs
+        .filter(t => {
+          const txDate = new Date(t.createdAt);
+          return txDate.getMonth() === d.getMonth() && txDate.getFullYear() === d.getFullYear();
+        })
+        .reduce((sum, t) => sum + (t.kesAmount || t.amount || 0), 0);
+      data6M.push(monthSum);
+    }
+
+    return {
+      '7D': { labels: labels7D, data: data7D },
+      '30D': { labels: labels30D, data: data30D },
+      '6M': { labels: labels6M, data: data6M }
+    };
+  };
+
+  const timeframes = generateChartData();
 
   const getGreeting = () => {
     const hour = new Date().getHours()
@@ -371,32 +425,35 @@ export default function Overview() {
         <section className="lg:col-span-2 bg-white rounded-[16px] border border-slate-300 shadow-sm editorial-shadow overflow-hidden">
           <div className="p-8 border-b border-slate-300 flex justify-between items-center">
             <h3 className="font-headline font-bold text-3xl text-primary">Recent Transactions</h3>
+            <button onClick={() => navigate('/transactions')} className="text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 px-4 py-2 rounded-lg transition-colors border border-emerald-100">
+              View All
+            </button>
           </div>
           <div className="flex flex-col">
             {recentTx.length === 0 ? (
-              <div className="p-12 text-center text-on-surface-variant font-medium">
+              <div className="p-8 text-center text-on-surface-variant font-medium">
                 No recent transactions found.
               </div>
             ) : (
               recentTx.map(tx => (
-                <div key={tx._id || tx.id} className="px-4 lg:px-8 py-4 lg:py-5 flex items-center justify-between hover:bg-[#00351D] transition-all group cursor-pointer border-b border-slate-300">
-                  <div className="flex items-center gap-3 lg:gap-4 flex-1 min-w-0">
-                    <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-full bg-emerald-100 flex items-center justify-center overflow-hidden font-black text-primary text-[10px] lg:text-xs border border-white/20 shadow-sm transition-all duration-300 shrink-0">
+                <div key={tx._id || tx.id} className="px-4 lg:px-8 py-2 lg:py-3 flex items-center justify-between hover:bg-[#00351D] transition-all group cursor-pointer border-b border-slate-300">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="w-8 h-8 lg:w-9 lg:h-9 rounded-full bg-emerald-100 flex items-center justify-center overflow-hidden font-black text-primary text-[9px] lg:text-[10px] border border-white/20 shadow-sm transition-all duration-300 shrink-0">
                       {tx.senderName ? tx.senderName.substring(0, 2).toUpperCase() : 'TX'}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-[13px] lg:text-sm font-black text-primary leading-tight group-hover:text-white transition-colors truncate">{tx.senderName || 'Customer'}</p>
+                      <p className="text-[12px] lg:text-[13px] font-black text-primary leading-tight group-hover:text-white transition-colors truncate">{tx.senderName || 'Customer'}</p>
                       <div className="flex items-center gap-2 mt-0.5">
-                        <p className="text-[9px] lg:text-[10px] text-on-surface-variant font-black uppercase tracking-widest opacity-40 group-hover:text-white/40 group-hover:opacity-100 transition-colors truncate">REF: {tx.receiptNumber || tx.reference}</p>
+                        <p className="text-[8px] lg:text-[9px] text-on-surface-variant font-black uppercase tracking-widest opacity-40 group-hover:text-white/40 group-hover:opacity-100 transition-colors truncate">REF: {tx.receiptNumber || tx.reference}</p>
                       </div>
                     </div>
                   </div>
                   
                   <div className="flex flex-col items-end shrink-0">
-                    <p className="text-[13px] lg:text-sm font-black text-emerald-700 group-hover:text-[#5EFEB3] transition-colors leading-none mb-1">
+                    <p className="text-[12px] lg:text-[13px] font-black text-emerald-700 group-hover:text-[#5EFEB3] transition-colors leading-none mb-1">
                       +{formatKES(tx.kesAmount || tx.amount || 0)}
                     </p>
-                    <p className="text-[9px] lg:text-[10px] text-on-surface-variant font-black opacity-30 tracking-widest group-hover:text-white/30 transition-colors uppercase">
+                    <p className="text-[8px] lg:text-[9px] text-on-surface-variant font-black opacity-30 tracking-widest group-hover:text-white/30 transition-colors uppercase">
                       {new Date(tx.createdAt || tx.timestamp).toLocaleDateString()}
                     </p>
                   </div>

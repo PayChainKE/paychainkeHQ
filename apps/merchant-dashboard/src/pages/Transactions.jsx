@@ -140,7 +140,7 @@ export default function Transactions() {
     doc.text('Transaction Details', 15, doc.lastAutoTable.finalY + 15)
 
     const tableData = filteredRows.map(tx => {
-      const dateTime = formatDateISO(tx.timestamp).split(',')
+      const dateTime = formatDateISO(tx.createdAt || tx.timestamp).split(',')
       const party = tx.sender?.name || tx.recipient?.name || 'Treasury'
       const amount = tx.type === 'fx_swap' 
         ? `${tx.usdcAmount} USDC` 
@@ -255,7 +255,7 @@ export default function Transactions() {
     doc.text(tx.type.replace('_', ' ').toUpperCase(), 20, valueY)
     doc.text(tx.status.toUpperCase(), 20, valueY + 20)
     doc.text(tx.sender?.name || tx.recipient?.name || 'Internal Treasury', 20, valueY + 40)
-    doc.text(formatDateISO(tx.timestamp), 20, valueY + 60)
+    doc.text(formatDateISO(tx.createdAt || tx.timestamp), 20, valueY + 60)
 
     // Column 2 - Amount Focus
     doc.setFontSize(9)
@@ -399,11 +399,11 @@ export default function Transactions() {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-[#0A2540] border-b border-white/10 transition-colors shadow-lg">
-                      <th className="px-6 py-5 text-[11px] font-bold text-blue-100 uppercase tracking-[0.2em] opacity-60">Date/Time</th>
-                      <th className="px-6 py-5 text-[11px] font-bold text-blue-100 uppercase tracking-[0.2em] opacity-60">Type</th>
-                      <th className="px-6 py-5 text-[11px] font-bold text-blue-100 uppercase tracking-[0.2em] opacity-60">Party</th>
-                      <th className="px-6 py-5 text-[11px] font-bold text-blue-100 uppercase tracking-[0.2em] opacity-60">Amount</th>
-                      <th className="px-6 py-5 text-[11px] font-bold text-blue-100 uppercase tracking-[0.2em] opacity-60">Status</th>
+                      <th className="px-6 py-3 text-[11px] font-bold text-blue-100 uppercase tracking-[0.2em] opacity-60">Date/Time</th>
+                      <th className="px-6 py-3 text-[11px] font-bold text-blue-100 uppercase tracking-[0.2em] opacity-60">Type</th>
+                      <th className="px-6 py-3 text-[11px] font-bold text-blue-100 uppercase tracking-[0.2em] opacity-60">Party</th>
+                      <th className="px-6 py-3 text-[11px] font-bold text-blue-100 uppercase tracking-[0.2em] opacity-60">Amount</th>
+                      <th className="px-6 py-3 text-[11px] font-bold text-blue-100 uppercase tracking-[0.2em] opacity-60">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-surface-container text-on-surface">
@@ -415,12 +415,12 @@ export default function Transactions() {
                           selectedTx?.id === tx.id ? 'bg-surface-container-low/50' : 'bg-white'
                         }`}
                       >
-                        <td className="px-6 py-5">
-                          <p className="text-sm font-semibold text-primary">{formatDateISO(tx.timestamp).split(',')[0]}</p>
-                          <p className="text-[11px] text-on-surface-variant">{formatDateISO(tx.timestamp).split(',')[1]}</p>
+                        <td className="px-6 py-2">
+                          <p className="text-[13px] font-semibold text-primary leading-tight">{formatDateISO(tx.createdAt || tx.timestamp).split(',')[0]}</p>
+                          <p className="text-[10px] text-on-surface-variant leading-tight">{formatDateISO(tx.createdAt || tx.timestamp).split(',')[1]}</p>
                         </td>
-                        <td className="px-6 py-5">
-                          <span className={`px-3 py-1 text-[10px] font-bold rounded-full uppercase tracking-tighter ${
+                        <td className="px-6 py-2">
+                          <span className={`px-2 py-1 text-[9px] font-bold rounded-full uppercase tracking-tighter ${
                             tx.type === 'inbound' ? 'bg-green-500/10 text-green-700' :
                             tx.type === 'fx_swap' ? 'bg-blue-500/10 text-blue-700' :
                             'bg-amber-500/10 text-amber-700'
@@ -428,19 +428,19 @@ export default function Transactions() {
                             {tx.type.replace('_', ' ')}
                           </span>
                         </td>
-                        <td className="px-6 py-5">
-                          <p className="text-sm font-semibold text-primary">{tx.sender?.name || tx.recipient?.name || 'Treasury'}</p>
-                          <p className="text-[11px] font-mono text-on-surface-variant group-hover:text-primary transition-colors">{tx.reference}</p>
+                        <td className="px-6 py-2">
+                          <p className="text-[13px] font-semibold text-primary leading-tight">{tx.sender?.name || tx.recipient?.name || 'Treasury'}</p>
+                          <p className="text-[10px] font-mono text-on-surface-variant group-hover:text-primary transition-colors leading-tight">{tx.reference}</p>
                         </td>
-                        <td className="px-6 py-5">
-                          <p className={`text-sm font-bold transition-all duration-300 ${tx.type === 'inbound' ? 'text-green-600' : 'text-primary'}`}>
+                        <td className="px-6 py-2">
+                          <p className={`text-[13px] font-bold transition-all duration-300 ${tx.type === 'inbound' ? 'text-green-600' : 'text-primary'}`}>
                             {tx.type === 'fx_swap' ? formatUSDC(tx.usdcAmount) : formatKES(tx.amount || tx.kesAmount || 0)}
                           </p>
                         </td>
-                        <td className="px-6 py-5">
+                        <td className="px-6 py-2">
                           <div className="flex items-center gap-1.5">
                             <div className={`w-1.5 h-1.5 rounded-full ${tx.status === 'verified' || tx.status === 'completed' ? 'bg-green-500' : 'bg-amber-500'}`}></div>
-                            <span className="text-xs font-semibold capitalize">{tx.status}</span>
+                            <span className="text-[11px] font-semibold capitalize">{tx.status}</span>
                           </div>
                         </td>
                       </tr>
@@ -456,16 +456,16 @@ export default function Transactions() {
                 <div 
                   key={tx.id} 
                   onClick={() => setSelectedTx(tx)}
-                  className={`bg-white p-6 transition-all active:bg-surface-container-low flex flex-col gap-1.5 ${
+                  className={`bg-white p-4 transition-all active:bg-surface-container-low flex flex-col gap-1 ${
                     selectedTx?.id === tx.id ? 'bg-surface-container-low/50 ring-2 ring-inset ring-primary/20' : ''
                   }`}
                 >
                   {/* Date/Time */}
                   <p className="text-[10px] text-on-surface-variant/40 font-bold uppercase tracking-[0.2em]">
-                    {formatDateISO(tx.timestamp).split(',')[0]}
+                    {formatDateISO(tx.createdAt || tx.timestamp).split(',')[0]}
                   </p>
                   <p className="text-[9px] text-on-surface-variant/30 font-bold uppercase tracking-widest -mt-1 mb-2">
-                    {formatDateISO(tx.timestamp).split(',')[1]}
+                    {formatDateISO(tx.createdAt || tx.timestamp).split(',')[1]}
                   </p>
 
                   {/* Type Badge */}
@@ -605,7 +605,7 @@ export default function Transactions() {
                   {/* Timestamp Section */}
                   <div className="space-y-3 pt-6 border-t border-outline-variant/5">
                     <p className="text-[10px] text-on-surface-variant/60 font-bold uppercase tracking-[0.2em]">Timestamp</p>
-                    <p className="text-xs font-bold text-primary/70 uppercase tracking-widest">{formatDateISO(selectedTx.timestamp)}</p>
+                    <p className="text-xs font-bold text-primary/70 uppercase tracking-widest">{formatDateISO(selectedTx?.createdAt || selectedTx?.timestamp)}</p>
                   </div>
 
                   {/* Verification Section */}
