@@ -1,6 +1,6 @@
 export function formatKES(n){
-  if (n==null) return 'KES 0'
-  return `KES ${new Intl.NumberFormat().format(n)}`
+  if (n==null) return 'KES 0.00'
+  return `KES ${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 export function formatUSD(n){

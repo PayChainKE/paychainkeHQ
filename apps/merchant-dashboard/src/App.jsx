@@ -17,6 +17,7 @@ import MyTills from './pages/MyTills'
 import Wallet from './pages/Wallet'
 import SendMoney from './pages/SendMoney'
 import RequestMoney from './pages/RequestMoney'
+import PaymentPage from './pages/PaymentPage'
 import ToastHost from './components/ui/Toast'
 
 function Protected({ children }){
@@ -34,6 +35,7 @@ export default function App(){
         <NotificationProvider>
           <Routes>
             <Route path="/login" element={<Login/>} />
+            <Route path="/pay/:linkId" element={<PaymentPage />} />
             <Route path="/" element={<Navigate to="/overview" replace />} />
             <Route path="/overview" element={<Protected><Overview/></Protected>} />
             <Route path="/transactions" element={<Protected><Transactions/></Protected>} />

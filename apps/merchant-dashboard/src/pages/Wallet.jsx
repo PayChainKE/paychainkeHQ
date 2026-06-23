@@ -89,18 +89,33 @@ export default function Wallet() {
     try {
       const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
       const token = localStorage.getItem('paychain_merchant_token')
-      await axios.post(`${API_URL}/api/transactions/send-money`, {
-        amount: Number(withdrawAmount),
-        destination: destination,
-        reference: `Withdrawal to ${destinationAccountValue}`
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      addToast({ title: 'Withdrawal Initiated', message: `KES ${withdrawAmount} sent to destination.`, type: 'success' })
+      
+      const destType = withdrawalDestinations.find(d => d.id === destination)?.type;
+      
+      if (destType === 'Mobile') {
+        await axios.post(`${API_URL}/api/callbacks/b2c-request`, {
+          phone: destinationAccountValue.replace(/^(?:\+?254|0)/, '254'),
+          amount: Number(withdrawAmount)
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        addToast({ title: 'Withdrawal Processing', message: `KES ${withdrawAmount} sent to phone. B2C Transfer initiated.`, type: 'success' });
+      } else {
+        await axios.post(`${API_URL}/api/transactions/send-money`, {
+          amount: Number(withdrawAmount),
+          destination: destination,
+          reference: `Withdrawal to ${destinationAccountValue}`
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        addToast({ title: 'Withdrawal Initiated', message: `KES ${withdrawAmount} sent to destination.`, type: 'success' })
+      }
+      
       setWithdrawAmount('')
+      setDestinationAccountValue('')
       await refreshSession()
     } catch (err) {
-      addToast({ title: 'Withdrawal Failed', message: err.response?.data?.error || 'Failed to withdraw funds', type: 'error' })
+      addToast({ title: 'Withdrawal Failed', message: err.response?.data?.error || err.response?.data?.message || 'Failed to withdraw funds', type: 'error' })
     } finally {
       setIsWithdrawing(false)
     }
@@ -258,23 +273,32 @@ export default function Wallet() {
     }
   }
 
-  const generatePaymentLink = () => {
+  const generatePaymentLink = async () => {
     if (!paymentLinkAmount || Number(paymentLinkAmount) <= 0) {
       addToast({ title: 'Invalid Amount', message: 'Please enter a valid amount to generate a link.', type: 'error' })
       return
     }
     
     setIsGeneratingLink(true)
-    setTimeout(() => {
+    try {
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+      const token = localStorage.getItem('paychain_merchant_token')
+      
+      const res = await axios.post(`${API_URL}/api/transactions/payment-link`, {
+        amount: Number(paymentLinkAmount)
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (res.data?.success) {
+        setGeneratedLink(res.data.url)
+        addToast({ title: 'Link Generated', message: 'Secure payment link created successfully! Expires in 24 hours.', type: 'success' })
+      }
+    } catch (err) {
+      addToast({ title: 'Generation Failed', message: err.response?.data?.error || 'Failed to generate secure payment link', type: 'error' })
+    } finally {
       setIsGeneratingLink(false)
-      const link = `https://www.paychain.co.ke/pay/${merchant?.paybillAccount || '84729'}/${paymentLinkAmount}`
-      setGeneratedLink(link)
-      addToast({
-        title: 'Payment Link Created',
-        message: 'Your custom payment link is ready for sharing.',
-        type: 'success'
-      })
-    }, 800)
+    }
   }
 
   const copyPaymentLink = () => {
@@ -770,17 +794,23 @@ export default function Wallet() {
                   <p className="text-sm font-medium text-on-surface-variant">No transaction history yet.</p>
                 </div>
               ) : liveTransactions.slice(0, 5).map((tx, idx) => (
-                <div key={tx.id} className="px-4 md:px-8 py-6 flex items-center justify-between hover:bg-surface-container-low/30 transition-all group border-b border-surface-container last:border-0">
+                <div key={tx.id} className="px-4 md:px-8 py-2.5 flex items-center justify-between hover:bg-surface-container-low/30 transition-all group border-b border-surface-container last:border-0">
                   <div className="flex items-center gap-3 md:gap-4">
-                    <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center text-lg md:text-xl shadow-sm border ${
-                      tx.type === 'withdrawal' ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-blue-50 text-blue-600 border-blue-100'
+                    <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center text-base md:text-lg shadow-sm border ${
+                      (tx.type === 'withdrawal' || tx.type === 'outbound' || tx.type === 'settlement' || tx.type === 'bulk_pay') ? 'bg-amber-50 text-amber-600 border-amber-100' : 
+                      tx.type === 'inbound' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                      'bg-blue-50 text-blue-600 border-blue-100'
                     }`}>
-                      <span className="material-symbols-outlined text-lg md:text-xl">
-                        {tx.type === 'withdrawal' ? 'logout' : 'sync'}
+                      <span className="material-symbols-outlined text-base md:text-lg">
+                        {(tx.type === 'withdrawal' || tx.type === 'outbound' || tx.type === 'settlement' || tx.type === 'bulk_pay') ? 'logout' : 
+                         tx.type === 'inbound' ? 'login' : 'sync'}
                       </span>
                     </div>
                     <div>
-                      <p className="text-xs md:text-sm font-bold text-primary capitalize">{tx.type === 'withdrawal' ? 'Funds Withdrawal' : 'Currency Swap'}</p>
+                      <p className="text-[11px] md:text-xs font-bold text-primary capitalize">
+                        {tx.type === 'inbound' ? 'Funds Deposit' : 
+                         (tx.type === 'withdrawal' || tx.type === 'outbound' || tx.type === 'settlement' || tx.type === 'bulk_pay') ? 'Funds Withdrawal' : 'Currency Swap'}
+                      </p>
                       <div className="flex items-center gap-2 mt-0.5">
                         <p className="text-[9px] md:text-[10px] text-on-surface-variant font-medium opacity-60">{formatDateISO(tx.createdAt || tx.timestamp)}</p>
                         <span className="text-[9px] md:text-[10px] text-on-surface-variant/20 block md:hidden">•</span>
@@ -789,10 +819,10 @@ export default function Wallet() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className={`text-xs md:text-sm font-black text-primary transition-all duration-300 ${!showAmounts && 'blur-md'}`}>
-                      {tx.type === 'withdrawal' ? '-' : ''}{tx.currency === 'KES' ? formatKES(tx.amount) : formatUSDC(tx.amount)}
+                    <p className={`text-[11px] md:text-xs font-black text-primary transition-all duration-300 ${!showAmounts && 'blur-sm'}`}>
+                      {tx.type === 'inbound' ? '+' : (tx.type === 'withdrawal' || tx.type === 'outbound' || tx.type === 'settlement' || tx.type === 'bulk_pay' ? '-' : '')}{tx.type === 'fx_swap' ? formatUSDC(tx.usdcAmount) : formatKES(tx.kesAmount || tx.amount || 0)}
                     </p>
-                    <span className={`text-[8px] md:text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-widest mt-1 inline-block ${
+                    <span className={`text-[8px] md:text-[9px] px-2 py-0.5 rounded font-bold uppercase tracking-widest mt-0.5 inline-block ${
                        tx.status === 'completed' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
                     }`}>
                        {tx.status}

@@ -1373,7 +1373,7 @@ export default function BulkPay() {
                 <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto max-w-xl mx-auto animate-in slide-in-from-bottom duration-1000">
                   <button 
                     onClick={downloadAllReceipts}
-                    className="flex-1 px-8 py-4 bg-surface-container-low text-primary font-black uppercase tracking-widest text-[11px] rounded-2xl border border-outline-variant/10 hover:bg-white transition-all flex items-center justify-center gap-3"
+                    className="flex-1 px-8 py-4 bg-[#0A2540] text-blue-100 font-black uppercase tracking-widest text-[11px] rounded-2xl shadow-xl hover:bg-[#0C2D4E] hover:text-white transition-all flex items-center justify-center gap-3"
                   >
                     <span className="material-symbols-outlined text-xl">file_download</span>
                     Download All Receipts

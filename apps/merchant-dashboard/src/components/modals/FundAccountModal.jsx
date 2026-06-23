@@ -29,26 +29,37 @@ export default function FundAccountModal({ method, onClose }) {
 
     setIsLoading(true);
     try {
-      // Simulate external API network latency for payment gateway
-      await new Promise(r => setTimeout(r, 2000));
-
       const token = localStorage.getItem('paychain_merchant_token');
       
-      // We hit the existing /api/transactions/simulate endpoint which credits KES balance
-      await axios.post(`${API_URL}/api/transactions/simulate`, {
-        accountNumber: merchant.paybillAccount,
-        amount: Number(amount),
-        senderName: method === 'card' ? cardName : 'Mobile Money Top-up',
-        senderPhone: method === 'mobile' ? phone : 'CARD_PAYMENT'
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      if (method === 'mobile') {
+        // Trigger Real Daraja STK Push API
+        addToast({ title: 'Processing', message: 'Initiating Daraja STK Push...', type: 'info' });
+        await axios.post(`${API_URL}/api/callbacks/stk-push`, {
+          phone: phone.replace(/^(?:\+?254|0)/, '254'), // Ensure 254 format
+          amount: Number(amount)
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        addToast({ title: 'Prompt Sent', message: 'Please check your phone and enter your M-PESA PIN to complete the top-up.', type: 'success' });
+      } else {
+        // Simulate card payment
+        await new Promise(r => setTimeout(r, 2000));
+        await axios.post(`${API_URL}/api/transactions/simulate`, {
+          accountNumber: merchant.paybillAccount,
+          amount: Number(amount),
+          senderName: cardName,
+          senderPhone: 'CARD_PAYMENT'
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        addToast({ title: 'Payment Successful', message: `Successfully funded ${amount} KES to your account!`, type: 'success' });
+        await refreshSession();
+      }
 
-      addToast({ title: 'Payment Successful', message: `Successfully funded ${amount} KES to your account!`, type: 'success' });
-      await refreshSession();
       onClose();
     } catch (err) {
-      addToast({ title: 'Payment Failed', message: err.response?.data?.error || 'Failed to process payment.', type: 'error' });
+      addToast({ title: 'Payment Failed', message: err.response?.data?.error || err.response?.data?.message || 'Failed to process payment.', type: 'error' });
     } finally {
       setIsLoading(false);
     }
@@ -104,33 +115,46 @@ export default function FundAccountModal({ method, onClose }) {
           <div className="p-6">
             {/* Mobile Money View */}
             {method === 'mobile' && (
-              <form onSubmit={handleSimulatedPayment} className="space-y-5">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">M-Pesa / Airtel Number</label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 material-symbols-outlined text-lg">smartphone</span>
-                    <input 
-                      type="tel" 
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="e.g. 0712345678"
-                      className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm font-medium rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 pl-11 py-3 outline-none transition-all"
-                      required
-                    />
-                  </div>
+              <form onSubmit={handleSimulatedPayment} className="space-y-6">
+                <div className="text-center mb-6">
+                  <h4 className="text-xl font-headline font-bold text-slate-800 tracking-tight">Complete your deposit</h4>
+                  <p className="text-xs text-slate-500 font-medium mt-1">Enter the amount and your mobile number. We will send a STK Push to your phone for instant top-up.</p>
                 </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Amount (KES)</label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">KES</span>
+
+                <div className="bg-[#0A0A0A] p-5 rounded-[20px] shadow-inner border border-black/10 relative overflow-hidden group transition-all focus-within:ring-2 focus-within:ring-emerald-500/50">
+                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent pointer-events-none group-hover:opacity-100 opacity-50 transition-opacity"></div>
+                  
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Amount to Top Up</label>
+                  <div className="flex items-center gap-3">
+                    <span className="text-emerald-400 font-bold text-xl tracking-wider">KES</span>
                     <input 
                       type="number" 
                       value={amount}
                       onChange={(e) => setAmount(e.target.value)}
                       placeholder="0.00"
-                      className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-lg font-headline font-bold rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 pl-14 py-3 outline-none transition-all"
+                      className="w-full bg-transparent text-white text-4xl font-headline font-bold outline-none placeholder-slate-700 caret-emerald-500"
                       required
                       min="10"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-[#0A0A0A] p-5 rounded-[20px] shadow-inner border border-black/10 relative overflow-hidden group transition-all focus-within:ring-2 focus-within:ring-emerald-500/50">
+                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent pointer-events-none group-hover:opacity-100 opacity-50 transition-opacity"></div>
+                  
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">M-Pesa / Airtel Number</label>
+                  <div className="flex items-center gap-3">
+                    <span className="text-emerald-400 font-bold text-xl tracking-wider">+254</span>
+                    <input 
+                      type="tel" 
+                      value={phone.replace(/^(?:\+?254|0)/, '')}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '');
+                        setPhone(val ? `254${val}` : '');
+                      }}
+                      placeholder="712 345 678"
+                      className="w-full bg-transparent text-white text-3xl font-headline font-bold outline-none placeholder-slate-700 caret-emerald-500 tracking-wide"
+                      required
                     />
                   </div>
                 </div>
@@ -138,18 +162,17 @@ export default function FundAccountModal({ method, onClose }) {
                 <button 
                   type="submit" 
                   disabled={isLoading}
-                  className="w-full bg-[#00351D] hover:bg-[#002414] text-white py-3.5 rounded-xl font-bold text-sm shadow-lg shadow-emerald-900/20 transition-all flex items-center justify-center gap-2 mt-4 active:scale-[0.98] disabled:opacity-70 disabled:pointer-events-none"
+                  className="w-full bg-emerald-500 hover:bg-emerald-400 text-[#00351D] py-4 rounded-[16px] font-black uppercase tracking-widest text-sm shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] transition-all flex items-center justify-center gap-3 mt-6 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
                 >
                   {isLoading ? (
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    <div className="w-5 h-5 border-2 border-[#00351D]/30 border-t-[#00351D] rounded-full animate-spin"></div>
                   ) : (
                     <>
-                      Send STK Push
-                      <span className="material-symbols-outlined text-sm">send</span>
+                      Request STK Push
+                      <span className="material-symbols-outlined text-lg">bolt</span>
                     </>
                   )}
                 </button>
-                <p className="text-[10px] text-center text-slate-400 font-medium mt-3">You will receive a prompt on your phone to confirm.</p>
               </form>
             )}
 

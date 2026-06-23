@@ -51,13 +51,13 @@ export default function Transactions() {
     
     if (activeTab === 'All') return matchesSearch
     if (activeTab === 'Inbound') return matchesSearch && t.type === 'inbound'
-    if (activeTab === 'Outbound') return matchesSearch && (t.type === 'bulk_pay' || t.type === 'settlement')
+    if (activeTab === 'Outbound') return matchesSearch && (t.type === 'bulk_pay' || t.type === 'settlement' || t.type === 'outbound')
     if (activeTab === 'FX Swaps') return matchesSearch && t.type === 'fx_swap'
     return matchesSearch
   })
 
   const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 5
+  const itemsPerPage = 10
   
   const totalItems = filteredRows.length
   const totalPages = Math.ceil(totalItems / itemsPerPage)
@@ -73,7 +73,7 @@ export default function Transactions() {
     
     // Stats calculation
     const totalIn = filteredRows.filter(t => t.type === 'inbound').reduce((s, o) => s + (o.amount || 0), 0)
-    const totalOut = filteredRows.filter(t => t.type === 'bulk_pay' || t.type === 'settlement').reduce((s, o) => s + (o.amount || 0), 0)
+    const totalOut = filteredRows.filter(t => t.type === 'bulk_pay' || t.type === 'settlement' || t.type === 'outbound').reduce((s, o) => s + (o.amount || 0), 0)
     const swpKES = filteredRows.filter(t => t.type === 'fx_swap').reduce((s, o) => s + (o.kesAmount || 0), 0)
     const swpUSDC = filteredRows.filter(t => t.type === 'fx_swap').reduce((s, o) => s + (o.usdcAmount || 0), 0)
     
@@ -309,11 +309,13 @@ export default function Transactions() {
   const monthAgo = new Date(today);
   monthAgo.setMonth(today.getMonth() - 1);
 
+  const inboundTxs = liveTransactions.filter(t => t.type === 'inbound');
+  
   const stats = {
-    today: liveTransactions.filter(t => new Date(t.createdAt || t.timestamp) >= today).reduce((s, t) => s + (t.kesAmount || t.amount || 0), 0),
-    week: liveTransactions.filter(t => new Date(t.createdAt || t.timestamp) >= weekAgo).reduce((s, t) => s + (t.kesAmount || t.amount || 0), 0),
-    month: liveTransactions.filter(t => new Date(t.createdAt || t.timestamp) >= monthAgo).reduce((s, t) => s + (t.kesAmount || t.amount || 0), 0),
-    allTime: liveTransactions.reduce((s, t) => s + (t.kesAmount || t.amount || 0), 0)
+    today: inboundTxs.filter(t => new Date(t.createdAt || t.timestamp) >= today).reduce((s, t) => s + (t.kesAmount || t.amount || 0), 0),
+    week: inboundTxs.filter(t => new Date(t.createdAt || t.timestamp) >= weekAgo).reduce((s, t) => s + (t.kesAmount || t.amount || 0), 0),
+    month: inboundTxs.filter(t => new Date(t.createdAt || t.timestamp) >= monthAgo).reduce((s, t) => s + (t.kesAmount || t.amount || 0), 0),
+    allTime: inboundTxs.reduce((s, t) => s + (t.kesAmount || t.amount || 0), 0)
   };
 
   return (

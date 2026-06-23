@@ -71,7 +71,6 @@ export default function Overview() {
   const totalTransactionsCount = liveTransactions.length
   
   const recentTx = [...liveTransactions]
-    .filter(t => t.type === 'inbound')
     .sort((a, b) => new Date(b.createdAt || b.timestamp) - new Date(a.createdAt || a.timestamp))
     .slice(0, 5)
 
@@ -450,8 +449,12 @@ export default function Overview() {
                   </div>
                   
                   <div className="flex flex-col items-end shrink-0">
-                    <p className="text-[12px] lg:text-[13px] font-black text-emerald-700 group-hover:text-[#5EFEB3] transition-colors leading-none mb-1">
-                      +{formatKES(tx.kesAmount || tx.amount || 0)}
+                    <p className={`text-[12px] lg:text-[13px] font-black ${
+                      tx.type === 'inbound' ? 'text-emerald-700 group-hover:text-[#5EFEB3]' : 
+                      (tx.type === 'outbound' || tx.type === 'settlement' || tx.type === 'bulk_pay' || tx.type === 'fx_swap') ? 'text-rose-600 group-hover:text-rose-400' :
+                      'text-primary group-hover:text-white'
+                    } transition-colors leading-none mb-1`}>
+                      {tx.type === 'inbound' ? '+' : (tx.type === 'outbound' || tx.type === 'settlement' || tx.type === 'bulk_pay' || tx.type === 'fx_swap' ? '-' : '')}{tx.type === 'fx_swap' ? formatKES(tx.kesAmount || 0) : formatKES(tx.kesAmount || tx.amount || 0)}
                     </p>
                     <p className="text-[8px] lg:text-[9px] text-on-surface-variant font-black opacity-30 tracking-widest group-hover:text-white/30 transition-colors uppercase">
                       {new Date(tx.createdAt || tx.timestamp).toLocaleDateString()}
