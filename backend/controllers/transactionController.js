@@ -1,6 +1,6 @@
 import Transaction from '../models/Transaction.js';
 import Merchant from '../models/Merchant.js';
-import { settleInflationShield, provisionMerchantWallet } from '../utils/stellarHelper.js';
+import { settleInflationShield, provisionMerchantWallet, getWalletBalance } from '../utils/stellarHelper.js';
 import { encryptKey } from '../utils/cryptoHelper.js';
 import { getLiveKesToUsdcRate } from '../utils/rateEngine.js';
 import { sendWalletActivationEmail } from '../utils/resend.js';
@@ -259,5 +259,50 @@ export const sendMoney = async (req, res) => {
   } catch (error) {
     console.error('❌ Error in sendMoney:', error);
     res.status(500).json({ error: 'Server Error: Failed to process transfer' });
+  }
+};
+
+// @desc    Sync Merchant Wallet Balance from Stellar Blockchain
+// @route   POST /api/transactions/sync-wallet
+// @access  Private
+export const syncWalletBalance = async (req, res) => {
+  try {
+    const merchant = await Merchant.findById(req.merchant._id);
+
+    if (!merchant || !merchant.stellarPublicKey) {
+      return res.status(400).json({ error: 'Digital Wallet not activated' });
+    }
+
+    const liveBalance = await getWalletBalance(merchant.stellarPublicKey);
+    
+    // If the live on-chain balance is strictly greater, it means an external deposit occurred.
+    // If it's different in any way, sync the DB to match the chain.
+    if (liveBalance !== merchant.usdcBalance) {
+      console.log(`🔄 Syncing ledger for ${merchant.businessName}: ${merchant.usdcBalance} -> ${liveBalance}`);
+      
+      // Optionally log external deposits
+      if (liveBalance > (merchant.usdcBalance || 0)) {
+        await Transaction.create({
+          merchantId: merchant._id,
+          accountNumber: merchant.paybillAccount,
+          type: 'inbound',
+          amount: liveBalance - (merchant.usdcBalance || 0),
+          kesAmount: 0,
+          currency: 'USDC',
+          status: 'completed',
+          reference: 'External Deposit',
+          sender: { name: 'External Wallet', id: 'Blockchain' },
+          recipient: { name: merchant.businessName, id: merchant.stellarPublicKey }
+        });
+      }
+
+      merchant.usdcBalance = liveBalance;
+      await merchant.save();
+    }
+
+    res.status(200).json({ success: true, usdcBalance: liveBalance });
+  } catch (error) {
+    console.error('❌ Error syncing wallet:', error);
+    res.status(500).json({ error: 'Server Error: Failed to sync wallet' });
   }
 };

@@ -42,12 +42,29 @@ export default function Wallet() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSwapping, setIsSwapping] = useState(false)
   const [isActivatingWallet, setIsActivatingWallet] = useState(false)
+  const hasSynced = React.useRef(false)
 
   useEffect(() => {
     const fetchTransactions = async () => {
       try {
         const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
-        const res = await axios.get(`${API_URL}/api/transactions`)
+        const token = localStorage.getItem('paychain_merchant_token')
+        
+        // 1. Sync Live Wallet Balance if not already synced this session
+        if (merchant?.stellarPublicKey && !hasSynced.current) {
+          try {
+            hasSynced.current = true; // Mark as synced to prevent infinite loop on refreshSession
+            await axios.post(`${API_URL}/api/transactions/sync-wallet`, {}, {
+              headers: { Authorization: `Bearer ${token}` }
+            })
+            await refreshSession()
+          } catch(e) { console.error('Failed to sync wallet', e) }
+        }
+
+        // 2. Fetch Transactions (will include the external deposit if just created)
+        const res = await axios.get(`${API_URL}/api/transactions`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
         setLiveTransactions(res.data)
       } catch (err) {
         console.error('Failed to fetch transactions', err)
