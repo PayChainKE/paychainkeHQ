@@ -389,62 +389,46 @@ export const initiateB2C = async (req, res) => {
       ? 'https://api.safaricom.co.ke/mpesa/b2c/v1/paymentrequest'
       : 'https://sandbox.safaricom.co.ke/mpesa/b2c/v1/paymentrequest';
 
-    // Try B2C Daraja
-    try {
-      const b2cRes = await axios.post(url, {
-        InitiatorName: process.env.MPESA_B2C_INITIATOR || 'testapi',
-        SecurityCredential: securityCredential,
-        CommandID: 'BusinessPayment',
-        Amount: amount,
-        PartyA: process.env.MPESA_SHORTCODE || '600000',
-        PartyB: phone,
-        Remarks: `Withdrawal to ${destination}`,
-        QueueTimeOutURL: 'https://your-domain.com/api/callbacks/b2c-timeout',
-        ResultURL: 'https://your-domain.com/api/callbacks/b2c-callback',
-        Occasion: 'PayChain Settlement'
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+    const b2cRes = await axios.post(url, {
+      InitiatorName: process.env.MPESA_B2C_INITIATOR || 'testapi',
+      SecurityCredential: securityCredential,
+      CommandID: 'BusinessPayment',
+      Amount: amount,
+      PartyA: process.env.MPESA_SHORTCODE || '600000',
+      PartyB: phone,
+      Remarks: `Withdrawal to ${destination}`,
+      QueueTimeOutURL: 'https://shiny-horses-write.loca.lt/api/callbacks/b2c-timeout',
+      ResultURL: 'https://shiny-horses-write.loca.lt/api/callbacks/b2c-callback',
+      Occasion: 'PayChain Settlement'
+    }, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
 
-      // Transaction successfully sent to Daraja
-      const tx = await Transaction.create({
-        merchantId: merchant._id,
-        accountNumber: merchant.paybillAccount || 'WALLET_FUND',
-        type: 'outbound',
-        amount: amount,
-        kesAmount: amount,
-        currency: 'KES',
-        status: 'completed', // B2C sandbox auto-completes
-        reference: b2cRes.data.OriginatorConversationID || `B2C_${Date.now()}`,
-        sender: { name: merchant.businessName, id: merchant.paybillAccount },
-        recipient: { name: destination, id: phone }
-      });
+    // Transaction successfully sent to Daraja
+    const tx = await Transaction.create({
+      merchantId: merchant._id,
+      accountNumber: merchant.paybillAccount || 'WALLET_FUND',
+      type: 'outbound',
+      amount: amount,
+      kesAmount: amount,
+      currency: 'KES',
+      status: 'pending', // Daraja transactions are pending until callback
+      reference: b2cRes.data.OriginatorConversationID || `B2C_${Date.now()}`,
+      sender: { name: merchant.businessName, id: merchant.paybillAccount },
+      recipient: { name: destination, id: phone }
+    });
 
-      res.status(200).json({ success: true, message: 'Transfer initiated', transaction: tx });
-
-    } catch (darajaErr) {
-      // Sandbox fallback: If Daraja fails (due to cert mismatch etc), we fallback to simulation
-      console.warn('Daraja B2C failed (Likely sandbox cert issue), falling back to simulation...');
-      
-      const tx = await Transaction.create({
-        merchantId: merchant._id,
-        accountNumber: merchant.paybillAccount || 'WALLET_FUND',
-        type: 'outbound',
-        amount: amount,
-        kesAmount: amount,
-        currency: 'KES',
-        status: 'completed',
-        reference: `SIM_B2C_${Date.now()}`,
-        sender: { name: merchant.businessName, id: merchant.paybillAccount },
-        recipient: { name: destination, id: phone }
-      });
-
-      res.status(200).json({ success: true, message: 'Transfer successful (Simulated)', transaction: tx });
-    }
+    res.status(200).json({ success: true, message: 'Transfer initiated successfully via Daraja', transaction: tx });
 
   } catch (error) {
-    console.error('❌ B2C Transfer Error:', error);
-    res.status(500).json({ error: 'Internal server error processing transfer' });
+    console.error('❌ B2C Transfer Error:', error.response?.data || error);
+    // Refund the merchant if Daraja fails to accept the request
+    const merchant = await Merchant.findById(req.merchant._id);
+    if (merchant) {
+      merchant.kesBalance += req.body.amount;
+      await merchant.save();
+    }
+    res.status(500).json({ error: error.response?.data?.errorMessage || 'Failed to initiate Daraja B2C transfer' });
   }
 };
 

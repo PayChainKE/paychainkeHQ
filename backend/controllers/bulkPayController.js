@@ -57,6 +57,22 @@ export const addPayee = async (req, res) => {
   }
 };
 
+// @desc    Delete a payee
+// @route   DELETE /api/bulkpay/payees/:id
+// @access  Private
+export const deletePayee = async (req, res) => {
+  try {
+    const payee = await Payee.findOne({ _id: req.params.id, merchantId: req.merchant._id });
+    if (!payee) {
+      return res.status(404).json({ message: 'Payee not found' });
+    }
+    await Payee.deleteOne({ _id: req.params.id });
+    res.status(200).json({ message: 'Payee removed successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to delete payee', error: error.message });
+  }
+};
+
 // @desc    Upload and parse CSV for bulk payout preview
 // @route   POST /api/bulkpay/upload-csv
 // @access  Private
@@ -224,8 +240,8 @@ export const authorizeBatch = async (req, res) => {
           PartyA: process.env.MPESA_SHORTCODE || '600000',
           PartyB: payee.phone,
           Remarks: `Bulk Payout to ${payee.name}`,
-          QueueTimeOutURL: 'https://your-domain.com/api/callbacks/timeout',
-          ResultURL: 'https://your-domain.com/api/callbacks/result',
+          QueueTimeOutURL: 'https://shiny-horses-write.loca.lt/api/callbacks/timeout',
+          ResultURL: 'https://shiny-horses-write.loca.lt/api/callbacks/result',
           Occasion: 'PayChain Settlement'
         } : {
           // B2B Payload
@@ -239,18 +255,14 @@ export const authorizeBatch = async (req, res) => {
           PartyB: payee.paybillNumber || payee.tillNumber,
           AccountReference: payee.businessAccount || 'Settlement',
           Remarks: `Bulk B2B Payout to ${payee.name}`,
-          QueueTimeOutURL: 'https://your-domain.com/api/callbacks/timeout',
-          ResultURL: 'https://your-domain.com/api/callbacks/result',
+          QueueTimeOutURL: 'https://shiny-horses-write.loca.lt/api/callbacks/timeout',
+          ResultURL: 'https://shiny-horses-write.loca.lt/api/callbacks/result',
         };
 
-        try {
-          const mpesaRes = await axios.post(url, payload, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          darajaRef = mpesaRes.data.OriginatorConversationID || darajaRef;
-        } catch (err) {
-          console.warn(`Daraja API skipped or failed for ${payee.name}, falling back to simulation.`);
-        }
+        const mpesaRes = await axios.post(url, payload, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        darajaRef = mpesaRes.data.OriginatorConversationID || darajaRef;
       }
 
       // Record standard Transaction ledger entry

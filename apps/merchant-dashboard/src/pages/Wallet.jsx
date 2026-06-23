@@ -416,7 +416,7 @@ export default function Wallet() {
                   <p className="text-[#8B98A9] text-[10px] font-black uppercase tracking-[0.2em] mb-1">Global Settlement Balance</p>
                   <div className="flex items-baseline gap-2">
                     <h3 className={`font-headline font-black text-3xl md:text-4xl tracking-tighter tabular-nums transition-all duration-300 text-transparent bg-clip-text bg-gradient-to-r from-white to-[#8B98A9] ${!showAmounts && 'blur-xl text-white bg-none'}`}>
-                      {merchant?.usdcBalance?.toLocaleString(undefined, { minimumFractionDigits: 2 }) || '0.00'}
+                      {Number(merchant?.usdcBalance || 0).toFixed(2)}
                     </h3>
                     <span className="text-lg font-bold text-[#2775CA]">USDC</span>
                   </div>

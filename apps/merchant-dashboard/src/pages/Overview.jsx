@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import axios from 'axios'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import RevenueChart from '../components/charts/RevenueChart'
-import { formatKES } from '../utils/formatCurrency'
+import { formatKES, formatUSDC } from '../utils/formatCurrency'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { useNavigate } from 'react-router-dom'
@@ -357,7 +357,7 @@ export default function Overview() {
               </div>
               <div className="flex-1">
                 <h3 className={`font-headline font-bold text-3xl lg:text-4xl tracking-tighter tabular-nums mb-2 lg:mb-3 transition-all duration-300 ${!showAmounts && 'blur-lg grayscale'}`}>
-                  {merchant?.usdcBalance || '0.00'} USDC
+                  {formatUSDC(merchant?.usdcBalance || 0)}
                 </h3>
                 <p className={`text-white/40 text-[9px] lg:text-[10px] font-bold tracking-tight opacity-70 uppercase transition-all duration-300 ${!showAmounts && 'blur-sm grayscale'}`}>
                   ≈ {formatKES((merchant?.usdcBalance || 0) * 130)}

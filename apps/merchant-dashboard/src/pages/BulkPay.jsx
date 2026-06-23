@@ -117,6 +117,23 @@ export default function BulkPay() {
     setShowAddModal(true);
   }
 
+  const handleDeletePayee = async (id, e) => {
+    e.stopPropagation();
+    if (!window.confirm('Are you sure you want to delete this payee?')) return;
+    try {
+      const token = localStorage.getItem('paychain_merchant_token');
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      await axios.delete(`${API_URL}/api/bulkpay/payees/${id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setPayeesList(prev => prev.filter(p => p._id !== id && p.id !== id));
+      addNotification({ title: 'Deleted', message: 'Payee has been removed successfully.', type: 'success' });
+    } catch (error) {
+      console.error('Failed to delete payee:', error);
+      addNotification({ title: 'Error', message: 'Failed to delete payee. Please try again.', type: 'error' });
+    }
+  };
+
   const handleSavePayee = async () => {
     if (!newPayee.name) {
       addNotification({ title: 'Missing Info', message: 'Recipient name is required.', type: 'error' });
@@ -999,12 +1016,22 @@ export default function BulkPay() {
                         {formatKES(p.salary || p.amount || 0)}
                       </p>
                     </div>
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); handleOpenEdit(p); }}
-                      className="p-1 md:p-1.5 rounded-lg bg-surface-container-low text-primary/40 hover:text-emerald-700 hover:bg-emerald-50 transition-all active:scale-90"
-                    >
-                      <span className="material-symbols-outlined text-xs md:text-sm">edit</span>
-                    </button>
+                    <div className="flex gap-1 shrink-0">
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleOpenEdit(p); }}
+                        className="p-1 md:p-1.5 rounded-lg bg-surface-container-low text-primary/40 hover:text-emerald-700 hover:bg-emerald-50 transition-all active:scale-90"
+                        title="Edit Payee"
+                      >
+                        <span className="material-symbols-outlined text-xs md:text-sm">edit</span>
+                      </button>
+                      <button 
+                        onClick={(e) => handleDeletePayee(p._id || p.id, e)}
+                        className="p-1 md:p-1.5 rounded-lg bg-surface-container-low text-primary/40 hover:text-red-600 hover:bg-red-50 transition-all active:scale-90"
+                        title="Delete Payee"
+                      >
+                        <span className="material-symbols-outlined text-xs md:text-sm">delete</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

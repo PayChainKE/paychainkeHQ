@@ -1,7 +1,8 @@
 import express from 'express';
 import multer from 'multer';
-import { getPayees, addPayee, uploadCSV, authorizeBatch } from '../controllers/bulkPayController.js';
+import { getPayees, addPayee, deletePayee, uploadCSV, authorizeBatch } from '../controllers/bulkPayController.js';
 import { protectMerchant } from '../middleware/authMiddleware.js';
+import { generateToken } from '../controllers/mpesaController.js';
 
 const router = express.Router();
 
@@ -15,7 +16,9 @@ router.route('/payees')
   .get(getPayees)
   .post(addPayee);
 
+router.delete('/payees/:id', deletePayee);
+
 router.post('/upload-csv', upload.single('file'), uploadCSV);
-router.post('/authorize', authorizeBatch);
+router.post('/authorize', generateToken, authorizeBatch);
 
 export default router;
