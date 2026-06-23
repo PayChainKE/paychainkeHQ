@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Support - PayChain</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=DM+Serif+Display:ital@0;1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "tertiary-fixed": "#d3e7e0",
+              "outline": "#707971",
+              "on-tertiary-container": "#a0b4ad",
+              "on-secondary-container": "#007151",
+              "primary-container": "#0b4d2e",
+              "background": "#faf9f6",
+              "surface-container-lowest": "#ffffff",
+              "on-surface-variant": "#404942",
+              "tertiary-container": "#354641",
+              "tertiary": "#1f302b",
+              "on-primary-container": "#80bd95",
+              "on-tertiary-fixed-variant": "#394a45",
+              "on-secondary-fixed-variant": "#00513a",
+              "inverse-surface": "#2f312f",
+              "on-background": "#1b1c1a",
+              "surface-tint": "#2e6a48",
+              "on-error": "#ffffff",
+              "surface-dim": "#dbdad7",
+              "surface-container-low": "#f4f3f0",
+              "secondary-container": "#83f5c6",
+              "on-primary-fixed-variant": "#115132",
+              "on-tertiary-fixed": "#0d1f1b",
+              "surface-variant": "#e3e2df",
+              "surface-container-high": "#e9e8e5",
+              "on-secondary-fixed": "#002115",
+              "on-tertiary": "#ffffff",
+              "error": "#ba1a1a",
+              "surface": "#faf9f6",
+              "surface-container": "#efeeeb",
+              "surface-bright": "#faf9f6",
+              "on-surface": "#1b1c1a",
+              "on-error-container": "#93000a",
+              "error-container": "#ffdad6",
+              "secondary": "#006c4e",
+              "secondary-fixed-dim": "#68dbae",
+              "secondary-fixed": "#86f8c9",
+              "on-secondary": "#ffffff",
+              "on-primary": "#ffffff",
+              "tertiary-fixed-dim": "#b7cbc4",
+              "outline-variant": "#c0c9c0",
+              "primary-fixed": "#b1f1c6",
+              "surface-container-highest": "#e3e2df",
+              "primary": "#00351d",
+              "on-primary-fixed": "#002110",
+              "primary-fixed-dim": "#96d4ab",
+              "inverse-primary": "#96d4ab",
+              "inverse-on-surface": "#f2f1ee"
+            },
+            fontFamily: {
+              "headline": ["Plus Jakarta Sans"],
+              "body": ["Plus Jakarta Sans"],
+              "label": ["Plus Jakarta Sans"]
+            },
+            borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      .shadow-inner-light { box-shadow: inset 0 2px 4px 0 rgba(255, 255, 255, 0.06); }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body antialiased selection:bg-primary-fixed selection:text-on-primary-fixed">
+<!-- Top Navigation Bar -->
+<nav class="fixed top-0 w-full z-50 bg-[#faf9f6]/80 backdrop-blur-md dark:bg-[#1b1c1a]/80 shadow-[0_10px_40px_rgba(0,53,29,0.04)] flex items-center justify-between px-6 h-16">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center overflow-hidden">
+<img alt="Merchant Profile" class="w-full h-full object-cover" data-alt="professional portrait of a smiling kenyan merchant in business attire with soft natural lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCFnan-NR1yuVY5p293TQLb5XbDeYiQgx_KmI1n4XLfwJX6tYO52OA2xDRtYFyHio5yio5lOxVNbAcrjhjeOtzFY1Tn72qgu0xb_k-6RuvEQPaR-NXM_ci4sDmI3pcbrnYxkAsdLn7ZBHeaCpyJ3hbQUi8cMO3hMMr14hLAhQnr6_FnARdGRylUDEXUgCidJtrP3PuZN46FZbQ9QQsbZOxymblMXzsGdhA3inZXMsHmdgkzrlxGwavKm-Fs_1j8Rd5Lk2D1RoUaEbc"/>
+</div>
+<span class="font-['Plus_Jakarta_Sans'] font-bold tracking-[-0.02em] text-[#00351d] dark:text-[#b1f1c6]">Merchant Store</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-[#00351d] dark:text-[#b1f1c6] p-2 hover:bg-[#efeeeb] dark:hover:bg-[#2a2b29] transition-colors rounded-full">notifications</button>
+</div>
+</nav>
+<main class="pt-24 pb-32 px-6 max-w-[430px] mx-auto min-h-screen">
+<!-- Header Section -->
+<header class="mb-10">
+<p class="font-['DM_Serif_Display'] text-xl italic text-primary mb-2">Collect. Pay. Grow.</p>
+<h1 class="text-4xl font-extrabold tracking-tight text-primary leading-tight">Help &amp; <br/>Support</h1>
+<p class="text-on-surface-variant mt-3 text-sm leading-relaxed max-w-[80%]">How can we assist your business growth today?</p>
+</header>
+<!-- Contact Options Bento Grid -->
+<section class="grid grid-cols-1 gap-4 mb-12">
+<!-- WhatsApp Card -->
+<div class="bg-[#ECFDF5] p-6 rounded-xl transition-all active:scale-[0.98] border border-[#25D366]/10 relative overflow-hidden group">
+<div class="flex justify-between items-start mb-6">
+<div class="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm text-[#25D366]">
+<span class="material-symbols-outlined text-3xl">chat_bubble</span>
+</div>
+<span class="bg-[#25D366] text-white text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider">Fastest</span>
+</div>
+<h3 class="text-xl font-bold text-primary mb-1">Chat on WhatsApp</h3>
+<p class="text-on-surface-variant text-sm mb-6">Mon–Fri 9am–5pm EAT.</p>
+<button class="w-full bg-[#25D366] text-white py-4 rounded-full font-bold text-sm transition-all hover:brightness-105 active:scale-95 flex items-center justify-center gap-2">
+                    Chat Now
+                </button>
+</div>
+<!-- Email Card -->
+<div class="bg-surface-container-lowest p-6 rounded-xl transition-all active:scale-[0.98] border border-outline-variant/10 shadow-[0_4px_20px_rgba(0,0,0,0.02)]">
+<div class="flex justify-between items-start mb-6">
+<div class="w-12 h-12 bg-surface-container-low rounded-full flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-3xl">mail</span>
+</div>
+</div>
+<h3 class="text-xl font-bold text-primary mb-1">Email Support</h3>
+<p class="text-on-surface-variant text-sm mb-6">hello@paychainke.co</p>
+<button class="w-full border-2 border-primary text-primary py-4 rounded-full font-bold text-sm transition-all hover:bg-primary/5 active:scale-95 flex items-center justify-center gap-2">
+                    Send Email
+                </button>
+</div>
+</section>
+<!-- Quick Answers Section (FAQ) -->
+<section class="mb-8">
+<div class="flex items-center justify-between mb-6">
+<h2 class="text-lg font-bold text-primary">Quick Answers</h2>
+<span class="text-[11px] font-bold uppercase tracking-widest text-outline">FAQ</span>
+</div>
+<div class="space-y-3">
+<!-- Question 1 -->
+<details class="group bg-surface-container-low rounded-lg transition-all border border-transparent open:border-outline-variant/20 open:bg-surface-container-lowest">
+<summary class="flex items-center justify-between p-5 cursor-pointer list-none list-none [&amp;::-webkit-details-marker]:hidden">
+<span class="font-bold text-sm text-primary">How do I withdraw funds?</span>
+<span class="material-symbols-outlined text-outline transition-transform group-open:rotate-180">expand_more</span>
+</summary>
+<div class="px-5 pb-5 text-sm text-on-surface-variant leading-relaxed">
+                        Navigate to your balance card, tap 'Withdraw', and select your linked bank or mobile money account. Transfers are processed instantly.
+                    </div>
+</details>
+<!-- Question 2 -->
+<details class="group bg-surface-container-low rounded-lg transition-all border border-transparent open:border-outline-variant/20 open:bg-surface-container-lowest">
+<summary class="flex items-center justify-between p-5 cursor-pointer list-none list-none [&amp;::-webkit-details-marker]:hidden">
+<span class="font-bold text-sm text-primary">Is my money safe?</span>
+<span class="material-symbols-outlined text-outline transition-transform group-open:rotate-180">expand_more</span>
+</summary>
+<div class="px-5 pb-5 text-sm text-on-surface-variant leading-relaxed">
+                        Yes. PayChain utilizes bank-grade 256-bit encryption and is fully licensed by the Central Bank. Your funds are held in secure escrow accounts.
+                    </div>
+</details>
+<!-- Question 3 -->
+<details class="group bg-surface-container-low rounded-lg transition-all border border-transparent open:border-outline-variant/20 open:bg-surface-container-lowest">
+<summary class="flex items-center justify-between p-5 cursor-pointer list-none list-none [&amp;::-webkit-details-marker]:hidden">
+<span class="font-bold text-sm text-primary">How to increase my Trust Score?</span>
+<span class="material-symbols-outlined text-outline transition-transform group-open:rotate-180">expand_more</span>
+</summary>
+<div class="px-5 pb-5 text-sm text-on-surface-variant leading-relaxed">
+                        Consistent transaction volume, timely repayments of advances, and positive customer feedback are the fastest ways to improve your score.
+                    </div>
+</details>
+<!-- Question 4 -->
+<details class="group bg-surface-container-low rounded-lg transition-all border border-transparent open:border-outline-variant/20 open:bg-surface-container-lowest">
+<summary class="flex items-center justify-between p-5 cursor-pointer list-none list-none [&amp;::-webkit-details-marker]:hidden">
+<span class="font-bold text-sm text-primary">What are the transaction fees?</span>
+<span class="material-symbols-outlined text-outline transition-transform group-open:rotate-180">expand_more</span>
+</summary>
+<div class="px-5 pb-5 text-sm text-on-surface-variant leading-relaxed">
+                        We offer a flat rate of 1.5% for all inward payments. Outward transfers to mobile money start from KES 25 depending on the amount.
+                    </div>
+</details>
+<!-- Question 5 -->
+<details class="group bg-surface-container-low rounded-lg transition-all border border-transparent open:border-outline-variant/20 open:bg-surface-container-lowest">
+<summary class="flex items-center justify-between p-5 cursor-pointer list-none list-none [&amp;::-webkit-details-marker]:hidden">
+<span class="font-bold text-sm text-primary">Can I use PayChain offline?</span>
+<span class="material-symbols-outlined text-outline transition-transform group-open:rotate-180">expand_more</span>
+</summary>
+<div class="px-5 pb-5 text-sm text-on-surface-variant leading-relaxed">
+                        You can receive payments via your merchant USSD code even without an internet connection. App features require data access.
+                    </div>
+</details>
+<!-- Question 6 -->
+<details class="group bg-surface-container-low rounded-lg transition-all border border-transparent open:border-outline-variant/20 open:bg-surface-container-lowest">
+<summary class="flex items-center justify-between p-5 cursor-pointer list-none list-none [&amp;::-webkit-details-marker]:hidden">
+<span class="font-bold text-sm text-primary">How do I link a second store?</span>
+<span class="material-symbols-outlined text-outline transition-transform group-open:rotate-180">expand_more</span>
+</summary>
+<div class="px-5 pb-5 text-sm text-on-surface-variant leading-relaxed">
+                        Go to Profile &gt; Manage Business &gt; Add New Branch. You can toggle between different business entities seamlessly within the same app.
+                    </div>
+</details>
+</div>
+</section>
+<!-- Growth Ribbon -->
+<div class="mt-10 p-6 bg-primary-fixed rounded-xl flex items-center justify-between overflow-hidden relative">
+<div class="relative z-10">
+<span class="font-['DM_Serif_Display'] text-lg italic text-on-primary-fixed-variant">Expert help, just a tap away.</span>
+<p class="text-[10px] uppercase font-bold tracking-widest text-on-primary-fixed-variant/60 mt-1">Available 24/7 for urgent issues</p>
+</div>
+<span class="material-symbols-outlined text-primary/10 text-7xl absolute -right-4 -bottom-2">support_agent</span>
+</div>
+</main>
+<!-- Bottom Navigation Bar -->
+<nav class="fixed bottom-0 w-full z-50 bg-[#ffffff]/90 backdrop-blur-2xl dark:bg-[#1b1c1a]/90 rounded-t-[2.5rem] shadow-[0_-15px_50px_rgba(0,53,29,0.08)]">
+<div class="flex justify-around items-end pb-6 pt-2 px-4 w-full">
+<a class="flex flex-col items-center justify-center text-[#707971] p-3 hover:text-[#00351d] transition-all" href="#">
+<span class="material-symbols-outlined mb-1">home</span>
+<span class="text-[11px] font-['Plus_Jakarta_Sans'] font-semibold uppercase tracking-wider">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#707971] p-3 hover:text-[#00351d] transition-all" href="#">
+<span class="material-symbols-outlined mb-1">account_balance_wallet</span>
+<span class="text-[11px] font-['Plus_Jakarta_Sans'] font-semibold uppercase tracking-wider">Collections</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#707971] p-3 hover:text-[#00351d] transition-all" href="#">
+<span class="material-symbols-outlined mb-1">payments</span>
+<span class="text-[11px] font-['Plus_Jakarta_Sans'] font-semibold uppercase tracking-wider">Pay</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#707971] p-3 hover:text-[#00351d] transition-all" href="#">
+<span class="material-symbols-outlined mb-1">trending_up</span>
+<span class="text-[11px] font-['Plus_Jakarta_Sans'] font-semibold uppercase tracking-wider">Advance</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-gradient-to-br from-[#00351d] to-[#0b4d2e] text-white rounded-full p-3 mb-1 shadow-lg active:scale-[0.95] duration-200 ease-out" href="#">
+<span class="material-symbols-outlined">grid_view</span>
+<span class="text-[11px] font-['Plus_Jakarta_Sans'] font-semibold uppercase tracking-wider">More</span>
+</a>
+</div>
+</nav>
+</body></html>
