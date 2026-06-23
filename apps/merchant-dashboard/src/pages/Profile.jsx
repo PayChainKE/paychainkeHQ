@@ -18,8 +18,16 @@ export default function Profile() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isUpdatingSecurity, setIsUpdatingSecurity] = useState(false)
+  
+  // PIN Reset states
+  const [currentPin, setCurrentPin] = useState('')
+  const [newPin, setNewPin] = useState('')
+  const [confirmNewPin, setConfirmNewPin] = useState('')
+  const [isResettingPin, setIsResettingPin] = useState(false)
+
   const [kraPinLocked, setKraPinLocked] = useState(!!merchant?.kraPin)
   const [businessNumberLocked, setBusinessNumberLocked] = useState(!!merchant?.businessNumber)
+  const [isSettingUpBiometrics, setIsSettingUpBiometrics] = useState(false)
   const toast = useToast()
 
   async function save() {
@@ -77,6 +85,92 @@ export default function Profile() {
       toast.push({ message: err.response?.data?.error || 'Failed to update password', type: 'error' })
     } finally {
       setIsUpdatingSecurity(false)
+    }
+  }
+
+  async function handlePinReset() {
+    if (!currentPin || !newPin || !confirmNewPin) {
+      toast.push({ message: 'Please fill out all PIN fields', type: 'error' })
+      return
+    }
+    if (newPin !== confirmNewPin) {
+      toast.push({ message: 'New PIN and confirm PIN do not match', type: 'error' })
+      return
+    }
+    if (newPin.length !== 4) {
+      toast.push({ message: 'New PIN must be exactly 4 digits', type: 'error' })
+      return
+    }
+
+    setIsResettingPin(true)
+    try {
+      const token = localStorage.getItem('paychain_merchant_token');
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+      const res = await axios.put(`${API_URL}/api/bulkpay/reset-pin`, {
+        currentPin,
+        newPin
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+
+      if (res.status === 200) {
+        toast.push({ message: 'Bulk Pay PIN updated successfully', type: 'success' })
+        setCurrentPin('')
+        setNewPin('')
+        setConfirmNewPin('')
+      }
+    } catch (err) {
+      toast.push({ message: err.response?.data?.message || 'Failed to reset PIN', type: 'error' })
+    } finally {
+      setIsResettingPin(false)
+    }
+  }
+
+  async function handleSetupBiometric() {
+    if (!window.PublicKeyCredential) {
+      toast.push({ message: 'Biometrics are not supported on this device.', type: 'error' })
+      return
+    }
+
+    setIsSettingUpBiometrics(true)
+    try {
+      // Mock Passkey / Biometric creation flow
+      const challenge = new Uint8Array(32);
+      window.crypto.getRandomValues(challenge);
+      const userId = new Uint8Array(16);
+      window.crypto.getRandomValues(userId);
+
+      await navigator.credentials.create({
+        publicKey: {
+          challenge,
+          rp: { name: "PayChain KE", id: window.location.hostname },
+          user: { id: userId, name: merchant.email, displayName: merchant.name },
+          pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
+          authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required" },
+          timeout: 60000,
+          attestation: "none"
+        }
+      });
+
+      // API call to save biometric state
+      const token = localStorage.getItem('paychain_merchant_token');
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+      const res = await axios.put(`${API_URL}/api/auth/merchant/biometrics`, {
+        enabled: true
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+
+      if (res.data.success) {
+        localStorage.setItem('last_biometric_user', merchant.email)
+        toast.push({ message: 'Biometrics successfully configured for this device', type: 'success' })
+        setTimeout(() => window.location.reload(), 1000)
+      }
+    } catch (err) {
+      console.error(err)
+      toast.push({ message: 'Biometric setup failed or was cancelled.', type: 'error' })
+    } finally {
+      setIsSettingUpBiometrics(false)
     }
   }
 
@@ -278,9 +372,51 @@ export default function Profile() {
                     <div className="space-y-6">
                       <h4 className="text-[10px] text-white/30 font-black uppercase tracking-widest flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                        Advanced Methods
+                        Advanced Methods & Authorizations
                       </h4>
                       
+                      {/* Bulk Pay PIN Reset */}
+                      {merchant?.hasBulkPayPin && (
+                        <div className="space-y-4 bg-white/5 p-5 rounded-[24px] border border-white/5">
+                          <h5 className="text-xs font-black text-white">Reset Bulk Pay PIN</h5>
+                          <div className="space-y-3">
+                            <input 
+                              type="password"
+                              maxLength="4"
+                              value={currentPin}
+                              onChange={(e) => setCurrentPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                              placeholder="Current PIN (4 digits)"
+                              className="w-full bg-black/20 border border-white/10 rounded-xl py-3 px-4 text-xs font-medium text-white focus:border-amber-500/50 outline-none transition-all placeholder:text-white/20"
+                            />
+                            <div className="flex gap-3">
+                              <input 
+                                type="password"
+                                maxLength="4"
+                                value={newPin}
+                                onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                                placeholder="New PIN"
+                                className="w-full bg-black/20 border border-white/10 rounded-xl py-3 px-4 text-xs font-medium text-white focus:border-amber-500/50 outline-none transition-all placeholder:text-white/20"
+                              />
+                              <input 
+                                type="password"
+                                maxLength="4"
+                                value={confirmNewPin}
+                                onChange={(e) => setConfirmNewPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                                placeholder="Confirm"
+                                className="w-full bg-black/20 border border-white/10 rounded-xl py-3 px-4 text-xs font-medium text-white focus:border-amber-500/50 outline-none transition-all placeholder:text-white/20"
+                              />
+                            </div>
+                            <button 
+                              onClick={handlePinReset}
+                              disabled={isResettingPin || newPin.length !== 4}
+                              className="w-full py-3 rounded-xl bg-amber-500 text-[#06201B] font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-amber-400 transition-all active:scale-95 disabled:opacity-50"
+                            >
+                              {isResettingPin ? 'Updating...' : 'Update PIN'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
                       <button 
                         onClick={() => setShowQuestions(true)}
                         className="w-full flex items-center justify-between p-5 bg-white/5 rounded-[24px] border border-white/5 hover:bg-white/[0.08] transition-all group"
@@ -296,6 +432,32 @@ export default function Profile() {
                         </div>
                         <span className="material-symbols-outlined text-white/20">chevron_right</span>
                       </button>
+
+                      <div className="w-full flex items-center justify-between p-5 bg-white/5 rounded-[24px] border border-white/5 transition-all group">
+                        <div className="flex items-center gap-4">
+                          <div className={`w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center ${merchant?.biometricsEnabled ? 'text-emerald-400' : 'text-white/60'}`}>
+                            <span className="material-symbols-outlined">fingerprint</span>
+                          </div>
+                          <div className="text-left">
+                            <p className="text-sm font-black text-white">Biometric Login</p>
+                            <p className="text-[10px] text-white/30 font-medium">
+                              {merchant?.biometricsEnabled ? 'Active on this device' : 'Use Touch ID or Face ID'}
+                            </p>
+                          </div>
+                        </div>
+                        {!merchant?.biometricsEnabled && (
+                          <button 
+                            onClick={handleSetupBiometric}
+                            disabled={isSettingUpBiometrics}
+                            className="text-[10px] bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl font-black uppercase tracking-widest transition-all disabled:opacity-50"
+                          >
+                            {isSettingUpBiometrics ? 'Setting up...' : 'Setup'}
+                          </button>
+                        )}
+                        {merchant?.biometricsEnabled && (
+                          <span className="material-symbols-outlined text-emerald-500 bg-emerald-500/10 p-1.5 rounded-full">check_circle</span>
+                        )}
+                      </div>
 
                     </div>
 

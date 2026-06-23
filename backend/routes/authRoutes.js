@@ -10,7 +10,8 @@ import {
   resetPassword,
   changeMerchantPassword,
   getMerchantMe,
-  updateMerchantProfile
+  updateMerchantProfile,
+  toggleBiometrics
 } from '../controllers/merchantAuthController.js';
 import { protectMerchant } from '../middleware/authMiddleware.js';
 import { upload } from '../utils/cloudinary.js';
@@ -32,5 +33,6 @@ router.post('/merchant/reset-password', resetPassword);
 router.put('/merchant/change-password', protectMerchant, changeMerchantPassword);
 router.get('/merchant/me', protectMerchant, getMerchantMe);
 router.put('/merchant/profile', protectMerchant, updateMerchantProfile);
+router.put('/merchant/biometrics', protectMerchant, toggleBiometrics);
 
 export default router;

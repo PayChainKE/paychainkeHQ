@@ -59,6 +59,15 @@ const merchantSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
+  bulkPayPin: {
+    type: String,
+    select: false,
+    default: null,
+  },
+  biometricsEnabled: {
+    type: Boolean,
+    default: false,
+  },
   settlementBankName: {
     type: String,
     default: null,

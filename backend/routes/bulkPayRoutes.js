@@ -1,6 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { getPayees, addPayee, deletePayee, uploadCSV, authorizeBatch } from '../controllers/bulkPayController.js';
+import { getPayees, addPayee, deletePayee, uploadCSV, authorizeBatch, setBulkPayPin, resetBulkPayPin } from '../controllers/bulkPayController.js';
 import { protectMerchant } from '../middleware/authMiddleware.js';
 import { generateToken } from '../controllers/mpesaController.js';
 
@@ -11,6 +11,9 @@ const upload = multer({ dest: 'uploads/' });
 
 // Protect all bulk pay routes with Merchant Auth
 router.use(protectMerchant);
+
+router.post('/set-pin', setBulkPayPin);
+router.put('/reset-pin', resetBulkPayPin);
 
 router.route('/payees')
   .get(getPayees)
