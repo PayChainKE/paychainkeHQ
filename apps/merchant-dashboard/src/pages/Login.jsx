@@ -61,6 +61,7 @@ export default function Login() {
   const [authEmail, setAuthEmail] = useState('') // Captured from backend for OTP verification
   const [hasBiometrics, setHasBiometrics] = useState(!!localStorage.getItem('last_biometric_user'))
   const [resendTimer, setResendTimer] = useState(59)
+  const [hasAccount, setHasAccount] = useState(() => localStorage.getItem('hasAccount') === 'true')
   
   // Real-time security validation
   useEffect(() => {
@@ -186,6 +187,8 @@ export default function Login() {
     if (res.success) {
       setIsOTPMode(false)
       if (otpFlowType === 'login' || otpFlowType === 'signup') {
+        localStorage.setItem('hasAccount', 'true')
+        setHasAccount(true)
         nav('/overview')
       } else {
         setIsResetMode(true) // Move to Reset Password after OTP
@@ -376,7 +379,7 @@ export default function Login() {
         <div className="max-w-md w-full animate-fade-in-up">
           {/* Navigation Tabs */}
           <div className="flex bg-surface-container-low p-1.5 rounded-2xl mb-8 lg:mb-12 border border-outline-variant/10 shadow-inner">
-            {['signup', 'login', 'reset'].map((tab) => (
+            {['signup', 'login', 'reset'].filter(t => t !== 'signup' || !hasAccount).map((tab) => (
               <button
                 key={tab}
                 type="button"
