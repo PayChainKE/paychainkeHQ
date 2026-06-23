@@ -1,0 +1,21 @@
+{
+  "name": "PayChain Merchant",
+  "short_name": "PayChain",
+  "description": "PayChain Merchant Dashboard",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0F141E",
+  "theme_color": "#00351D",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

@@ -33,6 +33,8 @@ export default function Wallet() {
   const [showTopUpSelection, setShowTopUpSelection] = useState(false)
   const [selectedFundingMethod, setSelectedFundingMethod] = useState(null)
   const [topUpAmount, setTopUpAmount] = useState('')
+  const [topUpPhone, setTopUpPhone] = useState('')
+  const [stkStatusText, setStkStatusText] = useState('')
   const [isProcessingTopUp, setIsProcessingTopUp] = useState(false)
 
   // Primary Ledger Actions
@@ -42,12 +44,29 @@ export default function Wallet() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSwapping, setIsSwapping] = useState(false)
   const [isActivatingWallet, setIsActivatingWallet] = useState(false)
+  const hasSynced = React.useRef(false)
 
   useEffect(() => {
     const fetchTransactions = async () => {
       try {
         const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
-        const res = await axios.get(`${API_URL}/api/transactions`)
+        const token = localStorage.getItem('paychain_merchant_token')
+        
+        // 1. Sync Live Wallet Balance if not already synced this session
+        if (merchant?.stellarPublicKey && !hasSynced.current) {
+          try {
+            hasSynced.current = true; // Mark as synced to prevent infinite loop on refreshSession
+            await axios.post(`${API_URL}/api/transactions/sync-wallet`, {}, {
+              headers: { Authorization: `Bearer ${token}` }
+            })
+            await refreshSession()
+          } catch(e) { console.error('Failed to sync wallet', e) }
+        }
+
+        // 2. Fetch Transactions (will include the external deposit if just created)
+        const res = await axios.get(`${API_URL}/api/transactions`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
         setLiveTransactions(res.data)
       } catch (err) {
         console.error('Failed to fetch transactions', err)
@@ -70,18 +89,33 @@ export default function Wallet() {
     try {
       const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
       const token = localStorage.getItem('paychain_merchant_token')
-      await axios.post(`${API_URL}/api/transactions/send-money`, {
-        amount: Number(withdrawAmount),
-        destination: destination,
-        reference: `Withdrawal to ${destinationAccountValue}`
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      addToast({ title: 'Withdrawal Initiated', message: `KES ${withdrawAmount} sent to destination.`, type: 'success' })
+      
+      const destType = withdrawalDestinations.find(d => d.id === destination)?.type;
+      
+      if (destType === 'Mobile') {
+        await axios.post(`${API_URL}/api/callbacks/b2c-request`, {
+          phone: destinationAccountValue.replace(/^(?:\+?254|0)/, '254'),
+          amount: Number(withdrawAmount)
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        addToast({ title: 'Withdrawal Processing', message: `KES ${withdrawAmount} sent to phone. B2C Transfer initiated.`, type: 'success' });
+      } else {
+        await axios.post(`${API_URL}/api/transactions/send-money`, {
+          amount: Number(withdrawAmount),
+          destination: destination,
+          reference: `Withdrawal to ${destinationAccountValue}`
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        addToast({ title: 'Withdrawal Initiated', message: `KES ${withdrawAmount} sent to destination.`, type: 'success' })
+      }
+      
       setWithdrawAmount('')
+      setDestinationAccountValue('')
       await refreshSession()
     } catch (err) {
-      addToast({ title: 'Withdrawal Failed', message: err.response?.data?.error || 'Failed to withdraw funds', type: 'error' })
+      addToast({ title: 'Withdrawal Failed', message: err.response?.data?.error || err.response?.data?.message || 'Failed to withdraw funds', type: 'error' })
     } finally {
       setIsWithdrawing(false)
     }
@@ -163,7 +197,7 @@ export default function Wallet() {
   }
 
   // QR Logic
-  const qrData = `https://www.paychain.co.ke/pay/${merchant?.paybillAccount || '84729'}`
+  const qrData = `${window.location.origin}/pay/${merchant?.paybillAccount || '84729'}`
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrData)}&margin=10&bgcolor=FFFFFF&color=00351D`
 
   const handleDownload = async () => {
@@ -239,23 +273,32 @@ export default function Wallet() {
     }
   }
 
-  const generatePaymentLink = () => {
+  const generatePaymentLink = async () => {
     if (!paymentLinkAmount || Number(paymentLinkAmount) <= 0) {
       addToast({ title: 'Invalid Amount', message: 'Please enter a valid amount to generate a link.', type: 'error' })
       return
     }
     
     setIsGeneratingLink(true)
-    setTimeout(() => {
+    try {
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+      const token = localStorage.getItem('paychain_merchant_token')
+      
+      const res = await axios.post(`${API_URL}/api/transactions/payment-link`, {
+        amount: Number(paymentLinkAmount)
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (res.data?.success) {
+        setGeneratedLink(`${window.location.origin}/pay/${res.data.linkId}`)
+        addToast({ title: 'Link Generated', message: 'Secure payment link created successfully! Expires in 24 hours.', type: 'success' })
+      }
+    } catch (err) {
+      addToast({ title: 'Generation Failed', message: err.response?.data?.error || 'Failed to generate secure payment link', type: 'error' })
+    } finally {
       setIsGeneratingLink(false)
-      const link = `https://www.paychain.co.ke/pay/${merchant?.paybillAccount || '84729'}/${paymentLinkAmount}`
-      setGeneratedLink(link)
-      addToast({
-        title: 'Payment Link Created',
-        message: 'Your custom payment link is ready for sharing.',
-        type: 'success'
-      })
-    }, 800)
+    }
   }
 
   const copyPaymentLink = () => {
@@ -751,29 +794,35 @@ export default function Wallet() {
                   <p className="text-sm font-medium text-on-surface-variant">No transaction history yet.</p>
                 </div>
               ) : liveTransactions.slice(0, 5).map((tx, idx) => (
-                <div key={tx.id} className="px-4 md:px-8 py-6 flex items-center justify-between hover:bg-surface-container-low/30 transition-all group border-b border-surface-container last:border-0">
+                <div key={tx.id} className="px-4 md:px-8 py-2.5 flex items-center justify-between hover:bg-surface-container-low/30 transition-all group border-b border-surface-container last:border-0">
                   <div className="flex items-center gap-3 md:gap-4">
-                    <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center text-lg md:text-xl shadow-sm border ${
-                      tx.type === 'withdrawal' ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-blue-50 text-blue-600 border-blue-100'
+                    <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center text-base md:text-lg shadow-sm border ${
+                      (tx.type === 'withdrawal' || tx.type === 'outbound' || tx.type === 'settlement' || tx.type === 'bulk_pay') ? 'bg-amber-50 text-amber-600 border-amber-100' : 
+                      tx.type === 'inbound' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                      'bg-blue-50 text-blue-600 border-blue-100'
                     }`}>
-                      <span className="material-symbols-outlined text-lg md:text-xl">
-                        {tx.type === 'withdrawal' ? 'logout' : 'sync'}
+                      <span className="material-symbols-outlined text-base md:text-lg">
+                        {(tx.type === 'withdrawal' || tx.type === 'outbound' || tx.type === 'settlement' || tx.type === 'bulk_pay') ? 'logout' : 
+                         tx.type === 'inbound' ? 'login' : 'sync'}
                       </span>
                     </div>
                     <div>
-                      <p className="text-xs md:text-sm font-bold text-primary capitalize">{tx.type === 'withdrawal' ? 'Funds Withdrawal' : 'Currency Swap'}</p>
+                      <p className="text-[11px] md:text-xs font-bold text-primary capitalize">
+                        {tx.type === 'inbound' ? 'Funds Deposit' : 
+                         (tx.type === 'withdrawal' || tx.type === 'outbound' || tx.type === 'settlement' || tx.type === 'bulk_pay') ? 'Funds Withdrawal' : 'Currency Swap'}
+                      </p>
                       <div className="flex items-center gap-2 mt-0.5">
-                        <p className="text-[9px] md:text-[10px] text-on-surface-variant font-medium opacity-60">{formatDateISO(tx.timestamp)}</p>
+                        <p className="text-[9px] md:text-[10px] text-on-surface-variant font-medium opacity-60">{formatDateISO(tx.createdAt || tx.timestamp)}</p>
                         <span className="text-[9px] md:text-[10px] text-on-surface-variant/20 block md:hidden">•</span>
                         <p className="hidden md:block text-[9px] text-on-surface-variant uppercase font-black tracking-widest opacity-40">{tx.destination || 'Internal Account'}</p>
                       </div>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className={`text-xs md:text-sm font-black text-primary transition-all duration-300 ${!showAmounts && 'blur-md'}`}>
-                      {tx.type === 'withdrawal' ? '-' : ''}{tx.currency === 'KES' ? formatKES(tx.amount) : formatUSDC(tx.amount)}
+                    <p className={`text-[11px] md:text-xs font-black text-primary transition-all duration-300 ${!showAmounts && 'blur-sm'}`}>
+                      {tx.type === 'inbound' ? '+' : (tx.type === 'withdrawal' || tx.type === 'outbound' || tx.type === 'settlement' || tx.type === 'bulk_pay' ? '-' : '')}{tx.type === 'fx_swap' ? formatUSDC(tx.usdcAmount) : formatKES(tx.kesAmount || tx.amount || 0)}
                     </p>
-                    <span className={`text-[8px] md:text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-widest mt-1 inline-block ${
+                    <span className={`text-[8px] md:text-[9px] px-2 py-0.5 rounded font-bold uppercase tracking-widest mt-0.5 inline-block ${
                        tx.status === 'completed' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
                     }`}>
                        {tx.status}
@@ -952,7 +1001,9 @@ export default function Wallet() {
                       <div className="relative group">
                         <div className="absolute left-6 top-1/2 -translate-y-1/2 text-primary/40 font-bold text-lg">+254</div>
                         <input 
-                          type="number"
+                          type="tel"
+                          value={topUpPhone}
+                          onChange={(e) => setTopUpPhone(e.target.value)}
                           placeholder="712 345 678"
                           className="w-full bg-surface-container-low border border-outline-variant/5 rounded-3xl py-6 pl-16 pr-6 text-2xl font-headline text-primary focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
                         />
@@ -961,36 +1012,76 @@ export default function Wallet() {
 
                     <button 
                       onClick={async () => {
-                        if (!topUpAmount) return
+                        if (!topUpAmount || !topUpPhone) return
                         setIsProcessingTopUp(true)
+                        setStkStatusText('Initiating STK Push...')
                         try {
-                          await new Promise(r => setTimeout(r, 1000))
                           const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
                           const token = localStorage.getItem('paychain_merchant_token')
-                          await axios.post(`${API_URL}/api/transactions/simulate`, {
-                            accountNumber: merchant?.paybillAccount,
+                          
+                          // 1. Send STK Push
+                          const pushRes = await axios.post(`${API_URL}/api/callbacks/stk-push`, {
                             amount: Number(topUpAmount),
-                            senderName: 'Mobile Money Top-up',
-                            senderPhone: merchant?.phone || '0700000000'
+                            phone: topUpPhone,
+                            merchantId: merchant._id
                           }, {
                             headers: { Authorization: `Bearer ${token}` }
                           })
-                          addToast({ title: 'Top Up Successful', message: `Successfully funded ${topUpAmount} KES.`, type: 'success' })
-                          await refreshSession()
-                          setShowTopUpSelection(false)
-                          setSelectedFundingMethod(null)
-                          setTopUpAmount('')
+                          
+                          const checkoutId = pushRes.data.checkoutRequestId
+                          setStkStatusText('Awaiting PIN on phone...')
+
+                          // 2. Poll Status
+                          let attempts = 0
+                          const maxAttempts = 20 // 20 * 3s = 60s
+                          
+                          const pollInterval = setInterval(async () => {
+                            attempts++
+                            try {
+                              const statusRes = await axios.get(`${API_URL}/api/callbacks/stk-status/${checkoutId}`, {
+                                headers: { Authorization: `Bearer ${token}` }
+                              })
+                              
+                              if (statusRes.data.status === 'success') {
+                                clearInterval(pollInterval)
+                                addToast({ title: 'Top Up Successful', message: `Successfully funded ${topUpAmount} KES via M-Pesa.`, type: 'success' })
+                                await refreshSession()
+                                setShowTopUpSelection(false)
+                                setSelectedFundingMethod(null)
+                                setTopUpAmount('')
+                                setTopUpPhone('')
+                                setStkStatusText('')
+                                setIsProcessingTopUp(false)
+                              } else if (statusRes.data.status === 'failed') {
+                                clearInterval(pollInterval)
+                                addToast({ title: 'Top Up Failed', message: statusRes.data.resultDesc || 'User cancelled or request failed.', type: 'error' })
+                                setStkStatusText('')
+                                setIsProcessingTopUp(false)
+                              } else if (attempts >= maxAttempts) {
+                                clearInterval(pollInterval)
+                                addToast({ title: 'Timeout', message: 'The request timed out. Please try again.', type: 'error' })
+                                setStkStatusText('')
+                                setIsProcessingTopUp(false)
+                              }
+                            } catch (e) {
+                              console.error('Polling error', e)
+                            }
+                          }, 3000)
+
                         } catch (err) {
-                          addToast({ title: 'Top Up Failed', message: err.response?.data?.error || 'Failed to process top up.', type: 'error' })
-                        } finally {
+                          addToast({ title: 'Request Failed', message: err.response?.data?.error || 'Failed to send STK Push.', type: 'error' })
+                          setStkStatusText('')
                           setIsProcessingTopUp(false)
                         }
                       }}
-                      disabled={isProcessingTopUp || !topUpAmount}
+                      disabled={isProcessingTopUp || !topUpAmount || !topUpPhone}
                       className="w-full bg-[#00351D] text-white py-5 rounded-3xl font-bold text-lg shadow-2xl hover:bg-[#004d2b] active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-white/5 disabled:opacity-20"
                     >
                       {isProcessingTopUp ? (
-                        <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        <div className="flex items-center gap-3">
+                          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                          <span className="text-sm font-medium">{stkStatusText}</span>
+                        </div>
                       ) : (
                         <>
                           Request STK Push

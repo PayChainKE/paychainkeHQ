@@ -69,7 +69,7 @@ app.use('/api/newsletter', newsletterRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/bulkpay', bulkPayRoutes);
 app.use('/api/transactions', transactionRoutes);
-app.use('/api/mpesa', mpesaRoutes);
+app.use('/api/callbacks', mpesaRoutes);
 app.use('/api/trust-score', trustScoreRoutes);
 
 // Basic Route

@@ -80,19 +80,18 @@ const payeeSchema = new mongoose.Schema(
 );
 
 // Optional: Validate required KRA fields based on type before saving
-payeeSchema.pre('save', function (next) {
+payeeSchema.pre('save', async function () {
   if (this.type === 'employee') {
     // In a strict prod environment, we would require these:
     // if (!this.kraPin || !this.idNumber) {
-    //   return next(new Error('KRA PIN and ID Number are required for Employees'));
+    //   throw new Error('KRA PIN and ID Number are required for Employees');
     // }
   }
   if (this.type === 'supplier') {
     // if (!this.kraPin || !this.etimsInvoiceNumber || !this.cuNumber) {
-    //   return next(new Error('KRA PIN, eTIMS Invoice Number, and CU Number are required for Suppliers'));
+    //   throw new Error('KRA PIN, eTIMS Invoice Number, and CU Number are required for Suppliers');
     // }
   }
-  next();
 });
 
 const Payee = mongoose.model('Payee', payeeSchema);

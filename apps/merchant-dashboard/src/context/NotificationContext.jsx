@@ -1,10 +1,34 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
+import { useMerchantAuth } from './MerchantAuthContext'
 
 const NotificationContext = createContext()
 
 export function NotificationProvider({ children }) {
+  const { merchant } = useMerchantAuth()
+  
   const [notifications, setNotifications] = useState([])
   const [toasts, setToasts] = useState([])
+
+  // Load notifications from localStorage on mount or merchant change
+  useEffect(() => {
+    if (merchant?.email) {
+      const saved = localStorage.getItem(`paychain_notifications_${merchant.email}`)
+      if (saved) {
+        try { setNotifications(JSON.parse(saved)) } catch(e) {}
+      } else {
+        setNotifications([])
+      }
+    } else {
+      setNotifications([])
+    }
+  }, [merchant?.email])
+
+  // Save notifications to localStorage whenever they change
+  useEffect(() => {
+    if (merchant?.email) {
+      localStorage.setItem(`paychain_notifications_${merchant.email}`, JSON.stringify(notifications))
+    }
+  }, [notifications, merchant?.email])
 
   // Derived state for unread count
   const unreadCount = notifications.filter(n => !n.isRead).length

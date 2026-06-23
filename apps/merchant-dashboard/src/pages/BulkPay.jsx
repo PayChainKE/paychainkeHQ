@@ -8,6 +8,7 @@ import { formatKES } from '../utils/formatCurrency'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useNotification } from '../context/NotificationContext'
 import paychainLogo from '../../images/logo.png'
+import axios from 'axios'
 
 export default function BulkPay() {
   const { showAmounts } = usePrivacyMode()
@@ -21,9 +22,10 @@ export default function BulkPay() {
   useEffect(() => {
     const fetchPayees = async () => {
       try {
-        const token = localStorage.getItem('merchantToken')
+        const token = localStorage.getItem('paychain_merchant_token')
         if (!token) return;
-        const res = await axios.get('/api/bulkpay/payees', {
+        const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+        const res = await axios.get(`${API_URL}/api/bulkpay/payees`, {
           headers: { Authorization: `Bearer ${token}` }
         })
         setPayeesList(res.data)
@@ -116,11 +118,48 @@ export default function BulkPay() {
   }
 
   const handleSavePayee = async () => {
-    if (!newPayee.name) return;
-    const numericAmount = parseFloat(newPayee.amount.replace(/,/g, '')) || 0;
+    if (!newPayee.name) {
+      addNotification({ title: 'Missing Info', message: 'Recipient name is required.', type: 'error' });
+      return;
+    }
 
+    // Professional Settlement Format Validation
+    if (newPayee.paymentMethod === 'Mobile Money') {
+      if (newPayee.mobileMoneyType === 'Personal Number') {
+        const phoneRegex = /^(?:254|\+254|0)?(7[0-9]{8}|1[0-9]{8})$/;
+        if (!phoneRegex.test(newPayee.phone?.replace(/\s+/g, ''))) {
+          addNotification({ title: 'Invalid Format', message: 'Please enter a valid 10-digit Kenyan phone number.', type: 'error' });
+          return;
+        }
+      } else if (newPayee.mobileMoneyType === 'Paybill') {
+        if (!/^\d{5,7}$/.test(newPayee.paybillNumber?.trim())) {
+          addNotification({ title: 'Invalid Format', message: 'Paybill Number must be exactly 5 to 7 digits.', type: 'error' });
+          return;
+        }
+        if (!newPayee.businessAccount?.trim() || newPayee.businessAccount.length > 20) {
+          addNotification({ title: 'Invalid Format', message: 'Account Number is required and must not exceed 20 characters.', type: 'error' });
+          return;
+        }
+      } else if (newPayee.mobileMoneyType === 'Buy Goods') {
+        if (!/^\d{6,8}$/.test(newPayee.tillNumber?.trim())) {
+          addNotification({ title: 'Invalid Format', message: 'Till Number must be exactly 6 to 8 digits.', type: 'error' });
+          return;
+        }
+      }
+    } else if (newPayee.paymentMethod === 'Bank') {
+      if (!newPayee.bankName?.trim()) {
+        addNotification({ title: 'Invalid Format', message: 'Bank Name is required.', type: 'error' });
+        return;
+      }
+      if (!/^\d{8,14}$/.test(newPayee.accountNumber?.trim())) {
+        addNotification({ title: 'Invalid Format', message: 'Bank Account Number must be between 8 and 14 digits.', type: 'error' });
+        return;
+      }
+    }
+
+    const numericAmount = parseFloat(newPayee.amount.replace(/,/g, '')) || 0;
     try {
-      const token = localStorage.getItem('merchantToken');
+      const token = localStorage.getItem('paychain_merchant_token');
       const payload = {
         ...newPayee,
         type: newPayee.type.toLowerCase(),
@@ -143,7 +182,8 @@ export default function BulkPay() {
           type: 'success'
         });
       } else {
-        const res = await axios.post('/api/bulkpay/payees', payload, {
+        const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+        const res = await axios.post(`${API_URL}/api/bulkpay/payees`, payload, {
           headers: { Authorization: `Bearer ${token}` }
         });
         
@@ -210,8 +250,9 @@ export default function BulkPay() {
     formData.append('file', file);
 
     try {
-      const token = localStorage.getItem('merchantToken');
-      const res = await axios.post('/api/bulkpay/upload-csv', formData, {
+      const token = localStorage.getItem('paychain_merchant_token');
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+      const res = await axios.post(`${API_URL}/api/bulkpay/upload-csv`, formData, {
         headers: { 
           Authorization: `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'
@@ -404,7 +445,7 @@ export default function BulkPay() {
   const handleAuthorize = async () => {
     try {
       addNotification({ title: 'Processing', message: 'Authorizing batch...', type: 'info' });
-      const token = localStorage.getItem('merchantToken');
+      const token = localStorage.getItem('paychain_merchant_token');
 
       let batchRows = [];
       if (csvPreview) {
@@ -422,7 +463,8 @@ export default function BulkPay() {
           }));
       }
 
-      const res = await axios.post('/api/bulkpay/authorize', {
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+      const res = await axios.post(`${API_URL}/api/bulkpay/authorize`, {
         batchRows,
         fundingSource: selectedTill || 'Main Business Till'
       }, {
@@ -781,9 +823,10 @@ export default function BulkPay() {
                               <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-300">
                                 <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">M-PESA Number</label>
                                 <input 
-                                  type="text"
+                                  type="tel"
                                   value={newPayee.phone}
-                                  onChange={(e) => setNewPayee({...newPayee, phone: e.target.value})}
+                                  onChange={(e) => setNewPayee({...newPayee, phone: e.target.value.replace(/\D/g, '')})}
+                                  maxLength={10}
                                   placeholder="07XX XXX XXX"
                                   className="w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 md:px-6 md:py-4 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none"
                                 />
@@ -795,9 +838,10 @@ export default function BulkPay() {
                                 <div className="space-y-1.5">
                                   <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Paybill Number</label>
                                   <input 
-                                    type="text"
+                                    type="tel"
                                     value={newPayee.paybillNumber}
-                                    onChange={(e) => setNewPayee({...newPayee, paybillNumber: e.target.value})}
+                                    onChange={(e) => setNewPayee({...newPayee, paybillNumber: e.target.value.replace(/\D/g, '')})}
+                                    maxLength={7}
                                     placeholder="e.g. 290290"
                                     className="w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 md:px-6 md:py-4 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none"
                                   />
@@ -819,9 +863,10 @@ export default function BulkPay() {
                               <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-300">
                                 <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Till Number</label>
                                 <input 
-                                  type="text"
+                                  type="tel"
                                   value={newPayee.tillNumber}
-                                  onChange={(e) => setNewPayee({...newPayee, tillNumber: e.target.value})}
+                                  onChange={(e) => setNewPayee({...newPayee, tillNumber: e.target.value.replace(/\D/g, '')})}
+                                  maxLength={8}
                                   placeholder="e.g. 567890"
                                   className="w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 md:px-6 md:py-4 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none"
                                 />
@@ -844,9 +889,10 @@ export default function BulkPay() {
                             <div className="space-y-1.5">
                               <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Account No.</label>
                               <input 
-                                type="text"
+                                type="tel"
                                 value={newPayee.accountNumber}
-                                onChange={(e) => setNewPayee({...newPayee, accountNumber: e.target.value})}
+                                onChange={(e) => setNewPayee({...newPayee, accountNumber: e.target.value.replace(/\D/g, '')})}
+                                maxLength={14}
                                 placeholder="0123 XXX XXX"
                                 className="w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 md:px-6 md:py-4 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none"
                               />
@@ -1327,7 +1373,7 @@ export default function BulkPay() {
                 <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto max-w-xl mx-auto animate-in slide-in-from-bottom duration-1000">
                   <button 
                     onClick={downloadAllReceipts}
-                    className="flex-1 px-8 py-4 bg-surface-container-low text-primary font-black uppercase tracking-widest text-[11px] rounded-2xl border border-outline-variant/10 hover:bg-white transition-all flex items-center justify-center gap-3"
+                    className="flex-1 px-8 py-4 bg-[#0A2540] text-blue-100 font-black uppercase tracking-widest text-[11px] rounded-2xl shadow-xl hover:bg-[#0C2D4E] hover:text-white transition-all flex items-center justify-center gap-3"
                   >
                     <span className="material-symbols-outlined text-xl">file_download</span>
                     Download All Receipts
