@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Modal, FlatList, Image } from 'react-native';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
@@ -37,6 +37,11 @@ export default function Login({ route }: any) {
   const [businessType, setBusinessType] = useState('');
   const [area, setArea] = useState('');
   const [employees, setEmployees] = useState('');
+  
+  // Modals for Selection
+  const [showCountyModal, setShowCountyModal] = useState(false);
+  const [showBusinessModal, setShowBusinessModal] = useState(false);
+  const [showEmployeesModal, setShowEmployeesModal] = useState(false);
 
   // Reset Flow States
   const [isResetMode, setIsResetMode] = useState(false);
@@ -220,7 +225,11 @@ export default function Login({ route }: any) {
       phone: signupPhone,
       businessName: signupBusinessName,
       password: newPassword,
-      ecommerce: signupEcommerce
+      ecommerce: signupEcommerce,
+      businessType,
+      county: signupCounty,
+      area,
+      employees
     };
 
     setLoading(true);
@@ -301,8 +310,11 @@ export default function Login({ route }: any) {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
         <ScrollView contentContainerStyle={{ flexGrow: 1 }} bounces={false} showsVerticalScrollIndicator={false}>
           <View className="px-8 pt-10 pb-8 justify-end">
-            <Text className="text-white text-[24px] font-jakarta-bold tracking-tight">PayChain</Text>
-            <Text className="text-[#68dbae] text-[12px] font-jakarta-bold tracking-[0.15em] uppercase mt-1 mb-8">Merchant Portal</Text>
+            <Text className="text-white text-[28px] font-jakarta-bold tracking-tight">PayChain</Text>
+            <Text className="text-[#68dbae] text-[12px] font-jakarta-bold tracking-[0.15em] uppercase mt-1">Merchant Portal</Text>
+            <Text className="text-white text-[28px] font-jakarta-bold mt-6 mb-2 leading-[34px]">
+              Collect.{'\n'}Pay.{'\n'}Grow.
+            </Text>
           </View>
 
           <View className="bg-white w-full flex-1 rounded-t-[32px] px-6 pt-10 pb-16 shadow-lg">
@@ -328,7 +340,7 @@ export default function Login({ route }: any) {
                 )}
 
                 <View className="mb-6">
-                  <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Email or Phone</Text>
+                  <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Email or Phone Number</Text>
                   <TextInput 
                     className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-4 px-5 text-[16px] font-jakarta-medium text-[#1b1c1a]"
                     placeholder="john@example.com or 0712..."
@@ -361,9 +373,42 @@ export default function Login({ route }: any) {
 
                 <TouchableOpacity 
                   onPress={handleLogin} disabled={loading}
-                  className="w-full bg-[#06201b] py-4 rounded-2xl flex-row justify-center items-center"
+                  className="w-full bg-[#06201b] py-4 rounded-2xl flex-row justify-center items-center mb-8"
                 >
                   {loading ? <ActivityIndicator color="white" /> : <Text className="text-white font-jakarta-bold text-[16px]">Sign In</Text>}
+                </TouchableOpacity>
+
+                <View className="flex-row items-center justify-center opacity-50 pt-4 gap-2">
+                  <Text className="text-[#00351d] opacity-60 text-[9px] font-jakarta-bold uppercase tracking-[2px]">
+                    Powered by
+                  </Text>
+                  <Image source={require('../../assets/poweredby-logo.png')} style={{ height: 16, width: 80, resizeMode: 'contain' }} />
+                </View>
+              </View>
+            )}
+
+            {activeTab === 'reset' && !isOTPMode && !isResetMode && (
+              <View>
+                <Text className="text-[#1b1c1a] text-[24px] font-jakarta-bold mb-2">Reset Password</Text>
+                <Text className="text-[#707971] text-[14px] font-jakarta-medium mb-6">Enter your registered phone number or email address to receive a recovery code.</Text>
+
+                <View className="mb-6">
+                  <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Email or Phone Number</Text>
+                  <TextInput 
+                    className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-4 px-5 text-[16px] font-jakarta-medium text-[#1b1c1a]"
+                    placeholder="john@example.com or 0712..."
+                    placeholderTextColor="#9ca3af"
+                    value={phone}
+                    onChangeText={setPhone}
+                    autoCapitalize="none"
+                  />
+                </View>
+
+                <TouchableOpacity 
+                  onPress={handleForgotPassword} disabled={loading}
+                  className="w-full bg-[#06201b] py-4 rounded-2xl flex-row justify-center items-center"
+                >
+                  {loading ? <ActivityIndicator color="white" /> : <Text className="text-white font-jakarta-bold text-[16px]">Send Recovery Code</Text>}
                 </TouchableOpacity>
               </View>
             )}
@@ -422,7 +467,7 @@ export default function Login({ route }: any) {
             {activeTab === 'signup' && !isSignupPasswordStep && !isSignupBiometricStep && !isSignupSuccess && (
               <View>
                 <Text className="text-[#1b1c1a] text-[24px] font-jakarta-bold mb-2">Get started with us</Text>
-                <Text className="text-[#707971] text-[14px] font-jakarta-medium mb-6">Fill out the form below to connect with us.</Text>
+                <Text className="text-[#707971] text-[14px] font-jakarta-medium mb-6">Fill out the form below and we will connect you with the right person.</Text>
 
                 <View className="space-y-4">
                   <View>
@@ -441,8 +486,44 @@ export default function Login({ route }: any) {
                     <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Business Name *</Text>
                     <TextInput className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-medium text-[#1b1c1a]" value={signupBusinessName} onChangeText={setSignupBusinessName} placeholder="Acme Corp" />
                   </View>
+                  <View>
+                    <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Business Type *</Text>
+                    <TouchableOpacity onPress={() => setShowBusinessModal(true)} className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 flex-row justify-between items-center">
+                      <Text className={`text-[14px] font-jakarta-medium ${businessType ? 'text-[#1b1c1a]' : 'text-[#9ca3af]'}`}>{businessType || '—Please choose an option—'}</Text>
+                      <Feather name="chevron-down" size={16} color="#9ca3af" />
+                    </TouchableOpacity>
+                  </View>
+                  <View>
+                    <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">County *</Text>
+                    <TouchableOpacity onPress={() => setShowCountyModal(true)} className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 flex-row justify-between items-center">
+                      <Text className={`text-[14px] font-jakarta-medium ${signupCounty ? 'text-[#1b1c1a]' : 'text-[#9ca3af]'}`}>{signupCounty || 'Search your county...'}</Text>
+                      <Feather name="search" size={16} color="#9ca3af" />
+                    </TouchableOpacity>
+                  </View>
+                  <View>
+                    <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Area/Location *</Text>
+                    <TextInput className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-medium text-[#1b1c1a]" value={area} onChangeText={setArea} placeholder="Westlands" />
+                  </View>
+                  <View>
+                    <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Employees *</Text>
+                    <TouchableOpacity onPress={() => setShowEmployeesModal(true)} className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 flex-row justify-between items-center">
+                      <Text className={`text-[14px] font-jakarta-medium ${employees ? 'text-[#1b1c1a]' : 'text-[#9ca3af]'}`}>{employees || '—Please choose an option—'}</Text>
+                      <Feather name="chevron-down" size={16} color="#9ca3af" />
+                    </TouchableOpacity>
+                  </View>
+                  <View className="mb-4">
+                    <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Is this an eCommerce business?</Text>
+                    <View className="flex-row space-x-4">
+                      <TouchableOpacity onPress={() => setSignupEcommerce('yes')} className={`flex-1 py-3 rounded-xl border flex-row items-center justify-center ${signupEcommerce === 'yes' ? 'bg-[#06201b] border-[#06201b]' : 'bg-white border-[#e5e7eb]'}`}>
+                        <Text className={`font-jakarta-bold text-[14px] ${signupEcommerce === 'yes' ? 'text-white' : 'text-[#1b1c1a]'}`}>Yes</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => setSignupEcommerce('no')} className={`flex-1 py-3 rounded-xl border flex-row items-center justify-center ${signupEcommerce === 'no' ? 'bg-[#06201b] border-[#06201b]' : 'bg-white border-[#e5e7eb]'}`}>
+                        <Text className={`font-jakarta-bold text-[14px] ${signupEcommerce === 'no' ? 'text-white' : 'text-[#1b1c1a]'}`}>No</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
                   <TouchableOpacity onPress={() => setIsSignupPasswordStep(true)} className="w-full bg-[#06201b] py-4 rounded-2xl flex-row justify-center items-center mt-4">
-                    <Text className="text-white font-jakarta-bold text-[16px]">Next Step</Text>
+                    <Text className="text-white font-jakarta-bold text-[16px]">Submit Application</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -513,6 +594,66 @@ export default function Login({ route }: any) {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Modals for Dropdowns */}
+      <Modal visible={showCountyModal} animationType="slide" transparent={true}>
+        <View className="flex-1 justify-end bg-black/50">
+          <View className="bg-white rounded-t-3xl h-[70%] p-6">
+            <View className="flex-row justify-between items-center mb-4">
+              <Text className="text-[#1b1c1a] text-[18px] font-jakarta-bold">Select County</Text>
+              <TouchableOpacity onPress={() => setShowCountyModal(false)}><Feather name="x" size={24} color="#1b1c1a" /></TouchableOpacity>
+            </View>
+            <TextInput 
+              className="w-full bg-[#f9fafb] border border-[#e5e7eb] rounded-xl py-3 px-4 mb-4 text-[14px] font-jakarta-medium"
+              placeholder="Search county..."
+              value={countySearch}
+              onChangeText={setCountySearch}
+            />
+            <FlatList 
+              data={KENYAN_COUNTIES.filter(c => c.toLowerCase().includes(countySearch.toLowerCase()))}
+              keyExtractor={item => item}
+              renderItem={({item}) => (
+                <TouchableOpacity className="py-4 border-b border-[#e5e7eb]" onPress={() => { setSignupCounty(item); setShowCountyModal(false); }}>
+                  <Text className="text-[16px] font-jakarta-medium text-[#1b1c1a]">{item}</Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showBusinessModal} animationType="slide" transparent={true}>
+        <View className="flex-1 justify-end bg-black/50">
+          <View className="bg-white rounded-t-3xl p-6">
+            <View className="flex-row justify-between items-center mb-6">
+              <Text className="text-[#1b1c1a] text-[18px] font-jakarta-bold">Business Type</Text>
+              <TouchableOpacity onPress={() => setShowBusinessModal(false)}><Feather name="x" size={24} color="#1b1c1a" /></TouchableOpacity>
+            </View>
+            {['Sole Proprietorship', 'Partnership', 'Limited Liability Company (LLC)', 'Public Limited Company (PLC)', 'NGO/Non-Profit'].map(type => (
+              <TouchableOpacity key={type} className="py-4 border-b border-[#e5e7eb]" onPress={() => { setBusinessType(type); setShowBusinessModal(false); }}>
+                <Text className="text-[16px] font-jakarta-medium text-[#1b1c1a]">{type}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showEmployeesModal} animationType="slide" transparent={true}>
+        <View className="flex-1 justify-end bg-black/50">
+          <View className="bg-white rounded-t-3xl p-6">
+            <View className="flex-row justify-between items-center mb-6">
+              <Text className="text-[#1b1c1a] text-[18px] font-jakarta-bold">Number of Employees</Text>
+              <TouchableOpacity onPress={() => setShowEmployeesModal(false)}><Feather name="x" size={24} color="#1b1c1a" /></TouchableOpacity>
+            </View>
+            {['1-10', '11-50', '51-200', '201-500', '501+'].map(type => (
+              <TouchableOpacity key={type} className="py-4 border-b border-[#e5e7eb]" onPress={() => { setEmployees(type); setShowEmployeesModal(false); }}>
+                <Text className="text-[16px] font-jakarta-medium text-[#1b1c1a]">{type}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }

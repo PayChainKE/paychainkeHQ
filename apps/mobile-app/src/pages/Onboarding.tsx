@@ -70,18 +70,22 @@ export default function Onboarding({ navigation }: any) {
         </TouchableOpacity>
       </View>
 
-      <View className="flex-1 items-center justify-center px-8">
-        <Image 
-          source={currentSlide.image} 
-          style={{ width: width * 0.8, height: width * 0.8, resizeMode: 'contain' }} 
-        />
-        <View className="mt-12 items-center w-full">
-          <Text className="text-[#1b1c1a] text-[28px] font-jakarta-bold text-center mb-4 tracking-tight">
+      <View className="flex-1 px-8 pt-10 pb-4">
+        <View className="items-center w-full mb-10">
+          <Text className="text-[#1b1c1a] text-[32px] font-jakarta-bold text-center mb-4 tracking-tight">
             {currentSlide.title}
           </Text>
-          <Text className="text-[#707971] text-[15px] font-jakarta-medium text-center leading-relaxed px-4">
+          <Text className="text-[#707971] text-[16px] font-jakarta-medium text-center leading-relaxed px-4">
             {currentSlide.description}
           </Text>
+        </View>
+        <View className="flex-1 items-center justify-center">
+          <View className="w-[280px] h-[280px] items-center justify-center bg-transparent">
+            <Image 
+              source={currentSlide.image} 
+              style={{ width: 280, height: 280, resizeMode: 'contain' }} 
+            />
+          </View>
         </View>
       </View>
 
