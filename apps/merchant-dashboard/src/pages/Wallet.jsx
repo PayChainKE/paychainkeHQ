@@ -12,13 +12,20 @@ export default function Wallet() {
   const { showAmounts } = usePrivacyMode()
   const { addToast } = useToast()
   const withdrawalDestinations = [
-    { id: 'bank-1', name: 'KCB Bank', type: 'Bank', acc: '**** 5283', img: 'account_balance' },
-    { id: 'mpesa-1', name: 'M-PESA Number', type: 'Mobile', acc: '0712***890', img: 'smartphone' }
+    { id: 'bank-1', name: merchant?.settlementBankName || 'Bank Transfer', type: 'Bank', acc: merchant?.settlementBankAccount ? `**** ${merchant.settlementBankAccount.slice(-4)}` : 'Not Configured', img: 'account_balance', verified: !!merchant?.settlementBankAccount },
+    { id: 'mpesa-1', name: 'M-PESA Number', type: 'Mobile', acc: merchant?.settlementMobile ? `07** *** ${merchant.settlementMobile.slice(-3)}` : 'Not Configured', img: 'smartphone', verified: !!merchant?.settlementMobile }
   ]
   const [withdrawAmount, setWithdrawAmount] = useState('')
   const [destination, setDestination] = useState(withdrawalDestinations[0].id)
   const [destinationAccountValue, setDestinationAccountValue] = useState('')
   const [isWithdrawing, setIsWithdrawing] = useState(false)
+
+  // Settlement Settings
+  const [showSettingsModal, setShowSettingsModal] = useState(false)
+  const [settleBankName, setSettleBankName] = useState('')
+  const [settleBankAccount, setSettleBankAccount] = useState('')
+  const [settleMobile, setSettleMobile] = useState('')
+  const [isSavingSettings, setIsSavingSettings] = useState(false)
   
   // QR Features
   const [isDownloading, setIsDownloading] = useState(false)
@@ -120,6 +127,40 @@ export default function Wallet() {
       setIsWithdrawing(false)
     }
   }
+
+  const handleSaveSettings = async (e) => {
+    e.preventDefault()
+    setIsSavingSettings(true)
+    try {
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+      const token = localStorage.getItem('paychain_merchant_token')
+      
+      await axios.put(`${API_URL}/api/auth/merchant/profile`, {
+        settlementBankName: settleBankName,
+        settlementBankAccount: settleBankAccount,
+        settlementMobile: settleMobile
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      
+      addToast({ title: 'Settings Saved', message: 'Your settlement destinations have been updated.', type: 'success' })
+      setShowSettingsModal(false)
+      await refreshSession()
+    } catch (err) {
+      addToast({ title: 'Failed to Save', message: err.response?.data?.error || 'Could not save settings.', type: 'error' })
+    } finally {
+      setIsSavingSettings(false)
+    }
+  }
+
+  // Pre-fill settings when modal opens
+  useEffect(() => {
+    if (showSettingsModal && merchant) {
+      setSettleBankName(merchant.settlementBankName || '')
+      setSettleBankAccount(merchant.settlementBankAccount || '')
+      setSettleMobile(merchant.settlementMobile || '')
+    }
+  }, [showSettingsModal, merchant])
 
   // Then further down, the JSX changes:
 
@@ -483,69 +524,78 @@ export default function Wallet() {
 
         <div className="grid grid-cols-12 gap-8 items-start lg:items-stretch">
           {/* Withdrawal Interface */}
-          <section className="col-span-12 lg:col-span-12 xl:col-span-5 bg-white p-6 md:p-8 lg:p-10 rounded-[32px] lg:rounded-[40px] border border-outline-variant/10 shadow-2xl editorial-shadow animate-fade-in-up [animation-delay:100ms] flex flex-col">
-            <div className="mb-6 md:mb-10">
-              <h3 className="font-headline text-2xl md:text-3xl text-primary tracking-tight">Withdraw Funds</h3>
-              <p className="text-[9px] md:text-[10px] text-on-surface-variant font-bold uppercase tracking-[0.2em] mt-1 opacity-60">Settlement Destination</p>
+          <section className="col-span-12 lg:col-span-12 xl:col-span-5 bg-white p-5 lg:p-6 rounded-3xl border border-outline-variant/10 shadow-xl editorial-shadow animate-fade-in-up [animation-delay:100ms] flex flex-col">
+            <div className="mb-6 md:mb-10 flex items-center justify-between">
+              <div>
+                <h3 className="font-headline text-2xl md:text-3xl text-primary tracking-tight">Withdraw Funds</h3>
+                <p className="text-[9px] md:text-[10px] text-on-surface-variant font-bold uppercase tracking-[0.2em] mt-1 opacity-60">Settlement Destination</p>
+              </div>
+              <button 
+                onClick={() => setShowSettingsModal(true)}
+                className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-all border border-slate-200/60 shadow-sm"
+                title="Edit Settlement Destinations"
+              >
+                <span className="material-symbols-outlined text-xl md:text-[22px]">settings</span>
+              </button>
             </div>
 
             <form onSubmit={handleWithdraw} className="space-y-6">
               <div className="space-y-3">
                 <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Amount to Withdraw</label>
                 <div className="relative group">
-                  <div className="absolute left-5 top-1/2 -translate-y-1/2 text-primary/40 font-bold text-sm">KES</div>
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-primary/40 font-bold text-sm">KES</div>
                   <input 
                     type="number"
                     value={withdrawAmount}
                     onChange={(e) => setWithdrawAmount(e.target.value)}
                     placeholder="0.00"
-                    className="w-full bg-surface-container-low border border-outline-variant/5 rounded-2xl md:rounded-3xl py-4 md:py-6 pl-14 md:pl-16 pr-6 text-2xl md:text-3xl font-headline text-primary focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
+                    className="w-full bg-surface-container-low border border-outline-variant/5 rounded-2xl py-3 pl-12 pr-4 text-xl font-headline text-primary focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
                   />
                 </div>
               </div>
 
               <div className="space-y-3">
                 <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Destination</label>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-3">
                   {withdrawalDestinations.map((dest) => (
                     <div 
                       key={dest.id}
                       onClick={() => setDestination(dest.id)}
-                      className={`relative p-4 md:p-5 rounded-2xl md:rounded-3xl border cursor-pointer transition-all duration-300 flex flex-col items-start gap-4 overflow-hidden group ${
+                      className={`relative p-3 md:p-4 rounded-xl md:rounded-2xl border cursor-pointer transition-all duration-300 flex items-center gap-4 group ${
                         destination === dest.id 
-                        ? 'border-primary bg-primary/[0.03] shadow-[0_8px_30px_rgba(0,53,29,0.08)] scale-[1.02]' 
-                        : 'border-outline-variant/10 bg-white hover:border-primary/30 hover:bg-surface-container-low hover:shadow-md'
+                        ? 'border-[#0B0E14] bg-[#0B0E14] shadow-lg' 
+                        : 'border-outline-variant/10 bg-white hover:border-primary/20 hover:bg-surface-container-low'
                       }`}
                     >
-                      {/* Premium Accent Line */}
-                      {destination === dest.id && (
-                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-emerald-400"></div>
-                      )}
-                      
-                      <div className="w-full flex justify-between items-start">
-                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 ${
-                           destination === dest.id 
-                           ? 'bg-primary text-white shadow-lg' 
-                           : 'bg-primary/10 text-primary group-hover:bg-primary/20'
-                        }`}>
-                           <span className="material-symbols-outlined text-[22px]">
-                              {dest.type === 'Till' ? 'point_of_sale' : dest.type === 'Mobile' ? 'smartphone' : 'account_balance'}
-                           </span>
-                        </div>
-                        {dest.verified && (
-                          <div className={`w-6 h-6 rounded-full flex items-center justify-center ${destination === dest.id ? 'bg-emerald-100' : 'bg-surface-container-low'}`}>
-                            <span className="material-symbols-outlined text-emerald-600 text-[14px]" style={{fontVariationSettings: "'FILL' 1"}}>verified</span>
-                          </div>
-                        )}
+                      {/* Selection Radio */}
+                      <div className={`w-5 h-5 rounded-full border-2 shrink-0 flex items-center justify-center transition-all ${
+                        destination === dest.id 
+                        ? 'border-emerald-400 bg-emerald-400' 
+                        : 'border-outline-variant/30 bg-transparent group-hover:border-primary/40'
+                      }`}>
+                        {destination === dest.id && <div className="w-2 h-2 bg-[#0B0E14] rounded-full"></div>}
+                      </div>
+
+                      <div className={`w-10 h-10 shrink-0 rounded-xl flex items-center justify-center transition-all duration-300 ${
+                        destination === dest.id
+                        ? 'bg-white/10 text-emerald-400'
+                        : 'bg-primary/10 text-primary group-hover:bg-primary/20'
+                      }`}>
+                         <span className="material-symbols-outlined text-[20px]">
+                            {dest.type === 'Till' ? 'point_of_sale' : dest.type === 'Mobile' ? 'smartphone' : 'account_balance'}
+                         </span>
                       </div>
                       
-                      <div className="w-full mt-2">
-                         <p className={`text-sm md:text-base font-bold truncate transition-colors duration-300 ${destination === dest.id ? 'text-primary' : 'text-on-surface'}`}>{dest.name}</p>
-                         <div className="flex items-center gap-2 mt-1">
-                           <p className="text-[11px] text-on-surface-variant font-medium opacity-80 capitalize">{dest.type}</p>
-                           <div className="w-1 h-1 rounded-full bg-outline-variant/30"></div>
-                           <p className="text-[10px] font-mono text-on-surface-variant/60 tracking-wider truncate">{dest.acc}</p>
+                      <div className="flex-1 min-w-0">
+                         <div className="flex items-center gap-2">
+                           <p className={`text-sm md:text-base font-bold truncate transition-colors duration-300 ${destination === dest.id ? 'text-white' : 'text-primary'}`}>{dest.name}</p>
+                           {dest.verified && (
+                             <span className={`material-symbols-outlined text-[14px] ${destination === dest.id ? 'text-emerald-400' : 'text-emerald-500'}`} style={{fontVariationSettings: "'FILL' 1"}} title="Verified Destination">verified</span>
+                           )}
                          </div>
+                         <p className={`text-[11px] md:text-xs font-medium truncate mt-0.5 ${destination === dest.id ? 'text-white/60' : 'text-on-surface-variant opacity-80'}`}>
+                            {dest.type} <span className="mx-1.5 opacity-50">•</span> <span className="font-mono tracking-wider">{dest.acc}</span>
+                         </p>
                       </div>
                     </div>
                   ))}
@@ -558,17 +608,23 @@ export default function Wallet() {
                     {selectedDest.type === 'Bank' ? 'Bank Account Number' : 'M-PESA Number'}
                   </label>
                   <div className="relative group">
-                    <div className="absolute left-5 top-1/2 -translate-y-1/2 text-primary/40 flex items-center justify-center">
-                      <span className="material-symbols-outlined text-xl">{selectedDest.type === 'Bank' ? 'account_balance' : 'smartphone'}</span>
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-primary/40 flex items-center justify-center">
+                      <span className="material-symbols-outlined text-lg">{selectedDest.type === 'Bank' ? 'account_balance' : 'smartphone'}</span>
                     </div>
                     <input 
                       type={selectedDest.type === 'Bank' ? 'text' : 'tel'}
                       value={destinationAccountValue}
                       onChange={(e) => setDestinationAccountValue(e.target.value)}
-                      placeholder={selectedDest.type === 'Bank' ? 'e.g. 1122334455' : 'e.g. 0712345678'}
-                      className="w-full bg-surface-container-low border border-outline-variant/5 rounded-2xl md:rounded-3xl py-4 md:py-6 pl-14 md:pl-16 pr-6 text-xl md:text-2xl font-headline text-primary focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
+                      placeholder={selectedDest.type === 'Bank' ? (merchant?.settlementBankAccount || 'e.g. 1122334455') : (merchant?.settlementMobile || '07xxxxxxxx')}
+                      className="w-full bg-surface-container-low border border-outline-variant/5 rounded-2xl py-3 pl-12 pr-4 text-lg font-headline text-primary focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
                     />
                   </div>
+                  {!selectedDest.verified && (
+                    <p className="text-[10px] text-orange-600 font-bold uppercase tracking-wider pl-1 flex items-center gap-1 mt-2">
+                      <span className="material-symbols-outlined text-[12px]">warning</span>
+                      Not configured in settings
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -586,7 +642,7 @@ export default function Wallet() {
               <button 
                 type="submit"
                 disabled={isWithdrawing || !withdrawAmount}
-                className="w-full bg-[#00351D] text-white py-5 rounded-3xl font-bold text-lg shadow-2xl hover:bg-[#004d2b] active:scale-[0.98] transition-all flex items-center justify-center gap-3 group border border-white/5 disabled:opacity-20 disabled:grayscale"
+                className="w-full bg-[#00351D] text-white py-4 rounded-2xl font-bold text-base shadow-xl hover:bg-[#004d2b] active:scale-[0.98] transition-all flex items-center justify-center gap-2 group border border-white/5 disabled:opacity-20 disabled:grayscale"
               >
                 {isWithdrawing ? (
                   <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
@@ -1218,6 +1274,99 @@ export default function Wallet() {
           </div>
         </div>
         )}
+
+      {/* Settings Modal Overlay */}
+      {showSettingsModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 animate-fade-in backdrop-blur-xl bg-primary/10">
+          <div className="absolute inset-0 bg-[#00351D]/80" onClick={() => setShowSettingsModal(false)}></div>
+          
+          <div className="bg-white w-full max-w-lg rounded-[32px] md:rounded-[40px] shadow-2xl relative z-10 overflow-hidden animate-scale-in flex flex-col max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="p-6 md:p-8 border-b border-outline-variant/10 flex items-center justify-between bg-surface-container-low shrink-0">
+              <div>
+                <h3 className="font-headline text-2xl md:text-3xl text-primary tracking-tight">
+                  Settlement Details
+                </h3>
+                <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-[0.2em] mt-1 opacity-60">
+                  Configure where to withdraw your funds
+                </p>
+              </div>
+              <button 
+                onClick={() => setShowSettingsModal(false)}
+                className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-primary/40 hover:text-primary transition-colors border border-outline-variant/10"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <form onSubmit={handleSaveSettings} className="p-6 md:p-10 space-y-6 overflow-y-auto">
+              {/* Bank Details */}
+              <div className="space-y-4">
+                <h4 className="font-headline text-lg text-primary tracking-tight flex items-center gap-2">
+                  <span className="material-symbols-outlined text-emerald-600">account_balance</span>
+                  Bank Account
+                </h4>
+                <div className="space-y-3">
+                  <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Bank Name</label>
+                  <input 
+                    type="text"
+                    value={settleBankName}
+                    onChange={(e) => setSettleBankName(e.target.value)}
+                    placeholder="e.g. KCB Bank"
+                    className="w-full bg-surface-container-low border border-outline-variant/5 rounded-2xl py-4 px-5 text-lg font-headline text-primary focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
+                  />
+                </div>
+                <div className="space-y-3">
+                  <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Account Number</label>
+                  <input 
+                    type="text"
+                    value={settleBankAccount}
+                    onChange={(e) => setSettleBankAccount(e.target.value)}
+                    placeholder="e.g. 1122334455"
+                    className="w-full bg-surface-container-low border border-outline-variant/5 rounded-2xl py-4 px-5 text-lg font-headline text-primary focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="h-px bg-outline-variant/10 my-6"></div>
+
+              {/* Mobile Details */}
+              <div className="space-y-4">
+                <h4 className="font-headline text-lg text-primary tracking-tight flex items-center gap-2">
+                  <span className="material-symbols-outlined text-emerald-600">smartphone</span>
+                  Mobile Money
+                </h4>
+                <div className="space-y-3">
+                  <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">M-PESA Number</label>
+                  <input 
+                    type="tel"
+                    value={settleMobile}
+                    onChange={(e) => setSettleMobile(e.target.value)}
+                    placeholder="07xxxxxxxx"
+                    className="w-full bg-surface-container-low border border-outline-variant/5 rounded-2xl py-4 px-5 text-lg font-headline text-primary focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
+                  />
+                </div>
+              </div>
+
+              <button 
+                type="submit"
+                disabled={isSavingSettings}
+                className="w-full bg-[#00351D] text-white py-5 rounded-3xl font-bold text-lg shadow-2xl hover:bg-[#004d2b] active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-white/5 disabled:opacity-50 mt-8"
+              >
+                {isSavingSettings ? (
+                  <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
+                ) : (
+                  <>
+                    Save Settings
+                    <span className="material-symbols-outlined">save</span>
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Swap Modal Overlay */}
       {showSwapModal && (

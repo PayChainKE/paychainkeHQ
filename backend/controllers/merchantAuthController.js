@@ -128,7 +128,10 @@ export const verifyMerchantOTP = async (req, res) => {
         loginCount: merchant.loginCount,
         kraPin: merchant.kraPin,
         businessNumber: merchant.businessNumber,
-        isKRAVerified: merchant.isKRAVerified
+        isKRAVerified: merchant.isKRAVerified,
+        settlementMobile: merchant.settlementMobile,
+        settlementBankName: merchant.settlementBankName,
+        settlementBankAccount: merchant.settlementBankAccount
       },
       token: generateToken(merchant._id)
     });
@@ -238,7 +241,10 @@ export const biometricLogin = async (req, res) => {
         usdcBalance: merchant.usdcBalance,
         stellarPublicKey: merchant.stellarPublicKey,
         status: merchant.status,
-        loginCount: merchant.loginCount
+        loginCount: merchant.loginCount,
+        settlementMobile: merchant.settlementMobile,
+        settlementBankName: merchant.settlementBankName,
+        settlementBankAccount: merchant.settlementBankAccount
       },
       token: generateToken(merchant._id)
     });
@@ -413,7 +419,10 @@ export const getMerchantMe = async (req, res) => {
         loginCount: merchant.loginCount,
         kraPin: merchant.kraPin,
         businessNumber: merchant.businessNumber,
-        isKRAVerified: merchant.isKRAVerified
+        isKRAVerified: merchant.isKRAVerified,
+        settlementMobile: merchant.settlementMobile,
+        settlementBankName: merchant.settlementBankName,
+        settlementBankAccount: merchant.settlementBankAccount
       }
     });
   } catch (error) {
@@ -432,7 +441,7 @@ export const updateMerchantProfile = async (req, res) => {
       return res.status(404).json({ error: 'Merchant not found' });
     }
 
-    const { kraPin, businessNumber } = req.body;
+    const { kraPin, businessNumber, settlementMobile, settlementBankName, settlementBankAccount } = req.body;
     
     // Validate KRA Pin and Mock eTIMS API
     if (kraPin !== undefined && kraPin !== merchant.kraPin) {
@@ -451,6 +460,9 @@ export const updateMerchantProfile = async (req, res) => {
     }
 
     if (businessNumber !== undefined) merchant.businessNumber = businessNumber;
+    if (settlementMobile !== undefined) merchant.settlementMobile = settlementMobile;
+    if (settlementBankName !== undefined) merchant.settlementBankName = settlementBankName;
+    if (settlementBankAccount !== undefined) merchant.settlementBankAccount = settlementBankAccount;
 
     await merchant.save();
 
@@ -472,7 +484,10 @@ export const updateMerchantProfile = async (req, res) => {
         loginCount: merchant.loginCount,
         kraPin: merchant.kraPin,
         businessNumber: merchant.businessNumber,
-        isKRAVerified: merchant.isKRAVerified
+        isKRAVerified: merchant.isKRAVerified,
+        settlementMobile: merchant.settlementMobile,
+        settlementBankName: merchant.settlementBankName,
+        settlementBankAccount: merchant.settlementBankAccount
       }
     });
   } catch (error) {

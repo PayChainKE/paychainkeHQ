@@ -55,6 +55,18 @@ const merchantSchema = new mongoose.Schema({
     minlength: 5,
     maxlength: 5,
   },
+  settlementMobile: {
+    type: String,
+    default: null,
+  },
+  settlementBankName: {
+    type: String,
+    default: null,
+  },
+  settlementBankAccount: {
+    type: String,
+    default: null,
+  },
   kesBalance: {
     type: Number,
     default: 0,
