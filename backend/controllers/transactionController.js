@@ -4,7 +4,7 @@ import PaymentLink from '../models/PaymentLink.js';
 import crypto from 'crypto';
 import axios from 'axios';
 import STKRequest from '../models/STKRequest.js';
-import { settleInflationShield, provisionMerchantWallet, getWalletBalance } from '../utils/stellarHelper.js';
+import { settleInflationShield, provisionMerchantWallet, getWalletBalance, swapUsdcToKesOnChain } from '../utils/stellarHelper.js';
 import { encryptKey } from '../utils/cryptoHelper.js';
 import { getLiveKesToUsdcRate } from '../utils/rateEngine.js';
 import { sendWalletActivationEmail } from '../utils/resend.js';
@@ -80,81 +80,122 @@ export const simulateIncomingPayment = async (req, res) => {
   }
 };
 
-// @desc    Swap KES to USDC manually
+// @desc    Swap KES to USDC or USDC to KES manually
 // @route   POST /api/transactions/swap
 // @access  Private
 export const swapKesToUsdc = async (req, res) => {
   try {
-    const { amount } = req.body;
+    const { amount, direction = 'KES_TO_USDC' } = req.body;
     
     if (!amount || amount <= 0) {
       return res.status(400).json({ error: 'Valid amount is required' });
     }
 
-    const merchant = await Merchant.findById(req.merchant._id);
+    const merchant = await Merchant.findById(req.merchant._id).select('+stellarEncryptedSecretKey');
 
     if (!merchant) {
       return res.status(404).json({ error: 'Merchant not found' });
-    }
-
-    if (merchant.kesBalance < amount) {
-      return res.status(400).json({ error: 'Insufficient KES balance' });
     }
 
     if (!merchant.stellarPublicKey) {
       return res.status(400).json({ error: 'No Stellar wallet configured for this merchant' });
     }
 
-    // Process Swap
-    const liveRate = await getLiveKesToUsdcRate();
-    const usdcPayoutValue = (amount * liveRate).toFixed(7);
+    const liveRate = await getLiveKesToUsdcRate(); // Returns USDC per 1 KES
 
-    console.log(`💱 Manual Swap: Converting ${amount} KES to ${usdcPayoutValue} USDC for ${merchant.paybillAccount}`);
-    
-    // Deduct immediately to prevent double spending
-    merchant.kesBalance -= amount;
-    await merchant.save();
+    if (direction === 'KES_TO_USDC') {
+      if (merchant.kesBalance < amount) {
+        return res.status(400).json({ error: 'Insufficient KES balance' });
+      }
 
-    try {
-      const txHash = await settleInflationShield(merchant.stellarPublicKey, usdcPayoutValue);
+      const usdcPayoutValue = (amount * liveRate).toFixed(7);
+      console.log(`💱 Manual Swap: Converting ${amount} KES to ${usdcPayoutValue} USDC for ${merchant.paybillAccount}`);
       
-      // Log the transaction
-      await Transaction.create({
-        merchantId: merchant._id,
-        accountNumber: merchant.paybillAccount,
-        type: 'swap',
-        amount: parseFloat(usdcPayoutValue),
-        kesAmount: amount,
-        currency: 'USDC',
-        status: 'completed',
-        reference: txHash,
-        sender: { name: 'Manual Swap', id: 'MASTER_WALLET' },
-        recipient: { name: merchant.businessName, id: merchant.stellarPublicKey }
-      });
-
-      // Update USDC balance cache
-      merchant.usdcBalance = (merchant.usdcBalance || 0) + parseFloat(usdcPayoutValue);
+      merchant.kesBalance -= amount;
       await merchant.save();
 
-      res.status(200).json({
-        success: true,
-        message: 'Swap successful',
-        newKesBalance: merchant.kesBalance,
-        newUsdcBalance: merchant.usdcBalance,
-        txHash
-      });
+      try {
+        const txHash = await settleInflationShield(merchant.stellarPublicKey, usdcPayoutValue);
+        
+        await Transaction.create({
+          merchantId: merchant._id,
+          accountNumber: merchant.paybillAccount,
+          type: 'fx_swap',
+          amount: parseFloat(usdcPayoutValue),
+          kesAmount: amount,
+          usdcAmount: parseFloat(usdcPayoutValue),
+          currency: 'USDC',
+          status: 'completed',
+          reference: txHash,
+          sender: { name: 'Manual Swap', id: 'MASTER_WALLET' },
+          recipient: { name: merchant.businessName, id: merchant.stellarPublicKey }
+        });
 
-    } catch (e) {
-      // Revert if blockchain fails
-      console.error('❌ Swap Failed on blockchain:', e.message);
-      merchant.kesBalance += amount;
-      await merchant.save();
-      return res.status(500).json({ error: 'Blockchain settlement failed. Balance refunded.' });
+        merchant.usdcBalance = (merchant.usdcBalance || 0) + parseFloat(usdcPayoutValue);
+        await merchant.save();
+
+        res.status(200).json({
+          success: true,
+          message: 'Swap successful',
+          newKesBalance: merchant.kesBalance,
+          newUsdcBalance: merchant.usdcBalance,
+          txHash
+        });
+
+      } catch (e) {
+        console.error('❌ Swap Failed on blockchain:', e.message);
+        merchant.kesBalance += amount;
+        await merchant.save();
+        return res.status(500).json({ error: 'Blockchain settlement failed. Balance refunded.' });
+      }
+    } else if (direction === 'USDC_TO_KES') {
+      const liveUsdcBalance = await getWalletBalance(merchant.stellarPublicKey);
+      if (liveUsdcBalance < amount) {
+        return res.status(400).json({ error: 'Insufficient USDC balance' });
+      }
+
+      const kesPayoutValue = amount / liveRate;
+      console.log(`💱 Manual Swap: Converting ${amount} USDC to ${kesPayoutValue} KES for ${merchant.paybillAccount}`);
+
+      try {
+        const txHash = await swapUsdcToKesOnChain(merchant.stellarEncryptedSecretKey, amount);
+
+        merchant.kesBalance = (merchant.kesBalance || 0) + kesPayoutValue;
+        merchant.usdcBalance = liveUsdcBalance - amount;
+        await merchant.save();
+
+        await Transaction.create({
+          merchantId: merchant._id,
+          accountNumber: merchant.paybillAccount,
+          type: 'fx_swap',
+          amount: kesPayoutValue,
+          kesAmount: kesPayoutValue,
+          usdcAmount: amount,
+          currency: 'KES',
+          status: 'completed',
+          reference: txHash,
+          sender: { name: merchant.businessName, id: merchant.stellarPublicKey },
+          recipient: { name: 'Manual Swap', id: 'MASTER_WALLET' }
+        });
+
+        res.status(200).json({
+          success: true,
+          message: 'Swap successful',
+          newKesBalance: merchant.kesBalance,
+          newUsdcBalance: merchant.usdcBalance,
+          txHash
+        });
+      } catch (e) {
+        console.error('❌ Swap Failed on blockchain:', e.message);
+        return res.status(500).json({ error: 'Blockchain settlement failed. USDC not swept.' });
+      }
+    } else {
+      return res.status(400).json({ error: 'Invalid swap direction' });
     }
 
   } catch (error) {
-    console.error('❌ Error swapping KES:', error);
-    res.status(500).json({ error: 'Server Error: Failed to swap KES' });
+    console.error('❌ Error swapping currency:', error);
+    res.status(500).json({ error: 'Server Error: Failed to swap currency' });
   }
 };
 

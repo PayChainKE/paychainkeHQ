@@ -117,6 +117,23 @@ export default function BulkPay() {
     setShowAddModal(true);
   }
 
+  const handleDeletePayee = async (id, e) => {
+    e.stopPropagation();
+    if (!window.confirm('Are you sure you want to delete this payee?')) return;
+    try {
+      const token = localStorage.getItem('paychain_merchant_token');
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      await axios.delete(`${API_URL}/api/bulkpay/payees/${id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setPayeesList(prev => prev.filter(p => p._id !== id && p.id !== id));
+      addNotification({ title: 'Deleted', message: 'Payee has been removed successfully.', type: 'success' });
+    } catch (error) {
+      console.error('Failed to delete payee:', error);
+      addNotification({ title: 'Error', message: 'Failed to delete payee. Please try again.', type: 'error' });
+    }
+  };
+
   const handleSavePayee = async () => {
     if (!newPayee.name) {
       addNotification({ title: 'Missing Info', message: 'Recipient name is required.', type: 'error' });
@@ -415,11 +432,42 @@ export default function BulkPay() {
   const [pin, setPin] = useState('')
 
   const handleSecurityVerification = () => {
-    setShowSecurityModal(false)
-    setSecurityStep(1)
-    setOtp('')
-    setPin('')
-    handleAuthorize()
+    // Keep modals open until success or let handleAuthorize manage them
+    handleAuthorize(pin)
+  }
+
+  const [showPinSetupModal, setShowPinSetupModal] = useState(false)
+  const [setupPin, setSetupPin] = useState('')
+  const [confirmPin, setConfirmPin] = useState('')
+
+  useEffect(() => {
+    if (merchant) {
+      if (merchant.hasBulkPayPin === false) {
+        setShowPinSetupModal(true)
+      } else {
+        setShowPinSetupModal(false)
+      }
+    }
+  }, [merchant])
+
+  const handleSetupPin = async () => {
+    if (setupPin.length !== 4 || setupPin !== confirmPin) {
+      addNotification({ title: 'Error', message: 'PINs do not match or are invalid.', type: 'error' });
+      return;
+    }
+    try {
+      const token = localStorage.getItem('paychain_merchant_token');
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      await axios.post(`${API_URL}/api/bulkpay/set-pin`, { pin: setupPin }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setShowPinSetupModal(false);
+      addNotification({ title: 'Success', message: 'Bulk Pay PIN set successfully.', type: 'success' });
+      // Ideally update auth context here, but reloading or forcing state is fine.
+      window.location.reload();
+    } catch (error) {
+      addNotification({ title: 'Error', message: error.response?.data?.message || 'Failed to set PIN', type: 'error' });
+    }
   }
 
   const handleFundAccount = () => {
@@ -466,7 +514,8 @@ export default function BulkPay() {
       const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
       const res = await axios.post(`${API_URL}/api/bulkpay/authorize`, {
         batchRows,
-        fundingSource: selectedTill || 'Main Business Till'
+        fundingSource: selectedTill || 'Main Business Till',
+        pin: pin
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -502,6 +551,12 @@ export default function BulkPay() {
         message: error.response?.data?.message || 'Could not process batch',
         type: 'error'
       });
+      // Allow retry for PIN if it fails
+      if (error.response?.status === 401) {
+         setPin('');
+      } else {
+         setShowSecurityModal(false);
+      }
     }
   }
 
@@ -999,12 +1054,22 @@ export default function BulkPay() {
                         {formatKES(p.salary || p.amount || 0)}
                       </p>
                     </div>
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); handleOpenEdit(p); }}
-                      className="p-1 md:p-1.5 rounded-lg bg-surface-container-low text-primary/40 hover:text-emerald-700 hover:bg-emerald-50 transition-all active:scale-90"
-                    >
-                      <span className="material-symbols-outlined text-xs md:text-sm">edit</span>
-                    </button>
+                    <div className="flex gap-1 shrink-0">
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleOpenEdit(p); }}
+                        className="p-1 md:p-1.5 rounded-lg bg-surface-container-low text-primary/40 hover:text-emerald-700 hover:bg-emerald-50 transition-all active:scale-90"
+                        title="Edit Payee"
+                      >
+                        <span className="material-symbols-outlined text-xs md:text-sm">edit</span>
+                      </button>
+                      <button 
+                        onClick={(e) => handleDeletePayee(p._id || p.id, e)}
+                        className="p-1 md:p-1.5 rounded-lg bg-surface-container-low text-primary/40 hover:text-red-600 hover:bg-red-50 transition-all active:scale-90"
+                        title="Delete Payee"
+                      >
+                        <span className="material-symbols-outlined text-xs md:text-sm">delete</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1357,7 +1422,19 @@ export default function BulkPay() {
                       </div>
                     )}
                     <button 
-                      onClick={step === 1 ? () => setStep(2) : step === 2 ? () => setStep(3) : () => setShowSecurityModal(true)}
+                      onClick={() => {
+                        if (step === 1) {
+                          setStep(2);
+                        } else if (step === 2) {
+                          setStep(3);
+                        } else {
+                          if (merchant?.hasBulkPayPin === false) {
+                            setShowPinSetupModal(true);
+                          } else {
+                            setShowSecurityModal(true);
+                          }
+                        }
+                      }}
                       disabled={batchTotal === 0 || isLiquidityLow || (step === 3 && !selectedTill)}
                       className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-400 text-[#00351D] px-6 py-2.5 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 group disabled:opacity-20 disabled:grayscale text-xs md:text-sm"
                     >
@@ -1653,6 +1730,60 @@ export default function BulkPay() {
             </div>
           </div>
         )}
+        {/* Setup PIN Modal Overlay */}
+        {showPinSetupModal && (
+          <div className="fixed inset-0 bg-[#0A2540]/60 backdrop-blur-md z-[110] flex items-center justify-center p-4 animate-in fade-in duration-300">
+            <div className="bg-white w-full max-w-md rounded-[32px] md:rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in duration-500 border border-white/20">
+              <div className="p-6 md:p-8">
+                <div className="flex flex-col items-center text-center space-y-4 mb-8">
+                  <div className="w-16 h-16 bg-[#00351D] text-emerald-400 rounded-full flex items-center justify-center">
+                    <span className="material-symbols-outlined text-3xl">password</span>
+                  </div>
+                  <div>
+                    <h2 className="font-headline text-2xl text-primary tracking-tight font-bold">Setup Bulk Pay PIN</h2>
+                    <p className="text-[10px] text-on-surface-variant font-medium mt-1 opacity-60">
+                      Create a 4-digit PIN to authorize your bulk payouts securely.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Enter 4-Digit PIN</label>
+                    <input 
+                      type="password"
+                      maxLength="4"
+                      value={setupPin}
+                      onChange={(e) => setSetupPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                      placeholder="• • • •"
+                      className="w-full bg-surface-container-low/30 border border-outline-variant/20 rounded-2xl px-5 py-4 text-center font-headline tracking-[1em] text-xl font-bold text-primary focus:ring-0 focus:border-[#00351D]/50 transition-all outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Confirm PIN</label>
+                    <input 
+                      type="password"
+                      maxLength="4"
+                      value={confirmPin}
+                      onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                      placeholder="• • • •"
+                      className="w-full bg-surface-container-low/30 border border-outline-variant/20 rounded-2xl px-5 py-4 text-center font-headline tracking-[1em] text-xl font-bold text-primary focus:ring-0 focus:border-[#00351D]/50 transition-all outline-none"
+                    />
+                  </div>
+
+                  <button 
+                    onClick={handleSetupPin}
+                    disabled={setupPin.length !== 4 || setupPin !== confirmPin}
+                    className="w-full py-4 rounded-2xl bg-[#00351D] text-white hover:bg-emerald-950 font-bold text-sm shadow-xl transition-all disabled:opacity-50"
+                  >
+                    Save PIN
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Security Verification Modal */}
         {showSecurityModal && (
@@ -1678,7 +1809,7 @@ export default function BulkPay() {
                       <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center">
                         <span className="material-symbols-outlined text-3xl">sms</span>
                       </div>
-                      <p className="text-sm text-primary font-bold">Enter OTP Sent to +254 7XX XXX XXX</p>
+                      <p className="text-sm text-primary font-bold">Enter OTP Sent to 07XX XXX XXX</p>
                     </div>
                     
                     <input 
@@ -1713,7 +1844,7 @@ export default function BulkPay() {
                       type="password"
                       maxLength="4"
                       value={pin}
-                      onChange={(e) => setPin(e.target.value)}
+                      onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
                       placeholder="• • • •"
                       className="w-full bg-surface-container-low/30 border border-outline-variant/20 rounded-2xl px-5 py-4 text-center font-headline tracking-[1em] text-xl font-bold text-primary focus:ring-0 focus:border-[#00351D]/50 transition-all outline-none"
                     />

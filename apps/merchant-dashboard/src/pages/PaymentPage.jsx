@@ -114,16 +114,16 @@ export default function PaymentPage() {
                 Your M-PESA Number
               </label>
               <div className="relative group">
-                <div className="absolute left-5 top-1/2 -translate-y-1/2 text-primary/40 font-bold text-sm">
-                  +254
+                <div className="absolute left-5 top-1/2 -translate-y-1/2 text-primary/40 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-lg">smartphone</span>
                 </div>
                 <input 
                   type="tel"
                   required
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="712 345 678"
-                  className="w-full bg-surface-container-low border border-outline-variant/5 rounded-2xl md:rounded-3xl py-4 md:py-5 pl-16 pr-6 text-xl md:text-2xl font-headline text-primary focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
+                  placeholder="0712 345 678"
+                  className="w-full bg-surface-container-low border border-outline-variant/5 rounded-2xl md:rounded-3xl py-4 md:py-5 pl-14 pr-6 text-xl md:text-2xl font-headline text-primary focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
                 />
               </div>
             </div>

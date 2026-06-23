@@ -7,6 +7,7 @@ import { generateSecurityCredential } from '../utils/safaricomCrypto.js';
 import axios from 'axios';
 import csv from 'csv-parser';
 import fs from 'fs';
+import bcrypt from 'bcryptjs';
 import { sendBatchReceiptEmail } from '../utils/resend.js';
 
 // @desc    Get all payees for a merchant
@@ -54,6 +55,73 @@ export const addPayee = async (req, res) => {
     res.status(201).json(savedPayee);
   } catch (error) {
     res.status(500).json({ message: 'Failed to add payee', error: error.message });
+  }
+};
+
+// @desc    Delete a payee
+// @route   DELETE /api/bulkpay/payees/:id
+// @access  Private
+export const deletePayee = async (req, res) => {
+  try {
+    const payee = await Payee.findOne({ _id: req.params.id, merchantId: req.merchant._id });
+    if (!payee) {
+      return res.status(404).json({ message: 'Payee not found' });
+    }
+    await Payee.deleteOne({ _id: req.params.id });
+    res.status(200).json({ message: 'Payee removed successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to delete payee', error: error.message });
+  }
+};
+
+// @desc    Set Bulk Pay PIN
+// @route   POST /api/bulkpay/set-pin
+// @access  Private
+export const setBulkPayPin = async (req, res) => {
+  try {
+    const { pin } = req.body;
+    if (!pin || pin.length !== 4 || !/^\d{4}$/.test(pin)) {
+      return res.status(400).json({ message: 'PIN must be exactly 4 digits' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPin = await bcrypt.hash(pin, salt);
+
+    await Merchant.findByIdAndUpdate(req.merchant._id, { bulkPayPin: hashedPin });
+    res.status(200).json({ message: 'Bulk Pay PIN set successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to set PIN', error: error.message });
+  }
+};
+
+// @desc    Reset Bulk Pay PIN
+// @route   PUT /api/bulkpay/reset-pin
+// @access  Private
+export const resetBulkPayPin = async (req, res) => {
+  try {
+    const { currentPin, newPin } = req.body;
+    
+    if (!currentPin || !newPin || newPin.length !== 4 || !/^\d{4}$/.test(newPin)) {
+      return res.status(400).json({ message: 'Invalid PIN provided. New PIN must be exactly 4 digits.' });
+    }
+
+    const merchant = await Merchant.findById(req.merchant._id).select('+bulkPayPin');
+    if (!merchant || !merchant.bulkPayPin) {
+      return res.status(400).json({ message: 'No existing PIN found to reset.' });
+    }
+
+    const isMatch = await bcrypt.compare(currentPin, merchant.bulkPayPin);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Current PIN is incorrect.' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPin = await bcrypt.hash(newPin, salt);
+
+    await Merchant.findByIdAndUpdate(req.merchant._id, { bulkPayPin: hashedPin });
+    res.status(200).json({ message: 'Bulk Pay PIN reset successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to reset PIN', error: error.message });
   }
 };
 
@@ -149,15 +217,28 @@ export const uploadCSV = async (req, res) => {
 // @access  Private
 export const authorizeBatch = async (req, res) => {
   try {
-    const { batchRows, fundingSource } = req.body;
+    const { batchRows, fundingSource, pin } = req.body;
     const token = req.mpesaToken; // Assuming protectMerchant + generateToken middleware
     
+    if (!pin) {
+      return res.status(400).json({ message: 'Bulk Pay PIN is required to authorize the batch' });
+    }
+
     if (!batchRows || !batchRows.length) {
       return res.status(400).json({ message: 'No transactions to process' });
     }
 
-    const merchant = await Merchant.findById(req.merchant._id);
+    const merchant = await Merchant.findById(req.merchant._id).select('+bulkPayPin');
     if (!merchant) return res.status(404).json({ message: 'Merchant not found' });
+
+    if (!merchant.bulkPayPin) {
+      return res.status(400).json({ message: 'Please set up your Bulk Pay PIN first' });
+    }
+
+    const isMatch = await bcrypt.compare(pin, merchant.bulkPayPin);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Invalid PIN' });
+    }
 
     // 1. Calculate Totals
     let totalGross = 0;
@@ -224,8 +305,8 @@ export const authorizeBatch = async (req, res) => {
           PartyA: process.env.MPESA_SHORTCODE || '600000',
           PartyB: payee.phone,
           Remarks: `Bulk Payout to ${payee.name}`,
-          QueueTimeOutURL: 'https://your-domain.com/api/callbacks/timeout',
-          ResultURL: 'https://your-domain.com/api/callbacks/result',
+          QueueTimeOutURL: 'https://shiny-horses-write.loca.lt/api/callbacks/timeout',
+          ResultURL: 'https://shiny-horses-write.loca.lt/api/callbacks/result',
           Occasion: 'PayChain Settlement'
         } : {
           // B2B Payload
@@ -239,8 +320,8 @@ export const authorizeBatch = async (req, res) => {
           PartyB: payee.paybillNumber || payee.tillNumber,
           AccountReference: payee.businessAccount || 'Settlement',
           Remarks: `Bulk B2B Payout to ${payee.name}`,
-          QueueTimeOutURL: 'https://your-domain.com/api/callbacks/timeout',
-          ResultURL: 'https://your-domain.com/api/callbacks/result',
+          QueueTimeOutURL: 'https://shiny-horses-write.loca.lt/api/callbacks/timeout',
+          ResultURL: 'https://shiny-horses-write.loca.lt/api/callbacks/result',
         };
 
         try {
@@ -249,7 +330,7 @@ export const authorizeBatch = async (req, res) => {
           });
           darajaRef = mpesaRes.data.OriginatorConversationID || darajaRef;
         } catch (err) {
-          console.warn(`Daraja API skipped or failed for ${payee.name}, falling back to simulation.`);
+          console.warn(`Daraja API failed for ${payee.name}, falling back to simulation. Error:`, err.response?.data?.errorMessage || err.message);
         }
       }
 
@@ -312,7 +393,10 @@ export const authorizeBatch = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Bulk Pay Error:', error);
-    res.status(500).json({ message: 'Failed to authorize batch', error: error.message });
+    console.error('Bulk Pay Error:', error.response?.data || error);
+    res.status(500).json({ 
+      message: error.response?.data?.errorMessage || 'Failed to authorize batch', 
+      error: error.message 
+    });
   }
 };

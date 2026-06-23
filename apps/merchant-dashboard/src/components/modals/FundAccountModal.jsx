@@ -144,15 +144,15 @@ export default function FundAccountModal({ method, onClose }) {
                   
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">M-Pesa / Airtel Number</label>
                   <div className="flex items-center gap-3">
-                    <span className="text-emerald-400 font-bold text-xl tracking-wider">+254</span>
+                    <span className="material-symbols-outlined text-emerald-400 text-xl tracking-wider">smartphone</span>
                     <input 
                       type="tel" 
-                      value={phone.replace(/^(?:\+?254|0)/, '')}
+                      value={phone}
                       onChange={(e) => {
                         const val = e.target.value.replace(/\D/g, '');
-                        setPhone(val ? `254${val}` : '');
+                        setPhone(val);
                       }}
-                      placeholder="712 345 678"
+                      placeholder="0712 345 678"
                       className="w-full bg-transparent text-white text-3xl font-headline font-bold outline-none placeholder-slate-700 caret-emerald-500 tracking-wide"
                       required
                     />

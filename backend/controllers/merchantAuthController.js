@@ -89,7 +89,7 @@ export const verifyMerchantOTP = async (req, res) => {
   const { email, otp } = req.body;
 
   try {
-    const merchant = await Merchant.findOne({ email });
+    const merchant = await Merchant.findOne({ email }).select('+password +bulkPayPin');
 
     if (!merchant) {
       return res.status(401).json({ error: 'Invalid request' });
@@ -128,7 +128,12 @@ export const verifyMerchantOTP = async (req, res) => {
         loginCount: merchant.loginCount,
         kraPin: merchant.kraPin,
         businessNumber: merchant.businessNumber,
-        isKRAVerified: merchant.isKRAVerified
+        isKRAVerified: merchant.isKRAVerified,
+        settlementMobile: merchant.settlementMobile,
+        settlementBankName: merchant.settlementBankName,
+        settlementBankAccount: merchant.settlementBankAccount,
+        hasBulkPayPin: !!merchant.bulkPayPin,
+        biometricsEnabled: merchant.biometricsEnabled
       },
       token: generateToken(merchant._id)
     });
@@ -148,7 +153,7 @@ export const loginMerchant = async (req, res) => {
   try {
     const merchant = await Merchant.findOne({ 
       $or: [{ email: loginIdentifier }, { phone: loginIdentifier }] 
-    }).select('+password');
+    }).select('+password +bulkPayPin');
     
     if (!merchant) {
       return res.status(401).json({ error: 'Invalid email/phone or password' });
@@ -194,7 +199,7 @@ export const biometricLogin = async (req, res) => {
   }
 
   try {
-    const merchant = await Merchant.findOne({ email });
+    const merchant = await Merchant.findOne({ email }).select('+bulkPayPin');
 
     if (!merchant) {
       return res.status(401).json({ error: 'Invalid biometric credential' });
@@ -238,7 +243,12 @@ export const biometricLogin = async (req, res) => {
         usdcBalance: merchant.usdcBalance,
         stellarPublicKey: merchant.stellarPublicKey,
         status: merchant.status,
-        loginCount: merchant.loginCount
+        loginCount: merchant.loginCount,
+        settlementMobile: merchant.settlementMobile,
+        settlementBankName: merchant.settlementBankName,
+        settlementBankAccount: merchant.settlementBankAccount,
+        hasBulkPayPin: !!merchant.bulkPayPin,
+        biometricsEnabled: merchant.biometricsEnabled
       },
       token: generateToken(merchant._id)
     });
@@ -377,7 +387,7 @@ export const changeMerchantPassword = async (req, res) => {
 // @access  Private (Merchant)
 export const getMerchantMe = async (req, res) => {
   try {
-    const merchant = await Merchant.findById(req.merchant._id);
+    const merchant = await Merchant.findById(req.merchant._id).select('+bulkPayPin');
     if (!merchant) {
       return res.status(404).json({ error: 'Merchant not found' });
     }
@@ -413,7 +423,12 @@ export const getMerchantMe = async (req, res) => {
         loginCount: merchant.loginCount,
         kraPin: merchant.kraPin,
         businessNumber: merchant.businessNumber,
-        isKRAVerified: merchant.isKRAVerified
+        isKRAVerified: merchant.isKRAVerified,
+        settlementMobile: merchant.settlementMobile,
+        settlementBankName: merchant.settlementBankName,
+        settlementBankAccount: merchant.settlementBankAccount,
+        hasBulkPayPin: !!merchant.bulkPayPin,
+        biometricsEnabled: merchant.biometricsEnabled
       }
     });
   } catch (error) {
@@ -427,12 +442,12 @@ export const getMerchantMe = async (req, res) => {
 // @access  Private (Merchant)
 export const updateMerchantProfile = async (req, res) => {
   try {
-    const merchant = await Merchant.findById(req.merchant._id);
+    const merchant = await Merchant.findById(req.merchant._id).select('+bulkPayPin');
     if (!merchant) {
       return res.status(404).json({ error: 'Merchant not found' });
     }
 
-    const { kraPin, businessNumber } = req.body;
+    const { kraPin, businessNumber, settlementMobile, settlementBankName, settlementBankAccount } = req.body;
     
     // Validate KRA Pin and Mock eTIMS API
     if (kraPin !== undefined && kraPin !== merchant.kraPin) {
@@ -451,6 +466,9 @@ export const updateMerchantProfile = async (req, res) => {
     }
 
     if (businessNumber !== undefined) merchant.businessNumber = businessNumber;
+    if (settlementMobile !== undefined) merchant.settlementMobile = settlementMobile;
+    if (settlementBankName !== undefined) merchant.settlementBankName = settlementBankName;
+    if (settlementBankAccount !== undefined) merchant.settlementBankAccount = settlementBankAccount;
 
     await merchant.save();
 
@@ -472,11 +490,39 @@ export const updateMerchantProfile = async (req, res) => {
         loginCount: merchant.loginCount,
         kraPin: merchant.kraPin,
         businessNumber: merchant.businessNumber,
-        isKRAVerified: merchant.isKRAVerified
+        isKRAVerified: merchant.isKRAVerified,
+        settlementMobile: merchant.settlementMobile,
+        settlementBankAccount: merchant.settlementBankAccount,
+        hasBulkPayPin: !!merchant.bulkPayPin,
+        biometricsEnabled: merchant.biometricsEnabled
       }
     });
   } catch (error) {
     console.error('Update Merchant Profile Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Toggle Biometrics
+// @route   PUT /api/auth/merchant/biometrics
+// @access  Private (Merchant)
+export const toggleBiometrics = async (req, res) => {
+  try {
+    const merchant = await Merchant.findById(req.merchant._id);
+    if (!merchant) {
+      return res.status(404).json({ error: 'Merchant not found' });
+    }
+
+    merchant.biometricsEnabled = req.body.enabled;
+    await merchant.save();
+
+    res.json({
+      success: true,
+      message: `Biometrics ${merchant.biometricsEnabled ? 'enabled' : 'disabled'} successfully`,
+      biometricsEnabled: merchant.biometricsEnabled
+    });
+  } catch (error) {
+    console.error('Toggle Biometrics Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };
