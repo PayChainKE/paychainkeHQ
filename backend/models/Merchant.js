@@ -64,6 +64,16 @@ const merchantSchema = new mongoose.Schema({
     select: false,
     default: null,
   },
+  appPin: {
+    type: String,
+    select: false,
+    default: null,
+  },
+  registrationSource: {
+    type: String,
+    enum: ['web', 'mobile'],
+    default: 'web',
+  },
   biometricsEnabled: {
     type: Boolean,
     default: false,

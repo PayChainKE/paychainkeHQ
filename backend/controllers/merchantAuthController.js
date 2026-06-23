@@ -3,6 +3,7 @@ import { sendOTP, sendWelcomeEmail } from '../utils/resend.js';
 import generateToken from '../utils/generateToken.js';
 import { provisionMerchantWallet, getWalletBalance } from '../utils/stellarHelper.js';
 import { encryptKey } from '../utils/cryptoHelper.js';
+import bcrypt from 'bcryptjs';
 
 // Helper to generate unique 5-digit account number
 const generateUniquePaybillAccount = async () => {
@@ -20,7 +21,7 @@ const generateUniquePaybillAccount = async () => {
 // @route   POST /api/auth/merchant/register
 // @access  Public
 export const registerMerchant = async (req, res) => {
-  let { name, email, phone, businessName, password } = req.body;
+  let { name, email, phone, businessName, password, registrationSource } = req.body;
   const certificateFile = req.file;
 
   if (phone) phone = phone.replace(/\s+/g, '');
@@ -53,7 +54,8 @@ export const registerMerchant = async (req, res) => {
       usdcBalance: 0,
       stellarPublicKey: null,
       stellarEncryptedSecretKey: null,
-      isVerified: true // The user requested immediate login redirection, setting isVerified true for smoother flow.
+      isVerified: true, // The user requested immediate login redirection, setting isVerified true for smoother flow.
+      registrationSource: registrationSource === 'mobile' ? 'mobile' : 'web'
     });
 
     if (merchant) {
@@ -548,6 +550,37 @@ export const toggleBiometrics = async (req, res) => {
     });
   } catch (error) {
     console.error('Toggle Biometrics Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Set Mobile App PIN
+// @route   POST /api/auth/merchant/set-app-pin
+// @access  Private (Merchant)
+export const setAppPin = async (req, res) => {
+  try {
+    const { pin } = req.body;
+    if (!pin || pin.length !== 4) {
+      return res.status(400).json({ error: 'A valid 4-digit PIN is required' });
+    }
+
+    const merchant = await Merchant.findById(req.merchant._id).select('+appPin');
+    if (!merchant) {
+      return res.status(404).json({ error: 'Merchant not found' });
+    }
+
+    // Hash the 4-digit PIN using bcrypt
+    const salt = await bcrypt.genSalt(10);
+    merchant.appPin = await bcrypt.hash(pin, salt);
+    
+    await merchant.save();
+
+    res.json({
+      success: true,
+      message: 'App PIN synced successfully'
+    });
+  } catch (error) {
+    console.error('Set App PIN Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };

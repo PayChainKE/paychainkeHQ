@@ -16,7 +16,7 @@ const KENYAN_COUNTIES = [
   "Uasin Gishu", "Vihiga", "Wajir", "West Pokot"
 ];
 
-export default function Login() {
+export default function Login({ route }: any) {
   const { login, biometricLogin, signup, verifyOTP, resendOTP, forgotPassword, resetPassword } = useAuth();
   
   const [phone, setPhone] = useState('');
@@ -49,7 +49,7 @@ export default function Login() {
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
 
   // Navigation Tabs
-  const [activeTab, setActiveTab] = useState('login');
+  const [activeTab, setActiveTab] = useState(route?.params?.initialTab || 'login');
   const [isSignupSuccess, setIsSignupSuccess] = useState(false);
   const [isSignupPasswordStep, setIsSignupPasswordStep] = useState(false);
   const [isSignupBiometricStep, setIsSignupBiometricStep] = useState(false);
@@ -151,6 +151,8 @@ export default function Login() {
       if (otpFlowType === 'reset') {
         setIsResetMode(true);
       }
+      // If otpFlowType === 'signup' or 'login', verifyOTP successfully sets the session context,
+      // which will instantly unmount the Login screen and move to PinSetup or Dashboard.
       setErr('');
     } else {
       setErr(res.error);
@@ -227,12 +229,10 @@ export default function Login() {
     
     if (res.success) {
       setIsSignupPasswordStep(false);
-      const compatible = await LocalAuthentication.hasHardwareAsync();
-      if (compatible) {
-        setIsSignupBiometricStep(true);
-      } else {
-        setIsSignupSuccess(true);
-      }
+      setAuthEmail(signupEmail);
+      setOtpFlowType('signup');
+      setIsOTPMode(true);
+      setResendTimer(59);
     } else {
       setErr(res.error);
     }

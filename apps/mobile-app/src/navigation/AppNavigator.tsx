@@ -14,6 +14,10 @@ import SupportPage from '../pages/SupportPage';
 import Login from '../pages/Login';
 import SetPassword from '../pages/SetPassword';
 import Transactions from '../pages/Transactions';
+import Onboarding from '../pages/Onboarding';
+import PinSetup from '../pages/PinSetup';
+import PinEntry from '../pages/PinEntry';
+import BiometricSetup from '../pages/BiometricSetup';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -97,7 +101,7 @@ import { useAuth } from '../context/AuthContext';
 import { View, ActivityIndicator } from 'react-native';
 
 export default function AppNavigator() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, hasCompletedOnboarding, appPin, isPinUnlocked, hasSetBiometrics } = useAuth();
 
   if (isLoading) {
     return (
@@ -110,11 +114,22 @@ export default function AppNavigator() {
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {!isAuthenticated ? (
+        {!hasCompletedOnboarding ? (
+          <>
+            <Stack.Screen name="Onboarding" component={Onboarding} />
+            <Stack.Screen name="Login" component={Login} />
+          </>
+        ) : !isAuthenticated ? (
           <>
             <Stack.Screen name="Login" component={Login} />
             <Stack.Screen name="SetPassword" component={SetPassword} />
           </>
+        ) : !appPin ? (
+          <Stack.Screen name="PinSetup" component={PinSetup} />
+        ) : !hasSetBiometrics ? (
+          <Stack.Screen name="BiometricSetup" component={BiometricSetup} />
+        ) : !isPinUnlocked ? (
+          <Stack.Screen name="PinEntry" component={PinEntry} />
         ) : (
           <>
             <Stack.Screen name="Main" component={MainTabs} />

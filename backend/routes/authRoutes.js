@@ -11,7 +11,8 @@ import {
   changeMerchantPassword,
   getMerchantMe,
   updateMerchantProfile,
-  toggleBiometrics
+  toggleBiometrics,
+  setAppPin
 } from '../controllers/merchantAuthController.js';
 import { protectMerchant } from '../middleware/authMiddleware.js';
 import { upload } from '../utils/cloudinary.js';
@@ -34,5 +35,6 @@ router.put('/merchant/change-password', protectMerchant, changeMerchantPassword)
 router.get('/merchant/me', protectMerchant, getMerchantMe);
 router.put('/merchant/profile', protectMerchant, updateMerchantProfile);
 router.put('/merchant/biometrics', protectMerchant, toggleBiometrics);
+router.post('/merchant/set-app-pin', protectMerchant, setAppPin);
 
 export default router;
