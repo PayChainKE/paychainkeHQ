@@ -66,7 +66,7 @@ export default function SupportPage() {
           {/* Hero Section */}
           <View className="mb-12">
             <Text style={{ fontFamily: 'DMSerifDisplay_400Regular_Italic' }} className="text-[22px] text-[#00351d] mb-4 tracking-wide">Collect. Pay. Grow.</Text>
-            <Text className="font-jakarta-extrabold text-[52px] text-[#00351d] leading-[54px] tracking-tight mb-4">Help &{'\n'}Support</Text>
+            <Text className="font-jakarta-extrabold text-4xl text-[#00351d] leading-tight tracking-tight mb-4">Help &{'\n'}Support</Text>
             <Text className="font-jakarta-medium text-[#404942] text-[16px] leading-relaxed max-w-[280px]">
               How can we assist your business growth today?
             </Text>

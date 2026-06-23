@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>PayChain — Cash Advance</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&amp;family=DM+Serif+Display:ital@0;1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-tertiary": "#ffffff",
+              "on-surface-variant": "#404942",
+              "primary-fixed": "#b1f1c6",
+              "on-secondary-fixed": "#002115",
+              "error-container": "#ffdad6",
+              "surface-container-lowest": "#ffffff",
+              "on-tertiary-container": "#a0b4ad",
+              "on-primary-fixed-variant": "#115132",
+              "surface-dim": "#dbdad7",
+              "on-primary-fixed": "#002110",
+              "on-primary-container": "#80bd95",
+              "on-error-container": "#93000a",
+              "surface": "#faf9f6",
+              "secondary-container": "#83f5c6",
+              "surface-container-high": "#e9e8e5",
+              "on-secondary-container": "#007151",
+              "secondary-fixed-dim": "#68dbae",
+              "on-tertiary-fixed": "#0d1f1b",
+              "surface-container-highest": "#e3e2df",
+              "primary": "#00351d",
+              "on-secondary-fixed-variant": "#00513a",
+              "on-surface": "#1b1c1a",
+              "surface-variant": "#e3e2df",
+              "outline-variant": "#c0c9c0",
+              "primary-fixed-dim": "#96d4ab",
+              "secondary": "#006c4e",
+              "primary-container": "#0b4d2e",
+              "error": "#ba1a1a",
+              "on-tertiary-fixed-variant": "#394a45",
+              "on-primary": "#ffffff",
+              "background": "#faf9f6",
+              "surface-tint": "#2e6a48",
+              "surface-container": "#efeeeb",
+              "secondary-fixed": "#86f8c9",
+              "tertiary-container": "#354641",
+              "tertiary": "#1f302b",
+              "on-secondary": "#ffffff",
+              "surface-container-low": "#f4f3f0",
+              "outline": "#707971",
+              "inverse-on-surface": "#f2f1ee",
+              "on-background": "#1b1c1a",
+              "surface-bright": "#faf9f6",
+              "inverse-surface": "#2f312f",
+              "tertiary-fixed-dim": "#b7cbc4",
+              "tertiary-fixed": "#d3e7e0",
+              "on-error": "#ffffff",
+              "inverse-primary": "#96d4ab"
+            },
+            fontFamily: {
+              "headline": ["Plus Jakarta Sans"],
+              "body": ["Plus Jakarta Sans"],
+              "label": ["Plus Jakarta Sans"]
+            },
+            borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      body { background-color: #faf9f6; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="font-body text-on-surface antialiased pb-32 min-h-screen">
+<!-- Top Navigation Bar -->
+<header class="w-full top-0 sticky z-50 no-border tonal-shift bg-[#efeeeb]/80 dark:bg-gray-800/80 backdrop-blur-xl flex justify-between items-center px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center overflow-hidden">
+<img alt="Merchant Profile" class="w-full h-full object-cover" data-alt="Close up portrait of a confident Kenyan business owner in a clean professional studio setting with soft lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDUxomkKEjPwCaoMLGbD9x39GaT4SxlJPOQxmFjMxF-lNtzLIPTj5tlO6KSToQb3-XZ5sNoe2piLrmGahv9fwOwbRU7Es2Z3B9VWkolQafIrHf68Qvg92mKVCTLhEzyBpbjss0bmGzvBc_lrahfyyvUtToEP8i6I7tKFoyj5YdAv_8QVU30ca1TDl3tOYF4RaXtyHgHnvHVptxv6cql0qlXQDjzj6P3mQlC70E0lnpsTrEDhLQEen26XJ5Y8MNyKhiHmBw2lt5ikyo"/>
+</div>
+<span class="font-['DM_Serif_Display'] italic text-2xl text-[#0b4d2e] dark:text-emerald-500">PayChain</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-[#0b4d2e] dark:text-emerald-500 hover:opacity-80 transition-opacity">notifications</button>
+</div>
+</header>
+<main class="px-6 pt-8 max-w-2xl mx-auto space-y-8">
+<!-- Header Section -->
+<section class="flex flex-col gap-2">
+<div class="flex items-center gap-3">
+<div class="w-12 h-12 bg-primary-fixed rounded-2xl flex items-center justify-center">
+<span class="material-symbols-outlined text-primary text-2xl" data-icon="payments">payments</span>
+</div>
+<div>
+<h1 class="font-headline font-extrabold text-3xl tracking-tight text-primary">Cash Advance</h1>
+<p class="text-sm text-on-surface-variant font-medium">Based on your 5-month transaction history</p>
+</div>
+</div>
+</section>
+<!-- Advance Status Card (Bento Style) -->
+<section class="bg-surface-container-lowest rounded-xl p-8 shadow-[0_4px_30px_rgba(0,53,29,0.04)] relative overflow-hidden">
+<div class="absolute top-0 right-0 w-32 h-32 bg-primary-fixed/30 rounded-full -mr-16 -mt-16 blur-3xl"></div>
+<div class="flex flex-col gap-6 relative z-10">
+<div class="space-y-1">
+<span class="text-xs font-bold uppercase tracking-widest text-secondary flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+                        Active Advance
+                    </span>
+<h2 class="font-headline font-bold text-4xl text-primary tracking-tighter">KES 150,000</h2>
+<p class="text-xs text-on-surface-variant">Disbursed 1 Feb 2026</p>
+</div>
+<!-- Repayment Progress -->
+<div class="space-y-3">
+<div class="flex justify-between items-end">
+<div class="space-y-0.5">
+<p class="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">Repayment Progress</p>
+<p class="text-sm font-semibold text-primary">KES 67,500 repaid of KES 150,000</p>
+</div>
+<p class="text-2xl font-['DM_Serif_Display'] text-primary">45%</p>
+</div>
+<div class="h-4 w-full bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-gradient-to-r from-primary to-secondary rounded-full w-[45%]"></div>
+</div>
+<div class="flex justify-between items-center text-[11px] font-bold text-on-surface-variant uppercase tracking-widest">
+<span>45% complete</span>
+<span>Est. done 15 Apr 2026</span>
+</div>
+</div>
+<div class="pt-4 border-t border-outline-variant/10">
+<div class="flex items-center justify-between">
+<span class="text-sm text-on-surface-variant">Rate</span>
+<span class="text-sm font-bold text-primary">8% of daily collections</span>
+</div>
+</div>
+</div>
+</section>
+<!-- How It Works Card (The "Growth Ribbon" Inspired) -->
+<section class="bg-primary-fixed rounded-xl p-6 flex items-start gap-4">
+<span class="material-symbols-outlined text-on-primary-fixed-variant mt-1" data-icon="info">info</span>
+<div class="space-y-1">
+<p class="font-['DM_Serif_Display'] text-lg text-on-primary-fixed-variant leading-tight">Automated Repayment</p>
+<p class="text-sm text-on-primary-fixed leading-relaxed">
+                    8% of each day's collections automatically applied to your advance. <span class="font-bold">No manual transfers required.</span>
+</p>
+</div>
+</section>
+<!-- Advance History Section (Asymmetric Editorial Style) -->
+<section class="space-y-6">
+<div class="flex items-center justify-between">
+<h3 class="font-headline font-bold text-xl text-primary">Advance History</h3>
+<button class="text-xs font-bold uppercase tracking-widest text-secondary flex items-center gap-1">
+                    Filter <span class="material-symbols-outlined text-sm" data-icon="keyboard_arrow_down">keyboard_arrow_down</span>
+</button>
+</div>
+<div class="space-y-4">
+<!-- History Item 1 -->
+<div class="group bg-surface-container-low p-5 rounded-lg flex items-center justify-between hover:bg-surface-container-high transition-colors">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="receipt_long">receipt_long</span>
+</div>
+<div>
+<p class="font-bold text-primary">KES 85,000</p>
+<p class="text-xs text-on-surface-variant">Oct 2025 — Jan 2026</p>
+</div>
+</div>
+<span class="px-3 py-1 bg-secondary-container text-on-secondary-container text-[10px] font-bold uppercase rounded-full tracking-widest">Completed</span>
+</div>
+<!-- History Item 2 -->
+<div class="group bg-surface-container-low p-5 rounded-lg flex items-center justify-between hover:bg-surface-container-high transition-colors">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="receipt_long">receipt_long</span>
+</div>
+<div>
+<p class="font-bold text-primary">KES 40,000</p>
+<p class="text-xs text-on-surface-variant">June 2025 — Aug 2025</p>
+</div>
+</div>
+<span class="px-3 py-1 bg-secondary-container text-on-secondary-container text-[10px] font-bold uppercase rounded-full tracking-widest">Completed</span>
+</div>
+</div>
+</section>
+</main>
+<!-- Bottom Navigation Bar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 bg-[#ffffff]/80 dark:bg-gray-900/80 backdrop-blur-lg shadow-[0_-4px_40px_rgba(11,77,46,0.06)] rounded-t-[2.5rem]">
+<!-- Home -->
+<a class="flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 px-5 py-2 hover:text-[#0b4d2e] transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[11px] font-semibold uppercase tracking-wider mt-1">Home</span>
+</a>
+<!-- Advance (Active) -->
+<a class="flex flex-col items-center justify-center bg-[#b1f1c6] dark:bg-emerald-900/40 text-[#00351d] dark:text-emerald-100 rounded-[1.5rem] px-5 py-2 scale-105 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="payments" style="font-variation-settings: 'FILL' 1;">payments</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[11px] font-semibold uppercase tracking-wider mt-1">Advance</span>
+</a>
+<!-- History -->
+<a class="flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 px-5 py-2 hover:text-[#0b4d2e] transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="receipt_long">receipt_long</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[11px] font-semibold uppercase tracking-wider mt-1">History</span>
+</a>
+<!-- Settings -->
+<a class="flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 px-5 py-2 hover:text-[#0b4d2e] transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[11px] font-semibold uppercase tracking-wider mt-1">Settings</span>
+</a>
+</nav>
+</body></html>

@@ -29,7 +29,7 @@ export default function Profile() {
           <View className="flex-col items-center mb-12">
             <View className="relative mb-6">
               <View className="w-[120px] h-[120px] rounded-full bg-[#00351d] flex items-center justify-center shadow-lg shadow-[#00351d]/10">
-                <Text className="text-white text-[48px] font-jakarta-extrabold tracking-tight">JK</Text>
+                <Text className="text-white text-4xl font-jakarta-extrabold tracking-tight">JK</Text>
               </View>
               <View className="absolute bottom-1 right-1 w-[30px] h-[30px] bg-[#006c4e] rounded-full flex items-center justify-center border-[3px] border-[#faf9f6] shadow-sm">
                 <MaterialIcons name="verified" size={14} color="white" />

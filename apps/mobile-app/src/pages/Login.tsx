@@ -22,9 +22,9 @@ export default function Login({ navigation }: any) {
                 <Text className="text-[#68dbae] text-[12px] font-jakarta-bold tracking-[0.15em] uppercase mt-1">Merchant Portal</Text>
               </View>
               <View>
-                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[52px] text-white leading-tight">Collect.</Text>
-                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[52px] text-[#68dbae] leading-tight">Pay.</Text>
-                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[52px] text-white leading-tight">Grow.</Text>
+                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-4xl text-white leading-tight">Collect.</Text>
+                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-4xl text-[#68dbae] leading-tight">Pay.</Text>
+                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-4xl text-white leading-tight">Grow.</Text>
               </View>
             </View>
 

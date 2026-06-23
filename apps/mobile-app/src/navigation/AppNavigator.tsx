@@ -13,6 +13,7 @@ import InflationShield from '../pages/InflationShield';
 import SupportPage from '../pages/SupportPage';
 import Login from '../pages/Login';
 import SetPassword from '../pages/SetPassword';
+import Transactions from '../pages/Transactions';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -26,21 +27,20 @@ function MainTabs() {
         tabBarActiveTintColor: '#00351d',
         tabBarInactiveTintColor: '#1b1c1a80',
         tabBarStyle: {
-          backgroundColor: 'rgba(255, 255, 255, 0.95)',
-          borderTopWidth: 0,
-          elevation: 0,
-          shadowOpacity: 0,
-          height: 65,
-          paddingBottom: 10,
-          paddingTop: 10,
-          position: 'absolute',
+          backgroundColor: '#ffffff',
+          borderTopWidth: 1,
+          borderTopColor: '#efeeeb',
+          elevation: 10,
+          shadowOpacity: 0.05,
+          shadowRadius: 10,
+          shadowOffset: { width: 0, height: -5 },
         },
         tabBarLabelStyle: {
           fontFamily: 'PlusJakartaSans_600SemiBold',
           fontSize: 10,
-          marginTop: 4,
           textTransform: 'uppercase',
           letterSpacing: 0.5,
+          paddingBottom: 4,
         }
       }}
     >
@@ -101,6 +101,8 @@ export default function AppNavigator() {
         <Stack.Screen name="SetPassword" component={SetPassword} />
         <Stack.Screen name="Main" component={MainTabs} />
         <Stack.Screen name="InflationShield" component={InflationShield} />
+        <Stack.Screen name="SupportPage" component={SupportPage} />
+        <Stack.Screen name="Transactions" component={Transactions} />
       </Stack.Navigator>
     </NavigationContainer>
   );

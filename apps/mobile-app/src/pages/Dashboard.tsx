@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function Dashboard({ navigation }: any) {
+
   return (
     <SafeAreaView className="flex-1 bg-[#faf9f6]" edges={['top', 'left', 'right']}>
       <ScrollView 
@@ -18,30 +19,37 @@ export default function Dashboard({ navigation }: any) {
             colors={['#1D9E75', '#0B4D2E']}
             start={{ x: 0, y: 0 }}
             end={{ x: 0, y: 1 }}
-            className="px-6 pt-6 pb-20 rounded-b-[40px] z-0"
+            className="px-6 pt-[150px] pb-40 rounded-b-[40px] z-0 shadow-lg shadow-[#0b4d2e]/20"
           >
-            <View className="flex-row justify-between items-center mb-8">
-              <View className="flex-row items-center gap-3">
-                <View className="w-10 h-10 rounded-full bg-white/20 items-center justify-center border border-white/30">
+            <View className="flex-row justify-between items-center mb-10 mt-4">
+              <View className="flex-row items-center gap-3 pl-3">
+                <TouchableOpacity 
+                  onPress={() => navigation?.navigate('More')}
+                  className="w-10 h-10 rounded-full bg-white/20 items-center justify-center border border-white/30"
+                >
                   <Text className="text-white font-jakarta-bold text-sm">JK</Text>
-                </View>
+                </TouchableOpacity>
                 <View>
-                  <Text className="text-white/80 text-[11px] font-jakarta-medium uppercase tracking-wider mb-0.5">Good morning 👋</Text>
-                  <Text className="text-white text-lg font-jakarta-bold">Kamau General Store</Text>
+                  <Text className="text-white/80 text-[11px] font-jakarta-bold uppercase tracking-wider mb-0.5">Good morning 👋</Text>
+                  <Text className="text-white text-base font-jakarta-bold tracking-tight">Kamau General Store</Text>
                 </View>
               </View>
-              <TouchableOpacity className="w-10 h-10 rounded-full bg-white/10 items-center justify-center">
+              <TouchableOpacity className="w-10 h-10 rounded-full bg-white/10 items-center justify-center border border-white/10 mr-3">
                 <MaterialIcons name="notifications" size={20} color="white" />
               </TouchableOpacity>
             </View>
 
-            <View className="mb-2">
-              <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', letterSpacing: -1.5 }} className="text-[52px] text-white leading-none">
+            <View className="mb-2 pl-3">
+              <Text className="text-white/80 text-[11px] font-jakarta-bold uppercase tracking-widest mb-1">Total Balance</Text>
+              <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', letterSpacing: -1 }} className="text-4xl text-white leading-none">
                 KES 184,250
               </Text>
-              <View className="flex-row items-center justify-between mt-3">
-                <Text className="text-[#83f5c6] font-jakarta-medium text-sm">+KES 18,450 today</Text>
-                <View className="bg-white/20 px-3 py-1.5 rounded-full">
+              <View className="flex-row items-center justify-between mt-4">
+                <View className="flex-row items-center gap-1.5 bg-[#83f5c6]/20 px-3 py-1.5 rounded-full border border-[#83f5c6]/20">
+                  <Feather name="trending-up" size={14} color="#83f5c6" />
+                  <Text className="text-[#83f5c6] font-jakarta-bold text-sm">+KES 18,450 today</Text>
+                </View>
+                <View className="bg-white/10 px-3 py-1.5 rounded-full border border-white/20 mb-1">
                   <Text className="text-white text-[10px] font-jakarta-bold uppercase tracking-widest">Till No: PC847291</Text>
                 </View>
               </View>
@@ -49,38 +57,38 @@ export default function Dashboard({ navigation }: any) {
           </LinearGradient>
 
           {/* Action Buttons (overlapping) */}
-          <View className="px-6 flex-row justify-between -mt-10 mb-8 z-10">
+          <View className="px-6 flex-row justify-between -mt-6 mb-10 z-10">
             <TouchableOpacity className="items-center" activeOpacity={0.8}>
-              <View className="w-16 h-16 rounded-full bg-white shadow-lg shadow-black/10 items-center justify-center mb-2">
-                <View className="w-10 h-10 rounded-full bg-[#b1f1c6] items-center justify-center">
-                  <Feather name="plus-circle" size={20} color="#00351d" />
+              <View className="w-[72px] h-[72px] rounded-full bg-white shadow-lg shadow-black/10 items-center justify-center mb-2.5">
+                <View className="w-12 h-12 rounded-full bg-[#b1f1c6] items-center justify-center">
+                  <Feather name="plus-circle" size={24} color="#00351d" />
                 </View>
               </View>
               <Text className="text-[11px] font-jakarta-bold text-[#1b1c1a] uppercase tracking-widest">Collect</Text>
             </TouchableOpacity>
 
             <TouchableOpacity className="items-center" activeOpacity={0.8}>
-              <View className="w-16 h-16 rounded-full bg-white shadow-lg shadow-black/10 items-center justify-center mb-2">
-                <View className="w-10 h-10 rounded-full bg-[#efeeeb] items-center justify-center">
-                  <MaterialIcons name="payments" size={20} color="#00351d" />
+              <View className="w-[72px] h-[72px] rounded-full bg-white shadow-lg shadow-black/10 items-center justify-center mb-2.5">
+                <View className="w-12 h-12 rounded-full bg-[#efeeeb] items-center justify-center">
+                  <MaterialIcons name="payments" size={24} color="#00351d" />
                 </View>
               </View>
               <Text className="text-[11px] font-jakarta-bold text-[#1b1c1a] uppercase tracking-widest">Pay</Text>
             </TouchableOpacity>
 
             <TouchableOpacity className="items-center" activeOpacity={0.8} onPress={() => navigation?.navigate('InflationShield')}>
-              <View className="w-16 h-16 rounded-full bg-white shadow-lg shadow-black/10 items-center justify-center mb-2">
-                <View className="w-10 h-10 rounded-full bg-[#83f5c6] items-center justify-center">
-                  <MaterialIcons name="swap-horiz" size={20} color="#00351d" />
+              <View className="w-[72px] h-[72px] rounded-full bg-white shadow-lg shadow-black/10 items-center justify-center mb-2.5">
+                <View className="w-12 h-12 rounded-full bg-[#83f5c6] items-center justify-center">
+                  <MaterialIcons name="swap-horiz" size={24} color="#00351d" />
                 </View>
               </View>
               <Text className="text-[11px] font-jakarta-bold text-[#1b1c1a] uppercase tracking-widest">Swap</Text>
             </TouchableOpacity>
 
             <TouchableOpacity className="items-center" activeOpacity={0.8}>
-              <View className="w-16 h-16 rounded-full bg-white shadow-lg shadow-black/10 items-center justify-center mb-2">
-                <View className="w-10 h-10 rounded-full bg-[#e8eaf6] items-center justify-center">
-                  <Feather name="trending-up" size={20} color="#3f51b5" />
+              <View className="w-[72px] h-[72px] rounded-full bg-white shadow-lg shadow-black/10 items-center justify-center mb-2.5">
+                <View className="w-12 h-12 rounded-full bg-[#e8eaf6] items-center justify-center">
+                  <Feather name="trending-up" size={24} color="#3f51b5" />
                 </View>
               </View>
               <Text className="text-[11px] font-jakarta-bold text-[#1b1c1a] uppercase tracking-widest">Advance</Text>
@@ -92,7 +100,7 @@ export default function Dashboard({ navigation }: any) {
             <View className="bg-[#b1f1c6] rounded-[24px] p-5 flex-row items-center justify-between shadow-sm">
               <View>
                 <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[22px] text-[#00351d] mb-1">
-                  Collect. Pay. Grow.
+                  Collect. Pay. Protect. Grow.
                 </Text>
                 <Text className="text-[#006c4e] text-[10px] font-jakarta-bold uppercase tracking-widest">
                   Merchant Estate Status: Elite
@@ -113,7 +121,17 @@ export default function Dashboard({ navigation }: any) {
               </TouchableOpacity>
             </View>
             
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="px-6 overflow-visible" contentContainerStyle={{ paddingRight: 40 }}>
+            <ScrollView 
+              horizontal={true}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingLeft: 24, paddingRight: 24 }}
+              snapToInterval={296} // 280 (card) + 16 (margin)
+              decelerationRate="fast"
+              bounces={true}
+              alwaysBounceHorizontal={true}
+              overScrollMode="always"
+              className="w-full"
+            >
               <View className="bg-[#0b4d2e] w-[280px] h-[160px] rounded-[32px] p-6 mr-4 relative overflow-hidden shadow-md shadow-[#0b4d2e]/30">
                 <View className="absolute -right-8 -top-8 opacity-10">
                   <MaterialIcons name="account-balance-wallet" size={140} color="white" />
@@ -126,7 +144,7 @@ export default function Dashboard({ navigation }: any) {
                 </View>
               </View>
 
-              <View className="bg-[#1e293b] w-[200px] h-[160px] rounded-[32px] p-6 mr-4 relative overflow-hidden shadow-md shadow-[#1e293b]/30">
+              <View className="bg-[#1e293b] w-[280px] h-[160px] rounded-[32px] p-6 mr-4 relative overflow-hidden shadow-md shadow-[#1e293b]/30">
                 <View className="absolute -right-4 -top-4 opacity-10">
                   <MaterialIcons name="shield" size={100} color="white" />
                 </View>
@@ -140,10 +158,10 @@ export default function Dashboard({ navigation }: any) {
             </ScrollView>
           </View>
 
-          {/* Today's Performance */}
+          {/* This Month Performance */}
           <View className="px-6 mb-8">
             <View className="bg-white rounded-[32px] p-6 shadow-sm border border-[#c0c9c0]/10">
-              <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-[0.15em] mb-6">Today's Performance</Text>
+              <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-[0.15em] mb-6">This Month Performance</Text>
               <View className="flex-row justify-between">
                 <View>
                   <Text className="text-[#1b1c1a] text-[10px] font-jakarta-bold uppercase tracking-wider mb-1">Revenue</Text>
@@ -156,8 +174,10 @@ export default function Dashboard({ navigation }: any) {
                 </View>
                 <View className="w-[1px] h-full bg-[#efeeeb]" />
                 <View>
-                  <Text className="text-[#1b1c1a] text-[10px] font-jakarta-bold uppercase tracking-wider mb-1">Avg Ticket</Text>
-                  <Text className="text-[#1b1c1a] text-[16px] font-jakarta-extrabold">KES 1,537</Text>
+                  <Text className="text-[#1b1c1a] text-[10px] font-jakarta-bold uppercase tracking-wider mb-1">Trust Score</Text>
+                  <View className="flex-row items-center gap-1.5">
+                    <Text className="text-[#1b1c1a] text-[16px] font-jakarta-extrabold">0/100</Text>
+                  </View>
                 </View>
               </View>
             </View>
@@ -167,64 +187,89 @@ export default function Dashboard({ navigation }: any) {
           <View className="px-6 mb-8">
             <View className="flex-row items-center justify-between mb-4">
               <Text className="text-lg font-jakarta-bold text-[#1b1c1a]">Recent Activity</Text>
-              <TouchableOpacity>
-                <Text className="text-[#006c4e] text-[11px] font-jakarta-bold uppercase tracking-widest">See Records</Text>
+              <TouchableOpacity onPress={() => navigation?.navigate('Transactions')} className="bg-[#e7f8ef] px-3 py-1.5 rounded-full">
+                <Text className="text-[#006c4e] text-[10px] font-jakarta-bold uppercase tracking-widest">View All</Text>
               </TouchableOpacity>
             </View>
 
             <View className="bg-white rounded-[32px] p-2 shadow-sm border border-[#c0c9c0]/10">
-              <View className="flex-row items-center justify-between p-4 border-b border-[#efeeeb]/50">
-                <View className="flex-row items-center gap-4">
-                  <View className="w-12 h-12 rounded-full bg-[#83f5c6] items-center justify-center">
-                    <Text className="text-[#00351d] font-jakarta-bold text-sm">AM</Text>
+              <View className="flex-row items-center justify-between py-3 px-4 border-b border-[#efeeeb]/50">
+                <View className="flex-row items-center gap-3">
+                  <View className="w-10 h-10 rounded-full bg-[#83f5c6] items-center justify-center">
+                    <Text className="text-[#00351d] font-jakarta-bold text-[11px]">AM</Text>
                   </View>
                   <View>
                     <View className="flex-row items-center gap-1">
-                      <Text className="font-jakarta-bold text-[15px] text-[#1b1c1a]">Alice Mumbua</Text>
-                      <MaterialIcons name="verified" size={14} color="#006c4e" />
+                      <Text className="font-jakarta-bold text-[14px] text-[#1b1c1a]">Alice Mumbua</Text>
+                      <MaterialIcons name="verified" size={12} color="#006c4e" />
                     </View>
-                    <Text className="text-[#707971] text-[11px] font-jakarta-medium mt-0.5">09:42 AM • M-Pesa</Text>
+                    <Text className="text-[#707971] text-[10px] font-jakarta-medium mt-0.5">09:42 AM • M-Pesa</Text>
                   </View>
                 </View>
-                <View className="bg-[#e7f8ef] px-3 py-1.5 rounded-full">
-                  <Text className="text-[#006c4e] font-jakarta-bold text-sm">+KES 1,500</Text>
-                </View>
+                <Text className="text-[#006c4e] font-jakarta-bold text-[13px]">+KES 1,500</Text>
               </View>
 
-              <View className="flex-row items-center justify-between p-4 border-b border-[#efeeeb]/50">
-                <View className="flex-row items-center gap-4">
-                  <View className="w-12 h-12 rounded-full bg-[#efeeeb] items-center justify-center">
-                    <Text className="text-[#404942] font-jakarta-bold text-sm">BK</Text>
+              <View className="flex-row items-center justify-between py-3 px-4 border-b border-[#efeeeb]/50">
+                <View className="flex-row items-center gap-3">
+                  <View className="w-10 h-10 rounded-full bg-[#efeeeb] items-center justify-center">
+                    <Text className="text-[#404942] font-jakarta-bold text-[11px]">BK</Text>
                   </View>
                   <View>
                     <View className="flex-row items-center gap-1">
-                      <Text className="font-jakarta-bold text-[15px] text-[#1b1c1a]">Brian Kimani</Text>
-                      <MaterialIcons name="verified" size={14} color="#006c4e" />
+                      <Text className="font-jakarta-bold text-[14px] text-[#1b1c1a]">Brian Kimani</Text>
+                      <MaterialIcons name="verified" size={12} color="#006c4e" />
                     </View>
-                    <Text className="text-[#707971] text-[11px] font-jakarta-medium mt-0.5">09:15 AM • Bank Transfer</Text>
+                    <Text className="text-[#707971] text-[10px] font-jakarta-medium mt-0.5">09:15 AM • Bank Transfer</Text>
                   </View>
                 </View>
-                <View className="bg-[#e7f8ef] px-3 py-1.5 rounded-full">
-                  <Text className="text-[#006c4e] font-jakarta-bold text-sm">+KES 4,200</Text>
-                </View>
+                <Text className="text-[#006c4e] font-jakarta-bold text-[13px]">+KES 4,200</Text>
               </View>
 
-              <View className="flex-row items-center justify-between p-4">
-                <View className="flex-row items-center gap-4">
-                  <View className="w-12 h-12 rounded-full bg-[#efeeeb] items-center justify-center">
-                    <Text className="text-[#404942] font-jakarta-bold text-sm">JO</Text>
+              <View className="flex-row items-center justify-between py-3 px-4 border-b border-[#efeeeb]/50">
+                <View className="flex-row items-center gap-3">
+                  <View className="w-10 h-10 rounded-full bg-[#efeeeb] items-center justify-center">
+                    <Text className="text-[#404942] font-jakarta-bold text-[11px]">JO</Text>
                   </View>
                   <View>
                     <View className="flex-row items-center gap-1">
-                      <Text className="font-jakarta-bold text-[15px] text-[#1b1c1a]">Jane Otieno</Text>
-                      <MaterialIcons name="verified" size={14} color="#006c4e" />
+                      <Text className="font-jakarta-bold text-[14px] text-[#1b1c1a]">Jane Otieno</Text>
+                      <MaterialIcons name="verified" size={12} color="#006c4e" />
                     </View>
-                    <Text className="text-[#707971] text-[11px] font-jakarta-medium mt-0.5">08:50 AM • USDC Pay</Text>
+                    <Text className="text-[#707971] text-[10px] font-jakarta-medium mt-0.5">08:50 AM • USDC Pay</Text>
                   </View>
                 </View>
-                <View className="bg-[#e7f8ef] px-3 py-1.5 rounded-full">
-                  <Text className="text-[#006c4e] font-jakarta-bold text-sm">+KES 850</Text>
+                <Text className="text-[#006c4e] font-jakarta-bold text-[13px]">+KES 850</Text>
+              </View>
+
+              <View className="flex-row items-center justify-between py-3 px-4 border-b border-[#efeeeb]/50">
+                <View className="flex-row items-center gap-3">
+                  <View className="w-10 h-10 rounded-full bg-[#fcd34d] items-center justify-center">
+                    <Text className="text-[#78350f] font-jakarta-bold text-[11px]">DM</Text>
+                  </View>
+                  <View>
+                    <View className="flex-row items-center gap-1">
+                      <Text className="font-jakarta-bold text-[14px] text-[#1b1c1a]">David Mutua</Text>
+                    </View>
+                    <Text className="text-[#707971] text-[10px] font-jakarta-medium mt-0.5">08:12 AM • M-Pesa</Text>
+                  </View>
                 </View>
+                <Text className="text-[#006c4e] font-jakarta-bold text-[13px]">+KES 2,100</Text>
+              </View>
+
+              <View className="flex-row items-center justify-between py-3 px-4">
+                <View className="flex-row items-center gap-3">
+                  <View className="w-10 h-10 rounded-full bg-[#efeeeb] items-center justify-center">
+                    <Text className="text-[#404942] font-jakarta-bold text-[11px]">SW</Text>
+                  </View>
+                  <View>
+                    <View className="flex-row items-center gap-1">
+                      <Text className="font-jakarta-bold text-[14px] text-[#1b1c1a]">Sarah Wanjiku</Text>
+                      <MaterialIcons name="verified" size={12} color="#006c4e" />
+                    </View>
+                    <Text className="text-[#707971] text-[10px] font-jakarta-medium mt-0.5">07:45 AM • Bank Transfer</Text>
+                  </View>
+                </View>
+                <Text className="text-[#006c4e] font-jakarta-bold text-[13px]">+KES 9,500</Text>
               </View>
             </View>
           </View>

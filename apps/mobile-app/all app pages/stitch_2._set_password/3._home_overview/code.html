@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Kamau General Store - Overview</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&amp;family=DM+Serif+Display&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-background": "#1b1c1a",
+                        "surface-container-low": "#f4f3f0",
+                        "tertiary-fixed": "#d3e7e0",
+                        "primary-fixed-dim": "#96d4ab",
+                        "surface-container": "#efeeeb",
+                        "outline": "#707971",
+                        "primary-container": "#0b4d2e",
+                        "surface-container-highest": "#e3e2df",
+                        "inverse-surface": "#2f312f",
+                        "on-tertiary-fixed": "#0d1f1b",
+                        "surface-tint": "#2e6a48",
+                        "surface-variant": "#e3e2df",
+                        "on-primary-fixed": "#002110",
+                        "surface-container-lowest": "#ffffff",
+                        "on-tertiary-container": "#a0b4ad",
+                        "secondary-fixed": "#86f8c9",
+                        "secondary": "#006c4e",
+                        "error": "#ba1a1a",
+                        "on-secondary-container": "#007151",
+                        "inverse-on-surface": "#f2f1ee",
+                        "on-tertiary-fixed-variant": "#394a45",
+                        "surface": "#faf9f6",
+                        "error-container": "#ffdad6",
+                        "primary": "#00351d",
+                        "on-primary": "#ffffff",
+                        "on-primary-fixed-variant": "#115132",
+                        "on-primary-container": "#80bd95",
+                        "on-surface": "#1b1c1a",
+                        "tertiary-container": "#354641",
+                        "on-secondary-fixed-variant": "#00513a",
+                        "inverse-primary": "#96d4ab",
+                        "tertiary-fixed-dim": "#b7cbc4",
+                        "outline-variant": "#c0c9c0",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "tertiary": "#1f302b",
+                        "background": "#faf9f6",
+                        "surface-dim": "#dbdad7",
+                        "primary-fixed": "#b1f1c6",
+                        "surface-bright": "#faf9f6",
+                        "on-error": "#ffffff",
+                        "surface-container-high": "#e9e8e5",
+                        "secondary-fixed-dim": "#68dbae",
+                        "on-surface-variant": "#404942",
+                        "on-secondary-fixed": "#002115",
+                        "secondary-container": "#83f5c6",
+                        "on-error-container": "#93000a"
+                    },
+                    fontFamily: {
+                        "headline": ["Plus Jakarta Sans"],
+                        "body": ["Plus Jakarta Sans"],
+                        "label": ["Plus Jakarta Sans"],
+                        "serif": ["DM Serif Display"]
+                    },
+                    borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface font-body selection:bg-secondary-fixed">
+<!-- TopAppBar -->
+<header class="bg-gradient-to-br from-[#0B4D2E] to-[#1D9E75] text-white font-['Plus_Jakarta_Sans'] antialiased docked full-width top-0 shadow-2xl shadow-[#0B4D2E]/20 flex flex-col justify-end pt-12 pb-6 px-6 w-full h-[240px]">
+<div class="flex justify-between items-start mb-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-sm font-bold border border-white/10" title="Merchant Profile Avatar">JK</div>
+<div>
+<p class="text-[13px] opacity-90">Good morning 👋</p>
+<h1 class="text-lg font-semibold tracking-tight">Kamau General Store</h1>
+</div>
+</div>
+<button class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:opacity-90 transition-opacity active:scale-95 duration-200">
+<span class="material-symbols-outlined text-white" data-icon="notifications">notifications</span>
+</button>
+</div>
+<div class="mt-2">
+<div class="flex items-baseline gap-2">
+<span class="text-[38px] font-bold tracking-tighter">KES 184,250</span>
+</div>
+<div class="flex justify-between items-center mt-1">
+<span class="text-[13px] font-medium text-secondary-fixed">+KES 18,450 today</span>
+<div class="bg-white/15 px-3 py-1 rounded-full backdrop-blur-md">
+<span class="text-[11px] font-semibold tracking-wider opacity-90 uppercase">Till No: PC847291</span>
+</div>
+</div>
+</div>
+</header>
+<main class="relative -mt-6 px-4 pb-32">
+<!-- Quick Actions Horizontal Scroll -->
+<div class="flex gap-3 overflow-x-auto hide-scrollbar pb-2">
+<button class="min-w-[84px] h-[80px] bg-surface-container-lowest shadow-sm rounded-xl flex flex-col items-center justify-center gap-2 active:scale-95 transition-transform">
+<div class="w-10 h-10 rounded-full bg-primary-fixed flex items-center justify-center text-primary">
+<span class="material-symbols-outlined" data-icon="add_circle">add_circle</span>
+</div>
+<span class="text-[11px] font-bold text-on-surface uppercase tracking-wider">Collect</span>
+</button>
+<button class="min-w-[84px] h-[80px] bg-surface-container-lowest shadow-sm rounded-xl flex flex-col items-center justify-center gap-2 active:scale-95 transition-transform">
+<div class="w-10 h-10 rounded-full bg-tertiary-fixed flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined" data-icon="payments">payments</span>
+</div>
+<span class="text-[11px] font-bold text-on-surface uppercase tracking-wider">Pay</span>
+</button>
+<button class="min-w-[84px] h-[80px] bg-surface-container-lowest shadow-sm rounded-xl flex flex-col items-center justify-center gap-2 active:scale-95 transition-transform">
+<div class="w-10 h-10 rounded-full bg-secondary-fixed flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined" data-icon="swap_horiz">swap_horiz</span>
+</div>
+<span class="text-[11px] font-bold text-on-surface uppercase tracking-wider">Swap</span>
+</button>
+<button class="min-w-[84px] h-[80px] bg-surface-container-lowest shadow-sm rounded-xl flex flex-col items-center justify-center gap-2 active:scale-95 transition-transform">
+<div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-800">
+<span class="material-symbols-outlined" data-icon="trending_up">trending_up</span>
+</div>
+<span class="text-[11px] font-bold text-on-surface uppercase tracking-wider">Advance</span>
+</button>
+</div>
+<!-- Growth Ribbon -->
+<div class="mt-6 bg-primary-fixed rounded-xl p-4 flex items-center justify-between shadow-sm overflow-hidden relative">
+<div class="relative z-10">
+<p class="font-serif text-primary text-xl leading-none">Collect. Pay. Grow.</p>
+<p class="text-[11px] font-bold text-on-primary-fixed-variant uppercase tracking-widest mt-1">Merchant Estate Status: Elite</p>
+</div>
+<div class="w-12 h-12 bg-white/30 rounded-full flex items-center justify-center relative z-10">
+<span class="material-symbols-outlined text-primary" data-icon="verified_user" style="font-variation-settings: 'FILL' 1;">verified_user</span>
+</div>
+<div class="absolute -right-4 -top-4 w-24 h-24 bg-white/10 rounded-full blur-2xl"></div>
+</div>
+<!-- Multi-Currency Balance Scroll -->
+<div class="mt-8">
+<div class="flex justify-between items-end mb-4 px-2">
+<h2 class="text-[18px] font-bold text-on-surface">Digital Ledgers</h2>
+<span class="text-xs font-semibold text-secondary uppercase tracking-widest">View All</span>
+</div>
+<div class="flex gap-4 overflow-x-auto hide-scrollbar snap-x">
+<!-- Card 1 -->
+<div class="min-w-[280px] h-[160px] bg-primary-container p-6 rounded-xl shadow-lg flex flex-col justify-between snap-center relative overflow-hidden">
+<div class="absolute top-0 right-0 p-4 opacity-10">
+<span class="material-symbols-outlined text-white scale-[4]" data-icon="account_balance_wallet">account_balance_wallet</span>
+</div>
+<div>
+<p class="text-primary-fixed text-xs font-bold uppercase tracking-widest">Operating Balance</p>
+<h3 class="text-white text-3xl font-bold mt-1">KES 184,250</h3>
+</div>
+<div class="flex items-center gap-2 text-primary-fixed-dim text-[13px]">
+<span class="material-symbols-outlined text-sm" data-icon="arrow_upward">arrow_upward</span>
+<span>12.4% vs last month</span>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="min-w-[280px] h-[160px] bg-[#1a2b4b] p-6 rounded-xl shadow-lg flex flex-col justify-between snap-center relative overflow-hidden">
+<div class="absolute top-0 right-0 p-4 opacity-10">
+<span class="material-symbols-outlined text-white scale-[4]" data-icon="currency_exchange">currency_exchange</span>
+</div>
+<div>
+<p class="text-blue-200 text-xs font-bold uppercase tracking-widest">USDC Reserve</p>
+<h3 class="text-white text-3xl font-bold mt-1">312.50 USDC</h3>
+</div>
+<div class="flex items-center gap-2 text-blue-200 text-[13px]">
+<span class="material-symbols-outlined text-sm" data-icon="sync">sync</span>
+<span>≈ KES 41,250.00</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Today's Stats Bento -->
+<div class="mt-8 bg-surface-container-lowest rounded-xl p-5 shadow-sm">
+<h3 class="text-[11px] font-bold text-outline uppercase tracking-[0.15em] mb-4">Today's Performance</h3>
+<div class="grid grid-cols-3 gap-2">
+<div class="flex flex-col">
+<span class="text-[10px] text-on-surface-variant font-medium uppercase">Revenue</span>
+<span class="text-[15px] font-bold text-secondary">KES 18,450</span>
+</div>
+<div class="flex flex-col border-l border-surface-container px-2">
+<span class="text-[10px] text-on-surface-variant font-medium uppercase">Payments</span>
+<span class="text-[15px] font-bold text-on-surface">12</span>
+</div>
+<div class="flex flex-col border-l border-surface-container px-2">
+<span class="text-[10px] text-on-surface-variant font-medium uppercase">Avg Ticket</span>
+<span class="text-[15px] font-bold text-on-surface">KES 1,537</span>
+</div>
+</div>
+</div>
+<!-- Recent Payments Ledger -->
+<div class="mt-8">
+<div class="flex justify-between items-center mb-4 px-2">
+<h3 class="text-[18px] font-bold text-on-surface">Recent Activity</h3>
+<button class="text-secondary text-[13px] font-bold">See Records</button>
+</div>
+<div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+<div class="flex flex-col">
+<!-- Row 1 -->
+<div class="p-4 flex items-center justify-between hover:bg-surface-container-low transition-colors group cursor-pointer">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center font-bold text-xs">AM</div>
+<div>
+<div class="flex items-center gap-1">
+<p class="text-[14px] font-bold text-on-surface">Alice Mumbua</p>
+<span class="material-symbols-outlined text-[14px] text-secondary" data-icon="verified" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+<p class="text-[11px] text-on-surface-variant">09:42 AM • M-Pesa</p>
+</div>
+</div>
+<div class="text-right">
+<p class="text-[14px] font-bold text-secondary-container bg-secondary/10 px-2 py-0.5 rounded">+KES 1,500</p>
+</div>
+</div>
+<!-- Row 2 -->
+<div class="p-4 flex items-center justify-between hover:bg-surface-container-low transition-colors border-t border-surface-container/50">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-container-highest text-on-surface-variant flex items-center justify-center font-bold text-xs">BK</div>
+<div>
+<div class="flex items-center gap-1">
+<p class="text-[14px] font-bold text-on-surface">Brian Kimani</p>
+<span class="material-symbols-outlined text-[14px] text-secondary" data-icon="verified" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+<p class="text-[11px] text-on-surface-variant">09:15 AM • Bank Transfer</p>
+</div>
+</div>
+<div class="text-right">
+<p class="text-[14px] font-bold text-secondary-container bg-secondary/10 px-2 py-0.5 rounded">+KES 4,200</p>
+</div>
+</div>
+<!-- Row 3 -->
+<div class="p-4 flex items-center justify-between hover:bg-surface-container-low transition-colors border-t border-surface-container/50">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-container-highest text-on-surface-variant flex items-center justify-center font-bold text-xs">JO</div>
+<div>
+<div class="flex items-center gap-1">
+<p class="text-[14px] font-bold text-on-surface">Jane Otieno</p>
+<span class="material-symbols-outlined text-[14px] text-secondary" data-icon="verified" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+<p class="text-[11px] text-on-surface-variant">08:50 AM • USDC Pay</p>
+</div>
+</div>
+<div class="text-right">
+<p class="text-[14px] font-bold text-secondary-container bg-secondary/10 px-2 py-0.5 rounded">+KES 850</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Cash Advance Card -->
+<div class="mt-8 bg-surface-container-lowest rounded-xl border-l-4 border-secondary p-5 shadow-sm relative overflow-hidden">
+<div class="flex justify-between items-start mb-4">
+<div>
+<h4 class="text-[11px] font-bold text-outline uppercase tracking-widest">Available Cash Advance</h4>
+<p class="text-2xl font-bold text-on-surface mt-1">KES 150,000</p>
+</div>
+<div class="w-14 h-14 relative flex items-center justify-center">
+<!-- Progress ring -->
+<svg class="w-full h-full transform -rotate-90">
+<circle class="text-surface-container" cx="28" cy="28" fill="transparent" r="24" stroke="currentColor" stroke-width="4"></circle>
+<circle class="text-secondary" cx="28" cy="28" fill="transparent" r="24" stroke="currentColor" stroke-dasharray="150.7" stroke-dashoffset="39.2" stroke-width="4"></circle>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<span class="text-[10px] font-bold">74</span>
+<span class="text-[6px] uppercase font-bold text-outline">Score</span>
+</div>
+</div>
+</div>
+<div class="w-full bg-surface-container rounded-full h-2 mb-4">
+<div class="bg-secondary h-2 rounded-full w-[45%]"></div>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary text-sm" data-icon="verified_user">verified_user</span>
+<span class="text-[11px] font-bold text-secondary uppercase tracking-tighter">Cash Advance Eligible</span>
+</div>
+<button class="bg-primary text-white text-[11px] font-bold px-4 py-2 rounded-full uppercase tracking-wider">Unlock Funds</button>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-safe bg-white/80 backdrop-blur-xl h-[83px] border-t border-gray-100 shadow-[0_-4px_20px_0_rgba(0,0,0,0.04)]">
+<!-- Home Active -->
+<a class="flex flex-col items-center justify-center text-[#1D9E75] font-bold transition-transform active:scale-110" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="layout_dashboard" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[10px] font-medium tracking-wide uppercase">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-gray-400 hover:text-[#0B4D2E] transition-colors active:scale-90" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="arrow_circle_down">arrow_circle_down</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[10px] font-medium tracking-wide uppercase">Collections</span>
+</a>
+<a class="flex flex-col items-center justify-center text-gray-400 hover:text-[#0B4D2E] transition-colors active:scale-90" href="#">
+<div class="w-12 h-12 bg-primary rounded-full -mt-10 shadow-lg shadow-primary/30 flex items-center justify-center text-white">
+<span class="material-symbols-outlined" data-icon="group">group</span>
+</div>
+<span class="font-['Plus_Jakarta_Sans'] text-[10px] font-medium tracking-wide uppercase mt-1">Pay</span>
+</a>
+<a class="flex flex-col items-center justify-center text-gray-400 hover:text-[#0B4D2E] transition-colors active:scale-90" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="payments">payments</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[10px] font-medium tracking-wide uppercase">Advance</span>
+</a>
+<a class="flex flex-col items-center justify-center text-gray-400 hover:text-[#0B4D2E] transition-colors active:scale-90" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="menu">menu</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[10px] font-medium tracking-wide uppercase">More</span>
+</a>
+</nav>
+</body></html>

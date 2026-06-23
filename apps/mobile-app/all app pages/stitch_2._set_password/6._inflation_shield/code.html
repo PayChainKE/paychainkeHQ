@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>PayChain | Inflation Shield</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=DM+Serif+Display&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-container-high": "#e9e8e5",
+              "on-secondary-fixed": "#002115",
+              "error-container": "#ffdad6",
+              "primary-container": "#0b4d2e",
+              "primary-fixed": "#b1f1c6",
+              "on-secondary-container": "#007151",
+              "outline-variant": "#c0c9c0",
+              "secondary-container": "#83f5c6",
+              "on-secondary": "#ffffff",
+              "surface-dim": "#dbdad7",
+              "surface-container": "#efeeeb",
+              "on-secondary-fixed-variant": "#00513a",
+              "secondary-fixed": "#86f8c9",
+              "on-primary": "#ffffff",
+              "on-error-container": "#93000a",
+              "on-background": "#1b1c1a",
+              "outline": "#707971",
+              "tertiary-container": "#354641",
+              "tertiary": "#1f302b",
+              "on-primary-fixed": "#002110",
+              "on-primary-fixed-variant": "#115132",
+              "primary-fixed-dim": "#96d4ab",
+              "inverse-on-surface": "#f2f1ee",
+              "on-primary-container": "#80bd95",
+              "inverse-primary": "#96d4ab",
+              "error": "#ba1a1a",
+              "on-tertiary-container": "#a0b4ad",
+              "surface-container-lowest": "#ffffff",
+              "on-tertiary": "#ffffff",
+              "surface-container-low": "#f4f3f0",
+              "tertiary-fixed": "#d3e7e0",
+              "background": "#faf9f6",
+              "surface-container-highest": "#e3e2df",
+              "on-surface-variant": "#404942",
+              "on-tertiary-fixed": "#0d1f1b",
+              "on-tertiary-fixed-variant": "#394a45",
+              "tertiary-fixed-dim": "#b7cbc4",
+              "surface-bright": "#faf9f6",
+              "secondary-fixed-dim": "#68dbae",
+              "inverse-surface": "#2f312f",
+              "on-error": "#ffffff",
+              "secondary": "#006c4e",
+              "on-surface": "#1b1c1a",
+              "surface-tint": "#2e6a48",
+              "primary": "#00351d",
+              "surface": "#faf9f6",
+              "surface-variant": "#e3e2df"
+            },
+            fontFamily: {
+              "headline": ["Plus Jakarta Sans"],
+              "body": ["Plus Jakarta Sans"],
+              "label": ["Plus Jakarta Sans"]
+            },
+            borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .serif-text { font-family: 'DM Serif Display', serif; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen pb-24">
+<!-- TopAppBar -->
+<header class="w-full sticky top-0 z-50 no-border tonal-shift bg-[#efeeeb]/80 backdrop-blur-xl">
+<div class="flex items-center justify-between px-6 py-4 w-full max-w-7xl mx-auto">
+<div class="flex items-center gap-4">
+<button class="hover:bg-stone-200/50 transition-colors active:scale-95 duration-200 p-2 rounded-full">
+<span class="material-symbols-outlined text-[#00351d]">arrow_back</span>
+</button>
+<h1 class="font-['Plus_Jakarta_Sans'] font-bold tracking-tight text-xl text-[#00351d]">Inflation Shield</h1>
+</div>
+<div class="hidden md:flex items-center gap-8">
+<nav class="flex gap-6">
+<a class="text-stone-500 hover:text-[#00351d] transition-colors font-medium" href="#">Home</a>
+<a class="text-[#00351d] font-bold" href="#">Swap</a>
+<a class="text-stone-500 hover:text-[#00351d] transition-colors font-medium" href="#">Vault</a>
+<a class="text-stone-500 hover:text-[#00351d] transition-colors font-medium" href="#">Profile</a>
+</nav>
+</div>
+<div class="font-['DM_Serif_Display'] text-xl text-[#00351d]">PayChain</div>
+</div>
+</header>
+<main class="max-w-xl mx-auto px-6 pt-8 pb-12 space-y-8">
+<!-- Header Section (Editorial) -->
+<section class="space-y-1">
+<p class="text-secondary font-bold tracking-[0.2em] text-[10px] uppercase">Protect Your Wealth</p>
+<h2 class="serif-text text-4xl text-primary">Collect. Pay. Grow.</h2>
+</section>
+<!-- Balance Section: Bento Grid Style -->
+<div class="grid grid-cols-2 gap-4">
+<!-- KES Card -->
+<div class="bg-primary-container p-6 rounded-lg relative overflow-hidden group">
+<div class="absolute -right-4 -top-4 opacity-10 group-hover:scale-110 transition-transform duration-500">
+<span class="material-symbols-outlined text-8xl" style="font-variation-settings: 'FILL' 1;">account_balance_wallet</span>
+</div>
+<p class="text-primary-fixed-dim text-xs font-bold uppercase tracking-wider mb-2">KES Balance</p>
+<p class="text-white text-2xl font-extrabold tracking-tight">KES 184,250</p>
+</div>
+<!-- USDC Card -->
+<div class="bg-tertiary-container p-6 rounded-lg relative overflow-hidden group">
+<div class="absolute -right-4 -top-4 opacity-10 group-hover:scale-110 transition-transform duration-500">
+<span class="material-symbols-outlined text-8xl" style="font-variation-settings: 'FILL' 1;">shield</span>
+</div>
+<p class="text-on-tertiary-container text-xs font-bold uppercase tracking-wider mb-2">USDC Vault</p>
+<p class="text-white text-2xl font-extrabold tracking-tight">312.50 USDC</p>
+</div>
+</div>
+<!-- Swap Interface -->
+<section class="space-y-4">
+<div class="flex items-center justify-between px-2">
+<h3 class="font-bold text-lg text-primary">KES → USDC</h3>
+<div class="flex items-center gap-2 bg-surface-container-high px-3 py-1.5 rounded-full">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary-fixed-dim opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-secondary"></span>
+</span>
+<span class="text-[11px] font-bold text-on-surface-variant">1 USDC = KES 130.00 <span class="mx-1 opacity-30">•</span> 0.5% fee</span>
+</div>
+</div>
+<div class="relative space-y-2">
+<!-- You Send Card -->
+<div class="bg-surface-container-lowest p-6 rounded-lg shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:bg-surface-bright">
+<div class="flex justify-between items-center mb-4">
+<span class="text-on-surface-variant text-xs font-bold uppercase tracking-widest">You Send</span>
+<button class="text-secondary text-xs font-bold hover:underline">MAX</button>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center">
+<span class="font-bold text-primary">K</span>
+</div>
+<span class="text-xl font-extrabold text-primary">KES</span>
+</div>
+<input class="text-right text-3xl font-extrabold text-primary bg-transparent border-none focus:ring-0 w-full" placeholder="0.00" type="text" value="10,000"/>
+</div>
+</div>
+<!-- Swap Button Anchor -->
+<div class="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 z-10">
+<button class="bg-secondary text-white w-12 h-12 rounded-full flex items-center justify-center shadow-xl active:scale-90 transition-transform duration-200 border-4 border-background">
+<span class="material-symbols-outlined">swap_vert</span>
+</button>
+</div>
+<!-- You Receive Card -->
+<div class="bg-surface-container p-6 rounded-lg">
+<div class="flex justify-between items-center mb-4">
+<span class="text-on-surface-variant text-xs font-bold uppercase tracking-widest">You Receive</span>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-[#2775ca] flex items-center justify-center shadow-lg">
+<span class="material-symbols-outlined text-white text-sm" style="font-variation-settings: 'FILL' 1;">monetization_on</span>
+</div>
+<span class="text-xl font-extrabold text-primary">USDC</span>
+</div>
+<span class="text-3xl font-extrabold text-secondary">76.92</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Fee Breakdown Section -->
+<section class="bg-primary-fixed/30 p-6 rounded-lg space-y-4">
+<div class="flex justify-between items-center text-sm">
+<span class="text-on-primary-fixed-variant font-medium">Amount to swap</span>
+<span class="text-primary font-bold">KES 10,000</span>
+</div>
+<div class="flex justify-between items-center text-sm">
+<span class="text-on-primary-fixed-variant font-medium">Transaction Fee (0.5%)</span>
+<span class="text-primary font-bold">KES 50.00</span>
+</div>
+<div class="flex justify-between items-center text-sm">
+<span class="text-on-primary-fixed-variant font-medium">Applied Rate</span>
+<span class="text-primary font-bold">130.00 KES/USDC</span>
+</div>
+<div class="h-px bg-on-primary-fixed-variant/10"></div>
+<div class="flex justify-between items-center">
+<span class="text-on-primary-fixed-variant font-bold">You will receive</span>
+<span class="text-primary text-xl font-extrabold">76.54 USDC</span>
+</div>
+</section>
+<!-- CTA Button -->
+<button class="w-full h-[52px] bg-primary text-white rounded-md font-bold text-sm tracking-wide flex items-center justify-center gap-2 group hover:bg-primary-container transition-colors shadow-lg active:scale-[0.98] duration-200">
+            Swap KES 10,000 for 76.54 USDC
+            <span class="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_forward</span>
+</button>
+<!-- Recent Swaps: Collapsible Header -->
+<section class="pt-4 border-t border-outline-variant/20">
+<details class="group">
+<summary class="flex items-center justify-between cursor-pointer list-none py-2">
+<h4 class="font-bold text-primary">Recent Swaps</h4>
+<span class="material-symbols-outlined text-primary group-open:rotate-180 transition-transform">expand_more</span>
+</summary>
+<div class="mt-6 space-y-6">
+<!-- History Item 1 -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary">trending_up</span>
+</div>
+<div>
+<p class="text-sm font-bold text-primary">Swapped KES for USDC</p>
+<p class="text-xs text-on-surface-variant">Oct 24, 2023 • 2:14 PM</p>
+</div>
+</div>
+<div class="text-right">
+<p class="text-sm font-bold text-primary">+450.00 USDC</p>
+<p class="text-xs text-error">-KES 58,500</p>
+</div>
+</div>
+<!-- History Item 2 -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary">trending_up</span>
+</div>
+<div>
+<p class="text-sm font-bold text-primary">Swapped KES for USDC</p>
+<p class="text-xs text-on-surface-variant">Oct 18, 2023 • 10:45 AM</p>
+</div>
+</div>
+<div class="text-right">
+<p class="text-sm font-bold text-primary">+120.00 USDC</p>
+<p class="text-xs text-error">-KES 15,600</p>
+</div>
+</div>
+</div>
+</details>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 bg-white/80 backdrop-blur-xl shadow-[0_-8px_40px_rgba(11,77,46,0.06)] rounded-t-[2.5rem] md:hidden">
+<a class="flex flex-col items-center justify-center text-stone-500 py-2 hover:text-[#00351d]" href="#">
+<span class="material-symbols-outlined">grid_view</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[11px] font-bold uppercase tracking-wider mt-1">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-[#b1f1c6] text-[#00351d] rounded-full px-5 py-2 scale-105 transition-all active:scale-[0.98]" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">swap_horiz</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[11px] font-bold uppercase tracking-wider mt-1">Swap</span>
+</a>
+<a class="flex flex-col items-center justify-center text-stone-500 py-2 hover:text-[#00351d]" href="#">
+<span class="material-symbols-outlined">shield</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[11px] font-bold uppercase tracking-wider mt-1">Vault</span>
+</a>
+<a class="flex flex-col items-center justify-center text-stone-500 py-2 hover:text-[#00351d]" href="#">
+<span class="material-symbols-outlined">person</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[11px] font-bold uppercase tracking-wider mt-1">Profile</span>
+</a>
+</nav>
+<!-- Growth Ribbon (Signature Component) -->
+<div class="hidden lg:block fixed left-0 top-1/2 -translate-y-1/2 -rotate-90 origin-left">
+<div class="bg-primary-fixed px-8 py-3 rounded-t-xl shadow-lg flex gap-8 whitespace-nowrap overflow-hidden">
+<span class="serif-text text-primary text-lg">Protect Your Business</span>
+<span class="serif-text text-primary text-lg opacity-40">●</span>
+<span class="serif-text text-primary text-lg">Beat Inflation</span>
+<span class="serif-text text-primary text-lg opacity-40">●</span>
+<span class="serif-text text-primary text-lg">Stability first</span>
+</div>
+</div>
+</body></html>

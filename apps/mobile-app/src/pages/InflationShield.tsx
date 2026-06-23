@@ -25,7 +25,7 @@ export default function InflationShield({ navigation }: any) {
         <View className="w-full max-w-lg mx-auto px-6 pt-10 pb-12">
           <View className="space-y-1 mb-8">
             <Text className="text-[#006c4e] font-jakarta-bold tracking-[0.2em] text-[10px] uppercase mb-1">Protect Your Wealth</Text>
-            <Text style={{ fontFamily: 'DMSerifDisplay_400Regular_Italic' }} className="text-[44px] text-[#00351d] leading-tight tracking-tight">Collect. Pay. Grow.</Text>
+            <Text style={{ fontFamily: 'DMSerifDisplay_400Regular_Italic' }} className="text-4xl text-[#00351d] leading-tight tracking-tight">Collect. Pay. Grow.</Text>
           </View>
 
           <View className="flex-row gap-4 mb-10">
