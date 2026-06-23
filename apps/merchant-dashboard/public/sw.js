@@ -1,9 +1,8 @@
-const CACHE_NAME = 'paychain-merchant-v1';
+const CACHE_NAME = 'paychain-merchant-v2';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      // Basic core files to cache for offline capabilities
       return cache.addAll([
         '/',
         '/index.html',
@@ -34,7 +33,16 @@ self.addEventListener('fetch', (event) => {
   // Allow network first, fallback to cache for navigation
   if (event.request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request).catch(() => caches.match('/index.html'))
+      fetch(event.request).catch(async () => {
+        const cached = await caches.match('/index.html') || await caches.match('/');
+        if (cached) return cached;
+        // Fallback response if offline and no cache
+        return new Response('You are offline and the app is not fully cached.', {
+          status: 503,
+          statusText: 'Service Unavailable',
+          headers: new Headers({ 'Content-Type': 'text/plain' })
+        });
+      })
     );
     return;
   }
@@ -50,8 +58,15 @@ self.addEventListener('fetch', (event) => {
           });
         }
         return networkResponse;
-      }).catch(() => {});
-      return cachedResponse || fetchPromise;
+      });
+
+      if (cachedResponse) {
+        // Prevent unhandled promise rejection if background fetch fails
+        fetchPromise.catch(() => {});
+        return cachedResponse;
+      }
+      
+      return fetchPromise;
     })
   );
 });
