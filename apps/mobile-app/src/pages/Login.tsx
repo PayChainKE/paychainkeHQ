@@ -63,9 +63,16 @@ export default function Login({ route }: any) {
   const [hasBiometrics, setHasBiometrics] = useState(false);
   const [resendTimer, setResendTimer] = useState(59);
 
+  const [hasAccount, setHasAccount] = useState(false);
+
   useEffect(() => {
     AsyncStorage.getItem('last_biometric_user').then(val => {
       setHasBiometrics(!!val);
+    });
+    AsyncStorage.getItem('hasAccount').then(val => {
+      if (val === 'true') {
+        setHasAccount(true);
+      }
     });
   }, []);
 
@@ -155,6 +162,9 @@ export default function Login({ route }: any) {
       setIsOTPMode(false);
       if (otpFlowType === 'reset') {
         setIsResetMode(true);
+      } else if (otpFlowType === 'signup' || otpFlowType === 'login') {
+        await AsyncStorage.setItem('hasAccount', 'true');
+        setHasAccount(true);
       }
       // If otpFlowType === 'signup' or 'login', verifyOTP successfully sets the session context,
       // which will instantly unmount the Login screen and move to PinSetup or Dashboard.
@@ -269,7 +279,7 @@ export default function Login({ route }: any) {
 
   const renderTabs = () => (
     <View className="flex-row bg-[#f0f2f1] p-1.5 rounded-2xl mb-8">
-      {['signup', 'login', 'reset'].map((tab) => (
+      {['signup', 'login', 'reset'].filter(t => t !== 'signup' || !hasAccount).map((tab) => (
         <TouchableOpacity
           key={tab}
           onPress={() => {
