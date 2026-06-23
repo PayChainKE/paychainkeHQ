@@ -93,16 +93,36 @@ function MainTabs() {
   );
 }
 
+import { useAuth } from '../context/AuthContext';
+import { View, ActivityIndicator } from 'react-native';
+
 export default function AppNavigator() {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#faf9f6' }}>
+        <ActivityIndicator size="large" color="#0B4D2E" />
+      </View>
+    );
+  }
+
   return (
     <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Login">
-        <Stack.Screen name="Login" component={Login} />
-        <Stack.Screen name="SetPassword" component={SetPassword} />
-        <Stack.Screen name="Main" component={MainTabs} />
-        <Stack.Screen name="InflationShield" component={InflationShield} />
-        <Stack.Screen name="SupportPage" component={SupportPage} />
-        <Stack.Screen name="Transactions" component={Transactions} />
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        {!isAuthenticated ? (
+          <>
+            <Stack.Screen name="Login" component={Login} />
+            <Stack.Screen name="SetPassword" component={SetPassword} />
+          </>
+        ) : (
+          <>
+            <Stack.Screen name="Main" component={MainTabs} />
+            <Stack.Screen name="InflationShield" component={InflationShield} />
+            <Stack.Screen name="SupportPage" component={SupportPage} />
+            <Stack.Screen name="Transactions" component={Transactions} />
+          </>
+        )}
       </Stack.Navigator>
     </NavigationContainer>
   );

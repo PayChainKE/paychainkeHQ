@@ -1,89 +1,515 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, Alert } from 'react-native';
+import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from '../context/AuthContext';
+import * as LocalAuthentication from 'expo-local-authentication';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export default function Login({ navigation }: any) {
-  const [phone, setPhone] = useState('712 847 291');
-  const [password, setPassword] = useState('••••••••••');
+const KENYAN_COUNTIES = [
+  "Baringo", "Bomet", "Bungoma", "Busia", "Elgeyo-Marakwet", "Embu", "Garissa", 
+  "Homa Bay", "Isiolo", "Kajiado", "Kakamega", "Kericho", "Kiambu", "Kilifi", 
+  "Kirinyaga", "Kisii", "Kisumu", "Kitui", "Kwale", "Laikipia", "Lamu", "Machakos", 
+  "Makueni", "Mandera", "Marsabit", "Meru", "Migori", "Mombasa", "Murang'a", 
+  "Nairobi", "Nakuru", "Nandi", "Narok", "Nyamira", "Nyandarua", "Nyeri", "Samburu", 
+  "Siaya", "Taita-Taveta", "Tana River", "Tharaka-Nithi", "Trans Nzoia", "Turkana", 
+  "Uasin Gishu", "Vihiga", "Wajir", "West Pokot"
+];
+
+export default function Login() {
+  const { login, biometricLogin, signup, verifyOTP, resendOTP, forgotPassword, resetPassword } = useAuth();
+  
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [err, setErr] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  // Signup Flow States
+  const [signupName, setSignupName] = useState('');
+  const [signupEmail, setSignupEmail] = useState('');
+  const [signupPhone, setSignupPhone] = useState('');
+  const [signupBusinessName, setSignupBusinessName] = useState('');
+  const [signupEcommerce, setSignupEcommerce] = useState('yes');
+  const [signupCounty, setSignupCounty] = useState('');
+  const [countySearch, setCountySearch] = useState('');
+  const [businessType, setBusinessType] = useState('');
+  const [area, setArea] = useState('');
+  const [employees, setEmployees] = useState('');
+
+  // Reset Flow States
+  const [isResetMode, setIsResetMode] = useState(false);
+  const [newPassword, setNewPasswordInput] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [strength, setStrength] = useState({ length: false, upper: false, number: false, symbol: false });
+
+  // OTP Flow States
+  const [isOTPMode, setIsOTPMode] = useState(false);
+  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+
+  // Navigation Tabs
+  const [activeTab, setActiveTab] = useState('login');
+  const [isSignupSuccess, setIsSignupSuccess] = useState(false);
+  const [isSignupPasswordStep, setIsSignupPasswordStep] = useState(false);
+  const [isSignupBiometricStep, setIsSignupBiometricStep] = useState(false);
+  const [otpFlowType, setOtpFlowType] = useState('');
+  const [authEmail, setAuthEmail] = useState('');
+  const [hasBiometrics, setHasBiometrics] = useState(false);
+  const [resendTimer, setResendTimer] = useState(59);
+
+  useEffect(() => {
+    AsyncStorage.getItem('last_biometric_user').then(val => {
+      setHasBiometrics(!!val);
+    });
+  }, []);
+
+  useEffect(() => {
+    setStrength({
+      length: newPassword.length >= 8,
+      upper: /[A-Z]/.test(newPassword),
+      number: /[0-9]/.test(newPassword),
+      symbol: /[^A-Za-z0-9]/.test(newPassword)
+    });
+  }, [newPassword]);
+
+  useEffect(() => {
+    if (isOTPMode && resendTimer > 0) {
+      const interval = setInterval(() => {
+        setResendTimer(prev => prev - 1);
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [isOTPMode, resendTimer]);
+
+  const handleLogin = async () => {
+    if (!phone || !password) {
+      setErr('Please enter both email and password');
+      return;
+    }
+    setLoading(true);
+    setErr('');
+    const res = await login(phone, password);
+    setLoading(false);
+    if (res.success) {
+      setAuthEmail(res.email);
+      if (res.mfaRequired) {
+        setOtpFlowType('login');
+        setIsOTPMode(true);
+        setResendTimer(59);
+      }
+    } else {
+      setErr(res.error);
+    }
+  };
+
+  const handleBiometricSignIn = async () => {
+    setErr('');
+    try {
+      const compatible = await LocalAuthentication.hasHardwareAsync();
+      const enrolled = await LocalAuthentication.isEnrolledAsync();
+      if (!compatible || !enrolled) {
+        setErr("Biometrics not supported or enrolled.");
+        return;
+      }
+      
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'Login to PayChain',
+      });
+
+      if (result.success) {
+        const userEmail = await AsyncStorage.getItem('last_biometric_user');
+        if (!userEmail) {
+          setErr("No registered biometric user found.");
+          return;
+        }
+
+        setLoading(true);
+        const res = await biometricLogin(userEmail);
+        setLoading(false);
+
+        if (!res.success) {
+          setErr(res.error);
+        }
+      }
+    } catch (error) {
+      console.error(error);
+      setErr("Biometric authentication failed.");
+    }
+  };
+
+  const handleVerifyOTP = async () => {
+    const code = otp.join('');
+    if (code.length < 6) return;
+    
+    setLoading(true);
+    const res = await verifyOTP(authEmail, code);
+    setLoading(false);
+    
+    if (res.success) {
+      setIsOTPMode(false);
+      if (otpFlowType === 'reset') {
+        setIsResetMode(true);
+      }
+      setErr('');
+    } else {
+      setErr(res.error);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!phone) {
+      setErr('Please enter email or phone number');
+      return;
+    }
+    setLoading(true);
+    const res = await forgotPassword(phone);
+    setLoading(false);
+    if (res.success) {
+      setAuthEmail(phone);
+      setOtpFlowType('reset');
+      setIsOTPMode(true);
+      setResendTimer(59);
+      setActiveTab('login');
+    } else {
+      setErr(res.error);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!Object.values(strength).every(v => v)) {
+      setErr('Please meet all security requirements.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setErr('Passwords do not match.');
+      return;
+    }
+
+    setLoading(true);
+    const code = otp.join('');
+    const res = await resetPassword(authEmail, code, newPassword);
+    setLoading(false);
+    
+    if (res.success) {
+      setIsResetMode(false);
+      setActiveTab('login');
+      setPassword('');
+      setNewPasswordInput('');
+      setConfirmPassword('');
+    } else {
+      setErr(res.error);
+    }
+  };
+
+  const handleSignupCreateAccount = async () => {
+    if (!Object.values(strength).every(v => v)) {
+      setErr('Please meet all security requirements.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setErr('Passwords do not match.');
+      return;
+    }
+
+    const payload = {
+      name: signupName,
+      email: signupEmail,
+      phone: signupPhone,
+      businessName: signupBusinessName,
+      password: newPassword,
+      ecommerce: signupEcommerce
+    };
+
+    setLoading(true);
+    const res = await signup(payload);
+    setLoading(false);
+    
+    if (res.success) {
+      setIsSignupPasswordStep(false);
+      const compatible = await LocalAuthentication.hasHardwareAsync();
+      if (compatible) {
+        setIsSignupBiometricStep(true);
+      } else {
+        setIsSignupSuccess(true);
+      }
+    } else {
+      setErr(res.error);
+    }
+  };
+
+  const handleSetupBiometric = async () => {
+    try {
+      setLoading(true);
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'Enable Biometrics for PayChain',
+      });
+      if (result.success) {
+        await AsyncStorage.setItem('last_biometric_user', signupEmail);
+        setHasBiometrics(true);
+      }
+    } catch (e) {
+      console.error(e);
+      setErr('Biometric setup failed.');
+    } finally {
+      setLoading(false);
+      setIsSignupBiometricStep(false);
+      setIsSignupSuccess(true);
+    }
+  };
+
+  const renderTabs = () => (
+    <View className="flex-row bg-[#f0f2f1] p-1.5 rounded-2xl mb-8">
+      {['signup', 'login', 'reset'].map((tab) => (
+        <TouchableOpacity
+          key={tab}
+          onPress={() => {
+            setActiveTab(tab);
+            setIsOTPMode(false);
+            setIsResetMode(false);
+            setIsSignupSuccess(false);
+            setIsSignupPasswordStep(false);
+            setNewPasswordInput('');
+            setConfirmPassword('');
+            setErr('');
+          }}
+          className={`flex-1 py-3 px-2 rounded-xl items-center justify-center ${
+            activeTab === tab ? 'bg-white shadow-sm' : 'bg-transparent'
+          }`}
+        >
+          <Text className={`text-[11px] font-jakarta-bold uppercase tracking-widest ${
+            activeTab === tab ? 'text-[#06201b]' : 'text-[#707971]'
+          }`}>
+            {tab === 'signup' ? 'Sign Up' : tab === 'login' ? 'Login' : 'Reset'}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+
+  const SecurityRequirement = ({ met, label }: { met: boolean, label: string }) => (
+    <View className="flex-row items-center mb-1">
+      <Feather name={met ? "check-circle" : "circle"} size={12} color={met ? "#10b981" : "#c0c9c0"} />
+      <Text className={`ml-2 text-[10px] font-jakarta-bold uppercase tracking-widest ${met ? 'text-[#10b981]' : 'text-[#707971]'}`}>
+        {label}
+      </Text>
+    </View>
+  );
 
   return (
     <SafeAreaView className="flex-1 bg-[#0b2114]" edges={['top', 'left', 'right']}>
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        className="flex-1"
-      >
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
         <ScrollView contentContainerStyle={{ flexGrow: 1 }} bounces={false} showsVerticalScrollIndicator={false}>
-          <View className="w-full max-w-lg mx-auto flex-1">
-            <View className="px-8 pt-10 pb-8 flex-1 justify-end">
-              <View className="mb-8">
-                <Text className="text-white text-[24px] font-jakarta-bold tracking-tight">PayChain</Text>
-                <Text className="text-[#68dbae] text-[12px] font-jakarta-bold tracking-[0.15em] uppercase mt-1">Merchant Portal</Text>
+          <View className="px-8 pt-10 pb-8 justify-end">
+            <Text className="text-white text-[24px] font-jakarta-bold tracking-tight">PayChain</Text>
+            <Text className="text-[#68dbae] text-[12px] font-jakarta-bold tracking-[0.15em] uppercase mt-1 mb-8">Merchant Portal</Text>
+          </View>
+
+          <View className="bg-white w-full flex-1 rounded-t-[32px] px-6 pt-10 pb-16 shadow-lg">
+            {!isSignupSuccess && !isSignupBiometricStep && !isSignupPasswordStep && !isOTPMode && !isResetMode && renderTabs()}
+
+            {err ? (
+              <View className="bg-red-50 border border-red-200 p-4 rounded-xl flex-row items-center mb-6">
+                <Feather name="alert-circle" size={18} color="#b91c1c" />
+                <Text className="text-red-700 text-[12px] font-jakarta-bold ml-3 flex-1">{err}</Text>
               </View>
+            ) : null}
+
+            {activeTab === 'login' && !isOTPMode && !isResetMode && (
               <View>
-                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-4xl text-white leading-tight">Collect.</Text>
-                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-4xl text-[#68dbae] leading-tight">Pay.</Text>
-                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-4xl text-white leading-tight">Grow.</Text>
-              </View>
-            </View>
+                <Text className="text-[#1b1c1a] text-[24px] font-jakarta-bold mb-2">Sign in</Text>
+                <Text className="text-[#707971] text-[14px] font-jakarta-medium mb-6">Enter credentials provided during onboarding.</Text>
 
-            <View className="bg-[#faf9f6] w-full rounded-t-[32px] px-8 pt-10 pb-16 shadow-lg">
-              <View className="space-y-2 mb-8">
-                <Text className="text-[#1b1c1a] text-[24px] font-jakarta-bold tracking-tight">Sign in to your account</Text>
-                <Text className="text-[#404942] text-[15px] leading-relaxed mt-2 font-jakarta-medium">Use your M-PESA phone number and the password provided during onboarding.</Text>
-              </View>
+                {hasBiometrics && (
+                  <TouchableOpacity onPress={handleBiometricSignIn} className="bg-[#ecfdf5] border border-[#a7f3d0] py-4 rounded-2xl flex-row justify-center items-center mb-6">
+                    <Feather name="target" size={20} color="#047857" />
+                    <Text className="text-[#047857] font-jakarta-bold text-[14px] ml-3">Sign in with Passkey / Biometrics</Text>
+                  </TouchableOpacity>
+                )}
 
-              <View className="bg-[#e7f8ef] border-l-4 border-[#006c4e] py-4 px-5 mb-10">
-                <Text className="text-[#006c4e] text-[13px] leading-relaxed font-jakarta-medium">No account? Access is provided by your PayChain onboarding officer after approval.</Text>
-              </View>
-
-              <View className="mb-8">
-                <Text className="text-[#404942] text-[11px] font-jakarta-bold uppercase tracking-[0.1em] mb-4">M-PESA Phone Number</Text>
-                <View className="flex-row items-center border-b border-[#c0c9c0] pb-3">
-                  <View className="bg-[#efeeeb] px-4 py-2.5 rounded-full mr-4">
-                    <Text className="text-[16px] font-jakarta-bold text-[#404942]">+254</Text>
-                  </View>
+                <View className="mb-6">
+                  <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Email or Phone</Text>
                   <TextInput 
-                    className="flex-1 text-[20px] font-jakarta-semibold text-[#1b1c1a]"
-                    placeholder="712 847 291"
-                    placeholderTextColor="#c0c9c0"
-                    keyboardType="phone-pad"
+                    className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-4 px-5 text-[16px] font-jakarta-medium text-[#1b1c1a]"
+                    placeholder="john@example.com or 0712..."
+                    placeholderTextColor="#9ca3af"
                     value={phone}
                     onChangeText={setPhone}
+                    autoCapitalize="none"
                   />
                 </View>
-              </View>
 
-              <View className="mb-10">
-                <Text className="text-[#404942] text-[11px] font-jakarta-bold uppercase tracking-[0.1em] mb-4">Password</Text>
-                <View className="flex-row items-center border-b border-[#c0c9c0] pb-3">
-                  <TextInput 
-                    className="flex-1 text-[24px] font-jakarta-bold text-[#1b1c1a] tracking-widest pt-2"
-                    placeholder="••••••••"
-                    placeholderTextColor="#c0c9c0"
-                    secureTextEntry={!showPassword}
-                    value={password}
-                    onChangeText={setPassword}
-                  />
-                  <TouchableOpacity onPress={() => setShowPassword(!showPassword)} className="p-2">
-                    <Feather name={showPassword ? "eye-off" : "eye"} size={22} color="#707971" />
-                  </TouchableOpacity>
+                <View className="mb-8">
+                  <View className="flex-row justify-between items-center mb-2">
+                    <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest">Password</Text>
+                    <TouchableOpacity onPress={() => setActiveTab('reset')}><Text className="text-[#059669] text-[11px] font-jakarta-bold uppercase tracking-widest">Forgot?</Text></TouchableOpacity>
+                  </View>
+                  <View className="flex-row items-center w-full bg-white border border-[#e5e7eb] rounded-2xl pr-4">
+                    <TextInput 
+                      className="flex-1 py-4 px-5 text-[16px] font-jakarta-medium text-[#1b1c1a]"
+                      placeholder="••••••••"
+                      placeholderTextColor="#9ca3af"
+                      secureTextEntry={!showPassword}
+                      value={password}
+                      onChangeText={setPassword}
+                    />
+                    <TouchableOpacity onPress={() => setShowPassword(!showPassword)} className="p-2">
+                      <Feather name={showPassword ? "eye-off" : "eye"} size={20} color="#9ca3af" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-                <Text className="text-[#707971] text-[13px] mt-4 italic font-jakarta-medium">First time? Use your temporary password.</Text>
-              </View>
 
-              <View className="pt-2">
                 <TouchableOpacity 
-                  className="w-full h-[60px] bg-[#006c4e] rounded-2xl flex-row items-center justify-center"
-                  activeOpacity={0.8}
-                  onPress={() => navigation.replace('Main')}
+                  onPress={handleLogin} disabled={loading}
+                  className="w-full bg-[#06201b] py-4 rounded-2xl flex-row justify-center items-center"
                 >
-                  <Text className="text-white font-jakarta-bold text-[18px] mr-2">Sign In</Text>
-                  <Feather name="log-in" size={20} color="white" />
+                  {loading ? <ActivityIndicator color="white" /> : <Text className="text-white font-jakarta-bold text-[16px]">Sign In</Text>}
                 </TouchableOpacity>
               </View>
-            </View>
+            )}
+
+            {isOTPMode && (
+              <View>
+                <Text className="text-[#1b1c1a] text-[24px] font-jakarta-bold mb-2">Enter OTP</Text>
+                <Text className="text-[#707971] text-[14px] font-jakarta-medium mb-6">Enter the code sent to {authEmail}</Text>
+                
+                <View className="flex-row justify-between mb-8">
+                  {otp.map((digit, index) => (
+                    <TextInput 
+                      key={index}
+                      className="w-[45px] h-[55px] bg-[#f9fafb] border border-[#e5e7eb] rounded-xl text-center text-[20px] font-jakarta-bold text-[#1b1c1a]"
+                      keyboardType="number-pad"
+                      maxLength={1}
+                      value={digit}
+                      onChangeText={(val) => {
+                        const newOtp = [...otp];
+                        newOtp[index] = val;
+                        setOtp(newOtp);
+                      }}
+                    />
+                  ))}
+                </View>
+                
+                <TouchableOpacity onPress={handleVerifyOTP} disabled={loading || otp.join('').length < 6} className="w-full bg-[#06201b] py-4 rounded-2xl flex-row justify-center items-center mb-4 opacity-100">
+                  {loading ? <ActivityIndicator color="white" /> : <Text className="text-white font-jakarta-bold text-[16px]">Verify Code</Text>}
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {isResetMode && (
+              <View>
+                 <Text className="text-[#1b1c1a] text-[24px] font-jakarta-bold mb-6">Create New Password</Text>
+                 <View className="mb-6">
+                    <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">New Password</Text>
+                    <View className="flex-row items-center w-full bg-white border border-[#e5e7eb] rounded-2xl pr-4">
+                      <TextInput className="flex-1 py-4 px-5 text-[16px] font-jakarta-medium text-[#1b1c1a]" placeholder="••••••••" secureTextEntry={!showPassword} value={newPassword} onChangeText={setNewPasswordInput} />
+                      <TouchableOpacity onPress={() => setShowPassword(!showPassword)} className="p-2"><Feather name={showPassword ? "eye-off" : "eye"} size={20} color="#9ca3af" /></TouchableOpacity>
+                    </View>
+                 </View>
+                 <View className="mb-8">
+                    <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Confirm Password</Text>
+                    <View className="flex-row items-center w-full bg-white border border-[#e5e7eb] rounded-2xl pr-4">
+                      <TextInput className="flex-1 py-4 px-5 text-[16px] font-jakarta-medium text-[#1b1c1a]" placeholder="••••••••" secureTextEntry={!showConfirmPassword} value={confirmPassword} onChangeText={setConfirmPassword} />
+                      <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} className="p-2"><Feather name={showConfirmPassword ? "eye-off" : "eye"} size={20} color="#9ca3af" /></TouchableOpacity>
+                    </View>
+                 </View>
+                 <TouchableOpacity onPress={handleResetPassword} disabled={loading} className="w-full bg-[#06201b] py-4 rounded-2xl flex-row justify-center items-center">
+                    {loading ? <ActivityIndicator color="white" /> : <Text className="text-white font-jakarta-bold text-[16px]">Set Password</Text>}
+                 </TouchableOpacity>
+              </View>
+            )}
+
+            {activeTab === 'signup' && !isSignupPasswordStep && !isSignupBiometricStep && !isSignupSuccess && (
+              <View>
+                <Text className="text-[#1b1c1a] text-[24px] font-jakarta-bold mb-2">Get started with us</Text>
+                <Text className="text-[#707971] text-[14px] font-jakarta-medium mb-6">Fill out the form below to connect with us.</Text>
+
+                <View className="space-y-4">
+                  <View>
+                    <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Your Name *</Text>
+                    <TextInput className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-medium text-[#1b1c1a]" value={signupName} onChangeText={setSignupName} placeholder="John Doe" />
+                  </View>
+                  <View>
+                    <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Your Email *</Text>
+                    <TextInput className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-medium text-[#1b1c1a]" value={signupEmail} onChangeText={setSignupEmail} placeholder="john@example.com" keyboardType="email-address" autoCapitalize="none" />
+                  </View>
+                  <View>
+                    <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Your Phone *</Text>
+                    <TextInput className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-medium text-[#1b1c1a]" value={signupPhone} onChangeText={setSignupPhone} placeholder="0712 345 678" keyboardType="phone-pad" />
+                  </View>
+                  <View>
+                    <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Business Name *</Text>
+                    <TextInput className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-medium text-[#1b1c1a]" value={signupBusinessName} onChangeText={setSignupBusinessName} placeholder="Acme Corp" />
+                  </View>
+                  <TouchableOpacity onPress={() => setIsSignupPasswordStep(true)} className="w-full bg-[#06201b] py-4 rounded-2xl flex-row justify-center items-center mt-4">
+                    <Text className="text-white font-jakarta-bold text-[16px]">Next Step</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {isSignupPasswordStep && (
+              <View>
+                <Text className="text-[#1b1c1a] text-[24px] font-jakarta-bold mb-6">Set Custom Access</Text>
+                 <View className="mb-4">
+                    <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">New Password</Text>
+                    <View className="flex-row items-center w-full bg-white border border-[#e5e7eb] rounded-2xl pr-4">
+                      <TextInput className="flex-1 py-4 px-5 text-[16px] font-jakarta-medium text-[#1b1c1a]" placeholder="••••••••" secureTextEntry={!showPassword} value={newPassword} onChangeText={setNewPasswordInput} />
+                      <TouchableOpacity onPress={() => setShowPassword(!showPassword)} className="p-2"><Feather name={showPassword ? "eye-off" : "eye"} size={20} color="#9ca3af" /></TouchableOpacity>
+                    </View>
+                 </View>
+                 
+                 <View className="bg-[#f0fdf4] p-4 rounded-2xl mb-6 border border-[#a7f3d0]">
+                   <SecurityRequirement met={strength.length} label="Minimum 8 Characters" />
+                   <SecurityRequirement met={strength.upper} label="Uppercase letters (A, B, C)" />
+                   <SecurityRequirement met={strength.number} label="Numerical digits (1, 2, 3)" />
+                   <SecurityRequirement met={strength.symbol} label="Special Symbols (@, #, $)" />
+                 </View>
+
+                 <View className="mb-8">
+                    <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Confirm Password</Text>
+                    <View className="flex-row items-center w-full bg-white border border-[#e5e7eb] rounded-2xl pr-4">
+                      <TextInput className="flex-1 py-4 px-5 text-[16px] font-jakarta-medium text-[#1b1c1a]" placeholder="••••••••" secureTextEntry={!showConfirmPassword} value={confirmPassword} onChangeText={setConfirmPassword} />
+                      <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} className="p-2"><Feather name={showConfirmPassword ? "eye-off" : "eye"} size={20} color="#9ca3af" /></TouchableOpacity>
+                    </View>
+                 </View>
+                 <TouchableOpacity onPress={handleSignupCreateAccount} disabled={loading} className="w-full bg-[#06201b] py-4 rounded-2xl flex-row justify-center items-center">
+                    {loading ? <ActivityIndicator color="white" /> : <Text className="text-white font-jakarta-bold text-[16px]">Create Account</Text>}
+                 </TouchableOpacity>
+              </View>
+            )}
+
+            {isSignupBiometricStep && (
+              <View className="items-center py-10">
+                <View className="w-20 h-20 bg-[#ecfdf5] rounded-full justify-center items-center mb-6">
+                  <MaterialIcons name="fingerprint" size={32} color="#047857" />
+                </View>
+                <Text className="text-[#1b1c1a] text-[24px] font-jakarta-bold mb-4">Enable Biometrics</Text>
+                <Text className="text-[#707971] text-[14px] font-jakarta-medium text-center mb-8">Set up Face ID or Touch ID for instant, secure access to your merchant dashboard.</Text>
+                
+                <TouchableOpacity onPress={handleSetupBiometric} disabled={loading} className="w-full bg-[#06201b] py-4 rounded-2xl flex-row justify-center items-center mb-4">
+                  {loading ? <ActivityIndicator color="white" /> : <Text className="text-white font-jakarta-bold text-[16px]">Set Up Now</Text>}
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => { setIsSignupBiometricStep(false); setIsSignupSuccess(true); }} className="py-2">
+                  <Text className="text-[#707971] font-jakarta-bold text-[14px]">Skip for now</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {isSignupSuccess && (
+              <View className="items-center py-10">
+                <View className="w-20 h-20 bg-[#ecfdf5] rounded-full justify-center items-center mb-6">
+                  <Feather name="check-circle" size={32} color="#047857" />
+                </View>
+                <Text className="text-[#1b1c1a] text-[24px] font-jakarta-bold mb-4">Application Received</Text>
+                <Text className="text-[#707971] text-[14px] font-jakarta-medium text-center mb-8">Thank you for applying to join PayChain! Our team will review your details shortly.</Text>
+                
+                <TouchableOpacity onPress={() => { setIsSignupSuccess(false); setActiveTab('login'); }} className="w-full bg-[#06201b] py-4 rounded-2xl flex-row justify-center items-center">
+                  <Text className="text-white font-jakarta-bold text-[16px]">Back to Login</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

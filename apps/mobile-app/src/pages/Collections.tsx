@@ -1,74 +1,62 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, Modal, TextInput } from 'react-native';
+import React, { useState, useEffect, useMemo } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Image, Modal, TextInput, ActivityIndicator } from 'react-native';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-
-const mockTransactions = [
-  {
-    id: '1',
-    name: 'Peter Otieno',
-    ref: 'QJX8472KL',
-    verified: true,
-    amount: '+KES 1,500',
-    time: '14:22',
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBG5CaKePfWPmBF5zxCzCUMgQXnrJPMOR32D5Ec2geLcUSysY-1VPnw54Iy52rc8c-jC549DEHDtSKLJ-XOkTxdjC11Mae5BgiSU3RA4DdyuI5fskPb7m1mls-yy0wbGYKjNKcFNSO7SEp6nQlnQmEZhgyxFAFH5CifI2OqIkXasN6Brb0zY3RUTEqmncP1RnnUEuuXr8LE4HUk7SPC0IK5RlqMcpDGU7_Q_WLO8UcAv3Q8EVySYxXq-jYqc_mANxHj8iD_DBH_Tng',
-    color: '#006c4e'
-  },
-  {
-    id: '2',
-    name: 'Sarah Wanjiku',
-    ref: 'RKP9102MN',
-    verified: true,
-    amount: '+KES 4,200',
-    time: '13:05',
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuD6N8VwNbg3kIrAt3Vu7TDGvVho_8EpGPzNmCd4iujIRRELVqivQM36jxfTLrK5yff--a-tw2eJcIYpYBeHkCUeK5QBe1-5DK8RNA5_EY4K4UY7ENEx0MRd2TaxO63OKOBRlci08T8xyh8VyuAFAqkG9SttYOSxjm17v5xs1zk68_VBr8aM66YSgPu39fcXnQ-w0GuDrlanv4k7BwsxLU06eUQEXB7GUz4MSXCgtVyI1SxP0RuLH-HiKnCf8VZgao3akxJE3BEu0Uc',
-    color: '#1b1c1a'
-  },
-  {
-    id: '3',
-    name: 'Michael Kamau',
-    ref: 'VBN2034ZX',
-    verified: false,
-    amount: '+KES 8,500',
-    time: '11:45',
-    image: '',
-    initials: 'MK',
-    color: '#475569'
-  },
-  {
-    id: '4',
-    name: 'Joy Njeri',
-    ref: 'YTC9911PQ',
-    verified: true,
-    amount: '+KES 650',
-    time: '09:12',
-    image: '',
-    initials: 'JN',
-    color: '#f59e0b'
-  },
-  {
-    id: '5',
-    name: 'David Omondi',
-    ref: 'PLO4421WW',
-    verified: true,
-    amount: '+KES 12,000',
-    time: '08:05',
-    image: '',
-    initials: 'DO',
-    color: '#2563eb'
-  }
-];
+import { useAuth } from '../context/AuthContext';
+import api from '../api/config';
 
 export default function Collections() {
+  const { merchant } = useAuth();
   const [showReceipt, setShowReceipt] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const filteredTransactions = mockTransactions.filter(tx => 
-    tx.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    tx.ref.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    tx.amount.includes(searchQuery)
-  );
+  useEffect(() => {
+    const fetchTransactions = async () => {
+      try {
+        const res = await api.get('/api/transactions');
+        if (res.data.success) {
+          setTransactions(res.data.transactions || []);
+        }
+      } catch (error) {
+        console.error("Error fetching collections", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    if (merchant) {
+      fetchTransactions();
+    }
+  }, [merchant]);
+
+  const initials = merchant?.businessName 
+    ? merchant.businessName.substring(0, 2).toUpperCase() 
+    : '??';
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(amount);
+  };
+
+
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter(tx => {
+      const searchStr = searchQuery.toLowerCase();
+      const nameMatch = (tx.senderName || '').toLowerCase().includes(searchStr);
+      const refMatch = (tx.providerRef || '').toLowerCase().includes(searchStr);
+      const amountMatch = tx.amount?.toString().includes(searchStr);
+      return nameMatch || refMatch || amountMatch;
+    });
+  }, [transactions, searchQuery]);
+
+  const todayTransactions = transactions.filter(tx => {
+    const today = new Date();
+    const txDate = new Date(tx.createdAt);
+    return txDate.getDate() === today.getDate() && txDate.getMonth() === today.getMonth() && txDate.getFullYear() === today.getFullYear();
+  });
+  const todayTotal = todayTransactions.reduce((acc, tx) => acc + (tx.amount || 0), 0);
+
 
   return (
     <SafeAreaView className="flex-1 bg-[#faf9f6]" edges={['top', 'left', 'right']}>
@@ -83,11 +71,11 @@ export default function Collections() {
             <TouchableOpacity 
               className="w-10 h-10 rounded-full bg-white/20 items-center justify-center border border-white/30 ml-3"
             >
-              <Text className="text-white font-jakarta-bold text-sm">JK</Text>
+              <Text className="text-white font-jakarta-bold text-sm">{initials}</Text>
             </TouchableOpacity>
             <View>
               <Text className="text-white text-[20px] font-jakarta-bold tracking-tight leading-tight">Collections</Text>
-              <Text className="text-white/70 text-[12px] font-jakarta-medium tracking-wide">Till PC847291</Text>
+              <Text className="text-white/70 text-[12px] font-jakarta-medium tracking-wide">Till {merchant?.paybillNumber || 'PENDING'}</Text>
             </View>
           </View>
         </View>
@@ -103,19 +91,19 @@ export default function Collections() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row gap-4 pb-6 pt-2 overflow-visible">
             <View className="bg-white p-5 rounded-[24px] shadow-sm w-44 mr-4">
               <Text className="text-[11px] font-jakarta-bold text-[#707971] uppercase tracking-[0.1em] mb-1.5">Today</Text>
-              <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[26px] text-[#006c4e]">KES 18,450</Text>
+              <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[26px] text-[#006c4e]">{formatCurrency(todayTotal)}</Text>
               <View className="flex-row items-center mt-3 gap-1.5">
                 <Feather name="credit-card" size={14} color="#68dbae" />
-                <Text className="text-[12px] font-jakarta-semibold text-[#404942]">12 payments</Text>
+                <Text className="text-[12px] font-jakarta-semibold text-[#404942]">{todayTransactions.length} payments</Text>
               </View>
             </View>
 
             <View className="bg-[#f4f3f0] p-5 rounded-[24px] w-44 mr-4">
               <Text className="text-[11px] font-jakarta-bold text-[#707971] uppercase tracking-[0.1em] mb-1.5">This Week</Text>
-              <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[26px] text-[#404942]">KES 142.2k</Text>
+              <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[26px] text-[#404942]">{formatCurrency(merchant?.balances?.KES || 0)}</Text>
               <View className="flex-row items-center mt-3 gap-1.5">
                 <Feather name="trending-up" size={14} color="#707971" />
-                <Text className="text-[12px] font-jakarta-semibold text-[#707971]">84 payments</Text>
+                <Text className="text-[12px] font-jakarta-semibold text-[#707971]">{transactions.length} payments</Text>
               </View>
             </View>
           </ScrollView>
@@ -161,15 +149,19 @@ export default function Collections() {
           <View className="px-2">
             <View className="flex-row justify-between items-center mb-5">
               <Text className="text-[11px] font-jakarta-extrabold uppercase tracking-[0.15em] text-[#707971]">
-                {searchQuery ? `Search Results (${filteredTransactions.length})` : 'Today — KES 18,450'}
+                {searchQuery ? `Search Results (${filteredTransactions.length})` : `Today — ${formatCurrency(todayTotal)}`}
               </Text>
-              {!searchQuery && <Text className="text-[11px] font-jakarta-medium text-[#707971]">12 Total</Text>}
+              {!searchQuery && <Text className="text-[11px] font-jakarta-medium text-[#707971]">{todayTransactions.length} Total</Text>}
             </View>
 
             <View className="bg-white rounded-[32px] p-2 shadow-sm border border-[#c0c9c0]/10 mb-6">
-              {filteredTransactions.length > 0 ? filteredTransactions.map((tx, index) => (
+              {isLoading ? (
+                <View className="py-10 items-center justify-center">
+                  <ActivityIndicator color="#0B4D2E" />
+                </View>
+              ) : filteredTransactions.length > 0 ? filteredTransactions.map((tx, index) => (
                 <TouchableOpacity 
-                  key={tx.id} 
+                  key={tx._id || index} 
                   activeOpacity={0.8} 
                   onPress={() => setShowReceipt(true)} 
                   className={`flex-row items-center justify-between py-3 px-4 ${
@@ -177,22 +169,26 @@ export default function Collections() {
                   }`}
                 >
                   <View className="flex-row items-center gap-3">
-                    <View className="w-10 h-10 rounded-full items-center justify-center overflow-hidden" style={{ backgroundColor: `${tx.color}15` }}>
-                      {tx.image ? (
-                        <Image source={{ uri: tx.image }} className="w-full h-full" />
-                      ) : (
-                        <Text style={{ color: tx.color }} className="font-jakarta-bold text-[11px]">{tx.initials}</Text>
-                      )}
+                    <View className="w-10 h-10 rounded-full bg-[#efeeeb] items-center justify-center overflow-hidden">
+                      <Text className="text-[#404942] font-jakarta-bold text-[11px]">
+                        {tx.senderName ? tx.senderName.substring(0, 2).toUpperCase() : 'TX'}
+                      </Text>
                     </View>
                     <View>
                       <View className="flex-row items-center gap-1">
-                        <Text className="font-jakarta-bold text-[14px] text-[#1b1c1a]">{tx.name}</Text>
-                        {tx.verified && <MaterialIcons name="verified" size={12} color="#006c4e" />}
+                        <Text className="font-jakarta-bold text-[14px] text-[#1b1c1a]">
+                          {tx.senderName || 'Unknown'}
+                        </Text>
+                        {tx.status === 'COMPLETED' && <MaterialIcons name="verified" size={12} color="#006c4e" />}
                       </View>
-                      <Text className="text-[#707971] text-[10px] font-jakarta-medium mt-0.5">{tx.time} • {tx.ref}</Text>
+                      <Text className="text-[#707971] text-[10px] font-jakarta-medium mt-0.5">
+                        {new Date(tx.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} • {tx.providerRef || tx.type}
+                      </Text>
                     </View>
                   </View>
-                  <Text className="font-jakarta-bold text-[#006c4e] text-[13px]">{tx.amount}</Text>
+                  <Text className={`font-jakarta-bold text-[13px] ${tx.type === 'INBOUND' ? 'text-[#006c4e]' : 'text-[#1b1c1a]'}`}>
+                    {tx.type === 'INBOUND' ? '+' : '-'} {formatCurrency(tx.amount)}
+                  </Text>
                 </TouchableOpacity>
               )) : (
                 <View className="items-center justify-center py-10">

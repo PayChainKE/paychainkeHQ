@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Text, TextInput } from 'react-native';
 import MobileLayout from './src/components/layout/MobileLayout';
 import AppNavigator from './src/navigation/AppNavigator';
+import { AuthProvider } from './src/context/AuthContext';
 
 // Prevent system text scaling and default font overrides across the entire application
 // @ts-ignore
@@ -34,11 +35,13 @@ export default function App() {
   }
 
   return (
-    <SafeAreaProvider>
-      <StatusBar style="dark" />
-      <MobileLayout>
-        <AppNavigator />
-      </MobileLayout>
-    </SafeAreaProvider>
+    <AuthProvider>
+      <SafeAreaProvider>
+        <StatusBar style="dark" />
+        <MobileLayout>
+          <AppNavigator />
+        </MobileLayout>
+      </SafeAreaProvider>
+    </AuthProvider>
   );
 }
