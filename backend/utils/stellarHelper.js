@@ -130,3 +130,45 @@ export const getWalletBalance = async (publicKey) => {
     return 0;
   }
 };
+
+/**
+ * Sweeps USDC from the merchant's wallet back to the Master wallet.
+ * @param {string} encryptedSecretKey - The merchant's encrypted Stellar secret key
+ * @param {number} amount - The amount in USDC to send
+ */
+export const swapUsdcToKesOnChain = async (encryptedSecretKey, amount) => {
+  if (!MASTER_SECRET_KEY) {
+    throw new Error('Master Secret Key is missing from environment.');
+  }
+
+  const merchantSecretKey = decryptKey(encryptedSecretKey);
+  const merchantKeypair = StellarSdk.Keypair.fromSecret(merchantSecretKey);
+  const masterKeypair = StellarSdk.Keypair.fromSecret(MASTER_SECRET_KEY);
+
+  try {
+    const merchantAccount = await server.loadAccount(merchantKeypair.publicKey());
+    
+    const transaction = new StellarSdk.TransactionBuilder(merchantAccount, {
+      fee: await server.fetchBaseFee(),
+      networkPassphrase: NETWORK === 'PUBLIC' ? StellarSdk.Networks.PUBLIC : StellarSdk.Networks.TESTNET
+    })
+    .addOperation(StellarSdk.Operation.payment({
+      destination: masterKeypair.publicKey(),
+      asset: usdcAsset,
+      amount: amount.toString()
+    }))
+    .setTimeout(30)
+    .build();
+
+    transaction.sign(merchantKeypair);
+
+    console.log(`🚀 Sweeping ${amount} USDC from ${merchantKeypair.publicKey()} to Master Wallet...`);
+    const response = await server.submitTransaction(transaction);
+    console.log(`✅ Swap (USDC->KES) successful! Hash: ${response.hash}`);
+    return response.hash;
+
+  } catch (error) {
+    console.error('❌ USDC to KES Swap Error:', error.response?.data?.extras?.result_codes || error.message);
+    throw new Error('Blockchain settlement failed.');
+  }
+};

@@ -125,7 +125,28 @@ export default function Wallet() {
 
   const [showSwapModal, setShowSwapModal] = useState(false)
   const [swapAmount, setSwapAmount] = useState('')
+  const [swapDirectionModal, setSwapDirectionModal] = useState('KES_TO_USDC')
   const [liveRate, setLiveRate] = useState(132.45)
+  const [usdBalance, setUsdBalance] = useState(0)
+
+  useEffect(() => {
+    const fetchUsdBalance = async () => {
+      if (!merchant?.stellarPublicKey) return;
+      try {
+        const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+        const token = localStorage.getItem('paychain_merchant_token');
+        const res = await axios.post(`${API_URL}/api/transactions/sync-wallet`, {}, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.data.success) {
+          setUsdBalance(res.data.usdcBalance || res.data.balance);
+        }
+      } catch (err) {
+        console.error('Failed to sync USDC balance', err);
+      }
+    };
+    if (merchant) fetchUsdBalance();
+  }, [merchant]);
 
   useEffect(() => {
     const fetchRate = async () => {
@@ -157,23 +178,34 @@ export default function Wallet() {
     if (isNaN(amount) || amount <= 0) {
       return addToast({ title: 'Invalid Amount', message: 'Please enter a valid number.', type: 'error' });
     }
-    if (amount > (merchant?.kesBalance || 0)) {
+    if (swapDirectionModal === 'KES_TO_USDC' && amount > (merchant?.kesBalance || 0)) {
       return addToast({ title: 'Insufficient Balance', message: 'You do not have enough KES.', type: 'error' });
+    }
+    if (swapDirectionModal === 'USDC_TO_KES' && amount > usdBalance) {
+      return addToast({ title: 'Insufficient Balance', message: 'You do not have enough USDC.', type: 'error' });
     }
 
     setIsSwapping(true);
     try {
       const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
       const token = localStorage.getItem('paychain_merchant_token');
-      const res = await axios.post(`${API_URL}/api/transactions/swap`, { amount }, {
+      const res = await axios.post(`${API_URL}/api/transactions/swap`, { amount, direction: swapDirectionModal }, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      addToast({ title: 'Swap Successful', message: `Successfully swapped ${amount} KES to USDC!`, type: 'success' });
+      addToast({ title: 'Swap Successful', message: `Successfully swapped ${amount} ${swapDirectionModal === 'KES_TO_USDC' ? 'KES to USDC' : 'USDC to KES'}!`, type: 'success' });
       await refreshSession();
+      if (swapDirectionModal === 'USDC_TO_KES') {
+        const syncRes = await axios.post(`${API_URL}/api/transactions/sync-wallet`, {}, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (syncRes.data.success) {
+          setUsdBalance(syncRes.data.usdcBalance || syncRes.data.balance);
+        }
+      }
       setShowSwapModal(false);
       setSwapAmount('');
     } catch (err) {
-      addToast({ title: 'Swap Failed', message: err.response?.data?.error || 'Failed to swap KES', type: 'error' });
+      addToast({ title: 'Swap Failed', message: err.response?.data?.error || 'Failed to swap currency', type: 'error' });
     } finally {
       setIsSwapping(false);
     }
@@ -1213,8 +1245,10 @@ export default function Wallet() {
             <div className="p-6 md:p-10 space-y-6">
               <div className="bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100 flex items-center justify-between">
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-emerald-800/60 mb-1">Available KES Balance</p>
-                  <p className="text-xl font-headline font-bold text-emerald-900">{formatKES(merchant?.kesBalance || 0)}</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-emerald-800/60 mb-1">Available {swapDirectionModal === 'KES_TO_USDC' ? 'KES' : 'USDC'} Balance</p>
+                  <p className="text-xl font-headline font-bold text-emerald-900">
+                    {swapDirectionModal === 'KES_TO_USDC' ? formatKES(merchant?.kesBalance || 0) : formatUSDC(usdBalance)}
+                  </p>
                 </div>
                 <div className="text-right">
                   <p className="text-[10px] font-black uppercase tracking-widest text-emerald-800/60 mb-1">Live Rate</p>
@@ -1223,19 +1257,19 @@ export default function Wallet() {
               </div>
 
               <div className="space-y-3">
-                <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Amount to Swap (KES)</label>
+                <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Amount to Swap ({swapDirectionModal === 'KES_TO_USDC' ? 'KES' : 'USDC'})</label>
                 <div className="relative group">
-                  <div className="absolute left-6 top-1/2 -translate-y-1/2 text-primary/40 font-bold text-lg">KES</div>
+                  <div className="absolute left-6 top-1/2 -translate-y-1/2 text-primary/40 font-bold text-lg">{swapDirectionModal === 'KES_TO_USDC' ? 'KES' : 'USDC'}</div>
                   <input 
                     type="number"
                     value={swapAmount}
                     onChange={(e) => setSwapAmount(e.target.value)}
                     placeholder="0.00"
-                    max={merchant?.kesBalance || 0}
-                    className="w-full bg-surface-container-low border border-outline-variant/5 rounded-3xl py-6 pl-16 pr-6 text-2xl font-headline text-primary focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
+                    max={swapDirectionModal === 'KES_TO_USDC' ? (merchant?.kesBalance || 0) : usdBalance}
+                    className="w-full bg-surface-container-low border border-outline-variant/5 rounded-3xl py-6 pl-20 pr-6 text-2xl font-headline text-primary focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
                   />
                   <button 
-                    onClick={() => setSwapAmount((merchant?.kesBalance || 0).toString())}
+                    onClick={() => setSwapAmount((swapDirectionModal === 'KES_TO_USDC' ? (merchant?.kesBalance || 0) : usdBalance).toString())}
                     className="absolute right-4 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-emerald-200 transition-colors"
                   >
                     Max
@@ -1244,7 +1278,10 @@ export default function Wallet() {
               </div>
 
               <div className="flex justify-center -my-2 relative z-10">
-                <div className="w-10 h-10 bg-white border border-outline-variant/10 rounded-full flex items-center justify-center shadow-sm text-primary">
+                <div 
+                  onClick={() => setSwapDirectionModal(prev => prev === 'KES_TO_USDC' ? 'USDC_TO_KES' : 'KES_TO_USDC')}
+                  className="w-10 h-10 bg-white border border-outline-variant/10 rounded-full flex items-center justify-center shadow-sm text-primary cursor-pointer hover:bg-gray-50 transition-colors"
+                >
                   <span className="material-symbols-outlined text-lg">swap_vert</span>
                 </div>
               </div>
@@ -1252,10 +1289,10 @@ export default function Wallet() {
               <div className="space-y-3">
                 <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">You Will Receive (Estimated)</label>
                 <div className="relative group">
-                  <div className="absolute left-6 top-1/2 -translate-y-1/2 text-primary/40 font-bold text-lg">USDC</div>
+                  <div className="absolute left-6 top-1/2 -translate-y-1/2 text-primary/40 font-bold text-lg">{swapDirectionModal === 'KES_TO_USDC' ? 'USDC' : 'KES'}</div>
                   <input 
                     type="text"
-                    value={swapAmount ? (Number(swapAmount) / liveRate).toFixed(4) : '0.0000'}
+                    value={swapAmount ? (swapDirectionModal === 'KES_TO_USDC' ? (Number(swapAmount) / liveRate).toFixed(4) : (Number(swapAmount) * liveRate).toFixed(2)) : '0.00'}
                     readOnly
                     className="w-full bg-surface-container-low border border-outline-variant/5 rounded-3xl py-6 pl-20 pr-6 text-2xl font-headline text-primary outline-none opacity-80"
                   />
@@ -1264,7 +1301,7 @@ export default function Wallet() {
 
               <button 
                 onClick={executeSwap}
-                disabled={isSwapping || !swapAmount || Number(swapAmount) <= 0 || Number(swapAmount) > (merchant?.kesBalance || 0)}
+                disabled={isSwapping || !swapAmount || Number(swapAmount) <= 0 || (swapDirectionModal === 'KES_TO_USDC' ? Number(swapAmount) > (merchant?.kesBalance || 0) : Number(swapAmount) > usdBalance)}
                 className="w-full bg-[#00351D] text-white py-5 rounded-3xl font-bold text-lg shadow-2xl hover:bg-[#004d2b] active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-white/5 disabled:opacity-50"
               >
                 {isSwapping ? (

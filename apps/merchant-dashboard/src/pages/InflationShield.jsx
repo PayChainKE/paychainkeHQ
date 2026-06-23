@@ -14,10 +14,16 @@ export default function InflationShield() {
   const [isSwapping, setIsSwapping] = useState(false)
   const [usdBalance, setUsdBalance] = useState(0)
 
-  const [kesAmount, setKesAmount] = useState('')
+  const [inputAmount, setInputAmount] = useState('')
+  const [swapDirection, setSwapDirection] = useState('KES_TO_USDC')
   const [rate, setRate] = useState(132.45)
   const feeRate = 0.005
-  const usdcAmount = kesAmount ? (Number(kesAmount) * (1 - feeRate) / rate).toFixed(2) : '0.00'
+  
+  const estimatedOutput = inputAmount ? (
+    swapDirection === 'KES_TO_USDC' 
+      ? (Number(inputAmount) * (1 - feeRate) / rate).toFixed(2)
+      : (Number(inputAmount) * (1 - feeRate) * rate).toFixed(2)
+  ) : '0.00'
 
   const [liveTransactions, setLiveTransactions] = useState([])
   useEffect(() => {
@@ -72,12 +78,15 @@ export default function InflationShield() {
   }, [merchant])
 
   const handleSwap = async () => {
-    const amount = Number(kesAmount);
+    const amount = Number(inputAmount);
     if (!amount || amount <= 0) {
       return addToast({ title: 'Invalid Amount', message: 'Please enter a valid amount to swap.', type: 'error' });
     }
-    if (amount > (merchant?.kesBalance || 0)) {
+    if (swapDirection === 'KES_TO_USDC' && amount > (merchant?.kesBalance || 0)) {
       return addToast({ title: 'Insufficient Balance', message: 'You do not have enough KES.', type: 'error' });
+    }
+    if (swapDirection === 'USDC_TO_KES' && amount > usdBalance) {
+      return addToast({ title: 'Insufficient Balance', message: 'You do not have enough USDC.', type: 'error' });
     }
     if (!merchant?.stellarPublicKey) {
       return addToast({ title: 'Wallet Not Activated', message: 'Please activate your Digital Wallet first.', type: 'error' });
@@ -87,14 +96,21 @@ export default function InflationShield() {
     try {
       const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
       const token = localStorage.getItem('paychain_merchant_token');
-      await axios.post(`${API_URL}/api/transactions/swap`, { amount }, {
+      await axios.post(`${API_URL}/api/transactions/swap`, { amount, direction: swapDirection }, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      addToast({ title: 'Swap Successful', message: `Successfully swapped ${amount} KES to USDC!`, type: 'success' });
+      addToast({ title: 'Swap Successful', message: `Successfully swapped ${amount} ${swapDirection === 'KES_TO_USDC' ? 'KES to USDC' : 'USDC to KES'}!`, type: 'success' });
       await refreshSession();
-      setKesAmount('');
+      setInputAmount('');
+      
+      const syncRes = await axios.post(`${API_URL}/api/transactions/sync-wallet`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (syncRes.data.success) {
+        setUsdBalance(syncRes.data.usdcBalance || syncRes.data.balance);
+      }
     } catch (err) {
-      addToast({ title: 'Swap Failed', message: err.response?.data?.error || 'Failed to swap KES', type: 'error' });
+      addToast({ title: 'Swap Failed', message: err.response?.data?.error || 'Failed to swap currency', type: 'error' });
     } finally {
       setIsSwapping(false);
     }
@@ -183,17 +199,21 @@ export default function InflationShield() {
               <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:border-emerald-500/30 transition-colors">
                 <div className="flex justify-between items-center mb-4">
                   <span className="text-[11px] text-gray-500 font-bold uppercase tracking-widest">You Send</span>
-                  <span className={`text-[11px] text-gray-600 font-medium transition-all duration-300 ${!showAmounts && 'blur-sm'}`}>Balance: {formatKES(merchant?.kesBalance || 0)}</span>
+                  <span className={`text-[11px] text-gray-600 font-medium transition-all duration-300 ${!showAmounts && 'blur-sm'}`}>
+                    Balance: {swapDirection === 'KES_TO_USDC' ? formatKES(merchant?.kesBalance || 0) : formatUSDC(usdBalance)}
+                  </span>
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="flex shrink-0 items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-200">
-                    <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center text-[10px] text-white font-bold shadow-sm">K</div>
-                    <span className="text-sm font-bold text-gray-900">KES</span>
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] text-white font-bold shadow-sm ${swapDirection === 'KES_TO_USDC' ? 'bg-emerald-500' : 'bg-blue-500'}`}>
+                      {swapDirection === 'KES_TO_USDC' ? 'K' : 'U'}
+                    </div>
+                    <span className="text-sm font-bold text-gray-900">{swapDirection === 'KES_TO_USDC' ? 'KES' : 'USDC'}</span>
                   </div>
                   <input 
                     type="number" 
-                    value={kesAmount} 
-                    onChange={(e) => setKesAmount(e.target.value === '' ? '' : e.target.value)}
+                    value={inputAmount} 
+                    onChange={(e) => setInputAmount(e.target.value === '' ? '' : e.target.value)}
                     className="flex-1 min-w-0 w-full bg-transparent border-none text-right font-headline text-2xl md:text-3xl text-gray-900 focus:ring-0 p-0 placeholder-gray-300 outline-none"
                     placeholder="0"
                   />
@@ -202,7 +222,10 @@ export default function InflationShield() {
 
               {/* Swap Icon */}
               <div className="flex justify-center -my-3 relative z-20">
-                <div className="bg-[#0f172a] text-emerald-400 w-12 h-12 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.2)] border-4 border-[#0a0f1a] hover:rotate-180 transition-transform duration-500 cursor-pointer">
+                <div 
+                  onClick={() => setSwapDirection(prev => prev === 'KES_TO_USDC' ? 'USDC_TO_KES' : 'KES_TO_USDC')}
+                  className="bg-[#0f172a] text-emerald-400 w-12 h-12 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.2)] border-4 border-[#0a0f1a] hover:rotate-180 transition-transform duration-500 cursor-pointer"
+                >
                   <span className="material-symbols-outlined text-xl">swap_vert</span>
                 </div>
               </div>
@@ -215,10 +238,12 @@ export default function InflationShield() {
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="flex shrink-0 items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-200">
-                    <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-[10px] text-white font-bold shadow-sm">U</div>
-                    <span className="text-sm font-bold text-gray-900">USDC</span>
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] text-white font-bold shadow-sm ${swapDirection === 'USDC_TO_KES' ? 'bg-emerald-500' : 'bg-blue-500'}`}>
+                      {swapDirection === 'USDC_TO_KES' ? 'K' : 'U'}
+                    </div>
+                    <span className="text-sm font-bold text-gray-900">{swapDirection === 'USDC_TO_KES' ? 'KES' : 'USDC'}</span>
                   </div>
-                  <p className="flex-1 min-w-0 w-full text-right font-headline text-2xl md:text-3xl text-gray-900 truncate">{usdcAmount}</p>
+                  <p className="flex-1 min-w-0 w-full text-right font-headline text-2xl md:text-3xl text-gray-900 truncate">{estimatedOutput}</p>
                 </div>
               </div>
             </div>
@@ -227,7 +252,7 @@ export default function InflationShield() {
             <div className="relative z-10 mt-8 space-y-3 pt-6 border-t border-white/10">
               <div className="flex justify-between text-xs font-medium">
                 <span className="text-white/50">Fee (0.5%)</span>
-                <span className="text-white/80">{formatKES(kesAmount * feeRate)}</span>
+                <span className="text-white/80">{swapDirection === 'KES_TO_USDC' ? formatKES(inputAmount * feeRate) : formatUSDC(inputAmount * feeRate)}</span>
               </div>
               <div className="flex justify-between text-xs font-bold">
                 <span className="text-white/70">Estimated Value Protection</span>
