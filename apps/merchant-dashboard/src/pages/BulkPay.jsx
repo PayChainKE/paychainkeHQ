@@ -1678,7 +1678,7 @@ export default function BulkPay() {
                       <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center">
                         <span className="material-symbols-outlined text-3xl">sms</span>
                       </div>
-                      <p className="text-sm text-primary font-bold">Enter OTP Sent to +254 7XX XXX XXX</p>
+                      <p className="text-sm text-primary font-bold">Enter OTP Sent to 07XX XXX XXX</p>
                     </div>
                     
                     <input 

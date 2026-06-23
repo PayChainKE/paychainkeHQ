@@ -375,7 +375,7 @@ export default function Overview() {
       </section>
 
       {/* Section 2: Stats Row */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 animate-fade-in-up [animation-delay:200ms] relative z-10">
+      <section className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 animate-fade-in-up [animation-delay:200ms] relative z-10">
         {[
           { label: "Today's Revenue", value: formatKES(todaysRevenue), trend: "", trendColor: "text-on-surface-variant" },
           { label: "This Month", value: formatKES(thisMonthRevenue), trend: "", trendColor: "text-emerald-600" },

@@ -1031,13 +1031,15 @@ export default function Wallet() {
                     <div className="space-y-3">
                       <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">M-Pesa / Airtel Number</label>
                       <div className="relative group">
-                        <div className="absolute left-6 top-1/2 -translate-y-1/2 text-primary/40 font-bold text-lg">+254</div>
+                        <div className="absolute left-6 top-1/2 -translate-y-1/2 text-primary/40 flex items-center justify-center">
+                          <span className="material-symbols-outlined text-xl">smartphone</span>
+                        </div>
                         <input 
                           type="tel"
                           value={topUpPhone}
                           onChange={(e) => setTopUpPhone(e.target.value)}
-                          placeholder="712 345 678"
-                          className="w-full bg-surface-container-low border border-outline-variant/5 rounded-3xl py-6 pl-16 pr-6 text-2xl font-headline text-primary focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
+                          placeholder="0712 345 678"
+                          className="w-full bg-surface-container-low border border-outline-variant/5 rounded-3xl py-6 pl-14 pr-6 text-2xl font-headline text-primary focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
                         />
                       </div>
                     </div>

@@ -578,8 +578,10 @@ export default function Login() {
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Your Phone *</label>
                     <div className="flex group">
-                      <div className="bg-surface-container-low border border-outline-variant/15 border-r-0 rounded-l-xl px-3 flex items-center justify-center text-xs font-black text-primary/40 group-focus-within:border-primary transition-colors">+254</div>
-                      <input required autoComplete="tel-national" value={signupPhone} onChange={e => setSignupPhone(e.target.value.replace(/\D/g, ''))} className="flex-1 w-full bg-white border border-outline-variant/15 rounded-r-xl py-3 px-3 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" placeholder="712 345 678" type="tel" pattern="[0-9]{9,10}" title="Enter a valid 9 or 10 digit phone number" />
+                      <div className="bg-surface-container-low border border-outline-variant/15 border-r-0 rounded-l-xl px-3 flex items-center justify-center text-primary/40 group-focus-within:border-primary transition-colors">
+                        <span className="material-symbols-outlined text-sm">smartphone</span>
+                      </div>
+                      <input required autoComplete="tel-national" value={signupPhone} onChange={e => setSignupPhone(e.target.value.replace(/\D/g, ''))} className="flex-1 w-full bg-white border border-outline-variant/15 rounded-r-xl py-3 px-3 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" placeholder="0712 345 678" type="tel" pattern="[0-9]{9,10}" title="Enter a valid 9 or 10 digit phone number" />
                     </div>
                   </div>
                   <div className="space-y-2">
