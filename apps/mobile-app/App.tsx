@@ -5,7 +5,7 @@ import { PlusJakartaSans_400Regular, PlusJakartaSans_600SemiBold, PlusJakartaSan
 import { DMSerifDisplay_400Regular_Italic } from '@expo-google-fonts/dm-serif-display';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import MobileLayout from './src/components/layout/MobileLayout';
-import SupportPage from './src/pages/SupportPage';
+import AppNavigator from './src/navigation/AppNavigator';
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -23,7 +23,7 @@ export default function App() {
     <SafeAreaProvider>
       <StatusBar style="dark" />
       <MobileLayout>
-        <SupportPage />
+        <AppNavigator />
       </MobileLayout>
     </SafeAreaProvider>
   );
