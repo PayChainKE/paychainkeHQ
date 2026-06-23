@@ -1,5 +1,6 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 /**
  * PayChain Mobile API Configuration
@@ -11,9 +12,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // or standard localhost for iOS simulators. The user can override this later.
 const getBaseUrl = () => {
   if (__DEV__) {
-    // For Android Emulator to reach localhost, use 10.0.2.2
-    // For physical devices on the same network, you would use your machine's local IP (e.g., 192.168.x.x)
-    return 'http://10.0.2.2:5000';
+    if (Platform.OS === 'android') {
+      return 'http://10.0.2.2:5000';
+    }
+    return 'http://localhost:5000';
   }
   // Production fallback
   return 'https://www.paychain.co.ke';
