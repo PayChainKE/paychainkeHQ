@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Bulk Payments — The Merchant’s Editorial</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&amp;family=DM+Serif+Display:italic&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-tertiary": "#ffffff",
+                        "outline-variant": "#c0c9c0",
+                        "tertiary-fixed-dim": "#b7cbc4",
+                        "inverse-primary": "#96d4ab",
+                        "tertiary-container": "#354641",
+                        "on-secondary-fixed-variant": "#00513a",
+                        "surface-dim": "#dbdad7",
+                        "primary-fixed": "#b1f1c6",
+                        "tertiary": "#1f302b",
+                        "background": "#faf9f6",
+                        "on-secondary": "#ffffff",
+                        "secondary-fixed-dim": "#68dbae",
+                        "surface-container-high": "#e9e8e5",
+                        "on-error": "#ffffff",
+                        "surface-bright": "#faf9f6",
+                        "secondary-container": "#83f5c6",
+                        "on-error-container": "#93000a",
+                        "on-secondary-fixed": "#002115",
+                        "on-surface-variant": "#404942",
+                        "primary-container": "#0b4d2e",
+                        "outline": "#707971",
+                        "surface-container": "#efeeeb",
+                        "primary-fixed-dim": "#96d4ab",
+                        "tertiary-fixed": "#d3e7e0",
+                        "surface-container-low": "#f4f3f0",
+                        "on-background": "#1b1c1a",
+                        "surface-variant": "#e3e2df",
+                        "surface-tint": "#2e6a48",
+                        "on-tertiary-fixed": "#0d1f1b",
+                        "inverse-surface": "#2f312f",
+                        "surface-container-highest": "#e3e2df",
+                        "inverse-on-surface": "#f2f1ee",
+                        "on-secondary-container": "#007151",
+                        "error": "#ba1a1a",
+                        "secondary": "#006c4e",
+                        "secondary-fixed": "#86f8c9",
+                        "on-tertiary-container": "#a0b4ad",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary-fixed": "#002110",
+                        "on-surface": "#1b1c1a",
+                        "on-primary-container": "#80bd95",
+                        "on-primary-fixed-variant": "#115132",
+                        "on-primary": "#ffffff",
+                        "primary": "#00351d",
+                        "error-container": "#ffdad6",
+                        "surface": "#faf9f6",
+                        "on-tertiary-fixed-variant": "#394a45"
+                    },
+                    fontFamily: {
+                        "headline": ["Plus Jakarta Sans"],
+                        "body": ["Plus Jakarta Sans"],
+                        "label": ["Plus Jakarta Sans"]
+                    },
+                    borderRadius: { "DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .tonal-shift { background-color: #efeeeb; }
+        .glass-nav { backdrop-filter: blur(20px); }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body min-h-screen pb-32">
+<!-- TopAppBar -->
+<header class="w-full sticky top-0 z-40 bg-[#faf9f6] dark:bg-stone-950 flex flex-col px-6 pt-4 pb-2">
+<div class="flex items-center justify-between w-full mb-6">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-emerald-900 dark:text-emerald-500" data-icon="menu">menu</span>
+<h1 class="font-['Plus_Jakarta_Sans'] font-bold tracking-tight text-2xl text-emerald-900 dark:text-emerald-500">Bulk Payments</h1>
+</div>
+<div class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center border-2 border-primary/10 overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="professional headshot of a business merchant with a warm smile in corporate attire" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCstlGI1-OVG7BgWVTsCDYyKqOxC-1apYQC8N4AJd3v6xvF_qSQny90MDLRa78i5wKz9FepJYjcmneIJWD283DvU_zMyKvNyrcm-kfnHiQ-N4qKmO13MkVLxThWc8MU9rerUPXtEi8ITmOnQBotU43IqDTc7VdVXOGA9bXDdyn2IuaIqTSg71Exx1hBLMMvVVc4pkVfroIjRp4W18dv2wJ2ZiDgja0Jje47VVcHH7XLz1JioYmiHWHI8nUqAChX_xUFoD9p3lz4eKE"/>
+</div>
+</div>
+<!-- Editorial Tabs -->
+<div class="flex gap-8 items-end">
+<button class="text-emerald-900 dark:text-emerald-400 border-b-2 border-emerald-900 dark:border-emerald-400 pb-2 font-bold tracking-tight transition-all">Payees</button>
+<button class="text-stone-500 dark:text-stone-400 pb-2 font-medium hover:text-emerald-700 transition-colors">Batches</button>
+</div>
+</header>
+<main class="px-6 py-6">
+<!-- Header Actions & Growth Ribbon -->
+<div class="flex justify-between items-center mb-8">
+<div>
+<p class="text-[11px] font-bold uppercase tracking-widest text-secondary font-headline">Operations</p>
+<h2 class="text-3xl font-['DM_Serif_Display'] italic text-primary leading-tight">Manage Payees</h2>
+</div>
+<button class="bg-gradient-to-br from-primary to-primary-container text-white px-6 py-3 rounded-md flex items-center gap-2 shadow-lg shadow-primary/20 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-sm" data-icon="add">add</span>
+<span class="text-sm font-bold tracking-tight">Add Payee</span>
+</button>
+</div>
+<!-- Filter Chips (No-Line Tonal Shift) -->
+<div class="flex gap-3 overflow-x-auto pb-6 no-scrollbar">
+<button class="bg-primary text-white px-5 py-2 rounded-full text-xs font-bold tracking-wide whitespace-nowrap">All</button>
+<button class="bg-surface-container text-on-surface-variant px-5 py-2 rounded-full text-xs font-bold tracking-wide whitespace-nowrap hover:bg-surface-container-high transition-colors">Employees</button>
+<button class="bg-surface-container text-on-surface-variant px-5 py-2 rounded-full text-xs font-bold tracking-wide whitespace-nowrap hover:bg-surface-container-high transition-colors">Suppliers</button>
+<button class="bg-surface-container text-on-surface-variant px-5 py-2 rounded-full text-xs font-bold tracking-wide whitespace-nowrap hover:bg-surface-container-high transition-colors">Utilities</button>
+</div>
+<!-- Payee Ledger (Asymmetric Cards) -->
+<div class="space-y-4">
+<!-- Card 1: Alice Mumbua -->
+<div class="bg-surface-container-lowest p-5 rounded-lg flex items-center gap-4 group cursor-pointer hover:bg-surface-container transition-all active:scale-[0.98]">
+<div class="relative">
+<div class="w-12 h-12 rounded-full bg-primary-fixed flex items-center justify-center text-on-primary-fixed font-bold text-sm">AM</div>
+<div class="absolute -bottom-1 -right-1 w-5 h-5 bg-secondary-container rounded-full border-2 border-white flex items-center justify-center">
+<span class="material-symbols-outlined text-[10px] text-on-secondary-container" data-icon="person">person</span>
+</div>
+</div>
+<div class="flex-1">
+<h3 class="text-sm font-bold text-on-background">Alice Mumbua</h3>
+<p class="text-xs text-outline font-medium">Last paid: <span class="text-on-surface">KES 45,000</span></p>
+</div>
+<div class="flex items-center gap-3">
+<span class="px-2 py-1 bg-secondary-fixed-dim/20 text-secondary text-[10px] font-bold uppercase rounded">Employee</span>
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors" data-icon="chevron_right">chevron_right</span>
+</div>
+</div>
+<!-- Card 2: Brian Kimani -->
+<div class="bg-surface-container-lowest p-5 rounded-lg flex items-center gap-4 group cursor-pointer hover:bg-surface-container transition-all active:scale-[0.98]">
+<div class="relative">
+<div class="w-12 h-12 rounded-full bg-tertiary-fixed flex items-center justify-center text-on-tertiary-fixed font-bold text-sm">BK</div>
+<div class="absolute -bottom-1 -right-1 w-5 h-5 bg-primary-fixed rounded-full border-2 border-white flex items-center justify-center">
+<span class="material-symbols-outlined text-[10px] text-on-primary-fixed-variant" data-icon="local_shipping">local_shipping</span>
+</div>
+</div>
+<div class="flex-1">
+<h3 class="text-sm font-bold text-on-background">Brian Kimani</h3>
+<p class="text-xs text-outline font-medium">Last paid: <span class="text-on-surface">KES 122,500</span></p>
+</div>
+<div class="flex items-center gap-3">
+<span class="px-2 py-1 bg-tertiary-fixed-dim/30 text-tertiary text-[10px] font-bold uppercase rounded">Supplier</span>
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors" data-icon="chevron_right">chevron_right</span>
+</div>
+</div>
+<!-- Card 3: Jane Otieno -->
+<div class="bg-surface-container-lowest p-5 rounded-lg flex items-center gap-4 group cursor-pointer hover:bg-surface-container transition-all active:scale-[0.98]">
+<div class="relative">
+<div class="w-12 h-12 rounded-full bg-secondary-container/30 flex items-center justify-center text-on-secondary-container font-bold text-sm">JO</div>
+<div class="absolute -bottom-1 -right-1 w-5 h-5 bg-secondary-container rounded-full border-2 border-white flex items-center justify-center">
+<span class="material-symbols-outlined text-[10px] text-on-secondary-container" data-icon="person">person</span>
+</div>
+</div>
+<div class="flex-1">
+<h3 class="text-sm font-bold text-on-background">Jane Otieno</h3>
+<p class="text-xs text-outline font-medium">Last paid: <span class="text-on-surface">KES 45,000</span></p>
+</div>
+<div class="flex items-center gap-3">
+<span class="px-2 py-1 bg-secondary-fixed-dim/20 text-secondary text-[10px] font-bold uppercase rounded">Employee</span>
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors" data-icon="chevron_right">chevron_right</span>
+</div>
+</div>
+<!-- Card 4: Kenya Power -->
+<div class="bg-surface-container-lowest p-5 rounded-lg flex items-center gap-4 group cursor-pointer hover:bg-surface-container transition-all active:scale-[0.98]">
+<div class="relative">
+<div class="w-12 h-12 rounded-full bg-error-container/20 flex items-center justify-center text-error font-bold text-sm">KP</div>
+<div class="absolute -bottom-1 -right-1 w-5 h-5 bg-surface-container-highest rounded-full border-2 border-white flex items-center justify-center">
+<span class="material-symbols-outlined text-[10px] text-on-surface-variant" data-icon="bolt">bolt</span>
+</div>
+</div>
+<div class="flex-1">
+<h3 class="text-sm font-bold text-on-background">Kenya Power</h3>
+<p class="text-xs text-outline font-medium">Last paid: <span class="text-on-surface">KES 12,400</span></p>
+</div>
+<div class="flex items-center gap-3">
+<span class="px-2 py-1 bg-surface-variant text-on-surface-variant text-[10px] font-bold uppercase rounded">Utility</span>
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors" data-icon="chevron_right">chevron_right</span>
+</div>
+</div>
+</div>
+<!-- Growth Ribbon (Ticker) -->
+<div class="mt-10 bg-primary-fixed rounded-xl p-6 flex flex-col gap-2 relative overflow-hidden">
+<div class="absolute -right-4 -top-4 opacity-10">
+<span class="material-symbols-outlined text-8xl" data-icon="trending_up">trending_up</span>
+</div>
+<p class="text-[11px] font-bold uppercase tracking-[0.2em] text-on-primary-fixed-variant">Growth Insight</p>
+<p class="font-['DM_Serif_Display'] italic text-2xl text-on-primary-fixed leading-tight">Your bulk payments have saved <br/> 14 hours of manual processing this month.</p>
+</div>
+</main>
+<!-- Floating Action State Button (Contextual) -->
+<div class="fixed bottom-24 left-0 w-full px-6 z-50 pointer-events-none">
+<div class="max-w-md mx-auto pointer-events-auto">
+<button class="w-full bg-primary text-white py-5 rounded-full shadow-2xl shadow-primary/40 flex items-center justify-between px-8 group active:scale-95 transition-all">
+<div class="flex flex-col items-start">
+<span class="text-[10px] font-bold uppercase tracking-widest opacity-70">3 payees selected</span>
+<span class="text-base font-bold">KES 135,000</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="font-bold tracking-tight">Pay Now</span>
+<span class="material-symbols-outlined group-hover:translate-x-1 transition-transform" data-icon="arrow_forward">arrow_forward</span>
+</div>
+</button>
+</div>
+</div>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-6 pb-6 pt-3 bg-white/80 dark:bg-stone-900/80 backdrop-blur-xl rounded-t-[3rem] shadow-[0_-4px_40px_rgba(11,77,46,0.06)]">
+<a class="flex flex-col items-center justify-center text-stone-400 dark:text-stone-500 px-4 py-2 hover:text-emerald-800 transition-transform active:scale-95" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="home">home</span>
+<span class="text-[11px] font-bold uppercase tracking-widest font-['Plus_Jakarta_Sans']">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-emerald-900 dark:bg-emerald-500 text-white rounded-full w-14 h-14 -mt-10 shadow-lg shadow-emerald-900/20 active:scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="payments">payments</span>
+</a>
+<a class="flex flex-col items-center justify-center text-stone-400 dark:text-stone-500 px-4 py-2 hover:text-emerald-800 transition-transform active:scale-95" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="receipt_long">receipt_long</span>
+<span class="text-[11px] font-bold uppercase tracking-widest font-['Plus_Jakarta_Sans']">History</span>
+</a>
+<a class="flex flex-col items-center justify-center text-stone-400 dark:text-stone-500 px-4 py-2 hover:text-emerald-800 transition-transform active:scale-95" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="settings">settings</span>
+<span class="text-[11px] font-bold uppercase tracking-widest font-['Plus_Jakarta_Sans']">Settings</span>
+</a>
+</nav>
+</body></html>

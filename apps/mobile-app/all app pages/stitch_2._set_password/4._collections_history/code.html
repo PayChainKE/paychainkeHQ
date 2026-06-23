@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=DM+Serif+Display&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-background": "#1b1c1a",
+              "surface-container-low": "#f4f3f0",
+              "tertiary-fixed": "#d3e7e0",
+              "primary-fixed-dim": "#96d4ab",
+              "surface-container": "#efeeeb",
+              "outline": "#707971",
+              "primary-container": "#0b4d2e",
+              "surface-container-highest": "#e3e2df",
+              "inverse-surface": "#2f312f",
+              "on-tertiary-fixed": "#0d1f1b",
+              "surface-tint": "#2e6a48",
+              "surface-variant": "#e3e2df",
+              "on-primary-fixed": "#002110",
+              "surface-container-lowest": "#ffffff",
+              "on-tertiary-container": "#a0b4ad",
+              "secondary-fixed": "#86f8c9",
+              "secondary": "#006c4e",
+              "error": "#ba1a1a",
+              "on-secondary-container": "#007151",
+              "inverse-on-surface": "#f2f1ee",
+              "on-tertiary-fixed-variant": "#394a45",
+              "surface": "#faf9f6",
+              "error-container": "#ffdad6",
+              "primary": "#00351d",
+              "on-primary": "#ffffff",
+              "on-primary-fixed-variant": "#115132",
+              "on-primary-container": "#80bd95",
+              "on-surface": "#1b1c1a",
+              "tertiary-container": "#354641",
+              "on-secondary-fixed-variant": "#00513a",
+              "inverse-primary": "#96d4ab",
+              "tertiary-fixed-dim": "#b7cbc4",
+              "outline-variant": "#c0c9c0",
+              "on-tertiary": "#ffffff",
+              "on-secondary": "#ffffff",
+              "tertiary": "#1f302b",
+              "background": "#faf9f6",
+              "surface-dim": "#dbdad7",
+              "primary-fixed": "#b1f1c6",
+              "surface-bright": "#faf9f6",
+              "on-error": "#ffffff",
+              "surface-container-high": "#e9e8e5",
+              "secondary-fixed-dim": "#68dbae",
+              "on-surface-variant": "#404942",
+              "on-secondary-fixed": "#002115",
+              "secondary-container": "#83f5c6",
+              "on-error-container": "#93000a"
+            },
+            fontFamily: {
+              "headline": ["Plus Jakarta Sans"],
+              "body": ["Plus Jakarta Sans"],
+              "label": ["Plus Jakarta Sans"]
+            },
+            borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .serif-text { font-family: 'DM Serif Display', serif; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface min-h-screen pb-[83px]">
+<!-- Top App Bar (Shared Component Logic) -->
+<header class="bg-gradient-to-br from-[#0B4D2E] to-[#1D9E75] shadow-2xl shadow-[#0B4D2E]/20 docked full-width top-0 z-40">
+<div class="flex flex-col justify-end pt-12 pb-6 px-6 w-full">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full border-2 border-white/20 overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Portrait of a smiling professional Kenyan male merchant in a clean green polo shirt" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDhK7YduPHU9dGzfjcz09QTf6DlHfeeh5cRnFqZViYjsow6zWLu23unhSmjIB9TqI8ql6TdZ48pP-FXV79LBv_QMg1248JJdJZhHZociysxaBGiR9ml2HFqvAKmaZJ30euHI85aUw3-zhgSBTR1PbcxwwcCRCBDE9BtSA31soB3_uE-0ETTCuTtILHt80oT39Lu0Kwd5JIjFPgwi3oHakX_htxixmpOHex914DSfg1IpdPjZjAwmgRY6Kesrn99s3HdfjFlHbB9RZY"/>
+</div>
+<div>
+<h1 class="text-white antialiased headline-sm font-bold tracking-tight leading-tight">Collections</h1>
+<p class="text-white/70 text-xs font-medium tracking-wide">Till PC847291</p>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-white hover:opacity-90 transition-opacity active:scale-95 duration-200">
+<span class="material-symbols-outlined" data-icon="search">search</span>
+</button>
+<button class="text-white hover:opacity-90 transition-opacity active:scale-95 duration-200">
+<span class="material-symbols-outlined" data-icon="tune">tune</span>
+</button>
+</div>
+</div>
+</div>
+</header>
+<!-- Content Area -->
+<main class="relative z-10 px-4 -mt-4">
+<!-- Summary Bar: Growth Ribbon Style -->
+<div class="flex gap-4 overflow-x-auto no-scrollbar pb-6 pt-2">
+<!-- Today Card -->
+<div class="flex-shrink-0 bg-surface-container-lowest p-5 rounded-lg shadow-sm w-44">
+<p class="text-[10px] font-bold text-outline uppercase tracking-widest mb-1">Today</p>
+<p class="serif-text text-2xl text-secondary">KES 18,450</p>
+<div class="flex items-center gap-1 mt-2">
+<span class="material-symbols-outlined text-xs text-secondary-fixed-dim" style="font-variation-settings: 'FILL' 1;">payments</span>
+<span class="text-[11px] font-semibold text-on-surface-variant">12 payments</span>
+</div>
+</div>
+<!-- Week Card -->
+<div class="flex-shrink-0 bg-surface-container-low p-5 rounded-lg w-44">
+<p class="text-[10px] font-bold text-outline uppercase tracking-widest mb-1">This Week</p>
+<p class="serif-text text-2xl text-on-surface-variant">KES 142.2k</p>
+<div class="flex items-center gap-1 mt-2">
+<span class="material-symbols-outlined text-xs text-outline" style="font-variation-settings: 'FILL' 1;">trending_up</span>
+<span class="text-[11px] font-semibold text-outline">84 payments</span>
+</div>
+</div>
+<!-- Month Card -->
+<div class="flex-shrink-0 bg-surface-container-low p-5 rounded-lg w-44">
+<p class="text-[10px] font-bold text-outline uppercase tracking-widest mb-1">This Month</p>
+<p class="serif-text text-2xl text-on-surface-variant">KES 2.4M</p>
+<div class="flex items-center gap-1 mt-2">
+<span class="material-symbols-outlined text-xs text-outline" style="font-variation-settings: 'FILL' 1;">calendar_month</span>
+<span class="text-[11px] font-semibold text-outline">342 payments</span>
+</div>
+</div>
+</div>
+<!-- Filter Bar -->
+<div class="flex gap-2 overflow-x-auto no-scrollbar mb-8">
+<button class="px-5 py-2 rounded-full bg-primary text-white text-xs font-bold transition-all shadow-md shadow-primary/10">All</button>
+<button class="px-5 py-2 rounded-full bg-surface-container-high text-on-surface-variant text-xs font-semibold hover:bg-surface-container-highest transition-colors">Today</button>
+<button class="px-5 py-2 rounded-full bg-surface-container-high text-on-surface-variant text-xs font-semibold hover:bg-surface-container-highest transition-colors">Inbound</button>
+<button class="px-5 py-2 rounded-full bg-surface-container-high text-on-surface-variant text-xs font-semibold hover:bg-surface-container-highest transition-colors">Outbound</button>
+<button class="px-5 py-2 rounded-full bg-surface-container-high text-on-surface-variant text-xs font-semibold hover:bg-surface-container-highest transition-colors">FX</button>
+</div>
+<!-- Transaction List -->
+<section>
+<div class="flex justify-between items-center mb-4 px-1">
+<h3 class="text-xs font-extrabold uppercase tracking-widest text-outline">Today — KES 18,450</h3>
+<span class="text-[10px] font-medium text-outline">12 Total</span>
+</div>
+<div class="space-y-4">
+<!-- Transaction Row 1 -->
+<div class="bg-surface-container-lowest p-4 rounded-lg flex items-center justify-between group active:scale-[0.98] transition-all">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Abstract minimalist logo of a digital payment service in vibrant green and white clean background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBG5CaKePfWPmBF5zxCzCUMgQXnrJPMOR32D5Ec2geLcUSysY-1VPnw54Iy52rc8c-jC549DEHDtSKLJ-XOkTxdjC11Mae5BgiSU3RA4DdyuI5fskPb7m1mls-yy0wbGYKjNKcFNSO7SEp6nQlnQmEZhgyxFAFH5CifI2OqIkXasN6Brb0zY3RUTEqmncP1RnnUEuuXr8LE4HUk7SPC0IK5RlqMcpDGU7_Q_WLO8UcAv3Q8EVySYxXq-jYqc_mANxHj8iD_DBH_Tng"/>
+</div>
+<div>
+<p class="font-bold text-on-surface text-sm">Peter Otieno</p>
+<div class="flex items-center gap-1.5 mt-0.5">
+<span class="text-[11px] font-medium text-outline">QJX8472KL</span>
+<div class="flex items-center gap-0.5 bg-secondary/10 px-1.5 py-0.5 rounded text-[10px] font-bold text-secondary">
+<span class="material-symbols-outlined text-[10px]" style="font-variation-settings: 'FILL' 1;">verified_user</span>
+<span>Verified</span>
+</div>
+</div>
+</div>
+</div>
+<div class="text-right">
+<p class="font-bold text-secondary text-sm">+KES 1,500</p>
+<p class="text-[10px] text-outline font-medium mt-0.5">14:22</p>
+</div>
+</div>
+<!-- Transaction Row 2 -->
+<div class="bg-surface-container-lowest p-4 rounded-lg flex items-center justify-between group active:scale-[0.98] transition-all">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Close-up avatar of a Kenyan customer with a warm friendly expression" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD6N8VwNbg3kIrAt3Vu7TDGvVho_8EpGPzNmCd4iujIRRELVqivQM36jxfTLrK5yff--a-tw2eJcIYpYBeHkCUeK5QBe1-5DK8RNA5_EY4K4UY7ENEx0MRd2TaxO63OKOBRlci08T8xyh8VyuAFAqkG9SttYOSxjm17v5xs1zk68_VBr8aM66YSgPu39fcXnQ-w0GuDrlanv4k7BwsxLU06eUQEXB7GUz4MSXCgtVyI1SxP0RuLH-HiKnCf8VZgao3akxJE3BEu0Uc"/>
+</div>
+<div>
+<p class="font-bold text-on-surface text-sm">Sarah Wanjiku</p>
+<div class="flex items-center gap-1.5 mt-0.5">
+<span class="text-[11px] font-medium text-outline">RKP9102MN</span>
+<div class="flex items-center gap-0.5 bg-secondary/10 px-1.5 py-0.5 rounded text-[10px] font-bold text-secondary">
+<span class="material-symbols-outlined text-[10px]" style="font-variation-settings: 'FILL' 1;">verified_user</span>
+<span>Verified</span>
+</div>
+</div>
+</div>
+</div>
+<div class="text-right">
+<p class="font-bold text-secondary text-sm">+KES 4,200</p>
+<p class="text-[10px] text-outline font-medium mt-0.5">13:05</p>
+</div>
+</div>
+<!-- Transaction Row 3 -->
+<div class="bg-surface-container-lowest p-4 rounded-lg flex items-center justify-between group active:scale-[0.98] transition-all">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Portrait of a woman with a confident business professional look" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDBZh_BWu0AY_qlfqx3VzO0hS_0op9XPcdXCNNPq9ckbNZFTzJJH-sQTPazRb61dlhsWeXMNNBmwCxc6Hl3Bekcp_AS5Kt7qRflkjtzb-ZlRTxBpELG8k0WW5Z6JObIwC0TtdWm1vJSQ-574LU6G8zTIyrjxUTuqwP-eYtyv6NVyGdazVFPinspiYKuDUn24A4HOiuoTQsHGGXErv5Rqk9YgrI3cvzPrujcnhq0Rbz1M7MjFFHU_3Sa4gEjQlorJPCf3pUuVTHBozE"/>
+</div>
+<div>
+<p class="font-bold text-on-surface text-sm">Emmanuel Korir</p>
+<div class="flex items-center gap-1.5 mt-0.5">
+<span class="text-[11px] font-medium text-outline">LBT5521XP</span>
+<div class="flex items-center gap-0.5 bg-secondary/10 px-1.5 py-0.5 rounded text-[10px] font-bold text-secondary">
+<span class="material-symbols-outlined text-[10px]" style="font-variation-settings: 'FILL' 1;">verified_user</span>
+<span>Verified</span>
+</div>
+</div>
+</div>
+</div>
+<div class="text-right">
+<p class="font-bold text-secondary text-sm">+KES 850</p>
+<p class="text-[10px] text-outline font-medium mt-0.5">11:48</p>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Bottom Sheet (Active Overlay) -->
+<div class="fixed inset-0 z-50 bg-on-background/40 backdrop-blur-sm flex items-end">
+<div class="w-full bg-surface rounded-t-xl overflow-hidden shadow-2xl">
+<!-- Handle -->
+<div class="flex justify-center pt-3 pb-2">
+<div class="w-12 h-1.5 rounded-full bg-surface-container-highest"></div>
+</div>
+<!-- Content -->
+<div class="px-6 pb-12">
+<div class="flex flex-col items-center py-6">
+<div class="w-16 h-16 rounded-full bg-secondary/10 flex items-center justify-center mb-4">
+<span class="material-symbols-outlined text-4xl text-secondary" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+<h2 class="serif-text text-2xl text-on-surface">Payment Verified</h2>
+<p class="text-outline text-sm mt-1">Transaction settled successfully</p>
+</div>
+<div class="bg-surface-container-low rounded-lg p-6 space-y-5">
+<div class="flex justify-between items-center">
+<span class="text-[11px] font-bold text-outline uppercase tracking-wider">Amount</span>
+<span class="font-extrabold text-on-surface">KES 1,500.00</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="text-[11px] font-bold text-outline uppercase tracking-wider">Phone</span>
+<span class="font-semibold text-on-surface">+254 701 *** 821</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="text-[11px] font-bold text-outline uppercase tracking-wider">Reference</span>
+<span class="font-semibold text-on-surface">QJX8472KL</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="text-[11px] font-bold text-outline uppercase tracking-wider">Till Number</span>
+<span class="font-semibold text-on-surface">PC847291</span>
+</div>
+<div class="pt-4 border-t border-outline-variant/30 mt-2">
+<div class="flex items-start gap-3">
+<div class="mt-0.5">
+<span class="material-symbols-outlined text-secondary text-lg">bolt</span>
+</div>
+<div>
+<p class="text-xs font-bold text-on-surface">Verified via Safaricom Daraja API</p>
+<p class="text-[10px] text-outline mt-0.5">Response latency: 94ms</p>
+</div>
+</div>
+</div>
+</div>
+<button class="w-full bg-gradient-to-br from-[#00351d] to-[#0b4d2e] text-white py-4 rounded-full font-bold text-sm mt-8 shadow-lg shadow-[#0b4d2e]/20 active:scale-[0.98] transition-transform">
+                    Done
+                </button>
+</div>
+</div>
+</div>
+<!-- Bottom Nav Bar (Shared Component Logic) -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-safe bg-white/80 backdrop-blur-xl h-[83px] border-t border-gray-100 shadow-[0_-4px_20px_0_rgba(0,0,0,0.04)]">
+<!-- Home -->
+<a class="flex flex-col items-center justify-center text-gray-400 hover:text-[#0B4D2E] transition-colors scale-90 active:scale-100 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="layout_dashboard">dashboard</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[10px] font-medium tracking-wide uppercase mt-1">Home</span>
+</a>
+<!-- Collections (Active) -->
+<a class="flex flex-col items-center justify-center text-[#1D9E75] font-bold scale-90 active:scale-100 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="arrow_circle_down" style="font-variation-settings: 'FILL' 1;">arrow_circle_down</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[10px] font-medium tracking-wide uppercase mt-1">Collections</span>
+</a>
+<!-- Pay -->
+<a class="flex flex-col items-center justify-center text-gray-400 hover:text-[#0B4D2E] transition-colors scale-90 active:scale-100 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="group">group</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[10px] font-medium tracking-wide uppercase mt-1">Pay</span>
+</a>
+<!-- Advance -->
+<a class="flex flex-col items-center justify-center text-gray-400 hover:text-[#0B4D2E] transition-colors scale-90 active:scale-100 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="payments">payments</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[10px] font-medium tracking-wide uppercase mt-1">Advance</span>
+</a>
+<!-- More -->
+<a class="flex flex-col items-center justify-center text-gray-400 hover:text-[#0B4D2E] transition-colors scale-90 active:scale-100 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="menu">menu</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[10px] font-medium tracking-wide uppercase mt-1">More</span>
+</a>
+</nav>
+</body></html>

@@ -127,6 +127,7 @@ const Merchants = () => {
                   <th className="py-3 px-4 border-b border-outline-variant/10 text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/40">Merchant</th>
                   <th className="py-3 px-4 border-b border-outline-variant/10 text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/40">Phone/Email</th>
                   <th className="py-3 px-4 border-b border-outline-variant/10 text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/40">Status</th>
+                  <th className="py-3 px-4 border-b border-outline-variant/10 text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/40">Source</th>
                   <th className="py-3 px-4 border-b border-outline-variant/10 text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/40">Certificate</th>
                   <th className="py-3 px-4 border-b border-outline-variant/10 text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/40">Registered</th>
                   <th className="py-3 px-4 border-b border-outline-variant/10 text-right"></th>
@@ -157,6 +158,19 @@ const Merchants = () => {
                       }`}>
                         {m.isVerified ? 'Verified' : 'Unverified'}
                       </span>
+                    </td>
+                    <td className="py-3 px-4 border-b border-outline-variant/5">
+                      {m.registrationSource === 'mobile' ? (
+                        <div className="flex items-center gap-1 text-primary bg-primary-container/20 px-2 py-0.5 rounded-full w-max">
+                          <span className="material-symbols-outlined text-[14px]">smartphone</span>
+                          <span className="text-[10px] font-bold uppercase tracking-widest">Mobile</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1 text-on-surface-variant/60 bg-surface-container px-2 py-0.5 rounded-full w-max">
+                          <span className="material-symbols-outlined text-[14px]">language</span>
+                          <span className="text-[10px] font-bold uppercase tracking-widest">Web</span>
+                        </div>
+                      )}
                     </td>
                     <td className="py-3 px-4 border-b border-outline-variant/5">
                       {m.certificateUrl ? (

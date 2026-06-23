@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>PayChain Merchant Portal - Login</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=DM+Serif+Display&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-background": "#1b1c1a",
+                        "surface-container-low": "#f4f3f0",
+                        "tertiary-fixed": "#d3e7e0",
+                        "primary-fixed-dim": "#96d4ab",
+                        "surface-container": "#efeeeb",
+                        "outline": "#707971",
+                        "primary-container": "#0b4d2e",
+                        "surface-container-highest": "#e3e2df",
+                        "inverse-surface": "#2f312f",
+                        "on-tertiary-fixed": "#0d1f1b",
+                        "surface-tint": "#2e6a48",
+                        "surface-variant": "#e3e2df",
+                        "on-primary-fixed": "#002110",
+                        "surface-container-lowest": "#ffffff",
+                        "on-tertiary-container": "#a0b4ad",
+                        "secondary-fixed": "#86f8c9",
+                        "secondary": "#006c4e",
+                        "error": "#ba1a1a",
+                        "on-secondary-container": "#007151",
+                        "inverse-on-surface": "#f2f1ee",
+                        "on-tertiary-fixed-variant": "#394a45",
+                        "surface": "#faf9f6",
+                        "error-container": "#ffdad6",
+                        "primary": "#00351d",
+                        "on-primary": "#ffffff",
+                        "on-primary-fixed-variant": "#115132",
+                        "on-primary-container": "#80bd95",
+                        "on-surface": "#1b1c1a",
+                        "tertiary-container": "#354641",
+                        "on-secondary-fixed-variant": "#00513a",
+                        "inverse-primary": "#96d4ab",
+                        "tertiary-fixed-dim": "#b7cbc4",
+                        "outline-variant": "#c0c9c0",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "tertiary": "#1f302b",
+                        "background": "#faf9f6",
+                        "surface-dim": "#dbdad7",
+                        "primary-fixed": "#b1f1c6",
+                        "surface-bright": "#faf9f6",
+                        "on-error": "#ffffff",
+                        "surface-container-high": "#e9e8e5",
+                        "secondary-fixed-dim": "#68dbae",
+                        "on-surface-variant": "#404942",
+                        "on-secondary-fixed": "#002115",
+                        "secondary-container": "#83f5c6",
+                        "on-error-container": "#93000a"
+                    },
+                    fontFamily: {
+                        "headline": ["Plus Jakarta Sans"],
+                        "body": ["Plus Jakarta Sans"],
+                        "label": ["Plus Jakarta Sans"],
+                        "display": ["DM Serif Display"]
+                    },
+                    borderRadius: { "DEFAULT": "1rem", "lg": "2.5rem", "xl": "3rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #0B1F0F; /* Deep Forest Base */
+        }
+        .editorial-text {
+            line-height: 1.05;
+        }
+        /* Mobile optimization: prevent background scroll when focused if needed */
+        .no-scroll { overflow: hidden; }
+        /* Smooth transition for active states */
+        .btn-active:active { transform: scale(0.96); opacity: 0.9; }
+    </style>
+</head>
+<body class="antialiased overflow-hidden flex flex-col items-center justify-end h-[100dvh] w-full">
+<!-- Top Section (Decorative & Branding) -->
+<div class="w-full flex-1 flex flex-col justify-end px-8 pb-10">
+<!-- Wordmark -->
+<div class="mb-8">
+<h1 class="text-white text-[24px] font-bold tracking-tight">PayChain</h1>
+<p class="text-secondary-fixed-dim text-[12px] font-extrabold tracking-[0.15em] uppercase opacity-90">Merchant Portal</p>
+</div>
+<!-- Editorial Headlines -->
+<div class="editorial-text space-y-0">
+<h2 class="font-display text-[44px] text-white">Collect.</h2>
+<h2 class="font-display text-[44px] text-secondary-fixed-dim">Pay.</h2>
+<h2 class="font-display text-[44px] text-white">Grow.</h2>
+</div>
+</div>
+<!-- Login Bottom Card -->
+<div class="bg-surface-container-lowest w-full h-auto min-h-[62%] rounded-t-lg px-8 pt-10 pb-[calc(2.5rem+env(safe-area-inset-bottom))] flex flex-col shadow-[0_-10px_40px_rgba(0,0,0,0.3)] relative overflow-visible">
+<!-- Content Container -->
+<div class="max-w-md mx-auto w-full flex flex-col h-full space-y-8">
+<!-- Header Text -->
+<div class="space-y-2">
+<h3 class="text-on-surface text-[22px] font-bold tracking-tight">Sign in to your account</h3>
+<p class="text-on-surface-variant text-[14px] leading-relaxed">Use your M-PESA phone number and the password provided during onboarding.</p>
+</div>
+<!-- Info Box -->
+<div class="bg-secondary-container/20 border-l-4 border-secondary p-4 rounded-r-md">
+<p class="text-on-secondary-container text-[12px] leading-snug font-medium">No account? Access is provided by your PayChain onboarding officer after approval.</p>
+</div>
+<!-- Form Fields -->
+<div class="space-y-8">
+<!-- Phone Field -->
+<div class="relative">
+<label class="text-on-surface-variant text-[11px] font-bold uppercase tracking-widest mb-3 block">M-PESA Phone Number</label>
+<div class="flex items-center space-x-3 border-b-2 border-outline-variant/50 pb-3 focus-within:border-secondary transition-all duration-300">
+<div class="bg-surface-container px-3 h-10 flex items-center rounded-lg text-[15px] font-bold text-on-surface-variant shrink-0">+254</div>
+<input class="bg-transparent border-none p-0 focus:ring-0 text-[18px] font-semibold text-on-surface w-full placeholder:text-outline-variant h-11" placeholder="712 345 678" type="tel" value="712 847 291"/>
+</div>
+</div>
+<!-- Password Field -->
+<div class="relative">
+<label class="text-on-surface-variant text-[11px] font-bold uppercase tracking-widest mb-3 block">Password</label>
+<div class="flex items-center justify-between border-b-2 border-outline-variant/50 pb-3 focus-within:border-secondary transition-all duration-300">
+<input class="bg-transparent border-none p-0 focus:ring-0 text-[18px] font-semibold text-on-surface w-full placeholder:text-outline-variant h-11" placeholder="••••••••" type="password" value="password123"/>
+<button aria-label="Toggle password visibility" class="w-11 h-11 flex items-center justify-center text-outline hover:text-secondary focus:outline-none" type="button">
+<span class="material-symbols-outlined" data-icon="visibility">visibility</span>
+</button>
+</div>
+<p class="text-on-surface-variant text-[12px] mt-3 italic opacity-80">First time? Use your temporary password.</p>
+</div>
+</div>
+<!-- Action Section -->
+<div class="pt-4">
+<button class="w-full h-[56px] bg-secondary text-white rounded-[16px] font-bold text-[17px] shadow-lg shadow-secondary/20 btn-active transition-all duration-200 flex items-center justify-center space-x-2">
+<span>Sign In</span>
+<span class="material-symbols-outlined text-[20px]">login</span>
+</button>
+<!-- Footer -->
+<div class="mt-8 text-center">
+<p class="text-on-surface-variant text-[13px]">
+                        Forgot password? <a class="text-secondary font-bold hover:underline" href="mailto:hello@paychainke.co">Email Support</a>
+</p>
+</div>
+</div>
+</div>
+<!-- Decorative Subtle Grain Over the White Card -->
+<div class="absolute inset-0 pointer-events-none opacity-[0.03] overflow-hidden rounded-t-lg">
+<div class="w-full h-full" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuABVd7chxWCh2ZvMcj1QmxzPbbxSJdpoSmO2ctaEZ9r-vBegGPROlaVTG6WseoRA8GWR8nRWdP0FZsMofMvExg4InaVASG0S4XZfRITVuj2vp8d6D2e2skOwPMsJtVzQPQZiztb2qodeYM65XWNoS0OxqBDw_mEC4Q0A6n96YWvjl7sdQqquLsRUVhyLzskSlAudK5qrwZmxmrZlHVYEResajyzXjpHGV4m-al29JOTNWbI5-w1ewSPwoHRI5nhH9UvPOOg1Gq9l9E');"></div>
+</div>
+</div>
+<!-- Background Decoration (Subtle Glows) -->
+<div class="fixed top-0 left-0 w-full h-full -z-10 pointer-events-none overflow-hidden">
+<div class="absolute top-[-10%] right-[-10%] w-[350px] h-[350px] rounded-full bg-secondary/30 blur-[120px]"></div>
+<div class="absolute bottom-[40%] left-[-20%] w-[450px] h-[450px] rounded-full bg-primary-container/20 blur-[140px]"></div>
+</div>
+</body></html>

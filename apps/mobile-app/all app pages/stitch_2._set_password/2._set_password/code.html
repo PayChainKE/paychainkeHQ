@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Set Password | Kamau General Store</title>
+<!-- Google Fonts: Plus Jakarta Sans & DM Serif Display -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serid+Display&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-background": "#1b1c1a",
+              "surface-container-low": "#f4f3f0",
+              "tertiary-fixed": "#d3e7e0",
+              "primary-fixed-dim": "#96d4ab",
+              "surface-container": "#efeeeb",
+              "outline": "#707971",
+              "primary-container": "#0b4d2e",
+              "surface-container-highest": "#e3e2df",
+              "inverse-surface": "#2f312f",
+              "on-tertiary-fixed": "#0d1f1b",
+              "surface-tint": "#2e6a48",
+              "surface-variant": "#e3e2df",
+              "on-primary-fixed": "#002110",
+              "surface-container-lowest": "#ffffff",
+              "on-tertiary-container": "#a0b4ad",
+              "secondary-fixed": "#86f8c9",
+              "secondary": "#006c4e",
+              "error": "#ba1a1a",
+              "on-secondary-container": "#007151",
+              "inverse-on-surface": "#f2f1ee",
+              "on-tertiary-fixed-variant": "#394a45",
+              "surface": "#faf9f6",
+              "error-container": "#ffdad6",
+              "primary": "#00351d",
+              "on-primary": "#ffffff",
+              "on-primary-fixed-variant": "#115132",
+              "on-primary-container": "#80bd95",
+              "on-surface": "#1b1c1a",
+              "tertiary-container": "#354641",
+              "on-secondary-fixed-variant": "#00513a",
+              "inverse-primary": "#96d4ab",
+              "tertiary-fixed-dim": "#b7cbc4",
+              "outline-variant": "#c0c9c0",
+              "on-tertiary": "#ffffff",
+              "on-secondary": "#ffffff",
+              "tertiary": "#1f302b",
+              "background": "#faf9f6",
+              "surface-dim": "#dbdad7",
+              "primary-fixed": "#b1f1c6",
+              "surface-bright": "#faf9f6",
+              "on-error": "#ffffff",
+              "surface-container-high": "#e9e8e5",
+              "secondary-fixed-dim": "#68dbae",
+              "on-surface-variant": "#404942",
+              "on-secondary-fixed": "#002115",
+              "secondary-container": "#83f5c6",
+              "on-error-container": "#93000a"
+            },
+            fontFamily: {
+              "headline": ["Plus Jakarta Sans"],
+              "body": ["Plus Jakarta Sans"],
+              "label": ["Plus Jakarta Sans"],
+              "serif": ["DM Serif Display"]
+            },
+            borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; -webkit-font-smoothing: antialiased; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+            text-transform: none;
+            letter-spacing: normal;
+            word-wrap: normal;
+            white-space: nowrap;
+            direction: ltr;
+        }
+        .editorial-shadow {
+            box-shadow: 0 40px 60px -20px rgba(17, 81, 50, 0.08);
+        }
+        input:focus {
+            outline: none;
+            border-bottom-color: #006c4e !important;
+            border-bottom-width: 2px !important;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface flex items-center justify-center min-h-screen">
+<!-- Mobile Shell: iPhone 14 Pro Dimensions -->
+<main class="w-[393px] h-[852px] bg-white relative overflow-hidden flex flex-col editorial-shadow">
+<!-- Header Section -->
+<header class="pt-16 px-8 flex flex-col items-center text-center">
+<div class="w-12 h-12 rounded-full bg-primary-fixed flex items-center justify-center mb-6">
+<span class="material-symbols-outlined text-on-primary-fixed-variant text-2xl" data-icon="lock_reset">lock_reset</span>
+</div>
+<h1 class="text-[22px] font-bold text-on-background tracking-tight mb-2">Set your password</h1>
+<p class="text-sm text-on-surface-variant leading-relaxed max-w-[280px]">
+                Welcome, James. Set a permanent password before accessing your dashboard.
+            </p>
+</header>
+<!-- Merchant Identity Card -->
+<section class="mt-8 px-6">
+<div class="bg-primary-fixed/30 p-4 rounded-xl flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center text-white font-bold text-sm">
+                    JK
+                </div>
+<div class="flex flex-col">
+<span class="text-sm font-bold text-on-background leading-none">James Kamau</span>
+<span class="text-xs text-on-primary-fixed-variant mt-1">Kamau General Store</span>
+</div>
+</div>
+</section>
+<!-- Password Form Canvas -->
+<section class="mt-10 px-8 flex-grow">
+<div class="space-y-8">
+<!-- New Password Field -->
+<div class="relative">
+<label class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1 block">New Password</label>
+<input class="w-full bg-transparent border-b border-outline/30 py-3 text-on-background font-medium focus:border-secondary transition-all" placeholder="••••••••" type="password" value="K@mauStore2024"/>
+<!-- Strength Indicators -->
+<div class="mt-4 flex items-center justify-between">
+<div class="flex gap-1.5 flex-1 max-w-[180px]">
+<div class="h-1 rounded-full bg-secondary flex-1"></div>
+<div class="h-1 rounded-full bg-secondary flex-1"></div>
+<div class="h-1 rounded-full bg-secondary flex-1"></div>
+<div class="h-1 rounded-full bg-secondary flex-1"></div>
+</div>
+<span class="text-[10px] font-bold text-secondary uppercase tracking-wider">Strong</span>
+</div>
+<!-- Requirements Checklist -->
+<ul class="mt-4 space-y-2">
+<li class="flex items-center gap-2 text-[12px] text-secondary">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                            At least 8 characters
+                        </li>
+<li class="flex items-center gap-2 text-[12px] text-secondary">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                            One uppercase letter
+                        </li>
+<li class="flex items-center gap-2 text-[12px] text-secondary">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                            One number
+                        </li>
+<li class="flex items-center gap-2 text-[12px] text-on-surface-variant/60">
+<span class="material-symbols-outlined text-[16px]" data-icon="circle">circle</span>
+                            One special character
+                        </li>
+</ul>
+</div>
+<!-- Confirm Password Field -->
+<div class="relative">
+<label class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1 block">Confirm Password</label>
+<input class="w-full bg-transparent border-b border-outline/30 py-3 text-on-background font-medium focus:border-secondary transition-all" placeholder="••••••••" type="password" value="K@mauStore2024"/>
+<div class="mt-2 flex items-center gap-1.5 text-secondary">
+<span class="text-[12px] font-medium">Passwords match</span>
+<span class="material-symbols-outlined text-[14px]">check</span>
+</div>
+</div>
+</div>
+</section>
+<!-- CTA & Footer -->
+<footer class="p-8 pb-12">
+<button class="w-full h-[52px] bg-gradient-to-br from-primary to-primary-container rounded-full text-white font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform shadow-lg shadow-primary-container/20">
+                Set Password &amp; Continue
+                <span class="material-symbols-outlined" data-icon="arrow_forward">arrow_forward</span>
+</button>
+<div class="mt-8 flex items-center justify-center gap-2 opacity-50">
+<span class="material-symbols-outlined text-[14px]" data-icon="encrypted">encrypted</span>
+<span class="text-[11px] font-medium text-on-surface">Encrypted and never stored in plain text</span>
+</div>
+<!-- Visual Decoration: The Growth Ribbon (Brand Signature) -->
+<div class="mt-10 -mx-8 bg-primary-fixed h-1 w-[120%] -rotate-1 opacity-20"></div>
+</footer>
+<!-- Hidden Navigation Shell Trigger (Suppressed for focused journey as per rule) -->
+</main>
+</body></html>

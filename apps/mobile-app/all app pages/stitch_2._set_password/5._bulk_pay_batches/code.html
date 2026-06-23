@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Bulk Payments - Batches</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&amp;family=DM+Serif+Display:ital@0;1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-tertiary": "#ffffff",
+              "outline-variant": "#c0c9c0",
+              "tertiary-fixed-dim": "#b7cbc4",
+              "inverse-primary": "#96d4ab",
+              "tertiary-container": "#354641",
+              "on-secondary-fixed-variant": "#00513a",
+              "surface-dim": "#dbdad7",
+              "primary-fixed": "#b1f1c6",
+              "tertiary": "#1f302b",
+              "background": "#faf9f6",
+              "on-secondary": "#ffffff",
+              "secondary-fixed-dim": "#68dbae",
+              "surface-container-high": "#e9e8e5",
+              "on-error": "#ffffff",
+              "surface-bright": "#faf9f6",
+              "secondary-container": "#83f5c6",
+              "on-error-container": "#93000a",
+              "on-secondary-fixed": "#002115",
+              "on-surface-variant": "#404942",
+              "primary-container": "#0b4d2e",
+              "outline": "#707971",
+              "surface-container": "#efeeeb",
+              "primary-fixed-dim": "#96d4ab",
+              "tertiary-fixed": "#d3e7e0",
+              "surface-container-low": "#f4f3f0",
+              "on-background": "#1b1c1a",
+              "surface-variant": "#e3e2df",
+              "surface-tint": "#2e6a48",
+              "on-tertiary-fixed": "#0d1f1b",
+              "inverse-surface": "#2f312f",
+              "surface-container-highest": "#e3e2df",
+              "inverse-on-surface": "#f2f1ee",
+              "on-secondary-container": "#007151",
+              "error": "#ba1a1a",
+              "secondary": "#006c4e",
+              "secondary-fixed": "#86f8c9",
+              "on-tertiary-container": "#a0b4ad",
+              "surface-container-lowest": "#ffffff",
+              "on-primary-fixed": "#002110",
+              "on-surface": "#1b1c1a",
+              "on-primary-container": "#80bd95",
+              "on-primary-fixed-variant": "#115132",
+              "on-primary": "#ffffff",
+              "primary": "#00351d",
+              "error-container": "#ffdad6",
+              "surface": "#faf9f6",
+              "on-tertiary-fixed-variant": "#394a45"
+            },
+            fontFamily: {
+              "headline": ["Plus Jakarta Sans"],
+              "body": ["Plus Jakarta Sans"],
+              "label": ["Plus Jakarta Sans"]
+            },
+            borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .tonal-shift {
+        background-color: #efeeeb;
+      }
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 4px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #c0c9c0;
+        border-radius: 10px;
+      }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body min-h-screen pb-32">
+<!-- TopAppBar -->
+<header class="w-full sticky top-0 z-40 bg-[#faf9f6] dark:bg-stone-950 flex flex-col w-full px-6 pt-4 pb-2">
+<div class="flex justify-between items-center w-full">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-emerald-900 dark:text-emerald-500 cursor-pointer">menu</span>
+<h1 class="font-['Plus_Jakarta_Sans'] font-bold tracking-tight text-2xl text-emerald-900 dark:text-emerald-500">Bulk Payments</h1>
+</div>
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-container overflow-hidden border border-outline-variant/20">
+<img class="w-full h-full object-cover" data-alt="professional portrait of a confident male merchant in a clean studio setting with soft lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDT_TCBfPtbFc1Ud_JlyySnGTrR6kWG4-FDxCWiud06FawPuJIGnGkGmFpQiQfR3lb4Wi9mE6XnhhaL3Dlwh8Y6XBt8wkMwJJP1z-EfqRCMbk_rJk74-7A6SljJJjLjeZyUwMyLmSW1yTtYEAbNev34tE6B4_D_tuVYONSncBjLFNgASjHsvddu0uTJZHFxfGQT7dUKXNcX3q2wAS76NSeVOFIkAEtxpaYG56urTH9ozzJhftQjnhmUeUos3-Hoy7Eb9XcGxiH1hwg"/>
+</div>
+</div>
+</div>
+<!-- Tabs Integration -->
+<nav class="flex gap-8 mt-6">
+<a class="text-stone-500 dark:text-stone-400 pb-2 font-bold transition-colors hover:text-emerald-700" href="#">Payees</a>
+<a class="text-emerald-900 dark:text-emerald-400 border-b-2 border-emerald-900 dark:border-emerald-400 pb-2 font-bold" href="#">Batches</a>
+</nav>
+</header>
+<main class="px-6 py-8 max-w-4xl mx-auto">
+<!-- Growth Ribbon (Signature Component) -->
+<div class="bg-primary-fixed rounded-xl px-6 py-4 mb-10 flex items-center justify-between overflow-hidden relative">
+<div class="flex flex-col">
+<span class="font-['DM_Serif_Display'] italic text-on-primary-fixed-variant text-xl">Active Batch Volume</span>
+<span class="text-on-primary-fixed font-bold text-sm tracking-widest uppercase opacity-60">Collect. Pay. Grow.</span>
+</div>
+<div class="flex gap-8">
+<div class="text-right">
+<p class="text-xs text-on-primary-fixed-variant font-bold uppercase tracking-tighter opacity-70">Total Pending</p>
+<p class="text-xl font-bold text-primary">KES 412,000</p>
+</div>
+<div class="text-right">
+<p class="text-xs text-on-primary-fixed-variant font-bold uppercase tracking-tighter opacity-70">Scheduled</p>
+<p class="text-xl font-bold text-primary">03</p>
+</div>
+</div>
+<!-- Decorative Grain/Texture would go here -->
+</div>
+<!-- Batches Timeline Section -->
+<section class="space-y-12">
+<div class="flex items-center justify-between">
+<h2 class="text-headline-sm font-bold text-primary tracking-tight">Recent Activity</h2>
+<div class="flex items-center gap-2 text-secondary font-bold text-sm cursor-pointer">
+<span>Filter by Status</span>
+<span class="material-symbols-outlined text-sm">filter_list</span>
+</div>
+</div>
+<div class="relative pl-8 space-y-8 before:content-[''] before:absolute before:left-[11px] before:top-4 before:bottom-4 before:w-[2px] before:bg-outline-variant/30">
+<!-- Batch Card 1: Completed -->
+<div class="relative">
+<!-- Timeline Node -->
+<div class="absolute -left-[30px] top-1 w-5 h-5 rounded-full bg-secondary ring-4 ring-background z-10"></div>
+<div class="bg-surface-container-lowest rounded-lg p-6 shadow-sm border border-outline-variant/10 transition-transform active:scale-95 duration-200">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+<div class="space-y-1">
+<div class="flex items-center gap-3">
+<h3 class="text-lg font-extrabold text-on-surface">March Payroll</h3>
+<span class="px-3 py-1 bg-secondary-container/30 text-on-secondary-container text-[10px] font-bold uppercase tracking-widest rounded-full">Completed</span>
+</div>
+<p class="text-stone-500 text-sm font-medium flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">calendar_today</span> 14 Mar 2026
+                                    <span class="w-1 h-1 rounded-full bg-stone-300"></span>
+                                    12 recipients
+                                </p>
+</div>
+<div class="flex items-center justify-between md:justify-end md:gap-8">
+<div class="text-right">
+<p class="text-[10px] text-stone-400 font-bold uppercase tracking-widest">Total Disbursed</p>
+<p class="text-xl font-['Plus_Jakarta_Sans'] font-extrabold text-primary">KES 184,250</p>
+</div>
+<span class="material-symbols-outlined text-stone-300">chevron_right</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Batch Card 2: Scheduled -->
+<div class="relative">
+<div class="absolute -left-[30px] top-1 w-5 h-5 rounded-full bg-amber-500 ring-4 ring-background z-10"></div>
+<div class="bg-surface-container-lowest rounded-lg p-6 shadow-sm border border-outline-variant/10 transition-transform active:scale-95 duration-200">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+<div class="space-y-1">
+<div class="flex items-center gap-3">
+<h3 class="text-lg font-extrabold text-on-surface">Fruit Suppliers</h3>
+<span class="px-3 py-1 bg-amber-100 text-amber-800 text-[10px] font-bold uppercase tracking-widest rounded-full">Scheduled</span>
+</div>
+<p class="text-stone-500 text-sm font-medium flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">schedule</span> 18 Mar 2026
+                                    <span class="w-1 h-1 rounded-full bg-stone-300"></span>
+                                    08 recipients
+                                </p>
+</div>
+<div class="flex items-center justify-between md:justify-end md:gap-8">
+<div class="text-right">
+<p class="text-[10px] text-stone-400 font-bold uppercase tracking-widest">Estimated Total</p>
+<p class="text-xl font-['Plus_Jakarta_Sans'] font-extrabold text-primary">KES 52,400</p>
+</div>
+<span class="material-symbols-outlined text-stone-300">chevron_right</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Batch Card 3: Completed -->
+<div class="relative">
+<div class="absolute -left-[30px] top-1 w-5 h-5 rounded-full bg-secondary ring-4 ring-background z-10"></div>
+<div class="bg-surface-container-lowest rounded-lg p-6 shadow-sm border border-outline-variant/10 transition-transform active:scale-95 duration-200">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+<div class="space-y-1">
+<div class="flex items-center gap-3">
+<h3 class="text-lg font-extrabold text-on-surface">Rent &amp; Utilities</h3>
+<span class="px-3 py-1 bg-secondary-container/30 text-on-secondary-container text-[10px] font-bold uppercase tracking-widest rounded-full">Completed</span>
+</div>
+<p class="text-stone-500 text-sm font-medium flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">calendar_today</span> 01 Mar 2026
+                                    <span class="w-1 h-1 rounded-full bg-stone-300"></span>
+                                    04 recipients
+                                </p>
+</div>
+<div class="flex items-center justify-between md:justify-end md:gap-8">
+<div class="text-right">
+<p class="text-[10px] text-stone-400 font-bold uppercase tracking-widest">Total Disbursed</p>
+<p class="text-xl font-['Plus_Jakarta_Sans'] font-extrabold text-primary">KES 120,000</p>
+</div>
+<span class="material-symbols-outlined text-stone-300">chevron_right</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- New Batch Action Card -->
+<div class="mt-12 bg-emerald-900 rounded-lg p-8 relative overflow-hidden group cursor-pointer shadow-lg shadow-emerald-900/20">
+<div class="relative z-10">
+<h4 class="text-white text-2xl font-['Plus_Jakarta_Sans'] font-bold mb-2">Create New Batch</h4>
+<p class="text-emerald-200/70 text-sm max-w-[240px]">Streamline your payouts by grouping multiple payees into a single ledger.</p>
+<div class="mt-6 inline-flex items-center gap-2 bg-emerald-500 text-white px-6 py-3 rounded-full font-bold text-sm transition-transform active:scale-95">
+<span class="material-symbols-outlined">add_circle</span>
+                    Start New Disbursal
+                </div>
+</div>
+<!-- Editorial Asymmetry: Decorative Image -->
+<div class="absolute -right-4 -bottom-4 w-40 h-40 opacity-20 group-hover:opacity-40 transition-opacity">
+<span class="material-symbols-outlined text-[120px] text-white" style="font-variation-settings: 'FILL' 1;">payments</span>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-6 pb-6 pt-3 bg-white/80 dark:bg-stone-900/80 backdrop-blur-xl shadow-[0_-4px_40px_rgba(11,77,46,0.06)] border-t border-emerald-900/5">
+<div class="flex flex-col items-center justify-center text-stone-400 dark:text-stone-500 px-4 py-2 hover:text-emerald-800 transition-transform active:scale-95">
+<span class="material-symbols-outlined mb-1">home</span>
+<span class="text-[11px] font-bold uppercase tracking-widest font-['Plus_Jakarta_Sans']">Home</span>
+</div>
+<div class="flex flex-col items-center justify-center bg-emerald-900 dark:bg-emerald-500 text-white rounded-full w-14 h-14 -mt-10 shadow-lg shadow-emerald-900/20 scale-98 transition-transform active:scale-95 duration-200">
+<span class="material-symbols-outlined">payments</span>
+<span class="text-[8px] font-bold uppercase tracking-widest">Pay</span>
+</div>
+<div class="flex flex-col items-center justify-center text-stone-400 dark:text-stone-500 px-4 py-2 hover:text-emerald-800 transition-transform active:scale-95">
+<span class="material-symbols-outlined mb-1">receipt_long</span>
+<span class="text-[11px] font-bold uppercase tracking-widest font-['Plus_Jakarta_Sans']">History</span>
+</div>
+<div class="flex flex-col items-center justify-center text-stone-400 dark:text-stone-500 px-4 py-2 hover:text-emerald-800 transition-transform active:scale-95">
+<span class="material-symbols-outlined mb-1">settings</span>
+<span class="text-[11px] font-bold uppercase tracking-widest font-['Plus_Jakarta_Sans']">Settings</span>
+</div>
+</nav>
+</body></html>

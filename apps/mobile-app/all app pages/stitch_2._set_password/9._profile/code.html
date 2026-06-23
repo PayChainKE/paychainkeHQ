@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Merchant Profile - PayChain</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&amp;family=DM+Serif+Display:ital@0;1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "tertiary-fixed": "#d3e7e0",
+              "outline": "#707971",
+              "on-tertiary-container": "#a0b4ad",
+              "on-secondary-container": "#007151",
+              "primary-container": "#0b4d2e",
+              "background": "#faf9f6",
+              "surface-container-lowest": "#ffffff",
+              "on-surface-variant": "#404942",
+              "tertiary-container": "#354641",
+              "tertiary": "#1f302b",
+              "on-primary-container": "#80bd95",
+              "on-tertiary-fixed-variant": "#394a45",
+              "on-secondary-fixed-variant": "#00513a",
+              "inverse-surface": "#2f312f",
+              "on-background": "#1b1c1a",
+              "surface-tint": "#2e6a48",
+              "on-error": "#ffffff",
+              "surface-dim": "#dbdad7",
+              "surface-container-low": "#f4f3f0",
+              "secondary-container": "#83f5c6",
+              "on-primary-fixed-variant": "#115132",
+              "on-tertiary-fixed": "#0d1f1b",
+              "surface-variant": "#e3e2df",
+              "surface-container-high": "#e9e8e5",
+              "on-secondary-fixed": "#002115",
+              "on-tertiary": "#ffffff",
+              "error": "#ba1a1a",
+              "surface": "#faf9f6",
+              "surface-container": "#efeeeb",
+              "surface-bright": "#faf9f6",
+              "on-surface": "#1b1c1a",
+              "on-error-container": "#93000a",
+              "error-container": "#ffdad6",
+              "secondary": "#006c4e",
+              "secondary-fixed-dim": "#68dbae",
+              "secondary-fixed": "#86f8c9",
+              "on-secondary": "#ffffff",
+              "on-primary": "#ffffff",
+              "tertiary-fixed-dim": "#b7cbc4",
+              "outline-variant": "#c0c9c0",
+              "primary-fixed": "#b1f1c6",
+              "surface-container-highest": "#e3e2df",
+              "primary": "#00351d",
+              "on-primary-fixed": "#002110",
+              "primary-fixed-dim": "#96d4ab",
+              "inverse-primary": "#96d4ab",
+              "inverse-on-surface": "#f2f1ee"
+            },
+            fontFamily: {
+              "headline": ["Plus Jakarta Sans"],
+              "body": ["Plus Jakarta Sans"],
+              "label": ["Plus Jakarta Sans"]
+            },
+            borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      .shadow-inner-light { box-shadow: inset 0 2px 4px 0 rgba(255, 255, 255, 0.06); }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body min-h-screen pb-32">
+<!-- Top App Bar -->
+<header class="fixed top-0 w-full z-50 bg-[#faf9f6]/80 backdrop-blur-md dark:bg-[#1b1c1a]/80 shadow-[0_10px_40px_rgba(0,53,29,0.04)] tonal-transition">
+<div class="flex items-center justify-between px-6 h-16 w-full">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center text-white text-xs font-bold">JK</div>
+<h1 class="font-['Plus_Jakarta_Sans'] font-bold tracking-[-0.02em] text-[#00351d] dark:text-[#b1f1c6] text-lg">Merchant Store</h1>
+</div>
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-[#00351d] dark:text-[#b1f1c6] active:scale-[0.98] transition-all" data-icon="notifications">notifications</button>
+</div>
+</div>
+</header>
+<main class="pt-24 px-6 max-w-2xl mx-auto">
+<!-- Profile Hero Section -->
+<section class="flex flex-col items-center mb-10">
+<div class="relative group">
+<div class="w-32 h-32 rounded-full bg-gradient-to-br from-primary to-primary-container flex items-center justify-center text-white text-4xl font-extrabold shadow-xl mb-4 border-4 border-surface-container">
+                    JK
+                </div>
+<div class="absolute bottom-4 right-0 w-8 h-8 bg-secondary rounded-full flex items-center justify-center text-white border-2 border-background">
+<span class="material-symbols-outlined text-sm">verified</span>
+</div>
+</div>
+<h2 class="text-2xl font-bold text-primary tracking-tight">Kamau General Store</h2>
+<p class="font-['DM_Serif_Display'] italic text-secondary text-lg mb-4">Collect. Pay. Grow.</p>
+<div class="flex gap-2">
+<span class="px-3 py-1 rounded-full bg-secondary-container/30 text-on-secondary-container text-xs font-bold uppercase tracking-wider flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse"></span> Active
+                </span>
+<span class="px-3 py-1 rounded-full bg-primary-fixed text-on-primary-fixed-variant text-xs font-bold uppercase tracking-wider flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" data-weight="fill" style="font-variation-settings: 'FILL' 1;">check_circle</span> KYC Verified
+                </span>
+</div>
+</section>
+<!-- Business Information (Bento Style) -->
+<section class="mb-8">
+<div class="flex items-center justify-between mb-4">
+<h3 class="text-sm font-bold uppercase tracking-[0.1em] text-outline">Business Information</h3>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="col-span-2 bg-surface-container-lowest p-6 rounded-xl shadow-sm">
+<p class="text-[11px] font-bold text-outline uppercase tracking-wider mb-1">Till Number</p>
+<div class="flex items-center justify-between">
+<span class="text-xl font-headline font-extrabold text-primary tracking-tight">PC847291</span>
+<button class="p-2 rounded-full hover:bg-surface-container transition-colors active:scale-90">
+<span class="material-symbols-outlined text-secondary">content_copy</span>
+</button>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-5 rounded-xl shadow-sm">
+<p class="text-[11px] font-bold text-outline uppercase tracking-wider mb-1">Member Since</p>
+<p class="font-semibold text-on-background">Oct 2023</p>
+</div>
+<div class="bg-surface-container-lowest p-5 rounded-xl shadow-sm">
+<p class="text-[11px] font-bold text-outline uppercase tracking-wider mb-1">Onboarded By</p>
+<p class="font-semibold text-on-background">Self-Registered</p>
+</div>
+</div>
+</section>
+<!-- Personal Details -->
+<section class="mb-8">
+<h3 class="text-sm font-bold uppercase tracking-[0.1em] text-outline mb-4">Personal Details</h3>
+<div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+<div class="p-5 flex items-center justify-between border-b border-surface-container/50">
+<div>
+<p class="text-[11px] font-bold text-outline uppercase tracking-wider mb-0.5">Full Name</p>
+<p class="font-medium text-on-background">James Kamau</p>
+</div>
+<span class="material-symbols-outlined text-outline/40">person</span>
+</div>
+<div class="p-5 flex items-center justify-between border-b border-surface-container/50">
+<div>
+<p class="text-[11px] font-bold text-outline uppercase tracking-wider mb-0.5">Email Address</p>
+<p class="font-medium text-on-background">james@kamau.co</p>
+</div>
+<span class="material-symbols-outlined text-outline/40">mail</span>
+</div>
+<div class="p-5 flex items-center justify-between">
+<div>
+<p class="text-[11px] font-bold text-outline uppercase tracking-wider mb-0.5">Phone Number</p>
+<p class="font-medium text-on-background">+254 712 847 291</p>
+</div>
+<span class="material-symbols-outlined text-outline/40">phone_iphone</span>
+</div>
+</div>
+</section>
+<!-- Security -->
+<section class="mb-8">
+<h3 class="text-sm font-bold uppercase tracking-[0.1em] text-outline mb-4">Security</h3>
+<div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+<button class="w-full p-5 flex items-center justify-between border-b border-surface-container/50 hover:bg-surface-container-low transition-colors text-left group">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-tertiary-fixed flex items-center justify-center text-on-tertiary-fixed-variant">
+<span class="material-symbols-outlined">lock_reset</span>
+</div>
+<div>
+<p class="font-semibold text-on-background">Change Password</p>
+<p class="text-xs text-outline">Last updated 3 months ago</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline group-hover:translate-x-1 transition-transform">chevron_right</span>
+</button>
+<div class="w-full p-5 flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-secondary-container flex items-center justify-center text-on-secondary-container">
+<span class="material-symbols-outlined">devices</span>
+</div>
+<div>
+<p class="font-semibold text-on-background">Active Session</p>
+<p class="text-xs text-secondary font-medium">iPhone 15 Pro • Nairobi, KE</p>
+</div>
+</div>
+<span class="px-2 py-1 rounded-md bg-surface-container text-[10px] font-bold uppercase text-outline">Current</span>
+</div>
+</div>
+</section>
+<!-- Notifications -->
+<section class="mb-12">
+<h3 class="text-sm font-bold uppercase tracking-[0.1em] text-outline mb-4">Notifications</h3>
+<div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+<div class="p-5 flex items-center justify-between border-b border-surface-container/50">
+<div>
+<p class="font-semibold text-on-background">Payment Alerts</p>
+<p class="text-xs text-outline">Get notified when a customer pays</p>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+</label>
+</div>
+<div class="p-5 flex items-center justify-between">
+<div>
+<p class="font-semibold text-on-background">Bulk Pay Completion</p>
+<p class="text-xs text-outline">Confirmations for payroll &amp; supplier runs</p>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+</label>
+</div>
+</div>
+</section>
+<!-- Sign Out -->
+<button class="w-full py-4 mb-8 bg-error-container text-on-error-container font-bold rounded-xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all">
+<span class="material-symbols-outlined">logout</span>
+            Sign Out
+        </button>
+</main>
+<!-- Bottom Navigation Bar -->
+<nav class="fixed bottom-0 w-full z-50 rounded-t-[2.5rem] bg-[#ffffff]/90 backdrop-blur-2xl dark:bg-[#1b1c1a]/90 shadow-[0_-15px_50px_rgba(0,53,29,0.08)] shadow-inner-light">
+<div class="flex justify-around items-end pb-6 pt-2 px-4 w-full">
+<button class="flex flex-col items-center justify-center text-[#707971] p-3 hover:text-[#00351d] dark:hover:text-[#b1f1c6] active:scale-[0.95] duration-200 ease-out">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+<span class="text-[11px] font-['Plus_Jakarta_Sans'] font-semibold uppercase tracking-wider mt-1">Home</span>
+</button>
+<button class="flex flex-col items-center justify-center text-[#707971] p-3 hover:text-[#00351d] dark:hover:text-[#b1f1c6] active:scale-[0.95] duration-200 ease-out">
+<span class="material-symbols-outlined" data-icon="account_balance_wallet">account_balance_wallet</span>
+<span class="text-[11px] font-['Plus_Jakarta_Sans'] font-semibold uppercase tracking-wider mt-1">Collections</span>
+</button>
+<button class="flex flex-col items-center justify-center text-[#707971] p-3 hover:text-[#00351d] dark:hover:text-[#b1f1c6] active:scale-[0.95] duration-200 ease-out">
+<span class="material-symbols-outlined" data-icon="payments">payments</span>
+<span class="text-[11px] font-['Plus_Jakarta_Sans'] font-semibold uppercase tracking-wider mt-1">Pay</span>
+</button>
+<button class="flex flex-col items-center justify-center text-[#707971] p-3 hover:text-[#00351d] dark:hover:text-[#b1f1c6] active:scale-[0.95] duration-200 ease-out">
+<span class="material-symbols-outlined" data-icon="trending_up">trending_up</span>
+<span class="text-[11px] font-['Plus_Jakarta_Sans'] font-semibold uppercase tracking-wider mt-1">Advance</span>
+</button>
+<button class="flex flex-col items-center justify-center bg-gradient-to-br from-[#00351d] to-[#0b4d2e] text-white rounded-full p-3 mb-1 shadow-lg active:scale-[0.95] duration-200 ease-out">
+<span class="material-symbols-outlined" data-icon="grid_view">grid_view</span>
+<span class="text-[11px] font-['Plus_Jakarta_Sans'] font-semibold uppercase tracking-wider mt-1">More</span>
+</button>
+</div>
+</nav>
+</body></html>
