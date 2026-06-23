@@ -342,7 +342,8 @@ export const generatePaymentLink = async (req, res) => {
       status: 'active'
     });
 
-    const url = `https://www.paychain.co.ke/pay/${linkId}`;
+    // Note: The frontend will construct the absolute URL using window.location.origin
+    const url = `/pay/${linkId}`;
 
     res.status(201).json({
       success: true,

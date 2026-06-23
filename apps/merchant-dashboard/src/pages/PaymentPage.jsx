@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import { formatKES } from '../utils/formatCurrency';
+import paychainLogo from '../../images/logo.png';
 
 export default function PaymentPage() {
   const { linkId } = useParams();
   const [linkDetails, setLinkDetails] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [paymentError, setPaymentError] = useState('');
   
   const [phone, setPhone] = useState('');
   const [isPaying, setIsPaying] = useState(false);
@@ -34,6 +36,7 @@ export default function PaymentPage() {
     e.preventDefault();
     if (!phone) return;
     setIsPaying(true);
+    setPaymentError('');
     setPaymentStatus('Initiating secure STK Push...');
 
     try {
@@ -49,7 +52,7 @@ export default function PaymentPage() {
         }, 3000);
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to process payment.');
+      setPaymentError(err.response?.data?.error || 'Failed to trigger payment on your phone.');
       setIsPaying(false);
       setPaymentStatus('');
     }
@@ -90,8 +93,8 @@ export default function PaymentPage() {
 
       <div className="w-full max-w-lg bg-white rounded-[40px] shadow-2xl overflow-hidden relative z-10 border border-outline-variant/10">
         <div className="p-8 md:p-10 flex flex-col items-center text-center border-b border-surface-container">
-          <div className="w-16 h-16 bg-primary/5 text-primary rounded-2xl flex items-center justify-center mb-6 shadow-inner border border-primary/10">
-             <span className="material-symbols-outlined text-3xl">shopping_cart_checkout</span>
+          <div className="mb-6 flex justify-center w-full">
+            <img src={paychainLogo} alt="PayChain Logo" className="h-10 object-contain contrast-125 saturate-150" />
           </div>
           <h2 className="font-headline text-2xl text-on-surface mb-1">Pay {linkDetails.merchantName}</h2>
           <p className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-70">
@@ -125,10 +128,17 @@ export default function PaymentPage() {
               </div>
             </div>
 
-            {paymentStatus && (
+            {paymentStatus && !paymentError && (
               <div className="p-4 bg-emerald-50 text-emerald-800 rounded-2xl text-sm font-medium text-center border border-emerald-100 flex flex-col items-center gap-2">
                  {isPaying && <div className="w-5 h-5 border-2 border-emerald-800/30 border-t-emerald-800 rounded-full animate-spin"></div>}
                  {paymentStatus}
+              </div>
+            )}
+
+            {paymentError && (
+              <div className="p-4 bg-error/10 text-error rounded-2xl text-sm font-medium text-center border border-error/20 flex flex-col items-center gap-2">
+                 <span className="material-symbols-outlined text-lg">error</span>
+                 {paymentError}
               </div>
             )}
 

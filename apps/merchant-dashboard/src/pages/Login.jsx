@@ -56,6 +56,7 @@ export default function Login() {
   const [activeTab, setActiveTab] = useState('login')
   const [isSignupSuccess, setIsSignupSuccess] = useState(false)
   const [isSignupPasswordStep, setIsSignupPasswordStep] = useState(false)
+  const [isSignupBiometricStep, setIsSignupBiometricStep] = useState(false)
   const [otpFlowType, setOtpFlowType] = useState('') // 'login' or 'reset'
   const [authEmail, setAuthEmail] = useState('') // Captured from backend for OTP verification
   const [hasBiometrics, setHasBiometrics] = useState(!!localStorage.getItem('last_biometric_user'))
@@ -271,16 +272,57 @@ export default function Login() {
     
     if (res.success) {
       setIsSignupPasswordStep(false)
-      setActiveTab('login')
-      setPhone(signupPhone)
-      addNotification({
-        title: 'Account Created',
-        message: 'Your account was created successfully. Please login.',
-        type: 'success'
-      })
+      if (window.PublicKeyCredential) {
+        setIsSignupBiometricStep(true)
+      } else {
+        setIsSignupSuccess(true)
+      }
     } else {
       setErr(res.error)
     }
+  }
+
+  async function handleSetupBiometric() {
+    try {
+      setLoading(true)
+      const challenge = new Uint8Array(32)
+      window.crypto.getRandomValues(challenge)
+      const userId = new Uint8Array(16)
+      window.crypto.getRandomValues(userId)
+
+      const credential = await navigator.credentials.create({
+        publicKey: {
+          challenge: challenge,
+          rp: { name: "PayChain Merchant", id: window.location.hostname },
+          user: {
+            id: userId,
+            name: signupEmail,
+            displayName: signupName
+          },
+          pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+          authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required" },
+          timeout: 60000
+        }
+      })
+
+      if (credential) {
+        localStorage.setItem('last_biometric_user', signupEmail)
+        setHasBiometrics(true)
+        addNotification({ title: 'Biometrics Enabled', message: 'You can now log in using Face ID or Touch ID.', type: 'success' })
+      }
+    } catch (e) {
+      console.error(e)
+      setErr('Biometric setup failed or was cancelled.')
+    } finally {
+      setLoading(false)
+      setIsSignupBiometricStep(false)
+      setIsSignupSuccess(true)
+    }
+  }
+
+  function skipBiometric() {
+    setIsSignupBiometricStep(false)
+    setIsSignupSuccess(true)
   }
 
   const SecurityRequirement = ({ met, label }) => (
@@ -380,6 +422,33 @@ export default function Login() {
                   >
                     Back to Login
                   </button>
+                </div>
+              ) : isSignupBiometricStep ? (
+                /* BIOMETRIC SETUP STEP */
+                <div className="flex flex-col items-center justify-center text-center py-10 px-4 animate-fade-in-up">
+                  <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mb-6 shadow-inner">
+                    <span className="material-symbols-outlined text-4xl text-emerald-500">fingerprint</span>
+                  </div>
+                  <h3 className="font-headline text-3xl text-primary tracking-tight font-black mb-3">Enable Biometrics</h3>
+                  <p className="text-on-surface-variant font-medium opacity-80 mb-8 max-w-sm leading-relaxed">
+                    Set up Face ID or Touch ID for instant, secure access to your merchant dashboard without needing a password.
+                  </p>
+                  <div className="flex flex-col w-full gap-4 max-w-xs mx-auto">
+                    <button 
+                      onClick={handleSetupBiometric}
+                      disabled={loading}
+                      className="bg-[#06201B] text-white py-4 rounded-xl font-black text-sm shadow-xl hover:bg-[#0a3029] transition-all flex items-center justify-center gap-2"
+                    >
+                      {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : 'Set Up Now'}
+                    </button>
+                    <button 
+                      onClick={skipBiometric}
+                      disabled={loading}
+                      className="text-primary/60 font-bold text-sm py-2 hover:text-primary transition-all"
+                    >
+                      Skip for now
+                    </button>
+                  </div>
                 </div>
               ) : isSignupPasswordStep ? (
                 /* SIGN UP PASSWORD STEP */

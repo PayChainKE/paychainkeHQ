@@ -197,7 +197,7 @@ export default function Wallet() {
   }
 
   // QR Logic
-  const qrData = `https://www.paychain.co.ke/pay/${merchant?.paybillAccount || '84729'}`
+  const qrData = `${window.location.origin}/pay/${merchant?.paybillAccount || '84729'}`
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrData)}&margin=10&bgcolor=FFFFFF&color=00351D`
 
   const handleDownload = async () => {
@@ -291,7 +291,7 @@ export default function Wallet() {
       });
       
       if (res.data?.success) {
-        setGeneratedLink(res.data.url)
+        setGeneratedLink(`${window.location.origin}/pay/${res.data.linkId}`)
         addToast({ title: 'Link Generated', message: 'Secure payment link created successfully! Expires in 24 hours.', type: 'success' })
       }
     } catch (err) {
