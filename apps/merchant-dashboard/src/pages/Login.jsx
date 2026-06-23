@@ -747,39 +747,21 @@ export default function Login() {
                   </div>
                 )}
 
-                {/* Mobile Login Field (Mobile Number Only) */}
-                <div className="space-y-2 lg:hidden">
-                  <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Mobile Number</label>
-                  <div className="flex group">
-                    <div className="bg-surface-container-low border border-outline-variant/15 border-r-0 rounded-l-2xl px-4 flex items-center justify-center text-primary/40 group-focus-within:border-primary transition-colors">
-                      <span className="material-symbols-outlined text-xl">phone_iphone</span>
-                    </div>
-                    <input 
-                      className="flex-1 bg-white border border-outline-variant/15 rounded-r-2xl py-3 px-4 text-lg font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40"
-                      value={phone} 
-                      onChange={e => setPhone(e.target.value.replace(/\D/g, ''))} 
-                      placeholder="0712 345 678"
-                      type="tel"
-                      autoComplete="tel-national"
-                      required
-                    />
-                  </div>
-                </div>
-
-                {/* Desktop Login Field (Email or Phone Number) */}
-                <div className="space-y-2 hidden lg:block">
+                {/* Unified Login Field (Email or Phone Number) */}
+                <div className="space-y-2">
                   <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Email or Phone Number</label>
                   <div className="flex group">
-                    <div className="bg-surface-container-low border border-outline-variant/15 border-r-0 rounded-l-2xl px-5 flex items-center justify-center text-primary/40 group-focus-within:border-primary transition-colors">
+                    <div className="bg-surface-container-low border border-outline-variant/15 border-r-0 rounded-l-2xl px-4 lg:px-5 flex items-center justify-center text-primary/40 group-focus-within:border-primary transition-colors">
                       <span className="material-symbols-outlined text-xl">person</span>
                     </div>
                     <input 
-                      className="flex-1 bg-white border border-outline-variant/15 rounded-r-2xl py-4 px-5 text-lg font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40"
+                      className="flex-1 w-full bg-white border border-outline-variant/15 rounded-r-2xl py-3 lg:py-4 px-4 lg:px-5 text-lg font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40"
                       value={phone} 
                       onChange={e => setPhone(e.target.value)} 
                       placeholder="john@example.com or 0712..."
                       type="text"
                       autoComplete="username"
+                      required
                     />
                   </div>
                 </div>
