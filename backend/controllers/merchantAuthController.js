@@ -20,8 +20,10 @@ const generateUniquePaybillAccount = async () => {
 // @route   POST /api/auth/merchant/register
 // @access  Public
 export const registerMerchant = async (req, res) => {
-  const { name, email, phone, businessName, password } = req.body;
+  let { name, email, phone, businessName, password } = req.body;
   const certificateFile = req.file;
+
+  if (phone) phone = phone.replace(/\s+/g, '');
 
   try {
     const merchantExists = await Merchant.findOne({ email });
@@ -148,11 +150,34 @@ export const verifyMerchantOTP = async (req, res) => {
 // @access  Public
 export const loginMerchant = async (req, res) => {
   const { email, password } = req.body;
-  const loginIdentifier = email; // can be phone or email
+  let loginIdentifier = email ? email.trim() : ''; // can be phone or email
+  
+  let phoneVariations = [loginIdentifier];
+  if (!loginIdentifier.includes('@')) {
+    let cleanPhone = loginIdentifier.replace(/\s+/g, '');
+    if (cleanPhone.startsWith('0')) {
+      cleanPhone = cleanPhone.substring(1);
+    } else if (cleanPhone.startsWith('+254')) {
+      cleanPhone = cleanPhone.substring(4);
+    } else if (cleanPhone.startsWith('254')) {
+      cleanPhone = cleanPhone.substring(3);
+    }
+    
+    // cleanPhone is now just the 9 digits (e.g. 790889066)
+    phoneVariations = [
+      cleanPhone,
+      `0${cleanPhone}`,
+      `254${cleanPhone}`,
+      `+254${cleanPhone}`
+    ];
+  }
 
   try {
     const merchant = await Merchant.findOne({ 
-      $or: [{ email: loginIdentifier }, { phone: loginIdentifier }] 
+      $or: [
+        { email: loginIdentifier }, 
+        { phone: { $in: phoneVariations } }
+      ] 
     }).select('+password +bulkPayPin');
     
     if (!merchant) {
