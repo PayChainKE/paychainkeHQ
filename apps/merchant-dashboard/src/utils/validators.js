@@ -29,6 +29,15 @@ export const formatters = {
   pin6:         (raw) => raw.replace(/\D/g, '').slice(0, 6),
   otp6:         (raw) => raw.replace(/\D/g, '').slice(0, 6),
   text:         (raw) => raw.slice(0, 200),
+  // Card number: digits, max 19 (covers Amex 15 + Visa/MC 16).
+  cardNumber:   (raw) => raw.replace(/\D/g, '').slice(0, 19),
+  // Card expiry: MM/YY, auto-insert slash after 2 digits.
+  cardExpiry: (raw) => {
+    const d = raw.replace(/\D/g, '').slice(0, 4);
+    return d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d;
+  },
+  // Card CVV: 3-4 digits.
+  cardCvv:      (raw) => raw.replace(/\D/g, '').slice(0, 4),
 };
 
 export const validators = {
@@ -133,6 +142,38 @@ export const validators = {
     return VALID;
   },
   text: (v) => (v ? VALID : { valid: false, error: 'Required.' }),
+  cardNumber: (v) => {
+    if (!v) return { valid: false, error: 'Card number required.' };
+    const digits = v.replace(/\D/g, '');
+    if (digits.length < 13 || digits.length > 19) return { valid: false, error: 'Card number must be 13-19 digits.' };
+    // Luhn checksum.
+    let sum = 0, alt = false;
+    for (let i = digits.length - 1; i >= 0; i--) {
+      let n = parseInt(digits[i], 10);
+      if (alt) { n *= 2; if (n > 9) n -= 9; }
+      sum += n;
+      alt = !alt;
+    }
+    if (sum % 10 !== 0) return { valid: false, error: 'Card number is invalid.' };
+    return VALID;
+  },
+  cardExpiry: (v) => {
+    if (!v) return { valid: false, error: 'Expiry required.' };
+    const m = v.match(/^(\d{2})\/(\d{2})$/);
+    if (!m) return { valid: false, error: 'Format: MM/YY.' };
+    const month = parseInt(m[1], 10);
+    if (month < 1 || month > 12) return { valid: false, error: 'Month must be 01-12.' };
+    const year = 2000 + parseInt(m[2], 10);
+    const now = new Date();
+    const exp = new Date(year, month, 0, 23, 59, 59);
+    if (exp < now) return { valid: false, error: 'Card has expired.' };
+    return VALID;
+  },
+  cardCvv: (v) => {
+    if (!v) return { valid: false, error: 'CVV required.' };
+    if (!/^\d{3,4}$/.test(v)) return { valid: false, error: 'CVV must be 3 or 4 digits.' };
+    return VALID;
+  },
 };
 
 // Browser <input> attribute hints per field kind.
@@ -157,4 +198,7 @@ export const inputAttrs = {
   pin6:         { type: 'password', inputMode: 'numeric', autoComplete: 'one-time-code', autoCapitalize: 'off' },
   otp6:         { type: 'text',   inputMode: 'numeric', autoComplete: 'one-time-code', autoCapitalize: 'off' },
   text:         { type: 'text',   inputMode: 'text',    autoComplete: 'off',          autoCapitalize: 'sentences' },
+  cardNumber:   { type: 'text',   inputMode: 'numeric', autoComplete: 'cc-number', autoCapitalize: 'off' },
+  cardExpiry:   { type: 'text',   inputMode: 'numeric', autoComplete: 'cc-exp',    autoCapitalize: 'off' },
+  cardCvv:      { type: 'password', inputMode: 'numeric', autoComplete: 'cc-csc',  autoCapitalize: 'off' },
 };

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Modal, TextInput, ActivityIndicator, Alert, RefreshControl } from 'react-native';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ValidatedTextInput } from '../components/ValidatedTextInput';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
@@ -858,25 +859,15 @@ export default function Collections() {
               <View className="flex-row gap-3 mb-6">
                 <View className="flex-1 bg-[#faf9f6] rounded-2xl px-4 py-3 border border-[#e9e8e5]">
                   <Text className="text-[9px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1">Min</Text>
-                  <TextInput
-                    keyboardType="numeric"
-                    placeholder="0"
-                    placeholderTextColor="#a1a1aa"
-                    value={filterMinAmount}
-                    onChangeText={setFilterMinAmount}
-                    className="text-[#1b1c1a] font-jakarta-bold text-[15px]"
-                  />
+                  <ValidatedTextInput kind="amount" optional placeholder="0" placeholderTextColor="#a1a1aa"
+                    value={filterMinAmount} onChangeText={setFilterMinAmount}
+                    className="text-[#1b1c1a] font-jakarta-bold text-[15px]" />
                 </View>
                 <View className="flex-1 bg-[#faf9f6] rounded-2xl px-4 py-3 border border-[#e9e8e5]">
                   <Text className="text-[9px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1">Max</Text>
-                  <TextInput
-                    keyboardType="numeric"
-                    placeholder="No limit"
-                    placeholderTextColor="#a1a1aa"
-                    value={filterMaxAmount}
-                    onChangeText={setFilterMaxAmount}
-                    className="text-[#1b1c1a] font-jakarta-bold text-[15px]"
-                  />
+                  <ValidatedTextInput kind="amount" optional placeholder="No limit" placeholderTextColor="#a1a1aa"
+                    value={filterMaxAmount} onChangeText={setFilterMaxAmount}
+                    className="text-[#1b1c1a] font-jakarta-bold text-[15px]" />
                 </View>
               </View>
             </ScrollView>

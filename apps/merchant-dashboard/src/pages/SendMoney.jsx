@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import { useNotification } from '../context/NotificationContext'
+import { ValidatedInput } from '../components/ValidatedInput'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { formatKES } from '../utils/formatCurrency'
 
@@ -162,8 +163,8 @@ export default function SendMoney() {
                 <label className="block text-[11px] font-black uppercase tracking-widest text-slate-400 mb-2">Recipient Details*</label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 material-symbols-outlined">person</span>
-                  <input 
-                    type={destination.includes('mpesa') || destination === 'mobile' ? 'tel' : 'text'}
+                  <ValidatedInput
+                    kind={destination.includes('mpesa') || destination === 'mobile' ? 'phoneKE' : 'integer'}
                     value={recipientAccount}
                     onChange={(e) => setRecipientAccount(e.target.value)}
                     placeholder={destination.includes('mpesa') || destination === 'mobile' ? "07XX XXX XXX" : "Account or Till Number"}
@@ -177,14 +178,13 @@ export default function SendMoney() {
                 <label className="block text-[11px] font-black uppercase tracking-widest text-slate-400 mb-2">Amount to Send (KES)*</label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">KES</span>
-                  <input 
-                    type="number"
+                  <ValidatedInput
+                    kind="amount"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     placeholder="0.00"
                     className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-lg font-headline font-bold rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 pl-14 py-3.5 outline-none transition-all"
                     required
-                    min="10"
                   />
                 </div>
               </div>
@@ -234,11 +234,10 @@ export default function SendMoney() {
               <div>
                 <label className="block text-[11px] font-black uppercase tracking-widest text-slate-400 mb-3 text-center">Enter 4-Digit Security PIN</label>
                 <div className="flex justify-center">
-                  <input 
-                    type="password"
-                    maxLength="4"
+                  <ValidatedInput
+                    kind="pin4"
                     value={pin}
-                    onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+                    onChange={(e) => setPin(e.target.value)}
                     placeholder="••••"
                     className="w-32 bg-slate-50 border border-slate-200 text-slate-800 text-2xl tracking-[0.5em] text-center font-bold rounded-xl focus:ring-2 focus:ring-[#00351D]/20 focus:border-[#00351D] px-4 py-3 outline-none transition-all"
                   />

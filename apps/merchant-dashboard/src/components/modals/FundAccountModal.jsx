@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { useMerchantAuth } from '../../context/MerchantAuthContext';
+import { ValidatedInput } from '../ValidatedInput';
 import { useToast } from '../../context/NotificationContext';
 
 export default function FundAccountModal({ method, onClose }) {
@@ -127,14 +128,14 @@ export default function FundAccountModal({ method, onClose }) {
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Amount to Top Up</label>
                   <div className="flex items-center gap-3">
                     <span className="text-emerald-400 font-bold text-xl tracking-wider">KES</span>
-                    <input 
-                      type="number" 
+                    <ValidatedInput
+                      kind="amount"
                       value={amount}
                       onChange={(e) => setAmount(e.target.value)}
                       placeholder="0.00"
                       className="w-full bg-transparent text-white text-4xl font-headline font-bold outline-none placeholder-slate-700 caret-emerald-500"
                       required
-                      min="10"
+                      errorClassName="text-red-400 text-[11px] font-bold mt-1.5 pl-1"
                     />
                   </div>
                 </div>
@@ -145,16 +146,14 @@ export default function FundAccountModal({ method, onClose }) {
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">M-Pesa / Airtel Number</label>
                   <div className="flex items-center gap-3">
                     <span className="material-symbols-outlined text-emerald-400 text-xl tracking-wider">smartphone</span>
-                    <input 
-                      type="tel" 
+                    <ValidatedInput
+                      kind="phoneKE"
                       value={phone}
-                      onChange={(e) => {
-                        const val = e.target.value.replace(/\D/g, '');
-                        setPhone(val);
-                      }}
+                      onChange={(e) => setPhone(e.target.value)}
                       placeholder="0712 345 678"
                       className="w-full bg-transparent text-white text-3xl font-headline font-bold outline-none placeholder-slate-700 caret-emerald-500 tracking-wide"
                       required
+                      errorClassName="text-red-400 text-[11px] font-bold mt-1.5 pl-1"
                     />
                   </div>
                 </div>
@@ -181,8 +180,8 @@ export default function FundAccountModal({ method, onClose }) {
               <form onSubmit={handleSimulatedPayment} className="space-y-4">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Cardholder Name</label>
-                  <input 
-                    type="text" 
+                  <ValidatedInput
+                    kind="personName"
                     value={cardName}
                     onChange={(e) => setCardName(e.target.value)}
                     placeholder="JOHN DOE"
@@ -195,14 +194,13 @@ export default function FundAccountModal({ method, onClose }) {
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Card Number</label>
                   <div className="relative">
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 material-symbols-outlined text-xl">credit_card</span>
-                    <input 
-                      type="text" 
+                    <ValidatedInput
+                      kind="cardNumber"
                       value={cardNumber}
                       onChange={handleCardNumberChange}
                       placeholder="0000 0000 0000 0000"
                       className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm font-mono rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 px-4 py-3 outline-none transition-all tracking-widest"
                       required
-                      minLength="19"
                     />
                   </div>
                 </div>
@@ -210,25 +208,21 @@ export default function FundAccountModal({ method, onClose }) {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Expiry</label>
-                    <input 
-                      type="text" 
+                    <ValidatedInput
+                      kind="cardExpiry"
                       value={expiry}
                       onChange={handleExpiryChange}
                       placeholder="MM/YY"
                       className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm font-mono rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 px-4 py-3 outline-none transition-all text-center tracking-widest"
                       required
-                      maxLength="5"
                     />
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">CVV</label>
-                    <input 
-                      type="password" 
+                    <ValidatedInput
+                      kind="cardCvv"
                       value={cvv}
-                      onChange={(e) => {
-                        const val = e.target.value.replace(/\D/g, '').substring(0, 4);
-                        setCvv(val);
-                      }}
+                      onChange={(e) => setCvv(e.target.value)}
                       placeholder="***"
                       className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm font-mono rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 px-4 py-3 outline-none transition-all text-center tracking-widest"
                       required
@@ -238,14 +232,13 @@ export default function FundAccountModal({ method, onClose }) {
 
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 mt-2">Amount to Fund (KES)</label>
-                  <input 
-                    type="number" 
+                  <ValidatedInput
+                    kind="amount"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     placeholder="0.00"
                     className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-lg font-headline font-bold rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 px-4 py-3 outline-none transition-all"
                     required
-                    min="10"
                   />
                 </div>
 
