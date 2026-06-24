@@ -4,10 +4,10 @@
     "esModuleInterop": true,
     "jsx": "react-native",
     "lib": [
-      "DOM",
-      "ESNext"
+      "dom",
+      "esnext"
     ],
-    "moduleResolution": "bundler",
+    "moduleResolution": "node",
     "noEmit": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
@@ -17,5 +17,5 @@
       "nativewind/types"
     ]
   },
-  "extends": "./node_modules/expo/tsconfig.base.json"
+  "extends": "expo/tsconfig.base"
 }

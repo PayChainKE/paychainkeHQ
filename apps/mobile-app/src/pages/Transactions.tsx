@@ -6,6 +6,59 @@ import api from '../api/config';
 
 const ITEMS_PER_PAGE = 20;
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function formatKES(amount: number) {
+  return new Intl.NumberFormat('en-KE', {
+    style: 'currency',
+    currency: 'KES',
+    minimumFractionDigits: 2,
+  }).format(amount);
+}
+
+// ─── Summary stat cards config ────────────────────────────────────────────────
+const STAT_CARD_STYLES = [
+  {
+    // Today – dark anchor card
+    containerStyle: { backgroundColor: '#00351d' },
+    labelColor: '#b1f1c6',
+    valueColor: '#ffffff',
+    subLabelColor: 'rgba(177,241,198,0.6)',
+    icon: 'today',
+    iconColor: '#b1f1c6',
+    accent: '#05c46b',
+  },
+  {
+    // This Week – sage green
+    containerStyle: { backgroundColor: '#f0fdf4' },
+    labelColor: '#006c4e',
+    valueColor: '#00351d',
+    subLabelColor: '#6b7280',
+    icon: 'calendar_view_week',
+    iconColor: '#006c4e',
+    accent: '#b1f1c6',
+  },
+  {
+    // This Month – cream
+    containerStyle: { backgroundColor: '#ffffff' },
+    labelColor: '#006c4e',
+    valueColor: '#00351d',
+    subLabelColor: '#6b7280',
+    icon: 'calendar_month',
+    iconColor: '#006c4e',
+    accent: '#b1f1c6',
+  },
+  {
+    // All Time – deep forest
+    containerStyle: { backgroundColor: '#002110' },
+    labelColor: '#b1f1c6',
+    valueColor: '#ffffff',
+    subLabelColor: 'rgba(177,241,198,0.5)',
+    icon: 'all_inclusive',
+    iconColor: '#b1f1c6',
+    accent: '#05c46b',
+  },
+];
+
 export default function Transactions({ navigation }: any) {
   const [currentPage, setCurrentPage] = useState(1);
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -17,9 +70,12 @@ export default function Transactions({ navigation }: any) {
         const res = await api.get('/api/transactions');
         if (res.data.success) {
           setTransactions(res.data.transactions || []);
+        } else if (Array.isArray(res.data)) {
+          // Fallback: some endpoints return array directly
+          setTransactions(res.data);
         }
       } catch (error) {
-        console.error("Error fetching transactions", error);
+        console.error('Error fetching transactions', error);
       } finally {
         setIsLoading(false);
       }
@@ -27,100 +83,231 @@ export default function Transactions({ navigation }: any) {
     fetchTransactions();
   }, []);
 
+  // ─── Stats calculation (mirroring merchant dashboard) ─────────────────────
+  const inboundTxs = transactions.filter(t => t.type === 'inbound' || t.type === 'INBOUND');
+
+  const now = new Date();
+  const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
+  const weekStart = new Date(todayStart); weekStart.setDate(todayStart.getDate() - 7);
+  const monthStart = new Date(todayStart); monthStart.setMonth(todayStart.getMonth() - 1);
+
+  const getAmt = (t: any) => t.kesAmount || t.amount || 0;
+
+  const stats = {
+    today:   inboundTxs.filter(t => new Date(t.createdAt || t.timestamp) >= todayStart).reduce((s, t) => s + getAmt(t), 0),
+    week:    inboundTxs.filter(t => new Date(t.createdAt || t.timestamp) >= weekStart).reduce((s, t) => s + getAmt(t), 0),
+    month:   inboundTxs.filter(t => new Date(t.createdAt || t.timestamp) >= monthStart).reduce((s, t) => s + getAmt(t), 0),
+    allTime: inboundTxs.reduce((s, t) => s + getAmt(t), 0),
+  };
+
+  const statCards = [
+    { label: 'Today',      value: stats.today,   style: STAT_CARD_STYLES[0] },
+    { label: 'This Week',  value: stats.week,    style: STAT_CARD_STYLES[1] },
+    { label: 'This Month', value: stats.month,   style: STAT_CARD_STYLES[2] },
+    { label: 'All Time',   value: stats.allTime, style: STAT_CARD_STYLES[3] },
+  ];
+
+  // ─── Pagination ────────────────────────────────────────────────────────────
   const totalPages = Math.max(1, Math.ceil(transactions.length / ITEMS_PER_PAGE));
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const currentTransactions = transactions.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
-  const handleNext = () => {
-    if (currentPage < totalPages) setCurrentPage(p => p + 1);
-  };
+  const handleNext = () => { if (currentPage < totalPages) setCurrentPage(p => p + 1); };
+  const handlePrev = () => { if (currentPage > 1) setCurrentPage(p => p - 1); };
 
-  const handlePrev = () => {
-    if (currentPage > 1) setCurrentPage(p => p - 1);
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(amount);
-  };
-
+  // ─── Render ────────────────────────────────────────────────────────────────
   return (
     <SafeAreaView className="flex-1 bg-[#faf9f6]" edges={['top', 'left', 'right']}>
+
       {/* Header */}
-      <View className="px-6 pt-6 pb-4 flex-row items-center border-b border-[#efeeeb]">
-        <TouchableOpacity onPress={() => navigation.goBack()} className="w-10 h-10 bg-white rounded-full items-center justify-center border border-[#efeeeb] shadow-sm">
-          <Feather name="arrow-left" size={20} color="#00351d" />
-        </TouchableOpacity>
-        <Text className="text-xl font-jakarta-bold text-[#1b1c1a] ml-4">All Transactions</Text>
+      <View className="px-6 pt-5 pb-4 flex-row items-center justify-between border-b border-[#efeeeb]">
+        <View className="flex-row items-center gap-3">
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            className="w-10 h-10 bg-white rounded-full items-center justify-center border border-[#efeeeb] shadow-sm"
+          >
+            <Feather name="arrow-left" size={20} color="#00351d" />
+          </TouchableOpacity>
+          <View>
+            <Text className="text-xl font-jakarta-bold text-[#1b1c1a]">Transactions</Text>
+            <Text className="text-[11px] font-jakarta-medium text-[#707971]">Inbound payment history</Text>
+          </View>
+        </View>
+        <MaterialIcons name="receipt-long" size={22} color="#00351d" />
       </View>
 
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+      <ScrollView
+        className="flex-1"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 48 }}
+      >
         <View className="w-full max-w-lg mx-auto px-6 pt-6">
-          
-          {/* Table Container */}
-          <View className="bg-white rounded-[32px] p-2 shadow-sm border border-[#c0c9c0]/10 mb-6">
-            {isLoading ? (
-              <View className="py-20 items-center justify-center">
-                <ActivityIndicator color="#0B4D2E" size="large" />
-              </View>
-            ) : currentTransactions.length === 0 ? (
-              <View className="py-20 items-center justify-center">
-                <Text className="text-[#707971] font-jakarta-medium">No transactions found</Text>
-              </View>
-            ) : currentTransactions.map((tx, index) => (
-              <View 
-                key={tx._id || index} 
-                className={`flex-row items-center justify-between py-3 px-4 ${
-                  index !== currentTransactions.length - 1 ? 'border-b border-[#efeeeb]/50' : ''
-                }`}
-              >
-                <View className="flex-row items-center gap-3">
-                  <View className="w-10 h-10 rounded-full bg-[#efeeeb] items-center justify-center overflow-hidden">
-                    <Text className="text-[#404942] font-jakarta-bold text-[11px]">
-                      {tx.senderName ? tx.senderName.substring(0, 2).toUpperCase() : 'TX'}
-                    </Text>
-                  </View>
-                  <View>
-                    <View className="flex-row items-center gap-1">
-                      <Text className="font-jakarta-bold text-[14px] text-[#1b1c1a]">
-                        {tx.senderName || 'Unknown'}
-                      </Text>
-                      {tx.status === 'COMPLETED' && <MaterialIcons name="verified" size={12} color="#006c4e" />}
+
+          {/* ── Premium Summary Cards ──────────────────────────────────────── */}
+          <View className="mb-8">
+            <Text className="text-[10px] font-jakarta-bold text-[#006c4e] uppercase tracking-[0.2em] mb-4">
+              Collection Summary
+            </Text>
+
+            {/* Top row: Today (wide) */}
+            <View
+              className="rounded-[28px] p-6 mb-3 shadow-sm overflow-hidden"
+              style={statCards[0].style.containerStyle}
+            >
+              <View className="flex-row items-start justify-between">
+                <View className="flex-1">
+                  <View className="flex-row items-center gap-2 mb-3">
+                    <View className="w-7 h-7 rounded-full items-center justify-center" style={{ backgroundColor: 'rgba(177,241,198,0.2)' }}>
+                      <MaterialIcons name="today" size={15} color={statCards[0].style.iconColor} />
                     </View>
-                    <Text className="text-[#707971] text-[10px] font-jakarta-medium mt-0.5">
-                      {new Date(tx.createdAt).toLocaleDateString()} {new Date(tx.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} • {tx.type}
+                    <Text className="text-[11px] font-jakarta-bold uppercase tracking-[0.15em]" style={{ color: statCards[0].style.labelColor }}>
+                      Today
                     </Text>
                   </View>
+                  <Text
+                    className="font-jakarta-extrabold text-[34px] tracking-tight leading-none"
+                    style={{ color: statCards[0].style.valueColor }}
+                    adjustsFontSizeToFit
+                    numberOfLines={1}
+                  >
+                    {formatKES(statCards[0].value)}
+                  </Text>
+                  <Text className="text-[12px] font-jakarta-medium mt-2" style={{ color: statCards[0].style.subLabelColor }}>
+                    {new Date().toLocaleDateString('en-KE', { weekday: 'long', day: 'numeric', month: 'long' })}
+                  </Text>
                 </View>
-                <Text className={`font-jakarta-bold text-[13px] ${tx.type === 'INBOUND' ? 'text-[#006c4e]' : 'text-[#1b1c1a]'}`}>
-                  {tx.type === 'INBOUND' ? '+' : '-'} {formatCurrency(tx.amount)}
-                </Text>
+                {/* Decorative icon */}
+                <View className="opacity-10 -mr-2 -mt-2">
+                  <MaterialIcons name="today" size={72} color="#ffffff" />
+                </View>
               </View>
-            ))}
+            </View>
+
+            {/* Bottom row: Week / Month / All Time */}
+            <View className="flex-row gap-3">
+              {statCards.slice(1).map((card, idx) => (
+                <View
+                  key={card.label}
+                  className="flex-1 rounded-[24px] p-5 shadow-sm border border-[#c0c9c0]/10 overflow-hidden"
+                  style={card.style.containerStyle}
+                >
+                  <View className="w-8 h-8 rounded-full items-center justify-center mb-3" style={{ backgroundColor: idx === 2 ? '#002110' : '#e7f8ef' }}>
+                    <MaterialIcons
+                      name={idx === 0 ? 'date-range' : idx === 1 ? 'calendar-today' : 'all-inclusive'}
+                      size={16}
+                      color={card.style.iconColor}
+                    />
+                  </View>
+                  <Text
+                    className="font-jakarta-extrabold text-[18px] tracking-tight leading-none mb-1"
+                    style={{ color: card.style.valueColor }}
+                    adjustsFontSizeToFit
+                    numberOfLines={1}
+                  >
+                    {formatKES(card.value)}
+                  </Text>
+                  <Text className="text-[10px] font-jakarta-bold uppercase tracking-[0.1em]" style={{ color: card.style.labelColor }}>
+                    {card.label}
+                  </Text>
+                </View>
+              ))}
+            </View>
           </View>
 
-          {/* Pagination Controls */}
-          {!isLoading && transactions.length > 0 && (
-            <View className="flex-row items-center justify-between bg-white p-4 rounded-3xl shadow-sm border border-[#c0c9c0]/10">
-              <TouchableOpacity 
+          {/* ── Transaction List ───────────────────────────────────────────── */}
+          <Text className="text-[10px] font-jakarta-bold text-[#006c4e] uppercase tracking-[0.2em] mb-4">
+            All Transactions
+          </Text>
+
+          <View className="bg-white rounded-[28px] shadow-sm border border-[#c0c9c0]/10 mb-6 overflow-hidden">
+            {isLoading ? (
+              <View className="py-20 items-center justify-center">
+                <ActivityIndicator color="#00351d" size="large" />
+                <Text className="text-[#707971] font-jakarta-medium text-[13px] mt-3">Loading…</Text>
+              </View>
+            ) : currentTransactions.length === 0 ? (
+              <View className="py-20 items-center justify-center px-8">
+                <View className="w-16 h-16 rounded-full bg-[#efeeeb] items-center justify-center mb-4">
+                  <MaterialIcons name="receipt-long" size={28} color="#707971" />
+                </View>
+                <Text className="text-[#1b1c1a] font-jakarta-bold text-[16px] mb-1">No transactions yet</Text>
+                <Text className="text-[#707971] font-jakarta-medium text-[13px] text-center leading-relaxed">
+                  Inbound payments to your account will appear here.
+                </Text>
+              </View>
+            ) : (
+              currentTransactions.map((tx, index) => {
+                const isInbound = tx.type === 'inbound';
+                const isSwap = tx.type === 'fx_swap';
+                const name = isInbound
+                  ? (tx.sender?.name || 'Unknown')
+                  : (tx.recipient?.name || tx.sender?.name || 'Treasury');
+                const verified = tx.status === 'completed' || tx.status === 'verified';
+                const typeLabel = (tx.type || 'inbound').toString().replace('_', ' ').toUpperCase();
+                const dateStr = new Date(tx.createdAt || tx.timestamp).toLocaleDateString('en-KE', {
+                  day: '2-digit', month: 'short', year: 'numeric'
+                });
+                return (
+                  <View
+                    key={tx._id || index}
+                    className={`flex-row items-center py-4 px-5 ${
+                      index !== currentTransactions.length - 1 ? 'border-b border-[#efeeeb]/60' : ''
+                    }`}
+                  >
+                    <View className="w-11 h-11 rounded-full bg-[#efeeeb] items-center justify-center mr-3">
+                      <Text className="text-[#404942] font-jakarta-bold text-[12px]">
+                        {name ? name.substring(0, 2).toUpperCase() : 'TX'}
+                      </Text>
+                    </View>
+                    <View className="flex-1 min-w-0 mr-2">
+                      <View className="flex-row items-center">
+                        <Text className="font-jakarta-bold text-[14px] text-[#1b1c1a] flex-shrink" numberOfLines={1} ellipsizeMode="tail">{name}</Text>
+                        {verified && <MaterialIcons name="verified" size={12} color="#006c4e" style={{ marginLeft: 4 }} />}
+                      </View>
+                      <Text className="text-[#707971] text-[11px] font-jakarta-medium mt-0.5" numberOfLines={1} ellipsizeMode="tail">
+                        {dateStr} · {typeLabel}
+                      </Text>
+                    </View>
+                    <Text
+                      className={`font-jakarta-bold text-[14px] ${
+                        isSwap ? 'text-[#1D4ED8]' : isInbound ? 'text-[#006c4e]' : 'text-[#1b1c1a]'
+                      }`}
+                      numberOfLines={1}
+                      style={{ flexShrink: 0 }}
+                    >
+                      {isSwap
+                        ? `${(tx.usdcAmount || 0).toLocaleString()} USDC`
+                        : `${isInbound ? '+' : '-'} ${formatKES(tx.kesAmount || tx.amount || 0)}`}
+                    </Text>
+                  </View>
+                );
+              })
+            )}
+          </View>
+
+          {/* ── Pagination ─────────────────────────────────────────────────── */}
+          {!isLoading && transactions.length > ITEMS_PER_PAGE && (
+            <View className="flex-row items-center justify-between bg-white p-4 rounded-[24px] shadow-sm border border-[#c0c9c0]/10">
+              <TouchableOpacity
                 onPress={handlePrev}
                 disabled={currentPage === 1}
-                className={`flex-row items-center px-4 py-2 rounded-full ${currentPage === 1 ? 'opacity-50' : 'bg-[#e7f8ef]'}`}
+                className={`flex-row items-center px-4 py-2.5 rounded-full gap-1 ${currentPage === 1 ? 'opacity-40' : 'bg-[#e7f8ef]'}`}
               >
-                <Feather name="chevron-left" size={16} color={currentPage === 1 ? "#a1a1aa" : "#006c4e"} />
-                <Text className={`font-jakarta-bold text-xs ml-1 ${currentPage === 1 ? 'text-[#a1a1aa]' : 'text-[#006c4e]'}`}>Prev</Text>
+                <Feather name="chevron-left" size={16} color={currentPage === 1 ? '#a1a1aa' : '#006c4e'} />
+                <Text className={`font-jakarta-bold text-[12px] ${currentPage === 1 ? 'text-[#a1a1aa]' : 'text-[#006c4e]'}`}>Prev</Text>
               </TouchableOpacity>
 
-              <Text className="text-[#707971] text-xs font-jakarta-bold uppercase tracking-widest">
+              <Text className="text-[#707971] text-[12px] font-jakarta-bold">
                 Page {currentPage} of {totalPages}
               </Text>
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 onPress={handleNext}
                 disabled={currentPage === totalPages}
-                className={`flex-row items-center px-4 py-2 rounded-full ${currentPage === totalPages ? 'opacity-50' : 'bg-[#e7f8ef]'}`}
+                className={`flex-row items-center px-4 py-2.5 rounded-full gap-1 ${currentPage === totalPages ? 'opacity-40' : 'bg-[#e7f8ef]'}`}
               >
-                <Text className={`font-jakarta-bold text-xs mr-1 ${currentPage === totalPages ? 'text-[#a1a1aa]' : 'text-[#006c4e]'}`}>Next</Text>
-                <Feather name="chevron-right" size={16} color={currentPage === totalPages ? "#a1a1aa" : "#006c4e"} />
+                <Text className={`font-jakarta-bold text-[12px] ${currentPage === totalPages ? 'text-[#a1a1aa]' : 'text-[#006c4e]'}`}>Next</Text>
+                <Feather name="chevron-right" size={16} color={currentPage === totalPages ? '#a1a1aa' : '#006c4e'} />
               </TouchableOpacity>
             </View>
           )}
