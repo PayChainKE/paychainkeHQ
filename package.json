@@ -27,6 +27,26 @@
   },
   "dependencies": {
     "axios": "^1.18.1",
-    "expo-local-authentication": "^56.0.4"
+    "expo-local-authentication": "^56.0.4",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "overrides": {
+    "@paychain/web": {
+      "react": "18.3.1",
+      "react-dom": "18.3.1"
+    },
+    "paychain-merchant": {
+      "react": "18.3.1",
+      "react-dom": "18.3.1"
+    },
+    "@paychain/admin": {
+      "react": "18.3.1",
+      "react-dom": "18.3.1"
+    },
+    "demo": {
+      "react": "18.3.1",
+      "react-dom": "18.3.1"
+    }
   }
 }

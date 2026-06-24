@@ -20,9 +20,12 @@ export default function Dashboard({ navigation }: any) {
           api.get('/api/trust-score').catch(() => ({ data: { current: 0, eligibleForAdvance: false } }))
         ]);
         
-        if (txRes.data.success) {
-          setTransactions(txRes.data.transactions || []);
-        }
+        const txList = Array.isArray(txRes.data)
+          ? txRes.data
+          : Array.isArray(txRes.data?.transactions)
+          ? txRes.data.transactions
+          : [];
+        setTransactions(txList);
         if (scoreRes.data) {
           setTrustScore(scoreRes.data);
         }
@@ -83,7 +86,7 @@ export default function Dashboard({ navigation }: any) {
             <View className="mb-2 pl-3">
               <Text className="text-white/80 text-[11px] font-jakarta-bold uppercase tracking-widest mb-1">Total Balance</Text>
               <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', letterSpacing: -1 }} className="text-4xl text-white leading-none">
-                {formatCurrency(merchant?.balances?.KES || 0)}
+                {formatCurrency(merchant?.kesBalance || 0)}
               </Text>
               <View className="flex-row items-center justify-between mt-4">
                 <View className="flex-row items-center gap-1.5 bg-[#83f5c6]/20 px-3 py-1.5 rounded-full border border-[#83f5c6]/20">
@@ -91,7 +94,7 @@ export default function Dashboard({ navigation }: any) {
                   <Text className="text-[#83f5c6] font-jakarta-bold text-sm">Active</Text>
                 </View>
                 <View className="bg-white/10 px-3 py-1.5 rounded-full border border-white/20 mb-1">
-                  <Text className="text-white text-[10px] font-jakarta-bold uppercase tracking-widest">Till No: {merchant?.paybillNumber || 'PENDING'}</Text>
+                  <Text className="text-white text-[10px] font-jakarta-bold uppercase tracking-widest">Till No: {merchant?.paybillAccount || 'PENDING'}</Text>
                 </View>
               </View>
             </View>
@@ -178,7 +181,7 @@ export default function Dashboard({ navigation }: any) {
                   <MaterialIcons name="account-balance-wallet" size={140} color="white" />
                 </View>
                 <Text className="text-[#96d4ab] text-[11px] font-jakarta-bold uppercase tracking-[0.15em] mb-2">Operating Balance</Text>
-                <Text className="text-white text-3xl font-jakarta-extrabold tracking-tight mb-auto">{formatCurrency(merchant?.balances?.KES || 0)}</Text>
+                <Text className="text-white text-3xl font-jakarta-extrabold tracking-tight mb-auto">{formatCurrency(merchant?.kesBalance || 0)}</Text>
                 <View className="flex-row items-center gap-1.5 mt-4">
                   <Feather name="arrow-up" size={14} color="#96d4ab" />
                   <Text className="text-[#96d4ab] text-[13px] font-jakarta-medium">12.4% vs last month</Text>
@@ -190,7 +193,7 @@ export default function Dashboard({ navigation }: any) {
                   <MaterialIcons name="shield" size={100} color="white" />
                 </View>
                 <Text className="text-[#94a3b8] text-[11px] font-jakarta-bold uppercase tracking-[0.15em] mb-2">USDC Vault</Text>
-                <Text className="text-white text-3xl font-jakarta-extrabold tracking-tight mb-auto">{merchant?.balances?.USDC || '0.00'}</Text>
+                <Text className="text-white text-3xl font-jakarta-extrabold tracking-tight mb-auto">{(merchant?.usdcBalance || 0).toFixed(2)}</Text>
                 <View className="flex-row items-center gap-1.5 mt-4">
                   <Feather name="refresh-cw" size={14} color="#94a3b8" />
                   <Text className="text-[#94a3b8] text-[13px] font-jakarta-medium">≈ KES 40,625</Text>
@@ -206,7 +209,7 @@ export default function Dashboard({ navigation }: any) {
               <View className="flex-row justify-between">
                 <View>
                   <Text className="text-[#1b1c1a] text-[10px] font-jakarta-bold uppercase tracking-wider mb-1">Revenue</Text>
-                  <Text className="text-[#006c4e] text-[16px] font-jakarta-extrabold">{formatCurrency(transactions.filter(t => t.type === 'INBOUND').reduce((acc, t) => acc + t.amount, 0))}</Text>
+                  <Text className="text-[#006c4e] text-[16px] font-jakarta-extrabold">{formatCurrency(transactions.filter(t => t.type === 'inbound').reduce((acc, t) => acc + (t.kesAmount || t.amount || 0), 0))}</Text>
                 </View>
                 <View className="w-[1px] h-full bg-[#efeeeb]" />
                 <View>
@@ -243,31 +246,40 @@ export default function Dashboard({ navigation }: any) {
                   <Text className="text-[#707971] font-jakarta-medium">No recent activity</Text>
                 </View>
               ) : (
-                transactions.slice(0, 5).map((tx, index) => (
-                  <View key={tx._id || index} className={`flex-row items-center justify-between py-3 px-4 ${index !== Math.min(transactions.length - 1, 4) ? 'border-b border-[#efeeeb]/50' : ''}`}>
-                    <View className="flex-row items-center gap-3">
-                      <View className="w-10 h-10 rounded-full bg-[#efeeeb] items-center justify-center overflow-hidden">
+                transactions.slice(0, 5).map((tx, index) => {
+                  const isInbound = tx.type === 'inbound';
+                  const isSwap = tx.type === 'fx_swap';
+                  const name = isInbound ? (tx.sender?.name || 'Unknown') : (tx.recipient?.name || tx.sender?.name || 'Treasury');
+                  const verified = tx.status === 'completed' || tx.status === 'verified';
+                  const kes = tx.kesAmount || tx.amount || 0;
+                  const rawRef = tx.reference || tx.type.replace('_', ' ');
+                  const refText = rawRef.length > 14 ? `${rawRef.slice(0, 6)}…${rawRef.slice(-4)}` : rawRef;
+                  return (
+                    <View key={tx._id || index} className={`flex-row items-center py-3 px-4 ${index !== Math.min(transactions.length - 1, 4) ? 'border-b border-[#efeeeb]/50' : ''}`}>
+                      <View className="w-10 h-10 rounded-full bg-[#efeeeb] items-center justify-center overflow-hidden mr-3">
                         <Text className="text-[#404942] font-jakarta-bold text-[11px]">
-                          {tx.senderName ? tx.senderName.substring(0, 2).toUpperCase() : 'TX'}
+                          {name ? name.substring(0, 2).toUpperCase() : 'TX'}
                         </Text>
                       </View>
-                      <View>
-                        <View className="flex-row items-center gap-1">
-                          <Text className="font-jakarta-bold text-[14px] text-[#1b1c1a]">
-                            {tx.senderName || 'Unknown'}
-                          </Text>
-                          {tx.status === 'COMPLETED' && <MaterialIcons name="verified" size={12} color="#006c4e" />}
+                      <View className="flex-1 min-w-0 mr-2">
+                        <View className="flex-row items-center">
+                          <Text className="font-jakarta-bold text-[14px] text-[#1b1c1a] flex-shrink" numberOfLines={1} ellipsizeMode="tail">{name}</Text>
+                          {verified && <MaterialIcons name="verified" size={12} color="#006c4e" style={{ marginLeft: 4 }} />}
                         </View>
-                        <Text className="text-[#707971] text-[10px] font-jakarta-medium mt-0.5">
-                          {new Date(tx.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} • {tx.type}
+                        <Text className="text-[#707971] text-[10px] font-jakarta-medium mt-0.5" numberOfLines={1} ellipsizeMode="tail">
+                          {new Date(tx.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} · {refText}
                         </Text>
                       </View>
+                      <Text
+                        className={`font-jakarta-bold text-[13px] ${isSwap ? 'text-[#1D4ED8]' : isInbound ? 'text-[#006c4e]' : 'text-[#1b1c1a]'}`}
+                        numberOfLines={1}
+                        style={{ flexShrink: 0 }}
+                      >
+                        {isSwap ? `${(tx.usdcAmount || 0).toLocaleString()} USDC` : `${isInbound ? '+' : '-'} ${formatCurrency(kes)}`}
+                      </Text>
                     </View>
-                    <Text className={`font-jakarta-bold text-[13px] ${tx.type === 'INBOUND' ? 'text-[#006c4e]' : 'text-[#1b1c1a]'}`}>
-                      {tx.type === 'INBOUND' ? '+' : '-'} {formatCurrency(tx.amount)}
-                    </Text>
-                  </View>
-                ))
+                  );
+                })
               )}
             </View>
           </View>
