@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { jsPDF } from 'jspdf'
 import domtoimage from 'dom-to-image'
+import { ValidatedInput } from '../components/ValidatedInput'
 import { useNavigate } from 'react-router-dom'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
@@ -744,8 +745,8 @@ export default function BulkPay() {
                         <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">
                           {newPayee.type === 'Utility' ? 'Utility Name' : 'Recipient Name'}
                         </label>
-                        <input 
-                          type="text"
+                        <ValidatedInput
+                          kind={newPayee.type === 'Utility' ? 'businessName' : 'personName'}
                           value={newPayee.name}
                           onChange={(e) => setNewPayee({...newPayee, name: e.target.value})}
                           placeholder={newPayee.type === 'Utility' ? 'e.g. Kenya Power' : 'e.g. John Kamau'}
@@ -783,19 +784,19 @@ export default function BulkPay() {
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-1.5">
                               <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">KRA PIN *</label>
-                              <input type="text" value={newPayee.kraPin} onChange={(e) => setNewPayee({...newPayee, kraPin: e.target.value})} placeholder="A000000000A" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 uppercase" />
+                              <ValidatedInput kind="kraPin" value={newPayee.kraPin} onChange={(e) => setNewPayee({...newPayee, kraPin: e.target.value})} placeholder="A000000000A" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 uppercase" />
                             </div>
                             <div className="space-y-1.5">
                               <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">ID Number *</label>
-                              <input type="text" value={newPayee.idNumber} onChange={(e) => setNewPayee({...newPayee, idNumber: e.target.value})} placeholder="e.g. 12345678" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50" />
+                              <ValidatedInput kind="nationalId" value={newPayee.idNumber} onChange={(e) => setNewPayee({...newPayee, idNumber: e.target.value})} placeholder="e.g. 12345678" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50" />
                             </div>
                             <div className="space-y-1.5">
                               <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">NSSF Number</label>
-                              <input type="text" value={newPayee.nssfNumber} onChange={(e) => setNewPayee({...newPayee, nssfNumber: e.target.value})} placeholder="e.g. 123456789" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50" />
+                              <ValidatedInput kind="nssf" optional value={newPayee.nssfNumber} onChange={(e) => setNewPayee({...newPayee, nssfNumber: e.target.value})} placeholder="e.g. 123456789" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50" />
                             </div>
                             <div className="space-y-1.5">
                               <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">SHIF / NHIF Number</label>
-                              <input type="text" value={newPayee.shifNumber} onChange={(e) => setNewPayee({...newPayee, shifNumber: e.target.value})} placeholder="e.g. 1234567" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50" />
+                              <ValidatedInput kind="shif" optional value={newPayee.shifNumber} onChange={(e) => setNewPayee({...newPayee, shifNumber: e.target.value})} placeholder="e.g. 1234567" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50" />
                             </div>
                           </div>
                         </div>
@@ -810,15 +811,15 @@ export default function BulkPay() {
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-1.5">
                               <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Supplier KRA PIN *</label>
-                              <input type="text" value={newPayee.kraPin} onChange={(e) => setNewPayee({...newPayee, kraPin: e.target.value})} placeholder="P000000000A" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-purple-500/50 uppercase" />
+                              <ValidatedInput kind="kraPin" value={newPayee.kraPin} onChange={(e) => setNewPayee({...newPayee, kraPin: e.target.value})} placeholder="P000000000A" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-purple-500/50 uppercase" />
                             </div>
                             <div className="space-y-1.5">
                               <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">eTIMS Invoice No. *</label>
-                              <input type="text" value={newPayee.etimsInvoiceNumber} onChange={(e) => setNewPayee({...newPayee, etimsInvoiceNumber: e.target.value})} placeholder="e.g. INV-123" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-purple-500/50" />
+                              <ValidatedInput kind="etims" value={newPayee.etimsInvoiceNumber} onChange={(e) => setNewPayee({...newPayee, etimsInvoiceNumber: e.target.value})} placeholder="e.g. INV-123" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-purple-500/50" />
                             </div>
                             <div className="space-y-1.5 sm:col-span-2">
                               <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Control Unit (CU) No.</label>
-                              <input type="text" value={newPayee.cuNumber} onChange={(e) => setNewPayee({...newPayee, cuNumber: e.target.value})} placeholder="e.g. 123456789" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-purple-500/50" />
+                              <ValidatedInput kind="cuNumber" optional value={newPayee.cuNumber} onChange={(e) => setNewPayee({...newPayee, cuNumber: e.target.value})} placeholder="e.g. 123456789" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-purple-500/50" />
                             </div>
                           </div>
                         </div>
@@ -826,11 +827,12 @@ export default function BulkPay() {
 
                       <div className="space-y-1.5 pt-4">
                         <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Amount to be paid (KES)</label>
-                        <input 
-                          type="text"
+                        <ValidatedInput
+                          kind="amount"
+                          optional
                           value={newPayee.amount}
                           onChange={(e) => setNewPayee({...newPayee, amount: e.target.value})}
-                          placeholder="e.g. 50,000"
+                          placeholder="e.g. 50000"
                           className="w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 md:px-6 md:py-4 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none"
                         />
                       </div>
@@ -877,11 +879,10 @@ export default function BulkPay() {
                             {newPayee.mobileMoneyType === 'Personal Number' && (
                               <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-300">
                                 <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">M-PESA Number</label>
-                                <input 
-                                  type="tel"
+                                <ValidatedInput
+                                  kind="phoneKE"
                                   value={newPayee.phone}
-                                  onChange={(e) => setNewPayee({...newPayee, phone: e.target.value.replace(/\D/g, '')})}
-                                  maxLength={10}
+                                  onChange={(e) => setNewPayee({...newPayee, phone: e.target.value})}
                                   placeholder="07XX XXX XXX"
                                   className="w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 md:px-6 md:py-4 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none"
                                 />
@@ -892,19 +893,18 @@ export default function BulkPay() {
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in slide-in-from-top-2 duration-300">
                                 <div className="space-y-1.5">
                                   <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Paybill Number</label>
-                                  <input 
-                                    type="tel"
+                                  <ValidatedInput
+                                    kind="paybill"
                                     value={newPayee.paybillNumber}
-                                    onChange={(e) => setNewPayee({...newPayee, paybillNumber: e.target.value.replace(/\D/g, '')})}
-                                    maxLength={7}
+                                    onChange={(e) => setNewPayee({...newPayee, paybillNumber: e.target.value})}
                                     placeholder="e.g. 290290"
                                     className="w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 md:px-6 md:py-4 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none"
                                   />
                                 </div>
                                 <div className="space-y-1.5">
                                   <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Account Number</label>
-                                  <input 
-                                    type="text"
+                                  <ValidatedInput
+                                    kind="text"
                                     value={newPayee.businessAccount}
                                     onChange={(e) => setNewPayee({...newPayee, businessAccount: e.target.value})}
                                     placeholder="e.g. 123456"
@@ -917,11 +917,10 @@ export default function BulkPay() {
                             {newPayee.mobileMoneyType === 'Buy Goods' && (
                               <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-300">
                                 <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Till Number</label>
-                                <input 
-                                  type="tel"
+                                <ValidatedInput
+                                  kind="till"
                                   value={newPayee.tillNumber}
-                                  onChange={(e) => setNewPayee({...newPayee, tillNumber: e.target.value.replace(/\D/g, '')})}
-                                  maxLength={8}
+                                  onChange={(e) => setNewPayee({...newPayee, tillNumber: e.target.value})}
                                   placeholder="e.g. 567890"
                                   className="w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 md:px-6 md:py-4 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none"
                                 />
@@ -933,8 +932,8 @@ export default function BulkPay() {
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in fade-in duration-300">
                             <div className="space-y-1.5">
                               <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Bank Name</label>
-                              <input 
-                                type="text"
+                              <ValidatedInput
+                                kind="businessName"
                                 value={newPayee.bankName}
                                 onChange={(e) => setNewPayee({...newPayee, bankName: e.target.value})}
                                 placeholder="e.g. Equity"
@@ -943,11 +942,10 @@ export default function BulkPay() {
                             </div>
                             <div className="space-y-1.5">
                               <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Account No.</label>
-                              <input 
-                                type="tel"
+                              <ValidatedInput
+                                kind="bankAccount"
                                 value={newPayee.accountNumber}
-                                onChange={(e) => setNewPayee({...newPayee, accountNumber: e.target.value.replace(/\D/g, '')})}
-                                maxLength={14}
+                                onChange={(e) => setNewPayee({...newPayee, accountNumber: e.target.value})}
                                 placeholder="0123 XXX XXX"
                                 className="w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 md:px-6 md:py-4 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none"
                               />
