@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "mobile-app-expo",
-    "slug": "mobile-app-expo",
+    "name": "paychain-mobile",
+    "slug": "paychain-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -15,6 +15,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "co.ke.paychain.mobile",
       "adaptiveIcon": {
         "backgroundColor": "#faf9f6",
         "foregroundImage": "./assets/icon.png"
@@ -23,6 +24,18 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "e2d80ac2-7386-401e-aa6c-ee01ed64bb6f"
+      }
+    },
+    "owner": "paychain-financial-services-limited",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/e2d80ac2-7386-401e-aa6c-ee01ed64bb6f"
     }
   }
 }
