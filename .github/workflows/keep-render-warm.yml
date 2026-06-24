@@ -1,0 +1,28 @@
+name: Keep Render Backend Warm
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping Render backend
+        run: |
+          URL="https://paychainke-backend.onrender.com/"
+          for attempt in 1 2 3; do
+            if curl -sSf --max-time 60 "$URL" -o /dev/null -w "HTTP %{http_code}  total=%{time_total}s\n"; then
+              echo "OK on attempt $attempt"
+              exit 0
+            fi
+            echo "Attempt $attempt failed; sleeping 30s before retry"
+            sleep 30
+          done
+          echo "All 3 attempts failed"
+          exit 1
