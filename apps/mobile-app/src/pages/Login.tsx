@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingVi
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
-import * as LocalAuthentication from 'expo-local-authentication';
+import { useBiometrics } from '../hooks/useBiometrics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const KENYAN_COUNTIES = [
@@ -18,6 +18,7 @@ const KENYAN_COUNTIES = [
 
 export default function Login({ route }: any) {
   const { login, biometricLogin, signup, verifyOTP, resendOTP, forgotPassword, resetPassword } = useAuth();
+  const { authenticate: authenticateBiometric } = useBiometrics();
   
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
@@ -117,37 +118,22 @@ export default function Login({ route }: any) {
 
   const handleBiometricSignIn = async () => {
     setErr('');
-    try {
-      const compatible = await LocalAuthentication.hasHardwareAsync();
-      const enrolled = await LocalAuthentication.isEnrolledAsync();
-      if (!compatible || !enrolled) {
-        setErr("Biometrics not supported or enrolled.");
-        return;
-      }
-      
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Login to PayChain',
-      });
-
-      if (result.success) {
-        const userEmail = await AsyncStorage.getItem('last_biometric_user');
-        if (!userEmail) {
-          setErr("No registered biometric user found.");
-          return;
-        }
-
-        setLoading(true);
-        const res = await biometricLogin(userEmail);
-        setLoading(false);
-
-        if (!res.success) {
-          setErr(res.error);
-        }
-      }
-    } catch (error) {
-      console.error(error);
-      setErr("Biometric authentication failed.");
+    const auth = await authenticateBiometric('Login to PayChain');
+    if (!auth.success) {
+      if (!auth.cancelled) setErr(auth.error);
+      return;
     }
+
+    const userEmail = await AsyncStorage.getItem('last_biometric_user');
+    if (!userEmail) {
+      setErr('No registered biometric user found.');
+      return;
+    }
+
+    setLoading(true);
+    const res = await biometricLogin(userEmail);
+    setLoading(false);
+    if (!res.success) setErr(res.error);
   };
 
   const handleVerifyOTP = async () => {
@@ -258,23 +244,17 @@ export default function Login({ route }: any) {
   };
 
   const handleSetupBiometric = async () => {
-    try {
-      setLoading(true);
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Enable Biometrics for PayChain',
-      });
-      if (result.success) {
-        await AsyncStorage.setItem('last_biometric_user', signupEmail);
-        setHasBiometrics(true);
-      }
-    } catch (e) {
-      console.error(e);
-      setErr('Biometric setup failed.');
-    } finally {
-      setLoading(false);
-      setIsSignupBiometricStep(false);
-      setIsSignupSuccess(true);
+    setLoading(true);
+    const result = await authenticateBiometric('Enable Biometrics for PayChain');
+    if (result.success) {
+      await AsyncStorage.setItem('last_biometric_user', signupEmail);
+      setHasBiometrics(true);
+    } else if (!result.cancelled) {
+      setErr(result.error);
     }
+    setLoading(false);
+    setIsSignupBiometricStep(false);
+    setIsSignupSuccess(true);
   };
 
   const renderTabs = () => (

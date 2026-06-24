@@ -10,6 +10,7 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import { useAuth } from '../context/AuthContext';
+import { useBiometrics } from '../hooks/useBiometrics';
 import api from '../api/config';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -94,7 +95,8 @@ const validatePhone = (phone: string) =>
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function BulkPay() {
-  const { merchant } = useAuth();
+  const { merchant, isBiometricsEnabled } = useAuth();
+  const { authenticate: authenticateBiometric } = useBiometrics();
 
   const [activeTab, setActiveTab] = useState<'Payees' | 'Batches'>('Payees');
   const [activeFilter, setActiveFilter] = useState<Filter>('All');
@@ -505,7 +507,7 @@ export default function BulkPay() {
   };
 
   // ── Authorize batch ──
-  const startAuthorize = () => {
+  const startAuthorize = async () => {
     if (selectedIds.length === 0) {
       Alert.alert('No selection', 'Select at least one payee.');
       return;
@@ -519,6 +521,15 @@ export default function BulkPay() {
       Alert.alert('Low balance', `Batch total exceeds your KES balance (${formatKES(balance)}).`);
       return;
     }
+
+    if (isBiometricsEnabled) {
+      const auth = await authenticateBiometric(`Authorize ${formatKES(batchTotal)} batch payment`);
+      if (!auth.success) {
+        if (!auth.cancelled) Alert.alert('Authorization blocked', auth.error);
+        return;
+      }
+    }
+
     setAuthPin('');
     setShowAuthorize(true);
   };

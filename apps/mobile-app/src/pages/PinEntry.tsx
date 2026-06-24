@@ -1,36 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView, Dimensions, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, SafeAreaView, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
-import * as LocalAuthentication from 'expo-local-authentication';
-
-const { width } = Dimensions.get('window');
+import { useBiometrics } from '../hooks/useBiometrics';
 
 export default function PinEntry() {
   const { appPin, unlockApp, logout, isBiometricsEnabled } = useAuth();
+  const { authenticate } = useBiometrics();
   const [pin, setPin] = useState('');
 
   useEffect(() => {
-    // Attempt biometric unlock immediately on load ONLY if user enabled it
-    const attemptBiometrics = async () => {
-      if (!isBiometricsEnabled) return;
-      try {
-        const compatible = await LocalAuthentication.hasHardwareAsync();
-        const enrolled = await LocalAuthentication.isEnrolledAsync();
-        if (compatible && enrolled) {
-          const result = await LocalAuthentication.authenticateAsync({
-            promptMessage: 'Unlock PayChain',
-          });
-          if (result.success) {
-            unlockApp();
-          }
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    };
-    attemptBiometrics();
-  }, []);
+    if (!isBiometricsEnabled) return;
+    (async () => {
+      const result = await authenticate('Unlock PayChain');
+      if (result.success) unlockApp();
+    })();
+  }, [isBiometricsEnabled]);
 
   const handlePress = (digit: string) => {
     if (pin.length < 4) {
