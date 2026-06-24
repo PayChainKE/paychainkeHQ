@@ -58,6 +58,48 @@ export const addPayee = async (req, res) => {
   }
 };
 
+// @desc    Update an existing payee
+// @route   PUT /api/bulkpay/payees/:id
+// @access  Private
+export const updatePayee = async (req, res) => {
+  try {
+    const {
+      name, type, paymentMethod, mobileMoneyType, phone, paybillNumber,
+      businessAccount, tillNumber, bankName, accountNumber, kraPin, idNumber,
+      nssfNumber, shifNumber, etimsInvoiceNumber, cuNumber, defaultAmount
+    } = req.body;
+
+    // Validate ownership
+    const payee = await Payee.findOne({ _id: req.params.id, merchantId: req.merchant._id });
+    if (!payee) {
+      return res.status(404).json({ message: 'Payee not found' });
+    }
+
+    // KRA validations for updated type
+    if (type === 'employee' && (!kraPin || !idNumber)) {
+      return res.status(400).json({ message: 'KRA PIN and ID Number are required for Employees.' });
+    } else if (type === 'supplier' && (!kraPin || !etimsInvoiceNumber || !cuNumber)) {
+      return res.status(400).json({ message: 'KRA PIN, eTIMS Invoice Number, and CU Number are required for Suppliers.' });
+    }
+
+    // Update payee
+    const updatedPayee = await Payee.findByIdAndUpdate(
+      req.params.id,
+      {
+        name, type, paymentMethod, mobileMoneyType, phone, paybillNumber,
+        businessAccount, tillNumber, bankName, accountNumber, kraPin, idNumber,
+        nssfNumber, shifNumber, etimsInvoiceNumber, cuNumber, defaultAmount,
+        updatedAt: new Date()
+      },
+      { new: true }
+    );
+
+    res.json(updatedPayee);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to update payee', error: error.message });
+  }
+};
+
 // @desc    Delete a payee
 // @route   DELETE /api/bulkpay/payees/:id
 // @access  Private
@@ -398,5 +440,92 @@ export const authorizeBatch = async (req, res) => {
       message: error.response?.data?.errorMessage || 'Failed to authorize batch', 
       error: error.message 
     });
+  }
+};
+
+// @desc    Get all batch history for a merchant
+// @route   GET /api/bulkpay/batches
+// @access  Private
+export const getBatches = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, status, fromDate, toDate } = req.query;
+    
+    let query = { merchantId: req.merchant._id };
+    
+    // Filter by status if provided
+    if (status) {
+      query.status = status;
+    }
+    
+    // Filter by date range if provided
+    if (fromDate || toDate) {
+      query.createdAt = {};
+      if (fromDate) {
+        query.createdAt.$gte = new Date(fromDate);
+      }
+      if (toDate) {
+        query.createdAt.$lte = new Date(toDate);
+      }
+    }
+    
+    const skip = (page - 1) * limit;
+    const batches = await PayoutBatch.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+    
+    const total = await PayoutBatch.countDocuments(query);
+    
+    res.json({
+      batches,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching batches', error: error.message });
+  }
+};
+
+// @desc    Get a specific batch by ID
+// @route   GET /api/bulkpay/batches/:id
+// @access  Private
+export const getBatchById = async (req, res) => {
+  try {
+    const batch = await PayoutBatch.findOne({
+      _id: req.params.id,
+      merchantId: req.merchant._id
+    });
+    
+    if (!batch) {
+      return res.status(404).json({ message: 'Batch not found' });
+    }
+    
+    res.json(batch);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching batch', error: error.message });
+  }
+};
+
+// @desc    Get a single payee by ID
+// @route   GET /api/bulkpay/payees/:id
+// @access  Private
+export const getPayeeById = async (req, res) => {
+  try {
+    const payee = await Payee.findOne({
+      _id: req.params.id,
+      merchantId: req.merchant._id
+    });
+    
+    if (!payee) {
+      return res.status(404).json({ message: 'Payee not found' });
+    }
+    
+    res.json(payee);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching payee', error: error.message });
   }
 };
