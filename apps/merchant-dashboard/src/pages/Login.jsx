@@ -54,7 +54,6 @@ export default function Login() {
 
   // Navigation Tabs
   const [activeTab, setActiveTab] = useState('login')
-  const [isSignupSuccess, setIsSignupSuccess] = useState(false)
   const [isSignupPasswordStep, setIsSignupPasswordStep] = useState(false)
   const [isSignupBiometricStep, setIsSignupBiometricStep] = useState(false)
   const [otpFlowType, setOtpFlowType] = useState('') // 'login' or 'reset'
@@ -278,11 +277,22 @@ export default function Login() {
       if (window.PublicKeyCredential) {
         setIsSignupBiometricStep(true)
       } else {
-        setIsSignupSuccess(true)
+        finishSignup()
       }
     } else {
       setErr(res.error)
     }
+  }
+
+  function finishSignup() {
+    setIsSignupBiometricStep(false)
+    setActiveTab('login')
+    setPassword('')
+    addNotification({
+      title: 'Account Created',
+      message: 'Sign in with your new credentials to access your dashboard.',
+      type: 'success',
+    })
   }
 
   async function handleSetupBiometric() {
@@ -318,14 +328,12 @@ export default function Login() {
       setErr('Biometric setup failed or was cancelled.')
     } finally {
       setLoading(false)
-      setIsSignupBiometricStep(false)
-      setIsSignupSuccess(true)
+      finishSignup()
     }
   }
 
   function skipBiometric() {
-    setIsSignupBiometricStep(false)
-    setIsSignupSuccess(true)
+    finishSignup()
   }
 
   const SecurityRequirement = ({ met, label }) => (
@@ -387,7 +395,6 @@ export default function Login() {
                   setActiveTab(tab)
                   setIsOTPMode(false)
                   setIsResetMode(false)
-                  setIsSignupSuccess(false)
                   setIsSignupPasswordStep(false)
                   setNewPasswordInput('')
                   setConfirmPassword('')
@@ -407,26 +414,7 @@ export default function Login() {
           {activeTab === 'signup' ? (
             /* SIGN UP FORM */
             <div className="animate-fade-in-up">
-              {isSignupSuccess ? (
-                <div className="flex flex-col items-center justify-center text-center py-10 px-4 animate-fade-in-up">
-                  <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mb-6">
-                    <span className="material-symbols-outlined text-4xl text-emerald-500">check_circle</span>
-                  </div>
-                  <h3 className="font-headline text-3xl text-primary tracking-tight font-black mb-3">Application Received</h3>
-                  <p className="text-on-surface-variant font-medium opacity-80 mb-8 max-w-sm leading-relaxed">
-                    Thank you for applying to join PayChain! Our onboarding team will review your details in <strong className="text-primary font-black">less than 2 working days</strong> and get back to you.
-                  </p>
-                  <button 
-                    onClick={() => {
-                      setIsSignupSuccess(false)
-                      setActiveTab('login')
-                    }} 
-                    className="bg-[#06201B] text-white py-3 px-8 rounded-xl font-black text-sm shadow-xl hover:bg-[#0a3029] transition-all flex items-center gap-2"
-                  >
-                    Back to Login
-                  </button>
-                </div>
-              ) : isSignupBiometricStep ? (
+              {isSignupBiometricStep ? (
                 /* BIOMETRIC SETUP STEP */
                 <div className="flex flex-col items-center justify-center text-center py-10 px-4 animate-fade-in-up">
                   <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mb-6 shadow-inner">
