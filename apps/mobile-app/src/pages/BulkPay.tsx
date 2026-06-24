@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl,
-  Modal, TextInput, Alert, KeyboardAvoidingView, Platform,
+  Modal, TextInput, Alert, KeyboardAvoidingView, Platform, FlatList,
 } from 'react-native';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as DocumentPicker from 'expo-document-picker';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/config';
 
@@ -45,6 +46,19 @@ interface Receipt {
   phone?: string;
   reference: string;
   timestamp: string;
+}
+
+interface BatchHistory {
+  _id: string;
+  batchReference: string;
+  totalGrossAmount: number;
+  totalNetAmount: number;
+  totalTaxDeductions: number;
+  payeeCount: number;
+  status: string;
+  fundingSource: string;
+  transactions: any[];
+  createdAt: string;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -97,6 +111,23 @@ export default function BulkPay() {
   const [showAmountEditor, setShowAmountEditor] = useState<Payee | null>(null);
   const [showAuthorize, setShowAuthorize] = useState(false);
   const [showReceipts, setShowReceipts] = useState(false);
+  const [showCsvUpload, setShowCsvUpload] = useState(false);
+  const [showFunding, setShowFunding] = useState(false);
+  const [showBatchDetails, setShowBatchDetails] = useState<BatchHistory | null>(null);
+
+  // CSV upload
+  const [csvPreview, setCsvPreview] = useState<any[]>([]);
+  const [csvSummary, setCsvSummary] = useState<any>(null);
+  const [csvUploadLoading, setCsvUploadLoading] = useState(false);
+
+  // Batch history
+  const [batchHistory, setBatchHistory] = useState<BatchHistory[]>([]);
+  const [batchFilter, setBatchFilter] = useState('All');
+  const [batchPage, setBatchPage] = useState(1);
+
+  // Funding
+  const [fundingAmount, setFundingAmount] = useState('');
+  const [fundingMethod, setFundingMethod] = useState<'Mobile Money' | 'Bank'>('Mobile Money');
 
   // PIN flows
   const [setupPin, setSetupPin] = useState('');
@@ -162,6 +193,133 @@ export default function BulkPay() {
   useEffect(() => {
     if (merchant) fetchPayees();
   }, [merchant, fetchPayees]);
+
+  // ── Fetch batch history ──
+  const fetchBatches = useCallback(async () => {
+    try {
+      const res = await api.get('/api/bulkpay/batches', {
+        params: { page: 1, limit: 20 }
+      });
+      setBatchHistory(res.data?.batches || []);
+    } catch (err) {
+      console.error('Failed to fetch batches:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (merchant && activeTab === 'Batches') {
+      fetchBatches();
+    }
+  }, [merchant, activeTab, fetchBatches]);
+
+  // ── Upload CSV ──
+  const handleCsvUpload = async () => {
+    try {
+      const doc = await DocumentPicker.getDocumentAsync({
+        type: ['text/csv', 'text/plain'],
+      });
+
+      if (doc.canceled || !doc.assets?.[0]) return;
+
+      setCsvUploadLoading(true);
+      const file = doc.assets[0];
+
+      // Read file content
+      const response = await fetch(file.uri);
+      const text = await response.text();
+
+      // Parse CSV manually
+      const lines = text.trim().split('\n');
+      const headers = lines[0].toLowerCase().split(',').map((h: string) => h.trim());
+      const rows = lines.slice(1).map((line: string) => {
+        const values = line.split(',').map((v: string) => v.trim());
+        return {
+          name: values[headers.indexOf('name')] || '',
+          type: (values[headers.indexOf('type')] || 'employee').toLowerCase(),
+          phone: values[headers.indexOf('phone')] || '',
+          amount: parseFloat(values[headers.indexOf('amount')] || '0') || 0,
+        };
+      }).filter((r: any) => r.name && r.phone);
+
+      // Send to backend for preview
+      const formData = new FormData();
+      formData.append('file', {
+        uri: file.uri,
+        type: 'text/csv',
+        name: file.name,
+      } as any);
+
+      try {
+        const previewRes = await api.post('/api/bulkpay/upload-csv', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        setCsvPreview(previewRes.data?.rows || []);
+        setCsvSummary(previewRes.data?.summary || {});
+        setShowCsvUpload(true);
+      } catch (err) {
+        // Fallback to manual parsing
+        setCsvPreview(rows);
+        setCsvSummary({
+          totalGross: rows.reduce((s: number, r: any) => s + r.amount, 0),
+          totalNet: rows.reduce((s: number, r: any) => s + r.amount, 0),
+        });
+        setShowCsvUpload(true);
+      }
+    } catch (err: any) {
+      Alert.alert('CSV Upload', err?.message || 'Failed to upload CSV');
+    } finally {
+      setCsvUploadLoading(false);
+    }
+  };
+
+  // ── Process CSV Batch ──
+  const processCsvBatch = async () => {
+    if (csvPreview.length === 0) return;
+    
+    setIsAuthorizing(true);
+    try {
+      const batchRows = csvPreview.map((row: any) => ({
+        name: row.name,
+        type: row.type || 'employee',
+        phone: row.phone,
+        grossAmount: row.grossAmount || row.amount || 0,
+        netAmount: row.netAmount || row.amount || 0,
+        taxDeductions: row.taxDeductions || { paye: 0, nssf: 0, shif: 0 },
+      }));
+
+      const res = await api.post('/api/bulkpay/authorize', {
+        batchRows,
+        fundingSource: 'CSV Bulk Import',
+        pin: authPin,
+      });
+
+      const processedBatch = res.data?.batch;
+      const ref = processedBatch?.batchReference || `B-${Date.now()}`;
+      setLastBatchReference(ref);
+
+      const newReceipts: Receipt[] = (processedBatch?.transactions || batchRows).map((tx: any, idx: number) => ({
+        id: tx.receiptNumber || `R-${idx + 1}`,
+        name: tx.name,
+        amount: tx.amount || tx.netAmount || 0,
+        method: tx.method,
+        phone: tx.accountReference || tx.phone,
+        reference: ref,
+        timestamp: new Date().toLocaleString('en-KE'),
+      }));
+
+      setReceipts(newReceipts);
+      setShowCsvUpload(false);
+      setAuthPin('');
+      setCsvPreview([]);
+      setCsvSummary(null);
+      setShowReceipts(true);
+      fetchBatches();
+    } catch (e: any) {
+      Alert.alert('Batch Error', e?.response?.data?.message || 'Failed to process CSV batch');
+    } finally {
+      setIsAuthorizing(false);
+    }
+  };
 
   // ── Trigger PIN setup if needed ──
   useEffect(() => {
@@ -264,9 +422,11 @@ export default function BulkPay() {
     const payload = { ...newPayee, defaultAmount: numericAmount };
     try {
       if (editingId) {
-        // Backend currently has no PUT — emulate locally for now to keep UX intact.
-        setPayeesList(prev => prev.map(p => p._id === editingId ? { ...p, ...payload } : p));
-        setPayoutAmounts(prev => ({ ...prev, [editingId]: numericAmount }));
+        const res = await api.put(`/api/bulkpay/payees/${editingId}`, payload);
+        setPayeesList(prev => prev.map(p => p._id === editingId ? res.data : p));
+        if (numericAmount > 0) {
+          setPayoutAmounts(prev => ({ ...prev, [editingId]: numericAmount }));
+        }
       } else {
         const res = await api.post('/api/bulkpay/payees', payload);
         setPayeesList(prev => [res.data, ...prev]);
@@ -678,28 +838,112 @@ export default function BulkPay() {
         ) : (
           // ─── Batches Tab ───
           <View className="w-full max-w-lg mx-auto px-6 pt-5">
-            <View className="bg-white rounded-[24px] p-5 border border-[#c0c9c0]/15 mb-4">
-              <View className="flex-row items-center gap-3 mb-3">
-                <View className="w-11 h-11 rounded-full bg-[#e7f8ef] items-center justify-center">
-                  <Feather name="layers" size={18} color="#006c4e" />
-                </View>
-                <View className="flex-1">
-                  <Text className="font-jakarta-bold text-[15px] text-[#1b1c1a]">Last Batch</Text>
-                  <Text className="text-[#707971] font-jakarta-medium text-[11px]" numberOfLines={1}>
-                    {receipts.length > 0 ? `${receipts.length} recipients · ${lastBatchReference}` : 'No batches yet'}
-                  </Text>
-                </View>
-                {receipts.length > 0 && (
+            {/* Quick actions */}
+            <View className="flex-row gap-2.5 mb-5">
+              <TouchableOpacity onPress={handleCsvUpload} className="flex-1 bg-[#dbeafe] rounded-2xl p-3.5 flex-row items-center justify-center gap-2 border border-[#bfdbfe]" disabled={csvUploadLoading}>
+                <Feather name={csvUploadLoading ? 'loader' : 'upload'} size={16} color="#1e40af" />
+                <Text className="text-[#1e40af] font-jakarta-bold text-[12px]">{csvUploadLoading ? 'Uploading' : 'CSV'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setShowFunding(true)} className="flex-1 bg-[#fef3e7] rounded-2xl p-3.5 flex-row items-center justify-center gap-2 border border-[#fed7aa]">
+                <Feather name="plus-circle" size={16} color="#b87333" />
+                <Text className="text-[#b87333] font-jakarta-bold text-[12px]">Fund</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={fetchBatches} className="flex-1 bg-[#e7f8ef] rounded-2xl p-3.5 flex-row items-center justify-center gap-2 border border-[#bbf7d0]">
+                <Feather name="refresh-cw" size={16} color="#006c4e" />
+                <Text className="text-[#006c4e] font-jakarta-bold text-[12px]">Refresh</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Last Batch Summary */}
+            {receipts.length > 0 && (
+              <View className="bg-white rounded-[24px] p-5 border border-[#c0c9c0]/15 mb-4">
+                <View className="flex-row items-center gap-3 mb-3">
+                  <View className="w-11 h-11 rounded-full bg-[#e7f8ef] items-center justify-center">
+                    <Feather name="check-circle" size={18} color="#006c4e" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="font-jakarta-bold text-[15px] text-[#1b1c1a]">Last Batch</Text>
+                    <Text className="text-[#707971] font-jakarta-medium text-[11px]" numberOfLines={1}>
+                      {receipts.length} recipients · {lastBatchReference}
+                    </Text>
+                  </View>
                   <TouchableOpacity onPress={() => setShowReceipts(true)} className="px-3 py-1.5 rounded-full bg-[#00351d]">
                     <Text className="text-white font-jakarta-bold text-[11px]">View</Text>
                   </TouchableOpacity>
-                )}
-              </View>
-              {receipts.length > 0 && (
+                </View>
                 <TouchableOpacity onPress={downloadBatchReceipts} className="flex-row items-center justify-center gap-2 bg-[#faf9f6] border border-[#c0c9c0]/30 rounded-full py-3 mt-2">
                   <Feather name="download" size={14} color="#00351d" />
-                  <Text className="text-[#00351d] font-jakarta-bold text-[12px]">Download Batch Report (PDF)</Text>
+                  <Text className="text-[#00351d] font-jakarta-bold text-[12px]">Download Report</Text>
                 </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Batch History */}
+            <View className="mb-4">
+              <View className="flex-row items-center justify-between mb-3">
+                <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em]">Batch History</Text>
+                <View className="flex-row gap-2">
+                  {['All', 'Processed', 'Pending'].map((status) => (
+                    <TouchableOpacity
+                      key={status}
+                      onPress={() => setBatchFilter(status)}
+                      className={`px-3 py-1 rounded-full ${batchFilter === status ? 'bg-[#00351d]' : 'bg-[#faf9f6] border border-[#c0c9c0]/30'}`}
+                    >
+                      <Text className={`text-[9px] font-jakarta-bold uppercase tracking-wider ${batchFilter === status ? 'text-white' : 'text-[#707971]'}`}>{status}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {batchHistory.length === 0 ? (
+                <View className="bg-white rounded-[20px] p-8 items-center border border-[#e9e8e5]">
+                  <View className="w-14 h-14 rounded-full bg-[#f4f3f0] items-center justify-center mb-3">
+                    <Feather name="layers" size={22} color="#707971" />
+                  </View>
+                  <Text className="text-[#1b1c1a] font-jakarta-bold text-[14px] mb-1">No batches</Text>
+                  <Text className="text-[#707971] font-jakarta-medium text-[12px] text-center">Create your first bulk payment to see history here.</Text>
+                </View>
+              ) : (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-1">
+                  {batchHistory
+                    .filter((b: BatchHistory) => batchFilter === 'All' || b.status === batchFilter)
+                    .map((batch: BatchHistory) => (
+                      <TouchableOpacity
+                        key={batch._id}
+                        onPress={() => setShowBatchDetails(batch)}
+                        className="bg-white rounded-[20px] p-4 border border-[#c0c9c0]/15 mr-3 w-[280px]"
+                        style={{ minWidth: 280 }}
+                      >
+                        <View className="flex-row items-center justify-between mb-3">
+                          <View>
+                            <Text className="font-jakarta-bold text-[13px] text-[#1b1c1a]" numberOfLines={1}>{batch.batchReference}</Text>
+                            <Text className="text-[#707971] font-jakarta-medium text-[10px] mt-1">
+                              {new Date(batch.createdAt).toLocaleDateString('en-KE')}
+                            </Text>
+                          </View>
+                          <View className={`px-2.5 py-1 rounded-full ${batch.status === 'Processed' ? 'bg-[#e7f8ef]' : 'bg-[#fef2f2]'}`}>
+                            <Text className={`text-[9px] font-jakarta-bold uppercase tracking-wider ${batch.status === 'Processed' ? 'text-[#006c4e]' : 'text-[#b91c1c]'}`}>
+                              {batch.status}
+                            </Text>
+                          </View>
+                        </View>
+                        <View className="bg-[#faf9f6] rounded-xl p-3 mb-2">
+                          <Text className="text-[9px] font-jakarta-medium text-[#707971] uppercase tracking-wider mb-1">Amount</Text>
+                          <Text className="text-[#00351d] font-jakarta-bold text-[16px]">{formatKES(batch.totalNetAmount)}</Text>
+                        </View>
+                        <View className="flex-row gap-2">
+                          <View className="flex-1">
+                            <Text className="text-[9px] font-jakarta-medium text-[#707971] uppercase tracking-wider mb-1">Recipients</Text>
+                            <Text className="text-[#404942] font-jakarta-bold text-[13px]">{batch.payeeCount}</Text>
+                          </View>
+                          <View className="flex-1">
+                            <Text className="text-[9px] font-jakarta-medium text-[#707971] uppercase tracking-wider mb-1">Source</Text>
+                            <Text className="text-[#404942] font-jakarta-medium text-[11px]" numberOfLines={1}>{batch.fundingSource}</Text>
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                </ScrollView>
               )}
             </View>
 
@@ -712,7 +956,7 @@ export default function BulkPay() {
                   </View>
                   <View>
                     <Text className="font-jakarta-bold text-[14px] text-[#1b1c1a]">Bulk Pay PIN</Text>
-                    <Text className="text-[#707971] font-jakarta-medium text-[11px]">{merchant?.hasBulkPayPin === false ? 'Not configured' : 'Configured · tap to reset'}</Text>
+                    <Text className="text-[#707971] font-jakarta-medium text-[11px]">{merchant?.hasBulkPayPin === false ? 'Not configured' : 'Configured'}</Text>
                   </View>
                 </View>
                 <Feather name="chevron-right" size={18} color="#707971" />
@@ -720,9 +964,9 @@ export default function BulkPay() {
             </View>
 
             <View className="bg-[#b1f1c6] rounded-[24px] p-6">
-              <Text className="text-[#00351d] font-jakarta-extrabold text-[10px] tracking-[0.2em] uppercase mb-3">Tip</Text>
-              <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[#00351d] text-[20px] leading-snug">
-                Tap a payee to select it, set an amount, then authorize the whole batch with your PIN.
+              <Text className="text-[#00351d] font-jakarta-extrabold text-[10px] tracking-[0.2em] uppercase mb-3">Pro Tip</Text>
+              <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[#00351d] text-[18px] leading-snug">
+                Upload CSV files for bulk imports, or fund your account to increase payment limits.
               </Text>
             </View>
           </View>
