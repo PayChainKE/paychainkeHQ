@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput } from 'react-native';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ValidatedTextInput } from '../components/ValidatedTextInput';
 
 export default function InflationShield({ navigation }: any) {
   const [kesAmount, setKesAmount] = useState('10,000');
@@ -69,12 +70,10 @@ export default function InflationShield({ navigation }: any) {
                     </View>
                     <Text className="text-[20px] font-jakarta-extrabold text-[#1b1c1a]">KES</Text>
                   </View>
-                  <TextInput 
-                    className="text-right text-[36px] font-jakarta-extrabold text-[#00351d] flex-1 ml-4 tracking-tight"
-                    value={kesAmount}
-                    onChangeText={setKesAmount}
-                    keyboardType="numeric"
-                  />
+                  <ValidatedTextInput kind="amount" optional
+                    value={kesAmount} onChangeText={setKesAmount}
+                    containerClassName="flex-1 ml-4"
+                    className="text-right text-[36px] font-jakarta-extrabold text-[#00351d] tracking-tight" />
                 </View>
               </View>
 

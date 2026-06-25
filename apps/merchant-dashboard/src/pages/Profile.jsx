@@ -3,6 +3,7 @@ import MerchantLayout from '../components/layout/MerchantLayout'
 import { useToast } from '../context/NotificationContext'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
+import { ValidatedInput } from '../components/ValidatedInput'
 import axios from 'axios'
 
 export default function Profile() {
@@ -242,10 +243,10 @@ export default function Profile() {
                     )}
                   </div>
                   <div className="relative">
-                    <input 
-                      type="text"
+                    <ValidatedInput
+                      kind="kraPin"
                       value={kraPin}
-                      onChange={(e) => setKraPin(e.target.value.toUpperCase())}
+                      onChange={(e) => setKraPin(e.target.value)}
                       placeholder="e.g. P123456789A"
                       disabled={kraPinLocked}
                       className={`w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none ${kraPinLocked ? 'opacity-60 bg-slate-50 cursor-not-allowed pr-32' : 'pr-32'}`}
@@ -274,10 +275,11 @@ export default function Profile() {
                     )}
                   </div>
                   <div className="relative">
-                    <input 
-                      type="text"
+                    <ValidatedInput
+                      kind="businessReg"
+                      optional
                       value={businessNumber}
-                      onChange={(e) => setBusinessNumber(e.target.value.toUpperCase())}
+                      onChange={(e) => setBusinessNumber(e.target.value)}
                       placeholder="e.g. PVT-XXXXXX"
                       disabled={businessNumberLocked}
                       className={`w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none ${businessNumberLocked ? 'opacity-60 bg-slate-50 cursor-not-allowed pr-10' : ''}`}
@@ -380,30 +382,30 @@ export default function Profile() {
                         <div className="space-y-4 bg-white/5 p-5 rounded-[24px] border border-white/5">
                           <h5 className="text-xs font-black text-white">Reset Bulk Pay PIN</h5>
                           <div className="space-y-3">
-                            <input 
-                              type="password"
-                              maxLength="4"
+                            <ValidatedInput
+                              kind="pin4"
                               value={currentPin}
-                              onChange={(e) => setCurrentPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                              onChange={(e) => setCurrentPin(e.target.value)}
                               placeholder="Current PIN (4 digits)"
                               className="w-full bg-black/20 border border-white/10 rounded-xl py-3 px-4 text-xs font-medium text-white focus:border-amber-500/50 outline-none transition-all placeholder:text-white/20"
+                              errorClassName="text-red-300 text-[11px] font-bold mt-1.5 pl-1"
                             />
                             <div className="flex gap-3">
-                              <input 
-                                type="password"
-                                maxLength="4"
+                              <ValidatedInput
+                                kind="pin4"
                                 value={newPin}
-                                onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                                onChange={(e) => setNewPin(e.target.value)}
                                 placeholder="New PIN"
                                 className="w-full bg-black/20 border border-white/10 rounded-xl py-3 px-4 text-xs font-medium text-white focus:border-amber-500/50 outline-none transition-all placeholder:text-white/20"
+                                errorClassName="text-red-300 text-[11px] font-bold mt-1.5 pl-1"
                               />
-                              <input 
-                                type="password"
-                                maxLength="4"
+                              <ValidatedInput
+                                kind="pin4"
                                 value={confirmNewPin}
-                                onChange={(e) => setConfirmNewPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                                onChange={(e) => setConfirmNewPin(e.target.value)}
                                 placeholder="Confirm"
                                 className="w-full bg-black/20 border border-white/10 rounded-xl py-3 px-4 text-xs font-medium text-white focus:border-amber-500/50 outline-none transition-all placeholder:text-white/20"
+                                errorClassName="text-red-300 text-[11px] font-bold mt-1.5 pl-1"
                               />
                             </div>
                             <button 

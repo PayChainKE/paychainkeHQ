@@ -5,6 +5,7 @@ import { useNotification } from '../context/NotificationContext'
 import mainLogo from '../assets/signin-logo.png'
 import footerBrandsLogo from '../assets/signin-footer-logo.png'
 import poweredByLogo from '../assets/poweredby-logo.png'
+import { ValidatedInput } from '../components/ValidatedInput'
 
 const KENYAN_COUNTIES = [
   "Baringo", "Bomet", "Bungoma", "Busia", "Elgeyo-Marakwet", "Embu", "Garissa", 
@@ -54,7 +55,6 @@ export default function Login() {
 
   // Navigation Tabs
   const [activeTab, setActiveTab] = useState('login')
-  const [isSignupSuccess, setIsSignupSuccess] = useState(false)
   const [isSignupPasswordStep, setIsSignupPasswordStep] = useState(false)
   const [isSignupBiometricStep, setIsSignupBiometricStep] = useState(false)
   const [otpFlowType, setOtpFlowType] = useState('') // 'login' or 'reset'
@@ -278,11 +278,22 @@ export default function Login() {
       if (window.PublicKeyCredential) {
         setIsSignupBiometricStep(true)
       } else {
-        setIsSignupSuccess(true)
+        finishSignup()
       }
     } else {
       setErr(res.error)
     }
+  }
+
+  function finishSignup() {
+    setIsSignupBiometricStep(false)
+    setActiveTab('login')
+    setPassword('')
+    addNotification({
+      title: 'Account Created',
+      message: 'Sign in with your new credentials to access your dashboard.',
+      type: 'success',
+    })
   }
 
   async function handleSetupBiometric() {
@@ -318,14 +329,12 @@ export default function Login() {
       setErr('Biometric setup failed or was cancelled.')
     } finally {
       setLoading(false)
-      setIsSignupBiometricStep(false)
-      setIsSignupSuccess(true)
+      finishSignup()
     }
   }
 
   function skipBiometric() {
-    setIsSignupBiometricStep(false)
-    setIsSignupSuccess(true)
+    finishSignup()
   }
 
   const SecurityRequirement = ({ met, label }) => (
@@ -387,7 +396,6 @@ export default function Login() {
                   setActiveTab(tab)
                   setIsOTPMode(false)
                   setIsResetMode(false)
-                  setIsSignupSuccess(false)
                   setIsSignupPasswordStep(false)
                   setNewPasswordInput('')
                   setConfirmPassword('')
@@ -407,26 +415,7 @@ export default function Login() {
           {activeTab === 'signup' ? (
             /* SIGN UP FORM */
             <div className="animate-fade-in-up">
-              {isSignupSuccess ? (
-                <div className="flex flex-col items-center justify-center text-center py-10 px-4 animate-fade-in-up">
-                  <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mb-6">
-                    <span className="material-symbols-outlined text-4xl text-emerald-500">check_circle</span>
-                  </div>
-                  <h3 className="font-headline text-3xl text-primary tracking-tight font-black mb-3">Application Received</h3>
-                  <p className="text-on-surface-variant font-medium opacity-80 mb-8 max-w-sm leading-relaxed">
-                    Thank you for applying to join PayChain! Our onboarding team will review your details in <strong className="text-primary font-black">less than 2 working days</strong> and get back to you.
-                  </p>
-                  <button 
-                    onClick={() => {
-                      setIsSignupSuccess(false)
-                      setActiveTab('login')
-                    }} 
-                    className="bg-[#06201B] text-white py-3 px-8 rounded-xl font-black text-sm shadow-xl hover:bg-[#0a3029] transition-all flex items-center gap-2"
-                  >
-                    Back to Login
-                  </button>
-                </div>
-              ) : isSignupBiometricStep ? (
+              {isSignupBiometricStep ? (
                 /* BIOMETRIC SETUP STEP */
                 <div className="flex flex-col items-center justify-center text-center py-10 px-4 animate-fade-in-up">
                   <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mb-6 shadow-inner">
@@ -569,11 +558,13 @@ export default function Login() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Your Name *</label>
-                    <input required autoComplete="name" value={signupName} onChange={e => setSignupName(e.target.value)} className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" placeholder="John Doe" />
+                    <ValidatedInput kind="personName" required value={signupName} onChange={e => setSignupName(e.target.value)} placeholder="John Doe"
+                      className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" />
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Your Email *</label>
-                    <input required type="email" autoComplete="email" value={signupEmail} onChange={e => setSignupEmail(e.target.value)} className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" placeholder="john@example.com" />
+                    <ValidatedInput kind="email" required value={signupEmail} onChange={e => setSignupEmail(e.target.value)} placeholder="john@example.com"
+                      className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" />
                   </div>
                 </div>
 
@@ -584,12 +575,14 @@ export default function Login() {
                       <div className="bg-surface-container-low border border-outline-variant/15 border-r-0 rounded-l-xl px-3 flex items-center justify-center text-primary/40 group-focus-within:border-primary transition-colors">
                         <span className="material-symbols-outlined text-sm">smartphone</span>
                       </div>
-                      <input required autoComplete="tel-national" value={signupPhone} onChange={e => setSignupPhone(e.target.value.replace(/\D/g, ''))} className="flex-1 w-full bg-white border border-outline-variant/15 rounded-r-xl py-3 px-3 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" placeholder="0712 345 678" type="tel" pattern="[0-9]{9,10}" title="Enter a valid 9 or 10 digit phone number" />
+                      <ValidatedInput kind="phoneKE" required value={signupPhone} onChange={e => setSignupPhone(e.target.value)} placeholder="0712 345 678"
+                        className="flex-1 w-full bg-white border border-outline-variant/15 rounded-r-xl py-3 px-3 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" />
                     </div>
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Business Name *</label>
-                    <input required autoComplete="organization" value={signupBusinessName} onChange={e => setSignupBusinessName(e.target.value)} className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" placeholder="Acme Corp" />
+                    <ValidatedInput kind="businessName" required value={signupBusinessName} onChange={e => setSignupBusinessName(e.target.value)} placeholder="Acme Corp"
+                      className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" />
                   </div>
                 </div>
 

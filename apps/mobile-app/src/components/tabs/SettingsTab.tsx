@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity } from 'react-native';
 import { MaterialIcons, Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { ValidatedTextInput } from '../../components/ValidatedTextInput';
 import { useAuth } from '../../context/AuthContext';
 
 export default function SettingsTab() {
@@ -76,14 +77,9 @@ export default function SettingsTab() {
                   )}
                 </View>
                 <View className="relative">
-                  <TextInput 
-                    value={kraPin}
-                    onChangeText={(text) => setKraPin(text.toUpperCase())}
-                    placeholder="e.g. P123456789A"
-                    placeholderTextColor="#b3b9b4"
-                    editable={!kraPinLocked}
-                    className={`w-full bg-white border border-[#efeeeb] rounded-2xl py-4 px-5 text-[15px] font-jakarta-extrabold text-[#00351d] tracking-tight ${kraPinLocked ? 'bg-[#faf9f6] text-[#707971]' : 'shadow-md shadow-[#006c4e]/10 border-[#006c4e]/30'}`}
-                  />
+                  <ValidatedTextInput kind="kraPin" value={kraPin} onChangeText={setKraPin}
+                    placeholder="e.g. P123456789A" placeholderTextColor="#b3b9b4" editable={!kraPinLocked}
+                    className={`w-full bg-white border border-[#efeeeb] rounded-2xl py-4 px-5 text-[15px] font-jakarta-extrabold text-[#00351d] tracking-tight ${kraPinLocked ? 'bg-[#faf9f6] text-[#707971]' : 'shadow-md shadow-[#006c4e]/10 border-[#006c4e]/30'}`} />
                   {kraPinLocked && (
                     <MaterialIcons name="lock-outline" size={16} color="#b3b9b4" style={{ position: 'absolute', right: 20, top: 18 }} />
                   )}
@@ -101,14 +97,9 @@ export default function SettingsTab() {
                   )}
                 </View>
                 <View className="relative">
-                  <TextInput 
-                    value={businessNumber}
-                    onChangeText={(text) => setBusinessNumber(text.toUpperCase())}
-                    placeholder="e.g. PVT-XXXXXX"
-                    placeholderTextColor="#b3b9b4"
-                    editable={!businessNumberLocked}
-                    className={`w-full bg-white border border-[#efeeeb] rounded-2xl py-4 px-5 text-[15px] font-jakarta-extrabold text-[#00351d] tracking-tight ${businessNumberLocked ? 'bg-[#faf9f6] text-[#707971]' : 'shadow-md shadow-[#006c4e]/10 border-[#006c4e]/30'}`}
-                  />
+                  <ValidatedTextInput kind="businessReg" optional value={businessNumber} onChangeText={setBusinessNumber}
+                    placeholder="e.g. PVT-XXXXXX" placeholderTextColor="#b3b9b4" editable={!businessNumberLocked}
+                    className={`w-full bg-white border border-[#efeeeb] rounded-2xl py-4 px-5 text-[15px] font-jakarta-extrabold text-[#00351d] tracking-tight ${businessNumberLocked ? 'bg-[#faf9f6] text-[#707971]' : 'shadow-md shadow-[#006c4e]/10 border-[#006c4e]/30'}`} />
                   {businessNumberLocked && (
                     <MaterialIcons name="lock-outline" size={16} color="#b3b9b4" style={{ position: 'absolute', right: 20, top: 18 }} />
                   )}

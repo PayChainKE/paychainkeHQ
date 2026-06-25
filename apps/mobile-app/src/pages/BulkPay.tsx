@@ -10,6 +10,8 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import { useAuth } from '../context/AuthContext';
+import { useBiometrics } from '../hooks/useBiometrics';
+import { ValidatedTextInput } from '../components/ValidatedTextInput';
 import api from '../api/config';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -94,7 +96,8 @@ const validatePhone = (phone: string) =>
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function BulkPay() {
-  const { merchant } = useAuth();
+  const { merchant, isBiometricsEnabled } = useAuth();
+  const { authenticate: authenticateBiometric } = useBiometrics();
 
   const [activeTab, setActiveTab] = useState<'Payees' | 'Batches'>('Payees');
   const [activeFilter, setActiveFilter] = useState<Filter>('All');
@@ -505,7 +508,7 @@ export default function BulkPay() {
   };
 
   // ── Authorize batch ──
-  const startAuthorize = () => {
+  const startAuthorize = async () => {
     if (selectedIds.length === 0) {
       Alert.alert('No selection', 'Select at least one payee.');
       return;
@@ -519,6 +522,15 @@ export default function BulkPay() {
       Alert.alert('Low balance', `Batch total exceeds your KES balance (${formatKES(balance)}).`);
       return;
     }
+
+    if (isBiometricsEnabled) {
+      const auth = await authenticateBiometric(`Authorize ${formatKES(batchTotal)} batch payment`);
+      if (!auth.success) {
+        if (!auth.cancelled) Alert.alert('Authorization blocked', auth.error);
+        return;
+      }
+    }
+
     setAuthPin('');
     setShowAuthorize(true);
   };
@@ -1011,27 +1023,11 @@ export default function BulkPay() {
                 <Text className="text-[#707971] font-jakarta-medium text-[12px] mt-1 text-center">A 4-digit PIN is required to authorize batches.</Text>
               </View>
               <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-2">New PIN</Text>
-              <TextInput
-                value={setupPin}
-                onChangeText={(t) => setSetupPin(t.replace(/\D/g, '').slice(0, 4))}
-                keyboardType="numeric"
-                secureTextEntry
-                maxLength={4}
-                className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-5 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[18px] tracking-[0.5em] text-center mb-4"
-                placeholder="••••"
-                placeholderTextColor="#a1a1aa"
-              />
+              <ValidatedTextInput kind="pin4" value={setupPin} onChangeText={setSetupPin} secureTextEntry placeholder="••••" placeholderTextColor="#a1a1aa"
+                className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-5 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[18px] tracking-[0.5em] text-center mb-4" />
               <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-2">Confirm PIN</Text>
-              <TextInput
-                value={confirmPin}
-                onChangeText={(t) => setConfirmPin(t.replace(/\D/g, '').slice(0, 4))}
-                keyboardType="numeric"
-                secureTextEntry
-                maxLength={4}
-                className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-5 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[18px] tracking-[0.5em] text-center mb-6"
-                placeholder="••••"
-                placeholderTextColor="#a1a1aa"
-              />
+              <ValidatedTextInput kind="pin4" value={confirmPin} onChangeText={setConfirmPin} secureTextEntry placeholder="••••" placeholderTextColor="#a1a1aa"
+                className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-5 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[18px] tracking-[0.5em] text-center mb-6" />
               <TouchableOpacity onPress={handleSetupPin} className="w-full bg-[#00351d] h-[56px] rounded-full flex-row items-center justify-center">
                 <Text className="text-white font-jakarta-bold text-[15px]">Save PIN</Text>
               </TouchableOpacity>
@@ -1051,15 +1047,9 @@ export default function BulkPay() {
               <Text className="text-[#707971] font-jakarta-medium text-[12px] mb-5" numberOfLines={1}>For {showAmountEditor?.name}</Text>
               <View className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-5 py-4 mb-5 flex-row items-center">
                 <Text className="text-[#707971] font-jakarta-bold text-[18px] mr-2">KES</Text>
-                <TextInput
-                  value={amountInput}
-                  onChangeText={(t) => setAmountInput(t.replace(/[^\d.]/g, ''))}
-                  keyboardType="decimal-pad"
-                  className="flex-1 text-[#1b1c1a] font-jakarta-bold text-[20px]"
-                  placeholder="0"
-                  placeholderTextColor="#a1a1aa"
-                  autoFocus
-                />
+                <ValidatedTextInput kind="amount" value={amountInput} onChangeText={setAmountInput} placeholder="0" placeholderTextColor="#a1a1aa" autoFocus
+                  containerClassName="flex-1"
+                  className="text-[#1b1c1a] font-jakarta-bold text-[20px]" />
               </View>
               <TouchableOpacity onPress={saveAmount} className="w-full bg-[#00351d] h-[56px] rounded-full flex-row items-center justify-center">
                 <Text className="text-white font-jakarta-bold text-[15px]">Confirm</Text>
@@ -1093,18 +1083,8 @@ export default function BulkPay() {
                   <Text className="font-jakarta-bold text-[#00351d] text-[16px]">{formatKES(batchTotal)}</Text>
                 </View>
               </View>
-              <TextInput
-                value={authPin}
-                onChangeText={(t) => setAuthPin(t.replace(/\D/g, '').slice(0, 4))}
-                keyboardType="numeric"
-                secureTextEntry
-                maxLength={4}
-                editable={!isAuthorizing}
-                className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-5 py-4 text-[#1b1c1a] font-jakarta-bold text-[20px] tracking-[0.5em] text-center mb-6"
-                placeholder="••••"
-                placeholderTextColor="#a1a1aa"
-                autoFocus
-              />
+              <ValidatedTextInput kind="pin4" value={authPin} onChangeText={setAuthPin} secureTextEntry editable={!isAuthorizing} placeholder="••••" placeholderTextColor="#a1a1aa" autoFocus
+                className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-5 py-4 text-[#1b1c1a] font-jakarta-bold text-[20px] tracking-[0.5em] text-center mb-6" />
               <TouchableOpacity
                 onPress={handleAuthorize}
                 disabled={isAuthorizing}
@@ -1212,12 +1192,14 @@ export default function BulkPay() {
                     <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-2">
                       {newPayee.type === 'utility' ? 'Utility Name' : 'Recipient Name'}
                     </Text>
-                    <TextInput
+                    <ValidatedTextInput
+                      kind={newPayee.type === 'utility' ? 'businessName' : 'personName'}
                       value={newPayee.name}
                       onChangeText={(t) => setNewPayee({ ...newPayee, name: t })}
                       placeholder={newPayee.type === 'utility' ? 'e.g. Kenya Power' : 'e.g. John Kamau'}
                       placeholderTextColor="#a1a1aa"
-                      className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-semibold text-[14px] mb-4"
+                      containerClassName="mb-4"
+                      className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-semibold text-[14px]"
                     />
 
                     {/* KRA Employee fields */}
@@ -1225,43 +1207,25 @@ export default function BulkPay() {
                       <View className="bg-[#f0fdf4] rounded-2xl p-4 mb-4 border border-[#bbf7d0]">
                         <Text className="text-[10px] font-jakarta-bold text-[#006c4e] uppercase tracking-wider mb-3">KRA Payroll Details</Text>
                         <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">KRA PIN *</Text>
-                        <TextInput
-                          value={newPayee.kraPin}
-                          onChangeText={(t) => setNewPayee({ ...newPayee, kraPin: t.toUpperCase() })}
-                          autoCapitalize="characters"
-                          placeholder="A000000000A"
-                          placeholderTextColor="#a1a1aa"
-                          className="bg-white border border-[#e9e8e5] rounded-xl px-4 py-3 text-[#1b1c1a] font-jakarta-bold text-[14px] mb-3"
-                        />
+                        <ValidatedTextInput kind="kraPin" value={newPayee.kraPin} onChangeText={(t) => setNewPayee({ ...newPayee, kraPin: t })}
+                          placeholder="A000000000A" placeholderTextColor="#a1a1aa" containerClassName="mb-3"
+                          className="bg-white border border-[#e9e8e5] rounded-xl px-4 py-3 text-[#1b1c1a] font-jakarta-bold text-[14px]" />
                         <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">ID Number *</Text>
-                        <TextInput
-                          value={newPayee.idNumber}
-                          onChangeText={(t) => setNewPayee({ ...newPayee, idNumber: t.replace(/\D/g, '') })}
-                          keyboardType="numeric"
-                          placeholder="12345678"
-                          placeholderTextColor="#a1a1aa"
-                          className="bg-white border border-[#e9e8e5] rounded-xl px-4 py-3 text-[#1b1c1a] font-jakarta-bold text-[14px] mb-3"
-                        />
+                        <ValidatedTextInput kind="nationalId" value={newPayee.idNumber} onChangeText={(t) => setNewPayee({ ...newPayee, idNumber: t })}
+                          placeholder="12345678" placeholderTextColor="#a1a1aa" containerClassName="mb-3"
+                          className="bg-white border border-[#e9e8e5] rounded-xl px-4 py-3 text-[#1b1c1a] font-jakarta-bold text-[14px]" />
                         <View className="flex-row gap-2">
                           <View className="flex-1">
                             <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">NSSF</Text>
-                            <TextInput
-                              value={newPayee.nssfNumber}
-                              onChangeText={(t) => setNewPayee({ ...newPayee, nssfNumber: t })}
-                              placeholder="123456789"
-                              placeholderTextColor="#a1a1aa"
-                              className="bg-white border border-[#e9e8e5] rounded-xl px-3 py-3 text-[#1b1c1a] font-jakarta-bold text-[13px]"
-                            />
+                            <ValidatedTextInput kind="nssf" optional value={newPayee.nssfNumber} onChangeText={(t) => setNewPayee({ ...newPayee, nssfNumber: t })}
+                              placeholder="123456789" placeholderTextColor="#a1a1aa"
+                              className="bg-white border border-[#e9e8e5] rounded-xl px-3 py-3 text-[#1b1c1a] font-jakarta-bold text-[13px]" />
                           </View>
                           <View className="flex-1">
                             <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">SHIF</Text>
-                            <TextInput
-                              value={newPayee.shifNumber}
-                              onChangeText={(t) => setNewPayee({ ...newPayee, shifNumber: t })}
-                              placeholder="1234567"
-                              placeholderTextColor="#a1a1aa"
-                              className="bg-white border border-[#e9e8e5] rounded-xl px-3 py-3 text-[#1b1c1a] font-jakarta-bold text-[13px]"
-                            />
+                            <ValidatedTextInput kind="shif" optional value={newPayee.shifNumber} onChangeText={(t) => setNewPayee({ ...newPayee, shifNumber: t })}
+                              placeholder="1234567" placeholderTextColor="#a1a1aa"
+                              className="bg-white border border-[#e9e8e5] rounded-xl px-3 py-3 text-[#1b1c1a] font-jakarta-bold text-[13px]" />
                           </View>
                         </View>
                       </View>
@@ -1272,43 +1236,25 @@ export default function BulkPay() {
                       <View className="bg-[#eef2ff] rounded-2xl p-4 mb-4 border border-[#c7d2fe]">
                         <Text className="text-[10px] font-jakarta-bold text-[#3730a3] uppercase tracking-wider mb-3">KRA eTIMS Details</Text>
                         <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">Supplier KRA PIN *</Text>
-                        <TextInput
-                          value={newPayee.kraPin}
-                          onChangeText={(t) => setNewPayee({ ...newPayee, kraPin: t.toUpperCase() })}
-                          autoCapitalize="characters"
-                          placeholder="P000000000A"
-                          placeholderTextColor="#a1a1aa"
-                          className="bg-white border border-[#e9e8e5] rounded-xl px-4 py-3 text-[#1b1c1a] font-jakarta-bold text-[14px] mb-3"
-                        />
+                        <ValidatedTextInput kind="kraPin" value={newPayee.kraPin} onChangeText={(t) => setNewPayee({ ...newPayee, kraPin: t })}
+                          placeholder="P000000000A" placeholderTextColor="#a1a1aa" containerClassName="mb-3"
+                          className="bg-white border border-[#e9e8e5] rounded-xl px-4 py-3 text-[#1b1c1a] font-jakarta-bold text-[14px]" />
                         <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">eTIMS Invoice *</Text>
-                        <TextInput
-                          value={newPayee.etimsInvoiceNumber}
-                          onChangeText={(t) => setNewPayee({ ...newPayee, etimsInvoiceNumber: t })}
-                          placeholder="INV-123"
-                          placeholderTextColor="#a1a1aa"
-                          className="bg-white border border-[#e9e8e5] rounded-xl px-4 py-3 text-[#1b1c1a] font-jakarta-bold text-[14px] mb-3"
-                        />
+                        <ValidatedTextInput kind="etims" value={newPayee.etimsInvoiceNumber} onChangeText={(t) => setNewPayee({ ...newPayee, etimsInvoiceNumber: t })}
+                          placeholder="INV-123" placeholderTextColor="#a1a1aa" containerClassName="mb-3"
+                          className="bg-white border border-[#e9e8e5] rounded-xl px-4 py-3 text-[#1b1c1a] font-jakarta-bold text-[14px]" />
                         <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">Control Unit (CU) *</Text>
-                        <TextInput
-                          value={newPayee.cuNumber}
-                          onChangeText={(t) => setNewPayee({ ...newPayee, cuNumber: t })}
-                          placeholder="123456789"
-                          placeholderTextColor="#a1a1aa"
-                          className="bg-white border border-[#e9e8e5] rounded-xl px-4 py-3 text-[#1b1c1a] font-jakarta-bold text-[14px]"
-                        />
+                        <ValidatedTextInput kind="cuNumber" value={newPayee.cuNumber} onChangeText={(t) => setNewPayee({ ...newPayee, cuNumber: t })}
+                          placeholder="123456789" placeholderTextColor="#a1a1aa"
+                          className="bg-white border border-[#e9e8e5] rounded-xl px-4 py-3 text-[#1b1c1a] font-jakarta-bold text-[14px]" />
                       </View>
                     )}
 
                     {/* Default Amount */}
                     <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-2">Default Amount (KES)</Text>
-                    <TextInput
-                      value={newPayee.amount}
-                      onChangeText={(t) => setNewPayee({ ...newPayee, amount: t.replace(/[^\d.]/g, '') })}
-                      keyboardType="decimal-pad"
-                      placeholder="0"
-                      placeholderTextColor="#a1a1aa"
-                      className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[14px] mb-4"
-                    />
+                    <ValidatedTextInput kind="amount" optional value={newPayee.amount} onChangeText={(t) => setNewPayee({ ...newPayee, amount: t })}
+                      placeholder="0" placeholderTextColor="#a1a1aa" containerClassName="mb-4"
+                      className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[14px]" />
 
                     {/* Payment Method */}
                     <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-2">Settlement Method</Text>
@@ -1339,64 +1285,36 @@ export default function BulkPay() {
                           ))}
                         </View>
                         {newPayee.mobileMoneyType === 'Personal Number' && (
-                          <TextInput
-                            value={newPayee.phone}
-                            onChangeText={(t) => setNewPayee({ ...newPayee, phone: t.replace(/\D/g, '').slice(0, 12) })}
-                            keyboardType="phone-pad"
-                            placeholder="07XX XXX XXX"
-                            placeholderTextColor="#a1a1aa"
-                            className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[14px] mb-2"
-                          />
+                          <ValidatedTextInput kind="phoneKE" value={newPayee.phone} onChangeText={(t) => setNewPayee({ ...newPayee, phone: t })}
+                            placeholder="07XX XXX XXX" placeholderTextColor="#a1a1aa" containerClassName="mb-2"
+                            className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[14px]" />
                         )}
                         {newPayee.mobileMoneyType === 'Paybill' && (
                           <View className="flex-row gap-2 mb-2">
-                            <TextInput
-                              value={newPayee.paybillNumber}
-                              onChangeText={(t) => setNewPayee({ ...newPayee, paybillNumber: t.replace(/\D/g, '').slice(0, 7) })}
-                              keyboardType="numeric"
-                              placeholder="Paybill"
-                              placeholderTextColor="#a1a1aa"
-                              className="flex-1 bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[14px]"
-                            />
-                            <TextInput
-                              value={newPayee.businessAccount}
-                              onChangeText={(t) => setNewPayee({ ...newPayee, businessAccount: t })}
-                              placeholder="Account #"
-                              placeholderTextColor="#a1a1aa"
-                              className="flex-1 bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[14px]"
-                            />
+                            <ValidatedTextInput kind="paybill" value={newPayee.paybillNumber} onChangeText={(t) => setNewPayee({ ...newPayee, paybillNumber: t })}
+                              placeholder="Paybill" placeholderTextColor="#a1a1aa" containerClassName="flex-1"
+                              className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[14px]" />
+                            <ValidatedTextInput kind="text" value={newPayee.businessAccount} onChangeText={(t) => setNewPayee({ ...newPayee, businessAccount: t })}
+                              placeholder="Account #" placeholderTextColor="#a1a1aa" containerClassName="flex-1"
+                              className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[14px]" />
                           </View>
                         )}
                         {newPayee.mobileMoneyType === 'Buy Goods' && (
-                          <TextInput
-                            value={newPayee.tillNumber}
-                            onChangeText={(t) => setNewPayee({ ...newPayee, tillNumber: t.replace(/\D/g, '').slice(0, 8) })}
-                            keyboardType="numeric"
-                            placeholder="Till Number"
-                            placeholderTextColor="#a1a1aa"
-                            className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[14px] mb-2"
-                          />
+                          <ValidatedTextInput kind="till" value={newPayee.tillNumber} onChangeText={(t) => setNewPayee({ ...newPayee, tillNumber: t })}
+                            placeholder="Till Number" placeholderTextColor="#a1a1aa" containerClassName="mb-2"
+                            className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[14px]" />
                         )}
                       </View>
                     )}
 
                     {newPayee.paymentMethod === 'Bank' && (
                       <View>
-                        <TextInput
-                          value={newPayee.bankName}
-                          onChangeText={(t) => setNewPayee({ ...newPayee, bankName: t })}
-                          placeholder="Bank Name (e.g. KCB)"
-                          placeholderTextColor="#a1a1aa"
-                          className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[14px] mb-2"
-                        />
-                        <TextInput
-                          value={newPayee.accountNumber}
-                          onChangeText={(t) => setNewPayee({ ...newPayee, accountNumber: t.replace(/\D/g, '').slice(0, 14) })}
-                          keyboardType="numeric"
-                          placeholder="Account Number"
-                          placeholderTextColor="#a1a1aa"
-                          className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[14px]"
-                        />
+                        <ValidatedTextInput kind="businessName" value={newPayee.bankName} onChangeText={(t) => setNewPayee({ ...newPayee, bankName: t })}
+                          placeholder="Bank Name (e.g. KCB)" placeholderTextColor="#a1a1aa" containerClassName="mb-2"
+                          className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[14px]" />
+                        <ValidatedTextInput kind="bankAccount" value={newPayee.accountNumber} onChangeText={(t) => setNewPayee({ ...newPayee, accountNumber: t })}
+                          placeholder="Account Number" placeholderTextColor="#a1a1aa"
+                          className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[14px]" />
                       </View>
                     )}
                   </View>

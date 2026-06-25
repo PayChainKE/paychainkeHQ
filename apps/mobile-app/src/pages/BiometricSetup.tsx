@@ -1,40 +1,26 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView, Dimensions } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, TouchableOpacity, SafeAreaView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
-import * as LocalAuthentication from 'expo-local-authentication';
+import { useBiometrics } from '../hooks/useBiometrics';
 
 export default function BiometricSetup() {
   const { completeBiometricSetup, unlockApp } = useAuth();
-  const [isSupported, setIsSupported] = useState<boolean | null>(null);
+  const { support, checking, authenticate } = useBiometrics();
 
   useEffect(() => {
-    const checkSupport = async () => {
-      const hardware = await LocalAuthentication.hasHardwareAsync();
-      const enrolled = await LocalAuthentication.isEnrolledAsync();
-      
-      if (!hardware || !enrolled) {
-        // Device doesn't support biometrics or none are enrolled, skip setup
-        completeBiometricSetup(false);
-        unlockApp();
-      } else {
-        setIsSupported(true);
-      }
-    };
-    checkSupport();
-  }, []);
+    if (checking) return;
+    if (!support.available) {
+      completeBiometricSetup(false);
+      unlockApp();
+    }
+  }, [checking, support.available]);
 
   const handleEnable = async () => {
-    try {
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Enable Biometric Login',
-      });
-      if (result.success) {
-        await completeBiometricSetup(true);
-        unlockApp();
-      }
-    } catch (error) {
-      console.warn('Biometric setup failed', error);
+    const result = await authenticate('Enable Biometric Login');
+    if (result.success) {
+      await completeBiometricSetup(true);
+      unlockApp();
     }
   };
 
@@ -43,10 +29,10 @@ export default function BiometricSetup() {
     unlockApp();
   };
 
-  if (isSupported === null) {
+  if (checking || !support.available) {
     return (
       <SafeAreaView className="flex-1 bg-[#0b2114] items-center justify-center">
-        {/* Loading state while checking hardware */}
+        {/* Loading state while checking hardware (or skipping if unsupported) */}
       </SafeAreaView>
     );
   }

@@ -3,8 +3,9 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingVi
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
-import * as LocalAuthentication from 'expo-local-authentication';
+import { useBiometrics } from '../hooks/useBiometrics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ValidatedTextInput } from '../components/ValidatedTextInput';
 
 const KENYAN_COUNTIES = [
   "Baringo", "Bomet", "Bungoma", "Busia", "Elgeyo-Marakwet", "Embu", "Garissa", 
@@ -18,6 +19,7 @@ const KENYAN_COUNTIES = [
 
 export default function Login({ route }: any) {
   const { login, biometricLogin, signup, verifyOTP, resendOTP, forgotPassword, resetPassword } = useAuth();
+  const { authenticate: authenticateBiometric } = useBiometrics();
   
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
@@ -117,37 +119,22 @@ export default function Login({ route }: any) {
 
   const handleBiometricSignIn = async () => {
     setErr('');
-    try {
-      const compatible = await LocalAuthentication.hasHardwareAsync();
-      const enrolled = await LocalAuthentication.isEnrolledAsync();
-      if (!compatible || !enrolled) {
-        setErr("Biometrics not supported or enrolled.");
-        return;
-      }
-      
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Login to PayChain',
-      });
-
-      if (result.success) {
-        const userEmail = await AsyncStorage.getItem('last_biometric_user');
-        if (!userEmail) {
-          setErr("No registered biometric user found.");
-          return;
-        }
-
-        setLoading(true);
-        const res = await biometricLogin(userEmail);
-        setLoading(false);
-
-        if (!res.success) {
-          setErr(res.error);
-        }
-      }
-    } catch (error) {
-      console.error(error);
-      setErr("Biometric authentication failed.");
+    const auth = await authenticateBiometric('Login to PayChain');
+    if (!auth.success) {
+      if (!auth.cancelled) setErr(auth.error);
+      return;
     }
+
+    const userEmail = await AsyncStorage.getItem('last_biometric_user');
+    if (!userEmail) {
+      setErr('No registered biometric user found.');
+      return;
+    }
+
+    setLoading(true);
+    const res = await biometricLogin(userEmail);
+    setLoading(false);
+    if (!res.success) setErr(res.error);
   };
 
   const handleVerifyOTP = async () => {
@@ -258,23 +245,17 @@ export default function Login({ route }: any) {
   };
 
   const handleSetupBiometric = async () => {
-    try {
-      setLoading(true);
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Enable Biometrics for PayChain',
-      });
-      if (result.success) {
-        await AsyncStorage.setItem('last_biometric_user', signupEmail);
-        setHasBiometrics(true);
-      }
-    } catch (e) {
-      console.error(e);
-      setErr('Biometric setup failed.');
-    } finally {
-      setLoading(false);
-      setIsSignupBiometricStep(false);
-      setIsSignupSuccess(true);
+    setLoading(true);
+    const result = await authenticateBiometric('Enable Biometrics for PayChain');
+    if (result.success) {
+      await AsyncStorage.setItem('last_biometric_user', signupEmail);
+      setHasBiometrics(true);
+    } else if (!result.cancelled) {
+      setErr(result.error);
     }
+    setLoading(false);
+    setIsSignupBiometricStep(false);
+    setIsSignupSuccess(true);
   };
 
   const renderTabs = () => (
@@ -482,19 +463,23 @@ export default function Login({ route }: any) {
                 <View className="space-y-4">
                   <View>
                     <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Your Name *</Text>
-                    <TextInput className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-medium text-[#1b1c1a]" value={signupName} onChangeText={setSignupName} placeholder="John Doe" />
+                    <ValidatedTextInput kind="personName" value={signupName} onChangeText={setSignupName} placeholder="John Doe"
+                      className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-medium text-[#1b1c1a]" />
                   </View>
                   <View>
                     <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Your Email *</Text>
-                    <TextInput className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-medium text-[#1b1c1a]" value={signupEmail} onChangeText={setSignupEmail} placeholder="john@example.com" keyboardType="email-address" autoCapitalize="none" />
+                    <ValidatedTextInput kind="email" value={signupEmail} onChangeText={setSignupEmail} placeholder="john@example.com"
+                      className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-medium text-[#1b1c1a]" />
                   </View>
                   <View>
                     <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Your Phone *</Text>
-                    <TextInput className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-medium text-[#1b1c1a]" value={signupPhone} onChangeText={setSignupPhone} placeholder="0712 345 678" keyboardType="phone-pad" />
+                    <ValidatedTextInput kind="phoneKE" value={signupPhone} onChangeText={setSignupPhone} placeholder="0712 345 678"
+                      className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-medium text-[#1b1c1a]" />
                   </View>
                   <View>
                     <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Business Name *</Text>
-                    <TextInput className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-medium text-[#1b1c1a]" value={signupBusinessName} onChangeText={setSignupBusinessName} placeholder="Acme Corp" />
+                    <ValidatedTextInput kind="businessName" value={signupBusinessName} onChangeText={setSignupBusinessName} placeholder="Acme Corp"
+                      className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-medium text-[#1b1c1a]" />
                   </View>
                   <View>
                     <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Business Type *</Text>
@@ -512,7 +497,8 @@ export default function Login({ route }: any) {
                   </View>
                   <View>
                     <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Area/Location *</Text>
-                    <TextInput className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-medium text-[#1b1c1a]" value={area} onChangeText={setArea} placeholder="Westlands" />
+                    <ValidatedTextInput kind="personName" value={area} onChangeText={setArea} placeholder="Westlands"
+                      className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-medium text-[#1b1c1a]" />
                   </View>
                   <View>
                     <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Employees *</Text>

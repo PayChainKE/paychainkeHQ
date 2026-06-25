@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import { formatKES } from '../utils/formatCurrency';
 import paychainLogo from '../../images/logo.png';
+import { ValidatedInput } from '../components/ValidatedInput';
 
 export default function PaymentPage() {
   const { linkId } = useParams();
@@ -117,8 +118,8 @@ export default function PaymentPage() {
                 <div className="absolute left-5 top-1/2 -translate-y-1/2 text-primary/40 flex items-center justify-center">
                   <span className="material-symbols-outlined text-lg">smartphone</span>
                 </div>
-                <input 
-                  type="tel"
+                <ValidatedInput
+                  kind="phoneKE"
                   required
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}

@@ -3,6 +3,7 @@ import axios from 'axios'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import { formatKES, formatUSDC } from '../utils/formatCurrency'
 import { formatDateISO } from '../utils/formatDate'
+import { ValidatedInput } from '../components/ValidatedInput'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useToast } from '../context/NotificationContext'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
@@ -544,8 +545,8 @@ export default function Wallet() {
                 <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Amount to Withdraw</label>
                 <div className="relative group">
                   <div className="absolute left-4 top-1/2 -translate-y-1/2 text-primary/40 font-bold text-sm">KES</div>
-                  <input 
-                    type="number"
+                  <ValidatedInput
+                    kind="amount"
                     value={withdrawAmount}
                     onChange={(e) => setWithdrawAmount(e.target.value)}
                     placeholder="0.00"
@@ -611,8 +612,8 @@ export default function Wallet() {
                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-primary/40 flex items-center justify-center">
                       <span className="material-symbols-outlined text-lg">{selectedDest.type === 'Bank' ? 'account_balance' : 'smartphone'}</span>
                     </div>
-                    <input 
-                      type={selectedDest.type === 'Bank' ? 'text' : 'tel'}
+                    <ValidatedInput
+                      kind={selectedDest.type === 'Bank' ? 'bankAccount' : 'phoneKE'}
                       value={destinationAccountValue}
                       onChange={(e) => setDestinationAccountValue(e.target.value)}
                       placeholder={selectedDest.type === 'Bank' ? (merchant?.settlementBankAccount || 'e.g. 1122334455') : (merchant?.settlementMobile || '07xxxxxxxx')}
@@ -807,12 +808,13 @@ export default function Wallet() {
                       <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                         <span className="text-[10px] font-black text-[#8B98A9] uppercase">KES</span>
                       </div>
-                      <input 
-                        type="number"
+                      <ValidatedInput
+                        kind="amount"
                         value={paymentLinkAmount}
                         onChange={(e) => setPaymentLinkAmount(e.target.value)}
                         placeholder="0.00"
                         className="w-full bg-transparent border-none py-4 pl-12 pr-4 text-right text-lg font-mono font-bold text-white outline-none focus:ring-0 placeholder-[#1E2532]"
+                        errorClassName="text-red-300 text-[11px] font-bold mt-1.5 pl-1"
                       />
                     </div>
                     <button 
@@ -1074,8 +1076,8 @@ export default function Wallet() {
                       <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Amount to Top Up</label>
                       <div className="relative group">
                         <div className="absolute left-6 top-1/2 -translate-y-1/2 text-primary/40 font-bold text-lg">KES</div>
-                        <input 
-                          type="number"
+                        <ValidatedInput
+                          kind="amount"
                           value={topUpAmount}
                           onChange={(e) => setTopUpAmount(e.target.value)}
                           placeholder="Min 100"
@@ -1090,8 +1092,8 @@ export default function Wallet() {
                         <div className="absolute left-6 top-1/2 -translate-y-1/2 text-primary/40 flex items-center justify-center">
                           <span className="material-symbols-outlined text-xl">smartphone</span>
                         </div>
-                        <input 
-                          type="tel"
+                        <ValidatedInput
+                          kind="phoneKE"
                           value={topUpPhone}
                           onChange={(e) => setTopUpPhone(e.target.value)}
                           placeholder="0712 345 678"
@@ -1194,8 +1196,8 @@ export default function Wallet() {
                   <div className="space-y-6">
                     <div className="space-y-3">
                       <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Amount (KES)</label>
-                      <input 
-                        type="number"
+                      <ValidatedInput
+                        kind="amount"
                         value={topUpAmount}
                         onChange={(e) => setTopUpAmount(e.target.value)}
                         placeholder="Enter amount"
@@ -1309,8 +1311,8 @@ export default function Wallet() {
                 </h4>
                 <div className="space-y-3">
                   <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Bank Name</label>
-                  <input 
-                    type="text"
+                  <ValidatedInput
+                    kind="businessName"
                     value={settleBankName}
                     onChange={(e) => setSettleBankName(e.target.value)}
                     placeholder="e.g. KCB Bank"
@@ -1319,8 +1321,8 @@ export default function Wallet() {
                 </div>
                 <div className="space-y-3">
                   <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Account Number</label>
-                  <input 
-                    type="text"
+                  <ValidatedInput
+                    kind="bankAccount"
                     value={settleBankAccount}
                     onChange={(e) => setSettleBankAccount(e.target.value)}
                     placeholder="e.g. 1122334455"
@@ -1339,8 +1341,8 @@ export default function Wallet() {
                 </h4>
                 <div className="space-y-3">
                   <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">M-PESA Number</label>
-                  <input 
-                    type="tel"
+                  <ValidatedInput
+                    kind="phoneKE"
                     value={settleMobile}
                     onChange={(e) => setSettleMobile(e.target.value)}
                     placeholder="07xxxxxxxx"
@@ -1411,12 +1413,11 @@ export default function Wallet() {
                 <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Amount to Swap ({swapDirectionModal === 'KES_TO_USDC' ? 'KES' : 'USDC'})</label>
                 <div className="relative group">
                   <div className="absolute left-6 top-1/2 -translate-y-1/2 text-primary/40 font-bold text-lg">{swapDirectionModal === 'KES_TO_USDC' ? 'KES' : 'USDC'}</div>
-                  <input 
-                    type="number"
+                  <ValidatedInput
+                    kind="amount"
                     value={swapAmount}
                     onChange={(e) => setSwapAmount(e.target.value)}
                     placeholder="0.00"
-                    max={swapDirectionModal === 'KES_TO_USDC' ? (merchant?.kesBalance || 0) : usdBalance}
                     className="w-full bg-surface-container-low border border-outline-variant/5 rounded-3xl py-6 pl-20 pr-6 text-2xl font-headline text-primary focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
                   />
                   <button 
