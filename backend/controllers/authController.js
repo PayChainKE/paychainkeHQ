@@ -28,7 +28,8 @@ export const login = async (req, res) => {
   }
 
   try {
-    const admin = await Admin.findOne({ email: email.toLowerCase().trim() });
+    // password is select:false on the schema; explicit opt-in for the compare.
+    const admin = await Admin.findOne({ email: email.toLowerCase().trim() }).select('+password');
     if (!admin) {
       // Same error + status as bad-password to avoid email enumeration.
       return res.status(401).json({ error: 'Invalid credentials' });

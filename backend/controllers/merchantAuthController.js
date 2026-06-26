@@ -569,8 +569,8 @@ export const setAppPin = async (req, res) => {
       return res.status(404).json({ error: 'Merchant not found' });
     }
 
-    // Hash the 4-digit PIN using bcrypt
-    const salt = await bcrypt.genSalt(10);
+    // Hash the 4-digit PIN using bcrypt (12 rounds = OWASP 2024 baseline).
+    const salt = await bcrypt.genSalt(12);
     merchant.appPin = await bcrypt.hash(pin, salt);
     
     await merchant.save();

@@ -11,7 +11,10 @@ const AdminSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: [true, 'Password is required']
+    required: [true, 'Password is required'],
+    // Never return the hash on default queries. Controllers must opt in
+    // via .select('+password') when they need to compare on login.
+    select: false,
   },
   otp: {
     type: String,
@@ -30,7 +33,9 @@ AdminSchema.pre('save', async function() {
   if (!this.isModified('password')) {
     return;
   }
-  const salt = await bcrypt.genSalt(10);
+  // 12 rounds = OWASP 2024 recommendation. Existing rounds=10 hashes still
+  // verify correctly via bcrypt.compare (rounds are embedded in the hash).
+  const salt = await bcrypt.genSalt(12);
   this.password = await bcrypt.hash(this.password, salt);
 });
 
