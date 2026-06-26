@@ -1,16 +1,28 @@
+import crypto from 'crypto';
+import mongoose from 'mongoose';
 import Waitlist from '../models/Waitlist.js';
-import { sendWaitlistConfirmation } from '../utils/resend.js';
+import Merchant from '../models/Merchant.js';
+import { sendWaitlistConfirmation, sendMerchantInvite } from '../utils/resend.js';
 
-// @desc    Join Waitlist
+const MERCHANT_DASHBOARD_URL =
+  process.env.MERCHANT_DASHBOARD_URL || 'https://merchant.paychain.co.ke';
+
+const ALLOWED_STATUSES = ['pending', 'contacted', 'approved', 'rejected', 'converted'];
+
+// ── Public ────────────────────────────────────────────────────────────
+
+// @desc    Join Waitlist (public — landing page form)
 // @route   POST /api/waitlist
 // @access  Public
 export const joinWaitlist = async (req, res) => {
   const { fullName, businessName, phone, email, businessType, challenge } = req.body;
 
   try {
-    const existing = await Waitlist.findOne({ email });
-    if (existing) {
-      return res.status(400).json({ error: 'This email is already on our waitlist!' });
+    if (email) {
+      const existing = await Waitlist.findOne({ email });
+      if (existing) {
+        return res.status(400).json({ error: 'This email is already on our waitlist!' });
+      }
     }
 
     const subscriber = await Waitlist.create({
@@ -19,37 +31,281 @@ export const joinWaitlist = async (req, res) => {
       phone,
       email,
       businessType,
-      challenge
+      challenge,
     });
 
-    // Send Confirmation Email
     if (email) {
-      await sendWaitlistConfirmation(email, fullName);
+      sendWaitlistConfirmation(email, fullName).catch((err) =>
+        console.error('Waitlist confirmation email failed:', err)
+      );
     }
 
-    res.status(201).json({
-      success: true,
-      message: 'Successfully joined the waitlist'
-    });
+    res.status(201).json({ success: true, message: 'Successfully joined the waitlist' });
   } catch (error) {
     console.error('Waitlist Error:', error);
     if (error.name === 'ValidationError') {
-      const messages = Object.values(error.errors).map(val => val.message);
+      const messages = Object.values(error.errors).map((val) => val.message);
       return res.status(400).json({ error: messages.join(', ') });
     }
     res.status(500).json({ error: 'Server Error' });
   }
 };
 
-// @desc    Get all waitlist entries
+// ── Admin ─────────────────────────────────────────────────────────────
+
+// @desc    Get all waitlist entries (full list — UI handles paging/filtering)
 // @route   GET /api/waitlist
-// @access  Private/Admin (To be protected soon)
+// @access  Private (Admin)
 export const getWaitlist = async (req, res) => {
   try {
-    const entries = await Waitlist.find({}).sort({ createdAt: -1 });
+    const entries = await Waitlist.find({})
+      .sort({ priority: -1, createdAt: -1 })
+      .populate('updatedBy', 'email')
+      .populate('convertedMerchantId', 'email businessName paybillAccount')
+      .lean();
     res.json(entries);
   } catch (error) {
     console.error('Get Waitlist Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Pipeline analytics — counts, conversion rate, avg time-to-status.
+// @route   GET /api/waitlist/analytics
+// @access  Private (Admin)
+export const getWaitlistAnalytics = async (req, res) => {
+  try {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const [statusAgg, totalCount, recentCount, convertedAgg, typeAgg] = await Promise.all([
+      Waitlist.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
+      Waitlist.countDocuments(),
+      Waitlist.countDocuments({ createdAt: { $gte: sevenDaysAgo } }),
+      // Average days-to-convert (createdAt → convertedAt) for converted rows.
+      Waitlist.aggregate([
+        { $match: { status: 'converted', convertedAt: { $ne: null } } },
+        {
+          $project: {
+            days: {
+              $divide: [{ $subtract: ['$convertedAt', '$createdAt'] }, 1000 * 60 * 60 * 24],
+            },
+          },
+        },
+        { $group: { _id: null, avgDays: { $avg: '$days' } } },
+      ]),
+      // Top business types by frequency.
+      Waitlist.aggregate([
+        { $group: { _id: '$businessType', count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 5 },
+      ]),
+    ]);
+
+    const byStatus = ALLOWED_STATUSES.reduce((acc, s) => ({ ...acc, [s]: 0 }), {});
+    statusAgg.forEach((row) => { byStatus[row._id || 'pending'] = row.count; });
+
+    const convertedTotal = byStatus.converted || 0;
+    const conversionRate = totalCount > 0 ? (convertedTotal / totalCount) * 100 : 0;
+
+    res.json({
+      success: true,
+      data: {
+        total: totalCount,
+        recent7d: recentCount,
+        byStatus,
+        conversionRate: Number(conversionRate.toFixed(1)),
+        avgDaysToConvert: convertedAgg[0]?.avgDays != null ? Number(convertedAgg[0].avgDays.toFixed(1)) : null,
+        topBusinessTypes: typeAgg.map((row) => ({ type: row._id || 'Unknown', count: row.count })),
+      },
+    });
+  } catch (error) {
+    console.error('Waitlist Analytics Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Update pipeline status. Stamps contactedAt the first time the
+//          entry transitions to 'contacted', and tracks the admin who did it.
+// @route   PUT /api/waitlist/:id/status
+// @access  Private (Admin)
+export const updateWaitlistStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body || {};
+    if (!ALLOWED_STATUSES.includes(status)) {
+      return res.status(400).json({ error: 'Invalid status value.' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid id.' });
+    }
+    const entry = await Waitlist.findById(id);
+    if (!entry) return res.status(404).json({ error: 'Entry not found.' });
+
+    // Convert is a separate, heavier endpoint that mints a merchant. Block here.
+    if (status === 'converted') {
+      return res.status(400).json({ error: 'Use the convert endpoint to mark an entry as converted.' });
+    }
+
+    entry.status = status;
+    if (status === 'contacted' && !entry.contactedAt) entry.contactedAt = new Date();
+    entry.updatedBy = req.admin?._id || null;
+    await entry.save();
+
+    res.json({ success: true, data: entry });
+  } catch (error) {
+    console.error('Update Waitlist Status Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Toggle priority star on a waitlist entry.
+// @route   PUT /api/waitlist/:id/priority
+// @access  Private (Admin)
+export const toggleWaitlistPriority = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { priority } = req.body || {};
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid id.' });
+    }
+    const entry = await Waitlist.findById(id);
+    if (!entry) return res.status(404).json({ error: 'Entry not found.' });
+    entry.priority = !!priority;
+    entry.updatedBy = req.admin?._id || null;
+    await entry.save();
+    res.json({ success: true, data: entry });
+  } catch (error) {
+    console.error('Toggle Waitlist Priority Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Save internal admin notes on a waitlist entry.
+// @route   PUT /api/waitlist/:id/notes
+// @access  Private (Admin)
+export const updateWaitlistNotes = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { notes } = req.body || {};
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid id.' });
+    }
+    const trimmed = String(notes || '').slice(0, 2000);
+    const entry = await Waitlist.findById(id);
+    if (!entry) return res.status(404).json({ error: 'Entry not found.' });
+    entry.notes = trimmed || null;
+    entry.updatedBy = req.admin?._id || null;
+    await entry.save();
+    res.json({ success: true, data: entry });
+  } catch (error) {
+    console.error('Update Waitlist Notes Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Delete a waitlist entry (hard delete — entry is a candidate, not
+//          a real business record yet).
+// @route   DELETE /api/waitlist/:id
+// @access  Private (Admin)
+export const deleteWaitlistEntry = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid id.' });
+    }
+    const result = await Waitlist.deleteOne({ _id: id });
+    if (result.deletedCount === 0) return res.status(404).json({ error: 'Entry not found.' });
+    res.json({ success: true, message: 'Entry removed.' });
+  } catch (error) {
+    console.error('Delete Waitlist Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Convert a waitlist entry to a real Merchant — mints a unique
+//          5-digit account number + a 24h password-setup token, emails the
+//          merchant the secure setup link, and marks the entry as
+//          'converted' with a reference to the new Merchant.
+// @route   POST /api/waitlist/:id/convert
+// @access  Private (Admin)
+export const convertWaitlistEntry = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid id.' });
+    }
+
+    const entry = await Waitlist.findById(id);
+    if (!entry) return res.status(404).json({ error: 'Entry not found.' });
+    if (entry.status === 'converted') {
+      return res.status(409).json({ error: 'This entry has already been converted.' });
+    }
+    if (!entry.email) {
+      return res.status(400).json({ error: 'Cannot convert: this entry has no email address.' });
+    }
+
+    // Reject if a merchant with this email/phone already exists — the admin
+    // either onboarded them already or there's a data conflict.
+    const phone = String(entry.phone || '').replace(/\s+/g, '');
+    if (await Merchant.exists({ email: entry.email })) {
+      return res.status(409).json({ error: 'A merchant with that email already exists.' });
+    }
+    if (phone && await Merchant.exists({ phone })) {
+      return res.status(409).json({ error: 'A merchant with that phone already exists.' });
+    }
+
+    // Mint unique paybill (retry up to 25× — collision is vanishingly rare).
+    let paybillAccount;
+    for (let i = 0; i < 25; i++) {
+      const candidate = crypto.randomInt(10000, 100000).toString();
+      const exists = await Merchant.exists({ paybillAccount: candidate });
+      if (!exists) { paybillAccount = candidate; break; }
+    }
+    if (!paybillAccount) {
+      return res.status(500).json({ error: 'Could not allocate a unique account number.' });
+    }
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    const merchant = await Merchant.create({
+      name: entry.fullName,
+      email: entry.email,
+      phone,
+      businessName: entry.businessName,
+      paybillAccount,
+      registrationSource: 'web',
+      isVerified: true,
+      invitedBy: req.admin?._id || null,
+      passwordResetToken: hashedToken,
+      passwordResetExpires: expires,
+    });
+
+    const setupLink = `${MERCHANT_DASHBOARD_URL.replace(/\/$/, '')}/setup-password?token=${rawToken}`;
+    sendMerchantInvite(entry.email, entry.fullName, entry.businessName, paybillAccount, setupLink)
+      .catch((err) => console.error('Convert: invite email failed:', err));
+
+    entry.status = 'converted';
+    entry.convertedAt = new Date();
+    entry.convertedMerchantId = merchant._id;
+    entry.updatedBy = req.admin?._id || null;
+    await entry.save();
+
+    res.json({
+      success: true,
+      message: 'Waitlist entry converted to merchant. Setup invite emailed.',
+      data: {
+        waitlistId: entry._id,
+        merchantId: merchant._id,
+        paybillAccount,
+        email: entry.email,
+      },
+    });
+  } catch (error) {
+    console.error('Convert Waitlist Error:', error);
+    if (error.code === 11000) {
+      return res.status(409).json({ error: 'A merchant with that email or phone already exists.' });
+    }
     res.status(500).json({ error: 'Server Error' });
   }
 };

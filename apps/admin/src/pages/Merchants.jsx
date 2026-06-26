@@ -177,6 +177,13 @@ const Merchants = () => {
 
   useEffect(() => { fetchMerchants(); }, [fetchMerchants]);
 
+  // Global sync (header refresh button)
+  useEffect(() => {
+    const h = () => fetchMerchants();
+    window.addEventListener('paychain:sync', h);
+    return () => window.removeEventListener('paychain:sync', h);
+  }, [fetchMerchants]);
+
   // Close the row action menu when clicking outside it.
   useEffect(() => {
     const onClick = (e) => {

@@ -29,7 +29,36 @@ const WaitlistSchema = new mongoose.Schema({
   challenge: {
     type: String,
     trim: true
-  }
+  },
+  // ─── Pipeline state — set by admins, drives the dashboard tabs/stats ───
+  status: {
+    type: String,
+    enum: ['pending', 'contacted', 'approved', 'rejected', 'converted'],
+    default: 'pending',
+    index: true,
+  },
+  priority: {
+    type: Boolean,
+    default: false,
+    index: true,
+  },
+  notes: {
+    type: String,
+    default: null,
+    maxlength: 2000,
+  },
+  contactedAt: { type: Date, default: null },
+  convertedAt: { type: Date, default: null },
+  convertedMerchantId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Merchant',
+    default: null,
+  },
+  updatedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin',
+    default: null,
+  },
 }, {
   timestamps: true
 });

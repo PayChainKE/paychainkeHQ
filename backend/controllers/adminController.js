@@ -7,6 +7,7 @@ import PayoutBatch from '../models/PayoutBatch.js';
 import STKRequest from '../models/STKRequest.js';
 import Payee from '../models/Payee.js';
 import PaymentLink from '../models/PaymentLink.js';
+import Waitlist from '../models/Waitlist.js';
 import { sendMerchantInvite, sendAdminActionOTP } from '../utils/resend.js';
 
 // Allowed sensitive actions an admin can request against a merchant.
@@ -554,6 +555,344 @@ export const createMerchant = async (req, res) => {
       const messages = Object.values(error.errors).map((v) => v.message);
       return res.status(400).json({ error: messages.join(', ') });
     }
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Wallet Ledger — paginated transaction trail + KPIs + asset
+//          breakdown + daily volume series + type mix. Powers the
+//          unicorn-grade Ledger page.
+// @route   GET /api/admin/ledger?range=24h|7d|30d|all&page=1&limit=25&type=&status=&q=
+// @access  Private (Admin)
+export const getLedger = async (req, res) => {
+  try {
+    const range = ['24h', '7d', '30d', 'all'].includes(req.query.range) ? req.query.range : '7d';
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(5, parseInt(req.query.limit, 10) || 25));
+    const type = req.query.type && req.query.type !== 'all' ? req.query.type : null;
+    const status = req.query.status && req.query.status !== 'all' ? req.query.status : null;
+    const q = (req.query.q || '').trim();
+
+    const now = new Date();
+    const days = range === '24h' ? 1 : range === '7d' ? 7 : range === '30d' ? 30 : 365 * 5;
+    const since = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+    const prevSince = new Date(since.getTime() - days * 24 * 60 * 60 * 1000);
+
+    const baseFilter = { createdAt: { $gte: since } };
+    if (type) baseFilter.type = type;
+    if (status) baseFilter.status = status;
+    if (q) {
+      baseFilter.$or = [
+        { reference: { $regex: q, $options: 'i' } },
+        { accountNumber: { $regex: q, $options: 'i' } },
+        { 'sender.name': { $regex: q, $options: 'i' } },
+        { 'sender.id': { $regex: q, $options: 'i' } },
+      ];
+    }
+
+    const [total, txns, allInRange, prev, typeAgg, daily] = await Promise.all([
+      Transaction.countDocuments(baseFilter),
+      Transaction.find(baseFilter)
+        .sort('-createdAt')
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .populate('merchantId', 'businessName paybillAccount status flagged')
+        .lean(),
+      // Aggregates over the FULL range (ignore q/type/status filters so KPIs reflect headline performance, not user's view)
+      Transaction.aggregate([
+        { $match: { createdAt: { $gte: since } } },
+        {
+          $group: {
+            _id: null,
+            count: { $sum: 1 },
+            volume: { $sum: '$amount' },
+            kesVolume: { $sum: '$kesAmount' },
+            usdcVolume: { $sum: '$usdcAmount' },
+            completed: { $sum: { $cond: [{ $in: ['$status', ['completed', 'verified']] }, 1, 0] } },
+            failed: { $sum: { $cond: [{ $eq: ['$status', 'failed'] }, 1, 0] } },
+            pending: { $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] } },
+          },
+        },
+      ]),
+      Transaction.aggregate([
+        { $match: { createdAt: { $gte: prevSince, $lt: since } } },
+        { $group: { _id: null, count: { $sum: 1 }, volume: { $sum: '$amount' } } },
+      ]),
+      Transaction.aggregate([
+        { $match: { createdAt: { $gte: since } } },
+        { $group: { _id: '$type', count: { $sum: 1 }, volume: { $sum: '$amount' } } },
+        { $sort: { volume: -1 } },
+      ]),
+      Transaction.aggregate([
+        { $match: { createdAt: { $gte: since } } },
+        {
+          $group: {
+            _id: { $dateToString: { format: range === '24h' ? '%Y-%m-%d %H:00' : '%Y-%m-%d', date: '$createdAt' } },
+            volume: { $sum: '$amount' },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]),
+    ]);
+
+    const cur = allInRange[0] || { count: 0, volume: 0, kesVolume: 0, usdcVolume: 0, completed: 0, failed: 0, pending: 0 };
+    const prv = prev[0] || { count: 0, volume: 0 };
+    const pct = (a, b) => (b ? Number((((a - b) / b) * 100).toFixed(1)) : (a > 0 ? 100 : 0));
+
+    const settlementRatio = cur.count > 0 ? Number(((cur.completed / cur.count) * 100).toFixed(1)) : 100;
+    // Fee model placeholder — 1% of completed volume. Replace with real fee
+    // ledger once it's available.
+    const estimatedFees = cur.volume * 0.01;
+
+    res.json({
+      success: true,
+      data: {
+        range,
+        kpis: {
+          volume: { value: cur.volume, change: pct(cur.volume, prv.volume) },
+          count: { value: cur.count, change: pct(cur.count, prv.count) },
+          settlementRatio,
+          estimatedFees,
+          failed: cur.failed,
+          pending: cur.pending,
+        },
+        assets: {
+          kes: cur.kesVolume || cur.volume,
+          usdc: cur.usdcVolume || 0,
+        },
+        typeMix: typeAgg.map((r) => ({ type: r._id || 'other', count: r.count, volume: r.volume })),
+        series: daily.map((r) => ({ bucket: r._id, volume: r.volume, count: r.count })),
+        // Paginated table
+        transactions: txns.map((t) => ({
+          _id: t._id,
+          reference: t.reference,
+          createdAt: t.createdAt,
+          type: t.type,
+          amount: t.amount,
+          kesAmount: t.kesAmount,
+          usdcAmount: t.usdcAmount,
+          currency: t.currency,
+          status: t.status,
+          accountNumber: t.accountNumber,
+          sender: t.sender,
+          recipient: t.recipient,
+          merchant: t.merchantId
+            ? {
+                _id: t.merchantId._id,
+                businessName: t.merchantId.businessName,
+                paybillAccount: t.merchantId.paybillAccount,
+                status: t.merchantId.status,
+                flagged: t.merchantId.flagged,
+              }
+            : null,
+        })),
+        pagination: { page, limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) },
+      },
+    });
+  } catch (error) {
+    console.error('Get Ledger Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Executive insights — aggregated KPIs (GTV, growth, conversion
+//          funnel, top merchants, time series). One round trip; everything
+//          the Insights page renders comes from here.
+// @route   GET /api/admin/insights?range=7d|30d|90d|all
+// @access  Private (Admin)
+export const getInsights = async (req, res) => {
+  try {
+    const range = ['7d', '30d', '90d', 'all'].includes(req.query.range) ? req.query.range : '30d';
+    const now = new Date();
+    const days = range === '7d' ? 7 : range === '30d' ? 30 : range === '90d' ? 90 : 365 * 5;
+    const since = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+    // Previous period of equal length for delta computation.
+    const prevSince = new Date(since.getTime() - days * 24 * 60 * 60 * 1000);
+
+    const pctChange = (curr, prev) => {
+      if (!prev) return curr > 0 ? 100 : 0;
+      return Number((((curr - prev) / prev) * 100).toFixed(1));
+    };
+
+    // ── Merchant health snapshot ─────────────────────────────────────
+    const [
+      totalMerchants, activeMerchants, lockedMerchants, flaggedMerchants,
+      newMerchantsCurr, newMerchantsPrev,
+      verifiedMerchants, kraVerified, withWallet,
+    ] = await Promise.all([
+      Merchant.countDocuments(),
+      Merchant.countDocuments({ status: { $ne: 'locked' } }),
+      Merchant.countDocuments({ status: 'locked' }),
+      Merchant.countDocuments({ flagged: true }),
+      Merchant.countDocuments({ createdAt: { $gte: since } }),
+      Merchant.countDocuments({ createdAt: { $gte: prevSince, $lt: since } }),
+      Merchant.countDocuments({ isVerified: true }),
+      Merchant.countDocuments({ isKRAVerified: true }),
+      Merchant.countDocuments({ stellarPublicKey: { $ne: null } }),
+    ]);
+
+    // Dormant = last activity older than 30 days OR never logged in. We use
+    // lastLogin as the cheap proxy; aligns with the activityTier on /merchants.
+    const dormantSince = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const dormantMerchants = await Merchant.countDocuments({
+      $or: [{ lastLogin: { $lt: dormantSince } }, { lastLogin: null }],
+    });
+
+    // ── Transaction / GTV ────────────────────────────────────────────
+    const [gtvCurr, gtvPrev, gtvSeries] = await Promise.all([
+      Transaction.aggregate([
+        { $match: { createdAt: { $gte: since }, status: { $in: ['completed', 'verified'] } } },
+        { $group: { _id: null, count: { $sum: 1 }, volume: { $sum: '$amount' } } },
+      ]),
+      Transaction.aggregate([
+        { $match: { createdAt: { $gte: prevSince, $lt: since }, status: { $in: ['completed', 'verified'] } } },
+        { $group: { _id: null, count: { $sum: 1 }, volume: { $sum: '$amount' } } },
+      ]),
+      // Daily volume series for the sparkline / area chart.
+      Transaction.aggregate([
+        { $match: { createdAt: { $gte: since }, status: { $in: ['completed', 'verified'] } } },
+        {
+          $group: {
+            _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+            count: { $sum: 1 },
+            volume: { $sum: '$amount' },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]),
+    ]);
+
+    const gtvVolume = gtvCurr[0]?.volume || 0;
+    const gtvVolumePrev = gtvPrev[0]?.volume || 0;
+    const gtvCount = gtvCurr[0]?.count || 0;
+    const gtvCountPrev = gtvPrev[0]?.count || 0;
+
+    // ── Signups time series ─────────────────────────────────────────
+    const signupsSeries = await Merchant.aggregate([
+      { $match: { createdAt: { $gte: since } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    // ── Conversion funnel (waitlist → merchant) ──────────────────────
+    const [waitlistCounts, convertedFromWaitlist] = await Promise.all([
+      Waitlist.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
+      Waitlist.countDocuments({ status: 'converted' }),
+    ]);
+    const wlByStatus = waitlistCounts.reduce(
+      (acc, r) => ({ ...acc, [r._id || 'pending']: r.count }), {}
+    );
+    const waitlistTotal = Object.values(wlByStatus).reduce((s, n) => s + n, 0);
+
+    // ── Top merchants by 30d volume ──────────────────────────────────
+    const topMerchantsRaw = await Transaction.aggregate([
+      { $match: { createdAt: { $gte: since }, status: { $in: ['completed', 'verified'] }, merchantId: { $ne: null } } },
+      {
+        $group: {
+          _id: '$merchantId',
+          txnCount: { $sum: 1 },
+          volume: { $sum: '$amount' },
+        },
+      },
+      { $sort: { volume: -1 } },
+      { $limit: 8 },
+    ]);
+    const topMerchantIds = topMerchantsRaw.map((r) => r._id);
+    const topMerchantDocs = await Merchant.find({ _id: { $in: topMerchantIds } })
+      .select('businessName name paybillAccount status flagged')
+      .lean();
+    const docMap = new Map(topMerchantDocs.map((d) => [String(d._id), d]));
+    const topMerchants = topMerchantsRaw.map((row) => {
+      const doc = docMap.get(String(row._id)) || {};
+      return {
+        _id: row._id,
+        businessName: doc.businessName || '— Unknown —',
+        name: doc.name || '',
+        paybillAccount: doc.paybillAccount || '',
+        status: doc.status || 'active',
+        flagged: !!doc.flagged,
+        txnCount: row.txnCount,
+        volume: row.volume,
+      };
+    });
+
+    // ── Transaction type mix ─────────────────────────────────────────
+    const txnTypeMix = await Transaction.aggregate([
+      { $match: { createdAt: { $gte: since } } },
+      { $group: { _id: '$type', count: { $sum: 1 }, volume: { $sum: '$amount' } } },
+      { $sort: { volume: -1 } },
+    ]);
+
+    // ── Business-type distribution (across all merchants via waitlist
+    // source, since merchant docs don't carry a businessType field).
+    const businessTypes = await Waitlist.aggregate([
+      { $group: { _id: '$businessType', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 6 },
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        range,
+        since,
+        // KPIs
+        kpis: {
+          gtv: {
+            value: gtvVolume,
+            prev: gtvVolumePrev,
+            change: pctChange(gtvVolume, gtvVolumePrev),
+          },
+          txnCount: {
+            value: gtvCount,
+            prev: gtvCountPrev,
+            change: pctChange(gtvCount, gtvCountPrev),
+          },
+          newMerchants: {
+            value: newMerchantsCurr,
+            prev: newMerchantsPrev,
+            change: pctChange(newMerchantsCurr, newMerchantsPrev),
+          },
+          totalMerchants,
+          activeMerchants,
+        },
+        // Health
+        health: {
+          total: totalMerchants,
+          active: activeMerchants,
+          locked: lockedMerchants,
+          flagged: flaggedMerchants,
+          dormant: dormantMerchants,
+          verified: verifiedMerchants,
+          kraVerified,
+          withWallet,
+        },
+        // Conversion funnel
+        funnel: {
+          waitlistTotal,
+          pending: wlByStatus.pending || 0,
+          contacted: wlByStatus.contacted || 0,
+          approved: wlByStatus.approved || 0,
+          converted: convertedFromWaitlist,
+          activeMerchants,
+        },
+        // Series
+        gtvSeries: gtvSeries.map((r) => ({ date: r._id, count: r.count, volume: r.volume })),
+        signupsSeries: signupsSeries.map((r) => ({ date: r._id, count: r.count })),
+        // Leaderboards
+        topMerchants,
+        txnTypeMix: txnTypeMix.map((r) => ({ type: r._id || 'other', count: r.count, volume: r.volume })),
+        businessTypes: businessTypes.map((r) => ({ type: r._id || 'Unknown', count: r.count })),
+      },
+    });
+  } catch (error) {
+    console.error('Get Insights Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };
