@@ -1,6 +1,7 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
+import helmet from 'helmet';
 import connectDB from './config/database.js';
 import authRoutes from './routes/authRoutes.js';
 import waitlistRoutes from './routes/waitlistRoutes.js';
@@ -61,7 +62,19 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
   optionsSuccessStatus: 200 // Some older browsers (IE11, various SmartTVs) choke on 204
 }));
-app.use(express.json());
+// Trust Render's proxy so req.ip reflects the real client (needed for rate limiting).
+app.set('trust proxy', 1);
+
+// Security headers: HSTS, frame guard, no-sniff, referrer policy, XSS protections, etc.
+app.use(helmet({
+  // The admin/merchant dashboards live on different origins; CSP is enforced at
+  // the frontend hosting layer (Vercel) so we keep the backend CSP off here to
+  // avoid blocking cross-origin API responses.
+  contentSecurityPolicy: false,
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
+
+app.use(express.json({ limit: '1mb' }));
 
 // Routes
 app.use('/api/auth', authRoutes);

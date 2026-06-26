@@ -3,6 +3,23 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import logo from '../assets/logo.png';
 
+// Mask an email for display so observers can't read it off the OTP screen.
+// "admin@paychain.co.ke" → "a•••n@p••••••.co.ke"
+function maskEmail(raw) {
+  if (!raw || typeof raw !== 'string' || !raw.includes('@')) return '';
+  const [local, domain] = raw.split('@');
+  const maskLocal = local.length <= 2
+    ? local[0] + '•'
+    : local[0] + '•'.repeat(Math.max(1, local.length - 2)) + local[local.length - 1];
+  const dotIdx = domain.lastIndexOf('.');
+  const domainBase = dotIdx === -1 ? domain : domain.slice(0, dotIdx);
+  const tld = dotIdx === -1 ? '' : domain.slice(dotIdx);
+  const maskDomain = domainBase.length <= 2
+    ? domainBase[0] + '•' + tld
+    : domainBase[0] + '•'.repeat(Math.max(1, domainBase.length - 1)) + tld;
+  return `${maskLocal}@${maskDomain}`;
+}
+
 const Login = () => {
   const { login, verifyOtp } = useAuth();
   const navigate = useNavigate();
@@ -19,9 +36,13 @@ const Login = () => {
     e.preventDefault();
     setLoading(true);
     setError('');
-    
+
     const res = await login(email, password);
     if (res.mfaRequired) {
+      // Wipe the password from React state as soon as it's no longer needed.
+      // The PII still lives in the network call but at least it's out of the
+      // component tree before the OTP screen renders.
+      setPassword('');
       setStep(2);
     } else if (!res.success) {
       setError(res.error);
@@ -97,13 +118,18 @@ const Login = () => {
               {step === 1 ? 'Sign in' : 'Verify Identity'}
             </h3>
             <p className="text-on-surface-variant font-medium mt-2 opacity-70">
-              {step === 1 
-                ? 'Authorized access for PayChain administrators.' 
-                : `We've sent a 6-digit code to ${email}`}
+              {step === 1
+                ? 'Authorized access for PayChain administrators.'
+                : `We've sent a 6-digit code to ${maskEmail(email)}`}
             </p>
           </div>
 
-          <form onSubmit={step === 1 ? handleLogin : handleVerifyOtp} className="space-y-6">
+          <form
+            onSubmit={step === 1 ? handleLogin : handleVerifyOtp}
+            className="space-y-6"
+            autoComplete="off"
+            spellCheck={false}
+          >
             {error && (
               <div className="bg-red-50 border border-red-200 p-4 rounded-xl flex items-center gap-3 text-red-700 animate-shake">
                 <span className="material-symbols-outlined text-lg">error_outline</span>
@@ -117,12 +143,20 @@ const Login = () => {
                   <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1" htmlFor="email">Email address</label>
                   <input
                     id="email"
+                    name="admin_login_id"
                     className="w-full bg-white border border-outline-variant/15 rounded-2xl py-3.5 lg:py-4 px-5 text-lg font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@example.com"
                     type="email"
                     required
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
+                    data-1p-ignore="true"
+                    data-lpignore="true"
+                    data-form-type="other"
                   />
                 </div>
 
@@ -134,12 +168,20 @@ const Login = () => {
                   <div className="relative">
                     <input
                       id="password"
+                      name="admin_login_secret"
                       type={showPassword ? "text" : "password"}
                       className="w-full bg-white border border-outline-variant/15 rounded-2xl py-3.5 lg:py-4 px-5 text-lg font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40 pr-14"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••"
                       required
+                      autoComplete="new-password"
+                      autoCorrect="off"
+                      autoCapitalize="off"
+                      spellCheck={false}
+                      data-1p-ignore="true"
+                      data-lpignore="true"
+                      data-form-type="other"
                     />
                     <button 
                       type="button" 
@@ -159,12 +201,16 @@ const Login = () => {
                   <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1" htmlFor="otp">Verification Code</label>
                   <input
                     id="otp"
+                    name="admin_otp_code"
                     className="w-full bg-white border border-outline-variant/15 rounded-2xl py-4 px-5 text-3xl font-headline text-primary text-center tracking-[0.5em] focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/20"
                     value={otpCode}
                     onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                     placeholder="000000"
                     type="text"
                     inputMode="numeric"
+                    autoComplete="one-time-code"
+                    spellCheck={false}
+                    maxLength={6}
                     required
                     autoFocus
                   />
