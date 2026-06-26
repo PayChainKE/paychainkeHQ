@@ -2,6 +2,12 @@ import React, { useState, useEffect } from 'react';
 import Layout from '../components/layout/Layout';
 import api from '../api/api';
 
+// Inline skeleton bar that mimics text height/width while data loads.
+// Subtle pulse, no abrupt "0 → real" flicker on first render.
+const Skel = ({ className = 'w-12 h-7' }) => (
+  <span className={`inline-block ${className} bg-on-surface/10 rounded animate-pulse align-middle`} aria-hidden="true" />
+);
+
 const Overview = () => {
   const [waitlist, setWaitlist] = useState([]);
   const [messages, setMessages] = useState([]);
@@ -74,30 +80,38 @@ const Overview = () => {
             <div className="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/20 flex flex-col gap-1 transition-all hover:scale-[1.01] hover:shadow-premium-glow">
               <span className="text-[12px] font-medium text-on-surface-variant/60">Total Entries</span>
               <div className="flex items-baseline gap-2">
-                <span className="text-[28px] font-semibold text-on-surface tracking-tighter">{stats.total}</span>
+                {loading
+                  ? <Skel className="w-14 h-7" />
+                  : <span className="text-[28px] font-semibold text-on-surface tracking-tighter">{stats.total}</span>}
                 <span className="text-[12px] font-bold text-secondary tracking-tight">Live</span>
               </div>
             </div>
             <div className="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/20 flex flex-col gap-1 relative overflow-hidden transition-all hover:scale-[1.01] hover:shadow-sm">
-              <div className="absolute top-0 right-0 w-1 h-full bg-amber-400 animate-pulse"></div>
+              {!loading && stats.pending > 0 && <div className="absolute top-0 right-0 w-1 h-full bg-amber-400"></div>}
               <span className="text-[12px] font-medium text-on-surface-variant/60">Pending Review</span>
               <div className="flex items-baseline gap-2">
-                <span className="text-[28px] font-semibold text-on-surface tracking-tighter">{stats.pending}</span>
-                <span className="w-2 h-2 bg-amber-400 rounded-full animate-pulse"></span>
+                {loading
+                  ? <Skel className="w-14 h-7" />
+                  : <span className="text-[28px] font-semibold text-on-surface tracking-tighter">{stats.pending}</span>}
+                {!loading && stats.pending > 0 && <span className="w-2 h-2 bg-amber-400 rounded-full"></span>}
               </div>
             </div>
             <div className="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/20 flex flex-col gap-1 transition-all hover:scale-[1.01] hover:shadow-premium-glow">
               <span className="text-[12px] font-medium text-on-surface-variant/60">Approved</span>
               <div className="flex items-baseline gap-2">
-                <span className="text-[28px] font-semibold text-on-surface tracking-tighter">{stats.approved}</span>
+                {loading
+                  ? <Skel className="w-14 h-7" />
+                  : <span className="text-[28px] font-semibold text-on-surface tracking-tighter">{stats.approved}</span>}
               </div>
             </div>
             <div className="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/20 flex flex-col gap-1 transition-all hover:scale-[1.01] hover:shadow-sm">
               <span className="text-[12px] font-medium text-on-surface-variant/60">Conversion Rate</span>
               <div className="flex items-baseline gap-2">
-                <span className="text-[28px] font-semibold text-on-surface tracking-tighter">
-                  {stats.total > 0 ? ((stats.converted / stats.total) * 100).toFixed(1) : 0}%
-                </span>
+                {loading
+                  ? <Skel className="w-16 h-7" />
+                  : <span className="text-[28px] font-semibold text-on-surface tracking-tighter">
+                      {stats.total > 0 ? ((stats.converted / stats.total) * 100).toFixed(1) : 0}%
+                    </span>}
                 <span className="text-[12px] font-bold text-secondary tracking-tight">Stable</span>
               </div>
             </div>
@@ -110,7 +124,7 @@ const Overview = () => {
             <span className="text-[11px] font-bold uppercase tracking-widest font-label">Digital Wallet Ecosystem</span>
             <div className="flex-1 h-[1px] bg-outline-variant/10"></div>
             <div className="flex items-center gap-1.5 bg-[#0F141E] border border-[#1E2532] rounded-full px-3 py-1">
-              <div className="w-1.5 h-1.5 rounded-full bg-[#35D07F] animate-pulse shadow-[0_0_6px_rgba(53,208,127,0.6)]"></div>
+              <div className="w-1.5 h-1.5 rounded-full bg-[#35D07F] shadow-[0_0_6px_rgba(53,208,127,0.6)]"></div>
               <span className="text-[9px] font-black uppercase tracking-widest text-[#35D07F]">Stellar Testnet Live</span>
             </div>
           </div>
@@ -120,7 +134,9 @@ const Overview = () => {
               <div className="absolute top-0 right-0 w-24 h-24 bg-[#2775CA]/10 rounded-full -mr-8 -mt-8 blur-2xl group-hover:bg-[#2775CA]/20 transition-all pointer-events-none"></div>
               <span className="text-[11px] font-bold text-[#8B98A9] uppercase tracking-widest">Active Wallets</span>
               <div className="flex items-baseline gap-2 mt-1">
-                <span className="text-[32px] font-bold text-white tracking-tighter">{merchantAnalytics?.activeWallets ?? 0}</span>
+                {loading
+                  ? <Skel className="w-16 h-8 bg-white/10" />
+                  : <span className="text-[32px] font-bold text-white tracking-tighter">{merchantAnalytics?.activeWallets ?? 0}</span>}
                 <span className="text-[11px] font-bold text-[#2775CA]">Merchants</span>
               </div>
               <p className="text-[10px] text-[#8B98A9]/60 mt-1">Unique Stellar wallets provisioned</p>
@@ -131,9 +147,11 @@ const Overview = () => {
               <div className="absolute top-0 right-0 w-24 h-24 bg-[#35D07F]/10 rounded-full -mr-8 -mt-8 blur-2xl group-hover:bg-[#35D07F]/20 transition-all pointer-events-none"></div>
               <span className="text-[11px] font-bold text-[#8B98A9] uppercase tracking-widest">Total USDC Locked</span>
               <div className="flex items-baseline gap-2 mt-1">
-                <span className="text-[32px] font-bold text-white tracking-tighter">
-                  {(merchantAnalytics?.totalUsdcLocked ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
+                {loading
+                  ? <Skel className="w-24 h-8 bg-white/10" />
+                  : <span className="text-[32px] font-bold text-white tracking-tighter">
+                      {(merchantAnalytics?.totalUsdcLocked ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>}
                 <span className="text-[11px] font-bold text-[#35D07F]">USDC</span>
               </div>
               <p className="text-[10px] text-[#8B98A9]/60 mt-1">Settled via Inflation Shield</p>
@@ -144,16 +162,18 @@ const Overview = () => {
               <div className="absolute top-0 right-0 w-24 h-24 bg-[#F0B429]/10 rounded-full -mr-8 -mt-8 blur-2xl group-hover:bg-[#F0B429]/20 transition-all pointer-events-none"></div>
               <span className="text-[11px] font-bold text-[#8B98A9] uppercase tracking-widest">Activation Rate</span>
               <div className="flex items-baseline gap-2 mt-1">
-                <span className="text-[32px] font-bold text-white tracking-tighter">
-                  {merchantAnalytics?.totalMerchants > 0
-                    ? ((merchantAnalytics.activeWallets / merchantAnalytics.totalMerchants) * 100).toFixed(1)
-                    : '0.0'}%
-                </span>
+                {loading
+                  ? <Skel className="w-20 h-8 bg-white/10" />
+                  : <span className="text-[32px] font-bold text-white tracking-tighter">
+                      {merchantAnalytics?.totalMerchants > 0
+                        ? ((merchantAnalytics.activeWallets / merchantAnalytics.totalMerchants) * 100).toFixed(1)
+                        : '0.0'}%
+                    </span>}
               </div>
               <div className="mt-2 w-full h-1.5 bg-[#1A212D] rounded-full overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-[#F0B429] to-[#35D07F] rounded-full transition-all duration-700"
-                  style={{ width: `${merchantAnalytics?.totalMerchants > 0 ? (merchantAnalytics.activeWallets / merchantAnalytics.totalMerchants) * 100 : 0}%` }}
+                  style={{ width: `${!loading && merchantAnalytics?.totalMerchants > 0 ? (merchantAnalytics.activeWallets / merchantAnalytics.totalMerchants) * 100 : 0}%` }}
                 ></div>
               </div>
             </div>
@@ -162,9 +182,11 @@ const Overview = () => {
             <div className="bg-gradient-to-br from-[#0F141E] to-[#0A0D14] p-5 rounded-xl border border-[#1E2532] flex flex-col gap-1 relative overflow-hidden group hover:border-[#8B98A9]/30 transition-all">
               <span className="text-[11px] font-bold text-[#8B98A9] uppercase tracking-widest">Pending Activation</span>
               <div className="flex items-baseline gap-2 mt-1">
-                <span className="text-[32px] font-bold text-white tracking-tighter">
-                  {(merchantAnalytics?.totalMerchants ?? 0) - (merchantAnalytics?.activeWallets ?? 0)}
-                </span>
+                {loading
+                  ? <Skel className="w-16 h-8 bg-white/10" />
+                  : <span className="text-[32px] font-bold text-white tracking-tighter">
+                      {(merchantAnalytics?.totalMerchants ?? 0) - (merchantAnalytics?.activeWallets ?? 0)}
+                    </span>}
                 <span className="text-[11px] font-bold text-[#8B98A9]">Merchants</span>
               </div>
               <p className="text-[10px] text-[#8B98A9]/60 mt-1">Yet to activate digital wallet</p>
@@ -205,7 +227,9 @@ const Overview = () => {
               <div className="w-40 h-40 rounded-full border-[16px] border-primary flex items-center justify-center relative">
                 <div className="absolute inset-[-16px] w-40 h-40 rounded-full border-[16px] border-transparent border-t-secondary border-r-secondary-container rotate-[45deg]"></div>
                 <div className="text-center font-body">
-                  <span className="block text-xl font-bold tracking-tight">{merchantAnalytics?.totalMerchants || 0}</span>
+                  {loading
+                    ? <Skel className="w-10 h-6 mb-0.5" />
+                    : <span className="block text-xl font-bold tracking-tight">{merchantAnalytics?.totalMerchants || 0}</span>}
                   <span className="text-[10px] uppercase font-bold text-on-surface-variant/40 tracking-widest">Total</span>
                 </div>
               </div>
@@ -213,15 +237,15 @@ const Overview = () => {
             <div className="mt-6 space-y-2">
               <div className="flex items-center justify-between text-[12px] font-medium">
                 <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-primary"></span> Verified Accounts</div>
-                <span className="font-bold">{merchantAnalytics?.verifiedMerchants || 0}</span>
+                {loading ? <Skel className="w-6 h-4" /> : <span className="font-bold">{merchantAnalytics?.verifiedMerchants || 0}</span>}
               </div>
               <div className="flex items-center justify-between text-[12px] font-medium">
                 <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-secondary"></span> Unverified Accounts</div>
-                <span className="font-bold">{merchantAnalytics?.unverifiedMerchants || 0}</span>
+                {loading ? <Skel className="w-6 h-4" /> : <span className="font-bold">{merchantAnalytics?.unverifiedMerchants || 0}</span>}
               </div>
               <div className="flex items-center justify-between text-[12px] font-medium">
                 <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-secondary-container"></span> Signups (Last 7 Days)</div>
-                <span className="font-bold">{merchantAnalytics?.recentMerchants || 0}</span>
+                {loading ? <Skel className="w-6 h-4" /> : <span className="font-bold">{merchantAnalytics?.recentMerchants || 0}</span>}
               </div>
             </div>
           </div>
@@ -234,10 +258,10 @@ const Overview = () => {
           </div>
           <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/20">
             <div className="flex w-full gap-2 overflow-x-auto no-scrollbar">
-              <div className="flex-1 min-w-[80px] h-12 bg-primary rounded-lg flex items-center justify-center text-on-primary text-[10px] font-bold tracking-widest uppercase">WAITLIST ({stats.total})</div>
-              <div className="flex-[0.85] min-w-[80px] h-12 bg-primary/90 rounded-lg flex items-center justify-center text-on-primary text-[10px] font-bold tracking-widest uppercase">APPROVED ({stats.approved})</div>
-              <div className="flex-[0.7] min-w-[80px] h-12 bg-primary/80 rounded-lg flex items-center justify-center text-on-primary text-[10px] font-bold tracking-widest uppercase">KYC ({stats.kyc})</div>
-              <div className="flex-[0.55] min-w-[80px] h-12 bg-secondary rounded-lg flex items-center justify-center text-on-secondary text-[10px] font-bold tracking-widest uppercase">CONVERTED ({stats.converted})</div>
+              <div className="flex-1 min-w-[80px] h-12 bg-primary rounded-lg flex items-center justify-center text-on-primary text-[10px] font-bold tracking-widest uppercase">WAITLIST {loading ? '' : `(${stats.total})`}</div>
+              <div className="flex-[0.85] min-w-[80px] h-12 bg-primary/90 rounded-lg flex items-center justify-center text-on-primary text-[10px] font-bold tracking-widest uppercase">APPROVED {loading ? '' : `(${stats.approved})`}</div>
+              <div className="flex-[0.7] min-w-[80px] h-12 bg-primary/80 rounded-lg flex items-center justify-center text-on-primary text-[10px] font-bold tracking-widest uppercase">KYC {loading ? '' : `(${stats.kyc})`}</div>
+              <div className="flex-[0.55] min-w-[80px] h-12 bg-secondary rounded-lg flex items-center justify-center text-on-secondary text-[10px] font-bold tracking-widest uppercase">CONVERTED {loading ? '' : `(${stats.converted})`}</div>
             </div>
           </div>
         </section>
