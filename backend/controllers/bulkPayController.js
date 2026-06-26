@@ -126,7 +126,7 @@ export const setBulkPayPin = async (req, res) => {
       return res.status(400).json({ message: 'PIN must be exactly 4 digits' });
     }
 
-    const salt = await bcrypt.genSalt(10);
+    const salt = await bcrypt.genSalt(12);
     const hashedPin = await bcrypt.hash(pin, salt);
 
     await Merchant.findByIdAndUpdate(req.merchant._id, { bulkPayPin: hashedPin });
@@ -157,7 +157,7 @@ export const resetBulkPayPin = async (req, res) => {
       return res.status(401).json({ message: 'Current PIN is incorrect.' });
     }
 
-    const salt = await bcrypt.genSalt(10);
+    const salt = await bcrypt.genSalt(12);
     const hashedPin = await bcrypt.hash(newPin, salt);
 
     await Merchant.findByIdAndUpdate(req.merchant._id, { bulkPayPin: hashedPin });

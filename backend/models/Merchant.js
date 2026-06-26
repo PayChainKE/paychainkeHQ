@@ -131,7 +131,9 @@ merchantSchema.pre('save', async function() {
     return;
   }
 
-  const salt = await bcrypt.genSalt(10);
+  // 12 rounds = OWASP 2024 recommendation. Existing rounds=10 hashes still
+  // verify correctly via bcrypt.compare (rounds are embedded in the hash).
+  const salt = await bcrypt.genSalt(12);
   this.password = await bcrypt.hash(this.password, salt);
 });
 
