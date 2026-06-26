@@ -120,7 +120,7 @@ const Login = () => {
                     className="w-full bg-white border border-outline-variant/15 rounded-2xl py-3.5 lg:py-4 px-5 text-lg font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="admin@paychain.co.ke"
+                    placeholder="you@example.com"
                     type="email"
                     required
                   />
