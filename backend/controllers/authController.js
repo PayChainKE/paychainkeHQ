@@ -68,6 +68,83 @@ export const login = async (req, res) => {
   }
 };
 
+// @desc    Return the authenticated admin's profile.
+// @route   GET /api/admin/auth/me
+// @access  Private (Admin)
+export const getMe = async (req, res) => {
+  try {
+    const admin = await Admin.findById(req.admin._id).select('-password -otp -otpExpires');
+    if (!admin) return res.status(404).json({ error: 'Admin not found.' });
+    res.json({ success: true, data: admin });
+  } catch (error) {
+    console.error('Get Me Error:', error?.message || error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Update display name / avatar URL. Email + role are immutable here
+//          (role changes require a separate, higher-privileged flow).
+// @route   PUT /api/admin/auth/me
+// @access  Private (Admin)
+export const updateMe = async (req, res) => {
+  try {
+    const admin = await Admin.findById(req.admin._id);
+    if (!admin) return res.status(404).json({ error: 'Admin not found.' });
+
+    const { name, avatarUrl } = req.body || {};
+    if (typeof name === 'string') admin.name = name.trim().slice(0, 80);
+    if (typeof avatarUrl === 'string') admin.avatarUrl = avatarUrl.trim().slice(0, 500) || null;
+    await admin.save();
+
+    res.json({
+      success: true,
+      data: {
+        _id: admin._id,
+        email: admin.email,
+        name: admin.name,
+        role: admin.role,
+        avatarUrl: admin.avatarUrl,
+        lastLogin: admin.lastLogin,
+      },
+    });
+  } catch (error) {
+    console.error('Update Me Error:', error?.message || error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Change admin password. Requires the current password to be
+//          submitted alongside the new one (defense against session hijack).
+//          Pre-save hook re-bcrypts at 12 rounds. Issues a fresh JWT so the
+//          UI can keep the user signed in without a re-OTP.
+// @route   PUT /api/admin/auth/password
+// @access  Private (Admin)
+export const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body || {};
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current and new password are required.' });
+    }
+    if (String(newPassword).length < 10) {
+      return res.status(400).json({ error: 'New password must be at least 10 characters.' });
+    }
+
+    const admin = await Admin.findById(req.admin._id).select('+password');
+    if (!admin) return res.status(404).json({ error: 'Admin not found.' });
+
+    const ok = await admin.matchPassword(currentPassword);
+    if (!ok) return res.status(401).json({ error: 'Current password is incorrect.' });
+
+    admin.password = newPassword;
+    await admin.save();
+
+    res.json({ success: true, message: 'Password updated.', token: generateToken(admin._id, '12h') });
+  } catch (error) {
+    console.error('Change Password Error:', error?.message || error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
 // @desc    Stage 2: Possession Verification (OTP -> JWT)
 // @route   POST /api/auth/verify-otp
 // @access  Public
@@ -103,13 +180,19 @@ export const verifyOTP = async (req, res) => {
     // Valid — single-use: clear the OTP and issue JWT.
     admin.otp = null;
     admin.otpExpires = null;
+    admin.lastLogin = new Date();
+    admin.loginCount = (admin.loginCount || 0) + 1;
     await admin.save();
 
     res.json({
       success: true,
       admin: {
         _id: admin._id,
-        email: admin.email
+        email: admin.email,
+        name: admin.name,
+        role: admin.role,
+        avatarUrl: admin.avatarUrl,
+        lastLogin: admin.lastLogin,
       },
       token: generateToken(admin._id, '12h')
     });

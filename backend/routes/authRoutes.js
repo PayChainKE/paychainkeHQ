@@ -1,6 +1,7 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
-import { login, verifyOTP } from '../controllers/authController.js';
+import { login, verifyOTP, getMe, updateMe, changePassword } from '../controllers/authController.js';
+import { protect } from '../middleware/authMiddleware.js';
 import {
   registerMerchant,
   verifyMerchantOTP,
@@ -63,6 +64,9 @@ const merchantOtpLimiter = rateLimit({
 // Admin Auth Routes
 router.post('/login', adminLoginLimiter, login);
 router.post('/verify-otp', adminOtpLimiter, verifyOTP);
+router.get('/me', protect, getMe);
+router.put('/me', protect, updateMe);
+router.put('/password', protect, changePassword);
 
 // Merchant Auth Routes
 router.post('/merchant/register', upload.single('certificate'), registerMerchant);

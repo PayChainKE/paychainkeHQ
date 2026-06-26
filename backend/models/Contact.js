@@ -1,5 +1,13 @@
 import mongoose from 'mongoose';
 
+const ReplySchema = new mongoose.Schema({
+  body: { type: String, required: true, trim: true },
+  sentByEmail: { type: String, required: true, trim: true, lowercase: true },
+  sentBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },
+  sentAt: { type: Date, default: Date.now },
+  resendId: { type: String, default: null },
+}, { _id: true });
+
 const ContactSchema = new mongoose.Schema({
   name: {
     type: String,
@@ -37,8 +45,24 @@ const ContactSchema = new mongoose.Schema({
   },
   isRead: {
     type: Boolean,
-    default: false
-  }
+    default: false,
+    index: true,
+  },
+  // Conversation lifecycle — drives the call-center pipeline view.
+  status: {
+    type: String,
+    enum: ['open', 'in_progress', 'resolved', 'closed'],
+    default: 'open',
+    index: true,
+  },
+  priority: {
+    type: Boolean,
+    default: false,
+    index: true,
+  },
+  replies: { type: [ReplySchema], default: [] },
+  lastRepliedAt: { type: Date, default: null },
+  closedAt: { type: Date, default: null },
 }, {
   timestamps: true
 });

@@ -9,6 +9,28 @@ const AdminSchema = new mongoose.Schema({
     trim: true,
     lowercase: true
   },
+  name: {
+    type: String,
+    default: '',
+    trim: true,
+  },
+  role: {
+    type: String,
+    enum: ['owner', 'admin', 'analyst'],
+    default: 'owner',
+  },
+  avatarUrl: {
+    type: String,
+    default: null,
+  },
+  lastLogin: {
+    type: Date,
+    default: null,
+  },
+  loginCount: {
+    type: Number,
+    default: 0,
+  },
   password: {
     type: String,
     required: [true, 'Password is required'],

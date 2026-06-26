@@ -10,6 +10,8 @@ import {
   confirmMerchantAction,
   flagMerchant,
   unflagMerchant,
+  getInsights,
+  getLedger,
 } from '../controllers/adminController.js';
 import { runWalletAudit } from '../controllers/walletAuditController.js';
 import { protect } from '../middleware/authMiddleware.js';
@@ -48,6 +50,12 @@ router.post('/merchants/:id/request-action', protect, sensitiveActionLimiter, re
 router.post('/merchants/:id/confirm-action', protect, sensitiveActionLimiter, confirmMerchantAction);
 router.post('/merchants/:id/flag', protect, sensitiveActionLimiter, flagMerchant);
 router.post('/merchants/:id/unflag', protect, sensitiveActionLimiter, unflagMerchant);
+
+// Executive insights — aggregated KPIs / GTV / funnel / leaderboards.
+router.get('/insights', protect, getInsights);
+
+// Wallet ledger — paginated transaction trail + KPIs + asset mix + series.
+router.get('/ledger', protect, getLedger);
 
 // Stellar Wallet Audit (live Horizon cross-reference)
 router.get('/wallet-audit', protect, runWalletAudit);

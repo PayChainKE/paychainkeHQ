@@ -258,6 +258,74 @@ export const sendWelcomeEmail = async (email, name, password, phone, paybillAcco
   }
 };
 
+// Send a support reply to a customer who submitted the contact form.
+// `inReplyToSubject` is rendered in the email header so the customer sees
+// the original subject they wrote in.
+export const sendSupportReply = async (toEmail, toName, inReplyToSubject, replyBody, fromAdminEmail) => {
+  try {
+    const data = await resend.emails.send({
+      from: 'PayChain Support <support@paychain.co.ke>',
+      to: [toEmail],
+      reply_to: fromAdminEmail || 'support@paychain.co.ke',
+      subject: `Re: ${inReplyToSubject || 'Your inquiry'}`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 16px; overflow: hidden; background: #fff;">
+          <div style="background: #06201B; padding: 28px 30px;">
+            <p style="margin: 0; color: #5EFEB3; font-size: 12px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase;">PayChain Support</p>
+            <h1 style="margin: 6px 0 0; font-size: 22px; color: #fff; font-weight: 700;">Re: ${inReplyToSubject || 'Your inquiry'}</h1>
+          </div>
+          <div style="padding: 36px 30px;">
+            <p style="margin: 0 0 18px; color: #111; font-size: 15px;">Hi ${toName || 'there'},</p>
+            <div style="color: #333; font-size: 15px; line-height: 1.7; white-space: pre-wrap;">${replyBody.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+            <p style="margin: 30px 0 0; color: #555; font-size: 14px;">— The PayChain Team</p>
+          </div>
+          <div style="padding: 22px 30px; background: #fafafa; border-top: 1px solid #eee; text-align: center;">
+            <p style="margin: 0; color: #aaa; font-size: 11px;">Reply to this email to continue the conversation, or visit <a href="https://www.paychain.co.ke" style="color: #06201B;">paychain.co.ke</a>.</p>
+            <p style="margin: 8px 0 0; color: #bbb; font-size: 11px;">&copy; ${new Date().getFullYear()} PayChainKE. All rights reserved.</p>
+          </div>
+        </div>
+      `,
+    });
+    console.log(`📧 Support reply sent to ${toEmail}`);
+    return data;
+  } catch (error) {
+    console.error('❌ Resend Support Reply Error:', error);
+    throw new Error('Failed to send support reply');
+  }
+};
+
+// Send a single newsletter campaign email. Caller iterates over subscribers
+// — we keep this single-send so a failure on one address doesn't kill the
+// whole batch. Returns Resend's response (with the message id) or throws.
+export const sendNewsletterEmail = async (toEmail, subject, htmlBody) => {
+  try {
+    const data = await resend.emails.send({
+      from: 'PayChain Updates <info@paychain.co.ke>',
+      to: [toEmail],
+      subject,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 640px; margin: auto; background: #fff;">
+          <div style="background: linear-gradient(135deg, #06201B 0%, #0a3029 100%); padding: 38px 30px; text-align: center;">
+            <div style="font-size: 12px; font-weight: 800; letter-spacing: 4px; color: #5EFEB3; text-transform: uppercase; margin-bottom: 8px;">PayChain Updates</div>
+            <h1 style="margin: 0; color: #fff; font-size: 26px; font-weight: 800; letter-spacing: -0.4px; line-height: 1.2;">${subject}</h1>
+          </div>
+          <div style="padding: 40px 30px; color: #1f2937; font-size: 15px; line-height: 1.75;">
+            ${htmlBody}
+          </div>
+          <div style="padding: 24px 30px; background: #fafafa; border-top: 1px solid #eee; text-align: center;">
+            <p style="margin: 0; color: #888; font-size: 12px;">You're receiving this because you subscribed to PayChain Updates.</p>
+            <p style="margin: 10px 0 0; color: #aaa; font-size: 11px;">PayChainKE · Nairobi, Kenya · <a href="https://www.paychain.co.ke" style="color: #06201B; text-decoration: none;">paychain.co.ke</a></p>
+          </div>
+        </div>
+      `,
+    });
+    return data;
+  } catch (error) {
+    console.error(`❌ Newsletter email failed for ${toEmail}:`, error?.message);
+    throw error;
+  }
+};
+
 // Send Sensitive-Action OTP to Admin. Used to verify destructive actions
 // (freeze, unfreeze, delete merchant) before they execute.
 export const sendAdminActionOTP = async (email, otp, actionLabel, target) => {

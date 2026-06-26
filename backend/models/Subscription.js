@@ -11,8 +11,21 @@ const SubscriptionSchema = new mongoose.Schema({
   },
   active: {
     type: Boolean,
-    default: true
-  }
+    default: true,
+    index: true,
+  },
+  source: {
+    // 'public' — joined via the public site form
+    // 'admin'  — added by an admin from the dashboard
+    type: String,
+    enum: ['public', 'admin'],
+    default: 'public',
+  },
+  addedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin',
+    default: null,
+  },
 }, {
   timestamps: true
 });
