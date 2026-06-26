@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import Merchant from '../models/Merchant.js';
 import { sendOTP, sendWelcomeEmail } from '../utils/resend.js';
 import generateToken from '../utils/generateToken.js';
@@ -21,16 +22,39 @@ const generateUniquePaybillAccount = async () => {
 // @route   POST /api/auth/merchant/register
 // @access  Public
 export const registerMerchant = async (req, res) => {
-  let { name, email, phone, businessName, password, registrationSource } = req.body;
+  let { name, email, phone, businessName, password, registrationSource, kraPin, businessNumber } = req.body;
   const certificateFile = req.file;
 
   if (phone) phone = phone.replace(/\s+/g, '');
+  if (email) email = String(email).trim().toLowerCase();
+  if (kraPin) kraPin = String(kraPin).trim().toUpperCase();
+  if (businessNumber) businessNumber = String(businessNumber).trim();
+
+  // Build phone variations (handles 0790…, 254790…, +254790…, 790…) to
+  // catch duplicates regardless of stored format.
+  const phoneBase = (() => {
+    let b = phone || '';
+    if (b.startsWith('+254')) b = b.substring(4);
+    else if (b.startsWith('254')) b = b.substring(3);
+    else if (b.startsWith('0')) b = b.substring(1);
+    return b;
+  })();
+  const phoneVars = phone
+    ? Array.from(new Set([phone, phoneBase, `0${phoneBase}`, `254${phoneBase}`, `+254${phoneBase}`]))
+    : [];
 
   try {
-    const merchantExists = await Merchant.findOne({ email });
-
-    if (merchantExists) {
-      return res.status(400).json({ error: 'Merchant already exists' });
+    if (await Merchant.exists({ email })) {
+      return res.status(400).json({ error: 'A merchant with that email already exists.' });
+    }
+    if (phoneVars.length && await Merchant.exists({ phone: { $in: phoneVars } })) {
+      return res.status(400).json({ error: 'A merchant with that phone number already exists.' });
+    }
+    if (kraPin && await Merchant.exists({ kraPin })) {
+      return res.status(400).json({ error: 'A merchant with that KRA PIN already exists.' });
+    }
+    if (businessNumber && await Merchant.exists({ businessNumber })) {
+      return res.status(400).json({ error: 'A merchant with that business registration number already exists.' });
     }
 
     const certificateUrl = certificateFile ? certificateFile.path : null;
@@ -45,6 +69,8 @@ export const registerMerchant = async (req, res) => {
       email,
       phone,
       businessName,
+      kraPin: kraPin || null,
+      businessNumber: businessNumber || null,
       password,
       certificateUrl,
       otp,
@@ -78,9 +104,18 @@ export const registerMerchant = async (req, res) => {
       const messages = Object.values(error.errors).map(val => val.message);
       return res.status(400).json({ error: messages.join(', ') });
     }
-    // Check for unique email constraint error
+    // Unique-index violation — surface which field collided.
     if (error.code === 11000) {
-      return res.status(400).json({ error: 'Merchant already exists' });
+      const key = Object.keys(error.keyPattern || {})[0];
+      const labels = {
+        email: 'email',
+        phone: 'phone number',
+        kraPin: 'KRA PIN',
+        businessNumber: 'business registration number',
+        paybillAccount: 'paybill account',
+      };
+      const label = labels[key] || 'detail';
+      return res.status(400).json({ error: `A merchant with that ${label} already exists.` });
     }
     res.status(500).json({ error: 'Server Error' });
   }
@@ -191,6 +226,10 @@ export const loginMerchant = async (req, res) => {
       return res.status(401).json({ error: 'Invalid email/phone or password' });
     }
 
+    if (merchant.status === 'locked') {
+      return res.status(403).json({ error: 'This account has been locked. Please contact PayChain support.' });
+    }
+
     // Always require OTP verification for every login (removed 3-day bypass)
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
@@ -232,8 +271,8 @@ export const biometricLogin = async (req, res) => {
       return res.status(401).json({ error: 'Invalid biometric credential' });
     }
 
-    if (merchant.status === 'suspended') {
-      return res.status(403).json({ error: 'Account suspended' });
+    if (merchant.status === 'locked') {
+      return res.status(403).json({ error: 'This account has been locked. Please contact PayChain support.' });
     }
 
     // Since biometrics verified at the OS level, we bypass password check.
@@ -550,6 +589,82 @@ export const toggleBiometrics = async (req, res) => {
     });
   } catch (error) {
     console.error('Toggle Biometrics Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Validate a password-setup token (admin-invite flow). Lets the
+//          frontend decide whether to render the form or a "link expired" view.
+//          Returns minimal info (email) and never leaks reset metadata.
+// @route   GET /api/auth/merchant/setup-password/:token
+// @access  Public
+export const validateSetupToken = async (req, res) => {
+  try {
+    const { token } = req.params;
+    if (!token) return res.status(400).json({ error: 'Token required' });
+
+    const hashed = crypto.createHash('sha256').update(token).digest('hex');
+    const merchant = await Merchant.findOne({
+      passwordResetToken: hashed,
+      passwordResetExpires: { $gt: new Date() },
+    }).select('+passwordResetToken +passwordResetExpires email name businessName');
+
+    if (!merchant) {
+      return res.status(400).json({ error: 'This setup link is invalid or has expired.' });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        email: merchant.email,
+        name: merchant.name,
+        businessName: merchant.businessName,
+      },
+    });
+  } catch (error) {
+    console.error('Validate Setup Token Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Consume a password-setup token and set the merchant's password.
+//          Pre-save bcrypt hook handles hashing (12 rounds). The reset token
+//          is cleared on success — single-use semantics.
+// @route   POST /api/auth/merchant/setup-password
+// @access  Public
+export const setupPassword = async (req, res) => {
+  try {
+    const { token, password } = req.body || {};
+    if (!token || !password) return res.status(400).json({ error: 'Token and password are required.' });
+    if (String(password).length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters.' });
+    }
+
+    const hashed = crypto.createHash('sha256').update(token).digest('hex');
+    const merchant = await Merchant.findOne({
+      passwordResetToken: hashed,
+      passwordResetExpires: { $gt: new Date() },
+    }).select('+passwordResetToken +passwordResetExpires +password');
+
+    if (!merchant) {
+      return res.status(400).json({ error: 'This setup link is invalid or has expired.' });
+    }
+
+    merchant.password = password;
+    merchant.passwordResetToken = null;
+    merchant.passwordResetExpires = null;
+    merchant.isVerified = true;
+    await merchant.save();
+
+    // Send confirmation email with their official credentials so the merchant
+    // has a record of their username (email/phone) and the password they just set.
+    // Fire-and-forget — never block the response on email delivery.
+    sendWelcomeEmail(merchant.email, merchant.name, password, merchant.phone, merchant.paybillAccount)
+      .catch((err) => console.error(`📧 Failed to send credentials email to ${merchant.email}:`, err));
+
+    res.json({ success: true, message: 'Password set successfully. You can now sign in.' });
+  } catch (error) {
+    console.error('Setup Password Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };

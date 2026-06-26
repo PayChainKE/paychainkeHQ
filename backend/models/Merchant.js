@@ -26,10 +26,14 @@ const merchantSchema = new mongoose.Schema({
   businessNumber: {
     type: String,
     default: null,
+    unique: true,
+    sparse: true,
   },
   kraPin: {
     type: String,
     default: null,
+    unique: true,
+    sparse: true,
   },
   isKRAVerified: {
     type: Boolean,
@@ -37,9 +41,27 @@ const merchantSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: [true, 'Please add a password'],
+    // Optional at create time so admin-onboarded merchants can be created
+    // without a password and complete it via the setup-password link.
+    required: false,
     minlength: 8,
     select: false,
+  },
+  // Setup / reset token (sha256 hex of the raw token sent by email).
+  passwordResetToken: {
+    type: String,
+    select: false,
+    default: null,
+  },
+  passwordResetExpires: {
+    type: Date,
+    select: false,
+    default: null,
+  },
+  invitedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin',
+    default: null,
   },
   certificateUrl: {
     type: String,
@@ -48,6 +70,21 @@ const merchantSchema = new mongoose.Schema({
   isVerified: {
     type: Boolean,
     default: false,
+  },
+  status: {
+    type: String,
+    enum: ['active', 'locked'],
+    default: 'active',
+    index: true,
+  },
+  lockedAt: {
+    type: Date,
+    default: null,
+  },
+  lockedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin',
+    default: null,
   },
   paybillAccount: {
     type: String,
