@@ -86,6 +86,27 @@ const merchantSchema = new mongoose.Schema({
     ref: 'Admin',
     default: null,
   },
+  // Suspicious-activity flag. Manual, set by an admin with a written reason.
+  // Reversible — `unflag` clears all four fields. Separate from `status`
+  // (locked) because flagging is a label/review-marker, not access denial.
+  flagged: {
+    type: Boolean,
+    default: false,
+    index: true,
+  },
+  flagReason: {
+    type: String,
+    default: null,
+  },
+  flaggedAt: {
+    type: Date,
+    default: null,
+  },
+  flaggedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin',
+    default: null,
+  },
   paybillAccount: {
     type: String,
     unique: true,

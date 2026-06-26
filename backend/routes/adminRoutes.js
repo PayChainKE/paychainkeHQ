@@ -8,6 +8,8 @@ import {
   createMerchant,
   requestMerchantAction,
   confirmMerchantAction,
+  flagMerchant,
+  unflagMerchant,
 } from '../controllers/adminController.js';
 import { runWalletAudit } from '../controllers/walletAuditController.js';
 import { protect } from '../middleware/authMiddleware.js';
@@ -44,6 +46,8 @@ router.get('/merchants/analytics', protect, getMerchantAnalytics);
 router.get('/merchants/:id', protect, getMerchantDetail);
 router.post('/merchants/:id/request-action', protect, sensitiveActionLimiter, requestMerchantAction);
 router.post('/merchants/:id/confirm-action', protect, sensitiveActionLimiter, confirmMerchantAction);
+router.post('/merchants/:id/flag', protect, sensitiveActionLimiter, flagMerchant);
+router.post('/merchants/:id/unflag', protect, sensitiveActionLimiter, unflagMerchant);
 
 // Stellar Wallet Audit (live Horizon cross-reference)
 router.get('/wallet-audit', protect, runWalletAudit);

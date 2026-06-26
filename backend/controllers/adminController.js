@@ -25,6 +25,40 @@ const tierFor = (lastAt) => {
   return 'dormant';
 };
 
+// Compute deterministic, replayable risk signals for a single merchant. Each
+// signal is a small object — admins eyeball the chips on the row and drill
+// into the KYB drawer for context. Pure function: same input → same output.
+const computeRiskSignals = (merchant, agg) => {
+  const signals = [];
+  const ageDays = (Date.now() - new Date(merchant.createdAt).getTime()) / (1000 * 60 * 60 * 24);
+  const txn30 = agg?.txnCount30d || 0;
+  const txn24 = agg?.txnCount24h || 0;
+  const dailyAvg = txn30 / 30;
+
+  // Always set: incomplete onboarding signals.
+  if (merchant.passwordResetExpires && new Date(merchant.passwordResetExpires) > new Date()) {
+    signals.push({ id: 'pending_setup', label: 'Setup incomplete', severity: 'low' });
+  }
+  if (!merchant.kraPin || !merchant.isKRAVerified) {
+    signals.push({ id: 'no_kra', label: 'KRA not verified', severity: 'medium' });
+  }
+  if (!merchant.stellarPublicKey) {
+    signals.push({ id: 'no_wallet', label: 'No wallet', severity: 'low' });
+  }
+
+  // Velocity / pattern signals.
+  if (ageDays < 7 && txn30 > 50) {
+    signals.push({ id: 'rapid_ramp', label: 'New account, high volume', severity: 'high' });
+  }
+  if (dailyAvg >= 5 && txn24 > dailyAvg * 3) {
+    signals.push({ id: 'volume_spike', label: '24h volume spike', severity: 'high' });
+  }
+  if (!merchant.isVerified && txn30 > 0) {
+    signals.push({ id: 'unverified_active', label: 'Active but unverified', severity: 'medium' });
+  }
+  return signals;
+};
+
 // Timing-safe 6-digit OTP compare (both strings).
 const safeEqual = (a, b) => {
   const A = Buffer.from(String(a));
@@ -65,16 +99,24 @@ const phoneVariations = (raw) => {
 // @access  Private (Admin)
 export const getMerchants = async (req, res) => {
   try {
-    const merchants = await Merchant.find({}).sort('-createdAt').select('-password -otp -otpExpires').lean();
+    // Include passwordResetExpires (select:false by default) so we can compute
+    // the "setup incomplete" risk signal. We strip it before responding.
+    const merchants = await Merchant.find({})
+      .sort('-createdAt')
+      .select('-password -otp -otpExpires +passwordResetExpires')
+      .populate('flaggedBy', 'email')
+      .lean();
 
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    // Single aggregation: per-merchant 30d transaction count + most recent txn date.
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    // Single aggregation: per-merchant 30d + 24h counts + most recent txn date.
     const txnAgg = await Transaction.aggregate([
       { $match: { createdAt: { $gte: thirtyDaysAgo } } },
       {
         $group: {
           _id: '$merchantId',
           txnCount30d: { $sum: 1 },
+          txnCount24h: { $sum: { $cond: [{ $gte: ['$createdAt', oneDayAgo] }, 1, 0] } },
           lastTxnAt: { $max: '$createdAt' },
         },
       },
@@ -88,11 +130,16 @@ export const getMerchants = async (req, res) => {
         .map((d) => new Date(d).getTime())
         .reduce((max, ts) => Math.max(max, ts), 0);
       const lastActivityDate = lastActivityAt ? new Date(lastActivityAt) : null;
+      const riskSignals = computeRiskSignals(m, t);
+      // Strip the field we only fetched for signal computation.
+      delete m.passwordResetExpires;
       return {
         ...m,
         txnCount30d: t?.txnCount30d || 0,
+        txnCount24h: t?.txnCount24h || 0,
         lastActivityAt: lastActivityDate,
         activityTier: tierFor(lastActivityDate),
+        riskSignals,
       };
     });
 
@@ -249,6 +296,68 @@ export const confirmMerchantAction = async (req, res) => {
   }
 };
 
+// @desc    Flag a merchant for suspicious activity. Lightweight + reversible —
+//          no OTP required (this is a review label, not access denial). Admin
+//          must provide a written reason which is shown in the KYB drawer for
+//          accountability and future review.
+// @route   POST /api/admin/merchants/:id/flag
+// @access  Private (Admin)
+export const flagMerchant = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body || {};
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid merchant id.' });
+    }
+    const trimmed = String(reason || '').trim();
+    if (trimmed.length < 5) {
+      return res.status(400).json({ error: 'Reason must be at least 5 characters.' });
+    }
+    if (trimmed.length > 500) {
+      return res.status(400).json({ error: 'Reason must be under 500 characters.' });
+    }
+
+    const merchant = await Merchant.findById(id);
+    if (!merchant) return res.status(404).json({ error: 'Merchant not found.' });
+
+    merchant.flagged = true;
+    merchant.flagReason = trimmed;
+    merchant.flaggedAt = new Date();
+    merchant.flaggedBy = req.admin._id;
+    await merchant.save();
+
+    res.json({ success: true, message: 'Merchant flagged for review.' });
+  } catch (error) {
+    console.error('Flag Merchant Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Clear a suspicious-activity flag.
+// @route   POST /api/admin/merchants/:id/unflag
+// @access  Private (Admin)
+export const unflagMerchant = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid merchant id.' });
+    }
+    const merchant = await Merchant.findById(id);
+    if (!merchant) return res.status(404).json({ error: 'Merchant not found.' });
+
+    merchant.flagged = false;
+    merchant.flagReason = null;
+    merchant.flaggedAt = null;
+    merchant.flaggedBy = null;
+    await merchant.save();
+
+    res.json({ success: true, message: 'Flag cleared.' });
+  } catch (error) {
+    console.error('Unflag Merchant Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
 // @desc    Get a single merchant's full profile for KYB review. Returns every
 //          submitted field plus computed activity metrics. Sensitive material
 //          (password hash, stellar secret, PIN hashes) is converted to
@@ -264,15 +373,18 @@ export const getMerchantDetail = async (req, res) => {
     }
 
     const merchant = await Merchant.findById(id)
-      .select('+password +bulkPayPin +appPin +stellarEncryptedSecretKey')
+      .select('+password +bulkPayPin +appPin +stellarEncryptedSecretKey +passwordResetExpires')
       .populate('lockedBy', 'email')
       .populate('invitedBy', 'email')
+      .populate('flaggedBy', 'email')
       .lean();
     if (!merchant) return res.status(404).json({ error: 'Merchant not found.' });
 
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const [txnCount30d, lastTxn] = await Promise.all([
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const [txnCount30d, txnCount24h, lastTxn] = await Promise.all([
       Transaction.countDocuments({ merchantId: merchant._id, createdAt: { $gte: thirtyDaysAgo } }),
+      Transaction.countDocuments({ merchantId: merchant._id, createdAt: { $gte: oneDayAgo } }),
       Transaction.findOne({ merchantId: merchant._id }).sort('-createdAt').select('createdAt amount status').lean(),
     ]);
 
@@ -280,6 +392,8 @@ export const getMerchantDetail = async (req, res) => {
       .filter(Boolean)
       .map((d) => new Date(d).getTime())
       .reduce((max, ts) => Math.max(max, ts), 0) || null;
+
+    const riskSignals = computeRiskSignals(merchant, { txnCount30d, txnCount24h });
 
     res.json({
       success: true,
@@ -304,6 +418,12 @@ export const getMerchantDetail = async (req, res) => {
         invitedBy: merchant.invitedBy ? { email: merchant.invitedBy.email } : null,
         lockedAt: merchant.lockedAt,
         lockedBy: merchant.lockedBy ? { email: merchant.lockedBy.email } : null,
+        // Flag / risk
+        flagged: !!merchant.flagged,
+        flagReason: merchant.flagReason,
+        flaggedAt: merchant.flaggedAt,
+        flaggedBy: merchant.flaggedBy ? { email: merchant.flaggedBy.email } : null,
+        riskSignals,
         // Settlement
         settlementMobile: merchant.settlementMobile,
         settlementBankName: merchant.settlementBankName,
@@ -324,6 +444,7 @@ export const getMerchantDetail = async (req, res) => {
         lastActivityAt: lastActivityAt ? new Date(lastActivityAt) : null,
         activityTier: tierFor(lastActivityAt ? new Date(lastActivityAt) : null),
         txnCount30d,
+        txnCount24h,
         lastTransaction: lastTxn ? {
           createdAt: lastTxn.createdAt,
           amount: lastTxn.amount,
