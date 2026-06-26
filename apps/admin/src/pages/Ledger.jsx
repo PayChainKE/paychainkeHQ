@@ -1,117 +1,555 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Layout from '../components/layout/Layout';
+import api from '../api/api';
+
+// ── Constants ─────────────────────────────────────────────────────────
+const RANGES = [
+  { v: '24h', l: '24H' },
+  { v: '7d',  l: '7D' },
+  { v: '30d', l: '30D' },
+  { v: 'all', l: 'ALL' },
+];
+
+const TYPE_META = {
+  inbound:    { label: 'Inbound',     short: 'IN',  color: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: '#10B981' },
+  outbound:   { label: 'Outbound',    short: 'OUT', color: 'bg-blue-50 text-blue-700 border-blue-200',           dot: '#3B82F6' },
+  bulk_pay:   { label: 'Bulk Pay',    short: 'BP',  color: 'bg-violet-50 text-violet-700 border-violet-200',     dot: '#8B5CF6' },
+  settlement: { label: 'Settlement',  short: 'SET', color: 'bg-amber-50 text-amber-700 border-amber-200',        dot: '#F59E0B' },
+  fx_swap:    { label: 'FX Swap',     short: 'FX',  color: 'bg-pink-50 text-pink-700 border-pink-200',           dot: '#EC4899' },
+  other:      { label: 'Other',       short: '—',   color: 'bg-gray-50 text-gray-700 border-gray-200',           dot: '#6B7280' },
+};
+
+const STATUS_META = {
+  completed: { label: 'Completed', pill: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
+  verified:  { label: 'Verified',  pill: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
+  pending:   { label: 'Pending',   pill: 'bg-amber-50 text-amber-700 border-amber-200',       dot: 'bg-amber-500 animate-pulse' },
+  failed:    { label: 'Failed',    pill: 'bg-red-50 text-red-700 border-red-200',             dot: 'bg-red-500' },
+};
+
+const fmtKES = (n) => {
+  if (n == null || isNaN(n)) return 'KES 0';
+  if (n >= 1_000_000_000) return `KES ${(n / 1_000_000_000).toFixed(2)}B`;
+  if (n >= 1_000_000)     return `KES ${(n / 1_000_000).toFixed(2)}M`;
+  if (n >= 1_000)         return `KES ${(n / 1_000).toFixed(1)}K`;
+  return `KES ${Math.round(n).toLocaleString()}`;
+};
+const fmtUSDC = (n) => {
+  if (n == null || isNaN(n)) return '0';
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
+  if (n >= 1_000)     return `${(n / 1_000).toFixed(1)}K`;
+  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+const fmtNum = (n) => {
+  if (n == null || isNaN(n)) return '0';
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000)     return `${(n / 1_000).toFixed(1)}k`;
+  return n.toLocaleString();
+};
+const fmtTime = (iso) => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  const today = new Date();
+  if (d.toDateString() === today.toDateString()) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
 
 const Ledger = () => {
-  const transactions = [
-    { id: 'TX-9921', date: '2024-10-26 14:32', type: 'Merchant Payout', amount: 'KES 428,000.00', status: 'Approved', entity: 'Njoroge Stores' },
-    { id: 'TX-9920', date: '2024-10-26 13:15', type: 'Card Transaction', amount: 'KES 12,450.00', status: 'Pending', entity: 'Mama Lydia Cafe' },
-    { id: 'TX-9919', date: '2024-10-26 12:44', type: 'M-PESA Settlement', amount: 'KES 89,200.00', status: 'Approved', entity: 'Otieno Wholesale' },
-    { id: 'TX-9918', date: '2024-10-26 10:20', type: 'Fee Collection', amount: 'KES 1,224.00', status: 'Success', entity: 'System' },
-    { id: 'TX-9917', date: '2024-10-26 09:12', type: 'Merchant Payout', amount: 'KES 1,240,000.00', status: 'Flagged', entity: 'Bright Aqua Ltd' },
-  ];
+  const [range, setRange] = useState('7d');
+  const [page, setPage] = useState(1);
+  const [type, setType] = useState('all');
+  const [status, setStatus] = useState('all');
+  const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await api.get('/api/admin/ledger', {
+        params: { range, page, limit: 25, type, status, q: search },
+      });
+      if (res.data?.success) setData(res.data.data);
+      else setError(res.data?.error || 'Could not load ledger.');
+    } catch (e) {
+      const code = e?.response?.status;
+      setError(
+        e?.response?.data?.error
+        || (code === 404 ? 'Ledger endpoint not deployed yet. Push backend changes and retry.' : 'Could not load ledger.')
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [range, page, type, status, search]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Global sync listener
+  useEffect(() => {
+    const h = () => fetchData();
+    window.addEventListener('paychain:sync', h);
+    return () => window.removeEventListener('paychain:sync', h);
+  }, [fetchData]);
+
+  // Debounce search
+  const searchTimer = useRef(null);
+  useEffect(() => {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => { setPage(1); setSearch(searchInput); }, 350);
+    return () => searchTimer.current && clearTimeout(searchTimer.current);
+  }, [searchInput]);
+
+  function exportCsv() {
+    if (!data?.transactions || data.transactions.length === 0) { alert('Nothing to export.'); return; }
+    const rows = data.transactions.map((t) => ({
+      Reference: t.reference,
+      Timestamp: new Date(t.createdAt).toISOString(),
+      Type: t.type,
+      Status: t.status,
+      Currency: t.currency,
+      Amount: t.amount,
+      'KES Amount': t.kesAmount || '',
+      'USDC Amount': t.usdcAmount || '',
+      Account: t.accountNumber,
+      'Merchant Business': t.merchant?.businessName || '',
+      'Merchant Paybill': t.merchant?.paybillAccount || '',
+      'Sender Name': t.sender?.name || '',
+      'Sender ID': t.sender?.id || '',
+    }));
+    const headers = Object.keys(rows[0]);
+    const escape = (v) => {
+      const s = String(v ?? '');
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const csv = [headers.join(','), ...rows.map((r) => headers.map((h) => escape(r[h])).join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `paychain-ledger-${range}-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+  }
 
   return (
     <Layout>
-      <div className="space-y-8">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-6">
-          <div>
-            <h2 className="text-[24px] md:text-[28px] font-semibold text-on-surface tracking-tight">Equatorial Ledger</h2>
-            <p className="text-on-surface-variant/60 text-[13px] md:text-[14px] mt-1 font-body">Real-time authoritative record of all ecosystem transactions.</p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-            <button className="flex-1 sm:flex-none bg-surface-container-lowest border border-outline-variant/30 text-on-surface px-4 py-2.5 rounded-lg text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all hover:bg-surface-container-low font-label uppercase tracking-widest">
-              <span className="material-symbols-outlined text-[18px]">print</span>
-              Print
-            </button>
-            <button className="flex-1 sm:flex-none bg-primary text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center justify-center gap-2 shadow-md transition-all hover:opacity-90 font-label uppercase tracking-widest">
-              <span className="material-symbols-outlined text-[18px]">reconcile</span>
-              Reconcile
-            </button>
-          </div>
-        </div>
-
-        {/* Ledger KPI Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 font-body">
-          {[
-            { label: 'Today\'s Volume', val: 'KES 8.42M', trend: '+12.4%', up: true },
-            { label: 'Settlement Ratio', val: '98.2%', trend: '+0.4%', up: true },
-            { label: 'Total Fees', val: 'KES 214.5K', trend: '+8.1%', up: true },
-            { label: 'Flagged Txns', val: '04', trend: '-2', up: false }
-          ].map((kpi, i) => (
-            <div key={i} className="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/20 shadow-sm transition-all hover:scale-[1.01]">
-              <p className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-widest mb-2 font-label">{kpi.label}</p>
-              <div className="flex items-baseline gap-2 md:gap-3">
-                <span className="text-xl md:text-2xl font-bold text-on-surface tracking-tighter">{kpi.val}</span>
-                <span className={`text-[9px] md:text-[11px] font-bold px-2 py-0.5 rounded-lg ${kpi.up ? 'bg-secondary-container/20 text-secondary' : 'bg-error-container/20 text-error'}`}>
-                  {kpi.trend}
-                </span>
+      <div className="space-y-6 pb-12">
+        {/* Hero / Header */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#06201B] via-[#0a3029] to-[#0f3a30] border border-emerald-900/40 shadow-[0_30px_80px_-20px_rgba(6,32,27,0.5)] p-6 md:p-8">
+          <div className="absolute -top-24 -right-24 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl"></div>
+          <div className="absolute -bottom-16 -left-16 w-60 h-60 bg-emerald-400/10 rounded-full blur-2xl"></div>
+          <div className="relative flex flex-col md:flex-row md:items-end md:justify-between gap-5">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-emerald-300">Wallet Ledger · Live Chain Settlement</p>
               </div>
+              <h1 className="text-[32px] md:text-[40px] font-bold text-white tracking-tighter font-headline leading-none">
+                On-Chain Treasury
+              </h1>
+              <p className="text-emerald-100/60 mt-2 max-w-xl text-[13px] md:text-[14px]">
+                Cryptographically auditable record of every M-Pesa collection, payout, FX swap, and on-chain USDC settlement across the PayChain network.
+              </p>
             </div>
-          ))}
-        </div>
-
-        {/* High Density Table */}
-        <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/20 overflow-hidden shadow-sm">
-          <div className="p-4 md:p-6 border-b border-outline-variant/10 bg-surface flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-            <h3 className="text-[11px] md:text-sm font-bold uppercase tracking-widest text-on-surface font-label">Financial Audit Trail</h3>
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
-              <div className="relative flex-1">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant/40 text-[18px]">search</span>
-                <input className="w-full pl-10 pr-4 py-2 bg-surface-container-low border-none rounded-lg text-xs md:w-64 font-body text-on-surface" placeholder="Search reference..." />
+            <div className="flex items-center gap-2">
+              <div className="inline-flex p-1 bg-emerald-900/40 rounded-xl border border-emerald-800/40 backdrop-blur-sm">
+                {RANGES.map((r) => (
+                  <button
+                    key={r.v}
+                    onClick={() => { setRange(r.v); setPage(1); }}
+                    className={`px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest rounded-lg transition-all ${
+                      range === r.v ? 'bg-emerald-500 text-white shadow-lg' : 'text-emerald-200/60 hover:text-white'
+                    }`}
+                  >
+                    {r.l}
+                  </button>
+                ))}
               </div>
-              <button className="flex items-center justify-center gap-2 p-2 hover:bg-surface-container-low text-on-surface-variant/40 rounded-lg transition-colors border border-outline-variant/10 sm:border-none">
-                <span className="material-symbols-outlined">filter_list</span>
-                <span className="sm:hidden text-xs font-bold uppercase tracking-widest">Filter</span>
+              <button onClick={exportCsv} className="flex items-center gap-2 px-3.5 py-2 bg-white/10 hover:bg-white/15 backdrop-blur-sm border border-white/10 text-white text-[11px] font-bold rounded-xl uppercase tracking-widest transition-all">
+                <span className="material-symbols-outlined text-[16px]">file_download</span>
+                Export
               </button>
             </div>
           </div>
-          <table className="w-full text-left font-body">
-            <thead>
-              <tr className="bg-surface-container-low font-label">
-                <th className="px-6 py-3 text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest">Ref ID</th>
-                <th className="px-6 py-3 text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest">Timestamp</th>
-                <th className="px-6 py-3 text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest">Entity</th>
-                <th className="px-6 py-3 text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest">Txn Type</th>
-                <th className="px-6 py-3 text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest">Amount</th>
-                <th className="px-6 py-3 text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest">Status</th>
-                <th className="px-6 py-3 text-right"></th>
-              </tr>
-            </thead>
-            <tbody className="text-[13px] divide-y divide-outline-variant/5">
-              {transactions.map((txn, i) => (
-                <tr key={i} className="hover:bg-secondary-container/5 transition-colors group">
-                  <td className="px-6 py-4 font-mono font-bold text-on-surface-variant/60">{txn.id}</td>
-                  <td className="px-6 py-4 text-on-surface-variant/40">{txn.date}</td>
-                  <td className="px-6 py-4 font-bold text-on-surface tracking-tight">{txn.entity}</td>
-                  <td className="px-6 py-4 text-on-surface-variant/70">{txn.type}</td>
-                  <td className="px-6 py-4 font-bold text-on-surface tracking-tight">{txn.amount}</td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold tracking-tight uppercase border ${
-                      txn.status === 'Approved' || txn.status === 'Success' ? 'bg-secondary-container/20 text-secondary border-secondary-container/50' :
-                      txn.status === 'Flagged' ? 'bg-error-container/20 text-error border-error-container/50' :
-                      'bg-surface-container text-on-surface-variant/60 border-outline-variant/30'
-                    }`}>
-                      {txn.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <button className="text-on-surface-variant/20 hover:text-secondary transition-colors"><span className="material-symbols-outlined text-[20px]">open_in_new</span></button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className="px-6 py-4 bg-surface flex justify-between items-center border-t border-outline-variant/10">
-            <span className="text-[11px] font-bold text-on-surface-variant/30 uppercase tracking-widest font-label">Consolidated Ledger v2.4</span>
-            <div className="flex gap-1">
-              <button className="w-8 h-8 rounded-lg bg-primary text-white font-bold text-xs">1</button>
-              <button className="w-8 h-8 rounded-lg bg-surface border border-outline-variant/30 text-on-surface-variant/60 font-bold text-xs hover:bg-surface-container-low transition-all">2</button>
-            </div>
-          </div>
         </div>
+
+        {loading && !data ? (
+          <LoadingState />
+        ) : error ? (
+          <ErrorState error={error} onRetry={fetchData} />
+        ) : data ? (
+          <>
+            {/* Multi-asset balance + KPI strip */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+              {/* Treasury balance card */}
+              <div className="lg:col-span-5 bg-gradient-to-br from-white to-emerald-50/30 border border-outline-variant/20 rounded-2xl p-6 shadow-editorial">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-3">Settled Volume</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <AssetTile
+                    label="Kenyan Shilling"
+                    symbol="KES"
+                    amount={fmtKES(data.assets.kes)}
+                    rawAmount={data.assets.kes}
+                    color="emerald"
+                    chain="Mainnet"
+                  />
+                  <AssetTile
+                    label="USD Coin"
+                    symbol="USDC"
+                    amount={fmtUSDC(data.assets.usdc)}
+                    rawAmount={data.assets.usdc}
+                    color="blue"
+                    chain="Stellar"
+                  />
+                </div>
+                <div className="mt-4 pt-4 border-t border-outline-variant/10 flex items-center justify-between text-[11px]">
+                  <span className="text-on-surface-variant/60 font-bold uppercase tracking-widest">Total Movement</span>
+                  <span className="font-bold text-on-surface">{fmtKES(data.kpis.volume.value)}</span>
+                </div>
+              </div>
+
+              {/* KPIs */}
+              <div className="lg:col-span-7 grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <KpiCard label="Volume" value={fmtKES(data.kpis.volume.value)} change={data.kpis.volume.change} icon="payments" tone="primary" />
+                <KpiCard label="Transactions" value={fmtNum(data.kpis.count.value)} change={data.kpis.count.change} icon="receipt_long" tone="blue" />
+                <KpiCard label="Settlement Ratio" value={`${data.kpis.settlementRatio}%`} icon="check_circle" tone="emerald" subtitle={`${data.kpis.failed} failed`} noDelta />
+                <KpiCard label="Est. Fees" value={fmtKES(data.kpis.estimatedFees)} icon="account_balance" tone="amber" subtitle="1% headline" noDelta />
+              </div>
+            </div>
+
+            {/* Volume chart + Type mix */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+              <div className="lg:col-span-8 bg-surface-container-lowest rounded-2xl border border-outline-variant/20 p-6 shadow-editorial">
+                <div className="flex items-start justify-between mb-5">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">Throughput</p>
+                    <h3 className="text-lg font-bold text-on-surface tracking-tight">Settlement Volume ({range.toUpperCase()})</h3>
+                  </div>
+                  <div className="flex items-center gap-3 text-[11px] font-bold">
+                    <Legend color="bg-primary" label="Volume" />
+                    <Legend color="bg-emerald-500" label="Count" />
+                  </div>
+                </div>
+                <AreaChart series={data.series} />
+              </div>
+              <div className="lg:col-span-4 bg-surface-container-lowest rounded-2xl border border-outline-variant/20 p-6 shadow-editorial">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">Composition</p>
+                <h3 className="text-lg font-bold text-on-surface tracking-tight mb-5">Transaction Mix</h3>
+                <TypeMix mix={data.typeMix} />
+              </div>
+            </div>
+
+            {/* Audit trail table */}
+            <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 overflow-hidden shadow-editorial">
+              <div className="px-6 py-4 border-b border-outline-variant/10 flex flex-col md:flex-row md:items-center md:justify-between gap-3 bg-white">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-0.5">Cryptographic Audit Trail</p>
+                  <h3 className="text-base font-bold text-on-surface tracking-tight">Transaction Ledger</h3>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="relative">
+                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/40 text-[18px]">search</span>
+                    <input
+                      value={searchInput}
+                      onChange={(e) => setSearchInput(e.target.value)}
+                      placeholder="Reference, account, sender..."
+                      className="pl-9 pr-3 py-2 bg-surface-container-low border-transparent focus:border-primary focus:ring-0 rounded-lg text-[13px] w-full sm:w-72"
+                    />
+                  </div>
+                  <select value={type} onChange={(e) => { setType(e.target.value); setPage(1); }} className="px-3 py-2 border border-outline-variant/40 rounded-lg text-[12px] font-bold uppercase tracking-widest bg-white">
+                    <option value="all">All types</option>
+                    {Object.entries(TYPE_META).filter(([k]) => k !== 'other').map(([v, m]) => <option key={v} value={v}>{m.label}</option>)}
+                  </select>
+                  <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className="px-3 py-2 border border-outline-variant/40 rounded-lg text-[12px] font-bold uppercase tracking-widest bg-white">
+                    <option value="all">All status</option>
+                    <option value="completed">Completed</option>
+                    <option value="verified">Verified</option>
+                    <option value="pending">Pending</option>
+                    <option value="failed">Failed</option>
+                  </select>
+                </div>
+              </div>
+
+              {data.transactions.length === 0 ? (
+                <div className="p-16 text-center">
+                  <div className="w-14 h-14 rounded-full bg-surface-container mx-auto flex items-center justify-center text-on-surface-variant/40 mb-3">
+                    <span className="material-symbols-outlined text-2xl">receipt_long</span>
+                  </div>
+                  <p className="text-sm text-on-surface-variant/60 font-medium">No transactions match this view.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto custom-scrollbar">
+                  <table className="w-full text-left font-body">
+                    <thead>
+                      <tr className="bg-surface-container-low/50">
+                        <Th>Reference</Th>
+                        <Th>When</Th>
+                        <Th>Type</Th>
+                        <Th>Merchant / Sender</Th>
+                        <Th>Amount</Th>
+                        <Th>Status</Th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-[13px]">
+                      {data.transactions.map((t) => {
+                        const tm = TYPE_META[t.type] || TYPE_META.other;
+                        const sm = STATUS_META[t.status] || STATUS_META.pending;
+                        return (
+                          <tr key={t._id} className="hover:bg-secondary-container/5 transition-colors group">
+                            <td className="px-4 py-3 border-b border-outline-variant/5">
+                              <span className="font-mono text-[11px] font-bold text-on-surface bg-surface-container-low px-2 py-1 rounded">
+                                {t.reference?.length > 18 ? `${t.reference.slice(0, 14)}…` : t.reference}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 border-b border-outline-variant/5 text-on-surface-variant/70">{fmtTime(t.createdAt)}</td>
+                            <td className="px-4 py-3 border-b border-outline-variant/5">
+                              <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest border ${tm.color}`}>
+                                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: tm.dot }}></span>
+                                {tm.label}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 border-b border-outline-variant/5">
+                              {t.merchant ? (
+                                <div>
+                                  <p className="font-bold text-on-surface tracking-tight">{t.merchant.businessName}</p>
+                                  <p className="text-[10px] text-on-surface-variant/60 font-mono">#{t.merchant.paybillAccount}</p>
+                                </div>
+                              ) : t.sender?.name ? (
+                                <div>
+                                  <p className="font-medium text-on-surface-variant">{t.sender.name}</p>
+                                  <p className="text-[10px] text-on-surface-variant/60 font-mono">{t.sender.id || t.accountNumber}</p>
+                                </div>
+                              ) : (
+                                <p className="text-on-surface-variant/40 font-mono text-[12px]">{t.accountNumber || '—'}</p>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 border-b border-outline-variant/5">
+                              <p className="font-bold text-on-surface tracking-tight tabular-nums">
+                                {t.currency === 'USDC' ? `${fmtUSDC(t.amount)} USDC` : fmtKES(t.amount)}
+                              </p>
+                              {t.usdcAmount > 0 && t.kesAmount > 0 && (
+                                <p className="text-[10px] text-on-surface-variant/60 font-mono">≈ {fmtUSDC(t.usdcAmount)} USDC</p>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 border-b border-outline-variant/5">
+                              <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest border ${sm.pill}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${sm.dot}`}></span>
+                                {sm.label}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Pagination */}
+              {data.pagination.total > 0 && (
+                <div className="px-6 py-4 bg-surface flex items-center justify-between border-t border-outline-variant/10">
+                  <p className="text-[12px] text-on-surface-variant/60 font-body">
+                    Showing page {data.pagination.page} of {data.pagination.totalPages} · {data.pagination.total.toLocaleString()} entries
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="p-1.5 rounded-lg hover:bg-surface-container-low text-on-surface-variant/40 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                      <span className="material-symbols-outlined text-[18px]">chevron_left</span>
+                    </button>
+                    <span className="px-3 py-1 rounded-lg bg-primary text-white text-xs font-bold tracking-tight">{page}</span>
+                    <button onClick={() => setPage((p) => Math.min(data.pagination.totalPages, p + 1))} disabled={page === data.pagination.totalPages} className="p-1.5 rounded-lg hover:bg-surface-container-low text-on-surface-variant/40 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                      <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        ) : null}
       </div>
     </Layout>
   );
 };
+
+// ── Asset tile ───────────────────────────────────────────────────────
+const AssetTile = ({ label, symbol, amount, rawAmount, color, chain }) => {
+  const colorMap = {
+    emerald: { bg: 'from-emerald-500/10 to-emerald-500/5', text: 'text-emerald-600', ring: 'ring-emerald-500/30' },
+    blue:    { bg: 'from-blue-500/10 to-blue-500/5',       text: 'text-blue-600',    ring: 'ring-blue-500/30' },
+  };
+  const c = colorMap[color] || colorMap.emerald;
+  return (
+    <div className={`bg-gradient-to-br ${c.bg} border border-outline-variant/20 rounded-xl p-4`}>
+      <div className="flex items-center justify-between mb-2">
+        <div className={`w-7 h-7 rounded-full ring-2 ${c.ring} bg-white flex items-center justify-center font-bold text-[9px] ${c.text}`}>
+          {symbol}
+        </div>
+        <span className="text-[8px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40">{chain}</span>
+      </div>
+      <p className="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1">{label}</p>
+      <p className={`text-xl font-bold tracking-tighter ${rawAmount > 0 ? 'text-on-surface' : 'text-on-surface-variant/40'}`}>{amount}</p>
+    </div>
+  );
+};
+
+// ── KPI ──────────────────────────────────────────────────────────────
+const KpiCard = ({ label, value, change, icon, tone, subtitle, noDelta }) => {
+  const toneMap = {
+    primary: 'bg-primary/10 text-primary',
+    emerald: 'bg-emerald-50 text-emerald-600',
+    blue:    'bg-blue-50 text-blue-600',
+    amber:   'bg-amber-50 text-amber-600',
+  };
+  const positive = (change ?? 0) >= 0;
+  return (
+    <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl p-4 shadow-sm transition-all hover:shadow-md">
+      <div className="flex items-start justify-between mb-2">
+        <p className="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant/40">{label}</p>
+        <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${toneMap[tone] || toneMap.primary}`}>
+          <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>{icon}</span>
+        </div>
+      </div>
+      <p className="text-xl font-bold text-on-surface tracking-tighter">{value}</p>
+      <div className="flex items-center justify-between mt-2 text-[10px]">
+        {!noDelta ? (
+          <span className={`inline-flex items-center gap-0.5 px-1 py-0.5 rounded font-bold ${positive ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+            <span className="material-symbols-outlined text-[10px]">{positive ? 'arrow_upward' : 'arrow_downward'}</span>
+            {positive ? '+' : ''}{change}%
+          </span>
+        ) : <span></span>}
+        {subtitle && <p className="text-on-surface-variant/50">{subtitle}</p>}
+      </div>
+    </div>
+  );
+};
+
+// ── Type Mix (donut) ─────────────────────────────────────────────────
+const TypeMix = ({ mix }) => {
+  const total = mix.reduce((s, r) => s + r.volume, 0);
+  if (total === 0) return <p className="py-8 text-center text-on-surface-variant/40 text-sm">No transactions yet.</p>;
+  let offset = 0;
+  return (
+    <div className="flex flex-col items-center gap-4">
+      <div className="relative w-32 h-32">
+        <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+          <circle cx="18" cy="18" r="15.5" fill="none" stroke="rgba(0,0,0,0.04)" strokeWidth="3" />
+          {mix.map((r, i) => {
+            const tm = TYPE_META[r.type] || TYPE_META.other;
+            const pct = (r.volume / total) * 100;
+            const circ = 2 * Math.PI * 15.5;
+            const dash = (pct / 100) * circ;
+            const seg = (
+              <circle
+                key={i} cx="18" cy="18" r="15.5" fill="none"
+                stroke={tm.dot} strokeWidth="3"
+                strokeDasharray={`${dash} ${circ - dash}`}
+                strokeDashoffset={-offset}
+              />
+            );
+            offset += dash;
+            return seg;
+          })}
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <p className="text-[8px] font-bold uppercase tracking-widest text-on-surface-variant/40">Total</p>
+          <p className="text-sm font-bold text-on-surface tracking-tight">{fmtKES(total)}</p>
+        </div>
+      </div>
+      <div className="w-full space-y-1.5">
+        {mix.map((r, i) => {
+          const tm = TYPE_META[r.type] || TYPE_META.other;
+          return (
+            <div key={i} className="flex items-center gap-2 text-[11px]">
+              <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: tm.dot }}></span>
+              <span className="font-bold text-on-surface-variant/70 flex-1 truncate">{tm.label}</span>
+              <span className="font-bold text-on-surface tabular-nums">{fmtKES(r.volume)}</span>
+              <span className="text-on-surface-variant/50 tabular-nums w-10 text-right">{((r.volume / total) * 100).toFixed(0)}%</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// ── Area chart (volume series) ───────────────────────────────────────
+const AreaChart = ({ series }) => {
+  if (!series || series.length === 0) return <div className="h-[200px] flex items-center justify-center text-on-surface-variant/40 text-sm">No volume in this range.</div>;
+  const w = 800, h = 200;
+  const padL = 40, padR = 16, padT = 10, padB = 28;
+  const innerW = w - padL - padR;
+  const innerH = h - padT - padB;
+  const volumes = series.map((d) => d.volume);
+  const max = Math.max(...volumes, 1);
+  const step = innerW / Math.max(series.length - 1, 1);
+  const pts = series.map((d, i) => [padL + i * step, padT + (1 - d.volume / max) * innerH]);
+  const path = pts.map(([x, y], i) => (i === 0 ? `M ${x} ${y}` : `L ${x} ${y}`)).join(' ');
+  const area = `${path} L ${padL + (series.length - 1) * step} ${padT + innerH} L ${padL} ${padT + innerH} Z`;
+  const yLabels = [0, 0.5, 1].reverse();
+  const xTicks = series.length <= 6 ? series.map((d, i) => ({ x: padL + i * step, label: d.bucket.slice(5) })) : [
+    { x: padL, label: series[0].bucket.slice(5) },
+    { x: padL + innerW / 2, label: series[Math.floor(series.length / 2)].bucket.slice(5) },
+    { x: padL + innerW, label: series[series.length - 1].bucket.slice(5) },
+  ];
+  return (
+    <div className="w-full overflow-x-auto">
+      <svg viewBox={`0 0 ${w} ${h}`} className="w-full min-w-[500px]" style={{ height: 200 }}>
+        <defs>
+          <linearGradient id="ledgerArea" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="#06201B" stopOpacity="0.18" />
+            <stop offset="100%" stopColor="#06201B" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {yLabels.map((p, i) => (
+          <g key={i}>
+            <line x1={padL} x2={w - padR} y1={padT + p * innerH} y2={padT + p * innerH} stroke="rgba(0,0,0,0.06)" strokeDasharray="2 4" />
+            <text x={padL - 6} y={padT + p * innerH + 3} fontSize="9" fill="rgba(0,0,0,0.4)" textAnchor="end" fontWeight="700">{fmtKES(max * (1 - p))}</text>
+          </g>
+        ))}
+        {xTicks.map((t, i) => (
+          <text key={i} x={t.x} y={h - 8} fontSize="9" fill="rgba(0,0,0,0.4)" textAnchor="middle" fontWeight="700">{t.label}</text>
+        ))}
+        <path d={area} fill="url(#ledgerArea)" />
+        <path d={path} fill="none" stroke="#06201B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        {pts.map(([x, y], i) => <circle key={i} cx={x} cy={y} r={3} fill="#06201B" stroke="#fff" strokeWidth="2" />)}
+      </svg>
+    </div>
+  );
+};
+
+const Th = ({ children }) => (
+  <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60">{children}</th>
+);
+
+const Legend = ({ color, label }) => (
+  <span className="inline-flex items-center gap-1.5">
+    <span className={`w-2.5 h-2.5 rounded-full ${color}`}></span>
+    <span className="text-on-surface-variant/60">{label}</span>
+  </span>
+);
+
+const LoadingState = () => (
+  <div className="space-y-4">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+      <div className="lg:col-span-5 h-44 bg-surface-container-low rounded-2xl animate-pulse"></div>
+      <div className="lg:col-span-7 grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {[...Array(4)].map((_, i) => <div key={i} className="h-28 bg-surface-container-low rounded-2xl animate-pulse"></div>)}
+      </div>
+    </div>
+    <div className="h-64 bg-surface-container-low rounded-2xl animate-pulse"></div>
+  </div>
+);
+
+const ErrorState = ({ error, onRetry }) => (
+  <div className="bg-red-50 border border-red-100 rounded-2xl p-8 text-center">
+    <div className="w-14 h-14 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-3">
+      <span className="material-symbols-outlined text-3xl">error</span>
+    </div>
+    <h3 className="text-lg font-bold text-red-900 mb-1">Ledger unavailable</h3>
+    <p className="text-sm text-red-700 max-w-md mx-auto mb-4">{error}</p>
+    <button onClick={onRetry} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold uppercase tracking-widest rounded-lg">
+      Retry
+    </button>
+  </div>
+);
 
 export default Ledger;

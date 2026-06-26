@@ -1,196 +1,634 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Layout from '../components/layout/Layout';
-// Using hardcoded values for charts based on stitch design
-// In a real app we'd use analyticsData
+import api from '../api/api';
+
+// ── Constants ─────────────────────────────────────────────────────────
+const RANGES = [
+  { v: '7d',  l: '7 Days' },
+  { v: '30d', l: '30 Days' },
+  { v: '90d', l: '90 Days' },
+  { v: 'all', l: 'All Time' },
+];
+
+const TXN_TYPE_LABEL = {
+  inbound:    'M-Pesa Collections',
+  outbound:   'Payouts',
+  bulk_pay:   'Bulk Payments',
+  settlement: 'Settlements',
+  fx_swap:    'FX Swaps',
+  other:      'Other',
+};
+
+const fmtKES = (n) => {
+  if (n == null || isNaN(n)) return 'KES 0';
+  if (n >= 1_000_000_000) return `KES ${(n / 1_000_000_000).toFixed(2)}B`;
+  if (n >= 1_000_000)     return `KES ${(n / 1_000_000).toFixed(2)}M`;
+  if (n >= 1_000)         return `KES ${(n / 1_000).toFixed(1)}k`;
+  return `KES ${Math.round(n).toLocaleString()}`;
+};
+const fmtNum = (n) => {
+  if (n == null || isNaN(n)) return '0';
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000)     return `${(n / 1_000).toFixed(1)}k`;
+  return n.toLocaleString();
+};
 
 const Analytics = () => {
+  const [range, setRange] = useState('30d');
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await api.get('/api/admin/insights', { params: { range } });
+      if (res.data?.success) setData(res.data.data);
+      else setError(res.data?.error || 'Could not load insights.');
+    } catch (err) {
+      console.error('Insights fetch failed:', err);
+      const status = err?.response?.status;
+      setError(
+        err?.response?.data?.error
+        || (status === 404 ? 'Insights endpoint not available — backend needs to be redeployed.' : 'Could not load insights.')
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [range]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  useEffect(() => {
+    const h = () => fetchData();
+    window.addEventListener('paychain:sync', h);
+    return () => window.removeEventListener('paychain:sync', h);
+  }, [fetchData]);
+
   return (
     <Layout>
-      <div className="space-y-10">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
+      <div className="space-y-8 pb-12">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
           <div>
-            <h2 className="text-[28px] md:text-[32px] font-bold text-on-surface tracking-tighter font-headline">System Analytics</h2>
-            <p className="text-on-surface-variant/60 text-[13px] md:text-[14px] mt-1 font-body">Deep insights into ecosystem growth and merchant health.</p>
-          </div>
-          <button className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs font-bold rounded-lg shadow-sm hover:bg-surface-container-low transition-all uppercase tracking-widest font-label">
-            <span className="material-symbols-outlined text-[18px]">calendar_today</span>
-            Filter Range
-          </button>
-        </div>
-
-        {/* Growth Metrics Section */}
-        <section>
-          <div className="flex items-center gap-3 mb-6">
-            <span className="text-[11px] font-bold uppercase tracking-[0.05em] text-on-surface-variant/40 font-label">GROWTH METRICS</span>
-          <div className="flex-1 h-[1px] bg-outline-variant/10"></div>
-          </div>
-          <div className="flex gap-2 mb-6">
-            <button className="px-3 py-1.5 text-xs font-bold bg-primary-container text-white rounded-lg tracking-tight font-label">Last 30 Days</button>
-            <button className="px-3 py-1.5 text-xs font-bold text-on-surface-variant/60 hover:bg-surface-container-low rounded-lg tracking-tight font-label">Last 12 Months</button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-            <div className="col-span-12 lg:col-span-8 bg-surface-container-lowest rounded-xl p-4 md:p-6 border border-outline-variant/20 shadow-editorial overflow-hidden">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
-                <div>
-                  <h4 className="text-sm font-bold text-on-surface uppercase tracking-widest font-label">Signups Over Time</h4>
-                  <p className="text-[11px] text-on-surface-variant/40 font-body">Daily registration volume across all regions</p>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-secondary"></span>
-                    <span className="text-[11px] text-on-surface-variant/60 font-medium">Merchant</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-primary/60"></span>
-                    <span className="text-[11px] text-on-surface-variant/60 font-medium">Waitlist</span>
-                  </div>
-                </div>
-              </div>
-              <div className="h-[200px] md:h-[240px] w-full chart-grid relative flex items-end justify-between gap-1 md:gap-2">
-                {[30, 45, 40, 65, 55, 80, 70, 90, 85, 95].map((h, i) => (
-                  <div key={i} className="flex-1 bg-secondary/80 rounded-t-sm transition-all hover:bg-secondary" style={{ height: `${h}%` }}></div>
-                ))}
-              </div>
-              <div className="flex justify-between mt-4 text-[9px] font-bold text-on-surface-variant/30 px-2 uppercase tracking-widest font-label overflow-hidden">
-                <span>01 Nov</span>
-                <span className="hidden sm:inline">08 Nov</span>
-                <span>15 Nov</span>
-                <span className="hidden sm:inline">22 Nov</span>
-                <span>29 Nov</span>
-              </div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="material-symbols-outlined text-primary text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>insights</span>
+              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary">Executive Insights</p>
             </div>
-            <div className="col-span-12 lg:col-span-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4">
-              {[
-                { label: 'New Signups', value: '1,248', change: '12.4%', up: true },
-                { label: 'New Merchants', value: '342', change: '8.2%', up: true },
-                { label: 'Approvals', value: '291', change: '15.1%', up: true },
-                { label: 'Conversions', value: '24.5%', change: '2.1%', up: false }
-              ].map((stat, i) => (
-                <div key={i} className="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/20 flex items-center justify-between shadow-sm transition-all hover:scale-[1.02]">
-                  <div>
-                    <span className="text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest mb-1 block font-label">{stat.label}</span>
-                    <p className="text-xl md:text-2xl font-bold text-on-surface tracking-tighter">{stat.value}</p>
-                  </div>
-                  <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold tracking-tight ${stat.up ? 'bg-secondary-container/20 text-secondary' : 'bg-error-container/20 text-error'}`}>
-                    <span className="material-symbols-outlined text-[14px]">{stat.up ? 'trending_up' : 'trending_down'}</span>
-                    <span>{stat.change}</span>
-                  </div>
-                </div>
+            <h2 className="text-[28px] md:text-[36px] font-bold text-on-surface tracking-tighter font-headline leading-none">
+              Pulse of the Network
+            </h2>
+            <p className="text-on-surface-variant/60 mt-2 text-[13px] md:text-[14px] font-body max-w-xl">
+              Real-time gross transaction volume, merchant health, and growth velocity across the PayChain ecosystem.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="inline-flex p-1 bg-surface-container-low rounded-xl border border-outline-variant/20">
+              {RANGES.map((r) => (
+                <button
+                  key={r.v}
+                  onClick={() => setRange(r.v)}
+                  className={`px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest rounded-lg transition-all ${
+                    range === r.v ? 'bg-primary text-white shadow-md' : 'text-on-surface-variant/60 hover:text-on-surface'
+                  }`}
+                >
+                  {r.l}
+                </button>
               ))}
             </div>
-          </div>
-        </section>
-
-        {/* intelligence section */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div className="sm:col-span-2 lg:col-span-3 mb-2">
-            <h3 className="text-xl font-semibold text-on-surface">Merchant Intelligence</h3>
-          </div>
-          <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/20 shadow-sm">
-            <h4 className="text-[11px] font-bold text-on-surface-variant/60 uppercase tracking-widest mb-6 font-label">Type Distribution</h4>
-            <div className="relative w-32 h-32 md:w-40 md:h-40 mx-auto mb-6">
-              <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                <circle className="stroke-surface-container" cx="18" cy="18" fill="none" r="16" strokeWidth="3"></circle>
-                <circle className="stroke-primary" cx="18" cy="18" fill="none" r="16" strokeDasharray="75, 100" strokeLinecap="round" strokeWidth="4"></circle>
-                <circle className="stroke-secondary" cx="18" cy="18" fill="none" r="16" strokeDasharray="25, 100" strokeDashoffset="-75" strokeLinecap="round" strokeWidth="4"></circle>
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center font-body">
-                <span className="text-lg md:text-xl font-bold text-on-surface tracking-tighter">1.8k</span>
-                <span className="text-[9px] font-bold text-on-surface-variant/40 uppercase tracking-widest font-label">Total</span>
-              </div>
-            </div>
-            <div className="space-y-4 font-body">
-              <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2 font-bold"><span className="w-2.5 h-2.5 rounded-full bg-primary"></span><span className="text-on-surface-variant/70">Enterprise</span></div>
-                <span className="font-bold text-on-surface">75%</span>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2 font-bold"><span className="w-2.5 h-2.5 rounded-full bg-secondary"></span><span className="text-on-surface-variant/70">SMBs</span></div>
-                <span className="font-bold text-on-surface">25%</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/20 shadow-sm">
-            <h4 className="text-[11px] font-bold text-on-surface-variant/60 uppercase tracking-widest mb-6 font-label">Trust Score Spread</h4>
-            <div className="h-32 md:h-40 flex items-end justify-between gap-1.5 md:gap-2 px-2">
-              {[10, 25, 45, 85, 60].map((h, i) => (
-                <div key={i} className={`w-full rounded-t-sm transition-all ${i === 3 ? 'bg-secondary' : i === 4 ? 'bg-primary' : 'bg-surface-container-high hover:bg-secondary-container/40'}`} style={{ height: `${h}%` }}></div>
-              ))}
-            </div>
-            <div className="flex justify-between mt-4 text-[9px] font-bold text-on-surface-variant/40 uppercase tracking-widest px-1 font-label">
-              <span>Poor</span><span>Fair</span><span>Good</span><span>High</span><span>Elite</span>
-            </div>
-          </div>
-
-          <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/20 shadow-sm sm:col-span-2 lg:col-span-1">
-            <h4 className="text-[11px] font-bold text-on-surface-variant/60 uppercase tracking-widest mb-6 font-label">Monthly Velocity</h4>
-            <div className="space-y-4 font-body">
-              {[
-                { label: '0 - 50k', val: 12, color: 'bg-primary/40' },
-                { label: '50k - 200k', val: 34, color: 'bg-secondary-container' },
-                { label: '200k - 1M', val: 42, color: 'bg-secondary' },
-                { label: '1M+', val: 12, color: 'bg-primary' }
-              ].map((item, i) => (
-                <div key={i}>
-                  <div className="flex justify-between text-[11px] font-bold mb-1.5 uppercase tracking-wide">
-                    <span className="text-on-surface-variant/60">{item.label}</span>
-                    <span className="text-on-surface">{item.val}%</span>
-                  </div>
-                  <div className="w-full h-1 bg-surface-container rounded-full overflow-hidden">
-                    <div className={`h-full ${item.color} rounded-full`} style={{ width: `${item.val}%` }}></div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Monthly Summary Table */}
-        <section className="bg-surface-container-lowest rounded-xl border border-outline-variant/20 overflow-hidden shadow-sm">
-          <div className="p-6 flex items-center justify-between border-b border-outline-variant/10">
-            <h3 className="text-lg font-semibold text-on-surface tracking-tight">Monthly Performance Summary</h3>
-            <button className="flex items-center gap-2 text-xs font-bold text-secondary uppercase tracking-widest font-label">
-              <span className="material-symbols-outlined text-[18px]">download</span>
-              Export CSV
+            <button onClick={fetchData} className="p-2 rounded-lg bg-surface-container-low hover:bg-surface-container-high text-on-surface-variant transition-colors" title="Refresh">
+              <span className="material-symbols-outlined text-[18px]">refresh</span>
             </button>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left font-body">
-              <thead>
-                <tr className="bg-surface-container-low font-label">
-                  <th className="px-6 py-4 text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest">Month</th>
-                  <th className="px-6 py-4 text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest">Signups</th>
-                  <th className="px-6 py-4 text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest">Cumulative</th>
-                  <th className="px-6 py-4 text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest">Collected</th>
-                  <th className="px-6 py-4 text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest">Est. Revenue</th>
-                  <th className="px-6 py-4 text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest">Conv Rate</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-outline-variant/10">
-                {[
-                  { month: 'November 2023', signups: '1,248', cum: '14,203', total: 'KES 12.4M', rev: 'KES 310k', rate: '24.5%' },
-                  { month: 'October 2023', signups: '1,102', cum: '12,955', total: 'KES 11.2M', rev: 'KES 280k', rate: '23.8%' },
-                  { month: 'September 2023', signups: '985', cum: '11,853', total: 'KES 10.1M', rev: 'KES 252k', rate: '22.1%' },
-                  { month: 'August 2023', signups: '890', cum: '10,868', total: 'KES 9.4M', rev: 'KES 235k', rate: '21.5%' },
-                  { month: 'July 2023', signups: '1,340', cum: '9,978', total: 'KES 13.1M', rev: 'KES 327k', rate: '26.2%' }
-                ].map((row, i) => (
-                  <tr key={i} className="hover:bg-secondary-container/5 transition-all">
-                    <td className="px-6 py-4 text-[13px] font-bold text-on-surface tracking-tight">{row.month}</td>
-                    <td className="px-6 py-4 text-[13px] text-on-surface-variant">{row.signups}</td>
-                    <td className="px-6 py-4 text-[13px] text-on-surface-variant">{row.cum}</td>
-                    <td className="px-6 py-4 text-[13px] text-on-surface-variant font-bold">{row.total}</td>
-                    <td className="px-6 py-4 text-[13px] text-on-surface-variant font-bold">{row.rev}</td>
-                    <td className="px-6 py-4"><span className="px-2 py-0.5 bg-secondary-container/20 text-secondary rounded-lg text-[11px] font-bold tracking-tight">{row.rate}</span></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+        </div>
+
+        {loading && !data ? (
+          <LoadingState />
+        ) : error ? (
+          <ErrorState error={error} />
+        ) : data ? (
+          <>
+            {/* North Star — GTV hero */}
+            <NorthStarCard data={data} />
+
+            {/* KPI grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <KpiCard
+                label="Gross Transaction Volume"
+                value={fmtKES(data.kpis.gtv.value)}
+                change={data.kpis.gtv.change}
+                icon="payments"
+                tone="primary"
+                subtitle={`vs ${fmtKES(data.kpis.gtv.prev)} prev period`}
+              />
+              <KpiCard
+                label="Transactions"
+                value={fmtNum(data.kpis.txnCount.value)}
+                change={data.kpis.txnCount.change}
+                icon="receipt_long"
+                tone="emerald"
+                subtitle={`${fmtNum(data.kpis.txnCount.prev)} prev`}
+              />
+              <KpiCard
+                label="New Merchants"
+                value={fmtNum(data.kpis.newMerchants.value)}
+                change={data.kpis.newMerchants.change}
+                icon="storefront"
+                tone="violet"
+                subtitle={`${fmtNum(data.kpis.newMerchants.prev)} prev`}
+              />
+              <KpiCard
+                label="Active Merchants"
+                value={fmtNum(data.kpis.activeMerchants)}
+                icon="bolt"
+                tone="amber"
+                subtitle={`${fmtNum(data.kpis.totalMerchants)} total`}
+                noDelta
+              />
+            </div>
+
+            {/* GTV chart + Health sidebar */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              <div className="lg:col-span-8 bg-surface-container-lowest rounded-2xl border border-outline-variant/20 p-6 shadow-editorial">
+                <div className="flex items-start justify-between mb-6">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">Volume Trajectory</p>
+                    <h3 className="text-lg font-bold text-on-surface tracking-tight">Daily GTV ({range.toUpperCase()})</h3>
+                  </div>
+                  <div className="flex items-center gap-4 text-[11px] font-bold">
+                    <Legend color="bg-primary" label="Volume" />
+                    <Legend color="bg-emerald-500" label="Txn Count" />
+                  </div>
+                </div>
+                <AreaChart series={data.gtvSeries} />
+              </div>
+
+              <div className="lg:col-span-4 space-y-4">
+                <HealthCard health={data.health} />
+                <FunnelCard funnel={data.funnel} />
+              </div>
+            </div>
+
+            {/* Top Merchants + Signups */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              <div className="lg:col-span-7 bg-surface-container-lowest rounded-2xl border border-outline-variant/20 overflow-hidden shadow-editorial">
+                <div className="px-6 py-5 border-b border-outline-variant/10 flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">Leaderboard</p>
+                    <h3 className="text-lg font-bold text-on-surface tracking-tight">Top Merchants by Volume</h3>
+                  </div>
+                  <span className="text-[11px] text-on-surface-variant/40">Last {range === 'all' ? 'all time' : range}</span>
+                </div>
+                <TopMerchantsTable rows={data.topMerchants} />
+              </div>
+
+              <div className="lg:col-span-5 bg-surface-container-lowest rounded-2xl border border-outline-variant/20 p-6 shadow-editorial">
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">Acquisition</p>
+                    <h3 className="text-lg font-bold text-on-surface tracking-tight">Daily Signups</h3>
+                  </div>
+                </div>
+                <BarChart series={data.signupsSeries} />
+              </div>
+            </div>
+
+            {/* Transaction mix + Business types */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              <div className="lg:col-span-6 bg-surface-container-lowest rounded-2xl border border-outline-variant/20 p-6 shadow-editorial">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">Product Mix</p>
+                <h3 className="text-lg font-bold text-on-surface tracking-tight mb-5">Volume by Transaction Type</h3>
+                <TypeMix mix={data.txnTypeMix} />
+              </div>
+              <div className="lg:col-span-6 bg-surface-container-lowest rounded-2xl border border-outline-variant/20 p-6 shadow-editorial">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">Composition</p>
+                <h3 className="text-lg font-bold text-on-surface tracking-tight mb-5">Pipeline by Business Sector</h3>
+                <BusinessTypeList items={data.businessTypes} />
+              </div>
+            </div>
+          </>
+        ) : null}
       </div>
     </Layout>
   );
 };
+
+// ── North Star ───────────────────────────────────────────────────────
+const NorthStarCard = ({ data }) => {
+  const gtv = data.kpis.gtv;
+  const trend = data.gtvSeries.map((d) => d.volume);
+  const positive = gtv.change >= 0;
+  return (
+    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#06201B] via-[#0a3029] to-[#06201B] border border-emerald-900/40 shadow-[0_30px_80px_-20px_rgba(6,32,27,0.5)] p-8">
+      {/* Decorative orbs */}
+      <div className="absolute -top-20 -right-20 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl"></div>
+      <div className="absolute -bottom-10 -left-10 w-48 h-48 bg-emerald-400/10 rounded-full blur-2xl"></div>
+
+      <div className="relative grid grid-cols-1 lg:grid-cols-3 gap-8 items-center">
+        <div className="lg:col-span-2">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-emerald-300">North Star · Live</p>
+          </div>
+          <p className="text-[12px] uppercase tracking-widest text-emerald-100/60 font-bold mb-2">Gross Transaction Volume</p>
+          <h1 className="text-[44px] md:text-[64px] font-bold text-white tracking-tighter font-headline leading-none">
+            {fmtKES(gtv.value)}
+          </h1>
+          <div className="flex items-center gap-3 mt-4">
+            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[12px] font-bold ${positive ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'}`}>
+              <span className="material-symbols-outlined text-[14px]">{positive ? 'trending_up' : 'trending_down'}</span>
+              {positive ? '+' : ''}{gtv.change}%
+            </span>
+            <span className="text-[12px] text-emerald-100/50">vs previous period</span>
+          </div>
+        </div>
+        <div className="lg:col-span-1">
+          <Sparkline values={trend} stroke="#5EFEB3" fill="#5EFEB3" height={100} />
+          <p className="text-[10px] text-emerald-100/50 font-bold uppercase tracking-widest mt-2 text-right">{data.gtvSeries.length} day trend</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── KPI Card ─────────────────────────────────────────────────────────
+const KpiCard = ({ label, value, change, icon, tone, subtitle, noDelta }) => {
+  const toneMap = {
+    primary: 'bg-primary/10 text-primary',
+    emerald: 'bg-emerald-50 text-emerald-600',
+    violet:  'bg-violet-50 text-violet-600',
+    amber:   'bg-amber-50 text-amber-600',
+    blue:    'bg-blue-50 text-blue-600',
+  };
+  const positive = (change ?? 0) >= 0;
+  return (
+    <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl p-5 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5">
+      <div className="flex items-start justify-between mb-3">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40">{label}</p>
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${toneMap[tone] || toneMap.primary}`}>
+          <span className="material-symbols-outlined text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>{icon}</span>
+        </div>
+      </div>
+      <p className="text-2xl md:text-3xl font-bold text-on-surface tracking-tighter">{value}</p>
+      <div className="flex items-center justify-between mt-3">
+        {!noDelta && (
+          <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[11px] font-bold ${positive ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+            <span className="material-symbols-outlined text-[12px]">{positive ? 'arrow_upward' : 'arrow_downward'}</span>
+            {positive ? '+' : ''}{change}%
+          </span>
+        )}
+        {subtitle && <p className="text-[10px] text-on-surface-variant/50 ml-auto">{subtitle}</p>}
+      </div>
+    </div>
+  );
+};
+
+// ── Health Card ──────────────────────────────────────────────────────
+const HealthCard = ({ health }) => {
+  const items = [
+    { label: 'Active',   value: health.active, color: 'bg-emerald-500', pct: (health.active / Math.max(1, health.total)) * 100 },
+    { label: 'Locked',   value: health.locked, color: 'bg-amber-500',   pct: (health.locked / Math.max(1, health.total)) * 100 },
+    { label: 'Flagged',  value: health.flagged, color: 'bg-red-500',     pct: (health.flagged / Math.max(1, health.total)) * 100 },
+    { label: 'Dormant',  value: health.dormant, color: 'bg-gray-400',    pct: (health.dormant / Math.max(1, health.total)) * 100 },
+  ];
+  return (
+    <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl p-5 shadow-editorial">
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">Network Health</p>
+          <h3 className="text-base font-bold text-on-surface tracking-tight">Merchant Status</h3>
+        </div>
+        <span className="material-symbols-outlined text-on-surface-variant/30 text-[20px]">monitor_heart</span>
+      </div>
+      <div className="space-y-3">
+        {items.map((it) => (
+          <div key={it.label}>
+            <div className="flex items-center justify-between text-[12px] mb-1">
+              <span className="font-bold text-on-surface-variant/70">{it.label}</span>
+              <span className="font-bold text-on-surface">{it.value}</span>
+            </div>
+            <div className="h-1.5 bg-surface-container-low rounded-full overflow-hidden">
+              <div className={`h-full ${it.color} rounded-full transition-all`} style={{ width: `${it.pct}%` }}></div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-3 gap-2 mt-5 pt-4 border-t border-outline-variant/10">
+        <MiniStat label="Verified" value={health.verified} />
+        <MiniStat label="KRA" value={health.kraVerified} />
+        <MiniStat label="Wallets" value={health.withWallet} />
+      </div>
+    </div>
+  );
+};
+
+const MiniStat = ({ label, value }) => (
+  <div className="text-center">
+    <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40">{label}</p>
+    <p className="text-base font-bold text-on-surface tracking-tight">{fmtNum(value)}</p>
+  </div>
+);
+
+// ── Funnel Card ──────────────────────────────────────────────────────
+const FunnelCard = ({ funnel }) => {
+  const stages = [
+    { label: 'Waitlist', value: funnel.waitlistTotal, color: 'from-blue-500 to-blue-600' },
+    { label: 'Contacted', value: funnel.contacted + funnel.approved + funnel.converted, color: 'from-violet-500 to-violet-600' },
+    { label: 'Approved', value: funnel.approved + funnel.converted, color: 'from-emerald-500 to-emerald-600' },
+    { label: 'Converted', value: funnel.converted, color: 'from-amber-500 to-amber-600' },
+    { label: 'Active Merchants', value: funnel.activeMerchants, color: 'from-primary to-emerald-700' },
+  ];
+  const max = Math.max(1, ...stages.map((s) => s.value));
+  return (
+    <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl p-5 shadow-editorial">
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">Acquisition Funnel</p>
+          <h3 className="text-base font-bold text-on-surface tracking-tight">Pipeline → Platform</h3>
+        </div>
+        <span className="material-symbols-outlined text-on-surface-variant/30 text-[20px]">filter_alt</span>
+      </div>
+      <div className="space-y-2">
+        {stages.map((s, i) => {
+          const pct = (s.value / max) * 100;
+          const prevValue = i > 0 ? stages[i - 1].value : null;
+          const stageRate = prevValue ? Math.round((s.value / Math.max(1, prevValue)) * 100) : null;
+          return (
+            <div key={s.label} className="relative">
+              <div className={`h-9 rounded-lg bg-gradient-to-r ${s.color} flex items-center px-3 transition-all`} style={{ width: `${Math.max(pct, 18)}%` }}>
+                <span className="text-[11px] font-bold text-white uppercase tracking-wide">{s.label}</span>
+                <span className="ml-auto text-[12px] font-bold text-white">{fmtNum(s.value)}</span>
+              </div>
+              {stageRate != null && i > 0 && (
+                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-on-surface-variant/60 ml-2" style={{ left: `calc(${Math.max(pct, 18)}% + 8px)` }}>
+                  {stageRate}%
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// ── Top Merchants Table ──────────────────────────────────────────────
+const TopMerchantsTable = ({ rows }) => {
+  if (rows.length === 0) {
+    return <p className="p-10 text-center text-on-surface-variant/40 text-sm">No transaction activity in this range.</p>;
+  }
+  const max = Math.max(1, ...rows.map((r) => r.volume));
+  return (
+    <div className="divide-y divide-outline-variant/10">
+      {rows.map((m, i) => {
+        const pct = (m.volume / max) * 100;
+        return (
+          <div key={m._id} className="px-6 py-3 flex items-center gap-4 hover:bg-secondary-container/5 transition-colors">
+            <span className="text-[18px] font-bold text-on-surface-variant/30 w-6 tabular-nums">{String(i + 1).padStart(2, '0')}</span>
+            <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-[10px] uppercase ring-2 ring-white shadow-sm ${m.flagged ? 'bg-red-500 text-white' : m.status === 'locked' ? 'bg-amber-500 text-white' : 'bg-primary-fixed-dim text-primary'}`}>
+              {m.flagged ? '!' : (m.businessName || 'M').substring(0, 2)}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[13px] font-bold text-on-surface tracking-tight truncate">{m.businessName}</p>
+              <p className="text-[10px] text-on-surface-variant/60 font-mono">#{m.paybillAccount || '—'} · {fmtNum(m.txnCount)} txns</p>
+              <div className="h-1 bg-surface-container-low rounded-full overflow-hidden mt-1.5">
+                <div className="h-full bg-gradient-to-r from-primary to-emerald-500 rounded-full" style={{ width: `${pct}%` }}></div>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-[14px] font-bold text-on-surface tracking-tight tabular-nums">{fmtKES(m.volume)}</p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// ── Type Mix (donut + list) ──────────────────────────────────────────
+const TypeMix = ({ mix }) => {
+  const total = mix.reduce((s, r) => s + r.volume, 0);
+  if (total === 0) {
+    return <p className="py-10 text-center text-on-surface-variant/40 text-sm">No transactions in this range.</p>;
+  }
+  const colors = ['#06201B', '#10B981', '#8B5CF6', '#F59E0B', '#3B82F6', '#6B7280'];
+  let offset = 0;
+  return (
+    <div className="flex flex-col md:flex-row items-center gap-6">
+      <div className="relative w-36 h-36 md:w-40 md:h-40 flex-shrink-0">
+        <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+          <circle cx="18" cy="18" r="15.5" fill="none" stroke="rgba(0,0,0,0.04)" strokeWidth="3" />
+          {mix.map((r, i) => {
+            const pct = (r.volume / total) * 100;
+            const circ = 2 * Math.PI * 15.5;
+            const dash = (pct / 100) * circ;
+            const seg = (
+              <circle
+                key={i}
+                cx="18" cy="18" r="15.5" fill="none"
+                stroke={colors[i % colors.length]}
+                strokeWidth="3"
+                strokeDasharray={`${dash} ${circ - dash}`}
+                strokeDashoffset={-offset}
+                strokeLinecap="butt"
+              />
+            );
+            offset += dash;
+            return seg;
+          })}
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <p className="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant/40">Total</p>
+          <p className="text-base md:text-lg font-bold text-on-surface tracking-tight">{fmtKES(total)}</p>
+        </div>
+      </div>
+      <div className="flex-1 w-full space-y-2">
+        {mix.map((r, i) => (
+          <div key={i} className="flex items-center gap-3">
+            <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: colors[i % colors.length] }}></span>
+            <span className="text-[12px] font-bold text-on-surface-variant/80 flex-1 truncate">{TXN_TYPE_LABEL[r.type] || r.type}</span>
+            <span className="text-[12px] font-bold text-on-surface tabular-nums">{fmtKES(r.volume)}</span>
+            <span className="text-[10px] text-on-surface-variant/50 tabular-nums w-12 text-right">{((r.volume / total) * 100).toFixed(1)}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ── Business Type List ───────────────────────────────────────────────
+const BusinessTypeList = ({ items }) => {
+  if (items.length === 0) {
+    return <p className="py-10 text-center text-on-surface-variant/40 text-sm">No sector data yet.</p>;
+  }
+  const max = Math.max(1, ...items.map((i) => i.count));
+  return (
+    <div className="space-y-2">
+      {items.map((t, idx) => {
+        const pct = (t.count / max) * 100;
+        return (
+          <div key={idx} className="flex items-center gap-3">
+            <p className="text-[12px] font-bold text-on-surface w-32 truncate">{t.type}</p>
+            <div className="flex-1 h-2.5 bg-surface-container-low rounded-full overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-violet-500 to-violet-600 rounded-full transition-all" style={{ width: `${pct}%` }}></div>
+            </div>
+            <p className="text-[12px] font-bold text-on-surface-variant tabular-nums w-10 text-right">{t.count}</p>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// ── Sparkline (used in North Star) ───────────────────────────────────
+const Sparkline = ({ values, stroke = '#06201B', fill, height = 60 }) => {
+  if (!values || values.length === 0) return <div style={{ height }} className="flex items-center justify-center text-[11px] text-white/40">No data</div>;
+  const w = 280;
+  const h = height;
+  const max = Math.max(...values, 1);
+  const min = Math.min(...values, 0);
+  const range = Math.max(max - min, 1);
+  const step = w / Math.max(values.length - 1, 1);
+  const pts = values.map((v, i) => [i * step, h - ((v - min) / range) * (h - 8) - 4]);
+  const path = pts.map(([x, y], i) => (i === 0 ? `M ${x} ${y}` : `L ${x} ${y}`)).join(' ');
+  const area = `${path} L ${w} ${h} L 0 ${h} Z`;
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="w-full" style={{ height }}>
+      <defs>
+        <linearGradient id="sparkFill" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor={fill || stroke} stopOpacity="0.4" />
+          <stop offset="100%" stopColor={fill || stroke} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={area} fill="url(#sparkFill)" />
+      <path d={path} fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+};
+
+// ── Area Chart (GTV trend) ───────────────────────────────────────────
+const AreaChart = ({ series }) => {
+  if (!series || series.length === 0) {
+    return <div className="h-[240px] flex items-center justify-center text-on-surface-variant/40 text-sm">No transactions in this range yet.</div>;
+  }
+  const w = 800;
+  const h = 240;
+  const padL = 40;
+  const padR = 20;
+  const padT = 10;
+  const padB = 32;
+  const volumes = series.map((d) => d.volume);
+  const counts = series.map((d) => d.count);
+  const vMax = Math.max(...volumes, 1);
+  const cMax = Math.max(...counts, 1);
+  const innerW = w - padL - padR;
+  const innerH = h - padT - padB;
+  const step = innerW / Math.max(series.length - 1, 1);
+
+  const volPts = series.map((d, i) => [padL + i * step, padT + (1 - d.volume / vMax) * innerH]);
+  const cntPts = series.map((d, i) => [padL + i * step, padT + (1 - d.count / cMax) * innerH]);
+  const volPath = volPts.map(([x, y], i) => (i === 0 ? `M ${x} ${y}` : `L ${x} ${y}`)).join(' ');
+  const cntPath = cntPts.map(([x, y], i) => (i === 0 ? `M ${x} ${y}` : `L ${x} ${y}`)).join(' ');
+  const areaPath = `${volPath} L ${padL + (series.length - 1) * step} ${padT + innerH} L ${padL} ${padT + innerH} Z`;
+
+  // y-axis labels — 4 gridlines
+  const yLabels = [0, 0.25, 0.5, 0.75, 1].reverse();
+  // X-axis: show first, middle, last date
+  const xTicks = series.length <= 7
+    ? series.map((d, i) => ({ x: padL + i * step, label: d.date.slice(5) }))
+    : [
+        { x: padL, label: series[0].date.slice(5) },
+        { x: padL + innerW / 2, label: series[Math.floor(series.length / 2)].date.slice(5) },
+        { x: padL + innerW, label: series[series.length - 1].date.slice(5) },
+      ];
+
+  return (
+    <div className="w-full overflow-x-auto">
+      <svg viewBox={`0 0 ${w} ${h}`} className="w-full min-w-[600px]" style={{ height: 240 }}>
+        <defs>
+          <linearGradient id="areaFill" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="#06201B" stopOpacity="0.18" />
+            <stop offset="100%" stopColor="#06201B" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {/* Gridlines */}
+        {yLabels.map((p, i) => (
+          <g key={i}>
+            <line x1={padL} x2={w - padR} y1={padT + p * innerH} y2={padT + p * innerH} stroke="rgba(0,0,0,0.06)" strokeDasharray="2 4" />
+            <text x={padL - 6} y={padT + p * innerH + 3} fontSize="9" fill="rgba(0,0,0,0.4)" textAnchor="end" fontWeight="600">
+              {fmtKES(vMax * (1 - p))}
+            </text>
+          </g>
+        ))}
+        {/* X labels */}
+        {xTicks.map((t, i) => (
+          <text key={i} x={t.x} y={h - 12} fontSize="9" fill="rgba(0,0,0,0.4)" textAnchor="middle" fontWeight="700">
+            {t.label}
+          </text>
+        ))}
+        {/* Volume area */}
+        <path d={areaPath} fill="url(#areaFill)" />
+        <path d={volPath} fill="none" stroke="#06201B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        {/* Count line */}
+        <path d={cntPath} fill="none" stroke="#10B981" strokeWidth="1.5" strokeDasharray="4 4" strokeLinecap="round" />
+        {/* Data points (volume only) */}
+        {volPts.map(([x, y], i) => (
+          <circle key={i} cx={x} cy={y} r={3} fill="#06201B" stroke="#fff" strokeWidth="2" />
+        ))}
+      </svg>
+    </div>
+  );
+};
+
+// ── Bar Chart (signups) ──────────────────────────────────────────────
+const BarChart = ({ series }) => {
+  if (!series || series.length === 0) {
+    return <div className="h-[200px] flex items-center justify-center text-on-surface-variant/40 text-sm">No signups in this range.</div>;
+  }
+  const max = Math.max(...series.map((d) => d.count), 1);
+  return (
+    <div className="h-[200px] flex items-end justify-between gap-1">
+      {series.slice(-30).map((d, i) => {
+        const pct = (d.count / max) * 100;
+        return (
+          <div key={i} className="flex-1 group relative">
+            <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-on-surface text-white text-[10px] px-2 py-0.5 rounded font-bold opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+              {d.count} on {d.date.slice(5)}
+            </div>
+            <div className="bg-gradient-to-t from-emerald-600 to-emerald-400 rounded-t-sm hover:from-emerald-700 hover:to-emerald-500 transition-all" style={{ height: `${Math.max(pct, 4)}%` }}></div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+const Legend = ({ color, label }) => (
+  <span className="inline-flex items-center gap-1.5">
+    <span className={`w-2.5 h-2.5 rounded-full ${color}`}></span>
+    <span className="text-on-surface-variant/60">{label}</span>
+  </span>
+);
+
+// ── Loading & Error states ───────────────────────────────────────────
+const LoadingState = () => (
+  <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+    {[...Array(4)].map((_, i) => (
+      <div key={i} className="h-32 bg-surface-container-low rounded-2xl animate-pulse"></div>
+    ))}
+    <div className="lg:col-span-4 h-80 bg-surface-container-low rounded-2xl animate-pulse"></div>
+  </div>
+);
+
+const ErrorState = ({ error }) => (
+  <div className="bg-red-50 border border-red-100 rounded-2xl p-8 text-center">
+    <div className="w-14 h-14 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-3">
+      <span className="material-symbols-outlined text-3xl">error</span>
+    </div>
+    <h3 className="text-lg font-bold text-red-900 mb-1">Couldn't load insights</h3>
+    <p className="text-sm text-red-700 max-w-md mx-auto">{error}</p>
+  </div>
+);
 
 export default Analytics;
