@@ -1,6 +1,32 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Layout from '../components/layout/Layout';
 import api from '../api/api';
+
+// Default filter state — every dimension at "all" means no filtering.
+const defaultFilters = {
+  status: 'all',       // all | active | locked
+  activity: 'all',     // all | active | idle | dormant
+  verification: 'all', // all | verified | unverified
+  source: 'all',       // all | web | mobile
+  kra: 'all',          // all | verified | missing
+  flag: 'all',         // all | flagged | risk (any risk signal) | clean
+};
+
+// Severity → colour for risk-signal chips.
+const RISK_TONE = {
+  low:    { pill: 'bg-blue-50 text-blue-700 border-blue-200',     dot: 'bg-blue-400' },
+  medium: { pill: 'bg-amber-50 text-amber-700 border-amber-200',  dot: 'bg-amber-500' },
+  high:   { pill: 'bg-red-50 text-red-700 border-red-200',        dot: 'bg-red-500' },
+};
+
+const SUGGESTED_FLAG_REASONS = [
+  'Unusual transaction velocity in last 24h',
+  'KYB documents appear inconsistent',
+  'Customer complaints filed against merchant',
+  'Multiple failed payment attempts',
+  'Suspected money-laundering pattern',
+  'Mismatched KRA PIN vs business name',
+];
 
 const emptyForm = {
   name: '',
@@ -40,8 +66,13 @@ function relativeTime(iso) {
 const Merchants = () => {
   const [merchantsData, setMerchantsData] = useState([]);
   const [merchantStats, setMerchantStats] = useState({
-    active: 0, locked: 0, dormant: 0, total: 0, kycVerified: 0,
+    active: 0, locked: 0, dormant: 0, total: 0, kycVerified: 0, flagged: 0,
   });
+
+  // Flag-merchant modal — { merchant, reason, busy, error }. Reuses the same
+  // 2-stage pattern as the action modal but doesn't need OTP since flagging
+  // is a reversible label, not a destructive action.
+  const [flagState, setFlagState] = useState(null);
 
   // KYB detail drawer
   const [detailMerchant, setDetailMerchant] = useState(null); // full record from /merchants/:id
@@ -63,6 +94,67 @@ const Merchants = () => {
   // stage: 'confirm' (read the warning) -> 'otp' (enter code) -> 'done'
   const [actionState, setActionState] = useState(null); // { merchant, action, stage, otp, error, busy }
 
+  // Search + filters
+  const [search, setSearch] = useState('');
+  const [filters, setFilters] = useState(defaultFilters);
+  const [showFilters, setShowFilters] = useState(false);
+  const filtersRef = useRef(null);
+
+  // Phone normalizer: strip non-digits + drop common KE prefixes so 0790…,
+  // 254790…, +254790… and bare 790… all match the same query.
+  const normalizePhone = (s) => {
+    let p = String(s || '').replace(/\D/g, '');
+    if (p.startsWith('254')) p = p.substring(3);
+    if (p.startsWith('0')) p = p.substring(1);
+    return p;
+  };
+
+  const activeFilterCount = useMemo(
+    () => Object.entries(filters).filter(([, v]) => v !== 'all').length,
+    [filters]
+  );
+
+  // Derived: search-then-filter merchant list (the table renders this, not
+  // merchantsData directly, so filtering is instant and client-side).
+  const filteredMerchants = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const qPhone = q ? normalizePhone(q) : '';
+    return merchantsData.filter((m) => {
+      // Search
+      if (q) {
+        const haystack = [
+          m.businessName, m.name, m.email, m.paybillAccount,
+        ].filter(Boolean).map((s) => String(s).toLowerCase());
+        const phoneMatch = qPhone && normalizePhone(m.phone).includes(qPhone);
+        const textMatch = haystack.some((s) => s.includes(q));
+        if (!phoneMatch && !textMatch) return false;
+      }
+      // Status
+      if (filters.status !== 'all') {
+        const isLocked = m.status === 'locked';
+        if (filters.status === 'locked' && !isLocked) return false;
+        if (filters.status === 'active' && isLocked) return false;
+      }
+      // Activity
+      if (filters.activity !== 'all' && m.activityTier !== filters.activity) return false;
+      // Verification (account-level isVerified flag)
+      if (filters.verification === 'verified' && !m.isVerified) return false;
+      if (filters.verification === 'unverified' && m.isVerified) return false;
+      // Registration source
+      if (filters.source !== 'all' && (m.registrationSource || 'web') !== filters.source) return false;
+      // KRA
+      if (filters.kra === 'verified' && !m.isKRAVerified) return false;
+      if (filters.kra === 'missing' && m.isKRAVerified) return false;
+      // Flag / risk
+      if (filters.flag === 'flagged' && !m.flagged) return false;
+      if (filters.flag === 'risk' && !(m.riskSignals && m.riskSignals.length > 0)) return false;
+      if (filters.flag === 'clean' && (m.flagged || (m.riskSignals && m.riskSignals.length > 0))) return false;
+      return true;
+    });
+  }, [merchantsData, search, filters]);
+
+  function clearFilters() { setFilters(defaultFilters); setSearch(''); }
+
   const fetchMerchants = useCallback(async () => {
     try {
       const res = await api.get('/api/admin/merchants');
@@ -75,6 +167,7 @@ const Merchants = () => {
           locked: mData.filter((m) => m.status === 'locked').length,
           dormant: mData.filter((m) => m.activityTier === 'dormant').length,
           kycVerified: mData.filter((m) => m.isVerified).length,
+          flagged: mData.filter((m) => m.flagged).length,
         });
       }
     } catch (err) {
@@ -92,6 +185,15 @@ const Merchants = () => {
     if (openMenuId) document.addEventListener('mousedown', onClick);
     return () => document.removeEventListener('mousedown', onClick);
   }, [openMenuId]);
+
+  // Close the filter popover when clicking outside.
+  useEffect(() => {
+    const onClick = (e) => {
+      if (filtersRef.current && !filtersRef.current.contains(e.target)) setShowFilters(false);
+    };
+    if (showFilters) document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [showFilters]);
 
   function openModal() {
     setForm(emptyForm); setFormError(''); setSuccess(null); setShowModal(true);
@@ -189,6 +291,40 @@ const Merchants = () => {
 
   function closeAction() { if (!actionState?.busy) setActionState(null); }
 
+  // ── Flag / Unflag merchant ──────────────────────────────────────────
+  function startFlag(merchant) {
+    setOpenMenuId(null);
+    setFlagState({ merchant, reason: '', busy: false, error: '' });
+  }
+  async function submitFlag() {
+    if (!flagState) return;
+    if (flagState.reason.trim().length < 5) {
+      setFlagState((s) => ({ ...s, error: 'Reason must be at least 5 characters.' }));
+      return;
+    }
+    setFlagState((s) => ({ ...s, busy: true, error: '' }));
+    try {
+      const res = await api.post(`/api/admin/merchants/${flagState.merchant._id}/flag`, { reason: flagState.reason.trim() });
+      if (res.data?.success) {
+        setFlagState(null);
+        fetchMerchants();
+      } else {
+        setFlagState((s) => ({ ...s, busy: false, error: res.data?.error || 'Could not flag merchant.' }));
+      }
+    } catch (e) {
+      setFlagState((s) => ({ ...s, busy: false, error: e?.response?.data?.error || 'Could not flag merchant.' }));
+    }
+  }
+  async function unflag(merchant) {
+    setOpenMenuId(null);
+    try {
+      await api.post(`/api/admin/merchants/${merchant._id}/unflag`);
+      fetchMerchants();
+    } catch (e) {
+      console.error('Unflag failed:', e);
+    }
+  }
+
   // ── KYB detail drawer ───────────────────────────────────────────────
   async function openDetail(id) {
     setDetailLoading(true);
@@ -240,8 +376,8 @@ const Merchants = () => {
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 md:gap-4">
           <StatCard label="Active" value={merchantStats.active} icon="bolt" tone="emerald" />
           <StatCard label="Locked" value={merchantStats.locked} icon="lock" tone="amber" />
+          <StatCard label="Flagged" value={merchantStats.flagged} icon="flag" tone="red" />
           <StatCard label="Dormant" value={merchantStats.dormant} icon="schedule" tone="gray" />
-          <StatCard label="Verified" value={merchantStats.kycVerified} icon="verified" tone="secondary" />
           <StatCard label="Total" value={merchantStats.total} icon="storefront" tone="primary" className="col-span-2 md:col-span-1" />
         </div>
 
@@ -252,17 +388,91 @@ const Merchants = () => {
               <div className="relative flex-1 max-w-md">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant/40 text-[20px]">search</span>
                 <input
-                  className="pl-10 pr-4 py-2 bg-surface-container-low border-transparent focus:border-secondary focus:ring-0 rounded-lg text-sm w-full transition-all font-body text-on-surface"
-                  placeholder="Search till, name or phone..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-10 pr-10 py-2 bg-surface-container-low border-transparent focus:border-secondary focus:ring-0 rounded-lg text-sm w-full transition-all font-body text-on-surface"
+                  placeholder="Search business, name, email, phone or account #..."
                   type="text"
                 />
+                {search && (
+                  <button
+                    onClick={() => setSearch('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md text-on-surface-variant/40 hover:bg-surface-container-high hover:text-on-surface"
+                    aria-label="Clear search"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">close</span>
+                  </button>
+                )}
               </div>
-              <button className="flex items-center justify-center gap-2 px-3 py-2 text-sm font-semibold text-on-surface-variant bg-surface-container-low hover:bg-surface-container-high rounded-lg transition-colors font-label tracking-tight">
-                <span className="material-symbols-outlined text-[18px]">filter_list</span>
-                Filters
-              </button>
+              <div className="relative" ref={filtersRef}>
+                <button
+                  onClick={() => setShowFilters((s) => !s)}
+                  className={`flex items-center justify-center gap-2 px-3 py-2 text-sm font-semibold rounded-lg transition-colors font-label tracking-tight ${
+                    activeFilterCount > 0
+                      ? 'bg-primary text-white hover:bg-primary/90'
+                      : 'text-on-surface-variant bg-surface-container-low hover:bg-surface-container-high'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[18px]">filter_list</span>
+                  Filters
+                  {activeFilterCount > 0 && (
+                    <span className="ml-1 px-1.5 py-0.5 rounded-full bg-white/25 text-[10px] font-bold">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </button>
+                {showFilters && (
+                  <FilterPopover
+                    filters={filters}
+                    onChange={(patch) => setFilters((f) => ({ ...f, ...patch }))}
+                    onReset={() => setFilters(defaultFilters)}
+                    onClose={() => setShowFilters(false)}
+                  />
+                )}
+              </div>
+              {(activeFilterCount > 0 || search) && (
+                <button
+                  onClick={clearFilters}
+                  className="flex items-center justify-center gap-1 px-3 py-2 text-xs font-bold uppercase tracking-widest text-on-surface-variant/70 hover:text-error transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[16px]">refresh</span>
+                  Clear all
+                </button>
+              )}
             </div>
+            <p className="text-[12px] text-on-surface-variant/60 font-body whitespace-nowrap">
+              {filteredMerchants.length} of {merchantsData.length}
+            </p>
           </div>
+
+          {/* Active filter chips */}
+          {(activeFilterCount > 0 || search) && (
+            <div className="px-4 md:px-6 py-3 border-b border-outline-variant/10 bg-surface-container-low/30 flex flex-wrap items-center gap-2">
+              {search && (
+                <Chip onClear={() => setSearch('')}>Search: "{search}"</Chip>
+              )}
+              {filters.status !== 'all' && (
+                <Chip onClear={() => setFilters((f) => ({ ...f, status: 'all' }))}>Status: {filters.status}</Chip>
+              )}
+              {filters.activity !== 'all' && (
+                <Chip onClear={() => setFilters((f) => ({ ...f, activity: 'all' }))}>Activity: {filters.activity}</Chip>
+              )}
+              {filters.verification !== 'all' && (
+                <Chip onClear={() => setFilters((f) => ({ ...f, verification: 'all' }))}>{filters.verification === 'verified' ? 'Verified accounts' : 'Unverified accounts'}</Chip>
+              )}
+              {filters.source !== 'all' && (
+                <Chip onClear={() => setFilters((f) => ({ ...f, source: 'all' }))}>Source: {filters.source}</Chip>
+              )}
+              {filters.kra !== 'all' && (
+                <Chip onClear={() => setFilters((f) => ({ ...f, kra: 'all' }))}>{filters.kra === 'verified' ? 'KRA verified' : 'No KRA'}</Chip>
+              )}
+              {filters.flag !== 'all' && (
+                <Chip onClear={() => setFilters((f) => ({ ...f, flag: 'all' }))}>
+                  {filters.flag === 'flagged' ? 'Manually flagged' : filters.flag === 'risk' ? 'Has risk signals' : 'Clean'}
+                </Chip>
+              )}
+            </div>
+          )}
           <div className="overflow-x-auto custom-scrollbar">
             <table className="w-full text-left border-collapse font-body">
               <thead>
@@ -278,20 +488,46 @@ const Merchants = () => {
                 </tr>
               </thead>
               <tbody className="text-[13px]">
-                {merchantsData.map((m, i) => {
+                {filteredMerchants.map((m, i) => {
                   const tier = ACTIVITY_STYLE[m.activityTier] || ACTIVITY_STYLE.dormant;
                   const locked = m.status === 'locked';
+                  const flagged = !!m.flagged;
+                  const riskSignals = m.riskSignals || [];
+                  const highSeverity = riskSignals.some((s) => s.severity === 'high');
                   return (
-                    <tr key={m._id || i} className={`hover:bg-secondary-container/5 transition-colors group cursor-pointer ${locked ? 'opacity-70' : ''}`} onClick={() => openDetail(m._id)}>
+                    <tr key={m._id || i} className={`hover:bg-secondary-container/5 transition-colors group cursor-pointer ${locked ? 'opacity-70' : ''} ${flagged ? 'bg-red-50/30' : ''}`} onClick={() => openDetail(m._id)}>
                       <td className="py-3 px-4 text-on-surface-variant/40 border-b border-outline-variant/5">{String(i + 1).padStart(2, '0')}</td>
                       <td className="py-3 px-4 border-b border-outline-variant/5">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-primary-fixed-dim text-on-primary-fixed flex items-center justify-center font-bold text-[10px] ring-2 ring-white shadow-sm uppercase">
-                            {m.businessName ? m.businessName.substring(0, 2) : 'M'}
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-[10px] ring-2 ring-white shadow-sm uppercase ${flagged ? 'bg-red-500 text-white' : 'bg-primary-fixed-dim text-on-primary-fixed'}`}>
+                            {flagged ? <span className="material-symbols-outlined text-[14px]">flag</span> : (m.businessName ? m.businessName.substring(0, 2) : 'M')}
                           </div>
-                          <div>
-                            <p className="font-bold text-on-surface tracking-tight">{m.businessName || 'N/A'}</p>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <p className="font-bold text-on-surface tracking-tight">{m.businessName || 'N/A'}</p>
+                              {flagged && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-red-100 text-red-700 border border-red-200">
+                                  <span className="material-symbols-outlined text-[11px]">flag</span> Flagged
+                                </span>
+                              )}
+                            </div>
                             <p className="text-[11px] text-on-surface-variant/60">{m.name || 'Unknown'}</p>
+                            {riskSignals.length > 0 && (
+                              <div className="flex items-center gap-1 mt-1 flex-wrap">
+                                {riskSignals.slice(0, 3).map((s) => {
+                                  const tone = RISK_TONE[s.severity] || RISK_TONE.low;
+                                  return (
+                                    <span key={s.id} title={s.label} className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold border ${tone.pill}`}>
+                                      <span className={`w-1 h-1 rounded-full ${tone.dot}`}></span>
+                                      {s.label}
+                                    </span>
+                                  );
+                                })}
+                                {riskSignals.length > 3 && (
+                                  <span className="text-[9px] text-on-surface-variant/50 font-semibold">+{riskSignals.length - 3} more</span>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -339,9 +575,14 @@ const Merchants = () => {
                           <span className="material-symbols-outlined text-[20px]">more_vert</span>
                         </button>
                         {openMenuId === m._id && (
-                          <div ref={menuRef} className="absolute right-3 top-10 z-20 w-52 bg-white rounded-xl shadow-xl border border-outline-variant/20 overflow-hidden">
+                          <div ref={menuRef} className="absolute right-3 top-10 z-20 w-56 bg-white rounded-xl shadow-xl border border-outline-variant/20 overflow-hidden">
                             <MenuItem icon="visibility" tone="blue" onClick={() => { setOpenMenuId(null); openDetail(m._id); }}>View KYB details</MenuItem>
                             <div className="h-px bg-outline-variant/20"></div>
+                            {flagged ? (
+                              <MenuItem icon="outlined_flag" tone="emerald" onClick={() => unflag(m)}>Clear suspicious flag</MenuItem>
+                            ) : (
+                              <MenuItem icon="flag" tone="red" onClick={() => startFlag(m)}>Flag as suspicious</MenuItem>
+                            )}
                             {locked ? (
                               <MenuItem icon="lock_open" tone="emerald" onClick={() => startAction(m, 'unlock')}>Unlock account</MenuItem>
                             ) : (
@@ -355,14 +596,28 @@ const Merchants = () => {
                     </tr>
                   );
                 })}
-                {merchantsData.length === 0 && (
-                  <tr><td colSpan="8" className="py-8 text-center text-on-surface-variant/40">No merchants found.</td></tr>
+                {filteredMerchants.length === 0 && (
+                  <tr>
+                    <td colSpan="8" className="py-10 text-center text-on-surface-variant/40">
+                      {merchantsData.length === 0
+                        ? 'No merchants found.'
+                        : (
+                          <div className="space-y-2">
+                            <p>No merchants match the current search or filters.</p>
+                            <button onClick={clearFilters} className="text-primary font-bold underline text-[12px]">Clear all filters</button>
+                          </div>
+                        )}
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
           </div>
           <div className="px-6 py-4 bg-surface flex items-center justify-between border-t border-outline-variant/10">
-            <p className="text-xs text-on-surface-variant/60 font-body">Showing 1 to {merchantsData.length} of {merchantStats.total} merchants</p>
+            <p className="text-xs text-on-surface-variant/60 font-body">
+              Showing {filteredMerchants.length} of {merchantStats.total} merchants
+              {(activeFilterCount > 0 || search) && <span className="text-on-surface-variant/40"> · filtered</span>}
+            </p>
           </div>
         </div>
       </div>
@@ -455,6 +710,16 @@ const Merchants = () => {
       {/* KYB Detail Drawer */}
       {detailMerchant && (
         <KybDrawer merchant={detailMerchant} loading={detailLoading} error={detailError} onClose={closeDetail} />
+      )}
+
+      {/* Flag merchant modal */}
+      {flagState && (
+        <FlagModal
+          state={flagState}
+          onChange={(patch) => setFlagState((s) => ({ ...s, ...patch }))}
+          onSubmit={submitFlag}
+          onClose={() => { if (!flagState.busy) setFlagState(null); }}
+        />
       )}
     </Layout>
   );
@@ -604,6 +869,134 @@ const ActionModal = ({ state, onClose, onConfirm, onSubmitOtp, onOtpChange }) =>
   );
 };
 
+// ── Flag Merchant Modal ─────────────────────────────────────────────────
+const FlagModal = ({ state, onChange, onSubmit, onClose }) => {
+  const { merchant, reason, busy, error } = state;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="p-7">
+          <div className="w-14 h-14 rounded-full bg-red-50 text-red-600 flex items-center justify-center mb-4">
+            <span className="material-symbols-outlined text-3xl">flag</span>
+          </div>
+          <h3 className="text-xl font-bold text-on-surface mb-1">Flag as suspicious</h3>
+          <p className="text-sm text-on-surface-variant mb-4">
+            Flag <strong>{merchant.businessName}</strong> ({merchant.email}) for review. The merchant retains full account access; this is an internal label only.
+          </p>
+
+          <label className="block text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/70 mb-2">Reason (required)</label>
+          <textarea
+            value={reason}
+            onChange={(e) => onChange({ reason: e.target.value })}
+            rows={3}
+            maxLength={500}
+            placeholder="Explain what triggered the flag…"
+            className="w-full px-3 py-2.5 border border-outline-variant/40 rounded-lg text-sm focus:border-red-500 focus:ring-2 focus:ring-red-100 outline-none resize-none"
+          />
+          <p className="text-[10px] text-on-surface-variant/50 text-right mt-1">{reason.length}/500</p>
+
+          <div className="mt-3">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1.5">Quick reasons</p>
+            <div className="flex flex-wrap gap-1.5">
+              {SUGGESTED_FLAG_REASONS.map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => onChange({ reason: r })}
+                  className="px-2 py-1 rounded-md text-[11px] font-semibold border border-outline-variant/40 text-on-surface-variant hover:bg-red-50 hover:text-red-700 hover:border-red-200 transition-colors"
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {error && <div className="mt-3 text-[13px] text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium">{error}</div>}
+
+          <div className="mt-5 flex gap-3">
+            <button onClick={onClose} disabled={busy} className="flex-1 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40 transition-all">Cancel</button>
+            <button onClick={onSubmit} disabled={busy || reason.trim().length < 5} className="flex-1 py-2.5 rounded-lg bg-red-600 text-white text-sm font-semibold uppercase tracking-widest hover:bg-red-700 disabled:opacity-50 transition-all">
+              {busy ? 'Flagging…' : 'Flag Merchant'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── Filter UI ───────────────────────────────────────────────────────────
+const FILTER_GROUPS = [
+  { key: 'status',       label: 'Account Status', opts: [
+    { v: 'all', l: 'All' }, { v: 'active', l: 'Active' }, { v: 'locked', l: 'Locked' },
+  ]},
+  { key: 'activity',     label: 'Activity', opts: [
+    { v: 'all', l: 'All' }, { v: 'active', l: 'Active (≤7d)' }, { v: 'idle', l: 'Idle (≤30d)' }, { v: 'dormant', l: 'Dormant' },
+  ]},
+  { key: 'verification', label: 'Verification', opts: [
+    { v: 'all', l: 'All' }, { v: 'verified', l: 'Verified' }, { v: 'unverified', l: 'Unverified' },
+  ]},
+  { key: 'source',       label: 'Registration Source', opts: [
+    { v: 'all', l: 'All' }, { v: 'web', l: 'Web' }, { v: 'mobile', l: 'Mobile' },
+  ]},
+  { key: 'kra',          label: 'KRA PIN', opts: [
+    { v: 'all', l: 'All' }, { v: 'verified', l: 'KRA Verified' }, { v: 'missing', l: 'Not Verified' },
+  ]},
+  { key: 'flag',         label: 'Flag / Risk', opts: [
+    { v: 'all', l: 'All' }, { v: 'flagged', l: 'Manually flagged' }, { v: 'risk', l: 'Has risk signals' }, { v: 'clean', l: 'Clean' },
+  ]},
+];
+
+const FilterPopover = ({ filters, onChange, onReset, onClose }) => (
+  <div className="absolute right-0 top-12 z-30 w-72 bg-white rounded-xl shadow-2xl border border-outline-variant/20 overflow-hidden animate-[fadeIn_0.15s_ease-out]">
+    <div className="px-4 py-3 border-b border-outline-variant/10 flex items-center justify-between bg-surface-container-low">
+      <h4 className="text-[12px] font-bold uppercase tracking-widest text-on-surface">Filter Merchants</h4>
+      <button onClick={onReset} className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/60 hover:text-error transition-colors">
+        Reset
+      </button>
+    </div>
+    <div className="max-h-[400px] overflow-y-auto custom-scrollbar p-4 space-y-4">
+      {FILTER_GROUPS.map((g) => (
+        <div key={g.key}>
+          <label className="block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60 mb-2">{g.label}</label>
+          <div className="flex flex-wrap gap-1.5">
+            {g.opts.map((o) => {
+              const selected = filters[g.key] === o.v;
+              return (
+                <button
+                  key={o.v}
+                  onClick={() => onChange({ [g.key]: o.v })}
+                  className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all ${
+                    selected
+                      ? 'bg-primary text-white border-primary'
+                      : 'bg-white text-on-surface-variant border-outline-variant/40 hover:border-primary/40'
+                  }`}
+                >
+                  {o.l}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+    <div className="px-4 py-3 border-t border-outline-variant/10 bg-surface-container-low/50 flex justify-end">
+      <button onClick={onClose} className="px-4 py-1.5 rounded-lg bg-primary text-white text-[11px] font-bold uppercase tracking-widest hover:shadow-md transition-all">
+        Done
+      </button>
+    </div>
+  </div>
+);
+
+const Chip = ({ children, onClear }) => (
+  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20 text-[11px] font-semibold text-primary">
+    {children}
+    <button onClick={onClear} className="ml-0.5 -mr-0.5 p-0.5 rounded-full hover:bg-primary/20 transition-colors" aria-label="Remove filter">
+      <span className="material-symbols-outlined text-[12px]">close</span>
+    </button>
+  </span>
+);
+
 // ── KYB Detail Drawer ───────────────────────────────────────────────────
 // Right-side slide-over showing every submitted field grouped by purpose so
 // the admin can sight-verify the merchant's KYB submission.
@@ -654,6 +1047,7 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
               <Badge tone={m.status === 'locked' ? 'amber' : 'emerald'} icon={m.status === 'locked' ? 'lock' : 'check_circle'}>
                 {m.status === 'locked' ? 'Locked' : 'Active'}
               </Badge>
+              {m.flagged && <Badge tone="red" icon="flag">Flagged</Badge>}
               <Badge tone={m.isVerified ? 'emerald' : 'gray'} icon={m.isVerified ? 'verified' : 'pending'}>
                 {m.isVerified ? 'Account Verified' : 'Unverified'}
               </Badge>
@@ -664,6 +1058,40 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
                 {ACTIVITY_STYLE[m.activityTier]?.label || 'Dormant'}
               </Badge>
             </div>
+
+            {/* Flag banner — if this account is currently flagged */}
+            {m.flagged && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <span className="material-symbols-outlined text-red-600 text-xl">flag</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] font-bold uppercase tracking-widest text-red-700 mb-1">Flagged for review</p>
+                    <p className="text-sm text-red-900 leading-relaxed">{m.flagReason || '—'}</p>
+                    <p className="text-[11px] text-red-700/70 mt-2">
+                      Flagged {fmtDate(m.flaggedAt)}{m.flaggedBy?.email ? ` by ${m.flaggedBy.email}` : ''}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Risk signals — auto-computed from data */}
+            {(m.riskSignals?.length ?? 0) > 0 && (
+              <Section title="Risk Signals" icon="warning">
+                <div className="p-4 flex flex-wrap gap-2">
+                  {m.riskSignals.map((s) => {
+                    const tone = RISK_TONE[s.severity] || RISK_TONE.low;
+                    return (
+                      <span key={s.id} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide border ${tone.pill}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${tone.dot}`}></span>
+                        {s.label}
+                        <span className="text-[9px] opacity-60 ml-0.5">{s.severity}</span>
+                      </span>
+                    );
+                  })}
+                </div>
+              </Section>
+            )}
 
             {/* Business Identity */}
             <Section title="Business Identity" icon="storefront">
@@ -723,6 +1151,7 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
               <Row label="Last Login" value={fmtDate(m.lastLogin)} />
               <Row label="Login Count" value={(m.loginCount ?? 0).toLocaleString()} />
               <Row label="Last Activity" value={fmtDate(m.lastActivityAt)} />
+              <Row label="Transactions (24h)" value={(m.txnCount24h ?? 0).toLocaleString()} />
               <Row label="Transactions (30d)" value={(m.txnCount30d ?? 0).toLocaleString()} />
               {m.lastTransaction && (
                 <Row label="Last Transaction" value={
