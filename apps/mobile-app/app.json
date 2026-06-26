@@ -5,11 +5,6 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#faf9f6"
-    },
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true
@@ -33,7 +28,15 @@
           "faceIDPermission": "Allow PayChain to use Face ID for secure login and transaction confirmation."
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#faf9f6"
+        }
+      ]
     ],
     "web": {
       "favicon": "./assets/favicon.png"

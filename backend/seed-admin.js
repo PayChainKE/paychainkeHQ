@@ -9,8 +9,17 @@ const seedAdmin = async () => {
   try {
     await connectDB();
 
-    const email = 'brandon@paychain.co.ke';
-    const password = 'Paychainadmin@2025!';
+    // Remove legacy admin first so the old credentials stop working.
+    const legacyEmail = 'brandon@paychain.co.ke';
+    const removed = await Admin.deleteOne({ email: legacyEmail });
+    if (removed.deletedCount > 0) {
+      console.log(`🗑️  Removed legacy admin: ${legacyEmail}`);
+    } else {
+      console.log(`ℹ️  No legacy admin to remove for: ${legacyEmail}`);
+    }
+
+    const email = 'admin@paychain.co.ke';
+    const password = 'PayChainadmin@2025 !';
 
     let admin = await Admin.findOne({ email });
 
@@ -25,7 +34,6 @@ const seedAdmin = async () => {
     await admin.save();
     console.log(`✅ Admin user (${email}) setup successfully`);
 
-    console.log('✅ Admin user created successfully');
     process.exit();
   } catch (error) {
     console.error(`❌ Error seeding admin: ${error.message}`);

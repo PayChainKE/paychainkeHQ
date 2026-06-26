@@ -20,6 +20,7 @@
     "expo-local-authentication": "~56.0.4",
     "expo-print": "~56.0.4",
     "expo-sharing": "~56.0.18",
+    "expo-splash-screen": "~56.0.10",
     "expo-status-bar": "~56.0.4",
     "expo-updates": "~56.0.19",
     "nativewind": "^4.0.1",
