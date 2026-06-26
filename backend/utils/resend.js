@@ -258,6 +258,98 @@ export const sendWelcomeEmail = async (email, name, password, phone, paybillAcco
   }
 };
 
+// Send Sensitive-Action OTP to Admin. Used to verify destructive actions
+// (freeze, unfreeze, delete merchant) before they execute.
+export const sendAdminActionOTP = async (email, otp, actionLabel, target) => {
+  try {
+    const data = await resend.emails.send({
+      from: 'PayChain Security <info@paychain.co.ke>',
+      to: [email],
+      subject: `[PayChain] Confirm action: ${actionLabel} — ${otp}`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 520px; margin: auto; padding: 40px 20px; border: 1px solid #f0f0f0; border-radius: 16px; background: #fff;">
+          <div style="text-align: center; margin-bottom: 24px;">
+            <h2 style="margin: 0; color: #111; font-size: 22px; font-weight: 700;">Confirm Sensitive Action</h2>
+            <p style="margin: 8px 0 0; color: #666; font-size: 14px;">Enter this code to ${actionLabel.toLowerCase()}.</p>
+          </div>
+          <div style="background: #fff7ed; border: 1px solid #fed7aa; border-radius: 10px; padding: 16px 20px; margin-bottom: 22px;">
+            <p style="margin: 0; color: #9a3412; font-size: 13px; line-height: 1.5;"><strong>Target:</strong> ${target}</p>
+            <p style="margin: 6px 0 0; color: #9a3412; font-size: 13px; line-height: 1.5;"><strong>Action:</strong> ${actionLabel}</p>
+          </div>
+          <div style="background: #f8faff; border-radius: 12px; padding: 26px; text-align: center; margin-bottom: 22px; border: 1px solid #eef2ff;">
+            <span style="font-family: 'Courier New', Courier, monospace; font-size: 34px; font-weight: 800; letter-spacing: 8px; color: #0066FF;">${otp}</span>
+          </div>
+          <div style="color: #888; font-size: 12px; text-align: center; line-height: 1.6;">
+            <p style="margin: 0;">This code expires in <strong>10 minutes</strong> and is bound to this exact action.</p>
+            <p style="margin: 8px 0 0;">If you did not initiate this action, change your admin password immediately.</p>
+          </div>
+          <div style="margin-top: 30px; padding-top: 16px; border-top: 1px solid #eee; text-align: center;">
+            <p style="margin: 0; color: #aaa; font-size: 11px;">Automated security message — do not reply.</p>
+          </div>
+        </div>
+      `
+    });
+    console.log(`📧 Admin Action OTP sent to ${email}`);
+    return data;
+  } catch (error) {
+    console.error('❌ Resend Admin Action OTP Error:', error);
+    throw new Error('Failed to send action verification email');
+  }
+};
+
+// Send Merchant Invite (Admin-Onboarded) — credentialless invite with a
+// single-use, time-limited setup link. We never send the password in the email.
+export const sendMerchantInvite = async (email, name, businessName, paybillAccount, setupLink) => {
+  try {
+    const data = await resend.emails.send({
+      from: 'PayChain Onboarding <info@paychain.co.ke>',
+      to: [email],
+      subject: 'You have been invited to PayChain — Set up your account',
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 16px; overflow: hidden; background: #fff;">
+          <div style="background: linear-gradient(135deg, #06201B 0%, #0a3029 100%); padding: 50px 30px; text-align: center; color: #fff;">
+            <h1 style="margin: 0; font-size: 30px; font-weight: 800; letter-spacing: -0.5px;">Welcome to PayChain</h1>
+            <p style="margin: 10px 0 0; color: #5EFEB3; font-size: 15px; font-weight: 600;">Your merchant account is ready</p>
+          </div>
+          <div style="padding: 40px 30px;">
+            <h2 style="margin: 0 0 16px; color: #111; font-size: 22px;">Hi ${name},</h2>
+            <p style="color: #444; line-height: 1.7; font-size: 15px;">PayChain has provisioned a merchant account for <strong>${businessName}</strong>. To start collecting payments, please set up your dashboard password using the secure link below.</p>
+
+            <div style="margin: 30px 0; text-align: center;">
+              <a href="${setupLink}" style="background: #00351D; color: #fff; padding: 14px 32px; text-decoration: none; border-radius: 10px; font-weight: 700; font-size: 15px; display: inline-block;">Set Up My Password</a>
+            </div>
+
+            <p style="color: #666; font-size: 13px; line-height: 1.6; text-align: center; margin: 0;">This link will expire in <strong>24 hours</strong>. If the button doesn't work, paste this URL into your browser:</p>
+            <p style="word-break: break-all; color: #0066FF; font-size: 12px; text-align: center; margin: 8px 0 0;"><a href="${setupLink}" style="color: #0066FF; text-decoration: none;">${setupLink}</a></p>
+
+            <div style="margin-top: 35px; padding: 22px; background: #f0fdf4; border-radius: 12px; border: 1px solid #bbf7d0;">
+              <h3 style="margin: 0 0 12px; color: #166534; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Your Payment Collection Details</h3>
+              <div style="color: #14532d; font-size: 14px; line-height: 1.8;">
+                <p style="margin: 6px 0;"><strong>Paybill:</strong> 400200</p>
+                <p style="margin: 6px 0;"><strong>Account Number:</strong> ${paybillAccount}</p>
+              </div>
+              <p style="margin: 12px 0 0; color: #15803d; font-size: 12px;">Share these with your customers to receive M-PESA payments directly into your PayChain wallet.</p>
+            </div>
+
+            <div style="margin-top: 24px; padding: 16px; background: #fff7ed; border-radius: 10px; border: 1px solid #fed7aa;">
+              <p style="margin: 0; color: #9a3412; font-size: 12px; line-height: 1.6;"><strong>Security:</strong> PayChain staff will never ask you for your password. If you did not expect this invitation, please ignore this email or contact support.</p>
+            </div>
+          </div>
+          <div style="padding: 28px; background: #fafafa; border-top: 1px solid #eee; text-align: center;">
+            <p style="margin: 0; color: #aaa; font-size: 11px;">This is a <strong>no-reply</strong> email. For assistance, contact <a href="mailto:support@paychain.co.ke" style="color: #06201B; text-decoration: none;">support@paychain.co.ke</a> or call <strong>0790889066</strong></p>
+            <p style="margin: 10px 0 0; color: #bbb; font-size: 11px;">&copy; ${new Date().getFullYear()} PayChainKE. All rights reserved.</p>
+          </div>
+        </div>
+      `
+    });
+    console.log(`📧 Merchant Invite sent to ${email}`);
+    return data;
+  } catch (error) {
+    console.error('❌ Resend Merchant Invite Error:', error);
+    throw new Error('Failed to send merchant invite email');
+  }
+};
+
 // Send Batch Payment Receipt Email
 export const sendBatchReceiptEmail = async (email, businessName, batchRows, totalGross, totalNet, totalTax) => {
   try {

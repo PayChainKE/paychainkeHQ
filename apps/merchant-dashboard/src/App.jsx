@@ -4,6 +4,7 @@ import { MerchantAuthProvider, useMerchantAuth } from './context/MerchantAuthCon
 import { NotificationProvider } from './context/NotificationContext'
 import ScrollToTop from './components/utils/ScrollToTop'
 import Login from './pages/Login'
+import SetupPassword from './pages/SetupPassword'
 import Overview from './pages/Overview'
 import Transactions from './pages/Transactions'
 import BulkPay from './pages/BulkPay'
@@ -35,6 +36,7 @@ export default function App(){
         <NotificationProvider>
           <Routes>
             <Route path="/login" element={<Login/>} />
+            <Route path="/setup-password" element={<SetupPassword/>} />
             <Route path="/pay/:linkId" element={<PaymentPage />} />
             <Route path="/" element={<Navigate to="/overview" replace />} />
             <Route path="/overview" element={<Protected><Overview/></Protected>} />

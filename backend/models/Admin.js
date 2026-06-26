@@ -23,7 +23,17 @@ const AdminSchema = new mongoose.Schema({
   otpExpires: {
     type: Date,
     default: null
-  }
+  },
+  // Sensitive admin actions (freeze/delete merchant, etc.) require a fresh
+  // OTP that is *bound* to a specific action+target. We store the sha256 of
+  // the OTP plus the action + targetId so an OTP minted for "freeze X" can
+  // never be replayed against "delete Y".
+  pendingAction: {
+    action: { type: String, default: null },
+    targetId: { type: mongoose.Schema.Types.ObjectId, default: null },
+    otpHash: { type: String, default: null, select: false },
+    expiresAt: { type: Date, default: null },
+  },
 }, {
   timestamps: true
 });

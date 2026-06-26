@@ -18,7 +18,7 @@ const Settings = () => {
                   <div className="w-20 h-20 rounded-full border-4 border-surface shadow-sm bg-primary-container text-on-primary-container text-2xl font-bold flex items-center justify-center">
                     AP
                   </div>
-                  <button className="absolute bottom-0 right-0 w-7 h-7 bg-primary rounded-full flex items-center justify-center text-on-primary border-2 border-surface shadow-md hover:opacity-90 transition-all">
+                  <button className="absolute bottom-0 right-0 w-7 h-7 bg-primary rounded-full flex items-center justify-center text-white border-2 border-surface shadow-md hover:opacity-90 transition-all">
                     <span className="material-symbols-outlined text-[16px]">edit</span>
                   </button>
                 </div>
@@ -53,7 +53,7 @@ const Settings = () => {
                   <input className="w-full px-4 py-3 rounded-lg bg-surface border border-outline-variant/30 focus:border-secondary focus:ring-0 transition-all text-sm font-body text-on-surface" placeholder="••••••••••••" type="password" />
                 </div>
                 <div className="sm:col-span-2 flex justify-center sm:justify-end">
-                  <button className="w-full sm:w-auto px-6 py-2.5 bg-primary text-on-primary rounded-lg text-xs font-bold shadow-md hover:opacity-90 transition-all flex items-center justify-center gap-2 font-label uppercase tracking-widest" type="button">
+                  <button className="w-full sm:w-auto px-6 py-2.5 bg-primary text-white rounded-lg text-xs font-bold shadow-md hover:opacity-90 transition-all flex items-center justify-center gap-2 font-label uppercase tracking-widest" type="button">
                     <span className="material-symbols-outlined text-[18px]">key</span>
                     Update Credentials
                   </button>

@@ -92,7 +92,7 @@ const Waitlist = () => {
               <span className="material-symbols-outlined text-sm">file_download</span>
               Export
             </button>
-            <button className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-primary text-on-primary text-xs font-bold rounded-lg hover:opacity-90 transition-all shadow-md uppercase tracking-widest font-label">
+            <button className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-primary text-white text-xs font-bold rounded-lg hover:opacity-90 transition-all shadow-md uppercase tracking-widest font-label">
               <span className="material-symbols-outlined text-sm">person_add</span>
               Record
             </button>
@@ -226,7 +226,7 @@ const Waitlist = () => {
               <button className="p-1 rounded-lg hover:bg-surface-container-low text-on-surface-variant/30 hover:text-secondary transition-colors">
                 <span className="material-symbols-outlined text-sm">chevron_left</span>
               </button>
-              <button className="w-6 h-6 flex items-center justify-center bg-primary text-on-primary text-[12px] font-bold rounded-lg tracking-tight">1</button>
+              <button className="w-6 h-6 flex items-center justify-center bg-primary text-white text-[12px] font-bold rounded-lg tracking-tight">1</button>
               <button className="p-1 rounded-lg hover:bg-surface-container-low text-on-surface-variant/30 hover:text-secondary transition-colors">
                 <span className="material-symbols-outlined text-sm">chevron_right</span>
               </button>

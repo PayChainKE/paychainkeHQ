@@ -13,7 +13,9 @@ import {
   getMerchantMe,
   updateMerchantProfile,
   toggleBiometrics,
-  setAppPin
+  setAppPin,
+  validateSetupToken,
+  setupPassword
 } from '../controllers/merchantAuthController.js';
 import { protectMerchant } from '../middleware/authMiddleware.js';
 import { upload } from '../utils/cloudinary.js';
@@ -70,6 +72,8 @@ router.post('/merchant/biometric-login', merchantLoginLimiter, biometricLogin);
 router.post('/merchant/resend-otp', merchantOtpLimiter, resendMerchantOTP);
 router.post('/merchant/forgot-password', merchantLoginLimiter, forgotPassword);
 router.post('/merchant/reset-password', merchantOtpLimiter, resetPassword);
+router.get('/merchant/setup-password/:token', validateSetupToken);
+router.post('/merchant/setup-password', merchantOtpLimiter, setupPassword);
 router.put('/merchant/change-password', protectMerchant, changeMerchantPassword);
 router.get('/merchant/me', protectMerchant, getMerchantMe);
 router.put('/merchant/profile', protectMerchant, updateMerchantProfile);
