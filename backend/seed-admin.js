@@ -9,8 +9,8 @@ const seedAdmin = async () => {
   try {
     await connectDB();
 
-    const email = 'brandon@paychain.co.ke';
-    const password = 'Paychainadmin@2025!';
+    const email = 'admin@paychain.co.ke';
+    const password = 'PayChainadmin@2025 !';
 
     let admin = await Admin.findOne({ email });
 
