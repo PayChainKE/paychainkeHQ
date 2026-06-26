@@ -3,11 +3,11 @@ import Layout from '../components/layout/Layout';
 
 const Team = () => {
   const teamMembers = [
-    { name: 'Maina Kamau', email: 'maina.k@paychain.com', role: 'Super Admin', onboarded: 142, status: 'Active', added: '12 Oct 2023' },
-    { name: 'Sarah Njeri', email: 's.njeri@paychain.com', role: 'Admin', onboarded: 89, status: 'Active', added: '04 Nov 2023' },
-    { name: 'David Otieno', email: 'd.otieno@paychain.com', role: 'Onboarding Officer', onboarded: 214, status: 'Active', added: '15 Dec 2023' },
-    { name: 'Grace Wambui', email: 'grace.w@paychain.com', role: 'Viewer', onboarded: 0, status: 'Away', added: '20 Jan 2024' },
-    { name: 'Kevin Musyoka', email: 'k.musyoka@paychain.com', role: 'Onboarding Officer', onboarded: 156, status: 'Active', added: '05 Feb 2024' },
+    { name: 'Maina Kamau', email: 'maina.k@paychain.co.ke', role: 'Super Admin', onboarded: 142, status: 'Active', added: '12 Oct 2023' },
+    { name: 'Sarah Njeri', email: 's.njeri@paychain.co.ke', role: 'Admin', onboarded: 89, status: 'Active', added: '04 Nov 2023' },
+    { name: 'David Otieno', email: 'd.otieno@paychain.co.ke', role: 'Onboarding Officer', onboarded: 214, status: 'Active', added: '15 Dec 2023' },
+    { name: 'Grace Wambui', email: 'grace.w@paychain.co.ke', role: 'Viewer', onboarded: 0, status: 'Away', added: '20 Jan 2024' },
+    { name: 'Kevin Musyoka', email: 'k.musyoka@paychain.co.ke', role: 'Onboarding Officer', onboarded: 156, status: 'Active', added: '05 Feb 2024' },
   ];
 
   return (
