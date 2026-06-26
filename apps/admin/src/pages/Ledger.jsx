@@ -23,7 +23,7 @@ const Ledger = () => {
               <span className="material-symbols-outlined text-[18px]">print</span>
               Print
             </button>
-            <button className="flex-1 sm:flex-none bg-primary text-on-primary px-4 py-2.5 rounded-lg text-xs font-bold flex items-center justify-center gap-2 shadow-md transition-all hover:opacity-90 font-label uppercase tracking-widest">
+            <button className="flex-1 sm:flex-none bg-primary text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center justify-center gap-2 shadow-md transition-all hover:opacity-90 font-label uppercase tracking-widest">
               <span className="material-symbols-outlined text-[18px]">reconcile</span>
               Reconcile
             </button>
@@ -104,7 +104,7 @@ const Ledger = () => {
           <div className="px-6 py-4 bg-surface flex justify-between items-center border-t border-outline-variant/10">
             <span className="text-[11px] font-bold text-on-surface-variant/30 uppercase tracking-widest font-label">Consolidated Ledger v2.4</span>
             <div className="flex gap-1">
-              <button className="w-8 h-8 rounded-lg bg-primary text-on-primary font-bold text-xs">1</button>
+              <button className="w-8 h-8 rounded-lg bg-primary text-white font-bold text-xs">1</button>
               <button className="w-8 h-8 rounded-lg bg-surface border border-outline-variant/30 text-on-surface-variant/60 font-bold text-xs hover:bg-surface-container-low transition-all">2</button>
             </div>
           </div>

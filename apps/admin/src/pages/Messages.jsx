@@ -174,7 +174,7 @@ const Messages = () => {
               </div>
               <div className="p-4 md:p-6 bg-surface border-t border-outline-variant/10 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 font-body">
                 <div className="flex flex-col sm:flex-row gap-2 md:gap-3">
-                  <button className="w-full sm:w-auto px-5 py-2.5 bg-primary text-on-primary text-xs font-bold rounded-lg shadow-md hover:opacity-90 transition-all flex items-center justify-center gap-2 font-label uppercase tracking-widest">
+                  <button className="w-full sm:w-auto px-5 py-2.5 bg-primary text-white text-xs font-bold rounded-lg shadow-md hover:opacity-90 transition-all flex items-center justify-center gap-2 font-label uppercase tracking-widest">
                     <span className="material-symbols-outlined text-[18px]">reply</span>
                     Reply
                   </button>

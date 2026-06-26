@@ -19,7 +19,7 @@ const Team = () => {
             <h2 className="text-[24px] md:text-[28px] font-semibold tracking-tight text-on-surface leading-none">Management Console</h2>
             <p className="text-on-surface-variant/60 mt-2 text-[13px] md:text-[14px] font-body">Reviewing 24 team members across 4 administrative tiers.</p>
           </div>
-          <button className="w-full sm:w-auto bg-primary text-on-primary px-5 py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm font-bold hover:shadow-lg transition-all active:scale-95 shadow-md font-label uppercase tracking-widest">
+          <button className="w-full sm:w-auto bg-primary text-white px-5 py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm font-bold hover:shadow-lg transition-all active:scale-95 shadow-md font-label uppercase tracking-widest">
             <span className="material-symbols-outlined text-[18px]">person_add</span>
             Add Member
           </button>

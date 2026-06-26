@@ -258,9 +258,9 @@ const Overview = () => {
           </div>
           <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/20">
             <div className="flex w-full gap-2 overflow-x-auto no-scrollbar">
-              <div className="flex-1 min-w-[80px] h-12 bg-primary rounded-lg flex items-center justify-center text-on-primary text-[10px] font-bold tracking-widest uppercase">WAITLIST {loading ? '' : `(${stats.total})`}</div>
-              <div className="flex-[0.85] min-w-[80px] h-12 bg-primary/90 rounded-lg flex items-center justify-center text-on-primary text-[10px] font-bold tracking-widest uppercase">APPROVED {loading ? '' : `(${stats.approved})`}</div>
-              <div className="flex-[0.7] min-w-[80px] h-12 bg-primary/80 rounded-lg flex items-center justify-center text-on-primary text-[10px] font-bold tracking-widest uppercase">KYC {loading ? '' : `(${stats.kyc})`}</div>
+              <div className="flex-1 min-w-[80px] h-12 bg-primary rounded-lg flex items-center justify-center text-white text-[10px] font-bold tracking-widest uppercase">WAITLIST {loading ? '' : `(${stats.total})`}</div>
+              <div className="flex-[0.85] min-w-[80px] h-12 bg-primary/90 rounded-lg flex items-center justify-center text-white text-[10px] font-bold tracking-widest uppercase">APPROVED {loading ? '' : `(${stats.approved})`}</div>
+              <div className="flex-[0.7] min-w-[80px] h-12 bg-primary/80 rounded-lg flex items-center justify-center text-white text-[10px] font-bold tracking-widest uppercase">KYC {loading ? '' : `(${stats.kyc})`}</div>
               <div className="flex-[0.55] min-w-[80px] h-12 bg-secondary rounded-lg flex items-center justify-center text-on-secondary text-[10px] font-bold tracking-widest uppercase">CONVERTED {loading ? '' : `(${stats.converted})`}</div>
             </div>
           </div>
