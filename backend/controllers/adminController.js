@@ -238,7 +238,11 @@ export const confirmMerchantAction = async (req, res) => {
       return res.status(400).json({ error: 'Invalid merchant id.' });
     }
 
-    const admin = await Admin.findById(req.admin._id).select('+pendingAction.otpHash pendingAction');
+    // Only the otpHash subfield is `select: false` — projecting both
+    // `pendingAction` and `pendingAction.otpHash` would trigger a MongoDB
+    // path-collision error (code 31249). Loading just the hash brings the
+    // rest of the subdoc along via the default projection.
+    const admin = await Admin.findById(req.admin._id).select('+pendingAction.otpHash');
     if (!admin) return res.status(401).json({ error: 'Admin session invalid.' });
 
     const pa = admin.pendingAction || {};
