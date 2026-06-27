@@ -1173,9 +1173,19 @@ export default function Wallet() {
                           }, 3000)
 
                         } catch (err) {
-                          addToast({ title: 'Request Failed', message: err.response?.data?.error || 'Failed to send STK Push.', type: 'error' })
                           setStkStatusText('')
                           setIsProcessingTopUp(false)
+                          // 5xx means the STK may have been sent but the backend errored after —
+                          // guide the user to check their phone rather than saying "failed"
+                          if (err.response?.status >= 500) {
+                            addToast({
+                              title: 'Check Your Phone',
+                              message: 'The STK prompt may have been sent. If you see an M-PESA prompt, enter your PIN. Otherwise try again.',
+                              type: 'error',
+                            })
+                          } else {
+                            addToast({ title: 'STK Push Failed', message: err.response?.data?.error || 'Could not send STK Push. Please try again.', type: 'error' })
+                          }
                         }
                       }}
                       disabled={isProcessingTopUp || !topUpAmount || !topUpPhone}

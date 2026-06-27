@@ -357,18 +357,25 @@ export const initiateSTKPush = async (req, res) => {
 
     const { CheckoutRequestID, ResponseCode, ResponseDescription } = response.data;
 
-    if (ResponseCode !== '0') {
+    if (String(ResponseCode) !== '0') {
       console.error('❌ Safaricom rejected STK Push:', response.data);
       return res.status(400).json({ error: ResponseDescription || 'Safaricom rejected the STK Push.' });
     }
 
-    await STKRequest.create({
-      merchantId,
-      checkoutRequestId: CheckoutRequestID,
-      amount: intAmount,
-      phone: formattedPhone,
-      status: 'pending',
-    });
+    // Safaricom accepted — STK prompt is on the customer's phone.
+    // Save the tracking record but do NOT let a DB failure kill the response;
+    // the callback will still arrive and credit the balance even if this save fails.
+    try {
+      await STKRequest.create({
+        merchantId: merchantId || null,
+        checkoutRequestId: CheckoutRequestID,
+        amount: intAmount,
+        phone: formattedPhone,
+        status: 'pending',
+      });
+    } catch (dbErr) {
+      console.warn('⚠️ STKRequest save failed (STK was still sent):', dbErr.message);
+    }
 
     res.status(200).json({
       success: true,
