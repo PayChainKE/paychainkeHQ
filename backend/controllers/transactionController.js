@@ -282,16 +282,18 @@ export const sendMoney = async (req, res) => {
     merchant.kesBalance -= totalDeduction;
     await merchant.save();
 
-    // Create Transaction Record
+    const ref = `OUT-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
     const transaction = await Transaction.create({
       merchantId,
-      receiptNumber: `OUT-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
+      accountNumber: merchant.paybillAccount,
       amount: totalDeduction,
       kesAmount: totalDeduction,
+      currency: 'KES',
       type: 'outbound',
-      senderName: 'PayChain Merchant',
-      senderPhone: merchant.phone,
-      reference: reference || `Transfer to ${destination}`,
+      status: 'completed',
+      reference: ref,
+      sender: { name: merchant.businessName, id: merchant.phone },
+      recipient: { name: reference || destination || 'Withdrawal', id: destination },
     });
 
     res.status(200).json({
