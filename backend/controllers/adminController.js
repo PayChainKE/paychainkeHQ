@@ -782,14 +782,82 @@ export const getInsights = async (req, res) => {
       { $sort: { _id: 1 } },
     ]);
 
-    // Always-on monthly view (last 12 months) for the Overview chart. Independent
-    // of the request's `range` so the chart shows the same trailing window no
-    // matter which timeframe the user is exploring.
+    // Always-on signup time series at four granularities for the Overview chart.
+    // Independent of the request's `range` so each toggle shows a consistent
+    // trailing window. All series are densified — any bucket with no signups
+    // becomes a zero so the chart has a clean, evenly spaced axis.
+
+    // ── Daily · last 30 days ───────────────────────────────────────────
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
+    thirtyDaysAgo.setHours(0, 0, 0, 0);
+    const dailySignupsAgg = await Merchant.aggregate([
+      { $match: { createdAt: { $gte: thirtyDaysAgo } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+    const byDay = new Map(dailySignupsAgg.map((r) => [r._id, r.count]));
+    const dailySignups = [];
+    for (let i = 29; i >= 0; i -= 1) {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() - i);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      dailySignups.push({
+        bucket: key,
+        // Show only every ~5th label so the x-axis doesn't get crowded.
+        label: i % 5 === 0 ? d.toLocaleString('en-US', { day: '2-digit', month: 'short' }) : '',
+        tooltip: d.toLocaleString('en-US', { weekday: 'short', day: '2-digit', month: 'short' }),
+        count: byDay.get(key) || 0,
+      });
+    }
+
+    // ── Weekly · last 12 ISO weeks ─────────────────────────────────────
+    const twelveWeeksAgo = new Date();
+    twelveWeeksAgo.setDate(twelveWeeksAgo.getDate() - 7 * 11);
+    twelveWeeksAgo.setHours(0, 0, 0, 0);
+    const weeklySignupsAgg = await Merchant.aggregate([
+      { $match: { createdAt: { $gte: twelveWeeksAgo } } },
+      {
+        $group: {
+          _id: { year: { $isoWeekYear: '$createdAt' }, week: { $isoWeek: '$createdAt' } },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+    const isoKey = (y, w) => `${y}-W${String(w).padStart(2, '0')}`;
+    const isoWeekOf = (date) => {
+      const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+      const dayNum = d.getUTCDay() || 7;
+      d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+      const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+      const week = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+      return { year: d.getUTCFullYear(), week };
+    };
+    const byWeek = new Map(weeklySignupsAgg.map((r) => [isoKey(r._id.year, r._id.week), r.count]));
+    const weeklySignups = [];
+    for (let i = 11; i >= 0; i -= 1) {
+      const d = new Date();
+      d.setDate(d.getDate() - 7 * i);
+      const { year, week } = isoWeekOf(d);
+      const key = isoKey(year, week);
+      weeklySignups.push({
+        bucket: key,
+        label: `W${week}`,
+        tooltip: `Week ${week} · ${year}`,
+        count: byWeek.get(key) || 0,
+      });
+    }
+
+    // ── Monthly · last 12 months ───────────────────────────────────────
     const twelveMonthsAgo = new Date();
     twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 11);
     twelveMonthsAgo.setDate(1);
     twelveMonthsAgo.setHours(0, 0, 0, 0);
-
     const monthlySignupsAgg = await Merchant.aggregate([
       { $match: { createdAt: { $gte: twelveMonthsAgo } } },
       {
@@ -800,7 +868,6 @@ export const getInsights = async (req, res) => {
       },
       { $sort: { _id: 1 } },
     ]);
-    // Densify — fill any gap months with zero so the chart has a clean axis.
     const byMonth = new Map(monthlySignupsAgg.map((r) => [r._id, r.count]));
     const monthlySignups = [];
     for (let i = 11; i >= 0; i -= 1) {
@@ -808,9 +875,35 @@ export const getInsights = async (req, res) => {
       d.setMonth(d.getMonth() - i);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       monthlySignups.push({
-        month: key,
+        bucket: key,
+        month: key, // legacy alias (existing consumers)
         label: d.toLocaleString('en-US', { month: 'short' }),
+        tooltip: d.toLocaleString('en-US', { month: 'long', year: 'numeric' }),
         count: byMonth.get(key) || 0,
+      });
+    }
+
+    // ── Yearly · last 5 years ──────────────────────────────────────────
+    const fiveYearsAgo = new Date();
+    fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 4);
+    fiveYearsAgo.setMonth(0, 1);
+    fiveYearsAgo.setHours(0, 0, 0, 0);
+    const yearlySignupsAgg = await Merchant.aggregate([
+      { $match: { createdAt: { $gte: fiveYearsAgo } } },
+      {
+        $group: { _id: { $year: '$createdAt' }, count: { $sum: 1 } },
+      },
+    ]);
+    const byYear = new Map(yearlySignupsAgg.map((r) => [String(r._id), r.count]));
+    const yearlySignups = [];
+    const currentYear = new Date().getFullYear();
+    for (let i = 4; i >= 0; i -= 1) {
+      const yr = currentYear - i;
+      yearlySignups.push({
+        bucket: String(yr),
+        label: String(yr),
+        tooltip: String(yr),
+        count: byYear.get(String(yr)) || 0,
       });
     }
 
@@ -919,7 +1012,10 @@ export const getInsights = async (req, res) => {
         // Series
         gtvSeries: gtvSeries.map((r) => ({ date: r._id, count: r.count, volume: r.volume })),
         signupsSeries: signupsSeries.map((r) => ({ date: r._id, count: r.count })),
+        dailySignups,
+        weeklySignups,
         monthlySignups,
+        yearlySignups,
         // Leaderboards
         topMerchants,
         txnTypeMix: txnTypeMix.map((r) => ({ type: r._id || 'other', count: r.count, volume: r.volume })),

@@ -33,6 +33,9 @@ const Overview = () => {
   const [merchantAnalytics, setMerchantAnalytics] = useState(null);
   const [insights, setInsights] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [fx, setFx] = useState(null);
+  const [fxLoading, setFxLoading] = useState(true);
+  const [fxError, setFxError] = useState(null);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -61,6 +64,38 @@ const Overview = () => {
     return () => window.removeEventListener('paychain:sync', h);
   }, [fetchAll]);
 
+  // Live FX rates. Both feeds are CORS-friendly + keyless. We never block
+  // dashboard render on FX — if the call fails we show '—' and a small hint.
+  const fetchFx = useCallback(async () => {
+    setFxLoading(true);
+    setFxError(null);
+    try {
+      const [fxRes, cgRes] = await Promise.allSettled([
+        fetch('https://open.er-api.com/v6/latest/USD').then((r) => r.json()),
+        fetch('https://api.coingecko.com/api/v3/simple/price?ids=usd-coin&vs_currencies=usd,kes').then((r) => r.json()),
+      ]);
+      const usdKes  = fxRes.status === 'fulfilled' ? fxRes.value?.rates?.KES  : null;
+      const usdEur  = fxRes.status === 'fulfilled' ? fxRes.value?.rates?.EUR  : null;
+      const usdGbp  = fxRes.status === 'fulfilled' ? fxRes.value?.rates?.GBP  : null;
+      const usdcUsd = cgRes.status === 'fulfilled' ? cgRes.value?.['usd-coin']?.usd : null;
+      const usdcKes = (cgRes.status === 'fulfilled' && cgRes.value?.['usd-coin']?.kes)
+        ? cgRes.value['usd-coin'].kes
+        : (usdKes && usdcUsd ? usdKes * usdcUsd : null);
+      if (!usdKes && !usdcUsd) throw new Error('rates unavailable');
+      setFx({ usdKes, usdEur, usdGbp, usdcUsd, usdcKes, fetchedAt: new Date().toISOString() });
+    } catch (e) {
+      setFxError('Live rates temporarily unavailable');
+    } finally {
+      setFxLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchFx();
+    const id = setInterval(fetchFx, 60_000);
+    return () => clearInterval(id);
+  }, [fetchFx]);
+
   const stats = useMemo(() => ({
     total: waitlist.length,
     pending: waitlist.filter((w) => w.status?.toLowerCase() === 'pending').length,
@@ -85,15 +120,20 @@ const Overview = () => {
 
   const topMerchants = insights?.topMerchants || [];
 
-  // Monthly signups for the trailing 12 months — densified server-side so the
-  // chart always has 12 evenly spaced bars regardless of activity gaps.
-  const monthlySignups = insights?.monthlySignups || [];
-  const maxMonthly = Math.max(1, ...monthlySignups.map((s) => s.count));
-
-  // Donut percentages from merchantAnalytics; defaults to 0 segments when empty.
-  const total = merchantAnalytics?.totalMerchants || 0;
-  const verifiedPct  = total > 0 ? (merchantAnalytics.verifiedMerchants / total) * 100 : 0;
-  const walletPct    = total > 0 ? (merchantAnalytics.activeWallets / total) * 100 : 0;
+  // Signups chart: user-selectable granularity. All four series are densified
+  // server-side so each toggle shows a complete trailing window even when some
+  // buckets had zero signups.
+  const [signupGranularity, setSignupGranularity] = useState('monthly');
+  const GRANULARITY_META = {
+    daily:   { label: 'Daily',   field: 'dailySignups',   subtitle: 'Trailing 30 days · per day' },
+    weekly:  { label: 'Weekly',  field: 'weeklySignups',  subtitle: 'Trailing 12 weeks · per ISO week' },
+    monthly: { label: 'Monthly', field: 'monthlySignups', subtitle: 'Trailing 12 months · per month' },
+    yearly:  { label: 'Yearly',  field: 'yearlySignups',  subtitle: 'Trailing 5 years · per year' },
+  };
+  const activeMeta = GRANULARITY_META[signupGranularity];
+  const signupSeries = insights?.[activeMeta.field] || [];
+  const maxSignup = Math.max(1, ...signupSeries.map((s) => s.count));
+  const signupTotal = signupSeries.reduce((s, x) => s + x.count, 0);
 
   return (
     <Layout>
@@ -190,7 +230,7 @@ const Overview = () => {
                 {loading
                   ? <Skel className="w-24 h-8 bg-white/10" />
                   : <span className="text-[22px] md:text-[32px] font-bold text-white tracking-tighter tabular-nums">
-                      {(merchantAnalytics?.totalUsdcLocked ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
+                      {(merchantAnalytics?.totalUsdcLocked ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>}
                 <span className="text-[11px] font-bold text-[#35D07F]">USDC</span>
               </div>
@@ -234,30 +274,106 @@ const Overview = () => {
           </div>
         </section>
 
+        {/* Live FX rates */}
+        <section>
+          <div className="flex items-center gap-2 md:gap-3 mb-4 text-slate-400">
+            <span className="text-[10px] md:text-[11px] font-bold uppercase tracking-widest font-label whitespace-nowrap">Live Exchange Rates</span>
+            <div className="flex-1 h-[1px] bg-outline-variant/10"></div>
+            <button
+              onClick={fetchFx}
+              disabled={fxLoading}
+              className="text-[10px] md:text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/60 hover:text-on-surface disabled:opacity-40 flex items-center gap-1"
+              title="Refresh rates"
+            >
+              <span className={`material-symbols-outlined text-[14px] ${fxLoading ? 'animate-spin' : ''}`}>refresh</span>
+              {fx?.fetchedAt && !fxLoading ? new Date(fx.fetchedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+            </button>
+          </div>
+          {fxError && (
+            <div className="mb-3 text-[11px] text-amber-500/80 font-medium">{fxError}</div>
+          )}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+            <FxCard
+              label="USD → KES"
+              value={fx?.usdKes}
+              digits={2}
+              hint="Fiat reference rate"
+              loading={fxLoading}
+            />
+            <FxCard
+              label="USDC → KES"
+              value={fx?.usdcKes}
+              digits={2}
+              hint="Settlement rate for merchants"
+              loading={fxLoading}
+              accent="text-[#35D07F]"
+            />
+            <FxCard
+              label="USDC → USD"
+              value={fx?.usdcUsd}
+              digits={4}
+              hint="Peg health (target 1.0000)"
+              loading={fxLoading}
+              accent={fx?.usdcUsd != null && Math.abs(fx.usdcUsd - 1) > 0.005 ? 'text-amber-400' : 'text-[#2775CA]'}
+            />
+            <FxCard
+              label="Float Value · KES"
+              value={
+                merchantAnalytics?.totalUsdcLocked != null && fx?.usdcKes != null
+                  ? merchantAnalytics.totalUsdcLocked * fx.usdcKes
+                  : null
+              }
+              digits={0}
+              prefix="KES "
+              hint="Total USDC locked × USDC/KES"
+              loading={fxLoading || loading}
+            />
+          </div>
+        </section>
+
         {/* Growth chart + composition */}
         <section className="grid grid-cols-1 lg:grid-cols-10 gap-4 md:gap-6">
           <div className="lg:col-span-6 bg-surface-container-lowest p-4 md:p-6 rounded-xl border border-outline-variant/10 shadow-editorial">
-            <div className="flex items-center justify-between mb-5 md:mb-8">
-              <div>
-                <h3 className="text-[15px] md:text-[16px] font-semibold text-on-surface">Merchant Signups · 12 Months</h3>
-                <p className="text-[12px] text-slate-500">Monthly new merchant onboarding volume</p>
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4 md:mb-6">
+              <div className="min-w-0">
+                <h3 className="text-[15px] md:text-[16px] font-semibold text-on-surface">Merchant Signups · {activeMeta.label}</h3>
+                <p className="text-[12px] text-slate-500">{activeMeta.subtitle}</p>
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40">
-                {monthlySignups.length > 0 ? `${monthlySignups.reduce((s, x) => s + x.count, 0)} total` : ''}
-              </span>
+              <div className="flex items-center gap-3 flex-shrink-0">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40 hidden sm:inline">
+                  {signupSeries.length > 0 ? `${signupTotal} total` : ''}
+                </span>
+                <div className="inline-flex bg-surface-container-low border border-outline-variant/20 rounded-full p-0.5">
+                  {Object.entries(GRANULARITY_META).map(([key, meta]) => (
+                    <button
+                      key={key}
+                      onClick={() => setSignupGranularity(key)}
+                      className={`px-2.5 md:px-3 py-1 text-[10px] md:text-[11px] font-bold uppercase tracking-widest rounded-full transition-colors ${
+                        signupGranularity === key
+                          ? 'bg-primary text-on-primary'
+                          : 'text-on-surface-variant/70 hover:text-on-surface'
+                      }`}
+                    >
+                      {meta.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
-            <MonthlySignupsBarChart series={monthlySignups} max={maxMonthly} loading={loading} />
+            <SignupsBarChart series={signupSeries} max={maxSignup} loading={loading} />
           </div>
           <div className="lg:col-span-4 bg-surface-container-lowest p-4 md:p-6 rounded-xl border border-outline-variant/10 shadow-editorial flex flex-col">
-            <h3 className="text-[15px] md:text-[16px] font-semibold text-on-surface mb-4 md:mb-6">Merchant Composition</h3>
-            <div className="flex-1 flex items-center justify-center">
-              <CompositionDonut verifiedPct={verifiedPct} walletPct={walletPct} total={total} loading={loading} />
+            <div className="flex items-baseline justify-between mb-4 md:mb-6">
+              <h3 className="text-[15px] md:text-[16px] font-semibold text-on-surface">Merchant Composition</h3>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40">Lifecycle</span>
             </div>
-            <div className="mt-6 space-y-2">
-              <LegendRow color="bg-primary" label="Verified Accounts" value={merchantAnalytics?.verifiedMerchants ?? 0} loading={loading} />
-              <LegendRow color="bg-secondary" label="With Wallet" value={merchantAnalytics?.activeWallets ?? 0} loading={loading} />
-              <LegendRow color="bg-secondary-container" label="Signups (Last 7d)" value={merchantAnalytics?.recentMerchants ?? 0} loading={loading} />
-            </div>
+            <CompositionDonut
+              total={merchantAnalytics?.totalMerchants ?? 0}
+              verified={merchantAnalytics?.verifiedMerchants ?? 0}
+              wallet={merchantAnalytics?.activeWallets ?? 0}
+              recent={merchantAnalytics?.recentMerchants ?? 0}
+              loading={loading}
+            />
           </div>
         </section>
 
@@ -357,24 +473,25 @@ const Overview = () => {
   );
 };
 
-// ── Monthly signups bar chart ─────────────────────────────────────────
-const MonthlySignupsBarChart = ({ series, max, loading }) => {
+// ── Signups bar chart (granularity-agnostic) ──────────────────────────
+const SignupsBarChart = ({ series, max, loading }) => {
   if (loading) return <div className="h-[220px] bg-surface-container-low rounded-lg animate-pulse"></div>;
   if (!series || series.length === 0) {
     return <div className="h-[220px] flex items-center justify-center text-sm text-on-surface-variant/40">No signups yet.</div>;
   }
   return (
     <div className="w-full">
-      <div className="h-[180px] md:h-[220px] w-full relative flex items-end gap-1.5 md:gap-2 px-1">
+      <div className="h-[180px] md:h-[220px] w-full relative flex items-end gap-1 md:gap-1.5 px-1">
         {series.map((d, i) => {
           const pct = d.count > 0 ? Math.max(4, (d.count / max) * 100) : 2;
+          const tip = d.tooltip || d.bucket || d.month || d.label;
           return (
             <div key={i} className="flex-1 flex flex-col items-center justify-end h-full group relative">
               {d.count > 0 && (
-                <span className="text-[9px] md:text-[10px] font-bold text-on-surface-variant/60 tabular-nums mb-1 opacity-0 group-hover:opacity-100 transition-opacity absolute -top-0">{d.count}</span>
+                <span className="text-[9px] md:text-[10px] font-bold text-on-surface-variant/80 tabular-nums mb-1 opacity-0 group-hover:opacity-100 transition-opacity absolute -top-0">{d.count}</span>
               )}
               <div
-                title={`${d.month} — ${d.count} signups`}
+                title={`${tip} — ${d.count} signup${d.count === 1 ? '' : 's'}`}
                 className={`w-full rounded-t-sm transition-all hover:opacity-80 ${d.count > 0 ? 'bg-gradient-to-t from-primary to-secondary' : 'bg-surface-container-low'}`}
                 style={{ height: `${pct}%` }}
               />
@@ -382,9 +499,9 @@ const MonthlySignupsBarChart = ({ series, max, loading }) => {
           );
         })}
       </div>
-      <div className="flex gap-1.5 md:gap-2 px-1 mt-2">
+      <div className="flex gap-1 md:gap-1.5 px-1 mt-2">
         {series.map((d, i) => (
-          <div key={i} className="flex-1 text-center text-[9px] md:text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40">
+          <div key={i} className="flex-1 text-center text-[9px] md:text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40 truncate">
             {d.label}
           </div>
         ))}
@@ -393,42 +510,114 @@ const MonthlySignupsBarChart = ({ series, max, loading }) => {
   );
 };
 
-// ── Composition donut (real percentages) ──────────────────────────────
-const CompositionDonut = ({ verifiedPct, walletPct, total, loading }) => {
-  if (loading) return <div className="w-40 h-40 rounded-full bg-surface-container-low animate-pulse"></div>;
-  const circ = 2 * Math.PI * 15.5;
+// ── Composition donut ─────────────────────────────────────────────────
+// Single ring, three mutually exclusive segments derived from the standard
+// merchant funnel (wallet ⊆ verified ⊆ total). Counts are clamped defensively
+// so dirty data never produces negative segments.
+const CompositionDonut = ({ total = 0, verified = 0, wallet = 0, recent = 0, loading }) => {
+  if (loading) {
+    return (
+      <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="w-44 h-44 rounded-full bg-surface-container-low animate-pulse" />
+        </div>
+        <div className="mt-6 space-y-2">
+          {[0, 1, 2].map((i) => <Skel key={i} className="w-full h-5" />)}
+        </div>
+      </div>
+    );
+  }
+
+  const v = Math.max(0, Math.min(verified, total));
+  const w = Math.max(0, Math.min(wallet, v));
+  const arcs = [
+    { key: 'active',   value: w,              color: 'rgb(var(--md-sys-color-secondary))', label: 'Active · Wallet' },
+    { key: 'verified', value: v - w,          color: 'rgb(var(--md-sys-color-primary))',   label: 'Verified · No Wallet' },
+    { key: 'pending',  value: Math.max(0, total - v), color: 'rgba(148,163,184,0.45)',     label: 'Pending KYC' },
+  ];
+
+  const r = 15.5;
+  const circ = 2 * Math.PI * r;
+  const denom = total > 0 ? total : 1;
+  const pct = (n) => (total > 0 ? (n / total) * 100 : 0);
+
+  let cursor = 0;
+  const drawArcs = arcs.map((a) => {
+    const len = (a.value / denom) * circ;
+    const arc = { ...a, len, offset: -cursor };
+    cursor += len;
+    return arc;
+  });
+
   return (
-    <div className="relative w-40 h-40">
-      <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
-        <circle cx="18" cy="18" r="15.5" fill="none" stroke="rgba(0,0,0,0.06)" strokeWidth="3.5" />
-        <circle
-          cx="18" cy="18" r="15.5" fill="none"
-          stroke="rgb(var(--md-sys-color-primary))" strokeWidth="3.5"
-          strokeDasharray={`${(verifiedPct / 100) * circ} ${circ}`}
-          strokeLinecap="round"
-        />
-        <circle
-          cx="18" cy="18" r="11.5" fill="none"
-          stroke="rgb(var(--md-sys-color-secondary))" strokeWidth="3.5"
-          strokeDasharray={`${(walletPct / 100) * (2 * Math.PI * 11.5)} ${2 * Math.PI * 11.5}`}
-          strokeLinecap="round"
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center font-body">
-        <span className="block text-2xl font-bold tracking-tight">{total}</span>
-        <span className="text-[10px] uppercase font-bold text-on-surface-variant/40 tracking-widest">Total</span>
+    <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex items-center justify-center">
+        <div className="relative w-44 h-44">
+          <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+            <circle cx="18" cy="18" r={r} fill="none" stroke="rgba(148,163,184,0.12)" strokeWidth="3.5" />
+            {total > 0 && drawArcs.map((a) => a.value > 0 && (
+              <circle
+                key={a.key}
+                cx="18" cy="18" r={r}
+                fill="none"
+                stroke={a.color}
+                strokeWidth="3.5"
+                strokeDasharray={`${a.len} ${circ - a.len}`}
+                strokeDashoffset={a.offset}
+              />
+            ))}
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center font-body">
+            <span className="text-[28px] md:text-[32px] font-bold tracking-tight leading-none">{total}</span>
+            <span className="text-[10px] uppercase font-bold text-on-surface-variant/40 tracking-widest mt-1">Merchants</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-6 space-y-2.5">
+        {drawArcs.map((a) => (
+          <div key={a.key} className="flex items-center justify-between text-[12px] font-medium">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: a.color }} />
+              <span className="text-on-surface-variant truncate">{a.label}</span>
+            </div>
+            <div className="flex items-baseline gap-2 flex-shrink-0">
+              <span className="font-bold tabular-nums text-on-surface">{a.value}</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40 tabular-nums w-9 text-right">
+                {pct(a.value).toFixed(0)}%
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-4 pt-4 border-t border-outline-variant/10 flex items-center justify-between">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40">Last 7 Days</span>
+        <span className="text-[12px] font-bold tabular-nums">
+          {recent > 0
+            ? <span className="text-[#35D07F]">+{recent}</span>
+            : <span className="text-on-surface-variant/40">0</span>}
+          <span className="ml-1 text-on-surface-variant/60 font-medium">new signups</span>
+        </span>
       </div>
     </div>
   );
 };
 
-const LegendRow = ({ color, label, value, loading }) => (
-  <div className="flex items-center justify-between text-[12px] font-medium">
-    <div className="flex items-center gap-2">
-      <span className={`w-2.5 h-2.5 rounded-full ${color}`}></span>
-      {label}
+const FxCard = ({ label, value, digits = 2, prefix = '', hint, loading, accent = 'text-secondary' }) => (
+  <div className="bg-surface-container-lowest p-3 md:p-5 rounded-xl border border-outline-variant/20 flex flex-col gap-1 transition-all hover:scale-[1.01] hover:shadow-sm">
+    <span className="text-[10px] md:text-[11px] font-bold text-on-surface-variant/60 uppercase tracking-widest">{label}</span>
+    <div className="flex items-baseline gap-2 mt-1">
+      {loading
+        ? <Skel className="w-20 h-7" />
+        : value == null
+          ? <span className="text-[20px] md:text-[28px] font-semibold text-on-surface-variant/30 tracking-tighter">—</span>
+          : <span className="text-[20px] md:text-[28px] font-semibold text-on-surface tracking-tighter tabular-nums">
+              {prefix}{value.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits })}
+            </span>}
+      <span className={`text-[10px] font-bold tracking-tight ${accent}`}>LIVE</span>
     </div>
-    {loading ? <Skel className="w-6 h-4" /> : <span className="font-bold tabular-nums">{value}</span>}
+    {hint && <p className="text-[10px] text-on-surface-variant/50 mt-0.5">{hint}</p>}
   </div>
 );
 
