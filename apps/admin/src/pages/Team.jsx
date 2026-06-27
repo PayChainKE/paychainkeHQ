@@ -21,25 +21,6 @@ const STATUS_META = {
   pending:  { label: 'Pending',  pill: 'bg-amber-50 text-amber-700 border-amber-200',       dot: 'bg-amber-500' },
 };
 
-const FUTURE_CONSOLES = [
-  {
-    title: 'Onboarding Officer Console',
-    icon: 'how_to_reg',
-    tone: 'amber',
-    desc: 'Dedicated workspace for officers to onboard merchants, drive KYB checklists, request additional documents, and approve activations.',
-    capabilities: ['Queue of pending merchants', 'In-app KYB checklist + doc capture', 'Side-by-side document viewer', 'Approve / reject with reason', 'Officer leaderboard'],
-    eta: 'Q3 2026',
-  },
-  {
-    title: 'CMO Marketing Console',
-    icon: 'campaign',
-    tone: 'pink',
-    desc: 'Marketing command-center to schedule newsletters, run drip campaigns, A/B test subject lines, segment audiences, and track funnel KPIs.',
-    capabilities: ['Scheduled campaigns + cron', 'Segmentation by region / vertical', 'A/B subject testing', 'Funnel + open/click analytics', 'Press & investor distribution lists'],
-    eta: 'Q4 2026',
-  },
-];
-
 const TIER_FILTERS = [
   { id: 'all',     label: 'All',     icon: 'groups' },
   { id: 'owner',   label: 'Owners',  icon: 'star' },
@@ -173,11 +154,6 @@ const Team = () => {
           <StatTile icon="star"            label="Owners"             value={stats.owners} />
           <StatTile icon="storefront"      label="Merchants Onboarded" value={stats.onboarded.toLocaleString()} />
           <StatTile icon="task_alt"        label="Tickets Resolved"   value={stats.resolved.toLocaleString()} />
-        </div>
-
-        {/* Future-console roadmap */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {FUTURE_CONSOLES.map((c) => <FutureConsoleCard key={c.title} {...c} />)}
         </div>
 
         {/* Filters / search */}
@@ -579,40 +555,6 @@ const StatTile = ({ icon, label, value, tone, pulse }) => {
       <div className="flex items-baseline gap-2">
         <span className="text-2xl font-bold text-on-surface tracking-tighter tabular-nums">{value}</span>
         {pulse && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>}
-      </div>
-    </div>
-  );
-};
-
-const FutureConsoleCard = ({ title, icon, tone, desc, capabilities, eta }) => {
-  const toneMap = {
-    amber: { bg: 'from-amber-500/15 to-amber-500/5',   ring: 'border-amber-500/30', text: 'text-amber-600',  dot: 'bg-amber-500' },
-    pink:  { bg: 'from-pink-500/15 to-pink-500/5',     ring: 'border-pink-500/30',  text: 'text-pink-600',   dot: 'bg-pink-500' },
-  };
-  const c = toneMap[tone] || toneMap.amber;
-  return (
-    <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${c.bg} border ${c.ring} p-6`}>
-      <div className="absolute -top-12 -right-12 w-44 h-44 bg-white/40 rounded-full blur-3xl pointer-events-none"></div>
-      <div className="relative">
-        <div className="flex items-start justify-between mb-3">
-          <div className={`w-11 h-11 rounded-xl bg-white border ${c.ring} flex items-center justify-center ${c.text}`}>
-            <span className="material-symbols-outlined text-[22px]" style={{ fontVariationSettings: "'FILL' 1" }}>{icon}</span>
-          </div>
-          <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-white border border-outline-variant/30 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/70">
-            <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`}></span>
-            ETA · {eta}
-          </span>
-        </div>
-        <h3 className="text-lg font-bold text-on-surface tracking-tight mb-1">{title}</h3>
-        <p className="text-[12px] text-on-surface-variant/70 mb-4">{desc}</p>
-        <ul className="space-y-1.5">
-          {capabilities.map((cap) => (
-            <li key={cap} className="flex items-start gap-2 text-[12px] text-on-surface-variant/80">
-              <span className={`material-symbols-outlined text-[14px] ${c.text} flex-shrink-0 mt-0.5`}>check_circle</span>
-              {cap}
-            </li>
-          ))}
-        </ul>
       </div>
     </div>
   );
