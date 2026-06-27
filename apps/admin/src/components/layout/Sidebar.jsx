@@ -4,25 +4,54 @@ import { useAuth } from '../../context/AuthContext';
 import api from '../../api/api';
 import logo from '../../assets/logo.png';
 
+// Grouped navigation. Every item in a section renders flat under the section
+// label — no parent/child nesting. The order within a section reflects the
+// information hierarchy (most-used first) but all entries share equal weight.
+const NAV_SECTIONS = [
+  {
+    title: 'Business Core',
+    items: [
+      { icon: 'dashboard',    label: 'Overview', path: '/overview' },
+      { icon: 'analytics',    label: 'Insights', path: '/analytics' },
+      { icon: 'trending_up',  label: 'Revenue',  path: '/revenue'  },
+    ],
+  },
+  {
+    title: 'Merchant Relations',
+    items: [
+      { icon: 'group',           label: 'Merchants', path: '/merchants' },
+      { icon: 'hourglass_empty', label: 'Waitlist',  path: '/waitlist'  },
+    ],
+  },
+  {
+    title: 'Financials & Compliance',
+    items: [
+      { icon: 'account_balance', label: 'Ledger',       path: '/ledger'       },
+      { icon: 'security',        label: 'Wallet Audit', path: '/wallet-audit' },
+      { icon: 'fact_check',      label: 'Audit Log',    path: '/audit-log'    },
+    ],
+  },
+  {
+    title: 'Communications',
+    items: [
+      { icon: 'support_agent', label: 'Call Centre', path: '/call-centre' },
+      { icon: 'mail',          label: 'Messages',    path: '/messages'    },
+      { icon: 'newspaper',     label: 'Newsletter',  path: '/newsletter'  },
+    ],
+  },
+  {
+    title: 'System Administration',
+    items: [
+      { icon: 'badge',    label: 'Team',     path: '/team'     },
+      { icon: 'settings', label: 'Settings', path: '/settings' },
+    ],
+  },
+];
+
 const Sidebar = ({ isOpen, onClose }) => {
   const { logout } = useAuth();
   const [status, setStatus] = useState(null);
   const [loadingStatus, setLoadingStatus] = useState(true);
-
-  const navItems = [
-    { icon: 'dashboard', label: 'Overview', path: '/overview' },
-    { icon: 'group', label: 'Merchants', path: '/merchants' },
-    { icon: 'hourglass_empty', label: 'Waitlist', path: '/waitlist' },
-    { icon: 'analytics', label: 'Insights', path: '/analytics' },
-    { icon: 'mail', label: 'Messages', path: '/messages' },
-    { icon: 'support_agent', label: 'Call Centre', path: '/call-centre' },
-    { icon: 'newspaper', label: 'Newsletter', path: '/newsletter' },
-    { icon: 'badge', label: 'Team', path: '/team' },
-    { icon: 'account_balance', label: 'Ledger', path: '/ledger' },
-    { icon: 'security', label: 'Wallet Audit', path: '/wallet-audit' },
-    { icon: 'fact_check', label: 'Audit Log', path: '/audit-log' },
-    { icon: 'settings', label: 'Settings', path: '/settings' },
-  ];
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -37,17 +66,15 @@ const Sidebar = ({ isOpen, onClose }) => {
 
   useEffect(() => {
     fetchStatus();
-    const id = setInterval(fetchStatus, 60_000); // refresh every minute
+    const id = setInterval(fetchStatus, 60_000);
     const h = () => fetchStatus();
     window.addEventListener('paychain:sync', h);
     return () => { clearInterval(id); window.removeEventListener('paychain:sync', h); };
   }, [fetchStatus]);
 
   const statRows = [
-    { icon: 'hourglass_empty', label: 'Waitlist',  value: status?.waitlist?.total,  badge: status?.waitlist?.pending,  badgeTone: 'amber',   path: '/waitlist'  },
-    { icon: 'storefront',      label: 'Merchants', value: status?.merchants?.total, badge: status?.merchants?.flagged, badgeTone: 'red',     path: '/merchants' },
-    { icon: 'mail',            label: 'Messages',  value: status?.messages?.total,  badge: status?.messages?.unread,   badgeTone: 'emerald', path: '/messages'  },
-    { icon: 'call',            label: 'Calls',     value: status?.calls?.total,     badge: status?.calls?.open,        badgeTone: 'emerald', path: '/call-centre' },
+    { icon: 'storefront', label: 'Merchants', value: status?.merchants?.total, badge: status?.merchants?.flagged, badgeTone: 'red',     path: '/merchants' },
+    { icon: 'mail',       label: 'Messages',  value: status?.messages?.total,  badge: status?.messages?.unread,   badgeTone: 'emerald', path: '/messages'  },
   ];
 
   const badgeToneMap = {
@@ -56,56 +83,72 @@ const Sidebar = ({ isOpen, onClose }) => {
     emerald: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
   };
 
+  const handleNavClick = () => { if (window.innerWidth < 1024) onClose(); };
+
   return (
-    <aside className={`fixed left-0 top-0 h-full w-[240px] bg-[#162723] flex flex-col py-6 px-4 z-50 transition-transform duration-300 lg:translate-x-0 ${isOpen ? 'translate-x-0 shadow-editorial' : '-translate-x-full'}`}>
-      <div className="flex items-center justify-between mb-10 px-2 lg:justify-center">
-        <div className="flex flex-col items-center gap-2">
+    <aside className={`fixed left-0 top-0 h-full w-[240px] bg-[#162723] flex flex-col py-5 px-3 z-50 transition-transform duration-300 lg:translate-x-0 ${isOpen ? 'translate-x-0 shadow-editorial' : '-translate-x-full'}`}>
+      {/* ── Brand ─────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between mb-6 px-2 lg:justify-center">
+        <div className="flex flex-col items-center gap-1.5">
           <img src={logo} alt="PayChain Logo" className="h-8 max-w-full w-auto object-contain" />
-          <span className="text-[10px] font-bold tracking-[0.2em] text-secondary-fixed opacity-60 uppercase">ADMIN PORTAL</span>
+          <span className="text-[9px] font-bold tracking-[0.22em] text-secondary-fixed opacity-60 uppercase">ADMIN PORTAL</span>
         </div>
-        <button onClick={onClose} className="lg:hidden text-white/40 hover:text-white">
+        <button onClick={onClose} className="lg:hidden text-white/40 hover:text-white absolute right-3 top-5">
           <span className="material-symbols-outlined">close</span>
         </button>
       </div>
-      <nav className="flex-1 space-y-1 overflow-y-auto no-scrollbar">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            onClick={() => window.innerWidth < 1024 && onClose()}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-[13px] font-body font-bold leading-[1.5] tracking-tight relative group ${
-                isActive
-                  ? 'bg-[#0E3D2E] text-[#5EFEB3] shadow-[0_0_15px_rgba(94,254,179,0.05)] after:absolute after:left-0 after:top-1 after:bottom-1 after:w-1 after:bg-[#5EFEB3] after:rounded-full'
-                  : 'text-[#c0c9c0] hover:text-white hover:bg-emerald-900/40'
-              }`
-            }
-          >
-            <span className="material-symbols-outlined text-[20px]">{item.icon}</span>
-            <span>{item.label}</span>
-          </NavLink>
+
+      {/* ── Grouped navigation ───────────────────────────────────── */}
+      <nav className="flex-1 overflow-y-auto no-scrollbar pr-1 -mr-1">
+        {NAV_SECTIONS.map((section, sIdx) => (
+          <div key={section.title} className={sIdx === 0 ? '' : 'mt-4'}>
+            <div className="px-3 mb-1.5 text-[9px] font-bold tracking-[0.18em] text-[#c0c9c0]/40 uppercase font-label">
+              {section.title}
+            </div>
+            <div className="space-y-0.5">
+              {section.items.map((item) => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  onClick={handleNavClick}
+                  className={({ isActive }) =>
+                    `flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-[12.5px] font-body font-bold leading-tight tracking-tight relative ${
+                      isActive
+                        ? 'bg-[#0E3D2E] text-[#5EFEB3] shadow-[0_0_15px_rgba(94,254,179,0.05)] after:absolute after:left-0 after:top-1 after:bottom-1 after:w-[3px] after:bg-[#5EFEB3] after:rounded-full'
+                        : 'text-[#c0c9c0] hover:text-white hover:bg-emerald-900/30'
+                    }`
+                  }
+                >
+                  <span className="material-symbols-outlined text-[19px]">{item.icon}</span>
+                  <span className="flex-1 truncate">{item.label}</span>
+                </NavLink>
+              ))}
+            </div>
+          </div>
         ))}
       </nav>
-      <div className="mt-auto pt-6 border-t border-white/10 space-y-4">
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-widest text-[#c0c9c0]/50 px-2 font-label">
+
+      {/* ── System Status + sign-out ─────────────────────────────── */}
+      <div className="mt-4 pt-3 border-t border-white/10 space-y-3">
+        <div className="space-y-0.5">
+          <div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-[0.18em] text-[#c0c9c0]/40 px-2 font-label">
             <span>System Status</span>
             <button
               onClick={fetchStatus}
               title="Refresh"
               className="text-[#c0c9c0]/40 hover:text-emerald-300 transition-colors"
             >
-              <span className="material-symbols-outlined text-[14px]">refresh</span>
+              <span className="material-symbols-outlined text-[13px]">refresh</span>
             </button>
           </div>
           {statRows.map((row) => (
             <NavLink
               key={row.label}
               to={row.path}
-              onClick={() => window.innerWidth < 1024 && onClose()}
-              className="flex items-center gap-2 px-3 py-1.5 text-slate-400 text-[12px] font-medium font-body rounded-lg hover:bg-emerald-900/30 hover:text-white transition-colors"
+              onClick={handleNavClick}
+              className="flex items-center gap-2 px-2 py-1 text-slate-400 text-[11px] font-medium font-body rounded-md hover:bg-emerald-900/30 hover:text-white transition-colors"
             >
-              <span className="material-symbols-outlined text-[16px] opacity-70">{row.icon}</span>
+              <span className="material-symbols-outlined text-[14px] opacity-70">{row.icon}</span>
               <span className="flex-1">{row.label}</span>
               {loadingStatus ? (
                 <span className="inline-block w-6 h-3 bg-white/10 rounded animate-pulse"></span>
@@ -124,9 +167,9 @@ const Sidebar = ({ isOpen, onClose }) => {
         </div>
         <button
           onClick={logout}
-          className="w-full flex items-center justify-center gap-2 py-2.5 bg-secondary-container/10 text-white rounded-lg text-[13px] font-medium hover:bg-secondary-container/20 transition-all font-label"
+          className="w-full flex items-center justify-center gap-2 py-2 bg-secondary-container/10 text-white rounded-lg text-[12px] font-medium hover:bg-secondary-container/20 transition-all font-label"
         >
-          <span className="material-symbols-outlined text-[18px]">logout</span>
+          <span className="material-symbols-outlined text-[16px]">logout</span>
           Sign Out
         </button>
       </div>

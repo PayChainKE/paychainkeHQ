@@ -32,6 +32,7 @@ import {
   resendInvite,
 } from '../controllers/teamController.js';
 import { runWalletAudit } from '../controllers/walletAuditController.js';
+import { getRevenue } from '../controllers/revenueController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -75,6 +76,10 @@ router.get('/insights', protect, getInsights);
 
 // Wallet ledger — paginated transaction trail + KPIs + asset mix + series.
 router.get('/ledger', protect, getLedger);
+
+// Revenue dashboard — per-stream fee aggregation, stacked time series,
+// top fee-generating merchants, projected ARR.
+router.get('/revenue', protect, getRevenue);
 
 // Stellar Wallet Audit (live Horizon cross-reference)
 router.get('/wallet-audit', protect, runWalletAudit);
