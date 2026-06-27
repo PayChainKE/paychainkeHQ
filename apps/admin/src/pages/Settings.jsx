@@ -84,18 +84,45 @@ const Settings = () => {
 // ── Profile ───────────────────────────────────────────────────────────
 const ProfileSection = ({ profile, onUpdated }) => {
   const [name, setName] = useState(profile.name || '');
-  const [avatarUrl, setAvatarUrl] = useState(profile.avatarUrl || '');
+  const [avatarData, setAvatarData] = useState(profile.avatarUrl || '');
+  const [uploadError, setUploadError] = useState('');
   const [busy, setBusy] = useState(false);
   const [savedAt, setSavedAt] = useState(null);
   const [error, setError] = useState('');
 
-  const dirty = (name !== (profile.name || '')) || (avatarUrl !== (profile.avatarUrl || ''));
+  const dirty = (name !== (profile.name || '')) || (avatarData !== (profile.avatarUrl || ''));
+
+  async function onAvatarFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setUploadError('');
+    if (!file.type.startsWith('image/')) { setUploadError('Please select an image file.'); return; }
+    if (file.size > 200 * 1024) { setUploadError('Image must be 200 KB or smaller.'); return; }
+    try {
+      const dataUrl = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onerror = () => reject(new Error('Could not read file.'));
+        r.onload  = () => resolve(r.result);
+        r.readAsDataURL(file);
+      });
+      setAvatarData(dataUrl);
+    } catch (err) {
+      setUploadError(err.message || 'Could not read file.');
+    }
+  }
+  function clearAvatar() { setAvatarData(''); setUploadError(''); }
 
   async function save() {
     setBusy(true);
     setError('');
     try {
-      const res = await api.put('/api/admin/auth/me', { name: name.trim(), avatarUrl: avatarUrl.trim() });
+      const body = { name: name.trim() };
+      if (avatarData !== (profile.avatarUrl || '')) {
+        if (avatarData.startsWith('data:image/')) body.avatarData = avatarData;
+        else body.avatarUrl = avatarData;
+      }
+      const res = await api.put('/api/admin/auth/me', body);
       if (res.data?.success) {
         onUpdated(res.data.data);
         setSavedAt(Date.now());
@@ -124,7 +151,7 @@ const ProfileSection = ({ profile, onUpdated }) => {
         <div className="absolute -top-10 -right-10 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl"></div>
         <div className="relative flex items-center gap-5">
           <div className="w-20 h-20 rounded-full ring-4 ring-emerald-900/40 bg-emerald-700 text-white flex items-center justify-center overflow-hidden text-2xl font-bold">
-            {avatarUrl ? <img src={avatarUrl} alt={displayName} className="w-full h-full object-cover" /> : initials}
+            {avatarData ? <img src={avatarData} alt={displayName} className="w-full h-full object-cover" /> : initials}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-300 mb-1">Signed in as</p>
@@ -150,7 +177,6 @@ const ProfileSection = ({ profile, onUpdated }) => {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Brandon Mutiti"
               maxLength={80}
               className={inputClass}
             />
@@ -159,15 +185,27 @@ const ProfileSection = ({ profile, onUpdated }) => {
             <input type="email" value={profile.email} disabled className={`${inputClass} opacity-60 cursor-not-allowed`} />
           </Field>
         </div>
-        <Field label="Avatar URL (optional)" hint="Paste a public image URL — leave empty to use your initials">
-          <input
-            type="url"
-            value={avatarUrl}
-            onChange={(e) => setAvatarUrl(e.target.value)}
-            placeholder="https://..."
-            maxLength={500}
-            className={inputClass}
-          />
+
+        <Field label="Profile Photo" hint="JPG, PNG or WebP. Max size 200 KB. Square images render best.">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 rounded-xl bg-emerald-50 border border-emerald-200/50 ring-1 ring-emerald-500/20 overflow-hidden flex items-center justify-center text-emerald-700 font-bold text-lg flex-shrink-0">
+              {avatarData ? <img src={avatarData} alt="" className="w-full h-full object-cover" /> : initials}
+            </div>
+            <div className="flex-1 flex flex-wrap gap-2">
+              <label className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/15 text-[11px] font-bold uppercase tracking-widest cursor-pointer transition-all">
+                <span className="material-symbols-outlined text-[14px]">upload</span>
+                Upload photo
+                <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" onChange={onAvatarFile} className="hidden" />
+              </label>
+              {avatarData && (
+                <button type="button" onClick={clearAvatar} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-outline-variant/30 text-on-surface-variant hover:bg-surface-container-low text-[11px] font-bold uppercase tracking-widest transition-all">
+                  <span className="material-symbols-outlined text-[14px]">delete</span>
+                  Remove
+                </button>
+              )}
+            </div>
+          </div>
+          {uploadError && <p className="text-[12px] text-red-600 font-medium mt-2">{uploadError}</p>}
         </Field>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
@@ -253,18 +291,16 @@ const SecuritySection = ({ profile }) => {
               onChange={(e) => setCurrent(e.target.value)}
               autoComplete="current-password"
               className={inputClass}
-              placeholder="Enter your existing password"
             />
           </Field>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="New Password" required>
+            <Field label="New Password" required hint="At least 10 characters with mixed case, a number, and a symbol.">
               <input
                 type="password"
                 value={next}
                 onChange={(e) => setNext(e.target.value)}
                 autoComplete="new-password"
                 className={inputClass}
-                placeholder="At least 10 characters"
               />
             </Field>
             <Field label="Confirm New Password" required>
@@ -274,7 +310,6 @@ const SecuritySection = ({ profile }) => {
                 onChange={(e) => setConfirm(e.target.value)}
                 autoComplete="new-password"
                 className={inputClass}
-                placeholder="Re-enter new password"
               />
               {confirm.length > 0 && !matches && <p className="text-[11px] text-red-600 font-medium mt-1">Passwords do not match.</p>}
             </Field>
