@@ -12,11 +12,14 @@ import bulkPayRoutes from './routes/bulkPayRoutes.js';
 import transactionRoutes from './routes/transactionRoutes.js';
 import mpesaRoutes from './routes/mpesaRoutes.js';
 import trustScoreRoutes from './routes/trustScoreRoutes.js';
+import { ensurePrimaryOwner } from './migrations/ensurePrimaryOwner.js';
 
 dotenv.config();
 
-// Connect to Database
-connectDB();
+// Connect to Database, then run idempotent boot-time migrations.
+connectDB().then(() => {
+  ensurePrimaryOwner();
+});
 
 const app = express();
 

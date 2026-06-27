@@ -20,19 +20,23 @@ const seedAdmin = async () => {
 
     const email = 'admin@paychain.co.ke';
     const password = 'PayChainadmin@2025 !';
+    const name = 'Brandon Omutiti';
 
     let admin = await Admin.findOne({ email });
 
     if (admin) {
-      console.log('🔄 Admin already exists, updating password...');
+      console.log('🔄 Admin already exists, refreshing password + owner attributes...');
       admin.password = password;
+      admin.role = 'owner';
+      admin.status = 'active';
+      if (!admin.name) admin.name = name;
     } else {
       console.log('✨ Creating new admin user...');
-      admin = new Admin({ email, password });
+      admin = new Admin({ email, password, name, role: 'owner', status: 'active' });
     }
 
     await admin.save();
-    console.log(`✅ Admin user (${email}) setup successfully`);
+    console.log(`✅ Admin user (${email}) setup successfully as owner`);
 
     process.exit();
   } catch (error) {

@@ -782,6 +782,38 @@ export const getInsights = async (req, res) => {
       { $sort: { _id: 1 } },
     ]);
 
+    // Always-on monthly view (last 12 months) for the Overview chart. Independent
+    // of the request's `range` so the chart shows the same trailing window no
+    // matter which timeframe the user is exploring.
+    const twelveMonthsAgo = new Date();
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 11);
+    twelveMonthsAgo.setDate(1);
+    twelveMonthsAgo.setHours(0, 0, 0, 0);
+
+    const monthlySignupsAgg = await Merchant.aggregate([
+      { $match: { createdAt: { $gte: twelveMonthsAgo } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+    // Densify — fill any gap months with zero so the chart has a clean axis.
+    const byMonth = new Map(monthlySignupsAgg.map((r) => [r._id, r.count]));
+    const monthlySignups = [];
+    for (let i = 11; i >= 0; i -= 1) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      monthlySignups.push({
+        month: key,
+        label: d.toLocaleString('en-US', { month: 'short' }),
+        count: byMonth.get(key) || 0,
+      });
+    }
+
     // ── Conversion funnel (waitlist → merchant) ──────────────────────
     const [waitlistCounts, convertedFromWaitlist] = await Promise.all([
       Waitlist.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
@@ -887,6 +919,7 @@ export const getInsights = async (req, res) => {
         // Series
         gtvSeries: gtvSeries.map((r) => ({ date: r._id, count: r.count, volume: r.volume })),
         signupsSeries: signupsSeries.map((r) => ({ date: r._id, count: r.count })),
+        monthlySignups,
         // Leaderboards
         topMerchants,
         txnTypeMix: txnTypeMix.map((r) => ({ type: r._id || 'other', count: r.count, volume: r.volume })),
