@@ -206,51 +206,161 @@ export const sendWalletActivationEmail = async (email, name, stellarPublicKey) =
 
 // Send Welcome Email with Credentials
 export const sendWelcomeEmail = async (email, name, password, phone, paybillAccount) => {
+  const firstName = (name || '').split(' ')[0] || 'Merchant';
   try {
     const data = await resend.emails.send({
       from: 'PayChain <info@paychain.co.ke>',
       to: [email],
-      subject: 'Welcome to PayChain! Your Account Details',
+      subject: `Welcome to PayChain, ${firstName} — Your Merchant Account is Active`,
       html: `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 16px; overflow: hidden; background: #fff;">
-          <div style="background: linear-gradient(135deg, #06201B 0%, #0a3029 100%); padding: 50px 30px; text-align: center; color: #fff;">
-            <h1 style="margin: 0; font-size: 32px; font-weight: 800; letter-spacing: -0.5px;">Welcome to PayChain</h1>
-            <p style="margin: 10px 0 0; color: #5EFEB3; font-size: 16px; font-weight: 600;">Your Account is Ready</p>
-          </div>
-          <div style="padding: 40px 30px;">
-            <h2 style="margin: 0 0 20px; color: #111; font-size: 22px;">Hi ${name},</h2>
-            <p style="color: #444; line-height: 1.7; font-size: 16px;">We are thrilled to welcome you to PayChain. Your merchant dashboard has been provisioned and is ready for use.</p>
-            <p style="color: #444; line-height: 1.7; font-size: 16px;">To start collecting payments for your business, instruct your customers to go to the M-PESA menu, select <strong>Lipa na M-PESA</strong>, choose <strong>Paybill</strong>, and enter the following details. All payments will instantly reflect on your PayChain dashboard.</p>
-            <div style="margin-top: 20px; padding: 25px; background: #f0fdf4; border-radius: 12px; border: 1px solid #bbf7d0;">
-              <h3 style="margin: 0 0 15px; color: #166534; font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Payment Collection Details</h3>
-              <div style="color: #14532d; font-size: 15px; line-height: 1.8;">
-                <p style="margin: 8px 0;"><strong>Main Paybill:</strong> 400200</p>
-                <p style="margin: 8px 0;"><strong>Account Number:</strong> ${paybillAccount}</p>
-              </div>
-            </div>
-            
-            <div style="margin-top: 20px; padding: 20px; background: #fffbeb; border-radius: 12px; border: 1px solid #fde68a;">
-              <p style="margin: 0; color: #92400e; font-size: 15px; line-height: 1.6;"><strong>🚀 Unlock Cash Advances:</strong> Keep your account active by regularly receiving payments through your PayChain account number. Consistent daily activity builds your Trust Score and automatically makes your business eligible for instant Cash Advances to fuel your growth!</p>
-            </div>
-            <div style="margin-top: 30px; padding: 25px; background: #f8faff; border-radius: 12px; border: 1px solid #eef2ff;">
-              <h3 style="margin: 0 0 15px; color: #0066FF; font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Dashboard Access Credentials</h3>
-              <div style="color: #003399; font-size: 15px; line-height: 1.8;">
-                <p style="margin: 8px 0;"><strong>Username:</strong> ${email} <span style="opacity: 0.7; font-size: 13px;">or</span> ${phone}</p>
-                <p style="margin: 8px 0;"><strong>Password:</strong> ${password}</p>
-              </div>
-            </div>
-            <div style="margin-top: 40px; text-align: center;">
-              <a href="https://www.paychain.co.ke/login" style="background: #00351D; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 10px; font-weight: 700; font-size: 16px; display: inline-block;">Log In to Dashboard</a>
-            </div>
-          </div>
-          <div style="padding: 30px; background: #fafafa; border-top: 1px solid #eee; text-align: center;">
-            <p style="margin: 0; color: #aaa; font-size: 11px;">This is a <strong>no-reply</strong> email. For assistance, reach out to <a href="mailto:support@paychain.co.ke" style="color: #06201B; text-decoration: none;">support@paychain.co.ke</a> or <strong>0790889066</strong></p>
-            <p style="margin: 10px 0 0; color: #bbb; font-size: 11px;">&copy; 2026 PayChainKE. Empowering the next generation of African merchants.</p>
-          </div>
-        </div>
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#F4F7F6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#F4F7F6;padding:40px 16px;">
+  <tr><td align="center">
+    <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;">
+
+      <!-- HEADER -->
+      <tr><td style="background:#06201B;border-radius:16px 16px 0 0;padding:40px 40px 36px;text-align:center;">
+        <p style="margin:0 0 4px;font-size:11px;font-weight:800;letter-spacing:0.25em;text-transform:uppercase;color:#5EFEB3;">PayChain Kenya</p>
+        <h1 style="margin:0;font-size:28px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;line-height:1.2;">Your Merchant Account<br>is Now Active</h1>
+        <p style="margin:16px 0 0;font-size:14px;color:rgba(255,255,255,0.6);line-height:1.6;">
+          Welcome aboard, <strong style="color:#fff;">${firstName}</strong>. Your PayChain dashboard is provisioned and ready to accept payments.
+        </p>
+      </td></tr>
+
+      <!-- PAYMENT COLLECTION CARD -->
+      <tr><td style="background:#ffffff;padding:36px 40px 0;">
+        <p style="margin:0 0 20px;font-size:11px;font-weight:800;letter-spacing:0.2em;text-transform:uppercase;color:#6B7280;">How to Receive M-PESA Payments</p>
+        <p style="margin:0 0 24px;font-size:14px;color:#374151;line-height:1.7;">
+          Share the details below with your customers. They pay via <strong>Lipa na M-PESA &rarr; Paybill</strong> and the funds reflect in your dashboard instantly.
+        </p>
+
+        <!-- PAYBILL HIGHLIGHT BOX -->
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#06201B;border-radius:14px;margin-bottom:12px;overflow:hidden;">
+          <tr>
+            <td style="padding:28px 32px;">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td width="50%" style="padding-right:12px;border-right:1px solid rgba(255,255,255,0.12);">
+                    <p style="margin:0 0 6px;font-size:10px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:rgba(255,255,255,0.45);">Paybill Number</p>
+                    <p style="margin:0;font-size:34px;font-weight:800;color:#5EFEB3;letter-spacing:2px;font-family:monospace;">400200</p>
+                  </td>
+                  <td width="50%" style="padding-left:28px;">
+                    <p style="margin:0 0 6px;font-size:10px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:rgba(255,255,255,0.45);">Account Number</p>
+                    <p style="margin:0;font-size:34px;font-weight:800;color:#ffffff;letter-spacing:2px;font-family:monospace;">${paybillAccount}</p>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:20px 0 0;font-size:11px;color:rgba(255,255,255,0.35);font-weight:600;letter-spacing:0.05em;">
+                &#9432;&nbsp; This account number is unique to your business. Keep it safe.
+              </p>
+            </td>
+          </tr>
+        </table>
+
+        <!-- STEP GUIDE -->
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:12px;margin-bottom:24px;overflow:hidden;">
+          <tr><td style="padding:20px 24px;">
+            <p style="margin:0 0 14px;font-size:11px;font-weight:800;letter-spacing:0.18em;text-transform:uppercase;color:#6B7280;">Customer Payment Steps</p>
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td width="32" style="vertical-align:top;padding:5px 12px 5px 0;"><div style="width:24px;height:24px;border-radius:50%;background:#06201B;text-align:center;"><span style="font-size:11px;font-weight:800;color:#5EFEB3;line-height:24px;display:block;">1</span></div></td>
+                <td style="font-size:13px;color:#374151;padding:5px 0;line-height:1.5;">Open M-PESA on their phone</td>
+              </tr>
+              <tr>
+                <td width="32" style="vertical-align:top;padding:5px 12px 5px 0;"><div style="width:24px;height:24px;border-radius:50%;background:#06201B;text-align:center;"><span style="font-size:11px;font-weight:800;color:#5EFEB3;line-height:24px;display:block;">2</span></div></td>
+                <td style="font-size:13px;color:#374151;padding:5px 0;line-height:1.5;">Select <strong>Lipa na M-PESA</strong></td>
+              </tr>
+              <tr>
+                <td width="32" style="vertical-align:top;padding:5px 12px 5px 0;"><div style="width:24px;height:24px;border-radius:50%;background:#06201B;text-align:center;"><span style="font-size:11px;font-weight:800;color:#5EFEB3;line-height:24px;display:block;">3</span></div></td>
+                <td style="font-size:13px;color:#374151;padding:5px 0;line-height:1.5;">Choose <strong>Pay Bill</strong></td>
+              </tr>
+              <tr>
+                <td width="32" style="vertical-align:top;padding:5px 12px 5px 0;"><div style="width:24px;height:24px;border-radius:50%;background:#06201B;text-align:center;"><span style="font-size:11px;font-weight:800;color:#5EFEB3;line-height:24px;display:block;">4</span></div></td>
+                <td style="font-size:13px;color:#374151;padding:5px 0;line-height:1.5;">Business No: <strong style="color:#06201B;font-family:monospace;">400200</strong></td>
+              </tr>
+              <tr>
+                <td width="32" style="vertical-align:top;padding:5px 12px 5px 0;"><div style="width:24px;height:24px;border-radius:50%;background:#06201B;text-align:center;"><span style="font-size:11px;font-weight:800;color:#5EFEB3;line-height:24px;display:block;">5</span></div></td>
+                <td style="font-size:13px;color:#374151;padding:5px 0;line-height:1.5;">Account No: <strong style="color:#06201B;font-family:monospace;">${paybillAccount}</strong></td>
+              </tr>
+              <tr>
+                <td width="32" style="vertical-align:top;padding:5px 12px 5px 0;"><div style="width:24px;height:24px;border-radius:50%;background:#06201B;text-align:center;"><span style="font-size:11px;font-weight:800;color:#5EFEB3;line-height:24px;display:block;">6</span></div></td>
+                <td style="font-size:13px;color:#374151;padding:5px 0;line-height:1.5;">Enter amount &amp; M-PESA PIN to confirm</td>
+              </tr>
+            </table>
+          </td></tr>
+        </table>
+      </td></tr>
+
+      <!-- TRUST SCORE NUDGE -->
+      <tr><td style="background:#ffffff;padding:0 40px 28px;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:12px;">
+          <tr><td style="padding:18px 22px;">
+            <p style="margin:0;font-size:13px;color:#92400E;line-height:1.65;">
+              <strong>&#9889; Build your Trust Score.</strong> Regular M-PESA collections through your account number grow your Trust Score automatically — unlocking <strong>instant cash advances</strong> for your business, with no collateral required.
+            </p>
+          </td></tr>
+        </table>
+      </td></tr>
+
+      <!-- DIVIDER -->
+      <tr><td style="background:#ffffff;padding:0 40px;">
+        <hr style="border:none;border-top:1px solid #F3F4F6;margin:4px 0 28px;">
+      </td></tr>
+
+      <!-- DASHBOARD ACCESS -->
+      <tr><td style="background:#ffffff;padding:0 40px 36px;">
+        <p style="margin:0 0 16px;font-size:11px;font-weight:800;letter-spacing:0.2em;text-transform:uppercase;color:#6B7280;">Dashboard Access</p>
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:12px;margin-bottom:24px;">
+          <tr><td style="padding:20px 24px;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="padding:6px 0;font-size:13px;color:#6B7280;font-weight:600;width:110px;">Email</td>
+                <td style="padding:6px 0;font-size:13px;color:#111827;font-weight:700;">${email}</td>
+              </tr>
+              <tr>
+                <td style="padding:6px 0;font-size:13px;color:#6B7280;font-weight:600;">Phone</td>
+                <td style="padding:6px 0;font-size:13px;color:#111827;font-weight:700;">${phone}</td>
+              </tr>
+              <tr>
+                <td style="padding:6px 0;font-size:13px;color:#6B7280;font-weight:600;">Password</td>
+                <td style="padding:6px 0;font-size:13px;color:#111827;font-weight:700;font-family:monospace;">${password}</td>
+              </tr>
+            </table>
+            <p style="margin:14px 0 0;font-size:11px;color:#9CA3AF;line-height:1.5;">
+              You can change your password anytime from the dashboard under <strong>Profile &rarr; Security</strong>. We recommend updating it after your first login.
+            </p>
+          </td></tr>
+        </table>
+
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr><td align="center">
+            <a href="https://app.paychain.co.ke" style="display:inline-block;background:#06201B;color:#ffffff;text-decoration:none;font-size:14px;font-weight:800;letter-spacing:0.06em;padding:16px 40px;border-radius:10px;">
+              Open Dashboard &rarr;
+            </a>
+          </td></tr>
+        </table>
+      </td></tr>
+
+      <!-- FOOTER -->
+      <tr><td style="background:#F9FAFB;border-top:1px solid #E5E7EB;border-radius:0 0 16px 16px;padding:28px 40px;text-align:center;">
+        <p style="margin:0 0 6px;font-size:12px;color:#374151;font-weight:700;">PayChain Kenya</p>
+        <p style="margin:0 0 12px;font-size:11px;color:#9CA3AF;line-height:1.6;">
+          Need help? Email <a href="mailto:support@paychain.co.ke" style="color:#06201B;font-weight:700;text-decoration:none;">support@paychain.co.ke</a> or call <strong>0790 889 066</strong>
+        </p>
+        <p style="margin:0;font-size:10px;color:#D1D5DB;">&copy; 2026 PayChain Kenya Limited. All rights reserved.</p>
+      </td></tr>
+
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>
       `
     });
-    console.log(`📧 Welcome Credentials Email sent to ${email}`);
+    console.log(`📧 Welcome email sent to ${email}`);
     return data;
   } catch (error) {
     console.error('❌ Resend Welcome Email Error:', error);

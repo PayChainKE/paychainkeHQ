@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { useNotification } from '../context/NotificationContext'
@@ -18,7 +18,7 @@ const KENYAN_COUNTIES = [
 ]
 
 export default function Login() {
-  const { login, biometricLogin, signup, verifyOTP, resendOTP, forgotPassword, verifyResetOTP, resetPassword, isAuthenticated } = useMerchantAuth()
+  const { login, signup, verifyOTP, resendOTP, forgotPassword, verifyResetOTP, resetPassword, isAuthenticated } = useMerchantAuth()
   const { addNotification } = useNotification()
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
@@ -60,13 +60,13 @@ export default function Login() {
   const [isOTPMode, setIsOTPMode] = useState(false)
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
 
+  const signupSubmittingRef = useRef(false)
+
   // Navigation Tabs
   const [activeTab, setActiveTab] = useState('login')
   const [isSignupPasswordStep, setIsSignupPasswordStep] = useState(false)
-  const [isSignupBiometricStep, setIsSignupBiometricStep] = useState(false)
   const [otpFlowType, setOtpFlowType] = useState('') // 'login' or 'reset'
   const [authEmail, setAuthEmail] = useState('') // Captured from backend for OTP verification
-  const [hasBiometrics, setHasBiometrics] = useState(!!localStorage.getItem('last_biometric_user'))
   const [resendTimer, setResendTimer] = useState(59)
   const [hasAccount, setHasAccount] = useState(() => localStorage.getItem('hasAccount') === 'true')
   
@@ -107,51 +107,6 @@ export default function Login() {
       }
     } else {
       setErr(res.error)
-    }
-  }
-
-  async function handleBiometricSignIn() {
-    setErr('')
-    try {
-      if (!window.PublicKeyCredential) {
-        setErr("Biometrics are not supported on this device.")
-        return
-      }
-
-      const challenge = new Uint8Array(32)
-      window.crypto.getRandomValues(challenge)
-
-      // Physically triggers OS-level Face ID / Touch ID prompt
-      const assertion = await navigator.credentials.get({
-        publicKey: {
-          challenge: challenge,
-          timeout: 60000,
-          userVerification: "required"
-        }
-      })
-
-      if (assertion) {
-        // OS verified the user physically. 
-        // We log them in bypassing the password check on the backend for demo purposes.
-        const userEmail = localStorage.getItem('last_biometric_user')
-        if (!userEmail) {
-          setErr("No registered biometric user found.")
-          return
-        }
-
-        setLoading(true)
-        const res = await biometricLogin(userEmail)
-        setLoading(false)
-
-        if (res.success) {
-          nav('/overview')
-        } else {
-          setErr(res.error)
-        }
-      }
-    } catch (error) {
-      console.error(error)
-      setErr("Biometric authentication cancelled or failed.")
     }
   }
 
@@ -292,25 +247,57 @@ export default function Login() {
     }
   }
 
+  const otpRefs = useRef([])
+
   const handleOtpChange = (element, index) => {
     const val = element.value.replace(/\D/g, '')
-    if (element.value !== '' && val === '') return // Reject if they typed a non-number
-    
+    if (element.value !== '' && val === '') return
     const newOtp = [...otp]
     newOtp[index] = val
     setOtp(newOtp)
-    if (element.nextSibling && val) {
-      element.nextSibling.focus()
+    if (val && index < 5) otpRefs.current[index + 1]?.focus()
+  }
+
+  const handleOtpKeyDown = (e, index) => {
+    if (e.key === 'Backspace') {
+      if (otp[index]) {
+        const newOtp = [...otp]
+        newOtp[index] = ''
+        setOtp(newOtp)
+      } else if (index > 0) {
+        otpRefs.current[index - 1]?.focus()
+      }
+    } else if (e.key === 'ArrowLeft' && index > 0) {
+      otpRefs.current[index - 1]?.focus()
+    } else if (e.key === 'ArrowRight' && index < 5) {
+      otpRefs.current[index + 1]?.focus()
     }
+  }
+
+  const handleOtpPaste = (e) => {
+    e.preventDefault()
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
+    if (!pasted) return
+    const newOtp = [...otp]
+    for (let i = 0; i < 6; i++) newOtp[i] = pasted[i] || ''
+    setOtp(newOtp)
+    const nextEmpty = newOtp.findIndex(v => !v)
+    otpRefs.current[nextEmpty === -1 ? 5 : nextEmpty]?.focus()
   }
 
   async function handleSignup(e) {
     e.preventDefault()
+    if (!signupPhone || signupPhone.length < 9) {
+      setErr('Please enter a valid Kenyan phone number before continuing.')
+      return
+    }
+    setErr('')
     setIsSignupPasswordStep(true)
   }
 
   async function handleSignupCreateAccount(e) {
     e.preventDefault()
+    if (signupSubmittingRef.current) return
     if (!Object.values(strength).every(v => v)) {
       setErr('Please meet all security requirements.')
       return
@@ -319,33 +306,30 @@ export default function Login() {
       setErr('Passwords do not match.')
       return
     }
+    const payload = {
+      name: signupName.trim(),
+      email: signupEmail.trim(),
+      phone: signupPhone.trim(),
+      businessName: signupBusinessName.trim(),
+      password: newPassword,
+      ecommerce: signupEcommerce,
+    }
 
-    const formData = new FormData()
-    formData.append('name', signupName)
-    formData.append('email', signupEmail)
-    formData.append('phone', signupPhone)
-    formData.append('businessName', signupBusinessName)
-    formData.append('password', newPassword)
-    formData.append('ecommerce', signupEcommerce)
-
+    signupSubmittingRef.current = true
     setLoading(true)
-    const res = await signup(formData)
+    const res = await signup(payload)
     setLoading(false)
-    
+    signupSubmittingRef.current = false
+
     if (res.success) {
       setIsSignupPasswordStep(false)
-      if (window.PublicKeyCredential) {
-        setIsSignupBiometricStep(true)
-      } else {
-        finishSignup()
-      }
+      finishSignup()
     } else {
       setErr(res.error)
     }
   }
 
   function finishSignup() {
-    setIsSignupBiometricStep(false)
     setActiveTab('login')
     setPassword('')
     addNotification({
@@ -353,47 +337,6 @@ export default function Login() {
       message: 'Sign in with your new credentials to access your dashboard.',
       type: 'success',
     })
-  }
-
-  async function handleSetupBiometric() {
-    try {
-      setLoading(true)
-      const challenge = new Uint8Array(32)
-      window.crypto.getRandomValues(challenge)
-      const userId = new Uint8Array(16)
-      window.crypto.getRandomValues(userId)
-
-      const credential = await navigator.credentials.create({
-        publicKey: {
-          challenge: challenge,
-          rp: { name: "PayChain Merchant", id: window.location.hostname },
-          user: {
-            id: userId,
-            name: signupEmail,
-            displayName: signupName
-          },
-          pubKeyCredParams: [{ type: "public-key", alg: -7 }],
-          authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required" },
-          timeout: 60000
-        }
-      })
-
-      if (credential) {
-        localStorage.setItem('last_biometric_user', signupEmail)
-        setHasBiometrics(true)
-        addNotification({ title: 'Biometrics Enabled', message: 'You can now log in using Face ID or Touch ID.', type: 'success' })
-      }
-    } catch (e) {
-      console.error(e)
-      setErr('Biometric setup failed or was cancelled.')
-    } finally {
-      setLoading(false)
-      finishSignup()
-    }
-  }
-
-  function skipBiometric() {
-    finishSignup()
   }
 
   const SecurityRequirement = ({ met, label }) => (
@@ -447,7 +390,7 @@ export default function Login() {
         <div className="max-w-md w-full animate-fade-in-up">
           {/* Navigation Tabs */}
           <div className="flex bg-surface-container-low p-1.5 rounded-2xl mb-8 lg:mb-12 border border-outline-variant/10 shadow-inner">
-            {['signup', 'login', 'reset'].filter(t => t !== 'signup' || !hasAccount).map((tab) => (
+            {['signup', 'login', 'reset'].map((tab) => (
               <button
                 key={tab}
                 type="button"
@@ -474,34 +417,7 @@ export default function Login() {
           {activeTab === 'signup' ? (
             /* SIGN UP FORM */
             <div className="animate-fade-in-up">
-              {isSignupBiometricStep ? (
-                /* BIOMETRIC SETUP STEP */
-                <div className="flex flex-col items-center justify-center text-center py-10 px-4 animate-fade-in-up">
-                  <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mb-6 shadow-inner">
-                    <span className="material-symbols-outlined text-4xl text-emerald-500">fingerprint</span>
-                  </div>
-                  <h3 className="font-headline text-3xl text-primary tracking-tight font-black mb-3">Enable Biometrics</h3>
-                  <p className="text-on-surface-variant font-medium opacity-80 mb-8 max-w-sm leading-relaxed">
-                    Set up Face ID or Touch ID for instant, secure access to your merchant dashboard without needing a password.
-                  </p>
-                  <div className="flex flex-col w-full gap-4 max-w-xs mx-auto">
-                    <button 
-                      onClick={handleSetupBiometric}
-                      disabled={loading}
-                      className="bg-[#06201B] text-white py-4 rounded-xl font-black text-sm shadow-xl hover:bg-[#0a3029] transition-all flex items-center justify-center gap-2"
-                    >
-                      {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : 'Set Up Now'}
-                    </button>
-                    <button 
-                      onClick={skipBiometric}
-                      disabled={loading}
-                      className="text-primary/60 font-bold text-sm py-2 hover:text-primary transition-all"
-                    >
-                      Skip for now
-                    </button>
-                  </div>
-                </div>
-              ) : isSignupPasswordStep ? (
+              {isSignupPasswordStep ? (
                 /* SIGN UP PASSWORD STEP */
                 <div className="animate-fade-in-up">
                   <div className="mb-6 lg:mb-10 flex flex-col items-center text-center">
@@ -627,22 +543,21 @@ export default function Login() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Your Phone *</label>
-                    <div className="flex group">
-                      <div className="bg-surface-container-low border border-outline-variant/15 border-r-0 rounded-l-xl px-3 flex items-center justify-center text-primary/40 group-focus-within:border-primary transition-colors">
-                        <span className="material-symbols-outlined text-sm">smartphone</span>
-                      </div>
-                      <ValidatedInput kind="phoneKE" required value={signupPhone} onChange={e => setSignupPhone(e.target.value)} placeholder="0712 345 678"
-                        className="flex-1 w-full bg-white border border-outline-variant/15 rounded-r-xl py-3 px-3 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" />
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Your Phone *</label>
+                  <div className="flex group">
+                    <div className="bg-surface-container-low border border-outline-variant/15 border-r-0 rounded-l-xl px-3 flex items-center justify-center text-primary/40 group-focus-within:border-primary transition-colors">
+                      <span className="material-symbols-outlined text-sm">smartphone</span>
                     </div>
+                    <ValidatedInput kind="phoneKE" value={signupPhone} onChange={e => setSignupPhone(e.target.value)} placeholder="0712 345 678"
+                      className="flex-1 w-full bg-white border border-outline-variant/15 rounded-r-xl py-3 px-3 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Business Name *</label>
-                    <ValidatedInput kind="businessName" required value={signupBusinessName} onChange={e => setSignupBusinessName(e.target.value)} placeholder="Acme Corp"
-                      className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" />
-                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Business Name *</label>
+                  <ValidatedInput kind="businessName" required value={signupBusinessName} onChange={e => setSignupBusinessName(e.target.value)} placeholder="Acme Corp"
+                    className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" />
                 </div>
 
                 <div className="space-y-2">
@@ -782,25 +697,6 @@ export default function Login() {
               </div>
 
               <form onSubmit={handleLogin} className="space-y-5 lg:space-y-6">
-                
-                {hasBiometrics && (
-                  <div className="mb-6 animate-fade-in-up">
-                    <button 
-                      type="button"
-                      onClick={handleBiometricSignIn}
-                      className="w-full bg-emerald-50 text-emerald-700 py-4 lg:py-5 rounded-2xl font-black text-sm lg:text-base shadow-sm hover:bg-emerald-100 active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-emerald-200"
-                    >
-                      <span className="material-symbols-outlined text-2xl">fingerprint</span>
-                      Sign in with Passkey / Biometrics
-                    </button>
-                    
-                    <div className="flex items-center gap-4 my-6 opacity-40">
-                      <div className="flex-1 h-px bg-primary"></div>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-primary">Or use password</span>
-                      <div className="flex-1 h-px bg-primary"></div>
-                    </div>
-                  </div>
-                )}
 
                 {/* Unified Login Field (Email or Phone Number) */}
                 <div className="space-y-2">
@@ -879,82 +775,115 @@ export default function Login() {
           ) : isOTPMode ? (
             /* OTP VERIFICATION VIEW */
             <div className="animate-fade-in-up duration-500">
-              <div className="mb-6 lg:mb-10 text-center flex flex-col items-center">
-                 <img src={footerBrandsLogo} alt="PayChain Logo" className="h-10 mb-6 w-auto object-contain" />
-                 <h3 className="font-headline text-2xl lg:text-5xl text-primary tracking-tight font-black">
-                   {otpFlowType === 'reset' ? 'Verify it’s you' : 'Security Code'}
-                 </h3>
-                 <p className="text-on-surface-variant font-medium mt-1.5 text-sm lg:text-base lg:mt-2 opacity-70 leading-relaxed max-w-sm">
-                   {otpFlowType === 'reset' ? (
-                     <>
-                       Enter the 6-digit code we sent to {' '}
-                       <span className="text-primary font-black">{maskedResetEmail || 'your inbox'}</span>.
-                       The code expires in 10 minutes.
-                     </>
-                   ) : (
-                     <>
-                       Enter the 6-digit code sent to your phone ending in {' '}
-                       <span className="text-primary font-black">...{phone.slice(-3)}</span>
-                     </>
-                   )}
-                 </p>
-                 {otpFlowType === 'reset' && (
-                   <button
-                     type="button"
-                     onClick={() => exitResetFlow('reset')}
-                     className="mt-4 text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600 hover:text-emerald-700"
-                   >
-                     ← Use a different email
-                   </button>
-                 )}
+
+              {/* Header */}
+              <div className="mb-8 text-center">
+                <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[#06201B] mb-5 shadow-lg">
+                  <span className="material-symbols-outlined text-emerald-400 text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>lock</span>
+                </div>
+                <h3 className="font-headline text-3xl lg:text-4xl text-primary tracking-tight font-black">
+                  {otpFlowType === 'reset' ? 'Verify your identity' : 'Enter security code'}
+                </h3>
+                <p className="text-on-surface-variant text-sm mt-2 opacity-60 leading-relaxed max-w-xs mx-auto">
+                  {otpFlowType === 'reset' ? (
+                    <>6-digit code sent to <span className="text-primary font-bold opacity-100">{maskedResetEmail || 'your inbox'}</span></>
+                  ) : (
+                    <>6-digit code sent to your registered email</>
+                  )}
+                </p>
+
+                {otpFlowType === 'reset' && (
+                  <button
+                    type="button"
+                    onClick={() => exitResetFlow('reset')}
+                    className="mt-3 flex items-center gap-1 mx-auto text-[10px] font-black uppercase tracking-[0.2em] text-primary/40 hover:text-emerald-600 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[12px]">arrow_back</span>
+                    Use a different email
+                  </button>
+                )}
               </div>
 
-              <form onSubmit={handleVerifyOTP} className="space-y-6 lg:space-y-8">
-                <div className="flex justify-between gap-1.5 sm:gap-3">
-                  {otp.map((data, index) => (
-                    <input
-                      key={index}
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      autoComplete={index === 0 ? "one-time-code" : "off"}
-                      maxLength="1"
-                      className="w-full aspect-square bg-slate-50 border-2 border-outline-variant/10 rounded-xl lg:rounded-2xl text-center text-xl lg:text-2xl font-black text-primary focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all"
-                      value={data}
-                      onChange={e => handleOtpChange(e.target, index)}
-                      onFocus={e => e.target.select()}
-                    />
-                  ))}
+              <form onSubmit={handleVerifyOTP}>
+                {/* Digit entry — dark glass card */}
+                <div className="bg-[#06201B] rounded-3xl p-5 lg:p-6 mb-5 shadow-[0_20px_60px_rgba(6,32,27,0.25)]">
+                  <p className="text-center text-[9px] font-black uppercase tracking-[0.3em] text-emerald-400/60 mb-4">
+                    Security Code
+                  </p>
+
+                  <div className="flex items-center justify-center gap-2 lg:gap-3">
+                    {otp.map((digit, index) => (
+                      <input
+                        key={index}
+                        ref={el => { otpRefs.current[index] = el }}
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        autoComplete={index === 0 ? 'one-time-code' : 'off'}
+                        maxLength="1"
+                        value={digit}
+                        onChange={e => handleOtpChange(e.target, index)}
+                        onKeyDown={e => handleOtpKeyDown(e, index)}
+                        onPaste={index === 0 ? handleOtpPaste : undefined}
+                        onFocus={e => e.target.select()}
+                        className={`
+                          w-10 h-12 lg:w-12 lg:h-14 rounded-xl text-center font-black text-xl lg:text-2xl
+                          outline-none transition-all duration-200 select-none caret-transparent
+                          ${digit
+                            ? 'bg-emerald-400 text-[#06201B] shadow-[0_0_20px_rgba(52,211,153,0.4)] scale-105'
+                            : 'bg-white/8 text-white/20 border border-white/10 focus:bg-white/15 focus:border-emerald-400/60 focus:shadow-[0_0_0_3px_rgba(52,211,153,0.15)]'
+                          }
+                        `}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Progress dots */}
+                  <div className="flex justify-center gap-1.5 mt-4">
+                    {otp.map((digit, i) => (
+                      <div
+                        key={i}
+                        className={`h-1 rounded-full transition-all duration-300 ${
+                          digit ? 'w-5 bg-emerald-400' : 'w-1.5 bg-white/15'
+                        }`}
+                      />
+                    ))}
+                  </div>
                 </div>
 
+                {/* Error */}
                 {err && (
-                  <div className="bg-red-50 border border-red-200 p-4 rounded-xl flex items-center gap-3 text-red-700">
-                    <span className="material-symbols-outlined text-lg">error_outline</span>
-                    <p className="text-xs font-bold">{err}</p>
+                  <div className="flex items-center gap-2.5 bg-red-50 border border-red-200 rounded-2xl px-4 py-3 mb-4 animate-shake">
+                    <span className="material-symbols-outlined text-red-500 text-base shrink-0">error_outline</span>
+                    <p className="text-xs font-bold text-red-700">{err}</p>
                   </div>
                 )}
 
-                <div className="space-y-4">
-                  <button 
-                    className="w-full bg-[#06201B] text-white py-4 lg:py-5 rounded-2xl font-black text-lg shadow-2xl hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-white/10 disabled:opacity-30" 
-                    disabled={loading || otp.some(v => !v)}
-                  >
-                    {loading ? (
-                      <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    ) : (
-                      <>
-                        Verify Account
-                        <span className="material-symbols-outlined">arrow_forward</span>
-                      </>
-                    )}
-                  </button>
-                  <button 
-                    type="button" 
+                {/* Submit */}
+                <button
+                  className="w-full bg-[#06201B] text-white py-4 lg:py-5 rounded-2xl font-black text-base lg:text-lg shadow-xl hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-white/5 disabled:opacity-30 disabled:cursor-not-allowed mb-4"
+                  disabled={loading || otp.some(v => !v)}
+                >
+                  {loading ? (
+                    <div className="w-5 h-5 border-[3px] border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-emerald-400 text-lg">verified</span>
+                      Verify &amp; Sign In
+                    </>
+                  )}
+                </button>
+
+                {/* Resend */}
+                <div className="text-center">
+                  <span className="text-[11px] text-primary/40 font-medium">Didn&apos;t receive it? </span>
+                  <button
+                    type="button"
                     onClick={handleResendOTP}
                     disabled={resendTimer > 0 || loading}
-                    className="w-full text-center text-[10px] uppercase font-black tracking-[0.2em] text-primary/40 hover:text-emerald-600 transition-colors disabled:opacity-50 disabled:hover:text-primary/40 disabled:cursor-not-allowed"
+                    className="text-[11px] font-black text-emerald-600 hover:text-emerald-700 transition-colors disabled:text-primary/30 disabled:cursor-not-allowed"
                   >
-                    {resendTimer > 0 ? `Resend Code (${resendTimer}s)` : 'Resend Code'}
+                    {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend code'}
                   </button>
                 </div>
               </form>

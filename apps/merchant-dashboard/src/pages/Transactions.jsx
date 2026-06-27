@@ -68,135 +68,210 @@ export default function Transactions() {
   )
 
   const handleExport = () => {
-    const doc = new jsPDF()
-    const pageWidth = doc.internal.pageSize.getWidth()
-    
-    // Stats calculation
-    const totalIn = filteredRows.filter(t => t.type === 'inbound').reduce((s, o) => s + (o.amount || 0), 0)
-    const totalOut = filteredRows.filter(t => t.type === 'bulk_pay' || t.type === 'settlement' || t.type === 'outbound').reduce((s, o) => s + (o.amount || 0), 0)
-    const swpKES = filteredRows.filter(t => t.type === 'fx_swap').reduce((s, o) => s + (o.kesAmount || 0), 0)
-    const swpUSDC = filteredRows.filter(t => t.type === 'fx_swap').reduce((s, o) => s + (o.usdcAmount || 0), 0)
-    
-    // Header - Professional Midnight Theme
-    doc.setFillColor(10, 37, 64) // #0A2540
-    doc.rect(0, 0, pageWidth, 45, 'F')
-    
-    // Logo - Adjusted for higher visibility
-    doc.addImage(statementLogo, 'PNG', 15, 12, 40, 22, undefined, 'FAST')
-    
-    // Identity
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+    const W = doc.internal.pageSize.getWidth()   // 210
+    const H = doc.internal.pageSize.getHeight()  // 297
+    const L = 14   // left margin
+    const R = W - 14 // right margin
+    const now = new Date()
+    const statementId = `PC-${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}-${Math.random().toString(36).slice(2,8).toUpperCase()}`
+
+    // ── HEADER BAND ─────────────────────────────────────────────────────────
+    doc.setFillColor(6, 32, 27)   // #06201B
+    doc.rect(0, 0, W, 38, 'F')
+
+    // Logo
+    try { doc.addImage(statementLogo, 'PNG', L, 8, 34, 18, undefined, 'FAST') } catch(_) {}
+
+    // Right-side header text
     doc.setTextColor(255, 255, 255)
-    doc.setFontSize(22)
     doc.setFont('helvetica', 'bold')
-    doc.text('PAYCHAIN', pageWidth - 15, 20, { align: 'right' })
-    
-    doc.setFontSize(10)
-    doc.setFont('helvetica', 'normal')
-    doc.text('OFFICIAL BUSINESS STATEMENT', pageWidth - 15, 28, { align: 'right' })
-    doc.text(`STATEMENT ID: PC-ST-${Math.random().toString(36).substring(7).toUpperCase()}`, pageWidth - 15, 33, { align: 'right' })
-    doc.text(`ISSUED: ${new Date().toLocaleString()}`, pageWidth - 15, 38, { align: 'right' })
-
-    // Official Narrative Section
-    doc.setTextColor(10, 37, 64)
-    doc.setFontSize(14)
-    doc.setFont('helvetica', 'bold')
-    doc.text('Business Overview', 15, 55)
-    
-    doc.setFontSize(10)
-    doc.setFont('helvetica', 'normal')
-    const narrative = `This document serves as the official transaction summary for Till ${merchant?.paybillAccount || '84729'}. It provides a comprehensive record of all financial movements, including inbound payments, outbound settlements, and currency swaps. These records are cryptographically verified and stored on the PayChainKE immutable ledger for your business security.`
-    const lines = doc.splitTextToSize(narrative, pageWidth - 30)
-    doc.text(lines, 15, 62)
-
-    // Summary Statistics Card
-    autoTable(doc, {
-      startY: 75,
-      head: [['TOTAL MONEY IN', 'TOTAL MONEY OUT', 'TOTAL SWAPPED']],
-      body: [[
-        `KES ${totalIn.toLocaleString()}`,
-        `KES ${totalOut.toLocaleString()}`,
-        `KES ${swpKES.toLocaleString()} / ${swpUSDC} USDC`
-      ]],
-      theme: 'plain',
-      headStyles: { 
-        fillColor: [240, 245, 250], 
-        textColor: [10, 37, 64],
-        fontSize: 8,
-        fontStyle: 'bold',
-        halign: 'center'
-      },
-      bodyStyles: {
-        fontSize: 12,
-        fontStyle: 'bold',
-        textColor: [10, 37, 64],
-        halign: 'center'
-      },
-      margin: { left: 15, right: 15 }
-    })
-
-    // Transaction Table
-    doc.setFontSize(14)
-    doc.setFont('helvetica', 'bold')
-    doc.text('Transaction Details', 15, doc.lastAutoTable.finalY + 15)
-
-    const tableData = filteredRows.map(tx => {
-      const dateTime = formatDateISO(tx.createdAt || tx.timestamp).split(',')
-      const party = tx.sender?.name || tx.recipient?.name || 'Treasury'
-      const amount = tx.type === 'fx_swap' 
-        ? `${tx.usdcAmount} USDC` 
-        : `KES ${(tx.amount || tx.kesAmount || 0).toLocaleString()}`
-        
-      return [
-        dateTime[0].trim(),
-        tx.type.replace('_', ' ').toUpperCase(),
-        tx.reference,
-        party,
-        amount,
-        tx.status.toUpperCase()
-      ]
-    })
-
-    autoTable(doc, {
-      startY: doc.lastAutoTable.finalY + 20,
-      head: [['DATE', 'TYPE', 'REFERENCE', 'PARTY', 'AMOUNT', 'STATUS']],
-      body: tableData,
-      theme: 'striped',
-      headStyles: { 
-        fillColor: [10, 37, 64], 
-        textColor: [255, 255, 255],
-        fontSize: 9,
-        fontStyle: 'bold',
-        cellPadding: 5
-      },
-      bodyStyles: {
-        fontSize: 8,
-        cellPadding: 4
-      },
-      alternateRowStyles: {
-        fillColor: [245, 247, 249]
-      },
-      margin: { left: 15, right: 15 }
-    })
-
-    // Footer
-    const finalY = doc.lastAutoTable.finalY || 150
+    doc.setFontSize(15)
+    doc.text('PayChain Kenya', R, 15, { align: 'right' })
     doc.setFontSize(8)
-    doc.setTextColor(150, 150, 150)
-    doc.text(`END OF STATEMENT - PAGE ${doc.internal.getNumberOfPages()}`, pageWidth / 2, finalY + 15, { align: 'center' })
-    
-    // Cryptographic signature line
-    doc.setDrawColor(200, 200, 200)
-    doc.line(15, doc.internal.pageSize.getHeight() - 25, pageWidth - 15, doc.internal.pageSize.getHeight() - 25)
-    doc.text('Verify authenticity at paychain.ke/verify', 15, doc.internal.pageSize.getHeight() - 15)
-    doc.text('Audit Hash: ' + Math.random().toString(36).substring(2, 18).toUpperCase(), pageWidth - 15, doc.internal.pageSize.getHeight() - 15, { align: 'right' })
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(94, 254, 179)  // emerald
+    doc.text('OFFICIAL TRANSACTION STATEMENT', R, 22, { align: 'right' })
+    doc.setTextColor(200, 220, 210)
+    doc.text(`Statement Ref: ${statementId}`, R, 27, { align: 'right' })
+    doc.text(`Issued: ${now.toLocaleString('en-KE', { dateStyle: 'medium', timeStyle: 'short' })}`, R, 32, { align: 'right' })
 
-    doc.save(`PayChain_Official_Statement_${new Date().toISOString().split('T')[0]}.pdf`)
-    
-    addNotification({
-      type: 'notifications',
-      title: 'Statement Downloaded',
-      message: 'Your official transaction statement has been generated and downloaded successfully.'
+    // ── ACCOUNT DETAILS BLOCK ────────────────────────────────────────────────
+    let y = 48
+    doc.setTextColor(6, 32, 27)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(11)
+    doc.text('Account Details', L, y)
+
+    doc.setDrawColor(220, 230, 225)
+    doc.setLineWidth(0.3)
+    doc.line(L, y + 2, R, y + 2)
+
+    y += 8
+    const col2 = W / 2 + 4
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9)
+    doc.setTextColor(90, 100, 95)
+
+    const acctLines = [
+      ['Account Name',   merchant?.name        || '—', 'Business',   merchant?.businessName || '—'],
+      ['Paybill / Acc',  `400200 / ${merchant?.paybillAccount || '—'}`, 'Email', merchant?.email || '—'],
+      ['Phone',          merchant?.phone        || '—', 'Statement Period', 'All transactions'],
+    ]
+    acctLines.forEach(([lk, lv, rk, rv]) => {
+      doc.setTextColor(100, 110, 105); doc.setFont('helvetica', 'normal')
+      doc.text(lk + ':', L, y)
+      doc.setTextColor(6, 32, 27); doc.setFont('helvetica', 'bold')
+      doc.text(String(lv), L + 32, y)
+      doc.setTextColor(100, 110, 105); doc.setFont('helvetica', 'normal')
+      doc.text(rk + ':', col2, y)
+      doc.setTextColor(6, 32, 27); doc.setFont('helvetica', 'bold')
+      doc.text(String(rv), col2 + 30, y)
+      y += 7
     })
+
+    // ── SUMMARY STRIP ────────────────────────────────────────────────────────
+    const totalIn   = filteredRows.filter(t => t.type === 'inbound').reduce((s, o) => s + (o.amount || 0), 0)
+    const totalOut  = filteredRows.filter(t => ['bulk_pay','settlement','outbound'].includes(t.type)).reduce((s, o) => s + (o.amount || 0), 0)
+    const fmtKES    = (n) => `KES ${Number(n).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+    y += 3
+    const summaryItems = [
+      { label: 'Total Money In',  value: fmtKES(totalIn),  color: [6, 32, 27] },
+      { label: 'Total Money Out', value: fmtKES(totalOut), color: [180, 30, 30] },
+      { label: 'Net Position',    value: fmtKES(totalIn - totalOut), color: totalIn >= totalOut ? [6, 32, 27] : [180, 30, 30] },
+      { label: 'Transactions',    value: String(filteredRows.length), color: [40, 80, 120] },
+    ]
+    const boxW = (R - L) / summaryItems.length - 2
+    summaryItems.forEach((item, i) => {
+      const bx = L + i * (boxW + 2)
+      doc.setFillColor(244, 247, 245)
+      doc.roundedRect(bx, y, boxW, 18, 2, 2, 'F')
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(100, 110, 105)
+      doc.text(item.label.toUpperCase(), bx + boxW / 2, y + 6, { align: 'center' })
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(...item.color)
+      doc.text(item.value, bx + boxW / 2, y + 13, { align: 'center' })
+    })
+
+    // ── TRANSACTION TABLE ────────────────────────────────────────────────────
+    y += 24
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(6, 32, 27)
+    doc.text('Transaction Ledger', L, y)
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(120, 130, 125)
+    doc.text(`${filteredRows.length} record${filteredRows.length !== 1 ? 's' : ''}`, R, y, { align: 'right' })
+
+    // Build rows with running balance
+    let runBalance = 0
+    const tableRows = [...filteredRows]
+      .sort((a, b) => new Date(a.createdAt || a.timestamp) - new Date(b.createdAt || b.timestamp))
+      .map(tx => {
+        const dt = new Date(tx.createdAt || tx.timestamp)
+        const dateStr = dt.toLocaleDateString('en-KE', { day: '2-digit', month: 'short', year: '2-digit' })
+        const timeStr = dt.toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit', hour12: false })
+        const isIn  = tx.type === 'inbound'
+        const isOut = ['bulk_pay','settlement','outbound'].includes(tx.type)
+        const isSwp = tx.type === 'fx_swap'
+        const rawAmt = tx.amount || tx.kesAmount || 0
+
+        let paidIn = '', paidOut = ''
+        if (isIn)  { paidIn  = fmtKES(rawAmt); runBalance += rawAmt }
+        if (isOut) { paidOut = fmtKES(rawAmt); runBalance -= rawAmt }
+        if (isSwp) { paidOut = fmtKES(tx.kesAmount || 0); runBalance -= (tx.kesAmount || 0) }
+
+        const desc = isSwp
+          ? `FX Swap → ${tx.usdcAmount || 0} USDC`
+          : (tx.sender?.name !== tx.recipient?.name
+              ? `${tx.sender?.name || '—'} → ${tx.recipient?.name || '—'}`
+              : tx.sender?.name || tx.recipient?.name || '—')
+
+        return [
+          `${dateStr}\n${timeStr}`,
+          (tx.reference || '—').slice(0, 14),
+          desc.slice(0, 32),
+          paidIn,
+          paidOut,
+          fmtKES(runBalance),
+          (tx.status || '').toUpperCase().slice(0, 9),
+        ]
+      })
+
+    autoTable(doc, {
+      startY: y + 4,
+      head: [['DATE / TIME', 'REF', 'DESCRIPTION', 'PAID IN', 'PAID OUT', 'BALANCE', 'STATUS']],
+      body: tableRows,
+      theme: 'plain',
+      headStyles: {
+        fillColor: [6, 32, 27],
+        textColor: [255, 255, 255],
+        fontSize: 7.5,
+        fontStyle: 'bold',
+        cellPadding: { top: 4, bottom: 4, left: 3, right: 3 },
+        halign: 'left',
+        lineWidth: 0,
+      },
+      bodyStyles: {
+        fontSize: 7.5,
+        textColor: [30, 40, 35],
+        cellPadding: { top: 3, bottom: 3, left: 3, right: 3 },
+        lineColor: [230, 235, 232],
+        lineWidth: 0.2,
+        valign: 'middle',
+      },
+      alternateRowStyles: { fillColor: [246, 249, 247] },
+      columnStyles: {
+        0: { cellWidth: 22, halign: 'left',  fontStyle: 'normal' },
+        1: { cellWidth: 24, halign: 'left',  fontStyle: 'normal', fontSize: 6.5 },
+        2: { cellWidth: 55, halign: 'left' },
+        3: { cellWidth: 26, halign: 'right', textColor: [6, 120, 60], fontStyle: 'bold' },
+        4: { cellWidth: 26, halign: 'right', textColor: [160, 30, 30], fontStyle: 'bold' },
+        5: { cellWidth: 26, halign: 'right', fontStyle: 'bold' },
+        6: { cellWidth: 18, halign: 'center', fontSize: 6.5 },
+      },
+      // Green highlight for paid-in cells, red for paid-out
+      didParseCell(data) {
+        if (data.section === 'body') {
+          if (data.column.index === 3 && data.cell.raw) data.cell.styles.textColor = [6, 120, 60]
+          if (data.column.index === 4 && data.cell.raw) data.cell.styles.textColor = [160, 30, 30]
+          if (data.column.index === 6) {
+            const v = String(data.cell.raw)
+            if (v === 'COMPLETED') { data.cell.styles.textColor = [6, 120, 60]; data.cell.styles.fontStyle = 'bold' }
+            if (v === 'PENDING')   { data.cell.styles.textColor = [160, 110, 6]; data.cell.styles.fontStyle = 'bold' }
+            if (v === 'FAILED')    { data.cell.styles.textColor = [160, 30, 30]; data.cell.styles.fontStyle = 'bold' }
+          }
+        }
+      },
+      // Page-break header repeat
+      didDrawPage(data) {
+        if (data.pageNumber > 1) {
+          doc.setFillColor(6, 32, 27)
+          doc.rect(0, 0, W, 12, 'F')
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(255, 255, 255)
+          doc.text(`PayChain — ${statementId} — continued`, L, 8)
+          doc.text(`Page ${data.pageNumber}`, R, 8, { align: 'right' })
+        }
+      },
+      margin: { left: L, right: W - R },
+    })
+
+    // ── CLOSING BALANCE STRIP ────────────────────────────────────────────────
+    const endY = doc.lastAutoTable.finalY + 4
+    doc.setFillColor(6, 32, 27)
+    doc.rect(L, endY, R - L, 12, 'F')
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(94, 254, 179)
+    doc.text('Closing Balance', L + 4, endY + 7.5)
+    doc.setTextColor(255, 255, 255)
+    doc.text(fmtKES(runBalance), R - 4, endY + 7.5, { align: 'right' })
+
+    // ── FOOTER ───────────────────────────────────────────────────────────────
+    const footerY = H - 14
+    doc.setDrawColor(200, 210, 205); doc.setLineWidth(0.3)
+    doc.line(L, footerY - 4, R, footerY - 4)
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(140, 150, 145)
+    doc.text('This is a computer-generated statement and requires no signature. For support: support@paychain.co.ke | +254 790 889 066', W / 2, footerY, { align: 'center' })
+    doc.text(`© ${now.getFullYear()} PayChain Kenya Limited  •  Ref: ${statementId}  •  Page 1 of ${doc.internal.getNumberOfPages()}`, W / 2, footerY + 5, { align: 'center' })
+
+    doc.save(`PayChain_Statement_${now.toISOString().slice(0,10)}.pdf`)
+    addNotification({ type: 'notifications', title: 'Statement Downloaded', message: 'Your official transaction statement has been downloaded.' })
   }
 
   const generateAuditReceipt = () => {

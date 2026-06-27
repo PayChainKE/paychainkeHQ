@@ -231,9 +231,27 @@ export default function InflationShield() {
                 <span className="material-symbols-outlined text-2xl md:text-3xl text-white" style={{fontVariationSettings: "'FILL' 1"}}>security</span>
               </div>
             </div>
-            <div className="mt-8 pt-6 border-t border-white/10 flex justify-end">
-              <Link 
-                to="/wallet" 
+
+            {/* Wallet address pill — same address shown on the Digital Wallet page */}
+            {merchant?.stellarPublicKey && (
+              <div
+                onClick={() => {
+                  navigator.clipboard.writeText(merchant.stellarPublicKey)
+                  addToast({ title: 'Address Copied', message: 'Stellar wallet address copied to clipboard.', type: 'success' })
+                }}
+                className="mt-5 inline-flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-full border border-white/10 cursor-pointer transition-all active:scale-95 group/pill"
+              >
+                <div className="w-1.5 h-1.5 rounded-full bg-blue-400 shadow-[0_0_6px_rgba(96,165,250,0.7)] animate-pulse shrink-0"></div>
+                <span className="text-[10px] text-white/50 font-mono tracking-wider group-hover/pill:text-white/80 transition-colors">
+                  {merchant.stellarPublicKey.slice(0, 8)}...{merchant.stellarPublicKey.slice(-6)}
+                </span>
+                <span className="material-symbols-outlined text-[11px] text-white/30 group-hover/pill:text-white/60 transition-colors">content_copy</span>
+              </div>
+            )}
+
+            <div className="mt-6 pt-6 border-t border-white/10 flex justify-end">
+              <Link
+                to="/wallet"
                 className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-300 hover:text-white transition-colors flex items-center gap-2"
               >
                 Manage in Wallet

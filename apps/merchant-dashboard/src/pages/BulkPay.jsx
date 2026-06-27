@@ -1855,18 +1855,6 @@ export default function BulkPay() {
                       Confirm & Pay
                     </button>
 
-                    <div className="relative flex items-center justify-center py-2">
-                       <div className="w-full h-px bg-outline-variant/10 absolute"></div>
-                       <span className="relative z-10 bg-white px-4 text-[10px] text-on-surface-variant font-bold uppercase tracking-widest opacity-40">OR</span>
-                    </div>
-
-                    <button 
-                      onClick={handleSecurityVerification}
-                      className="w-full py-4 rounded-2xl border border-outline-variant/20 text-primary hover:bg-surface-container-low font-bold text-sm flex items-center justify-center gap-3 transition-all group"
-                    >
-                      <span className="material-symbols-outlined text-xl group-hover:scale-110 transition-transform">fingerprint</span>
-                      Use Biometrics / Face ID
-                    </button>
                   </div>
                 )}
               </div>

@@ -82,23 +82,6 @@ export function MerchantAuthProvider({ children }) {
     }
   }
 
-  async function biometricLogin(email) {
-    try {
-      const res = await axios.post(`${API_URL}/api/auth/merchant/biometric-login`, { email });
-      const { merchant: userData, token: jwt } = res.data;
-      
-      setMerchant(userData);
-      setToken(jwt);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
-      localStorage.setItem(TOKEN_KEY, jwt);
-      axios.defaults.headers.common['Authorization'] = `Bearer ${jwt}`;
-      
-      return { success: true };
-    } catch (err) {
-      return { success: false, error: err.response?.data?.error || 'Biometric Login failed' };
-    }
-  }
-
   async function verifyOTP(email, otp) {
     try {
       const res = await axios.post(`${API_URL}/api/auth/merchant/verify-otp`, { email, otp });
@@ -178,11 +161,10 @@ export function MerchantAuthProvider({ children }) {
 
   return (
     <MerchantAuthContext.Provider value={{ 
-      merchant, 
-      isLoading, 
-      isAuthenticated: !!merchant, 
-      login, 
-      biometricLogin,
+      merchant,
+      isLoading,
+      isAuthenticated: !!merchant,
+      login,
       signup,
       verifyOTP,
       resendOTP,
