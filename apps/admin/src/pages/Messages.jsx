@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Layout from '../components/layout/Layout';
 import api from '../api/api';
+import TablePagination from '../components/ui/TablePagination';
+
+const PAGE_SIZE = 20;
 
 // ── Constants ─────────────────────────────────────────────────────────
 const STATUS_META = {
@@ -57,6 +60,7 @@ const Messages = () => {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
+  const [page, setPage] = useState(1);
 
   // Composer
   const [replyDraft, setReplyDraft] = useState('');
@@ -115,6 +119,10 @@ const Messages = () => {
       return true;
     });
   }, [messages, search, filter, typeFilter]);
+
+  useEffect(() => { setPage(1); }, [search, filter, typeFilter]);
+
+  const paged = useMemo(() => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [filtered, page]);
 
   const selected = messages.find((m) => m._id === selectedId);
 
@@ -285,7 +293,7 @@ const Messages = () => {
             ) : filtered.length === 0 ? (
               <EmptyList />
             ) : (
-              filtered.map((m) => {
+              paged.map((m) => {
                 const isActive = selectedId === m._id;
                 const st = STATUS_META[m.status || 'open'];
                 return (
@@ -334,6 +342,7 @@ const Messages = () => {
               })
             )}
           </div>
+          <TablePagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPage={setPage} />
         </section>
 
         {/* ── RIGHT: Detail + composer ───────────────────────────── */}

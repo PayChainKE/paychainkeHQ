@@ -8,6 +8,8 @@ import STKRequest from '../models/STKRequest.js';
 import Payee from '../models/Payee.js';
 import PaymentLink from '../models/PaymentLink.js';
 import Waitlist from '../models/Waitlist.js';
+import Contact from '../models/Contact.js';
+import Communication from '../models/Communication.js';
 import { sendMerchantInvite, sendAdminActionOTP } from '../utils/resend.js';
 
 // Allowed sensitive actions an admin can request against a merchant.
@@ -79,7 +81,7 @@ const generateUniquePaybillAccount = async () => {
 };
 
 const MERCHANT_DASHBOARD_URL =
-  process.env.MERCHANT_DASHBOARD_URL || 'https://merchant.paychain.co.ke';
+  process.env.MERCHANT_DASHBOARD_URL || 'https://app.paychain.co.ke';
 
 // Generate every common storage variation of a Kenyan phone number so we can
 // detect duplicates regardless of how a previous record was saved (e.g. `0790...`,
@@ -780,6 +782,38 @@ export const getInsights = async (req, res) => {
       { $sort: { _id: 1 } },
     ]);
 
+    // Always-on monthly view (last 12 months) for the Overview chart. Independent
+    // of the request's `range` so the chart shows the same trailing window no
+    // matter which timeframe the user is exploring.
+    const twelveMonthsAgo = new Date();
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 11);
+    twelveMonthsAgo.setDate(1);
+    twelveMonthsAgo.setHours(0, 0, 0, 0);
+
+    const monthlySignupsAgg = await Merchant.aggregate([
+      { $match: { createdAt: { $gte: twelveMonthsAgo } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+    // Densify — fill any gap months with zero so the chart has a clean axis.
+    const byMonth = new Map(monthlySignupsAgg.map((r) => [r._id, r.count]));
+    const monthlySignups = [];
+    for (let i = 11; i >= 0; i -= 1) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      monthlySignups.push({
+        month: key,
+        label: d.toLocaleString('en-US', { month: 'short' }),
+        count: byMonth.get(key) || 0,
+      });
+    }
+
     // ── Conversion funnel (waitlist → merchant) ──────────────────────
     const [waitlistCounts, convertedFromWaitlist] = await Promise.all([
       Waitlist.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
@@ -885,6 +919,7 @@ export const getInsights = async (req, res) => {
         // Series
         gtvSeries: gtvSeries.map((r) => ({ date: r._id, count: r.count, volume: r.volume })),
         signupsSeries: signupsSeries.map((r) => ({ date: r._id, count: r.count })),
+        monthlySignups,
         // Leaderboards
         topMerchants,
         txnTypeMix: txnTypeMix.map((r) => ({ type: r._id || 'other', count: r.count, volume: r.volume })),
@@ -933,6 +968,45 @@ export const getMerchantAnalytics = async (req, res) => {
     });
   } catch (error) {
     console.error('Get Merchant Analytics Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Compact system-status counts — powers the sidebar widget so it
+//          reflects real backend state instead of placeholder numbers.
+// @route   GET /api/admin/system-status
+// @access  Private (Admin)
+export const getSystemStatus = async (req, res) => {
+  try {
+    const [
+      merchants, lockedMerchants, flaggedMerchants,
+      waitlistTotal, waitlistPending,
+      messagesTotal, messagesUnread,
+      commsTotal, commsUnresolved,
+    ] = await Promise.all([
+      Merchant.countDocuments(),
+      Merchant.countDocuments({ status: 'locked' }),
+      Merchant.countDocuments({ flagged: true }),
+      Waitlist.countDocuments(),
+      Waitlist.countDocuments({ status: 'pending' }),
+      Contact.countDocuments(),
+      Contact.countDocuments({ isRead: false }),
+      Communication.countDocuments(),
+      Communication.countDocuments({ status: { $in: ['new', 'in_progress'] } }),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        merchants: { total: merchants, locked: lockedMerchants, flagged: flaggedMerchants },
+        waitlist: { total: waitlistTotal, pending: waitlistPending },
+        messages: { total: messagesTotal, unread: messagesUnread },
+        calls:    { total: commsTotal,    open: commsUnresolved },
+        generatedAt: new Date(),
+      },
+    });
+  } catch (error) {
+    console.error('Get System Status Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };

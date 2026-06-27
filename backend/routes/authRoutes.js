@@ -1,6 +1,7 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import { login, verifyOTP, getMe, updateMe, changePassword } from '../controllers/authController.js';
+import { validateSetupToken as validateAdminSetupToken, setupPasswordWithToken } from '../controllers/teamController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import {
   registerMerchant,
@@ -67,6 +68,10 @@ router.post('/verify-otp', adminOtpLimiter, verifyOTP);
 router.get('/me', protect, getMe);
 router.put('/me', protect, updateMe);
 router.put('/password', protect, changePassword);
+
+// Admin team-member setup (public — validates the time-limited invite token).
+router.get('/setup-password/:token', validateAdminSetupToken);
+router.post('/setup-password', adminOtpLimiter, setupPasswordWithToken);
 
 // Merchant Auth Routes
 router.post('/merchant/register', upload.single('certificate'), registerMerchant);

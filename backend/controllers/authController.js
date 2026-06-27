@@ -91,9 +91,18 @@ export const updateMe = async (req, res) => {
     const admin = await Admin.findById(req.admin._id);
     if (!admin) return res.status(404).json({ error: 'Admin not found.' });
 
-    const { name, avatarUrl } = req.body || {};
+    const { name, avatarUrl, avatarData } = req.body || {};
     if (typeof name === 'string') admin.name = name.trim().slice(0, 80);
-    if (typeof avatarUrl === 'string') admin.avatarUrl = avatarUrl.trim().slice(0, 500) || null;
+    // Accept either a plain URL or an uploaded base64 data URL. Cap the data
+    // URL at ~400 KB to keep Mongo doc size reasonable.
+    if (typeof avatarData === 'string' && avatarData.startsWith('data:image/')) {
+      if (avatarData.length > 400_000) {
+        return res.status(413).json({ error: 'Avatar image is too large. Max 200 KB.' });
+      }
+      admin.avatarUrl = avatarData;
+    } else if (typeof avatarUrl === 'string') {
+      admin.avatarUrl = avatarUrl.trim().slice(0, 500) || null;
+    }
     await admin.save();
 
     res.json({

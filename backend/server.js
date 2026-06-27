@@ -12,22 +12,36 @@ import bulkPayRoutes from './routes/bulkPayRoutes.js';
 import transactionRoutes from './routes/transactionRoutes.js';
 import mpesaRoutes from './routes/mpesaRoutes.js';
 import trustScoreRoutes from './routes/trustScoreRoutes.js';
+import { ensurePrimaryOwner } from './migrations/ensurePrimaryOwner.js';
 
 dotenv.config();
 
-// Connect to Database
-connectDB();
+// Connect to Database, then run idempotent boot-time migrations. In dev we
+// keep the process alive even if Mongo is unreachable (Atlas whitelist drift,
+// VPN flap) so nodemon doesn't crash-loop — operator just fixes the IP and
+// hits save to retry.
+connectDB()
+  .then(() => ensurePrimaryOwner())
+  .catch(() => { /* error already printed with actionable hint in connectDB */ });
 
 const app = express();
 
 // Middleware
 const allowedOrigins = [
+  // Public marketing site
   'https://www.paychain.co.ke',
   'https://paychain.co.ke',
+  // Admin console
+  'https://www.admin.paychain.co.ke',
   'https://admin.paychain.co.ke',
-  'https://demo.paychain.co.ke',
-  'https://merchant.paychain.co.ke',
+  // Merchant dashboard
+  'https://www.app.paychain.co.ke',
   'https://app.paychain.co.ke',
+  // Demo dashboard
+  'https://www.demo.paychain.co.ke',
+  'https://demo.paychain.co.ke',
+  // Legacy alias (kept short-term so existing magic links still work)
+  'https://merchant.paychain.co.ke',
   'http://localhost:5173',
   'http://localhost:5174',
   'http://localhost:5175',

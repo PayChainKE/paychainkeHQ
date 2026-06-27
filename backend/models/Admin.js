@@ -23,6 +23,17 @@ const AdminSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
+  status: {
+    type: String,
+    enum: ['active', 'inactive', 'pending'],
+    default: 'active',
+    index: true,
+  },
+  invitedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },
+  invitedAt: { type: Date, default: null },
+  // Setup-token for newly-invited members (sha256 hashed).
+  passwordResetToken: { type: String, select: false, default: null },
+  passwordResetExpires: { type: Date, select: false, default: null },
   lastLogin: {
     type: Date,
     default: null,
@@ -33,10 +44,11 @@ const AdminSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: [true, 'Password is required'],
-    // Never return the hash on default queries. Controllers must opt in
-    // via .select('+password') when they need to compare on login.
+    // Optional at insert time so invited admins can be created before they
+    // set their own password via the setup link. Login flow still requires
+    // a hash to be present; setup flow writes one.
     select: false,
+    default: null,
   },
   otp: {
     type: String,
@@ -62,7 +74,7 @@ const AdminSchema = new mongoose.Schema({
 
 // Hash password before saving
 AdminSchema.pre('save', async function() {
-  if (!this.isModified('password')) {
+  if (!this.isModified('password') || !this.password) {
     return;
   }
   // 12 rounds = OWASP 2024 recommendation. Existing rounds=10 hashes still

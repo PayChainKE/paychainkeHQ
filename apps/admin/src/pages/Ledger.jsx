@@ -26,11 +26,25 @@ const STATUS_META = {
   failed:    { label: 'Failed',    pill: 'bg-red-50 text-red-700 border-red-200',             dot: 'bg-red-500' },
 };
 
+const QUICK_FILTERS = [
+  { id: 'all',       label: 'All',           range: null, type: null,         status: null },
+  { id: 'inbound',   label: 'Inbound only',  range: null, type: 'inbound',    status: null },
+  { id: 'outbound',  label: 'Outbound only', range: null, type: 'outbound',   status: null },
+  { id: 'failed',    label: 'Failed',        range: null, type: null,         status: 'failed' },
+  { id: 'pending',   label: 'Pending',       range: null, type: null,         status: 'pending' },
+  { id: 'settle',    label: 'Settlements',   range: null, type: 'settlement', status: null },
+  { id: 'today',     label: 'Today',         range: '24h', type: null,        status: null },
+];
+
 const fmtKES = (n) => {
   if (n == null || isNaN(n)) return 'KES 0';
   if (n >= 1_000_000_000) return `KES ${(n / 1_000_000_000).toFixed(2)}B`;
   if (n >= 1_000_000)     return `KES ${(n / 1_000_000).toFixed(2)}M`;
   if (n >= 1_000)         return `KES ${(n / 1_000).toFixed(1)}K`;
+  return `KES ${Math.round(n).toLocaleString()}`;
+};
+const fmtKESFull = (n) => {
+  if (n == null || isNaN(n)) return 'KES 0';
   return `KES ${Math.round(n).toLocaleString()}`;
 };
 const fmtUSDC = (n) => {
@@ -52,6 +66,10 @@ const fmtTime = (iso) => {
   if (d.toDateString() === today.toDateString()) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   return d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 };
+const fmtFullTime = (iso) => {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString();
+};
 
 const Ledger = () => {
   const [range, setRange] = useState('7d');
@@ -63,16 +81,21 @@ const Ledger = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [activeTxn, setActiveTxn] = useState(null);
+  const [refreshedAt, setRefreshedAt] = useState(null);
+  const [copiedRef, setCopiedRef] = useState('');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
       const res = await api.get('/api/admin/ledger', {
-        params: { range, page, limit: 25, type, status, q: search },
+        params: { range, page, limit: 20, type, status, q: search },
       });
-      if (res.data?.success) setData(res.data.data);
-      else setError(res.data?.error || 'Could not load ledger.');
+      if (res.data?.success) {
+        setData(res.data.data);
+        setRefreshedAt(new Date());
+      } else setError(res.data?.error || 'Could not load ledger.');
     } catch (e) {
       const code = e?.response?.status;
       setError(
@@ -100,6 +123,13 @@ const Ledger = () => {
     searchTimer.current = setTimeout(() => { setPage(1); setSearch(searchInput); }, 350);
     return () => searchTimer.current && clearTimeout(searchTimer.current);
   }, [searchInput]);
+
+  // ESC closes the txn drawer
+  useEffect(() => {
+    const h = (e) => { if (e.key === 'Escape') setActiveTxn(null); };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, []);
 
   function exportCsv() {
     if (!data?.transactions || data.transactions.length === 0) { alert('Nothing to export.'); return; }
@@ -131,11 +161,33 @@ const Ledger = () => {
     document.body.appendChild(a); a.click(); a.remove();
   }
 
+  function applyQuickFilter(qf) {
+    if (qf.range !== null) setRange(qf.range);
+    setType(qf.type || 'all');
+    setStatus(qf.status || 'all');
+    setSearchInput(''); setSearch('');
+    setPage(1);
+  }
+
+  function resetFilters() {
+    setType('all'); setStatus('all'); setSearchInput(''); setSearch(''); setPage(1);
+  }
+
+  async function copyReference(ref) {
+    try {
+      await navigator.clipboard.writeText(ref);
+      setCopiedRef(ref);
+      setTimeout(() => setCopiedRef(''), 1500);
+    } catch { /* noop */ }
+  }
+
+  const filtersActive = type !== 'all' || status !== 'all' || !!search;
+
   return (
     <Layout>
       <div className="space-y-6 pb-12">
         {/* Hero / Header */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#06201B] via-[#0a3029] to-[#0f3a30] border border-emerald-900/40 shadow-[0_30px_80px_-20px_rgba(6,32,27,0.5)] p-6 md:p-8">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#06201B] via-[#0a3029] to-[#0f3a30] border border-emerald-900/40 shadow-[0_30px_80px_-20px_rgba(6,32,27,0.5)] p-5 md:p-8">
           <div className="absolute -top-24 -right-24 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl"></div>
           <div className="absolute -bottom-16 -left-16 w-60 h-60 bg-emerald-400/10 rounded-full blur-2xl"></div>
           <div className="relative flex flex-col md:flex-row md:items-end md:justify-between gap-5">
@@ -144,14 +196,19 @@ const Ledger = () => {
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                 <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-emerald-300">Wallet Ledger · Live Chain Settlement</p>
               </div>
-              <h1 className="text-[32px] md:text-[40px] font-bold text-white tracking-tighter font-headline leading-none">
+              <h1 className="text-[24px] md:text-[40px] font-bold text-white tracking-tighter font-headline leading-none">
                 On-Chain Treasury
               </h1>
               <p className="text-emerald-100/60 mt-2 max-w-xl text-[13px] md:text-[14px]">
                 Cryptographically auditable record of every M-Pesa collection, payout, FX swap, and on-chain USDC settlement across the PayChain network.
               </p>
+              {refreshedAt && (
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-300/60 mt-3">
+                  Last refresh · {refreshedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                </p>
+              )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <div className="inline-flex p-1 bg-emerald-900/40 rounded-xl border border-emerald-800/40 backdrop-blur-sm">
                 {RANGES.map((r) => (
                   <button
@@ -165,9 +222,18 @@ const Ledger = () => {
                   </button>
                 ))}
               </div>
-              <button onClick={exportCsv} className="flex items-center gap-2 px-3.5 py-2 bg-white/10 hover:bg-white/15 backdrop-blur-sm border border-white/10 text-white text-[11px] font-bold rounded-xl uppercase tracking-widest transition-all">
+              <button
+                onClick={fetchData}
+                disabled={loading}
+                title="Refresh"
+                className="flex items-center gap-2 px-3.5 py-2 bg-white/10 hover:bg-white/15 backdrop-blur-sm border border-white/10 text-white text-[11px] font-bold rounded-xl uppercase tracking-widest transition-all disabled:opacity-60"
+              >
+                <span className={`material-symbols-outlined text-[16px] ${loading ? 'animate-spin' : ''}`}>refresh</span>
+                Refresh
+              </button>
+              <button onClick={exportCsv} className="flex items-center gap-2 px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-white text-[11px] font-bold rounded-xl uppercase tracking-widest transition-all shadow-lg">
                 <span className="material-symbols-outlined text-[16px]">file_download</span>
-                Export
+                Export CSV
               </button>
             </div>
           </div>
@@ -204,7 +270,7 @@ const Ledger = () => {
                 </div>
                 <div className="mt-4 pt-4 border-t border-outline-variant/10 flex items-center justify-between text-[11px]">
                   <span className="text-on-surface-variant/60 font-bold uppercase tracking-widest">Total Movement</span>
-                  <span className="font-bold text-on-surface">{fmtKES(data.kpis.volume.value)}</span>
+                  <span className="font-bold text-on-surface">{fmtKESFull(data.kpis.volume.value)}</span>
                 </div>
               </div>
 
@@ -239,12 +305,46 @@ const Ledger = () => {
               </div>
             </div>
 
+            {/* Quick filter chips */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {QUICK_FILTERS.map((qf) => {
+                const active = (
+                  (qf.id === 'all' && !filtersActive) ||
+                  (qf.type && qf.type === type) ||
+                  (qf.status && qf.status === status) ||
+                  (qf.id === 'today' && range === '24h')
+                );
+                return (
+                  <button
+                    key={qf.id}
+                    onClick={() => applyQuickFilter(qf)}
+                    className={`px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-widest border transition-all ${
+                      active
+                        ? 'bg-primary text-white border-primary shadow'
+                        : 'bg-white text-on-surface-variant/60 border-outline-variant/30 hover:border-primary hover:text-primary'
+                    }`}
+                  >
+                    {qf.label}
+                  </button>
+                );
+              })}
+              {filtersActive && (
+                <button onClick={resetFilters} className="ml-auto px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-widest border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 transition-all flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[14px]">close</span>
+                  Clear filters
+                </button>
+              )}
+            </div>
+
             {/* Audit trail table */}
             <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 overflow-hidden shadow-editorial">
               <div className="px-6 py-4 border-b border-outline-variant/10 flex flex-col md:flex-row md:items-center md:justify-between gap-3 bg-white">
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-0.5">Cryptographic Audit Trail</p>
-                  <h3 className="text-base font-bold text-on-surface tracking-tight">Transaction Ledger</h3>
+                  <h3 className="text-base font-bold text-on-surface tracking-tight">
+                    Transaction Ledger
+                    <span className="ml-2 text-[11px] font-bold text-on-surface-variant/50 tabular-nums">· {data.pagination.total.toLocaleString()} entries</span>
+                  </h3>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <div className="relative">
@@ -255,6 +355,14 @@ const Ledger = () => {
                       placeholder="Reference, account, sender..."
                       className="pl-9 pr-3 py-2 bg-surface-container-low border-transparent focus:border-primary focus:ring-0 rounded-lg text-[13px] w-full sm:w-72"
                     />
+                    {searchInput && (
+                      <button
+                        onClick={() => setSearchInput('')}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-variant/40 hover:text-on-surface"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">close</span>
+                      </button>
+                    )}
                   </div>
                   <select value={type} onChange={(e) => { setType(e.target.value); setPage(1); }} className="px-3 py-2 border border-outline-variant/40 rounded-lg text-[12px] font-bold uppercase tracking-widest bg-white">
                     <option value="all">All types</option>
@@ -276,80 +384,147 @@ const Ledger = () => {
                     <span className="material-symbols-outlined text-2xl">receipt_long</span>
                   </div>
                   <p className="text-sm text-on-surface-variant/60 font-medium">No transactions match this view.</p>
+                  {filtersActive && (
+                    <button onClick={resetFilters} className="mt-3 text-[12px] font-bold uppercase tracking-widest text-primary hover:underline">
+                      Clear filters
+                    </button>
+                  )}
                 </div>
               ) : (
-                <div className="overflow-x-auto custom-scrollbar">
-                  <table className="w-full text-left font-body">
-                    <thead>
-                      <tr className="bg-surface-container-low/50">
-                        <Th>Reference</Th>
-                        <Th>When</Th>
-                        <Th>Type</Th>
-                        <Th>Merchant / Sender</Th>
-                        <Th>Amount</Th>
-                        <Th>Status</Th>
-                      </tr>
-                    </thead>
-                    <tbody className="text-[13px]">
-                      {data.transactions.map((t) => {
-                        const tm = TYPE_META[t.type] || TYPE_META.other;
-                        const sm = STATUS_META[t.status] || STATUS_META.pending;
-                        return (
-                          <tr key={t._id} className="hover:bg-secondary-container/5 transition-colors group">
-                            <td className="px-4 py-3 border-b border-outline-variant/5">
-                              <span className="font-mono text-[11px] font-bold text-on-surface bg-surface-container-low px-2 py-1 rounded">
-                                {t.reference?.length > 18 ? `${t.reference.slice(0, 14)}…` : t.reference}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 border-b border-outline-variant/5 text-on-surface-variant/70">{fmtTime(t.createdAt)}</td>
-                            <td className="px-4 py-3 border-b border-outline-variant/5">
-                              <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest border ${tm.color}`}>
+                <>
+                  {/* Desktop / tablet table */}
+                  <div className="hidden md:block overflow-x-auto custom-scrollbar">
+                    <table className="w-full text-left font-body">
+                      <thead>
+                        <tr className="bg-surface-container-low/50">
+                          <Th>Reference</Th>
+                          <Th>When</Th>
+                          <Th>Type</Th>
+                          <Th>Merchant / Sender</Th>
+                          <Th>Amount</Th>
+                          <Th>Status</Th>
+                          <Th></Th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-[13px]">
+                        {data.transactions.map((t) => {
+                          const tm = TYPE_META[t.type] || TYPE_META.other;
+                          const sm = STATUS_META[t.status] || STATUS_META.pending;
+                          return (
+                            <tr
+                              key={t._id}
+                              onClick={() => setActiveTxn(t)}
+                              className="hover:bg-secondary-container/5 transition-colors group cursor-pointer"
+                            >
+                              <td className="px-3 py-2 border-b border-outline-variant/5">
+                                <div className="flex items-center gap-1">
+                                  <span className="font-mono text-[11px] font-bold text-on-surface bg-surface-container-low px-2 py-1 rounded">
+                                    {t.reference?.length > 18 ? `${t.reference.slice(0, 14)}…` : t.reference || '—'}
+                                  </span>
+                                  {t.reference && (
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); copyReference(t.reference); }}
+                                      title="Copy reference"
+                                      className="opacity-0 group-hover:opacity-100 text-on-surface-variant/40 hover:text-primary transition-all"
+                                    >
+                                      <span className="material-symbols-outlined text-[14px]">
+                                        {copiedRef === t.reference ? 'check' : 'content_copy'}
+                                      </span>
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-3 py-2 border-b border-outline-variant/5 text-on-surface-variant/70 whitespace-nowrap">{fmtTime(t.createdAt)}</td>
+                              <td className="px-3 py-2 border-b border-outline-variant/5">
+                                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest border ${tm.color}`}>
+                                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: tm.dot }}></span>
+                                  {tm.label}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 border-b border-outline-variant/5">
+                                {t.merchant ? (
+                                  <div>
+                                    <p className="font-bold text-on-surface tracking-tight">{t.merchant.businessName}</p>
+                                    <p className="text-[10px] text-on-surface-variant/60 font-mono">#{t.merchant.paybillAccount}</p>
+                                  </div>
+                                ) : t.sender?.name ? (
+                                  <div>
+                                    <p className="font-medium text-on-surface-variant">{t.sender.name}</p>
+                                    <p className="text-[10px] text-on-surface-variant/60 font-mono">{t.sender.id || t.accountNumber}</p>
+                                  </div>
+                                ) : (
+                                  <p className="text-on-surface-variant/40 font-mono text-[12px]">{t.accountNumber || '—'}</p>
+                                )}
+                              </td>
+                              <td className="px-3 py-2 border-b border-outline-variant/5">
+                                <p className="font-bold text-on-surface tracking-tight tabular-nums">
+                                  {t.currency === 'USDC' ? `${fmtUSDC(t.amount)} USDC` : fmtKES(t.amount)}
+                                </p>
+                                {t.usdcAmount > 0 && t.kesAmount > 0 && (
+                                  <p className="text-[10px] text-on-surface-variant/60 font-mono">≈ {fmtUSDC(t.usdcAmount)} USDC</p>
+                                )}
+                              </td>
+                              <td className="px-3 py-2 border-b border-outline-variant/5">
+                                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest border ${sm.pill}`}>
+                                  <span className={`w-1.5 h-1.5 rounded-full ${sm.dot}`}></span>
+                                  {sm.label}
+                                </span>
+                              </td>
+                              <td className="px-2 py-3 border-b border-outline-variant/5 text-right">
+                                <span className="material-symbols-outlined text-on-surface-variant/30 text-[18px] group-hover:text-primary transition-colors">chevron_right</span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile cards */}
+                  <div className="md:hidden divide-y divide-outline-variant/10">
+                    {data.transactions.map((t) => {
+                      const tm = TYPE_META[t.type] || TYPE_META.other;
+                      const sm = STATUS_META[t.status] || STATUS_META.pending;
+                      return (
+                        <button
+                          key={t._id}
+                          onClick={() => setActiveTxn(t)}
+                          className="w-full text-left p-4 hover:bg-surface-container-low/40 active:bg-surface-container-low transition-colors"
+                        >
+                          <div className="flex items-start justify-between gap-3 mb-2">
+                            <div className="min-w-0 flex-1">
+                              <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest border mb-1 ${tm.color}`}>
                                 <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: tm.dot }}></span>
                                 {tm.label}
                               </span>
-                            </td>
-                            <td className="px-4 py-3 border-b border-outline-variant/5">
-                              {t.merchant ? (
-                                <div>
-                                  <p className="font-bold text-on-surface tracking-tight">{t.merchant.businessName}</p>
-                                  <p className="text-[10px] text-on-surface-variant/60 font-mono">#{t.merchant.paybillAccount}</p>
-                                </div>
-                              ) : t.sender?.name ? (
-                                <div>
-                                  <p className="font-medium text-on-surface-variant">{t.sender.name}</p>
-                                  <p className="text-[10px] text-on-surface-variant/60 font-mono">{t.sender.id || t.accountNumber}</p>
-                                </div>
-                              ) : (
-                                <p className="text-on-surface-variant/40 font-mono text-[12px]">{t.accountNumber || '—'}</p>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 border-b border-outline-variant/5">
-                              <p className="font-bold text-on-surface tracking-tight tabular-nums">
+                              <p className="font-bold text-on-surface text-[14px] tracking-tight truncate">
+                                {t.merchant?.businessName || t.sender?.name || t.accountNumber || '—'}
+                              </p>
+                              <p className="text-[10px] font-mono text-on-surface-variant/60 truncate">{t.reference || '—'}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-bold text-on-surface tabular-nums">
                                 {t.currency === 'USDC' ? `${fmtUSDC(t.amount)} USDC` : fmtKES(t.amount)}
                               </p>
-                              {t.usdcAmount > 0 && t.kesAmount > 0 && (
-                                <p className="text-[10px] text-on-surface-variant/60 font-mono">≈ {fmtUSDC(t.usdcAmount)} USDC</p>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 border-b border-outline-variant/5">
-                              <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest border ${sm.pill}`}>
+                              <span className={`mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest border ${sm.pill}`}>
                                 <span className={`w-1.5 h-1.5 rounded-full ${sm.dot}`}></span>
                                 {sm.label}
                               </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                            </div>
+                          </div>
+                          <p className="text-[10px] text-on-surface-variant/50">{fmtTime(t.createdAt)}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
               )}
 
               {/* Pagination */}
               {data.pagination.total > 0 && (
                 <div className="px-6 py-4 bg-surface flex items-center justify-between border-t border-outline-variant/10">
                   <p className="text-[12px] text-on-surface-variant/60 font-body">
-                    Showing page {data.pagination.page} of {data.pagination.totalPages} · {data.pagination.total.toLocaleString()} entries
+                    Page {data.pagination.page} of {data.pagination.totalPages}
                   </p>
                   <div className="flex items-center gap-1">
                     <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="p-1.5 rounded-lg hover:bg-surface-container-low text-on-surface-variant/40 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
@@ -365,10 +540,122 @@ const Ledger = () => {
             </div>
           </>
         ) : null}
+
+        {/* Transaction detail drawer */}
+        {activeTxn && <TxnDrawer txn={activeTxn} onClose={() => setActiveTxn(null)} onCopy={copyReference} copiedRef={copiedRef} />}
       </div>
     </Layout>
   );
 };
+
+// ── Transaction detail drawer ───────────────────────────────────────
+const TxnDrawer = ({ txn, onClose, onCopy, copiedRef }) => {
+  const tm = TYPE_META[txn.type] || TYPE_META.other;
+  const sm = STATUS_META[txn.status] || STATUS_META.pending;
+  return (
+    <div className="fixed inset-0 z-50 flex">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose}></div>
+      <div className="relative ml-auto w-full max-w-md h-full bg-white shadow-2xl overflow-y-auto">
+        {/* Header */}
+        <div className="bg-gradient-to-br from-[#06201B] to-[#0a3029] p-6 text-white relative">
+          <button onClick={onClose} className="absolute top-4 right-4 text-white/60 hover:text-white p-1">
+            <span className="material-symbols-outlined">close</span>
+          </button>
+          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest border mb-3 ${tm.color}`}>
+            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: tm.dot }}></span>
+            {tm.label}
+          </span>
+          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-emerald-300 mb-1">Transaction</p>
+          <h3 className="text-2xl font-bold text-white tracking-tight mb-1 tabular-nums">
+            {txn.currency === 'USDC' ? `${fmtUSDC(txn.amount)} USDC` : fmtKESFull(txn.amount)}
+          </h3>
+          <p className="text-[12px] text-emerald-100/70">{fmtFullTime(txn.createdAt)}</p>
+          <div className="mt-3">
+            <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border ${sm.pill}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${sm.dot}`}></span>
+              {sm.label}
+            </span>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="p-6 space-y-5">
+          {/* Reference */}
+          <Section title="Reference">
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-[12px] font-bold text-on-surface bg-surface-container-low px-2 py-1.5 rounded flex-1 break-all">
+                {txn.reference || '—'}
+              </span>
+              {txn.reference && (
+                <button onClick={() => onCopy(txn.reference)} className="px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary rounded-lg text-[11px] font-bold uppercase tracking-widest flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[14px]">
+                    {copiedRef === txn.reference ? 'check' : 'content_copy'}
+                  </span>
+                  {copiedRef === txn.reference ? 'Copied' : 'Copy'}
+                </button>
+              )}
+            </div>
+          </Section>
+
+          {/* Counterparty */}
+          {(txn.merchant || txn.sender) && (
+            <Section title="Counterparty">
+              {txn.merchant && (
+                <div className="bg-emerald-50/40 border border-emerald-200/40 rounded-lg p-3 mb-2">
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-emerald-700 mb-1">Merchant</p>
+                  <p className="font-bold text-on-surface text-[14px]">{txn.merchant.businessName}</p>
+                  {txn.merchant.paybillAccount && (
+                    <p className="text-[11px] text-on-surface-variant/70 font-mono">Paybill #{txn.merchant.paybillAccount}</p>
+                  )}
+                </div>
+              )}
+              {txn.sender?.name && (
+                <div className="bg-blue-50/40 border border-blue-200/40 rounded-lg p-3">
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-blue-700 mb-1">Sender</p>
+                  <p className="font-bold text-on-surface text-[14px]">{txn.sender.name}</p>
+                  {txn.sender.id && <p className="text-[11px] text-on-surface-variant/70 font-mono">{txn.sender.id}</p>}
+                </div>
+              )}
+            </Section>
+          )}
+
+          {/* Amounts breakdown */}
+          <Section title="Amount breakdown">
+            <div className="grid grid-cols-2 gap-3">
+              <DetailPill label="Currency" value={txn.currency || 'KES'} />
+              <DetailPill label="Amount" value={fmtKESFull(txn.amount)} mono />
+              {txn.kesAmount > 0 && <DetailPill label="KES Settled" value={fmtKESFull(txn.kesAmount)} mono />}
+              {txn.usdcAmount > 0 && <DetailPill label="USDC Settled" value={`${fmtUSDC(txn.usdcAmount)} USDC`} mono />}
+            </div>
+          </Section>
+
+          {/* Meta */}
+          <Section title="Metadata">
+            <DetailPill label="Account" value={txn.accountNumber || '—'} mono />
+            {txn.merchant?.status && <DetailPill label="Merchant status" value={txn.merchant.status} />}
+            {txn.merchant?.flagged !== undefined && (
+              <DetailPill label="Merchant flagged" value={txn.merchant.flagged ? 'Yes' : 'No'} />
+            )}
+          </Section>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const Section = ({ title, children }) => (
+  <div>
+    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/50 mb-2">{title}</p>
+    <div className="space-y-2">{children}</div>
+  </div>
+);
+
+const DetailPill = ({ label, value, mono }) => (
+  <div className="bg-surface-container-low/60 px-3 py-2 rounded-lg">
+    <p className="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant/50 mb-0.5">{label}</p>
+    <p className={`text-[13px] font-bold text-on-surface tracking-tight break-all ${mono ? 'font-mono' : ''}`}>{value}</p>
+  </div>
+);
 
 // ── Asset tile ───────────────────────────────────────────────────────
 const AssetTile = ({ label, symbol, amount, rawAmount, color, chain }) => {
@@ -517,7 +804,7 @@ const AreaChart = ({ series }) => {
 };
 
 const Th = ({ children }) => (
-  <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60">{children}</th>
+  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60">{children}</th>
 );
 
 const Legend = ({ color, label }) => (
