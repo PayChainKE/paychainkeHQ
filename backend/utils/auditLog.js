@@ -32,6 +32,15 @@ export function detectPlatform(req) {
   return 'unknown';
 }
 
+// Retention windows by severity.
+// critical/warning events are kept longer because they are security-relevant.
+const RETENTION_MS = {
+  critical: 21 * 24 * 60 * 60 * 1000,  // 21 days
+  warning:  21 * 24 * 60 * 60 * 1000,  // 21 days
+  success:  14 * 24 * 60 * 60 * 1000,  // 14 days
+  info:     14 * 24 * 60 * 60 * 1000,  // 14 days
+};
+
 // Fire-and-forget audit write. Never throws — if Mongo is down or the schema
 // rejects something we just log and move on; never block the user's request.
 //
@@ -85,6 +94,7 @@ export function logAudit({
         userAgent: clipUa(req),
         platform: detectPlatform(req),
         metadata: safeMeta,
+        expiresAt: new Date(Date.now() + (RETENTION_MS[severity] ?? RETENTION_MS.info)),
       });
     } catch (err) {
       // Never surface audit failures — log to stderr and continue.

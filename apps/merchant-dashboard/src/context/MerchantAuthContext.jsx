@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
@@ -15,11 +15,38 @@ export function MerchantAuthProvider({ children }) {
   const [token, setToken] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
+  const interceptorRef = useRef(null);
+
+  // Axios 401 interceptor — any API call that gets a 401 (expired/invalid
+  // token) automatically clears the session and redirects to login.
+  useEffect(() => {
+    interceptorRef.current = axios.interceptors.response.use(
+      res => res,
+      err => {
+        if (err.response?.status === 401) {
+          const url = err.config?.url || '';
+          // Don't intercept the login/auth endpoints themselves
+          const isAuthEndpoint = ['/login', '/register', '/verify-otp', '/forgot-password',
+            '/verify-reset-otp', '/reset-password', '/resend-otp'].some(p => url.includes(p));
+          if (!isAuthEndpoint) {
+            localStorage.removeItem(STORAGE_KEY);
+            localStorage.removeItem(TOKEN_KEY);
+            delete axios.defaults.headers.common['Authorization'];
+            setMerchant(null);
+            setToken(null);
+            navigate('/login');
+          }
+        }
+        return Promise.reject(err);
+      }
+    );
+    return () => axios.interceptors.response.eject(interceptorRef.current);
+  }, [navigate]);
 
   useEffect(() => {
     const rawMerchant = localStorage.getItem(STORAGE_KEY);
     const rawToken = localStorage.getItem(TOKEN_KEY);
-    
+
     if (rawMerchant && rawToken) {
       try {
         setMerchant(JSON.parse(rawMerchant));
@@ -33,12 +60,17 @@ export function MerchantAuthProvider({ children }) {
               localStorage.setItem(STORAGE_KEY, JSON.stringify(res.data.merchant));
             }
           })
-          .catch(err => console.error("Failed to fetch fresh merchant session", err));
+          .catch(err => {
+            // 401 is handled by the interceptor above; log others
+            if (err.response?.status !== 401) {
+              console.error('Failed to fetch fresh merchant session', err);
+            }
+          });
       } catch (e) {
-        console.error("Failed to parse local session", e);
+        console.error('Failed to parse local session', e);
       }
     }
-    
+
     setIsLoading(false);
   }, []);
 

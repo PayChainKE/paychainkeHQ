@@ -53,11 +53,22 @@ const AuditLogSchema = new mongoose.Schema({
   // Free-form payload (request shape, what changed, error codes, etc.). Capped
   // softly via .slice on the helper to keep documents small.
   metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
+
+  // Retention — MongoDB TTL index fires on this field and removes the document
+  // automatically once the date passes.  Set at write-time by logAudit():
+  //   critical / warning  →  21 days  (security events, longer retention)
+  //   info    / success   →  14 days  (routine auth events)
+  // Existing documents without this field are unaffected by the TTL index.
+  expiresAt: { type: Date, default: null, index: true },
 }, { timestamps: true });
 
 // Compound index — the most common query is "this merchant's recent activity".
 AuditLogSchema.index({ merchantId: 1, createdAt: -1 });
 AuditLogSchema.index({ createdAt: -1 });
+
+// TTL index: MongoDB deletes each document once its expiresAt date passes.
+// expireAfterSeconds: 0 means "delete at expiresAt exactly" (no extra delay).
+AuditLogSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 const AuditLog = mongoose.model('AuditLog', AuditLogSchema);
 export default AuditLog;
