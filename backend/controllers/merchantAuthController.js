@@ -134,9 +134,8 @@ export const registerMerchant = async (req, res) => {
 // @route   POST /api/auth/merchant/verify-otp
 // @access  Public
 export const verifyMerchantOTP = async (req, res) => {
-  const { email, otp } = req.body;
-
   try {
+    const { email, otp } = req.body || {};
     const merchant = await Merchant.findOne({ email }).select('+password +bulkPayPin');
 
     if (!merchant) {
@@ -202,35 +201,24 @@ export const verifyMerchantOTP = async (req, res) => {
 // @route   POST /api/auth/merchant/login
 // @access  Public
 export const loginMerchant = async (req, res) => {
-  const { email, password } = req.body;
-  let loginIdentifier = email ? email.trim() : ''; // can be phone or email
-  
-  let phoneVariations = [loginIdentifier];
-  if (!loginIdentifier.includes('@')) {
-    let cleanPhone = loginIdentifier.replace(/\s+/g, '');
-    if (cleanPhone.startsWith('0')) {
-      cleanPhone = cleanPhone.substring(1);
-    } else if (cleanPhone.startsWith('+254')) {
-      cleanPhone = cleanPhone.substring(4);
-    } else if (cleanPhone.startsWith('254')) {
-      cleanPhone = cleanPhone.substring(3);
-    }
-    
-    // cleanPhone is now just the 9 digits (e.g. 790889066)
-    phoneVariations = [
-      cleanPhone,
-      `0${cleanPhone}`,
-      `254${cleanPhone}`,
-      `+254${cleanPhone}`
-    ];
-  }
-
   try {
-    const merchant = await Merchant.findOne({ 
+    const { email, password } = req.body || {};
+    let loginIdentifier = email ? email.trim() : '';
+
+    let phoneVariations = [loginIdentifier];
+    if (!loginIdentifier.includes('@')) {
+      let cleanPhone = loginIdentifier.replace(/\s+/g, '');
+      if (cleanPhone.startsWith('+254')) cleanPhone = cleanPhone.substring(4);
+      else if (cleanPhone.startsWith('254')) cleanPhone = cleanPhone.substring(3);
+      else if (cleanPhone.startsWith('0')) cleanPhone = cleanPhone.substring(1);
+      phoneVariations = [cleanPhone, `0${cleanPhone}`, `254${cleanPhone}`, `+254${cleanPhone}`];
+    }
+
+    const merchant = await Merchant.findOne({
       $or: [
-        { email: loginIdentifier }, 
+        { email: loginIdentifier },
         { phone: { $in: phoneVariations } }
-      ] 
+      ]
     }).select('+password +bulkPayPin');
     
     if (!merchant) {
@@ -381,9 +369,8 @@ export const biometricLogin = async (req, res) => {
 // @route   POST /api/auth/merchant/resend-otp
 // @access  Public
 export const resendMerchantOTP = async (req, res) => {
-  const { email } = req.body;
-
   try {
+    const { email } = req.body || {};
     const merchant = await Merchant.findOne({ email });
 
     if (!merchant) {
