@@ -20,6 +20,7 @@ const Sidebar = ({ isOpen, onClose }) => {
     { icon: 'badge', label: 'Team', path: '/team' },
     { icon: 'account_balance', label: 'Ledger', path: '/ledger' },
     { icon: 'security', label: 'Wallet Audit', path: '/wallet-audit' },
+    { icon: 'fact_check', label: 'Audit Log', path: '/audit-log' },
     { icon: 'settings', label: 'Settings', path: '/settings' },
   ];
 
