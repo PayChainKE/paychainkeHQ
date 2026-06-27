@@ -247,18 +247,80 @@ export const initiateSTKPush = async (req, res) => {
     const { amount, phone, merchantId } = req.body;
     const token = req.mpesaToken;
 
-    if (!shortCode || !passkey) {
-      return res.status(500).json({ error: 'STK Push is not fully configured (MPESA_SHORTCODE / MPESA_PASSKEY missing).' });
-    }
-    if (!callbackBase) {
-      return res.status(500).json({ error: 'MPESA_CALLBACK_URL is not set — Safaricom cannot deliver the payment result.' });
-    }
-    // Safety: block live transactions unless explicitly enabled
-    if (isLive && process.env.MPESA_LIVE_ENABLED !== 'true') {
-      return res.status(503).json({ error: 'Live M-PESA payments are not yet enabled. Set MPESA_LIVE_ENABLED=true to activate.' });
+    // Normalise phone to 254XXXXXXXXX
+    let formattedPhone = String(phone).replace(/\s+/g, '');
+    if (formattedPhone.startsWith('+')) formattedPhone = formattedPhone.slice(1);
+    if (formattedPhone.startsWith('0')) formattedPhone = '254' + formattedPhone.slice(1);
+
+    const intAmount = Math.ceil(Number(amount));
+
+    // ── SANDBOX MODE: full local simulation — NO call to Safaricom ────────────
+    // This prevents any real M-PESA deductions during testing. The sandbox
+    // simulation auto-confirms after 4 seconds, exactly like the real callback.
+    if (!isLive) {
+      const checkoutRequestId = `SANDBOX-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+      console.log(`🧪 [SANDBOX] Simulating STK Push for ${formattedPhone} KES ${intAmount} | ID: ${checkoutRequestId}`);
+
+      await STKRequest.create({
+        merchantId,
+        checkoutRequestId,
+        amount: intAmount,
+        phone: formattedPhone,
+        status: 'pending',
+      });
+
+      // Auto-confirm after 4 s — simulates the Safaricom callback
+      setTimeout(async () => {
+        try {
+          const stkReq = await STKRequest.findOne({ checkoutRequestId });
+          if (!stkReq || stkReq.status !== 'pending') return;
+
+          stkReq.status = 'success';
+          stkReq.resultDesc = 'Sandbox simulation — no real money moved';
+          await stkReq.save();
+
+          const merchant = await Merchant.findById(merchantId);
+          if (merchant) {
+            merchant.kesBalance = (merchant.kesBalance || 0) + intAmount;
+            await merchant.save();
+
+            await Transaction.create({
+              merchantId: merchant._id,
+              accountNumber: merchant.paybillAccount || 'WALLET_FUND',
+              type: 'inbound',
+              amount: intAmount,
+              kesAmount: intAmount,
+              currency: 'KES',
+              status: 'completed',
+              reference: `SBX-${checkoutRequestId.slice(-8)}`,
+              sender: { name: 'M-PESA Sandbox', id: formattedPhone },
+              recipient: { name: merchant.businessName, id: 'WALLET' },
+            });
+            console.log(`✅ [SANDBOX] Auto-confirmed KES ${intAmount} for merchant ${merchant.paybillAccount}`);
+          }
+        } catch (e) {
+          console.error('❌ [SANDBOX] Auto-confirm error:', e.message);
+        }
+      }, 4000);
+
+      return res.status(200).json({
+        success: true,
+        checkoutRequestId,
+        message: '[Sandbox] STK simulated — funds will credit in ~4 seconds. No real money moved.',
+      });
     }
 
-    // Format timestamp YYYYMMDDHHmmss
+    // ── LIVE MODE ─────────────────────────────────────────────────────────────
+    if (process.env.MPESA_LIVE_ENABLED !== 'true') {
+      return res.status(503).json({ error: 'Live M-PESA payments are not enabled. Set MPESA_LIVE_ENABLED=true to activate.' });
+    }
+    if (!shortCode || !passkey) {
+      return res.status(500).json({ error: 'STK Push not fully configured (MPESA_SHORTCODE / MPESA_PASSKEY missing).' });
+    }
+    if (!callbackBase) {
+      return res.status(500).json({ error: 'MPESA_CALLBACK_URL is not set.' });
+    }
+
     const now = new Date();
     const timestamp = [
       now.getFullYear(),
@@ -271,17 +333,12 @@ export const initiateSTKPush = async (req, res) => {
 
     const stkPassword = Buffer.from(`${shortCode}${passkey}${timestamp}`).toString('base64');
 
-    // Normalise phone to 254XXXXXXXXX
-    let formattedPhone = String(phone).replace(/\s+/g, '');
-    if (formattedPhone.startsWith('+')) formattedPhone = formattedPhone.slice(1);
-    if (formattedPhone.startsWith('0')) formattedPhone = '254' + formattedPhone.slice(1);
-
     const payload = {
       BusinessShortCode: shortCode,
       Password: stkPassword,
       Timestamp: timestamp,
       TransactionType: 'CustomerPayBillOnline',
-      Amount: Math.ceil(Number(amount)), // Safaricom requires integer KES
+      Amount: intAmount,
       PartyA: formattedPhone,
       PartyB: shortCode,
       PhoneNumber: formattedPhone,
@@ -290,7 +347,7 @@ export const initiateSTKPush = async (req, res) => {
       TransactionDesc: 'Wallet Top Up',
     };
 
-    console.log(`📲 STK Push [${mpesaEnv}] → ${formattedPhone} KES ${payload.Amount}`);
+    console.log(`📲 [LIVE] STK Push → ${formattedPhone} KES ${intAmount}`);
 
     const response = await axios.post(
       `${mpesaBaseUrl}/mpesa/stkpush/v1/processrequest`,
@@ -302,15 +359,13 @@ export const initiateSTKPush = async (req, res) => {
 
     if (ResponseCode !== '0') {
       console.error('❌ Safaricom rejected STK Push:', response.data);
-      return res.status(400).json({
-        error: ResponseDescription || 'Safaricom rejected the STK Push request.',
-      });
+      return res.status(400).json({ error: ResponseDescription || 'Safaricom rejected the STK Push.' });
     }
 
     await STKRequest.create({
       merchantId,
       checkoutRequestId: CheckoutRequestID,
-      amount: payload.Amount,
+      amount: intAmount,
       phone: formattedPhone,
       status: 'pending',
     });
@@ -322,14 +377,9 @@ export const initiateSTKPush = async (req, res) => {
     });
 
   } catch (error) {
-    const detail = error.response?.data
-      ? JSON.stringify(error.response.data)
-      : error.message;
+    const detail = error.response?.data ? JSON.stringify(error.response.data) : error.message;
     console.error('❌ STK Push Error:', detail);
-    res.status(502).json({
-      error: error.response?.data?.errorMessage || 'Failed to send STK Push — please try again.',
-      detail,
-    });
+    res.status(502).json({ error: error.response?.data?.errorMessage || 'Failed to send STK Push — please try again.', detail });
   }
 };
 
