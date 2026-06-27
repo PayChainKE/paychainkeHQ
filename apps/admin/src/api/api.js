@@ -44,21 +44,38 @@ api.interceptors.request.use(
 );
 
 // 4. Response Interceptor: Global Error Handling
+//
+// Normalise backend errors so every action handler can read `err.response.data.error`
+// reliably. The backend now sends { error, code } consistently; we still tolerate
+// the older { message } shape for backward-compat. On token expiry we hard-redirect
+// to /login with a banner reason so the user understands why they were bumped.
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      console.warn('Unauthorized access - potential session expiry.');
-      // Optional: Clear storage and redirect to login if not already there
+    const status  = error.response?.status;
+    const data    = error.response?.data;
+    // Promote { message } → { error } so action handlers don't have to guess.
+    if (data && !data.error && data.message) {
+      error.response.data = { ...data, error: data.message };
+    }
+
+    if (status === 401) {
+      const code = data?.code;
+      const reason = code === 'TOKEN_EXPIRED' ? 'session-expired'
+                   : code === 'ADMIN_NOT_FOUND' ? 'account-missing'
+                   : 'session-invalid';
       if (!window.location.pathname.includes('/login')) {
-         localStorage.removeItem('paychain_admin_session');
-         localStorage.removeItem('paychain_admin_token');
-         window.location.href = '/login';
+        localStorage.removeItem('paychain_admin_session');
+        localStorage.removeItem('paychain_admin_token');
+        sessionStorage.setItem('paychain_login_reason', reason);
+        window.location.href = `/login?reason=${reason}`;
       }
     }
-    
+
     if (!error.response) {
-      console.error('PAYCHAIN_NETWORK_ERROR: Possible CORS mismatch or Backend Down.');
+      console.error('PAYCHAIN_NETWORK_ERROR: backend unreachable, CORS, or timeout.');
+      // Synthesise a response so handlers can show a sane message instead of "undefined".
+      error.response = { data: { error: 'Cannot reach PayChain API. Check your connection or try again in a moment.' } };
     }
     return Promise.reject(error);
   }
