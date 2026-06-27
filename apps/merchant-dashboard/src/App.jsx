@@ -20,6 +20,7 @@ import SendMoney from './pages/SendMoney'
 import RequestMoney from './pages/RequestMoney'
 import PaymentPage from './pages/PaymentPage'
 import ToastHost from './components/ui/Toast'
+import { Analytics as VercelAnalytics } from '@vercel/analytics/react'
 
 function Protected({ children }){
   const { isAuthenticated, isLoading } = useMerchantAuth()
@@ -58,6 +59,7 @@ export default function App(){
           <ToastHost />
         </NotificationProvider>
       </MerchantAuthProvider>
+      <VercelAnalytics />
     </BrowserRouter>
   )
 }
