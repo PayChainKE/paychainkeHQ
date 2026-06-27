@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { MerchantAuthProvider, useMerchantAuth } from './context/MerchantAuthContext'
 import { NotificationProvider } from './context/NotificationContext'
@@ -21,11 +21,62 @@ import RequestMoney from './pages/RequestMoney'
 import PaymentPage from './pages/PaymentPage'
 import ToastHost from './components/ui/Toast'
 import { Analytics as VercelAnalytics } from '@vercel/analytics/react'
+import useIdleTimer from './hooks/useIdleTimer'
+import SessionTimeoutModal from './components/modals/SessionTimeoutModal'
 
-function Protected({ children }){
+// 15 minutes idle → logout  |  warn 2 minutes before
+const IDLE_TIMEOUT_MS  = 15 * 60 * 1000
+const WARNING_BEFORE_MS =  2 * 60 * 1000
+
+// Branded full-page loading spinner shown while session state is resolving
+function LoadingScreen() {
+  return (
+    <div className="fixed inset-0 bg-[#FDFDFC] flex flex-col items-center justify-center z-50">
+      <div className="relative w-16 h-16 mb-6">
+        <div className="absolute inset-0 rounded-full border-4 border-emerald-100" />
+        <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-[#00351D] animate-spin" />
+      </div>
+      <p className="text-[11px] font-black uppercase tracking-[0.3em] text-primary/30">PayChain</p>
+    </div>
+  )
+}
+
+// Wraps every authenticated route; enforces auth check and idle-timeout policy
+function Protected({ children }) {
+  const { isAuthenticated, isLoading, logout } = useMerchantAuth()
+  const [showWarning, setShowWarning] = useState(false)
+
+  useIdleTimer({
+    timeout:   IDLE_TIMEOUT_MS,
+    warningMs: WARNING_BEFORE_MS,
+    enabled:   isAuthenticated,
+    onWarn:    () => setShowWarning(true),
+    onIdle:    () => { setShowWarning(false); logout(); },
+    onActive:  () => setShowWarning(false),
+  })
+
+  if (isLoading) return <LoadingScreen />
+  if (!isAuthenticated) return <Navigate to="/login" replace />
+
+  return (
+    <>
+      {children}
+      {showWarning && (
+        <SessionTimeoutModal
+          countdownSec={WARNING_BEFORE_MS / 1000}
+          onStay={() => setShowWarning(false)}
+          onLogout={() => { setShowWarning(false); logout(); }}
+        />
+      )}
+    </>
+  )
+}
+
+// Redirects already-authenticated users away from /login to the dashboard
+function LoginGuard({ children }) {
   const { isAuthenticated, isLoading } = useMerchantAuth()
-  if (isLoading) return <div style={{padding:40}}>Loading...</div>
-  if (!isAuthenticated) return <Navigate to="/login" />
+  if (isLoading) return <LoadingScreen />
+  if (isAuthenticated) return <Navigate to="/overview" replace />
   return children
 }
 
@@ -36,7 +87,7 @@ export default function App(){
       <MerchantAuthProvider>
         <NotificationProvider>
           <Routes>
-            <Route path="/login" element={<Login/>} />
+            <Route path="/login" element={<LoginGuard><Login/></LoginGuard>} />
             <Route path="/setup-password" element={<SetupPassword/>} />
             <Route path="/pay/:linkId" element={<PaymentPage />} />
             <Route path="/" element={<Navigate to="/overview" replace />} />
