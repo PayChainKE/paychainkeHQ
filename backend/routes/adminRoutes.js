@@ -12,7 +12,14 @@ import {
   unflagMerchant,
   getInsights,
   getLedger,
+  getSystemStatus,
 } from '../controllers/adminController.js';
+import {
+  getCommunications,
+  updateCommunication,
+  addCommunicationNote,
+  deleteCommunication,
+} from '../controllers/communicationController.js';
 import { runWalletAudit } from '../controllers/walletAuditController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
@@ -59,5 +66,14 @@ router.get('/ledger', protect, getLedger);
 
 // Stellar Wallet Audit (live Horizon cross-reference)
 router.get('/wallet-audit', protect, runWalletAudit);
+
+// Compact health pulse for the sidebar widget.
+router.get('/system-status', protect, getSystemStatus);
+
+// Call-centre / inbound communications console.
+router.get('/communications',                protect, getCommunications);
+router.patch('/communications/:id',          protect, updateCommunication);
+router.post('/communications/:id/notes',     protect, addCommunicationNote);
+router.delete('/communications/:id',         protect, deleteCommunication);
 
 export default router;

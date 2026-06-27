@@ -8,6 +8,8 @@ import STKRequest from '../models/STKRequest.js';
 import Payee from '../models/Payee.js';
 import PaymentLink from '../models/PaymentLink.js';
 import Waitlist from '../models/Waitlist.js';
+import Contact from '../models/Contact.js';
+import Communication from '../models/Communication.js';
 import { sendMerchantInvite, sendAdminActionOTP } from '../utils/resend.js';
 
 // Allowed sensitive actions an admin can request against a merchant.
@@ -933,6 +935,45 @@ export const getMerchantAnalytics = async (req, res) => {
     });
   } catch (error) {
     console.error('Get Merchant Analytics Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Compact system-status counts — powers the sidebar widget so it
+//          reflects real backend state instead of placeholder numbers.
+// @route   GET /api/admin/system-status
+// @access  Private (Admin)
+export const getSystemStatus = async (req, res) => {
+  try {
+    const [
+      merchants, lockedMerchants, flaggedMerchants,
+      waitlistTotal, waitlistPending,
+      messagesTotal, messagesUnread,
+      commsTotal, commsUnresolved,
+    ] = await Promise.all([
+      Merchant.countDocuments(),
+      Merchant.countDocuments({ status: 'locked' }),
+      Merchant.countDocuments({ flagged: true }),
+      Waitlist.countDocuments(),
+      Waitlist.countDocuments({ status: 'pending' }),
+      Contact.countDocuments(),
+      Contact.countDocuments({ isRead: false }),
+      Communication.countDocuments(),
+      Communication.countDocuments({ status: { $in: ['new', 'in_progress'] } }),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        merchants: { total: merchants, locked: lockedMerchants, flagged: flaggedMerchants },
+        waitlist: { total: waitlistTotal, pending: waitlistPending },
+        messages: { total: messagesTotal, unread: messagesUnread },
+        calls:    { total: commsTotal,    open: commsUnresolved },
+        generatedAt: new Date(),
+      },
+    });
+  } catch (error) {
+    console.error('Get System Status Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };
