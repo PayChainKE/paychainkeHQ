@@ -13,8 +13,7 @@ const RANGES = [
   { v: 'all', l: 'ALL' },
 ];
 
-// Safaricom M-Pesa Send Money / PayBill tariff (KES). Pass-through cost
-// to the customer — surfaced here purely for transparency.
+// Safaricom M-Pesa tariff (pass-through, KES). Displayed for transparency.
 const MPESA_TARIFF_DISPLAY = [
   { label: '1 – 100',          fee: 0   },
   { label: '101 – 500',        fee: 7   },
@@ -30,73 +29,15 @@ const MPESA_TARIFF_DISPLAY = [
   { label: '20,001 – 500,000', fee: 108 },
 ];
 
-// Accent → Tailwind class map. Keep all classes literal so JIT picks them up.
-const ACCENTS = {
-  emerald: {
-    bg:      'bg-emerald-50',
-    bgDark:  'bg-emerald-500/10',
-    text:    'text-emerald-700',
-    textDark:'text-emerald-300',
-    border:  'border-emerald-200',
-    borderDark:'border-emerald-500/30',
-    bar:     'bg-emerald-500',
-    barLight:'bg-emerald-100',
-    chip:    'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-    dot:     '#10B981',
-    gradient:'from-emerald-500/20 to-emerald-500/0',
-  },
-  pink: {
-    bg:      'bg-pink-50',
-    bgDark:  'bg-pink-500/10',
-    text:    'text-pink-700',
-    textDark:'text-pink-300',
-    border:  'border-pink-200',
-    borderDark:'border-pink-500/30',
-    bar:     'bg-pink-500',
-    barLight:'bg-pink-100',
-    chip:    'bg-pink-500/15 text-pink-300 border-pink-500/30',
-    dot:     '#EC4899',
-    gradient:'from-pink-500/20 to-pink-500/0',
-  },
-  blue: {
-    bg:      'bg-blue-50',
-    bgDark:  'bg-blue-500/10',
-    text:    'text-blue-700',
-    textDark:'text-blue-300',
-    border:  'border-blue-200',
-    borderDark:'border-blue-500/30',
-    bar:     'bg-blue-500',
-    barLight:'bg-blue-100',
-    chip:    'bg-blue-500/15 text-blue-300 border-blue-500/30',
-    dot:     '#3B82F6',
-    gradient:'from-blue-500/20 to-blue-500/0',
-  },
-  amber: {
-    bg:      'bg-amber-50',
-    bgDark:  'bg-amber-500/10',
-    text:    'text-amber-700',
-    textDark:'text-amber-300',
-    border:  'border-amber-200',
-    borderDark:'border-amber-500/30',
-    bar:     'bg-amber-500',
-    barLight:'bg-amber-100',
-    chip:    'bg-amber-500/15 text-amber-300 border-amber-500/30',
-    dot:     '#F59E0B',
-    gradient:'from-amber-500/20 to-amber-500/0',
-  },
-  violet: {
-    bg:      'bg-violet-50',
-    bgDark:  'bg-violet-500/10',
-    text:    'text-violet-700',
-    textDark:'text-violet-300',
-    border:  'border-violet-200',
-    borderDark:'border-violet-500/30',
-    bar:     'bg-violet-500',
-    barLight:'bg-violet-100',
-    chip:    'bg-violet-500/15 text-violet-300 border-violet-500/30',
-    dot:     '#8B5CF6',
-    gradient:'from-violet-500/20 to-violet-500/0',
-  },
+// Solid accent colours per revenue stream. Used only for the small dot/bar
+// segment — the rest of every card uses the neutral monochrome palette so
+// the page reads cleanly without competing colour gradients.
+const ACCENT_DOT = {
+  emerald: '#10B981',
+  pink:    '#EC4899',
+  blue:    '#3B82F6',
+  amber:   '#F59E0B',
+  violet:  '#8B5CF6',
 };
 
 // ── Formatters ────────────────────────────────────────────────────────
@@ -131,7 +72,7 @@ const fmtRate = (r) => `${(r * 100).toFixed(2)}%`;
 
 // ── Skeleton ──────────────────────────────────────────────────────────
 const Skel = ({ className = 'w-16 h-7' }) => (
-  <span className={`inline-block ${className} bg-white/10 rounded animate-pulse align-middle`} aria-hidden="true" />
+  <span className={`inline-block ${className} bg-white/[0.06] rounded align-middle animate-pulse`} aria-hidden="true" />
 );
 
 // ── Stacked time series chart ─────────────────────────────────────────
@@ -139,8 +80,8 @@ const StackedSeries = ({ series, streams }) => {
   const buckets = series || [];
   if (!buckets.length) {
     return (
-      <div className="h-[280px] flex flex-col items-center justify-center text-on-surface-variant/60 text-[13px] gap-2">
-        <span className="material-symbols-outlined text-[36px] opacity-50">monitoring</span>
+      <div className="h-[240px] flex flex-col items-center justify-center text-white/40 text-[13px] gap-2">
+        <span className="material-symbols-outlined text-[32px] opacity-40">monitoring</span>
         No revenue activity in this window yet.
       </div>
     );
@@ -150,33 +91,28 @@ const StackedSeries = ({ series, streams }) => {
   const active = streams.filter((s) => s.revenue > 0);
 
   return (
-    <div className="space-y-4">
-      {/* Legend */}
-      <div className="flex flex-wrap items-center gap-3 text-[11px]">
-        {active.map((s) => {
-          const a = ACCENTS[s.accent] || ACCENTS.blue;
-          return (
-            <div key={s.id} className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-sm" style={{ background: a.dot }} />
-              <span className="text-on-surface-variant">{s.label}</span>
-            </div>
-          );
-        })}
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center gap-4 text-[11px]">
+        {active.map((s) => (
+          <div key={s.id} className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full" style={{ background: ACCENT_DOT[s.accent] || ACCENT_DOT.blue }} />
+            <span className="text-white/60">{s.label}</span>
+          </div>
+        ))}
       </div>
 
-      {/* Bars */}
       <div className="flex items-end gap-1 h-[220px] pb-7 relative">
         {buckets.map((b, idx) => {
           const heightPct = Math.max(2, (b.total / max) * 100);
           return (
             <div key={`${b.bucket}-${idx}`} className="flex-1 flex flex-col items-center group relative min-w-[8px]">
               {b.total > 0 && (
-                <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-bold text-white/70 whitespace-nowrap tabular-nums">
+                <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-bold text-white/70 whitespace-nowrap tabular-nums opacity-0 group-hover:opacity-100 transition-opacity">
                   {fmtKES(b.total)}
                 </div>
               )}
               <div
-                className="w-full flex flex-col-reverse rounded-t overflow-hidden transition-transform group-hover:scale-[1.04]"
+                className="w-full flex flex-col-reverse rounded-sm overflow-hidden"
                 style={{ height: `${heightPct}%` }}
                 title={`${b.bucket} — ${fmtKESPrecise(b.total)}`}
               >
@@ -184,17 +120,16 @@ const StackedSeries = ({ series, streams }) => {
                   const v = b[s.id] || 0;
                   if (v <= 0) return null;
                   const pct = (v / b.total) * 100;
-                  const a = ACCENTS[s.accent] || ACCENTS.blue;
                   return (
                     <div
                       key={s.id}
-                      style={{ height: `${pct}%`, background: a.dot }}
+                      style={{ height: `${pct}%`, background: ACCENT_DOT[s.accent] || ACCENT_DOT.blue }}
                       title={`${s.label}: ${fmtKESPrecise(v)}`}
                     />
                   );
                 })}
               </div>
-              <div className="absolute -bottom-6 text-[9px] text-on-surface-variant/50 truncate w-full text-center font-mono">
+              <div className="absolute -bottom-6 text-[9px] text-white/40 truncate w-full text-center font-mono">
                 {b.bucket.slice(5)}
               </div>
             </div>
@@ -240,28 +175,28 @@ const Revenue = () => {
 
   return (
     <Layout>
-      <div className="space-y-8 md:space-y-10">
+      <div className="space-y-10">
         {/* ── Header ───────────────────────────────────────────────── */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="material-symbols-outlined text-emerald-400 text-[24px]">trending_up</span>
-              <h2 className="text-[22px] md:text-[32px] font-bold text-on-surface tracking-tighter font-headline">Revenue</h2>
-            </div>
-            <p className="text-[13px] md:text-[14px] text-on-surface-variant">
-              Live earnings across every PayChain revenue stream — fees, FX spread, settlement and stablecoin payments.
+            <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/40 mb-2">Finance</p>
+            <h2 className="text-[28px] md:text-[36px] font-bold text-white tracking-tighter leading-none">
+              Revenue
+            </h2>
+            <p className="text-[13px] text-white/60 mt-2 max-w-xl">
+              Live earnings across every PayChain revenue stream — fees, FX spread, settlement and stablecoin payments. All figures shown are amounts routed to the PayChain settlement account.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex bg-surface-container-lowest border border-outline-variant/20 rounded-lg p-1">
+            <div className="inline-flex bg-white/[0.03] border border-white/10 rounded-md p-0.5">
               {RANGES.map((r) => (
                 <button
                   key={r.v}
                   onClick={() => setRange(r.v)}
-                  className={`px-3 py-1.5 text-[11px] font-bold tracking-wider rounded-md transition-all ${
+                  className={`px-3 py-1.5 text-[11px] font-bold tracking-wider rounded transition-colors ${
                     range === r.v
-                      ? 'bg-emerald-700 text-white shadow-sm'
-                      : 'text-on-surface-variant hover:text-on-surface hover:bg-white/5'
+                      ? 'bg-white text-[#0A0D14]'
+                      : 'text-white/60 hover:text-white'
                   }`}
                 >
                   {r.l}
@@ -271,7 +206,7 @@ const Revenue = () => {
             <button
               onClick={fetchRevenue}
               title="Refresh"
-              className="w-9 h-9 inline-flex items-center justify-center bg-surface-container-lowest border border-outline-variant/20 rounded-lg text-on-surface-variant hover:text-emerald-300 hover:border-emerald-500/40 transition-colors"
+              className="w-9 h-9 inline-flex items-center justify-center bg-white/[0.03] border border-white/10 rounded-md text-white/60 hover:text-white hover:bg-white/[0.06] transition-colors"
             >
               <span className="material-symbols-outlined text-[18px]">refresh</span>
             </button>
@@ -279,193 +214,151 @@ const Revenue = () => {
         </div>
 
         {error && (
-          <div className="rounded-lg border border-red-500/30 bg-red-500/10 text-red-300 text-[13px] px-4 py-3">
+          <div className="rounded-md border border-red-500/20 bg-red-500/[0.06] text-red-200 text-[13px] px-4 py-3">
             {error}
           </div>
         )}
 
-        {/* ── Hero KPI cards ──────────────────────────────────────── */}
+        {/* ── Hero KPI strip ──────────────────────────────────────── */}
         <section>
-          <div className="flex items-center gap-2 mb-4 text-slate-400">
-            <span className="text-[10px] md:text-[11px] font-bold uppercase tracking-widest font-label">Snapshot</span>
-            <div className="flex-1 h-[1px] bg-outline-variant/10"></div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
-            {/* Total Revenue — hero */}
-            <div className="relative col-span-1 sm:col-span-2 lg:col-span-2 bg-gradient-to-br from-emerald-900/40 via-[#0F141E] to-[#0A0D14] p-5 md:p-7 rounded-2xl border border-emerald-500/20 overflow-hidden group">
-              <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-500/10 rounded-full -mr-12 -mt-12 blur-3xl group-hover:bg-emerald-500/20 transition-all pointer-events-none"></div>
-              <div className="relative">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] md:text-[11px] font-bold text-emerald-300/80 uppercase tracking-widest">Total Revenue</span>
-                  <span className="text-[10px] font-bold text-emerald-200 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded">
-                    {RANGES.find((r) => r.v === range)?.l}
-                  </span>
-                </div>
-                <div className="flex items-baseline gap-3">
-                  {loading
-                    ? <Skel className="w-40 h-10 bg-white/10" />
-                    : <span className="text-[32px] md:text-[44px] font-bold text-white tracking-tighter leading-none">
-                        {fmtKES(kpis.totalRevenue)}
-                      </span>}
-                </div>
-                <div className="flex items-baseline gap-2 mt-2 text-[12px]">
-                  {!loading && (
-                    <>
-                      <span className={`font-bold ${
-                        (kpis.change || 0) >= 0 ? 'text-emerald-300' : 'text-red-300'
-                      }`}>
-                        {fmtChange(kpis.change)}
-                      </span>
-                      <span className="text-on-surface-variant/60">vs previous period</span>
-                    </>
-                  )}
-                </div>
-                <div className="mt-4 pt-4 border-t border-emerald-500/15">
-                  <p className="text-[11px] text-on-surface-variant/60 mb-1 uppercase tracking-widest font-bold">Projected ARR</p>
-                  <p className="text-[18px] md:text-[22px] font-bold text-emerald-200 tabular-nums tracking-tight">
-                    {loading ? <Skel className="w-32 h-7 bg-white/10" /> : fmtKES(kpis.projectedARR)}
-                  </p>
-                </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px bg-white/10 border border-white/10 rounded-lg overflow-hidden">
+            {/* Total Revenue */}
+            <div className="bg-[#0A0D14] p-6 flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-white/50 uppercase tracking-[0.18em]">Total Revenue</span>
+                <span className="text-[9px] font-bold text-white/40 uppercase tracking-widest">{RANGES.find((r) => r.v === range)?.l}</span>
               </div>
+              {loading
+                ? <Skel className="w-32 h-9" />
+                : <span className="text-[28px] md:text-[34px] font-bold text-white tracking-tighter leading-none tabular-nums">{fmtKES(kpis.totalRevenue)}</span>}
+              {!loading && (
+                <div className="flex items-baseline gap-1.5 text-[12px]">
+                  <span className={`font-bold tabular-nums ${(kpis.change || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {fmtChange(kpis.change)}
+                  </span>
+                  <span className="text-white/40">vs previous</span>
+                </div>
+              )}
             </div>
 
             {/* Take Rate */}
-            <div className="bg-gradient-to-br from-[#0F141E] to-[#0A0D14] p-4 md:p-5 rounded-xl border border-outline-variant/20 flex flex-col gap-1.5 group hover:border-pink-500/30 transition-all">
-              <span className="text-[10px] md:text-[11px] font-bold text-pink-300/80 uppercase tracking-widest">Effective Take Rate</span>
-              <div className="flex items-baseline gap-2 mt-1">
-                {loading
-                  ? <Skel className="w-20 h-8 bg-white/10" />
-                  : <span className="text-[24px] md:text-[30px] font-bold text-white tracking-tighter">{fmtPct(kpis.takeRate, 2)}</span>}
-              </div>
-              <p className="text-[11px] text-on-surface-variant/60 mt-1">
-                Revenue / volume across all streams
-              </p>
+            <div className="bg-[#0A0D14] p-6 flex flex-col gap-2">
+              <span className="text-[10px] font-bold text-white/50 uppercase tracking-[0.18em]">Take Rate</span>
+              {loading
+                ? <Skel className="w-24 h-9" />
+                : <span className="text-[28px] md:text-[34px] font-bold text-white tracking-tighter leading-none tabular-nums">{fmtPct(kpis.takeRate, 2)}</span>}
+              <p className="text-[12px] text-white/40">Revenue ÷ volume</p>
             </div>
 
-            {/* Volume processed */}
-            <div className="bg-gradient-to-br from-[#0F141E] to-[#0A0D14] p-4 md:p-5 rounded-xl border border-outline-variant/20 flex flex-col gap-1.5 group hover:border-blue-500/30 transition-all">
-              <span className="text-[10px] md:text-[11px] font-bold text-blue-300/80 uppercase tracking-widest">Volume Processed</span>
-              <div className="flex items-baseline gap-2 mt-1">
-                {loading
-                  ? <Skel className="w-24 h-8 bg-white/10" />
-                  : <span className="text-[24px] md:text-[30px] font-bold text-white tracking-tighter">{fmtKES(kpis.totalVolume)}</span>}
-              </div>
-              <p className="text-[11px] text-on-surface-variant/60 mt-1">
-                {loading ? <Skel className="w-12 h-3 bg-white/10" /> : `${fmtNum(kpis.totalCount)} fee-bearing transactions`}
-              </p>
+            {/* Volume */}
+            <div className="bg-[#0A0D14] p-6 flex flex-col gap-2">
+              <span className="text-[10px] font-bold text-white/50 uppercase tracking-[0.18em]">Volume Processed</span>
+              {loading
+                ? <Skel className="w-28 h-9" />
+                : <span className="text-[28px] md:text-[34px] font-bold text-white tracking-tighter leading-none tabular-nums">{fmtKES(kpis.totalVolume)}</span>}
+              <p className="text-[12px] text-white/40">{loading ? <Skel className="w-12 h-3" /> : `${fmtNum(kpis.totalCount)} fee-bearing transactions`}</p>
             </div>
 
-            {/* Safaricom Passthrough — informational, not PayChain revenue */}
-            <div className="bg-gradient-to-br from-[#0F141E] to-[#0A0D14] p-4 md:p-5 rounded-xl border border-outline-variant/20 flex flex-col gap-1.5 group hover:border-green-500/30 transition-all relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-20 h-20 bg-green-500/5 rounded-full -mr-6 -mt-6 blur-2xl pointer-events-none"></div>
-              <div className="flex items-center justify-between relative">
-                <span className="text-[10px] md:text-[11px] font-bold text-green-300/80 uppercase tracking-widest">Safaricom Passthrough</span>
-                <span className="text-[8px] font-bold text-on-surface-variant/40 uppercase tracking-widest border border-outline-variant/30 px-1.5 py-0.5 rounded">Cost</span>
-              </div>
-              <div className="flex items-baseline gap-2 mt-1 relative">
-                {loading
-                  ? <Skel className="w-24 h-8 bg-white/10" />
-                  : <span className="text-[22px] md:text-[28px] font-bold text-white/90 tracking-tighter">{fmtKES(kpis.safaricomPassthrough)}</span>}
-              </div>
-              <p className="text-[11px] text-on-surface-variant/60 mt-1 relative">
-                Paid to Safaricom on customer txns
-              </p>
+            {/* Projected ARR */}
+            <div className="bg-[#0A0D14] p-6 flex flex-col gap-2">
+              <span className="text-[10px] font-bold text-white/50 uppercase tracking-[0.18em]">Projected ARR</span>
+              {loading
+                ? <Skel className="w-28 h-9" />
+                : <span className="text-[28px] md:text-[34px] font-bold text-white tracking-tighter leading-none tabular-nums">{fmtKES(kpis.projectedARR)}</span>}
+              <p className="text-[12px] text-white/40">Linear run-rate</p>
             </div>
           </div>
 
-          {/* Pricing policy banner */}
-          <div className="mt-4 flex items-start gap-3 rounded-xl border border-emerald-500/20 bg-gradient-to-r from-emerald-900/20 to-transparent px-4 py-3">
-            <span className="material-symbols-outlined text-emerald-300 text-[20px] mt-0.5 flex-shrink-0">policy</span>
-            <p className="text-[12px] text-on-surface-variant/80 leading-snug">
-              <span className="text-white font-bold">Headline pricing:</span>{' '}
-              PayChain charges <span className="text-emerald-300 font-bold">+0.50%</span> on every transaction, on top of the standard Safaricom M-Pesa tariff which passes through to the customer.
-              FX conversions (KES ↔ USDC) carry a <span className="text-pink-300 font-bold">2.00% spread</span>, in line with Kotani Pay and HoneyCoin standard rates.
-              All PayChain fees route to the PayChain settlement account; this page shows the live total.
-            </p>
+          {/* Secondary row — Safaricom passthrough + policy banner */}
+          <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="bg-[#0A0D14] border border-white/10 rounded-lg p-5 flex flex-col gap-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-white/50 uppercase tracking-[0.18em]">Safaricom Pass-through</span>
+                <span className="text-[9px] font-bold text-white/40 uppercase tracking-widest border border-white/10 px-1.5 py-0.5 rounded">Cost</span>
+              </div>
+              {loading
+                ? <Skel className="w-24 h-7" />
+                : <span className="text-[22px] font-bold text-white tracking-tight tabular-nums">{fmtKES(kpis.safaricomPassthrough)}</span>}
+              <p className="text-[11px] text-white/40">Paid to Safaricom on M-Pesa transactions — not retained by PayChain.</p>
+            </div>
+            <div className="lg:col-span-2 bg-[#0A0D14] border border-white/10 rounded-lg p-5 flex items-start gap-3">
+              <span className="material-symbols-outlined text-white/40 text-[18px] mt-0.5 flex-shrink-0">policy</span>
+              <p className="text-[12px] text-white/70 leading-relaxed">
+                <span className="text-white font-bold">Universal pricing.</span>{' '}
+                PayChain charges <span className="text-white font-bold">+0.50%</span> on every transaction across every merchant account, on top of the standard Safaricom M-Pesa tariff. FX conversions (KES ↔ USDC) carry a <span className="text-white font-bold">2.00%</span> spread — aligned to Kotani Pay and HoneyCoin. All fees route directly to the PayChain settlement account.
+              </p>
+            </div>
           </div>
         </section>
 
         {/* ── Revenue Streams ─────────────────────────────────────── */}
         <section>
-          <div className="flex items-center gap-3 mb-4 text-slate-400">
-            <span className="text-[10px] md:text-[11px] font-bold uppercase tracking-widest font-label">Revenue Streams</span>
-            <div className="flex-1 h-[1px] bg-outline-variant/10"></div>
+          <div className="flex items-end justify-between mb-5">
+            <div>
+              <h3 className="text-[16px] font-bold text-white tracking-tight">Revenue streams</h3>
+              <p className="text-[12px] text-white/40 mt-1">Per-stream contribution to total revenue this period.</p>
+            </div>
             {!loading && topStream && (
-              <span className="text-[10px] md:text-[11px] text-on-surface-variant/60">
-                Top earner: <span className="text-emerald-300 font-bold">{topStream.label}</span>
+              <span className="text-[11px] text-white/50">
+                Top: <span className="text-white font-bold">{topStream.label}</span>
               </span>
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-px bg-white/10 border border-white/10 rounded-lg overflow-hidden">
             {streams.map((s) => {
-              const a = ACCENTS[s.accent] || ACCENTS.blue;
+              const dot = ACCENT_DOT[s.accent] || ACCENT_DOT.blue;
               return (
-                <div
-                  key={s.id}
-                  className={`relative bg-gradient-to-br from-[#0F141E] to-[#0A0D14] p-5 rounded-xl border ${a.borderDark} flex flex-col gap-3 group hover:scale-[1.01] transition-all overflow-hidden`}
-                >
-                  <div className={`absolute top-0 right-0 w-32 h-32 rounded-full -mr-12 -mt-12 blur-2xl bg-gradient-to-br ${a.gradient} pointer-events-none`}></div>
-
-                  <div className="relative flex items-start justify-between gap-3">
+                <div key={s.id} className="bg-[#0A0D14] p-5 flex flex-col gap-3 hover:bg-white/[0.02] transition-colors">
+                  <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className={`w-10 h-10 rounded-lg ${a.bgDark} flex items-center justify-center ${a.textDark}`}>
-                        <span className="material-symbols-outlined text-[22px]">{s.icon}</span>
+                      <div className="w-9 h-9 rounded-md bg-white/[0.04] border border-white/10 flex items-center justify-center text-white/80">
+                        <span className="material-symbols-outlined text-[19px]">{s.icon}</span>
                       </div>
                       <div className="min-w-0">
-                        <h3 className="text-[14px] font-bold text-white truncate">{s.label}</h3>
-                        <p className="text-[10px] font-mono uppercase tracking-widest text-on-surface-variant/50">
+                        <h4 className="text-[13px] font-bold text-white truncate">{s.label}</h4>
+                        <p className="text-[10px] font-mono uppercase tracking-widest text-white/40">
                           {fmtRate(s.rate)}{s.minFee > 0 ? ` · min KES ${s.minFee}` : ''}
                         </p>
                       </div>
                     </div>
                     {s.pilot && (
-                      <span className="text-[9px] font-bold uppercase tracking-widest text-violet-300 bg-violet-500/15 border border-violet-500/30 px-2 py-0.5 rounded">
+                      <span className="text-[9px] font-bold uppercase tracking-widest text-white/60 bg-white/[0.04] border border-white/10 px-2 py-0.5 rounded">
                         Pilot
                       </span>
                     )}
                   </div>
 
-                  <p className="text-[12px] text-on-surface-variant/70 leading-snug relative line-clamp-2">
+                  <p className="text-[12px] text-white/55 leading-snug line-clamp-2">
                     {s.description}
                   </p>
 
-                  <div className="relative pt-2">
+                  <div className="pt-1">
                     <div className="flex items-baseline gap-2">
                       {loading
-                        ? <Skel className="w-28 h-7 bg-white/10" />
-                        : <span className="text-[22px] md:text-[26px] font-bold text-white tracking-tighter tabular-nums">
-                            {fmtKES(s.revenue)}
-                          </span>}
+                        ? <Skel className="w-24 h-7" />
+                        : <span className="text-[22px] font-bold text-white tracking-tighter tabular-nums">{fmtKES(s.revenue)}</span>}
                       {!loading && s.revenue > 0 && (
-                        <span className={`text-[11px] font-bold ${a.textDark}`}>
-                          {fmtPct(s.share)} share
-                        </span>
+                        <span className="text-[11px] font-bold text-white/50 tabular-nums">{fmtPct(s.share)}</span>
                       )}
                     </div>
                     <div className="flex items-center justify-between mt-1 text-[11px]">
-                      <span className="text-on-surface-variant/60 tabular-nums">
-                        {loading ? <Skel className="w-20 h-3 bg-white/10" /> : `${fmtNum(s.count)} txns · ${fmtKES(s.volume)}`}
+                      <span className="text-white/40 tabular-nums">
+                        {loading ? <Skel className="w-20 h-3" /> : `${fmtNum(s.count)} txns · ${fmtKES(s.volume)}`}
                       </span>
                       {!loading && s.prevRevenue > 0 && (
-                        <span className={`font-bold ${
-                          s.change >= 0 ? 'text-emerald-300' : 'text-red-300'
-                        }`}>
+                        <span className={`font-bold tabular-nums ${s.change >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                           {fmtChange(s.change)}
                         </span>
                       )}
                     </div>
                   </div>
 
-                  {/* Share bar */}
-                  <div className="relative">
-                    <div className={`h-1.5 rounded-full ${a.bgDark} overflow-hidden`}>
-                      <div
-                        className={`h-full ${a.bar} transition-all duration-500`}
-                        style={{ width: `${Math.min(100, s.share || 0)}%` }}
-                      />
-                    </div>
+                  <div className="h-1 rounded-full bg-white/[0.04] overflow-hidden">
+                    <div
+                      className="h-full transition-all duration-500"
+                      style={{ width: `${Math.min(100, s.share || 0)}%`, background: dot }}
+                    />
                   </div>
                 </div>
               );
@@ -475,17 +368,16 @@ const Revenue = () => {
 
         {/* ── Time series ──────────────────────────────────────────── */}
         <section>
-          <div className="flex items-center gap-3 mb-4 text-slate-400">
-            <span className="text-[10px] md:text-[11px] font-bold uppercase tracking-widest font-label">Revenue Trend</span>
-            <div className="flex-1 h-[1px] bg-outline-variant/10"></div>
-            <span className="text-[10px] md:text-[11px] text-on-surface-variant/60">
-              Stacked by stream
-            </span>
+          <div className="flex items-end justify-between mb-5">
+            <div>
+              <h3 className="text-[16px] font-bold text-white tracking-tight">Revenue trend</h3>
+              <p className="text-[12px] text-white/40 mt-1">Stacked by stream over the selected window.</p>
+            </div>
           </div>
-          <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-xl p-5 md:p-6">
+          <div className="bg-[#0A0D14] border border-white/10 rounded-lg p-6">
             {loading ? (
-              <div className="h-[280px] flex items-center justify-center">
-                <Skel className="w-full h-[200px] bg-white/5" />
+              <div className="h-[240px] flex items-center justify-center">
+                <Skel className="w-full h-[200px]" />
               </div>
             ) : (
               <StackedSeries series={series} streams={streams} />
@@ -493,26 +385,26 @@ const Revenue = () => {
           </div>
         </section>
 
-        {/* ── Top fee-generating merchants ─────────────────────────── */}
+        {/* ── Top merchants ────────────────────────────────────────── */}
         <section>
-          <div className="flex items-center gap-3 mb-4 text-slate-400">
-            <span className="text-[10px] md:text-[11px] font-bold uppercase tracking-widest font-label">Top Revenue-Generating Merchants</span>
-            <div className="flex-1 h-[1px] bg-outline-variant/10"></div>
+          <div className="flex items-end justify-between mb-5">
+            <div>
+              <h3 className="text-[16px] font-bold text-white tracking-tight">Top revenue-generating merchants</h3>
+              <p className="text-[12px] text-white/40 mt-1">Ranked by total PayChain fees earned this period.</p>
+            </div>
           </div>
-          <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-xl overflow-hidden">
+          <div className="bg-[#0A0D14] border border-white/10 rounded-lg overflow-hidden">
             {loading ? (
-              <div className="p-8 flex items-center justify-center">
-                <Skel className="w-full h-32 bg-white/5" />
-              </div>
+              <div className="p-8"><Skel className="w-full h-32" /></div>
             ) : top.length === 0 ? (
-              <div className="p-10 text-center text-on-surface-variant/60 text-[13px]">
+              <div className="p-12 text-center text-white/40 text-[13px]">
                 No merchant revenue yet in this window.
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-[13px]">
-                  <thead className="bg-white/[0.02] border-b border-outline-variant/20">
-                    <tr className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60">
+                  <thead className="bg-white/[0.02] border-b border-white/10">
+                    <tr className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/50">
                       <th className="text-left px-5 py-3 w-10">#</th>
                       <th className="text-left px-3 py-3">Merchant</th>
                       <th className="text-right px-3 py-3">Volume</th>
@@ -525,36 +417,30 @@ const Revenue = () => {
                       const maxRev = top[0]?.revenue || 1;
                       const pct = (m.revenue / maxRev) * 100;
                       return (
-                        <tr key={m.merchantId || i} className="border-b border-outline-variant/10 hover:bg-emerald-900/10 transition-colors group">
-                          <td className="px-5 py-3 text-on-surface-variant/60 font-mono text-[12px]">{i + 1}</td>
-                          <td className="px-3 py-3">
-                            <Link
-                              to={`/merchants?id=${m.merchantId}`}
-                              className="block group-hover:text-emerald-300 transition-colors"
-                            >
+                        <tr key={m.merchantId || i} className="border-b border-white/[0.06] last:border-b-0 hover:bg-white/[0.02] transition-colors group">
+                          <td className="px-5 py-3.5 text-white/40 font-mono text-[12px]">{i + 1}</td>
+                          <td className="px-3 py-3.5">
+                            <Link to={`/merchants?id=${m.merchantId}`} className="block group-hover:opacity-90 transition-opacity">
                               <div className="font-bold text-white truncate max-w-[280px]">
                                 {m.businessName || '—'}
                               </div>
-                              <div className="text-[11px] text-on-surface-variant/60 truncate max-w-[280px]">
+                              <div className="text-[11px] text-white/40 truncate max-w-[280px]">
                                 {m.email}
-                                {m.paybillAccount ? <span className="ml-2 font-mono text-emerald-300/80">·{m.paybillAccount}</span> : null}
+                                {m.paybillAccount ? <span className="ml-2 font-mono text-white/60">·{m.paybillAccount}</span> : null}
                               </div>
                             </Link>
                           </td>
-                          <td className="px-3 py-3 text-right tabular-nums text-on-surface-variant/80">
+                          <td className="px-3 py-3.5 text-right tabular-nums text-white/70">
                             {fmtKES(m.volume)}
                           </td>
-                          <td className="px-3 py-3 text-right tabular-nums text-on-surface-variant/80">
+                          <td className="px-3 py-3.5 text-right tabular-nums text-white/70">
                             {fmtNum(m.count)}
                           </td>
-                          <td className="px-5 py-3 text-right">
-                            <div className="flex flex-col items-end gap-1">
+                          <td className="px-5 py-3.5 text-right">
+                            <div className="flex flex-col items-end gap-1.5">
                               <span className="font-bold text-white tabular-nums">{fmtKESPrecise(m.revenue)}</span>
-                              <div className="h-1 w-24 bg-white/5 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400"
-                                  style={{ width: `${pct}%` }}
-                                />
+                              <div className="h-[3px] w-24 bg-white/[0.06] rounded-full overflow-hidden">
+                                <div className="h-full bg-emerald-400" style={{ width: `${pct}%` }} />
                               </div>
                             </div>
                           </td>
@@ -568,45 +454,46 @@ const Revenue = () => {
           </div>
         </section>
 
-        {/* ── Rate card footer ─────────────────────────────────────── */}
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
-          <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-xl p-5 md:p-6">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="material-symbols-outlined text-emerald-300 text-[18px]">policy</span>
-              <h3 className="text-[12px] font-bold uppercase tracking-widest text-on-surface-variant">PayChain Rate Card</h3>
+        {/* ── Rate cards ──────────────────────────────────────────── */}
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="bg-[#0A0D14] border border-white/10 rounded-lg p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <h3 className="text-[12px] font-bold uppercase tracking-[0.18em] text-white/70">PayChain Rate Card</h3>
             </div>
-            <p className="text-[12px] text-on-surface-variant/70 mb-4">
-              Live rates PayChain earns per stream. Revenue on this page is computed from completed transactions at these rates — single source of truth.
+            <p className="text-[12px] text-white/50 mb-5 leading-relaxed">
+              Live rates PayChain earns per stream. Single source of truth — every transaction across every merchant account is priced from this table.
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+            <div className="space-y-1">
               {streams.map((s) => {
-                const a = ACCENTS[s.accent] || ACCENTS.blue;
+                const dot = ACCENT_DOT[s.accent] || ACCENT_DOT.blue;
                 return (
-                  <div key={s.id} className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${a.borderDark} bg-white/[0.02]`}>
-                    <span className={`w-2 h-2 rounded-full flex-shrink-0`} style={{ background: a.dot }} />
-                    <div className="min-w-0 flex-1">
-                      <div className="text-white font-bold truncate">{s.label}</div>
-                      <div className="text-on-surface-variant/60 font-mono">{fmtRate(s.rate)}{s.minFee > 0 ? ` · ≥${s.minFee}` : ''}</div>
+                  <div key={s.id} className="flex items-center justify-between px-3 py-2.5 rounded bg-white/[0.02] border border-white/[0.06]">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: dot }} />
+                      <span className="text-[12px] text-white font-bold truncate">{s.label}</span>
                     </div>
+                    <span className="text-[11px] text-white/70 font-mono tabular-nums">
+                      {fmtRate(s.rate)}{s.minFee > 0 ? ` · ≥${s.minFee}` : ''}
+                    </span>
                   </div>
                 );
               })}
             </div>
           </div>
 
-          <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-xl p-5 md:p-6">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="material-symbols-outlined text-green-300 text-[18px]">account_balance</span>
-              <h3 className="text-[12px] font-bold uppercase tracking-widest text-on-surface-variant">Safaricom M-Pesa Tariff (Pass-through)</h3>
+          <div className="bg-[#0A0D14] border border-white/10 rounded-lg p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <h3 className="text-[12px] font-bold uppercase tracking-[0.18em] text-white/70">Safaricom M-Pesa Tariff</h3>
+              <span className="text-[9px] font-bold text-white/40 uppercase tracking-widest border border-white/10 px-1.5 py-0.5 rounded">Pass-through</span>
             </div>
-            <p className="text-[12px] text-on-surface-variant/70 mb-4">
-              What Safaricom charges the sender per M-Pesa transaction. PayChain does not retain any portion of this — surfaced here so admins see the full customer cost.
+            <p className="text-[12px] text-white/50 mb-5 leading-relaxed">
+              What Safaricom charges the sender per M-Pesa transaction. PayChain does not retain any portion of this — shown for full customer-cost transparency.
             </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[11px] font-mono">
+            <div className="grid grid-cols-2 gap-1 text-[11px] font-mono">
               {MPESA_TARIFF_DISPLAY.map((t) => (
-                <div key={t.label} className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-white/[0.02] border border-outline-variant/15">
-                  <span className="text-on-surface-variant/70">{t.label}</span>
-                  <span className="text-white font-bold">{t.fee === 0 ? 'FREE' : `KES ${t.fee}`}</span>
+                <div key={t.label} className="flex items-center justify-between px-3 py-2 rounded bg-white/[0.02] border border-white/[0.06]">
+                  <span className="text-white/60">{t.label}</span>
+                  <span className="text-white font-bold tabular-nums">{t.fee === 0 ? 'FREE' : `KES ${t.fee}`}</span>
                 </div>
               ))}
             </div>

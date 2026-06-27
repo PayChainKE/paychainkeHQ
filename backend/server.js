@@ -13,6 +13,7 @@ import transactionRoutes from './routes/transactionRoutes.js';
 import mpesaRoutes from './routes/mpesaRoutes.js';
 import trustScoreRoutes from './routes/trustScoreRoutes.js';
 import { ensurePrimaryOwner } from './migrations/ensurePrimaryOwner.js';
+import { backfillTransactionFees } from './migrations/backfillTransactionFees.js';
 
 dotenv.config();
 
@@ -22,6 +23,7 @@ dotenv.config();
 // hits save to retry.
 connectDB()
   .then(() => ensurePrimaryOwner())
+  .then(() => backfillTransactionFees())
   .catch(() => { /* error already printed with actionable hint in connectDB */ });
 
 const app = express();
