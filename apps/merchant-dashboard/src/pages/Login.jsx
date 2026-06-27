@@ -792,14 +792,6 @@ export default function Login() {
                   )}
                 </p>
 
-                {/* Expiry pill */}
-                <div className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200">
-                  <span className="material-symbols-outlined text-amber-500 text-[13px]">timer</span>
-                  <span className="text-[11px] font-black text-amber-700 uppercase tracking-widest">
-                    Expires in {resendTimer}s
-                  </span>
-                </div>
-
                 {otpFlowType === 'reset' && (
                   <button
                     type="button"
