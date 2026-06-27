@@ -117,6 +117,72 @@ export default function InflationShield() {
   }
 
   const swapHistory = liveTransactions.filter(t => t.type === 'fx_swap')
+  const walletActivated = !!merchant?.stellarPublicKey
+
+  // Hard gate: Inflation Shield is a wallet-only feature. Without an active
+  // Stellar wallet there's nothing to swap into, so we show an activation CTA
+  // instead of letting the merchant submit a swap that the backend would just
+  // reject with "Wallet Not Activated".
+  if (!walletActivated) {
+    return (
+      <MerchantLayout title="Inflation Shield">
+        <div className="px-4 lg:px-0 max-w-3xl mx-auto w-full pb-20">
+          <div className="bg-gradient-to-br from-[#0A2540] via-[#081d34] to-[#02101e] text-white rounded-[32px] lg:rounded-[40px] p-8 lg:p-14 border border-blue-500/15 shadow-[0_30px_60px_-25px_rgba(10,37,64,0.7)] relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/15 rounded-full -mr-32 -mt-32 blur-3xl pointer-events-none"></div>
+            <div className="absolute bottom-0 left-0 w-72 h-72 bg-emerald-400/10 rounded-full -ml-24 -mb-24 blur-3xl pointer-events-none"></div>
+
+            <div className="relative z-10">
+              <div className="w-16 h-16 lg:w-20 lg:h-20 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-blue-200 backdrop-blur-md mb-7">
+                <span className="material-symbols-outlined text-3xl lg:text-4xl" style={{ fontVariationSettings: "'FILL' 1" }}>security</span>
+              </div>
+
+              <p className="text-[10px] lg:text-[11px] font-black uppercase tracking-[0.3em] text-blue-300 mb-3">Activate to unlock</p>
+              <h2 className="font-headline text-3xl lg:text-5xl tracking-tight leading-[1.05] mb-4">
+                Inflation Shield needs an active Digital Wallet
+              </h2>
+              <p className="text-white/70 text-sm lg:text-base leading-relaxed max-w-xl mb-8">
+                Shielding KES into USDC requires a provisioned Stellar wallet on your account. Activation takes under a minute — once it's live you can swap, hold and convert at any time.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 lg:gap-4 mb-9">
+                {[
+                  { icon: 'shield', label: 'USDC-pegged', sub: 'Dollar-stable savings' },
+                  { icon: 'currency_exchange', label: 'Live FX rate', sub: 'Real-time KES ↔ USDC' },
+                  { icon: 'bolt', label: 'On-chain settle', sub: 'Stellar Mainnet' },
+                ].map((b) => (
+                  <div key={b.label} className="bg-white/5 border border-white/10 rounded-2xl p-4">
+                    <span className="material-symbols-outlined text-blue-300 text-xl mb-2">{b.icon}</span>
+                    <p className="text-[12px] font-bold text-white">{b.label}</p>
+                    <p className="text-[10px] text-white/50 mt-0.5">{b.sub}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Link
+                  to="/wallet"
+                  className="inline-flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-[#031813] font-black text-sm uppercase tracking-[0.18em] px-7 py-4 rounded-2xl transition-all shadow-[0_10px_30px_-12px_rgba(16,185,129,0.6)] active:scale-[0.98]"
+                >
+                  <span className="material-symbols-outlined text-lg">account_balance_wallet</span>
+                  Activate Digital Wallet
+                </Link>
+                <Link
+                  to="/overview"
+                  className="inline-flex items-center justify-center gap-2 text-[11px] font-black uppercase tracking-[0.2em] text-white/60 hover:text-white px-5 py-4"
+                >
+                  Back to overview
+                </Link>
+              </div>
+
+              <p className="text-[10px] uppercase tracking-[0.2em] text-white/30 mt-8 font-bold">
+                You'll be redirected to the Wallet page to provision your address.
+              </p>
+            </div>
+          </div>
+        </div>
+      </MerchantLayout>
+    )
+  }
 
   return (
     <MerchantLayout title="Inflation Shield">
