@@ -187,7 +187,7 @@ const Ledger = () => {
     <Layout>
       <div className="space-y-6 pb-12">
         {/* Hero / Header */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#06201B] via-[#0a3029] to-[#0f3a30] border border-emerald-900/40 shadow-[0_30px_80px_-20px_rgba(6,32,27,0.5)] p-6 md:p-8">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#06201B] via-[#0a3029] to-[#0f3a30] border border-emerald-900/40 shadow-[0_30px_80px_-20px_rgba(6,32,27,0.5)] p-5 md:p-8">
           <div className="absolute -top-24 -right-24 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl"></div>
           <div className="absolute -bottom-16 -left-16 w-60 h-60 bg-emerald-400/10 rounded-full blur-2xl"></div>
           <div className="relative flex flex-col md:flex-row md:items-end md:justify-between gap-5">
@@ -196,7 +196,7 @@ const Ledger = () => {
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                 <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-emerald-300">Wallet Ledger · Live Chain Settlement</p>
               </div>
-              <h1 className="text-[32px] md:text-[40px] font-bold text-white tracking-tighter font-headline leading-none">
+              <h1 className="text-[24px] md:text-[40px] font-bold text-white tracking-tighter font-headline leading-none">
                 On-Chain Treasury
               </h1>
               <p className="text-emerald-100/60 mt-2 max-w-xl text-[13px] md:text-[14px]">

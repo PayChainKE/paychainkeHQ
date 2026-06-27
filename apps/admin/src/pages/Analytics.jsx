@@ -76,7 +76,7 @@ const Analytics = () => {
               <span className="material-symbols-outlined text-primary text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>insights</span>
               <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary">Executive Insights</p>
             </div>
-            <h2 className="text-[28px] md:text-[36px] font-bold text-on-surface tracking-tighter font-headline leading-none">
+            <h2 className="text-[22px] md:text-[36px] font-bold text-on-surface tracking-tighter font-headline leading-none">
               Pulse of the Network
             </h2>
             <p className="text-on-surface-variant/60 mt-2 text-[13px] md:text-[14px] font-body max-w-xl">

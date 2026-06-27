@@ -379,7 +379,7 @@ const Merchants = () => {
         {/* Page Title */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
           <div>
-            <h2 className="text-[28px] md:text-[32px] font-bold text-on-surface tracking-tighter font-headline">Merchant Directory</h2>
+            <h2 className="text-[22px] md:text-[32px] font-bold text-on-surface tracking-tighter font-headline">Merchant Directory</h2>
             <p className="text-[13px] md:text-[14px] text-on-surface-variant mt-1">Manage all registered businesses, their activity, and account status.</p>
           </div>
           <button

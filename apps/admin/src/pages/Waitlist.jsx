@@ -343,7 +343,7 @@ const Waitlist = () => {
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
           <div>
-            <h2 className="text-[28px] md:text-[32px] font-bold text-on-surface tracking-tighter font-headline">Waitlist Pipeline</h2>
+            <h2 className="text-[22px] md:text-[32px] font-bold text-on-surface tracking-tighter font-headline">Waitlist Pipeline</h2>
             <p className="text-on-surface-variant/60 mt-1 text-[13px] md:text-[14px] font-body">Track prospective merchants from interest through to onboarded business.</p>
           </div>
           <div className="flex items-center gap-2 w-full sm:w-auto">

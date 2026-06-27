@@ -41,7 +41,7 @@ const Settings = () => {
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary mb-1">Console</p>
-            <h2 className="text-[28px] md:text-[32px] font-bold text-on-surface tracking-tighter font-headline">Settings</h2>
+            <h2 className="text-[22px] md:text-[32px] font-bold text-on-surface tracking-tighter font-headline">Settings</h2>
             <p className="text-on-surface-variant/60 mt-1 text-[13px] md:text-[14px] font-body">
               Manage your profile, security credentials, and system-level controls.
             </p>
