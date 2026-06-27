@@ -44,10 +44,8 @@ const Sidebar = ({ isOpen, onClose }) => {
   }, [fetchStatus]);
 
   const statRows = [
-    { icon: 'hourglass_empty', label: 'Waitlist',  value: status?.waitlist?.total,  badge: status?.waitlist?.pending,  badgeTone: 'amber',   path: '/waitlist'  },
-    { icon: 'storefront',      label: 'Merchants', value: status?.merchants?.total, badge: status?.merchants?.flagged, badgeTone: 'red',     path: '/merchants' },
-    { icon: 'mail',            label: 'Messages',  value: status?.messages?.total,  badge: status?.messages?.unread,   badgeTone: 'emerald', path: '/messages'  },
-    { icon: 'call',            label: 'Calls',     value: status?.calls?.total,     badge: status?.calls?.open,        badgeTone: 'emerald', path: '/call-centre' },
+    { icon: 'storefront', label: 'Merchants', value: status?.merchants?.total, badge: status?.merchants?.flagged, badgeTone: 'red',     path: '/merchants' },
+    { icon: 'mail',       label: 'Messages',  value: status?.messages?.total,  badge: status?.messages?.unread,   badgeTone: 'emerald', path: '/messages'  },
   ];
 
   const badgeToneMap = {
@@ -86,16 +84,16 @@ const Sidebar = ({ isOpen, onClose }) => {
           </NavLink>
         ))}
       </nav>
-      <div className="mt-auto pt-6 border-t border-white/10 space-y-4">
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-widest text-[#c0c9c0]/50 px-2 font-label">
+      <div className="mt-auto pt-3 border-t border-white/10 space-y-3">
+        <div className="space-y-0.5">
+          <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-[#c0c9c0]/50 px-2 font-label">
             <span>System Status</span>
             <button
               onClick={fetchStatus}
               title="Refresh"
               className="text-[#c0c9c0]/40 hover:text-emerald-300 transition-colors"
             >
-              <span className="material-symbols-outlined text-[14px]">refresh</span>
+              <span className="material-symbols-outlined text-[13px]">refresh</span>
             </button>
           </div>
           {statRows.map((row) => (
@@ -103,9 +101,9 @@ const Sidebar = ({ isOpen, onClose }) => {
               key={row.label}
               to={row.path}
               onClick={() => window.innerWidth < 1024 && onClose()}
-              className="flex items-center gap-2 px-3 py-1.5 text-slate-400 text-[12px] font-medium font-body rounded-lg hover:bg-emerald-900/30 hover:text-white transition-colors"
+              className="flex items-center gap-2 px-2 py-1 text-slate-400 text-[11px] font-medium font-body rounded-md hover:bg-emerald-900/30 hover:text-white transition-colors"
             >
-              <span className="material-symbols-outlined text-[16px] opacity-70">{row.icon}</span>
+              <span className="material-symbols-outlined text-[14px] opacity-70">{row.icon}</span>
               <span className="flex-1">{row.label}</span>
               {loadingStatus ? (
                 <span className="inline-block w-6 h-3 bg-white/10 rounded animate-pulse"></span>
