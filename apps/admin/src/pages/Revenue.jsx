@@ -287,28 +287,28 @@ const Revenue = () => {
         <div className="flex flex-col gap-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/65 mb-2">Finance · Internal</p>
-              <h2 className="text-[28px] md:text-[34px] font-bold text-white tracking-tighter leading-none">
+              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-on-surface-variant/70 mb-2">Finance · Internal</p>
+              <h2 className="text-[28px] md:text-[34px] font-bold text-on-surface tracking-tighter leading-none font-headline">
                 Revenue &amp; Fees
               </h2>
-              <p className="text-[13px] text-white/80 mt-2 max-w-2xl leading-relaxed">
+              <p className="text-[13px] text-on-surface-variant mt-2 max-w-2xl leading-relaxed">
                 Split-settlement view of PayChain platform earnings. All figures are PayChain's share — strictly separated from merchant funds held in the FBO account.
               </p>
             </div>
             <button
               onClick={fetchRevenue}
               title="Refresh"
-              className="self-start sm:self-end w-9 h-9 inline-flex items-center justify-center bg-white/[0.03] border border-white/10 rounded-md text-white/80 hover:text-white hover:bg-white/[0.06] transition-colors"
+              className="self-start sm:self-end w-9 h-9 inline-flex items-center justify-center bg-surface-container border border-outline-variant/40 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors"
             >
               <span className="material-symbols-outlined text-[18px]">refresh</span>
             </button>
           </div>
 
           {/* Filter toolbar */}
-          <div className="flex flex-wrap items-center gap-2 p-2 rounded-lg border border-white/10 bg-white/[0.04]">
+          <div className="flex flex-wrap items-center gap-2 p-2 rounded-lg border border-outline-variant/40 bg-surface-container-lowest">
             <div className="flex items-center gap-2 px-2">
-              <span className="material-symbols-outlined text-white/65 text-[16px]">date_range</span>
-              <span className="text-[11px] font-bold uppercase tracking-widest text-white/75">Period</span>
+              <span className="material-symbols-outlined text-on-surface-variant text-[16px]">date_range</span>
+              <span className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant">Period</span>
             </div>
             <div className="inline-flex bg-[#0A0D14] border border-white/10 rounded-md p-0.5">
               {RANGES.map((r) => (
@@ -325,10 +325,10 @@ const Revenue = () => {
                 </button>
               ))}
             </div>
-            <div className="w-px h-6 bg-white/10 mx-1" />
+            <div className="w-px h-6 bg-outline-variant/60 mx-1" />
             <div className="flex items-center gap-2 px-2">
-              <span className="material-symbols-outlined text-white/65 text-[16px]">filter_alt</span>
-              <span className="text-[11px] font-bold uppercase tracking-widest text-white/75">Channel</span>
+              <span className="material-symbols-outlined text-on-surface-variant text-[16px]">filter_alt</span>
+              <span className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant">Channel</span>
             </div>
             <select
               value={channelFilter}
@@ -510,15 +510,15 @@ const Revenue = () => {
         <section>
           <div className="flex items-end justify-between mb-4">
             <div>
-              <h3 className="text-[16px] font-bold text-white tracking-tight">Revenue Sweeps &amp; Settlement Batches</h3>
-              <p className="text-[12px] text-white/65 mt-1">
+              <h3 className="text-[16px] font-bold text-on-surface tracking-tight font-headline">Revenue Sweeps &amp; Settlement Batches</h3>
+              <p className="text-[12px] text-on-surface-variant mt-1">
                 Automated movement of accumulated fees from the PayChain FBO settlement account into the corporate operating account.
               </p>
             </div>
             {!loading && data?.corporateDestination && (
-              <div className="hidden md:flex items-center gap-2 text-[11px] text-white/65">
+              <div className="hidden md:flex items-center gap-2 text-[11px] text-on-surface-variant">
                 <span className="material-symbols-outlined text-[14px]">account_balance</span>
-                <span>Destination: <span className="text-white font-bold">{data.corporateDestination}</span></span>
+                <span>Destination: <span className="text-on-surface font-bold">{data.corporateDestination}</span></span>
               </div>
             )}
           </div>
@@ -584,14 +584,14 @@ const Revenue = () => {
 
           {/* Reconciliation footer — totals always reconcile to the KPIs above */}
           {!loading && sweeps.length > 0 && (
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-white/[0.04] border border-white/15 rounded-md text-[11px]">
-              <span className="text-white/65">
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-surface-container-lowest border border-outline-variant/40 rounded-md text-[11px]">
+              <span className="text-on-surface-variant">
                 Showing {sweeps.length} batches · figures reconcile to KPI strip
               </span>
               <div className="flex items-center gap-5 tabular-nums">
-                <span className="text-white/75">Σ Gross <span className="text-white font-bold">{fmtKESPrecise(sweeps.reduce((s, b) => s + b.gross, 0))}</span></span>
-                <span className="text-white/75">Σ Cuts <span className="text-white/80 font-bold">−{fmtKESPrecise(sweeps.reduce((s, b) => s + b.costs, 0))}</span></span>
-                <span className="text-emerald-300 font-bold">
+                <span className="text-on-surface-variant">Σ Gross <span className="text-on-surface font-bold">{fmtKESPrecise(sweeps.reduce((s, b) => s + b.gross, 0))}</span></span>
+                <span className="text-on-surface-variant">Σ Cuts <span className="text-on-surface font-bold">−{fmtKESPrecise(sweeps.reduce((s, b) => s + b.costs, 0))}</span></span>
+                <span className="text-emerald-700 font-bold">
                   Σ Net {fmtKESPrecise(sweeps.reduce((s, b) => s + b.net, 0))}
                 </span>
               </div>
@@ -603,8 +603,8 @@ const Revenue = () => {
         <section>
           <div className="flex items-end justify-between mb-4">
             <div>
-              <h3 className="text-[16px] font-bold text-white tracking-tight">Top revenue-generating merchants</h3>
-              <p className="text-[12px] text-white/65 mt-1">Ranked by net PayChain margin contributed this period.</p>
+              <h3 className="text-[16px] font-bold text-on-surface tracking-tight font-headline">Top revenue-generating merchants</h3>
+              <p className="text-[12px] text-on-surface-variant mt-1">Ranked by net PayChain margin contributed this period.</p>
             </div>
           </div>
           <div className="bg-[#0A0D14] border border-white/10 rounded-lg overflow-hidden">
@@ -662,10 +662,10 @@ const Revenue = () => {
 
         {/* ── Footer disclaimer ────────────────────────────────────── */}
         <section>
-          <div className="bg-white/[0.04] border border-white/15 rounded-lg p-4 flex items-start gap-3">
-            <span className="material-symbols-outlined text-white/65 text-[18px] mt-0.5 flex-shrink-0">shield_lock</span>
-            <p className="text-[11px] text-white/75 leading-relaxed">
-              <span className="text-white font-bold">Split-settlement architecture.</span>{' '}
+          <div className="bg-surface-container-lowest border border-outline-variant/40 rounded-lg p-4 flex items-start gap-3">
+            <span className="material-symbols-outlined text-on-surface-variant text-[18px] mt-0.5 flex-shrink-0">shield_lock</span>
+            <p className="text-[11px] text-on-surface-variant leading-relaxed">
+              <span className="text-on-surface font-bold">Split-settlement architecture.</span>{' '}
               Customer funds and PayChain fees are settled to separate ledger accounts at processing time. Figures on this page reflect only the PayChain share — they are isolated from merchant balances and the FBO trust account. All values reconcile to the live transactions collection.
             </p>
           </div>
