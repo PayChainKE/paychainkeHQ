@@ -68,10 +68,10 @@ const CHANNEL_META = {
 };
 
 const STATUS_META = {
-  'Settled to Corporate':   { dot: 'bg-emerald-400', text: 'text-emerald-300', border: 'border-emerald-500/30', bg: 'bg-emerald-500/[0.08]' },
-  'Pending Bank Clearing':  { dot: 'bg-amber-400 animate-pulse',  text: 'text-amber-300',   border: 'border-amber-500/30',  bg: 'bg-amber-500/[0.08]' },
-  'Accruing':               { dot: 'bg-sky-400',     text: 'text-sky-300',     border: 'border-sky-500/30',     bg: 'bg-sky-500/[0.08]' },
-  'Failed':                 { dot: 'bg-red-400',     text: 'text-red-300',     border: 'border-red-500/30',     bg: 'bg-red-500/[0.08]' },
+  'Settled to Corporate':   { dot: 'bg-emerald-500',                 text: 'text-emerald-700', border: 'border-emerald-200', bg: 'bg-emerald-50' },
+  'Pending Bank Clearing':  { dot: 'bg-amber-500 animate-pulse',     text: 'text-amber-800',   border: 'border-amber-200',   bg: 'bg-amber-50'   },
+  'Accruing':               { dot: 'bg-sky-500',                     text: 'text-sky-700',     border: 'border-sky-200',     bg: 'bg-sky-50'     },
+  'Failed':                 { dot: 'bg-red-500',                     text: 'text-red-700',     border: 'border-red-200',     bg: 'bg-red-50'     },
 };
 
 // ── Formatters ────────────────────────────────────────────────────────
@@ -139,7 +139,7 @@ function rebucketSeries(series, granularity) {
 
 // ── Skeleton ──────────────────────────────────────────────────────────
 const Skel = ({ className = 'w-16 h-7' }) => (
-  <span className={`inline-block ${className} bg-white/[0.06] rounded align-middle animate-pulse`} aria-hidden="true" />
+  <span className={`inline-block ${className} bg-surface-container/80 rounded align-middle animate-pulse`} aria-hidden="true" />
 );
 
 // ── Volume-vs-Net-Revenue chart ───────────────────────────────────────
@@ -149,7 +149,7 @@ const VolumeRevenueChart = ({ series, totalGmv, totalNet }) => {
   const buckets = series || [];
   if (!buckets.length) {
     return (
-      <div className="h-[260px] flex flex-col items-center justify-center text-white/65 text-[13px] gap-2">
+      <div className="h-[260px] flex flex-col items-center justify-center text-on-surface-variant text-[13px] gap-2">
         <span className="material-symbols-outlined text-[32px] opacity-40">monitoring</span>
         No activity in this window yet.
       </div>
@@ -183,12 +183,12 @@ const VolumeRevenueChart = ({ series, totalGmv, totalNet }) => {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-5 text-[11px]">
         <div className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded-sm bg-white/15" />
-          <span className="text-white/80">GMV (volume)</span>
+          <span className="w-3 h-3 rounded-sm bg-outline-variant/40" />
+          <span className="text-on-surface-variant">GMV (volume)</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="w-3 h-0.5 bg-emerald-400" />
-          <span className="text-white/80">Net Revenue</span>
+          <span className="text-on-surface-variant">Net Revenue</span>
         </div>
       </div>
 
@@ -199,15 +199,15 @@ const VolumeRevenueChart = ({ series, totalGmv, totalNet }) => {
             const heightPct = Math.max(2, (r.gmv / maxGmv) * 100);
             return (
               <div key={`${r.bucket}-${i}`} className="flex-1 flex flex-col items-center group relative min-w-[8px]">
-                <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-bold text-white/85 whitespace-nowrap tabular-nums z-10">
+                <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-bold text-on-surface whitespace-nowrap tabular-nums z-10">
                   {fmtKES(r.gmv)}
                 </div>
                 <div
-                  className="w-full rounded-sm bg-white/25 group-hover:bg-white/40 transition-colors"
+                  className="w-full rounded-sm bg-on-surface-variant/35 group-hover:bg-on-surface-variant/55 transition-colors"
                   style={{ height: `${heightPct}%` }}
                   title={`${r.bucket} · GMV ${fmtKESPrecise(r.gmv)} · Net ${fmtKESPrecise(r.net)}`}
                 />
-                <div className="absolute -bottom-6 text-[10px] text-white/70 truncate w-full text-center font-mono">
+                <div className="absolute -bottom-6 text-[10px] text-on-surface/70 truncate w-full text-center font-mono">
                   {r.bucket.length > 5 ? r.bucket.slice(5) : r.bucket}
                 </div>
               </div>
@@ -225,7 +225,7 @@ const VolumeRevenueChart = ({ series, totalGmv, totalNet }) => {
         >
           <polyline
             fill="none"
-            stroke="#34D399"
+            stroke="#059669"
             strokeWidth="2"
             strokeLinejoin="round"
             strokeLinecap="round"
@@ -310,15 +310,15 @@ const Revenue = () => {
               <span className="material-symbols-outlined text-on-surface-variant text-[16px]">date_range</span>
               <span className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant">Period</span>
             </div>
-            <div className="inline-flex bg-[#0A0D14] border border-white/10 rounded-md p-0.5">
+            <div className="inline-flex bg-surface-container-lowest border border-outline-variant/40 rounded-md p-0.5">
               {RANGES.map((r) => (
                 <button
                   key={r.v}
                   onClick={() => setRange(r.v)}
                   className={`px-2.5 py-1 text-[11px] font-bold tracking-wider rounded transition-colors ${
                     range === r.v
-                      ? 'bg-white text-[#0A0D14]'
-                      : 'text-white/80 hover:text-white'
+                      ? 'bg-on-surface text-surface-container-lowest'
+                      : 'text-on-surface-variant hover:text-on-surface'
                   }`}
                 >
                   {r.l}
@@ -333,7 +333,7 @@ const Revenue = () => {
             <select
               value={channelFilter}
               onChange={(e) => setChannelFilter(e.target.value)}
-              className="bg-[#0A0D14] border border-white/10 rounded-md px-2.5 py-1.5 text-[12px] text-white font-medium focus:outline-none focus:border-white/30 cursor-pointer"
+              className="bg-surface-container-lowest border border-outline-variant/40 rounded-md px-2.5 py-1.5 text-[12px] text-on-surface font-medium focus:outline-none focus:border-white/30 cursor-pointer"
             >
               {channelOptions.map((c) => (
                 <option key={c} value={c}>{c === 'all' ? 'All channels' : c}</option>
@@ -343,74 +343,74 @@ const Revenue = () => {
         </div>
 
         {error && (
-          <div className="rounded-md border border-red-500/20 bg-red-500/[0.06] text-red-200 text-[13px] px-4 py-3">
+          <div className="rounded-md border border-red-200 bg-red-50 text-red-700 text-[13px] px-4 py-3">
             {error}
           </div>
         )}
 
         {/* ── A. Financial-Summary metric cards ────────────────────── */}
         <section>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px bg-white/10 border border-white/10 rounded-lg overflow-hidden">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px bg-outline-variant/40 border border-outline-variant/40 rounded-lg overflow-hidden">
             {/* GMV — volume processed */}
-            <div className="bg-[#0A0D14] p-5 flex flex-col gap-2">
+            <div className="bg-surface-container-lowest p-5 flex flex-col gap-2">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-white/75 uppercase tracking-[0.18em]">Gross Merchandise Volume</span>
-                <span className="material-symbols-outlined text-white/30 text-[14px]" title="Total transaction volume processed">payments</span>
+                <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-[0.18em]">Gross Merchandise Volume</span>
+                <span className="material-symbols-outlined text-on-surface-variant/60 text-[14px]" title="Total transaction volume processed">payments</span>
               </div>
               {loading
                 ? <Skel className="w-32 h-9" />
-                : <span className="text-[26px] md:text-[30px] font-bold text-white tracking-tighter leading-none tabular-nums">{fmtKES(kpis.gmv)}</span>}
-              <p className="text-[11px] text-white/65">Volume routed through PayChain</p>
+                : <span className="text-[26px] md:text-[30px] font-bold text-on-surface tracking-tighter leading-none tabular-nums">{fmtKES(kpis.gmv)}</span>}
+              <p className="text-[11px] text-on-surface-variant">Volume routed through PayChain</p>
             </div>
 
             {/* Gross Platform Revenue */}
-            <div className="bg-[#0A0D14] p-5 flex flex-col gap-2">
+            <div className="bg-surface-container-lowest p-5 flex flex-col gap-2">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-white/75 uppercase tracking-[0.18em]">Gross Platform Revenue</span>
-                <span className="material-symbols-outlined text-white/30 text-[14px]" title="Total fees collected at the take rate">request_quote</span>
+                <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-[0.18em]">Gross Platform Revenue</span>
+                <span className="material-symbols-outlined text-on-surface-variant/60 text-[14px]" title="Total fees collected at the take rate">request_quote</span>
               </div>
               {loading
                 ? <Skel className="w-28 h-9" />
-                : <span className="text-[26px] md:text-[30px] font-bold text-white tracking-tighter leading-none tabular-nums">{fmtKES(kpis.grossRevenue)}</span>}
+                : <span className="text-[26px] md:text-[30px] font-bold text-on-surface tracking-tighter leading-none tabular-nums">{fmtKES(kpis.grossRevenue)}</span>}
               {!loading && (
                 <div className="flex items-baseline gap-1.5 text-[11px]">
-                  <span className={`font-bold tabular-nums ${(kpis.grossChange || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  <span className={`font-bold tabular-nums ${(kpis.grossChange || 0) >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
                     {fmtChange(kpis.grossChange)}
                   </span>
-                  <span className="text-white/65">vs prev period</span>
+                  <span className="text-on-surface-variant">vs prev period</span>
                 </div>
               )}
             </div>
 
             {/* Network & Partner Costs */}
-            <div className="bg-[#0A0D14] p-5 flex flex-col gap-2">
+            <div className="bg-surface-container-lowest p-5 flex flex-col gap-2">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-white/75 uppercase tracking-[0.18em]">Network &amp; Partner Costs</span>
-                <span className="material-symbols-outlined text-white/30 text-[14px]" title="Pass-through fees paid to networks (Safaricom, etc.)">output</span>
+                <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-[0.18em]">Network &amp; Partner Costs</span>
+                <span className="material-symbols-outlined text-on-surface-variant/60 text-[14px]" title="Pass-through fees paid to networks (Safaricom, etc.)">output</span>
               </div>
               {loading
                 ? <Skel className="w-24 h-9" />
-                : <span className="text-[26px] md:text-[30px] font-bold text-white tracking-tighter leading-none tabular-nums">−{fmtKES(kpis.networkCosts).replace('KES ', 'KES ')}</span>}
-              <p className="text-[11px] text-white/65">Paid to M-Pesa / banking rails</p>
+                : <span className="text-[26px] md:text-[30px] font-bold text-on-surface tracking-tighter leading-none tabular-nums">−{fmtKES(kpis.networkCosts).replace('KES ', 'KES ')}</span>}
+              <p className="text-[11px] text-on-surface-variant">Paid to M-Pesa / banking rails</p>
             </div>
 
-            {/* Net Revenue — THE bottom line. Solid dark background with
-                an emerald left border + label so the value stays at full
-                white-on-black contrast (no translucent wash). */}
-            <div className="bg-[#0A0D14] p-5 flex flex-col gap-2 relative border-l-2 border-emerald-400">
+            {/* Net Revenue — THE bottom line. Subtle emerald tint + accent
+                border so it pops from its three siblings without sacrificing
+                contrast on the dark figure. */}
+            <div className="bg-emerald-50 p-5 flex flex-col gap-2 relative border-l-2 border-emerald-500">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-emerald-300 uppercase tracking-[0.18em]">Net Revenue · Platform Margin</span>
-                <span className="material-symbols-outlined text-emerald-400 text-[14px]" title="Gross revenue minus partner costs — PayChain's actual margin">savings</span>
+                <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-[0.18em]">Net Revenue · Platform Margin</span>
+                <span className="material-symbols-outlined text-emerald-700 text-[14px]" title="Gross revenue minus partner costs — PayChain's actual margin">savings</span>
               </div>
               {loading
                 ? <Skel className="w-28 h-9" />
-                : <span className="text-[28px] md:text-[34px] font-bold text-white tracking-tighter leading-none tabular-nums">{fmtKES(kpis.netRevenue)}</span>}
+                : <span className="text-[28px] md:text-[34px] font-bold text-on-surface tracking-tighter leading-none tabular-nums">{fmtKES(kpis.netRevenue)}</span>}
               {!loading && (
                 <div className="flex items-baseline gap-1.5 text-[11px]">
-                  <span className={`font-bold tabular-nums ${(kpis.netChange || 0) >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
+                  <span className={`font-bold tabular-nums ${(kpis.netChange || 0) >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
                     {fmtChange(kpis.netChange)}
                   </span>
-                  <span className="text-white/75">vs prev · take {fmtPct((kpis.netRevenue || 0) / Math.max(kpis.gmv || 1, 1) * 100, 2)}</span>
+                  <span className="text-on-surface-variant">vs prev · take {fmtPct((kpis.netRevenue || 0) / Math.max(kpis.gmv || 1, 1) * 100, 2)}</span>
                 </div>
               )}
             </div>
@@ -420,21 +420,21 @@ const Revenue = () => {
         {/* ── B. Volume vs Net Revenue chart + Channel breakdown ─── */}
         <section className="grid grid-cols-1 xl:grid-cols-5 gap-4">
           {/* Chart */}
-          <div className="xl:col-span-3 bg-[#0A0D14] border border-white/10 rounded-lg p-5 md:p-6">
+          <div className="xl:col-span-3 bg-surface-container-lowest border border-outline-variant/40 rounded-lg p-5 md:p-6">
             <div className="flex items-start justify-between mb-5">
               <div>
-                <h3 className="text-[14px] font-bold text-white tracking-tight">Volume vs Net Platform Fees</h3>
-                <p className="text-[11px] text-white/65 mt-1">GMV bars overlaid with the net-revenue trend line.</p>
+                <h3 className="text-[14px] font-bold text-on-surface tracking-tight">Volume vs Net Platform Fees</h3>
+                <p className="text-[11px] text-on-surface-variant mt-1">GMV bars overlaid with the net-revenue trend line.</p>
               </div>
-              <div className="inline-flex bg-[#0A0D14] border border-white/10 rounded-md p-0.5">
+              <div className="inline-flex bg-surface-container-lowest border border-outline-variant/40 rounded-md p-0.5">
                 {GRANULARITIES.map((g) => (
                   <button
                     key={g.v}
                     onClick={() => setGranularity(g.v)}
                     className={`px-2.5 py-1 text-[10px] font-bold tracking-wider rounded transition-colors ${
                       granularity === g.v
-                        ? 'bg-white text-[#0A0D14]'
-                        : 'text-white/80 hover:text-white'
+                        ? 'bg-on-surface text-surface-container-lowest'
+                        : 'text-on-surface-variant hover:text-on-surface'
                     }`}
                   >
                     {g.l}
@@ -456,17 +456,17 @@ const Revenue = () => {
           </div>
 
           {/* Channel breakdown */}
-          <div className="xl:col-span-2 bg-[#0A0D14] border border-white/10 rounded-lg p-5 md:p-6">
+          <div className="xl:col-span-2 bg-surface-container-lowest border border-outline-variant/40 rounded-lg p-5 md:p-6">
             <div className="flex items-start justify-between mb-5">
               <div>
-                <h3 className="text-[14px] font-bold text-white tracking-tight">Net Margin by Payment Rail</h3>
-                <p className="text-[11px] text-white/65 mt-1">Which channel keeps the most after partner cuts.</p>
+                <h3 className="text-[14px] font-bold text-on-surface tracking-tight">Net Margin by Payment Rail</h3>
+                <p className="text-[11px] text-on-surface-variant mt-1">Which channel keeps the most after partner cuts.</p>
               </div>
             </div>
             {loading ? (
               <Skel className="w-full h-40" />
             ) : filteredChannels.length === 0 ? (
-              <div className="h-32 flex items-center justify-center text-white/65 text-[12px]">
+              <div className="h-32 flex items-center justify-center text-on-surface-variant text-[12px]">
                 No data for selected channel.
               </div>
             ) : (
@@ -477,24 +477,24 @@ const Revenue = () => {
                   const pct = (c.net / maxNet) * 100;
                   const margin = c.gmv ? (c.net / c.gmv) * 100 : 0;
                   return (
-                    <div key={c.channel} className="border border-white/15 rounded-md bg-white/[0.04] p-3.5">
+                    <div key={c.channel} className="border border-outline-variant/40 rounded-md bg-surface-container/70 p-3.5">
                       <div className="flex items-start justify-between gap-3 mb-2">
                         <div className="flex items-center gap-2.5 min-w-0">
                           <span className="material-symbols-outlined text-[18px]" style={{ color: meta.dot }}>{meta.icon}</span>
                           <div className="min-w-0">
-                            <div className="text-[12px] font-bold text-white truncate">{c.channel}</div>
-                            <div className="text-[10px] text-white/65 tabular-nums">{fmtNum(c.count)} txns · GMV {fmtKES(c.gmv)}</div>
+                            <div className="text-[12px] font-bold text-on-surface truncate">{c.channel}</div>
+                            <div className="text-[10px] text-on-surface-variant tabular-nums">{fmtNum(c.count)} txns · GMV {fmtKES(c.gmv)}</div>
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="text-[13px] font-bold text-white tabular-nums">{fmtKESPrecise(c.net)}</div>
-                          <div className="text-[10px] text-white/65 tabular-nums">{fmtPct(margin, 2)} margin</div>
+                          <div className="text-[13px] font-bold text-on-surface tabular-nums">{fmtKESPrecise(c.net)}</div>
+                          <div className="text-[10px] text-on-surface-variant tabular-nums">{fmtPct(margin, 2)} margin</div>
                         </div>
                       </div>
-                      <div className="h-1 bg-white/[0.04] rounded-full overflow-hidden">
+                      <div className="h-1 bg-surface-container/70 rounded-full overflow-hidden">
                         <div className="h-full transition-all duration-500" style={{ width: `${pct}%`, background: meta.dot }} />
                       </div>
-                      <div className="flex items-center justify-between mt-2 text-[10px] text-white/65 tabular-nums">
+                      <div className="flex items-center justify-between mt-2 text-[10px] text-on-surface-variant tabular-nums">
                         <span>Gross {fmtKES(c.gross)}</span>
                         <span>Costs −{fmtKES(c.costs)}</span>
                       </div>
@@ -522,18 +522,18 @@ const Revenue = () => {
               </div>
             )}
           </div>
-          <div className="bg-[#0A0D14] border border-white/10 rounded-lg overflow-hidden">
+          <div className="bg-surface-container-lowest border border-outline-variant/40 rounded-lg overflow-hidden">
             {loading ? (
               <div className="p-8"><Skel className="w-full h-32" /></div>
             ) : sweeps.length === 0 ? (
-              <div className="p-12 text-center text-white/65 text-[13px]">
+              <div className="p-12 text-center text-on-surface-variant text-[13px]">
                 No sweep batches in this window yet.
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-[12.5px]">
-                  <thead className="bg-white/[0.04] border-b border-white/10">
-                    <tr className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/75">
+                  <thead className="bg-surface-container/70 border-b border-outline-variant/40">
+                    <tr className="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">
                       <th className="text-left px-5 py-3">Batch ID</th>
                       <th className="text-left px-3 py-3">Period</th>
                       <th className="text-right px-3 py-3">Gross Fees</th>
@@ -547,22 +547,22 @@ const Revenue = () => {
                     {sweeps.map((b) => {
                       const s = STATUS_META[b.status] || STATUS_META['Accruing'];
                       return (
-                        <tr key={b.id} className="border-b border-white/15 last:border-b-0 hover:bg-white/[0.04] transition-colors">
+                        <tr key={b.id} className="border-b border-outline-variant/40 last:border-b-0 hover:bg-surface-container/70 transition-colors">
                           <td className="px-5 py-3.5">
-                            <div className="font-mono text-white font-bold">{b.id}</div>
-                            <div className="text-[10px] text-white/65">{fmtNum(b.count)} fees</div>
+                            <div className="font-mono text-on-surface font-bold">{b.id}</div>
+                            <div className="text-[10px] text-on-surface-variant">{fmtNum(b.count)} fees</div>
                           </td>
-                          <td className="px-3 py-3.5 text-white/85 tabular-nums">
+                          <td className="px-3 py-3.5 text-on-surface tabular-nums">
                             {fmtPeriod(b.period)}
                           </td>
-                          <td className="px-3 py-3.5 text-right tabular-nums text-white/80">
+                          <td className="px-3 py-3.5 text-right tabular-nums text-on-surface-variant">
                             {fmtKESPrecise(b.gross)}
                           </td>
-                          <td className="px-3 py-3.5 text-right tabular-nums text-white/80">
+                          <td className="px-3 py-3.5 text-right tabular-nums text-on-surface-variant">
                             −{fmtKESPrecise(b.costs)}
                           </td>
                           <td className="px-3 py-3.5 text-right">
-                            <span className="font-bold text-white tabular-nums">{fmtKESPrecise(b.net)}</span>
+                            <span className="font-bold text-on-surface tabular-nums">{fmtKESPrecise(b.net)}</span>
                           </td>
                           <td className="px-3 py-3.5">
                             <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded border ${s.border} ${s.bg} ${s.text} text-[10.5px] font-bold uppercase tracking-wider`}>
@@ -570,7 +570,7 @@ const Revenue = () => {
                               {b.status}
                             </span>
                           </td>
-                          <td className="px-5 py-3.5 text-white/80 tabular-nums">
+                          <td className="px-5 py-3.5 text-on-surface-variant tabular-nums">
                             {b.destination}
                           </td>
                         </tr>
@@ -607,16 +607,16 @@ const Revenue = () => {
               <p className="text-[12px] text-on-surface-variant mt-1">Ranked by net PayChain margin contributed this period.</p>
             </div>
           </div>
-          <div className="bg-[#0A0D14] border border-white/10 rounded-lg overflow-hidden">
+          <div className="bg-surface-container-lowest border border-outline-variant/40 rounded-lg overflow-hidden">
             {loading ? (
               <div className="p-8"><Skel className="w-full h-32" /></div>
             ) : (data?.topMerchants || []).length === 0 ? (
-              <div className="p-12 text-center text-white/65 text-[13px]">No merchant revenue yet in this window.</div>
+              <div className="p-12 text-center text-on-surface-variant text-[13px]">No merchant revenue yet in this window.</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-[12.5px]">
-                  <thead className="bg-white/[0.04] border-b border-white/10">
-                    <tr className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/75">
+                  <thead className="bg-surface-container/70 border-b border-outline-variant/40">
+                    <tr className="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">
                       <th className="text-left px-5 py-3 w-10">#</th>
                       <th className="text-left px-3 py-3">Merchant</th>
                       <th className="text-right px-3 py-3">GMV</th>
@@ -629,23 +629,23 @@ const Revenue = () => {
                       const top = data?.topMerchants?.[0]?.revenue || 1;
                       const pct = (m.revenue / top) * 100;
                       return (
-                        <tr key={m.merchantId || i} className="border-b border-white/15 last:border-b-0 hover:bg-white/[0.04] transition-colors group">
-                          <td className="px-5 py-3.5 text-white/65 font-mono">{i + 1}</td>
+                        <tr key={m.merchantId || i} className="border-b border-outline-variant/40 last:border-b-0 hover:bg-surface-container/70 transition-colors group">
+                          <td className="px-5 py-3.5 text-on-surface-variant font-mono">{i + 1}</td>
                           <td className="px-3 py-3.5">
                             <Link to={`/merchants?id=${m.merchantId}`} className="block group-hover:opacity-90 transition-opacity">
-                              <div className="font-bold text-white truncate max-w-[280px]">{m.businessName || '—'}</div>
-                              <div className="text-[11px] text-white/65 truncate max-w-[280px]">
+                              <div className="font-bold text-on-surface truncate max-w-[280px]">{m.businessName || '—'}</div>
+                              <div className="text-[11px] text-on-surface-variant truncate max-w-[280px]">
                                 {m.email}
-                                {m.paybillAccount ? <span className="ml-2 font-mono text-white/80">·{m.paybillAccount}</span> : null}
+                                {m.paybillAccount ? <span className="ml-2 font-mono text-on-surface-variant">·{m.paybillAccount}</span> : null}
                               </div>
                             </Link>
                           </td>
-                          <td className="px-3 py-3.5 text-right tabular-nums text-white/85">{fmtKES(m.volume)}</td>
-                          <td className="px-3 py-3.5 text-right tabular-nums text-white/85">{fmtNum(m.count)}</td>
+                          <td className="px-3 py-3.5 text-right tabular-nums text-on-surface">{fmtKES(m.volume)}</td>
+                          <td className="px-3 py-3.5 text-right tabular-nums text-on-surface">{fmtNum(m.count)}</td>
                           <td className="px-5 py-3.5 text-right">
                             <div className="flex flex-col items-end gap-1.5">
-                              <span className="font-bold text-white tabular-nums">{fmtKESPrecise(m.revenue)}</span>
-                              <div className="h-[3px] w-24 bg-white/[0.06] rounded-full overflow-hidden">
+                              <span className="font-bold text-on-surface tabular-nums">{fmtKESPrecise(m.revenue)}</span>
+                              <div className="h-[3px] w-24 bg-surface-container/80 rounded-full overflow-hidden">
                                 <div className="h-full bg-emerald-400" style={{ width: `${pct}%` }} />
                               </div>
                             </div>
