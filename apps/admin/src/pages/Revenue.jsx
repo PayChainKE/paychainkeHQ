@@ -13,6 +13,23 @@ const RANGES = [
   { v: 'all', l: 'ALL' },
 ];
 
+// Safaricom M-Pesa Send Money / PayBill tariff (KES). Pass-through cost
+// to the customer — surfaced here purely for transparency.
+const MPESA_TARIFF_DISPLAY = [
+  { label: '1 – 100',          fee: 0   },
+  { label: '101 – 500',        fee: 7   },
+  { label: '501 – 1,000',      fee: 13  },
+  { label: '1,001 – 1,500',    fee: 23  },
+  { label: '1,501 – 2,500',    fee: 33  },
+  { label: '2,501 – 3,500',    fee: 53  },
+  { label: '3,501 – 5,000',    fee: 57  },
+  { label: '5,001 – 7,500',    fee: 78  },
+  { label: '7,501 – 10,000',   fee: 90  },
+  { label: '10,001 – 15,000',  fee: 100 },
+  { label: '15,001 – 20,000',  fee: 105 },
+  { label: '20,001 – 500,000', fee: 108 },
+];
+
 // Accent → Tailwind class map. Keep all classes literal so JIT picks them up.
 const ACCENTS = {
   emerald: {
@@ -274,7 +291,7 @@ const Revenue = () => {
             <div className="flex-1 h-[1px] bg-outline-variant/10"></div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
             {/* Total Revenue — hero */}
             <div className="relative col-span-1 sm:col-span-2 lg:col-span-2 bg-gradient-to-br from-emerald-900/40 via-[#0F141E] to-[#0A0D14] p-5 md:p-7 rounded-2xl border border-emerald-500/20 overflow-hidden group">
               <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-500/10 rounded-full -mr-12 -mt-12 blur-3xl group-hover:bg-emerald-500/20 transition-all pointer-events-none"></div>
@@ -338,6 +355,34 @@ const Revenue = () => {
                 {loading ? <Skel className="w-12 h-3 bg-white/10" /> : `${fmtNum(kpis.totalCount)} fee-bearing transactions`}
               </p>
             </div>
+
+            {/* Safaricom Passthrough — informational, not PayChain revenue */}
+            <div className="bg-gradient-to-br from-[#0F141E] to-[#0A0D14] p-4 md:p-5 rounded-xl border border-outline-variant/20 flex flex-col gap-1.5 group hover:border-green-500/30 transition-all relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-green-500/5 rounded-full -mr-6 -mt-6 blur-2xl pointer-events-none"></div>
+              <div className="flex items-center justify-between relative">
+                <span className="text-[10px] md:text-[11px] font-bold text-green-300/80 uppercase tracking-widest">Safaricom Passthrough</span>
+                <span className="text-[8px] font-bold text-on-surface-variant/40 uppercase tracking-widest border border-outline-variant/30 px-1.5 py-0.5 rounded">Cost</span>
+              </div>
+              <div className="flex items-baseline gap-2 mt-1 relative">
+                {loading
+                  ? <Skel className="w-24 h-8 bg-white/10" />
+                  : <span className="text-[22px] md:text-[28px] font-bold text-white/90 tracking-tighter">{fmtKES(kpis.safaricomPassthrough)}</span>}
+              </div>
+              <p className="text-[11px] text-on-surface-variant/60 mt-1 relative">
+                Paid to Safaricom on customer txns
+              </p>
+            </div>
+          </div>
+
+          {/* Pricing policy banner */}
+          <div className="mt-4 flex items-start gap-3 rounded-xl border border-emerald-500/20 bg-gradient-to-r from-emerald-900/20 to-transparent px-4 py-3">
+            <span className="material-symbols-outlined text-emerald-300 text-[20px] mt-0.5 flex-shrink-0">policy</span>
+            <p className="text-[12px] text-on-surface-variant/80 leading-snug">
+              <span className="text-white font-bold">Headline pricing:</span>{' '}
+              PayChain charges <span className="text-emerald-300 font-bold">+0.50%</span> on every transaction, on top of the standard Safaricom M-Pesa tariff which passes through to the customer.
+              FX conversions (KES ↔ USDC) carry a <span className="text-pink-300 font-bold">2.00% spread</span>, in line with Kotani Pay and HoneyCoin standard rates.
+              All PayChain fees route to the PayChain settlement account; this page shows the live total.
+            </p>
           </div>
         </section>
 
@@ -524,28 +569,46 @@ const Revenue = () => {
         </section>
 
         {/* ── Rate card footer ─────────────────────────────────────── */}
-        <section>
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
           <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-xl p-5 md:p-6">
             <div className="flex items-center gap-2 mb-3">
-              <span className="material-symbols-outlined text-on-surface-variant/60 text-[18px]">policy</span>
-              <h3 className="text-[12px] font-bold uppercase tracking-widest text-on-surface-variant">Active Rate Card</h3>
+              <span className="material-symbols-outlined text-emerald-300 text-[18px]">policy</span>
+              <h3 className="text-[12px] font-bold uppercase tracking-widest text-on-surface-variant">PayChain Rate Card</h3>
             </div>
             <p className="text-[12px] text-on-surface-variant/70 mb-4">
-              These are the live rates PayChain charges across every stream. Revenue on this page is computed from completed transactions at these rates — single source of truth.
+              Live rates PayChain earns per stream. Revenue on this page is computed from completed transactions at these rates — single source of truth.
             </p>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 text-[11px]">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
               {streams.map((s) => {
                 const a = ACCENTS[s.accent] || ACCENTS.blue;
                 return (
                   <div key={s.id} className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${a.borderDark} bg-white/[0.02]`}>
-                    <span className={`w-2 h-2 rounded-full`} style={{ background: a.dot }} />
-                    <div className="min-w-0">
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0`} style={{ background: a.dot }} />
+                    <div className="min-w-0 flex-1">
                       <div className="text-white font-bold truncate">{s.label}</div>
                       <div className="text-on-surface-variant/60 font-mono">{fmtRate(s.rate)}{s.minFee > 0 ? ` · ≥${s.minFee}` : ''}</div>
                     </div>
                   </div>
                 );
               })}
+            </div>
+          </div>
+
+          <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-xl p-5 md:p-6">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="material-symbols-outlined text-green-300 text-[18px]">account_balance</span>
+              <h3 className="text-[12px] font-bold uppercase tracking-widest text-on-surface-variant">Safaricom M-Pesa Tariff (Pass-through)</h3>
+            </div>
+            <p className="text-[12px] text-on-surface-variant/70 mb-4">
+              What Safaricom charges the sender per M-Pesa transaction. PayChain does not retain any portion of this — surfaced here so admins see the full customer cost.
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[11px] font-mono">
+              {MPESA_TARIFF_DISPLAY.map((t) => (
+                <div key={t.label} className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-white/[0.02] border border-outline-variant/15">
+                  <span className="text-on-surface-variant/70">{t.label}</span>
+                  <span className="text-white font-bold">{t.fee === 0 ? 'FREE' : `KES ${t.fee}`}</span>
+                </div>
+              ))}
             </div>
           </div>
         </section>

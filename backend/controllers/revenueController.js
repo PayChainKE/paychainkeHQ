@@ -1,5 +1,5 @@
 import Transaction from '../models/Transaction.js';
-import { REVENUE_STREAMS } from '../config/revenueRateCard.js';
+import { REVENUE_STREAMS, SAFARICOM_TARIFF } from '../config/revenueRateCard.js';
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 const RANGES = ['24h', '7d', '30d', '90d', 'ytd', 'all'];
@@ -237,6 +237,62 @@ export const getRevenue = async (req, res) => {
       },
     ]);
 
+    // ─── Safaricom passthrough — what customers paid Safaricom in fees.
+    // Pure transparency line, not PayChain revenue. We build a $switch
+    // that picks the tier fee for each doc by KES amount.
+    const safaricomBranches = SAFARICOM_TARIFF.map((tier) => ({
+      case: { $lte: [KES_BASIS, tier.max] },
+      then: tier.fee,
+    }));
+    const passthroughTypes = REVENUE_STREAMS
+      .filter((s) => s.passthrough === 'safaricom')
+      .flatMap((s) => s.txTypes);
+
+    const [safCur, safPrv] = await Promise.all([
+      Transaction.aggregate([
+        {
+          $match: {
+            createdAt: { $gte: since },
+            type: { $in: passthroughTypes },
+            status: { $in: ['completed', 'verified'] },
+          },
+        },
+        {
+          $addFields: {
+            _saf: {
+              $switch: {
+                branches: safaricomBranches,
+                default: SAFARICOM_TARIFF[SAFARICOM_TARIFF.length - 1].fee,
+              },
+            },
+          },
+        },
+        { $group: { _id: null, fees: { $sum: '$_saf' }, count: { $sum: 1 } } },
+      ]),
+      Transaction.aggregate([
+        {
+          $match: {
+            createdAt: { $gte: prevSince, $lt: since },
+            type: { $in: passthroughTypes },
+            status: { $in: ['completed', 'verified'] },
+          },
+        },
+        {
+          $addFields: {
+            _saf: {
+              $switch: {
+                branches: safaricomBranches,
+                default: SAFARICOM_TARIFF[SAFARICOM_TARIFF.length - 1].fee,
+              },
+            },
+          },
+        },
+        { $group: { _id: null, fees: { $sum: '$_saf' } } },
+      ]),
+    ]);
+    const safaricomFees     = Math.round((safCur[0]?.fees || 0) * 100) / 100;
+    const safaricomFeesPrev = Math.round((safPrv[0]?.fees || 0) * 100) / 100;
+
     // ─── Wait for stream aggregates and roll up totals ─────────────────
     const streams = await Promise.all(streamJobs);
     const totalRevenue = streams.reduce((s, x) => s + x.revenue, 0);
@@ -293,6 +349,11 @@ export const getRevenue = async (req, res) => {
           totalCount,
           takeRate: Number(takeRate.toFixed(3)),
           projectedARR: Math.round(runRate),
+          // Pass-through paid to Safaricom across PayChain transactions
+          // (cost to the customer, not PayChain revenue). Surfaced for
+          // transparency so the admin sees full transaction economics.
+          safaricomPassthrough: safaricomFees,
+          safaricomPassthroughChange: pctChange(safaricomFees, safaricomFeesPrev),
         },
         streams: enriched,
         series,

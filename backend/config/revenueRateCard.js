@@ -1,31 +1,82 @@
-// Single source of truth for PayChain's revenue model rates. Every revenue
-// computation (admin Revenue page, P&L exports, board reports) reads from
-// this card so a rate change is one edit instead of N grepped magic numbers.
+// Single source of truth for PayChain's revenue model. Two layers:
 //
-// Rates are expressed as decimals (0.01 = 1%). Floors are absolute KES.
-// Each stream maps to a transaction-type bucket so the aggregator knows
-// which docs to multiply by the rate.
+//   1. SAFARICOM_TARIFF — Safaricom's published M-Pesa tariff. This is a
+//      pass-through cost; PayChain does not keep it. We surface it so the
+//      admin can see what the *customer* paid in total.
+//
+//   2. REVENUE_STREAMS — what PayChain actually earns. The headline rule
+//      is "+0.5% on every transaction, on top of whatever Safaricom
+//      charges". Plus a 2% spread on FX conversions (matches the standard
+//      stablecoin off-ramp rate used by Kotani Pay / HoneyCoin).
+//
+// Rate edits happen here — every aggregator, P&L export and board report
+// reads from this file.
 
+// ── Safaricom standard tariff (Send Money / PayBill) ──────────────────
+// Source: Safaricom public M-Pesa tariff (KES). Pass-through cost — the
+// sender pays this to Safaricom, never to PayChain. Used purely for
+// transparency in the admin Revenue page.
+export const SAFARICOM_TARIFF = [
+  { max: 49,      fee: 0   },
+  { max: 100,     fee: 0   },
+  { max: 500,     fee: 7   },
+  { max: 1000,    fee: 13  },
+  { max: 1500,    fee: 23  },
+  { max: 2500,    fee: 33  },
+  { max: 3500,    fee: 53  },
+  { max: 5000,    fee: 57  },
+  { max: 7500,    fee: 78  },
+  { max: 10000,   fee: 90  },
+  { max: 15000,   fee: 100 },
+  { max: 20000,   fee: 105 },
+  { max: 35000,   fee: 108 },
+  { max: 50000,   fee: 108 },
+  { max: 150000,  fee: 108 },
+  { max: 250000,  fee: 108 },
+  { max: 500000,  fee: 108 },
+];
+
+export function safaricomFeeFor(kesAmount) {
+  const v = Number(kesAmount) || 0;
+  if (v <= 0) return 0;
+  for (const tier of SAFARICOM_TARIFF) {
+    if (v <= tier.max) return tier.fee;
+  }
+  return SAFARICOM_TARIFF[SAFARICOM_TARIFF.length - 1].fee;
+}
+
+// ── PayChain headline rate ────────────────────────────────────────────
+// Applied to every transaction PayChain processes (inbound, outbound,
+// bulk pay, settlement). On top of the Safaricom tariff for M-Pesa
+// transactions. This is the universal margin line.
+export const PAYCHAIN_TXN_RATE = 0.005;     // 0.50%
+export const FX_SPREAD_RATE    = 0.020;     // 2.00% — Kotani / HoneyCoin standard
+export const CASH_ADVANCE_RATE = 0.025;     // 2.50% — pilot product
+
+// ── Revenue streams ───────────────────────────────────────────────────
+// Each stream maps to one or more transaction-type buckets; the aggregator
+// multiplies the per-doc KES basis by `rate` and sums.
 export const REVENUE_STREAMS = [
   {
     id: 'transaction_fee',
     label: 'Transaction Fee',
-    description: 'Charged on inbound paybill receipts (KES). The headline merchant-acquiring revenue line.',
+    description: 'PayChain charges 0.50% on every inbound paybill receipt — applied on top of the standard Safaricom tariff.',
     icon: 'point_of_sale',
     accent: 'emerald',
-    rate: 0.010,        // 1.00%
-    minFee: 5,          // KES floor per txn
+    rate: PAYCHAIN_TXN_RATE,
+    minFee: 0,
     txTypes: ['inbound'],
     statuses: ['completed', 'verified'],
     basis: 'kes_volume',
+    passthrough: 'safaricom',
   },
   {
     id: 'fx_spread',
     label: 'FX Spread / Conversion',
-    description: 'Spread captured on on-chain conversions between KES and USDC. Earned on every fx_swap.',
+    description: 'On-chain KES ↔ USDC conversions. 2.00% spread — aligned to standard stablecoin off-ramp rates (Kotani Pay, HoneyCoin).',
     icon: 'currency_exchange',
     accent: 'pink',
-    rate: 0.015,        // 1.50% spread
+    rate: FX_SPREAD_RATE,
     minFee: 0,
     txTypes: ['fx_swap'],
     statuses: ['completed', 'verified'],
@@ -34,26 +85,28 @@ export const REVENUE_STREAMS = [
   {
     id: 'stablecoin_payment',
     label: 'Stablecoin Payment Fee',
-    description: 'Fee on USDC outbound payments — settlements, cross-border B2B, supplier payouts.',
+    description: 'PayChain margin on USDC outbound payments — settlements, cross-border B2B, supplier payouts, bulk pay.',
     icon: 'paid',
     accent: 'blue',
-    rate: 0.005,        // 0.50%
+    rate: PAYCHAIN_TXN_RATE,
     minFee: 0,
     txTypes: ['outbound', 'bulk_pay'],
     statuses: ['completed', 'verified'],
     basis: 'kes_volume',
+    passthrough: 'safaricom',
   },
   {
     id: 'settlement_fee',
     label: 'Settlement Fee',
-    description: 'Charged on KES off-ramp settlements to merchant bank or mobile money.',
+    description: 'PayChain margin on KES off-ramp settlements to merchant bank or mobile money. Safaricom B2C tariff passes through to the merchant.',
     icon: 'account_balance_wallet',
     accent: 'amber',
-    rate: 0.003,        // 0.30%
+    rate: PAYCHAIN_TXN_RATE,
     minFee: 0,
     txTypes: ['settlement'],
     statuses: ['completed', 'verified'],
     basis: 'kes_volume',
+    passthrough: 'safaricom',
   },
   {
     id: 'cash_advance',
@@ -61,20 +114,17 @@ export const REVENUE_STREAMS = [
     description: 'Origination fee on PayChain Cash Advance product (merchant credit line). Pilot stage.',
     icon: 'savings',
     accent: 'violet',
-    rate: 0.025,        // 2.50%
+    rate: CASH_ADVANCE_RATE,
     minFee: 0,
-    txTypes: [],        // Not yet wired to a transaction type — surfaces as 0.
+    txTypes: [],
     statuses: [],
     basis: 'kes_volume',
     pilot: true,
   },
 ];
 
-// Quick lookup by id for the controller and the frontend if we ever need it.
 export const REVENUE_STREAM_BY_ID = Object.fromEntries(REVENUE_STREAMS.map((s) => [s.id, s]));
 
-// Compute the fee for one transaction under a stream's rate. Used in the
-// $function pipeline AND mirrored in JS for any single-doc preview.
 export function computeStreamFee(stream, kesAmount) {
   const v = Number(kesAmount) || 0;
   if (v <= 0) return 0;
