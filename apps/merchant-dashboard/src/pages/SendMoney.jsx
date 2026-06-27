@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import MerchantLayout from '../components/layout/MerchantLayout'
@@ -7,301 +7,507 @@ import { ValidatedInput } from '../components/ValidatedInput'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { formatKES } from '../utils/formatCurrency'
 
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+
+const DESTINATIONS = [
+  { id: 'mpesa-primary', label: 'Primary M-PESA Number',   icon: 'phone_iphone',     fee: 0,  hint: 'Your registered phone number' },
+  { id: 'mobile',        label: 'Any M-PESA Number',        icon: 'smartphone',        fee: 0,  hint: 'Send to any Kenyan mobile number' },
+  { id: 'bank',          label: 'Bank Account',             icon: 'account_balance',   fee: 50, hint: 'Direct bank transfer' },
+  { id: 'till',          label: 'Till Number',              icon: 'point_of_sale',     fee: 50, hint: 'Pay to a Safaricom Till' },
+  { id: 'paybill',       label: 'Paybill',                  icon: 'receipt_long',      fee: 50, hint: 'Pay to a Paybill number' },
+]
+
+// 4 individual PIN boxes — same premium feel as the OTP entry
+function PinBoxes({ value, onChange, autoFocus }) {
+  const refs = useRef([])
+
+  const handleChange = (e, i) => {
+    const digit = e.target.value.replace(/\D/g, '').slice(-1)
+    const arr = value.split('')
+    arr[i] = digit
+    const next = arr.join('').slice(0, 4)
+    onChange(next)
+    if (digit && i < 3) refs.current[i + 1]?.focus()
+  }
+
+  const handleKey = (e, i) => {
+    if (e.key === 'Backspace') {
+      if (value[i]) {
+        const arr = value.split('')
+        arr[i] = ''
+        onChange(arr.join(''))
+      } else if (i > 0) {
+        refs.current[i - 1]?.focus()
+      }
+    }
+  }
+
+  const handlePaste = (e) => {
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 4)
+    if (pasted) {
+      onChange(pasted.padEnd(4, '').slice(0, 4))
+      refs.current[Math.min(pasted.length, 3)]?.focus()
+    }
+    e.preventDefault()
+  }
+
+  return (
+    <div className="flex items-center justify-center gap-3">
+      {[0, 1, 2, 3].map(i => (
+        <input
+          key={i}
+          ref={el => { refs.current[i] = el }}
+          type="password"
+          inputMode="numeric"
+          maxLength={1}
+          autoFocus={autoFocus && i === 0}
+          value={value[i] || ''}
+          onChange={e => handleChange(e, i)}
+          onKeyDown={e => handleKey(e, i)}
+          onPaste={i === 0 ? handlePaste : undefined}
+          onFocus={e => e.target.select()}
+          className={`
+            w-14 h-16 rounded-2xl text-center font-black text-2xl outline-none transition-all duration-200
+            ${value[i]
+              ? 'bg-[#00351D] text-white shadow-[0_0_20px_rgba(0,53,29,0.4)] scale-105'
+              : 'bg-slate-100 border-2 border-slate-200 text-slate-400 focus:border-[#00351D] focus:bg-white focus:shadow-md'}
+          `}
+        />
+      ))}
+    </div>
+  )
+}
+
 export default function SendMoney() {
   const navigate = useNavigate()
   const { addNotification } = useNotification()
   const { merchant, refreshSession } = useMerchantAuth()
-  
+
+  // step 1: From/To  2: Details  3: PIN setup (first time)  4: Confirm & authorize
   const [step, setStep] = useState(1)
-  const [destination, setDestination] = useState('')
-  const [showDestDropdown, setShowDestDropdown] = useState(false)
-  
-  // Payment Details State
-  const [amount, setAmount] = useState('')
+  const [destination, setDestination]       = useState('')
   const [recipientAccount, setRecipientAccount] = useState('')
-  const [reference, setReference] = useState('')
-  
-  // Confirmation State
-  const [pin, setPin] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
+  const [amount, setAmount]                 = useState('')
+  const [reference, setReference]           = useState('')
+  const [pin, setPin]                       = useState('')
+  const [newPin, setNewPin]                 = useState('')
+  const [confirmPin, setConfirmPin]         = useState('')
+  const [isLoading, setIsLoading]           = useState(false)
+  const [pinError, setPinError]             = useState('')
+  const [success, setSuccess]               = useState(false)
 
-  const steps = [
-    { id: 1, label: 'From / To' },
-    { id: 2, label: 'Payment Details' },
-    { id: 3, label: 'Confirm & Send' }
+  const hasPin       = !!merchant?.hasAppPin
+  const selectedDest = DESTINATIONS.find(d => d.id === destination)
+  const fee          = selectedDest?.fee || 0
+  const totalAmount  = Number(amount || 0) + fee
+  const balance      = merchant?.kesBalance || 0
+
+  const token = () => localStorage.getItem('paychain_merchant_token')
+  const cfg   = () => ({ headers: { Authorization: `Bearer ${token()}` } })
+
+  // Derived step labels
+  const STEPS = [
+    { id: 1, label: 'Destination' },
+    { id: 2, label: 'Details' },
+    ...(!hasPin ? [{ id: 3, label: 'Set PIN' }] : []),
+    { id: hasPin ? 3 : 4, label: 'Confirm' },
   ]
+  const confirmStep = hasPin ? 3 : 4
+  const totalSteps  = hasPin ? 3 : 4
 
-  const destinations = [
-    { id: 'mpesa-primary', label: 'Send to primary mpesa phone', fee: 0 },
-    { id: 'bank', label: 'Send to Bank account', fee: 50 },
-    { id: 'till', label: 'Send to Till', fee: 50 },
-    { id: 'paybill', label: 'Send to paybill', fee: 50 },
-    { id: 'mobile', label: 'Send to Mobile phone', fee: 50 }
-  ]
+  useEffect(() => { setPinError('') }, [pin, newPin, confirmPin])
 
-  const selectedDest = destinations.find(d => d.id === destination)
-  const fee = selectedDest?.fee || 0
-  const totalAmount = Number(amount || 0) + fee
+  const goNext = async () => {
+    if (step < (hasPin ? 2 : 3)) { setStep(s => s + 1); return }
+
+    // PIN setup step (first time)
+    if (!hasPin && step === 3) {
+      if (newPin.length < 4) { setPinError('PIN must be exactly 4 digits.'); return }
+      if (newPin !== confirmPin) { setPinError('PINs do not match. Please re-enter.'); return }
+      setIsLoading(true)
+      try {
+        await axios.post(`${API_URL}/api/auth/merchant/set-app-pin`, { pin: newPin }, cfg())
+        await refreshSession()
+        setStep(4)
+      } catch (e) {
+        setPinError(e.response?.data?.error || 'Failed to save PIN. Try again.')
+      } finally {
+        setIsLoading(false)
+      }
+      return
+    }
+
+    // Confirm & send step
+    if (step === confirmStep) {
+      if (totalAmount > balance) {
+        addNotification({ title: 'Insufficient Balance', message: `You need ${formatKES(totalAmount)} but only have ${formatKES(balance)}.`, type: 'error' })
+        return
+      }
+      if (pin.length < 4) { setPinError('Enter your 4-digit payment PIN.'); return }
+
+      setIsLoading(true)
+      try {
+        // 1. Verify PIN
+        await axios.post(`${API_URL}/api/auth/merchant/verify-payment-pin`, { pin }, cfg())
+
+        // 2. Execute transfer
+        const isMobile = destination === 'mpesa-primary' || destination === 'mobile'
+        if (isMobile) {
+          await axios.post(`${API_URL}/api/callbacks/b2c-request`, {
+            phone: recipientAccount,
+            amount: Number(amount),
+            destination: selectedDest.label,
+            fee,
+            reference,
+          }, cfg())
+        } else {
+          await axios.post(`${API_URL}/api/transactions/send-money`, {
+            destination: recipientAccount,
+            amount: Number(amount),
+            fee,
+            reference: reference || `Transfer to ${recipientAccount}`,
+          }, cfg())
+        }
+
+        await refreshSession()
+        setSuccess(true)
+      } catch (e) {
+        const msg = e.response?.data?.error || 'Transfer failed. Please try again.'
+        if (e.response?.status === 401) {
+          setPinError('Incorrect PIN. Please try again.')
+          setPin('')
+        } else {
+          addNotification({ title: 'Transfer Failed', message: msg, type: 'error' })
+        }
+      } finally {
+        setIsLoading(false)
+      }
+    }
+  }
+
+  const canContinue = () => {
+    if (step === 1) return !!destination
+    if (step === 2) return !!amount && Number(amount) > 0 && !!recipientAccount
+    if (!hasPin && step === 3) return newPin.length === 4 && confirmPin.length === 4
+    if (step === confirmStep) return pin.length === 4
+    return true
+  }
+
+  // ── SUCCESS STATE ──────────────────────────────────────────────────────────
+  if (success) {
+    return (
+      <MerchantLayout title="Send Money">
+        <div className="max-w-md mx-auto pt-12 text-center animate-fade-in-up">
+          <div className="w-24 h-24 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-6 shadow-lg border-4 border-emerald-200/40">
+            <span className="material-symbols-outlined text-emerald-600 text-5xl" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+          </div>
+          <h2 className="font-headline text-4xl font-bold text-primary tracking-tight mb-2">Transfer Sent</h2>
+          <p className="text-on-surface-variant font-medium opacity-70 mb-2">
+            {formatKES(amount)} {selectedDest?.id === 'mpesa-primary' || selectedDest?.id === 'mobile' ? 'via M-PESA' : 'via Bank Transfer'}
+          </p>
+          <p className="text-sm font-mono text-primary/40 mb-10">→ {recipientAccount}</p>
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={() => navigate('/transactions')}
+              className="w-full py-4 bg-[#00351D] text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl hover:opacity-90 active:scale-[0.98] transition-all"
+            >
+              View Transactions
+            </button>
+            <button
+              onClick={() => navigate('/overview')}
+              className="w-full py-3 text-primary/50 font-bold text-sm hover:text-primary transition-colors"
+            >
+              Back to Dashboard
+            </button>
+          </div>
+        </div>
+      </MerchantLayout>
+    )
+  }
 
   return (
     <MerchantLayout title="Send Money">
-      <div className="max-w-2xl mx-auto animate-fade-in-up">
-        {/* Back Button */}
-        <button 
-          onClick={() => navigate('/overview')}
-          className="flex items-center gap-2 text-slate-400 hover:text-primary transition-colors mb-6 group"
-        >
+      <div className="max-w-lg mx-auto animate-fade-in-up">
+
+        {/* Back */}
+        <button onClick={() => step > 1 ? setStep(s => s - 1) : navigate('/overview')}
+          className="flex items-center gap-2 text-slate-400 hover:text-primary transition-colors mb-8 group">
           <span className="material-symbols-outlined text-lg group-hover:-translate-x-1 transition-transform">arrow_back</span>
-          <span className="text-[10px] font-black uppercase tracking-widest">Back to Dashboard</span>
+          <span className="text-[10px] font-black uppercase tracking-widest">{step > 1 ? 'Back' : 'Dashboard'}</span>
         </button>
 
         {/* Header */}
-        <header className="mb-10 text-center">
-          <h2 className="font-headline font-bold text-4xl text-primary tracking-tight mb-2">Send Money</h2>
-          <p className="text-on-surface-variant font-medium opacity-70">
-            via Bank or M-PESA <button className="text-emerald-700 font-bold hover:underline ml-1">Learn more</button>
+        <div className="mb-8">
+          <h2 className="font-headline font-bold text-3xl lg:text-4xl text-primary tracking-tight">Send Money</h2>
+          <p className="text-on-surface-variant font-medium opacity-60 text-sm mt-1">
+            Secured with your PayChain payment PIN
           </p>
-        </header>
+        </div>
 
         {/* Stepper */}
-        <div className="flex items-center justify-between mb-12 px-4 relative">
-          <div className="absolute top-1/2 left-0 w-full h-0.5 bg-emerald-100 -translate-y-1/2 z-0"></div>
-          {steps.map((s, idx) => (
-            <div key={s.id} className="relative z-10 flex flex-col items-center">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-sm border-2 transition-all duration-500 ${step >= s.id ? 'bg-[#00351D] border-[#00351D] text-white' : 'bg-white border-emerald-100 text-emerald-200'}`}>
-                {s.id}
+        <div className="flex items-center mb-10">
+          {STEPS.map((s, idx) => (
+            <React.Fragment key={s.id}>
+              <div className="flex flex-col items-center">
+                <div className={`w-9 h-9 rounded-full flex items-center justify-center font-black text-sm border-2 transition-all duration-300 ${
+                  step > s.id ? 'bg-[#00351D] border-[#00351D] text-white'
+                  : step === s.id ? 'bg-white border-[#00351D] text-[#00351D] shadow-md'
+                  : 'bg-white border-slate-200 text-slate-300'
+                }`}>
+                  {step > s.id
+                    ? <span className="material-symbols-outlined text-base" style={{ fontVariationSettings: "'FILL' 1" }}>check</span>
+                    : <span className="text-xs font-black">{idx + 1}</span>
+                  }
+                </div>
+                <p className={`mt-1.5 text-[9px] uppercase tracking-widest font-black transition-colors whitespace-nowrap ${step >= s.id ? 'text-primary' : 'text-slate-300'}`}>
+                  {s.label}
+                </p>
               </div>
-              <p className={`mt-3 text-[10px] uppercase tracking-widest font-black transition-colors duration-500 ${step >= s.id ? 'text-primary' : 'text-emerald-200'}`}>{s.label}</p>
-            </div>
+              {idx < STEPS.length - 1 && (
+                <div className={`flex-1 h-0.5 mx-2 mb-4 rounded-full transition-all duration-500 ${step > s.id ? 'bg-[#00351D]' : 'bg-slate-100'}`} />
+              )}
+            </React.Fragment>
           ))}
         </div>
 
-        {/* Form Content */}
-        <div className="bg-white rounded-[24px] border border-slate-200 shadow-2xl p-8 lg:p-10 relative">
+        {/* Card */}
+        <div className="bg-white rounded-[28px] border border-slate-100 shadow-[0_20px_60px_rgba(0,0,0,0.08)] overflow-hidden">
+
+          {/* Step 1 — Destination */}
           {step === 1 && (
-            <div className="space-y-8">
-              {/* From Selector */}
-              <div>
-                <label className="block text-[11px] font-black uppercase tracking-widest text-slate-400 mb-3">From*</label>
-                <div className="p-4 lg:p-5 rounded-2xl border border-emerald-100 bg-[#F0FDF4]/30 flex items-center justify-between group hover:border-emerald-300 transition-all cursor-default overflow-hidden">
-                  <div className="flex items-center gap-3 lg:gap-4">
-                    <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-2xl bg-[#00351D] text-[#5EFEB3] flex items-center justify-center shadow-lg shrink-0">
-                      <span className="material-symbols-outlined text-lg lg:text-xl">account_balance_wallet</span>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[10px] lg:text-xs font-black text-primary uppercase tracking-wider truncate">Available balance</p>
-                      <p className="text-lg lg:text-xl font-headline text-emerald-700 mt-0.5">{formatKES(merchant?.kesBalance || 0)}</p>
-                    </div>
-                  </div>
-                  <span className="material-symbols-outlined text-slate-300 group-hover:text-emerald-600 transition-colors shrink-0">check_circle</span>
+            <div className="p-7 lg:p-9 space-y-6 animate-fade-in-up">
+              {/* Balance pill */}
+              <div className="flex items-center gap-3 p-4 rounded-2xl bg-emerald-50 border border-emerald-100">
+                <div className="w-10 h-10 rounded-xl bg-[#00351D] text-emerald-400 flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-lg">account_balance_wallet</span>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">Available Balance</p>
+                  <p className="font-headline text-xl font-bold text-[#00351D]">{formatKES(balance)}</p>
                 </div>
               </div>
 
-              {/* To Selector */}
-              <div className="relative">
-                <label className="block text-[11px] font-black uppercase tracking-widest text-slate-400 mb-3">To*</label>
-                <button 
-                  onClick={() => setShowDestDropdown(!showDestDropdown)}
-                  className={`w-full p-4 lg:p-5 rounded-2xl border transition-all group flex items-center justify-between text-left ${showDestDropdown ? 'border-emerald-500 bg-white shadow-xl z-[60]' : 'border-slate-100 bg-slate-50'}`}
-                >
-                  <div className="flex items-center gap-3 lg:gap-4 min-w-0">
-                    <div className={`w-10 h-10 lg:w-12 lg:h-12 rounded-2xl flex items-center justify-center shrink-0 transition-colors ${destination ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-200 text-slate-400'}`}>
-                      <span className="material-symbols-outlined text-lg lg:text-xl">{destination ? 'stars' : 'ads_click'}</span>
-                    </div>
-                    <div className="min-w-0">
-                      <p className={`text-[13px] lg:text-sm font-bold truncate ${destination ? 'text-primary' : 'text-slate-400'}`}>
-                        {selectedDest?.label || 'Select destination'}
-                      </p>
-                      {destination && (
-                        <p className="text-[9px] lg:text-[10px] text-emerald-600 font-bold uppercase tracking-widest mt-0.5">
-                          Fee: {fee === 0 ? 'Free' : formatKES(fee)}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <span className={`material-symbols-outlined shrink-0 transition-transform duration-300 ${showDestDropdown ? 'rotate-180 text-emerald-600' : 'text-slate-300'}`}>expand_more</span>
-                </button>
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-3">Send To</p>
+                <div className="space-y-2">
+                  {DESTINATIONS.map(d => (
+                    <button
+                      key={d.id}
+                      onClick={() => {
+                        setDestination(d.id)
+                        setRecipientAccount(d.id === 'mpesa-primary' ? merchant?.phone || '' : '')
+                      }}
+                      className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all text-left group ${
+                        destination === d.id
+                          ? 'border-[#00351D] bg-[#f0fdf4]'
+                          : 'border-slate-100 hover:border-emerald-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                        destination === d.id ? 'bg-[#00351D] text-emerald-400' : 'bg-slate-100 text-slate-500 group-hover:bg-emerald-50 group-hover:text-emerald-600'
+                      }`}>
+                        <span className="material-symbols-outlined text-lg">{d.icon}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-bold truncate transition-colors ${destination === d.id ? 'text-[#00351D]' : 'text-primary'}`}>{d.label}</p>
+                        <p className="text-[10px] text-slate-400 font-medium mt-0.5">{d.hint}</p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className={`text-[10px] font-black uppercase tracking-widest ${d.fee === 0 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                          {d.fee === 0 ? 'Free' : formatKES(d.fee)}
+                        </span>
+                        {destination === d.id && (
+                          <span className="material-symbols-outlined text-[#00351D] text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
-                {/* Custom Destination Dropdown */}
-                {showDestDropdown && (
-                  <div className="absolute left-0 right-0 top-full mt-3 bg-white rounded-2xl shadow-[0_25px_60px_rgba(0,0,0,0.25)] border border-slate-100 z-[100] overflow-hidden animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-300">
-                    <div className="max-h-[300px] overflow-y-auto p-1.5 lg:p-2 space-y-0.5 lg:space-y-1">
-                      {destinations.map((d) => (
-                        <button
-                          key={d.id}
-                          onClick={() => {
-                            setDestination(d.id)
-                            setShowDestDropdown(false)
-                            setRecipientAccount(d.id === 'mpesa-primary' ? merchant?.phone || '' : '')
-                          }}
-                          className={`w-full text-left p-3 lg:p-4 rounded-xl transition-all flex items-center justify-between group ${destination === d.id ? 'bg-emerald-50' : 'hover:bg-slate-50'}`}
-                        >
-                          <div className="flex items-center gap-3 lg:gap-4 min-w-0">
-                            <div className={`w-1.5 h-1.5 lg:w-2 lg:h-2 rounded-full shrink-0 transition-all ${destination === d.id ? 'bg-emerald-500 scale-125' : 'bg-slate-200 group-hover:bg-slate-300'}`}></div>
-                            <span className={`text-[12px] lg:text-[13px] font-bold truncate ${destination === d.id ? 'text-emerald-900' : 'text-slate-600'}`}>{d.label}</span>
-                          </div>
-                          <span className="text-[9px] lg:text-[10px] font-black text-emerald-600 opacity-60 group-hover:opacity-100 transition-opacity uppercase tracking-widest shrink-0 ml-2">
-                             {d.fee === 0 ? 'Free' : formatKES(d.fee)}
-                          </span>
-                        </button>
-                      ))}
+          {/* Step 2 — Payment Details */}
+          {step === 2 && (
+            <div className="p-7 lg:p-9 space-y-6 animate-fade-in-up">
+              <div className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-100">
+                <div className="w-8 h-8 rounded-lg bg-[#00351D] text-emerald-400 flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-base">{selectedDest?.icon}</span>
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-primary">{selectedDest?.label}</p>
+                  <p className="text-[10px] text-slate-400">Fee: {fee === 0 ? 'Free' : formatKES(fee)}</p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">
+                  {destination.includes('mpesa') || destination === 'mobile' ? 'Phone Number' : 'Account / Till Number'}
+                </label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-300 text-lg">
+                    {destination.includes('mpesa') || destination === 'mobile' ? 'smartphone' : 'tag'}
+                  </span>
+                  <ValidatedInput
+                    kind={destination.includes('mpesa') || destination === 'mobile' ? 'phoneKE' : 'integer'}
+                    value={recipientAccount}
+                    onChange={e => setRecipientAccount(e.target.value)}
+                    placeholder={destination.includes('mpesa') || destination === 'mobile' ? '0712 345 678' : 'Account Number'}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 pl-12 pr-4 text-primary font-bold focus:border-[#00351D] focus:ring-2 focus:ring-[#00351D]/10 outline-none transition-all"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Amount (KES)</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 font-bold text-sm">KES</span>
+                  <ValidatedInput
+                    kind="amount"
+                    value={amount}
+                    onChange={e => setAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 pl-14 pr-4 text-primary font-headline font-bold text-xl focus:border-[#00351D] focus:ring-2 focus:ring-[#00351D]/10 outline-none transition-all"
+                    required
+                  />
+                </div>
+                {Number(amount) > 0 && (
+                  <p className={`text-[11px] font-bold ${Number(amount) + fee > balance ? 'text-red-500' : 'text-emerald-600'}`}>
+                    Total deduction: {formatKES(totalAmount)}
+                    {Number(amount) + fee > balance ? ' — exceeds balance' : ''}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Reference <span className="text-slate-300 font-medium normal-case">(optional)</span></label>
+                <input
+                  type="text"
+                  value={reference}
+                  onChange={e => setReference(e.target.value)}
+                  placeholder="e.g. Supplier Payment, Rent"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 px-4 text-primary font-medium focus:border-[#00351D] focus:ring-2 focus:ring-[#00351D]/10 outline-none transition-all"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Step 3 — Set Payment PIN (first time only) */}
+          {!hasPin && step === 3 && (
+            <div className="p-7 lg:p-9 animate-fade-in-up">
+              <div className="text-center mb-8">
+                <div className="w-16 h-16 rounded-2xl bg-[#00351D] flex items-center justify-center mx-auto mb-4 shadow-xl">
+                  <span className="material-symbols-outlined text-emerald-400 text-3xl" style={{ fontVariationSettings: "'FILL' 1" }}>lock</span>
+                </div>
+                <h3 className="font-headline text-2xl font-bold text-primary mb-2">Set Payment PIN</h3>
+                <p className="text-sm text-on-surface-variant opacity-60 leading-relaxed max-w-xs mx-auto">
+                  Create a 4-digit PIN to authorise all money movements. This PIN is shared with the PayChain mobile app — if you already set one there, it works here too.
+                </p>
+              </div>
+
+              {merchant?.hasAppPin ? (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-start gap-3 mb-6">
+                  <span className="material-symbols-outlined text-emerald-600 shrink-0" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                  <p className="text-sm text-emerald-800 font-medium">Your payment PIN is already set from the mobile app. You can use it directly to confirm this transfer.</p>
+                </div>
+              ) : (
+                <div className="space-y-8">
+                  <div className="space-y-3">
+                    <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 text-center">New PIN</p>
+                    <PinBoxes value={newPin} onChange={setNewPin} autoFocus />
+                  </div>
+                  <div className="space-y-3">
+                    <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 text-center">Confirm PIN</p>
+                    <PinBoxes value={confirmPin} onChange={setConfirmPin} />
+                  </div>
+                  {pinError && (
+                    <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 animate-shake">
+                      <span className="material-symbols-outlined text-red-500 text-base shrink-0">error_outline</span>
+                      <p className="text-xs font-bold text-red-700">{pinError}</p>
                     </div>
+                  )}
+                  <p className="text-center text-[10px] text-slate-400 font-medium">
+                    This is a one-time setup. Keep your PIN confidential.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Confirm & Send step */}
+          {step === confirmStep && (
+            <div className="p-7 lg:p-9 space-y-6 animate-fade-in-up">
+              {/* Summary */}
+              <div className="bg-slate-50 rounded-2xl border border-slate-100 overflow-hidden">
+                <div className="px-5 py-3 bg-[#00351D]">
+                  <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Transfer Summary</p>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {[
+                    ['Destination', selectedDest?.label],
+                    ['Recipient',   recipientAccount],
+                    ['Amount',      formatKES(amount || 0)],
+                    ['Fee',         fee === 0 ? 'Free' : formatKES(fee)],
+                  ].map(([k, v]) => (
+                    <div key={k} className="flex justify-between items-center px-5 py-3">
+                      <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">{k}</span>
+                      <span className="text-sm font-bold text-primary">{v}</span>
+                    </div>
+                  ))}
+                  <div className="flex justify-between items-center px-5 py-4 bg-emerald-50">
+                    <span className="text-xs font-black text-emerald-800 uppercase tracking-wider">Total Deducted</span>
+                    <span className="text-xl font-headline font-black text-[#00351D]">{formatKES(totalAmount)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* PIN entry */}
+              <div className="space-y-4">
+                <div className="text-center">
+                  <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-1">Enter Payment PIN</p>
+                  {hasPin && (
+                    <p className="text-[10px] text-slate-400">
+                      {merchant?.hasAppPin ? 'Use the PIN you set on the mobile app or web dashboard.' : ''}
+                    </p>
+                  )}
+                </div>
+                <PinBoxes value={pin} onChange={setPin} autoFocus />
+                {pinError && (
+                  <div className="flex items-center justify-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 animate-shake">
+                    <span className="material-symbols-outlined text-red-500 text-base shrink-0">error_outline</span>
+                    <p className="text-xs font-bold text-red-700">{pinError}</p>
                   </div>
                 )}
               </div>
             </div>
           )}
 
-          {step === 2 && (
-            <div className="space-y-6 animate-in slide-in-from-right duration-500">
-              <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100 flex items-start gap-3">
-                 <span className="material-symbols-outlined text-emerald-600">info</span>
-                 <p className="text-xs text-emerald-800 font-medium">Please enter the details for your transfer to <span className="font-bold">{selectedDest?.label}</span>. Transfers are processed instantly.</p>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-black uppercase tracking-widest text-slate-400 mb-2">Recipient Details*</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 material-symbols-outlined">person</span>
-                  <ValidatedInput
-                    kind={destination.includes('mpesa') || destination === 'mobile' ? 'phoneKE' : 'integer'}
-                    value={recipientAccount}
-                    onChange={(e) => setRecipientAccount(e.target.value)}
-                    placeholder={destination.includes('mpesa') || destination === 'mobile' ? "07XX XXX XXX" : "Account or Till Number"}
-                    className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm font-bold rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 pl-12 py-3.5 outline-none transition-all"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-black uppercase tracking-widest text-slate-400 mb-2">Amount to Send (KES)*</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">KES</span>
-                  <ValidatedInput
-                    kind="amount"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder="0.00"
-                    className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-lg font-headline font-bold rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 pl-14 py-3.5 outline-none transition-all"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-black uppercase tracking-widest text-slate-400 mb-2">Reference / Reason (Optional)</label>
-                <input 
-                  type="text"
-                  value={reference}
-                  onChange={(e) => setReference(e.target.value)}
-                  placeholder="e.g. Supplier Payment"
-                  className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm font-medium rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 px-4 py-3.5 outline-none transition-all"
-                />
-              </div>
-            </div>
-          )}
-
-          {step === 3 && (
-            <div className="space-y-8 animate-in slide-in-from-right duration-500">
-              <div className="text-center">
-                <h3 className="font-headline text-2xl font-bold text-primary">Confirm Transfer</h3>
-                <p className="text-sm text-on-surface-variant mt-1">Review the details below before authorizing.</p>
-              </div>
-
-              <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 space-y-4">
-                <div className="flex justify-between items-center pb-4 border-b border-slate-200">
-                   <span className="text-xs text-slate-500 font-bold uppercase tracking-widest">To</span>
-                   <span className="text-sm font-bold text-primary text-right">
-                     {selectedDest?.label}<br/>
-                     <span className="text-xs text-on-surface-variant font-normal">{recipientAccount}</span>
-                   </span>
-                </div>
-                <div className="flex justify-between items-center pb-4 border-b border-slate-200">
-                   <span className="text-xs text-slate-500 font-bold uppercase tracking-widest">Amount</span>
-                   <span className="text-sm font-bold text-primary">{formatKES(amount || 0)}</span>
-                </div>
-                <div className="flex justify-between items-center pb-4 border-b border-slate-200">
-                   <span className="text-xs text-slate-500 font-bold uppercase tracking-widest">Transfer Fee</span>
-                   <span className="text-sm font-bold text-primary">{fee === 0 ? 'Free' : formatKES(fee)}</span>
-                </div>
-                <div className="flex justify-between items-center pt-2">
-                   <span className="text-xs text-primary font-black uppercase tracking-widest">Total Deduction</span>
-                   <span className="text-xl font-headline font-black text-emerald-700">{formatKES(totalAmount)}</span>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-black uppercase tracking-widest text-slate-400 mb-3 text-center">Enter 4-Digit Security PIN</label>
-                <div className="flex justify-center">
-                  <ValidatedInput
-                    kind="pin4"
-                    value={pin}
-                    onChange={(e) => setPin(e.target.value)}
-                    placeholder="••••"
-                    className="w-32 bg-slate-50 border border-slate-200 text-slate-800 text-2xl tracking-[0.5em] text-center font-bold rounded-xl focus:ring-2 focus:ring-[#00351D]/20 focus:border-[#00351D] px-4 py-3 outline-none transition-all"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="mt-12 flex gap-4">
-            {step > 1 && (
-              <button 
-                onClick={() => setStep(step - 1)}
-                disabled={isLoading}
-                className="flex-1 py-4 px-6 border border-slate-200 rounded-2xl text-[11px] font-black uppercase tracking-widest text-slate-400 hover:bg-slate-50 transition-all disabled:opacity-50"
-              >
-                Back
-              </button>
-            )}
-            <button 
-              onClick={async () => {
-                if (step === 3) {
-                  if (totalAmount > (merchant?.kesBalance || 0)) {
-                    addNotification({ title: 'Insufficient Balance', message: 'You do not have enough funds.', type: 'error' });
-                    return;
-                  }
-                  setIsLoading(true);
-                  try {
-                    const token = localStorage.getItem('paychain_merchant_token');
-                    const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
-                    await axios.post(`${API_URL}/api/callbacks/b2c-request`, {
-                      phone: recipientAccount,
-                      amount: Number(amount),
-                      destination: selectedDest.label,
-                      fee,
-                      reference
-                    }, { headers: { Authorization: `Bearer ${token}` } });
-                    
-                    addNotification({ title: 'Transfer Complete', message: `Successfully dispatched ${formatKES(amount)} via M-Pesa.`, type: 'success' });
-                    await refreshSession();
-                    navigate('/overview');
-                  } catch (err) {
-                    addNotification({ title: 'Transfer Failed', message: err.response?.data?.error || 'Failed to process transfer.', type: 'error' });
-                  } finally {
-                    setIsLoading(false);
-                  }
-                } else {
-                  setStep(step + 1);
-                }
-              }}
-              disabled={(step === 1 && !destination) || (step === 2 && (!amount || !recipientAccount)) || (step === 3 && pin.length < 4) || isLoading}
-              className={`flex-1 py-4 px-6 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${((step === 1 && !destination) || (step === 2 && (!amount || !recipientAccount)) || (step === 3 && pin.length < 4) || isLoading) ? 'bg-slate-100 text-slate-300 cursor-not-allowed shadow-none' : 'bg-[#00351D] text-white shadow-xl shadow-emerald-900/20 active:scale-[0.98]'}`}
+          {/* CTA */}
+          <div className="px-7 lg:px-9 pb-7 lg:pb-9">
+            <button
+              onClick={goNext}
+              disabled={!canContinue() || isLoading}
+              className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${
+                canContinue() && !isLoading
+                  ? 'bg-[#00351D] text-white shadow-xl shadow-emerald-900/20 hover:opacity-90 active:scale-[0.98]'
+                  : 'bg-slate-100 text-slate-300 cursor-not-allowed'
+              }`}
             >
-              {isLoading ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-              ) : (
-                step === 3 ? 'Confirm & Send' : 'Continue'
-              )}
+              {isLoading
+                ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                : step === confirmStep
+                  ? <><span className="material-symbols-outlined text-emerald-400 text-lg">send_money</span>Confirm &amp; Send</>
+                  : !hasPin && step === 3
+                    ? 'Save PIN & Continue'
+                    : <>Continue <span className="material-symbols-outlined text-base">arrow_forward</span></>
+              }
             </button>
           </div>
         </div>
 
-        {/* Footer info */}
-        <p className="mt-8 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest opacity-60">
-           Transactions are processed securely by PayChain KE
+        <p className="mt-6 text-center text-[10px] font-bold text-slate-300 uppercase tracking-widest">
+          Secured by PayChain KE · PIN-authorised payments
         </p>
       </div>
     </MerchantLayout>

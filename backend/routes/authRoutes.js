@@ -17,6 +17,7 @@ import {
   updateMerchantProfile,
   toggleBiometrics,
   setAppPin,
+  verifyPaymentPin,
   validateSetupToken,
   setupPassword
 } from '../controllers/merchantAuthController.js';
@@ -90,5 +91,6 @@ router.get('/merchant/me', protectMerchant, getMerchantMe);
 router.put('/merchant/profile', protectMerchant, updateMerchantProfile);
 router.put('/merchant/biometrics', protectMerchant, toggleBiometrics);
 router.post('/merchant/set-app-pin', protectMerchant, setAppPin);
+router.post('/merchant/verify-payment-pin', protectMerchant, verifyPaymentPin);
 
 export default router;
