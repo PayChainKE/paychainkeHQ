@@ -11,7 +11,7 @@ import AuditLog from '../models/AuditLog.js';
 export const getAuditLog = async (req, res) => {
   try {
     const {
-      merchantId, action, category, severity, actor,
+      merchantId, action, category, severity, actor, platform,
       q, from, to,
       page = 1, limit = 25,
     } = req.query;
@@ -25,6 +25,7 @@ export const getAuditLog = async (req, res) => {
     if (category) filter.category = category;
     if (severity) filter.severity = severity;
     if (actor)    filter['actor.type'] = actor;
+    if (platform) filter.platform = platform;
 
     // Free-text search across merchant email/name and the action verb. We
     // escape regex specials so a "." in an email doesn't act as wildcard.
@@ -68,6 +69,10 @@ export const getAuditLog = async (req, res) => {
             failedLogins: { $sum: { $cond: [{ $eq: ['$action', 'merchant.login.failed'] }, 1, 0] } },
             resets:    { $sum: { $cond: [{ $eq: ['$action', 'merchant.password.reset_completed'] }, 1, 0] } },
             adminActions: { $sum: { $cond: [{ $eq: ['$actor.type', 'admin'] }, 1, 0] } },
+            // Platform split — counted across ALL events, not just logins,
+            // so the admin sees which surface is more active overall.
+            webEvents:    { $sum: { $cond: [{ $eq: ['$platform', 'web'] }, 1, 0] } },
+            mobileEvents: { $sum: { $cond: [{ $eq: ['$platform', 'mobile'] }, 1, 0] } },
           },
         },
       ]),
@@ -82,6 +87,7 @@ export const getAuditLog = async (req, res) => {
       totalPages: Math.max(1, Math.ceil(total / pageSize)),
       kpis: kpis[0] || {
         total: 0, critical: 0, warnings: 0, logins: 0, failedLogins: 0, resets: 0, adminActions: 0,
+        webEvents: 0, mobileEvents: 0,
       },
     });
   } catch (error) {
