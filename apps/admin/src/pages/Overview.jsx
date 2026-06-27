@@ -85,9 +85,10 @@ const Overview = () => {
 
   const topMerchants = insights?.topMerchants || [];
 
-  // Signups series → bar chart heights. Computed from real Mongo aggregation.
-  const signupsSeries = insights?.signupsSeries || [];
-  const maxSignups = Math.max(1, ...signupsSeries.map((s) => s.count));
+  // Monthly signups for the trailing 12 months — densified server-side so the
+  // chart always has 12 evenly spaced bars regardless of activity gaps.
+  const monthlySignups = insights?.monthlySignups || [];
+  const maxMonthly = Math.max(1, ...monthlySignups.map((s) => s.count));
 
   // Donut percentages from merchantAnalytics; defaults to 0 segments when empty.
   const total = merchantAnalytics?.totalMerchants || 0;
@@ -238,14 +239,14 @@ const Overview = () => {
           <div className="lg:col-span-6 bg-surface-container-lowest p-4 md:p-6 rounded-xl border border-outline-variant/10 shadow-editorial">
             <div className="flex items-center justify-between mb-5 md:mb-8">
               <div>
-                <h3 className="text-[15px] md:text-[16px] font-semibold text-on-surface">Merchant Signups · 30d</h3>
-                <p className="text-[12px] text-slate-500">Daily new merchant onboarding volume</p>
+                <h3 className="text-[15px] md:text-[16px] font-semibold text-on-surface">Merchant Signups · 12 Months</h3>
+                <p className="text-[12px] text-slate-500">Monthly new merchant onboarding volume</p>
               </div>
               <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40">
-                {signupsSeries.length > 0 ? `${signupsSeries.reduce((s, x) => s + x.count, 0)} total` : ''}
+                {monthlySignups.length > 0 ? `${monthlySignups.reduce((s, x) => s + x.count, 0)} total` : ''}
               </span>
             </div>
-            <SignupsBarChart series={signupsSeries} max={maxSignups} loading={loading} />
+            <MonthlySignupsBarChart series={monthlySignups} max={maxMonthly} loading={loading} />
           </div>
           <div className="lg:col-span-4 bg-surface-container-lowest p-4 md:p-6 rounded-xl border border-outline-variant/10 shadow-editorial flex flex-col">
             <h3 className="text-[15px] md:text-[16px] font-semibold text-on-surface mb-4 md:mb-6">Merchant Composition</h3>
@@ -356,25 +357,38 @@ const Overview = () => {
   );
 };
 
-// ── Signups bar chart (real data) ─────────────────────────────────────
-const SignupsBarChart = ({ series, max, loading }) => {
-  if (loading) return <div className="h-[200px] bg-surface-container-low rounded-lg animate-pulse"></div>;
+// ── Monthly signups bar chart ─────────────────────────────────────────
+const MonthlySignupsBarChart = ({ series, max, loading }) => {
+  if (loading) return <div className="h-[220px] bg-surface-container-low rounded-lg animate-pulse"></div>;
   if (!series || series.length === 0) {
-    return <div className="h-[200px] flex items-center justify-center text-sm text-on-surface-variant/40">No signups in this range.</div>;
+    return <div className="h-[220px] flex items-center justify-center text-sm text-on-surface-variant/40">No signups yet.</div>;
   }
   return (
-    <div className="h-[200px] md:h-[240px] w-full relative flex items-end gap-[3px] md:gap-1 px-2">
-      {series.map((d, i) => {
-        const pct = Math.max(4, (d.count / max) * 100);
-        return (
-          <div
-            key={i}
-            title={`${d.date} — ${d.count} signups`}
-            className="flex-1 bg-gradient-to-t from-primary to-secondary rounded-t-sm transition-all hover:opacity-80"
-            style={{ height: `${pct}%` }}
-          />
-        );
-      })}
+    <div className="w-full">
+      <div className="h-[180px] md:h-[220px] w-full relative flex items-end gap-1.5 md:gap-2 px-1">
+        {series.map((d, i) => {
+          const pct = d.count > 0 ? Math.max(4, (d.count / max) * 100) : 2;
+          return (
+            <div key={i} className="flex-1 flex flex-col items-center justify-end h-full group relative">
+              {d.count > 0 && (
+                <span className="text-[9px] md:text-[10px] font-bold text-on-surface-variant/60 tabular-nums mb-1 opacity-0 group-hover:opacity-100 transition-opacity absolute -top-0">{d.count}</span>
+              )}
+              <div
+                title={`${d.month} — ${d.count} signups`}
+                className={`w-full rounded-t-sm transition-all hover:opacity-80 ${d.count > 0 ? 'bg-gradient-to-t from-primary to-secondary' : 'bg-surface-container-low'}`}
+                style={{ height: `${pct}%` }}
+              />
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex gap-1.5 md:gap-2 px-1 mt-2">
+        {series.map((d, i) => (
+          <div key={i} className="flex-1 text-center text-[9px] md:text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40">
+            {d.label}
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
