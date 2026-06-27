@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Layout from '../components/layout/Layout';
 import api from '../api/api';
+import TablePagination from '../components/ui/TablePagination';
+
+const PAGE_SIZE = 20;
 
 // Default filter state — every dimension at "all" means no filtering.
 const defaultFilters = {
@@ -98,6 +101,7 @@ const Merchants = () => {
   const [search, setSearch] = useState('');
   const [filters, setFilters] = useState(defaultFilters);
   const [showFilters, setShowFilters] = useState(false);
+  const [page, setPage] = useState(1);
   const filtersRef = useRef(null);
 
   // Phone normalizer: strip non-digits + drop common KE prefixes so 0790…,
@@ -152,6 +156,14 @@ const Merchants = () => {
       return true;
     });
   }, [merchantsData, search, filters]);
+
+  // Reset to page 1 whenever the filtered set changes shape.
+  useEffect(() => { setPage(1); }, [search, filters]);
+
+  const pagedMerchants = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filteredMerchants.slice(start, start + PAGE_SIZE);
+  }, [filteredMerchants, page]);
 
   function clearFilters() { setFilters(defaultFilters); setSearch(''); }
 
@@ -495,7 +507,7 @@ const Merchants = () => {
                 </tr>
               </thead>
               <tbody className="text-[13px]">
-                {filteredMerchants.map((m, i) => {
+                {pagedMerchants.map((m, i) => {
                   const tier = ACTIVITY_STYLE[m.activityTier] || ACTIVITY_STYLE.dormant;
                   const locked = m.status === 'locked';
                   const flagged = !!m.flagged;
@@ -503,10 +515,10 @@ const Merchants = () => {
                   const highSeverity = riskSignals.some((s) => s.severity === 'high');
                   return (
                     <tr key={m._id || i} className={`hover:bg-secondary-container/5 transition-colors group cursor-pointer ${locked ? 'opacity-70' : ''} ${flagged ? 'bg-red-50/30' : ''}`} onClick={() => openDetail(m._id)}>
-                      <td className="py-3 px-4 text-on-surface-variant/40 border-b border-outline-variant/5">{String(i + 1).padStart(2, '0')}</td>
-                      <td className="py-3 px-4 border-b border-outline-variant/5">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-[10px] ring-2 ring-white shadow-sm uppercase ${flagged ? 'bg-red-500 text-white' : 'bg-primary-fixed-dim text-on-primary-fixed'}`}>
+                      <td className="py-2 px-3 text-on-surface-variant/40 border-b border-outline-variant/5 text-[11px] tabular-nums">{String((page - 1) * PAGE_SIZE + i + 1).padStart(2, '0')}</td>
+                      <td className="py-2 px-3 border-b border-outline-variant/5">
+                        <div className="flex items-center gap-2.5">
+                          <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-[10px] ring-2 ring-white shadow-sm uppercase ${flagged ? 'bg-red-500 text-white' : 'bg-primary-fixed-dim text-on-primary-fixed'}`}>
                             {flagged ? <span className="material-symbols-outlined text-[14px]">flag</span> : (m.businessName ? m.businessName.substring(0, 2) : 'M')}
                           </div>
                           <div className="min-w-0">
@@ -538,16 +550,16 @@ const Merchants = () => {
                           </div>
                         </div>
                       </td>
-                      <td className="py-3 px-4 border-b border-outline-variant/5">
+                      <td className="py-2 px-3 border-b border-outline-variant/5">
                         <p className="text-on-surface-variant/80 font-medium">{m.phone}</p>
                         <p className="text-[11px] text-on-surface-variant/60">{m.email}</p>
                       </td>
-                      <td className="py-3 px-4 border-b border-outline-variant/5">
+                      <td className="py-2 px-3 border-b border-outline-variant/5">
                         <span className="font-mono text-[12px] font-bold text-on-surface bg-surface-container-low px-2 py-1 rounded">
                           {m.paybillAccount || '—'}
                         </span>
                       </td>
-                      <td className="py-3 px-4 border-b border-outline-variant/5">
+                      <td className="py-2 px-3 border-b border-outline-variant/5">
                         <div className="flex flex-col gap-1">
                           <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold border tracking-wider uppercase w-max ${tier.pill}`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${tier.dot}`}></span>
@@ -558,7 +570,7 @@ const Merchants = () => {
                           </p>
                         </div>
                       </td>
-                      <td className="py-3 px-4 border-b border-outline-variant/5">
+                      <td className="py-2 px-3 border-b border-outline-variant/5">
                         {locked ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border tracking-tight uppercase bg-amber-100 text-amber-800 border-amber-200">
                             <span className="material-symbols-outlined text-[12px]">lock</span> Locked
@@ -571,10 +583,10 @@ const Merchants = () => {
                           </span>
                         )}
                       </td>
-                      <td className="py-3 px-4 border-b border-outline-variant/5 text-on-surface-variant/60">
+                      <td className="py-2 px-3 border-b border-outline-variant/5 text-on-surface-variant/60 text-[11px]">
                         {new Date(m.createdAt).toLocaleDateString()}
                       </td>
-                      <td className="py-3 px-4 text-right border-b border-outline-variant/5 relative" onClick={(e) => e.stopPropagation()}>
+                      <td className="py-2 px-3 text-right border-b border-outline-variant/5 relative" onClick={(e) => e.stopPropagation()}>
                         <button
                           onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === m._id ? null : m._id); }}
                           className="p-1 hover:bg-surface-container-high rounded-lg text-on-surface-variant/30 hover:text-secondary transition-colors"
@@ -620,11 +632,10 @@ const Merchants = () => {
               </tbody>
             </table>
           </div>
-          <div className="px-6 py-4 bg-surface flex items-center justify-between border-t border-outline-variant/10">
-            <p className="text-xs text-on-surface-variant/60 font-body">
-              Showing {filteredMerchants.length} of {merchantStats.total} merchants
-              {(activeFilterCount > 0 || search) && <span className="text-on-surface-variant/40"> · filtered</span>}
-            </p>
+          <TablePagination page={page} pageSize={PAGE_SIZE} total={filteredMerchants.length} onPage={setPage} />
+          <div className="px-4 py-2 bg-surface text-[11px] text-on-surface-variant/50 font-body border-t border-outline-variant/10">
+            Showing {filteredMerchants.length} of {merchantStats.total} merchants
+            {(activeFilterCount > 0 || search) && <span className="text-on-surface-variant/40"> · filtered</span>}
           </div>
         </div>
       </div>

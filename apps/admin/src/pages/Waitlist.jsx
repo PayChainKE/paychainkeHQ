@@ -11,7 +11,7 @@ const STATUS_META = {
   converted: { label: 'Converted', pill: 'bg-violet-50 text-violet-700 border-violet-200',  dot: 'bg-violet-500',  icon: 'storefront' },
 };
 const STATUS_ORDER = ['pending', 'contacted', 'approved', 'converted', 'rejected'];
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 20;
 
 const defaultFilters = {
   status: 'all',
@@ -461,7 +461,7 @@ const Waitlist = () => {
               <table className="w-full text-left border-collapse font-body">
                 <thead>
                   <tr className="bg-surface-container-low/50">
-                    <th className="px-4 py-3 w-10">
+                    <th className="px-3 py-2 w-10">
                       <input type="checkbox" checked={allOnPageSelected} onChange={toggleAllOnPage} className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary" />
                     </th>
                     <Th>#</Th>
@@ -471,7 +471,7 @@ const Waitlist = () => {
                     <Th>Status</Th>
                     <Th>Added</Th>
                     <Th>Priority</Th>
-                    <th className="px-4 py-3 text-right"></th>
+                    <th className="px-3 py-2 text-right"></th>
                   </tr>
                 </thead>
                 <tbody className="text-[13px]">
@@ -484,11 +484,11 @@ const Waitlist = () => {
                         className={`hover:bg-secondary-container/5 transition-colors group cursor-pointer ${e.priority ? 'bg-amber-50/20' : ''} ${isSelected ? 'bg-primary/5' : ''}`}
                         onClick={() => openDetail(e)}
                       >
-                        <td className="px-4 py-3" onClick={(ev) => ev.stopPropagation()}>
+                        <td className="px-3 py-2" onClick={(ev) => ev.stopPropagation()}>
                           <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(e._id)} className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary" />
                         </td>
                         <td className="px-4 py-3 text-on-surface-variant/40 border-b border-outline-variant/5">{String(pageStart + i + 1).padStart(3, '0')}</td>
-                        <td className="px-4 py-3 border-b border-outline-variant/5">
+                        <td className="px-3 py-2 border-b border-outline-variant/5">
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-full bg-primary-fixed-dim flex items-center justify-center text-primary text-xs font-bold ring-2 ring-white shadow-sm uppercase">
                               {initials(e.fullName)}
@@ -499,23 +499,23 @@ const Waitlist = () => {
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3 border-b border-outline-variant/5">
+                        <td className="px-3 py-2 border-b border-outline-variant/5">
                           <p className="text-on-surface-variant/80 font-medium">{e.phone || '—'}</p>
                           <p className="text-[11px] text-on-surface-variant/60">{e.email || 'No email'}</p>
                         </td>
-                        <td className="px-4 py-3 border-b border-outline-variant/5">
+                        <td className="px-3 py-2 border-b border-outline-variant/5">
                           <span className="px-2 py-0.5 rounded bg-surface-container text-on-surface-variant text-[11px] font-bold uppercase tracking-tight">{e.businessType || '—'}</span>
                         </td>
-                        <td className="px-4 py-3 border-b border-outline-variant/5">
+                        <td className="px-3 py-2 border-b border-outline-variant/5">
                           <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold border tracking-wide uppercase ${st.pill}`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`}></span>
                             {st.label}
                           </span>
                         </td>
-                        <td className="px-4 py-3 border-b border-outline-variant/5 text-on-surface-variant/60">
+                        <td className="px-3 py-2 border-b border-outline-variant/5 text-on-surface-variant/60">
                           {relativeTime(e.createdAt)}
                         </td>
-                        <td className="px-4 py-3 border-b border-outline-variant/5" onClick={(ev) => ev.stopPropagation()}>
+                        <td className="px-3 py-2 border-b border-outline-variant/5" onClick={(ev) => ev.stopPropagation()}>
                           <button
                             onClick={() => togglePriority(e)}
                             className="p-1 rounded hover:bg-amber-50 transition-colors"

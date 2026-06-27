@@ -2,7 +2,9 @@ import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import Layout from '../components/layout/Layout';
 import { exportCSV } from '../utils/exportCSV';
 import api from '../api/api';
+import TablePagination from '../components/ui/TablePagination';
 
+const PAGE_SIZE = 20;
 const EMAIL_RE = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
 
 function relativeTime(iso) {
@@ -31,6 +33,7 @@ export default function Newsletter() {
 
   // Search / filter
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState('all'); // all | active | inactive
 
   // Compose modal
@@ -90,6 +93,9 @@ export default function Newsletter() {
       return true;
     });
   }, [subscribers, search, statusFilter]);
+
+  useEffect(() => { setPage(1); }, [search, statusFilter]);
+  const paged = useMemo(() => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [filtered, page]);
 
   // ── Actions ────────────────────────────────────────────────────────
   async function handleAdd(e) {
@@ -296,14 +302,14 @@ export default function Newsletter() {
                   </tr>
                 </thead>
                 <tbody className="text-[13px]">
-                  {filtered.map((s, i) => (
+                  {paged.map((s, i) => (
                     <tr key={s._id} className="hover:bg-secondary-container/5 transition-colors group">
-                      <td className="px-4 py-3 text-on-surface-variant/40 border-b border-outline-variant/5">{String(i + 1).padStart(3, '0')}</td>
-                      <td className="px-4 py-3 border-b border-outline-variant/5">
+                      <td className="px-3 py-2 text-on-surface-variant/40 border-b border-outline-variant/5 text-[11px] tabular-nums">{String((page - 1) * PAGE_SIZE + i + 1).padStart(3, '0')}</td>
+                      <td className="px-3 py-2 border-b border-outline-variant/5">
                         <p className="font-bold text-on-surface tracking-tight">{s.email}</p>
                         {s.addedBy?.email && <p className="text-[10px] text-on-surface-variant/50">added by {s.addedBy.email}</p>}
                       </td>
-                      <td className="px-4 py-3 border-b border-outline-variant/5">
+                      <td className="px-3 py-2 border-b border-outline-variant/5">
                         <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-widest ${
                           s.active ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-100 text-gray-600 border-gray-200'
                         }`}>
@@ -311,17 +317,17 @@ export default function Newsletter() {
                           {s.active ? 'Active' : 'Inactive'}
                         </span>
                       </td>
-                      <td className="px-4 py-3 border-b border-outline-variant/5">
+                      <td className="px-3 py-2 border-b border-outline-variant/5">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest border ${
                           s.source === 'admin' ? 'bg-violet-50 text-violet-700 border-violet-200' : 'bg-blue-50 text-blue-700 border-blue-200'
                         }`}>
                           {s.source === 'admin' ? 'Manual' : 'Public'}
                         </span>
                       </td>
-                      <td className="px-4 py-3 border-b border-outline-variant/5 text-on-surface-variant/60">
+                      <td className="px-3 py-2 border-b border-outline-variant/5 text-on-surface-variant/60 text-[11px]">
                         {relativeTime(s.createdAt)}
                       </td>
-                      <td className="px-4 py-3 text-right border-b border-outline-variant/5">
+                      <td className="px-3 py-2 text-right border-b border-outline-variant/5">
                         <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => toggleActive(s)}
@@ -350,6 +356,7 @@ export default function Newsletter() {
                   )}
                 </tbody>
               </table>
+              <TablePagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPage={setPage} />
             </div>
           )}
         </div>

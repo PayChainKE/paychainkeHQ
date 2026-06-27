@@ -90,7 +90,7 @@ const Ledger = () => {
     setError('');
     try {
       const res = await api.get('/api/admin/ledger', {
-        params: { range, page, limit: 25, type, status, q: search },
+        params: { range, page, limit: 20, type, status, q: search },
       });
       if (res.data?.success) {
         setData(res.data.data);
@@ -416,7 +416,7 @@ const Ledger = () => {
                               onClick={() => setActiveTxn(t)}
                               className="hover:bg-secondary-container/5 transition-colors group cursor-pointer"
                             >
-                              <td className="px-4 py-3 border-b border-outline-variant/5">
+                              <td className="px-3 py-2 border-b border-outline-variant/5">
                                 <div className="flex items-center gap-1">
                                   <span className="font-mono text-[11px] font-bold text-on-surface bg-surface-container-low px-2 py-1 rounded">
                                     {t.reference?.length > 18 ? `${t.reference.slice(0, 14)}…` : t.reference || '—'}
@@ -434,14 +434,14 @@ const Ledger = () => {
                                   )}
                                 </div>
                               </td>
-                              <td className="px-4 py-3 border-b border-outline-variant/5 text-on-surface-variant/70 whitespace-nowrap">{fmtTime(t.createdAt)}</td>
-                              <td className="px-4 py-3 border-b border-outline-variant/5">
+                              <td className="px-3 py-2 border-b border-outline-variant/5 text-on-surface-variant/70 whitespace-nowrap">{fmtTime(t.createdAt)}</td>
+                              <td className="px-3 py-2 border-b border-outline-variant/5">
                                 <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest border ${tm.color}`}>
                                   <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: tm.dot }}></span>
                                   {tm.label}
                                 </span>
                               </td>
-                              <td className="px-4 py-3 border-b border-outline-variant/5">
+                              <td className="px-3 py-2 border-b border-outline-variant/5">
                                 {t.merchant ? (
                                   <div>
                                     <p className="font-bold text-on-surface tracking-tight">{t.merchant.businessName}</p>
@@ -456,7 +456,7 @@ const Ledger = () => {
                                   <p className="text-on-surface-variant/40 font-mono text-[12px]">{t.accountNumber || '—'}</p>
                                 )}
                               </td>
-                              <td className="px-4 py-3 border-b border-outline-variant/5">
+                              <td className="px-3 py-2 border-b border-outline-variant/5">
                                 <p className="font-bold text-on-surface tracking-tight tabular-nums">
                                   {t.currency === 'USDC' ? `${fmtUSDC(t.amount)} USDC` : fmtKES(t.amount)}
                                 </p>
@@ -464,7 +464,7 @@ const Ledger = () => {
                                   <p className="text-[10px] text-on-surface-variant/60 font-mono">≈ {fmtUSDC(t.usdcAmount)} USDC</p>
                                 )}
                               </td>
-                              <td className="px-4 py-3 border-b border-outline-variant/5">
+                              <td className="px-3 py-2 border-b border-outline-variant/5">
                                 <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest border ${sm.pill}`}>
                                   <span className={`w-1.5 h-1.5 rounded-full ${sm.dot}`}></span>
                                   {sm.label}
@@ -804,7 +804,7 @@ const AreaChart = ({ series }) => {
 };
 
 const Th = ({ children }) => (
-  <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60">{children}</th>
+  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60">{children}</th>
 );
 
 const Legend = ({ color, label }) => (

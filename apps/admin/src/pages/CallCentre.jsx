@@ -77,7 +77,7 @@ const CallCentre = () => {
     setError('');
     try {
       const res = await api.get('/api/admin/communications', {
-        params: { range, channel, status, q: search, page, limit: 30 },
+        params: { range, channel, status, q: search, page, limit: 20 },
       });
       if (res.data?.success) {
         setData(res.data.data);
