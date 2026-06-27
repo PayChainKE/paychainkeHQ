@@ -16,10 +16,13 @@ import { ensurePrimaryOwner } from './migrations/ensurePrimaryOwner.js';
 
 dotenv.config();
 
-// Connect to Database, then run idempotent boot-time migrations.
-connectDB().then(() => {
-  ensurePrimaryOwner();
-});
+// Connect to Database, then run idempotent boot-time migrations. In dev we
+// keep the process alive even if Mongo is unreachable (Atlas whitelist drift,
+// VPN flap) so nodemon doesn't crash-loop — operator just fixes the IP and
+// hits save to retry.
+connectDB()
+  .then(() => ensurePrimaryOwner())
+  .catch(() => { /* error already printed with actionable hint in connectDB */ });
 
 const app = express();
 
