@@ -16,6 +16,95 @@ const fmtKES = (n) => {
   return `KES ${Math.round(n).toLocaleString()}`;
 };
 
+// ── Client-side signup bucketer ──────────────────────────────────────
+// Mirrors the backend's densified daily/weekly/monthly/yearly aggregations
+// so the chart can always render — even before the new backend endpoints
+// (dailySignups / weeklySignups / yearlySignups) have shipped to prod.
+const ymdKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const ymKey  = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+const isoWeekOf = (date) => {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return { year: d.getUTCFullYear(), week: Math.ceil((((d - yearStart) / 86400000) + 1) / 7) };
+};
+
+function bucketSignups(dailyEntries = [], granularity) {
+  // Accept either `{ date, count }` (insights.signupsSeries) or `{ bucket, count }`.
+  const safe = dailyEntries
+    .map((e) => ({ date: e.date || e.bucket, count: Number(e.count) || 0 }))
+    .filter((e) => e.date);
+
+  if (granularity === 'daily') {
+    const by = new Map(safe.map((e) => [e.date, e.count]));
+    const out = [];
+    for (let i = 29; i >= 0; i -= 1) {
+      const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - i);
+      const key = ymdKey(d);
+      out.push({
+        bucket: key,
+        label: i % 5 === 0 ? d.toLocaleString('en-US', { day: '2-digit', month: 'short' }) : '',
+        tooltip: d.toLocaleString('en-US', { weekday: 'short', day: '2-digit', month: 'short' }),
+        count: by.get(key) || 0,
+      });
+    }
+    return out;
+  }
+
+  if (granularity === 'weekly') {
+    const by = new Map();
+    safe.forEach((e) => {
+      const { year, week } = isoWeekOf(new Date(e.date));
+      const key = `${year}-W${String(week).padStart(2, '0')}`;
+      by.set(key, (by.get(key) || 0) + e.count);
+    });
+    const out = [];
+    for (let i = 11; i >= 0; i -= 1) {
+      const d = new Date(); d.setDate(d.getDate() - 7 * i);
+      const { year, week } = isoWeekOf(d);
+      const key = `${year}-W${String(week).padStart(2, '0')}`;
+      out.push({ bucket: key, label: `W${week}`, tooltip: `Week ${week} · ${year}`, count: by.get(key) || 0 });
+    }
+    return out;
+  }
+
+  if (granularity === 'yearly') {
+    const by = new Map();
+    safe.forEach((e) => {
+      const yr = new Date(e.date).getFullYear();
+      by.set(yr, (by.get(yr) || 0) + e.count);
+    });
+    const out = [];
+    const cur = new Date().getFullYear();
+    for (let i = 4; i >= 0; i -= 1) {
+      const yr = cur - i;
+      out.push({ bucket: String(yr), label: String(yr), tooltip: String(yr), count: by.get(yr) || 0 });
+    }
+    return out;
+  }
+
+  // Monthly (default)
+  const by = new Map();
+  safe.forEach((e) => {
+    const d = new Date(e.date);
+    const key = ymKey(d);
+    by.set(key, (by.get(key) || 0) + e.count);
+  });
+  const out = [];
+  for (let i = 11; i >= 0; i -= 1) {
+    const d = new Date(); d.setMonth(d.getMonth() - i);
+    const key = ymKey(d);
+    out.push({
+      bucket: key,
+      label: d.toLocaleString('en-US', { month: 'short' }),
+      tooltip: d.toLocaleString('en-US', { month: 'long', year: 'numeric' }),
+      count: by.get(key) || 0,
+    });
+  }
+  return out;
+}
+
 const fmtTime = (iso) => {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -120,9 +209,11 @@ const Overview = () => {
 
   const topMerchants = insights?.topMerchants || [];
 
-  // Signups chart: user-selectable granularity. All four series are densified
-  // server-side so each toggle shows a complete trailing window even when some
-  // buckets had zero signups.
+  // Signups chart: user-selectable granularity. Prefer the densified
+  // server-side series when present; fall back to client-side bucketing of
+  // `signupsSeries` (the raw daily list) so the chart still renders during
+  // the deploy window before the new endpoints land, AND when only the
+  // legacy backend is available.
   const [signupGranularity, setSignupGranularity] = useState('monthly');
   const GRANULARITY_META = {
     daily:   { label: 'Daily',   field: 'dailySignups',   subtitle: 'Trailing 30 days · per day' },
@@ -131,7 +222,15 @@ const Overview = () => {
     yearly:  { label: 'Yearly',  field: 'yearlySignups',  subtitle: 'Trailing 5 years · per year' },
   };
   const activeMeta = GRANULARITY_META[signupGranularity];
-  const signupSeries = insights?.[activeMeta.field] || [];
+
+  const signupSeries = useMemo(() => {
+    const fromServer = insights?.[activeMeta.field];
+    if (Array.isArray(fromServer) && fromServer.length > 0) return fromServer;
+    // Fallback: bucket the raw daily series (always returned by /insights).
+    const daily = insights?.signupsSeries || [];
+    return bucketSignups(daily, signupGranularity);
+  }, [insights, activeMeta.field, signupGranularity]);
+
   const maxSignup = Math.max(1, ...signupSeries.map((s) => s.count));
   const signupTotal = signupSeries.reduce((s, x) => s + x.count, 0);
 
@@ -350,7 +449,7 @@ const Overview = () => {
                       onClick={() => setSignupGranularity(key)}
                       className={`px-2.5 md:px-3 py-1 text-[10px] md:text-[11px] font-bold uppercase tracking-widest rounded-full transition-colors ${
                         signupGranularity === key
-                          ? 'bg-primary text-on-primary'
+                          ? 'bg-emerald-700 text-white shadow-sm'
                           : 'text-on-surface-variant/70 hover:text-on-surface'
                       }`}
                     >
@@ -477,22 +576,23 @@ const Overview = () => {
 const SignupsBarChart = ({ series, max, loading }) => {
   if (loading) return <div className="h-[220px] bg-surface-container-low rounded-lg animate-pulse"></div>;
   if (!series || series.length === 0) {
-    return <div className="h-[220px] flex items-center justify-center text-sm text-on-surface-variant/40">No signups yet.</div>;
+    return <div className="h-[220px] flex items-center justify-center text-sm text-on-surface-variant/40">No signup data yet.</div>;
   }
+  const totalAcross = series.reduce((s, x) => s + (x.count || 0), 0);
   return (
     <div className="w-full">
       <div className="h-[180px] md:h-[220px] w-full relative flex items-end gap-1 md:gap-1.5 px-1">
         {series.map((d, i) => {
-          const pct = d.count > 0 ? Math.max(4, (d.count / max) * 100) : 2;
-          const tip = d.tooltip || d.bucket || d.month || d.label;
+          const pct = d.count > 0 ? Math.max(8, (d.count / max) * 100) : 2;
+          const tip = d.tooltip || d.bucket || d.month || d.label || '';
           return (
             <div key={i} className="flex-1 flex flex-col items-center justify-end h-full group relative">
               {d.count > 0 && (
-                <span className="text-[9px] md:text-[10px] font-bold text-on-surface-variant/80 tabular-nums mb-1 opacity-0 group-hover:opacity-100 transition-opacity absolute -top-0">{d.count}</span>
+                <span className="text-[9px] md:text-[10px] font-bold text-emerald-700 tabular-nums mb-1 absolute -top-0">{d.count}</span>
               )}
               <div
                 title={`${tip} — ${d.count} signup${d.count === 1 ? '' : 's'}`}
-                className={`w-full rounded-t-sm transition-all hover:opacity-80 ${d.count > 0 ? 'bg-gradient-to-t from-primary to-secondary' : 'bg-surface-container-low'}`}
+                className={`w-full rounded-t-sm transition-all hover:opacity-80 ${d.count > 0 ? 'bg-gradient-to-t from-emerald-600 to-emerald-400' : 'bg-surface-container-low'}`}
                 style={{ height: `${pct}%` }}
               />
             </div>
@@ -506,6 +606,9 @@ const SignupsBarChart = ({ series, max, loading }) => {
           </div>
         ))}
       </div>
+      {totalAcross === 0 && (
+        <p className="mt-2 text-center text-[11px] text-on-surface-variant/50">No signups in this window yet.</p>
+      )}
     </div>
   );
 };
@@ -531,9 +634,24 @@ const CompositionDonut = ({ total = 0, verified = 0, wallet = 0, recent = 0, loa
   const v = Math.max(0, Math.min(verified, total));
   const w = Math.max(0, Math.min(wallet, v));
   const arcs = [
-    { key: 'active',   value: w,              color: 'rgb(var(--md-sys-color-secondary))', label: 'Active · Wallet' },
-    { key: 'verified', value: v - w,          color: 'rgb(var(--md-sys-color-primary))',   label: 'Verified · No Wallet' },
-    { key: 'pending',  value: Math.max(0, total - v), color: 'rgba(148,163,184,0.45)',     label: 'Pending KYC' },
+    {
+      key: 'active', value: w,
+      color: '#059669', // emerald-600 — arc + dot
+      labelClass: 'text-emerald-700', valueClass: 'text-emerald-700',
+      label: 'Active · Wallet',
+    },
+    {
+      key: 'verified', value: v - w,
+      color: '#2563eb', // blue-600
+      labelClass: 'text-blue-700', valueClass: 'text-blue-700',
+      label: 'Verified · No Wallet',
+    },
+    {
+      key: 'pending', value: Math.max(0, total - v),
+      color: '#d97706', // amber-600
+      labelClass: 'text-amber-700', valueClass: 'text-amber-700',
+      label: 'Pending KYC',
+    },
   ];
 
   const r = 15.5;
@@ -576,14 +694,14 @@ const CompositionDonut = ({ total = 0, verified = 0, wallet = 0, recent = 0, loa
 
       <div className="mt-6 space-y-2.5">
         {drawArcs.map((a) => (
-          <div key={a.key} className="flex items-center justify-between text-[12px] font-medium">
+          <div key={a.key} className="flex items-center justify-between text-[12px] font-semibold">
             <div className="flex items-center gap-2 min-w-0">
               <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: a.color }} />
-              <span className="text-on-surface-variant truncate">{a.label}</span>
+              <span className={`${a.labelClass} truncate`}>{a.label}</span>
             </div>
             <div className="flex items-baseline gap-2 flex-shrink-0">
-              <span className="font-bold tabular-nums text-on-surface">{a.value}</span>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40 tabular-nums w-9 text-right">
+              <span className={`font-bold tabular-nums ${a.valueClass}`}>{a.value}</span>
+              <span className={`text-[10px] font-bold uppercase tracking-widest tabular-nums w-9 text-right ${a.labelClass} opacity-70`}>
                 {pct(a.value).toFixed(0)}%
               </span>
             </div>
