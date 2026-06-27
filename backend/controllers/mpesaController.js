@@ -7,13 +7,21 @@ import { getLiveKesToUsdcRate } from '../utils/rateEngine.js';
 import STKRequest from '../models/STKRequest.js';
 
 // ── M-PESA configuration ──────────────────────────────────────────────────────
-// Use MPESA_ENVIRONMENT (sandbox | live) to control which Daraja endpoint is
-// used. Never rely on NODE_ENV for this — NODE_ENV is 'production' on Render
-// even when credentials are still sandbox, which caused the token failure.
-const mpesaEnv      = process.env.MPESA_ENVIRONMENT || 'sandbox';
-const mpesaBaseUrl  = mpesaEnv === 'live'
+// MPESA_ENVIRONMENT controls which Daraja endpoint is used.
+// Defaults to 'sandbox' — must be explicitly set to 'live' to reach production.
+// Never derive this from NODE_ENV: hosting platforms set NODE_ENV='production'
+// even for staging deployments, which would accidentally hit the live API.
+const mpesaEnv      = (process.env.MPESA_ENVIRONMENT || 'sandbox').toLowerCase();
+const isLive        = mpesaEnv === 'live';
+const mpesaBaseUrl  = isLive
   ? 'https://api.safaricom.co.ke'
   : 'https://sandbox.safaricom.co.ke';
+
+if (isLive) {
+  console.log('⚠️  M-PESA running in LIVE mode — real money will move');
+} else {
+  console.log('🧪 M-PESA running in SANDBOX mode — no real money at risk');
+}
 
 const consumerKey     = process.env.MPESA_CONSUMER_KEY;
 const consumerSecret  = process.env.MPESA_CONSUMER_SECRET;
@@ -245,6 +253,10 @@ export const initiateSTKPush = async (req, res) => {
     if (!callbackBase) {
       return res.status(500).json({ error: 'MPESA_CALLBACK_URL is not set — Safaricom cannot deliver the payment result.' });
     }
+    // Safety: block live transactions unless explicitly enabled
+    if (isLive && process.env.MPESA_LIVE_ENABLED !== 'true') {
+      return res.status(503).json({ error: 'Live M-PESA payments are not yet enabled. Set MPESA_LIVE_ENABLED=true to activate.' });
+    }
 
     // Format timestamp YYYYMMDDHHmmss
     const now = new Date();
@@ -403,10 +415,15 @@ export const initiateB2C = async (req, res) => {
     const { phone, amount, destination } = req.body;
     const merchantId = req.merchant._id;
     
+    // Safety: block live transactions unless explicitly enabled
+    if (isLive && process.env.MPESA_LIVE_ENABLED !== 'true') {
+      return res.status(503).json({ error: 'Live M-PESA payments are not yet enabled. Set MPESA_LIVE_ENABLED=true to activate.' });
+    }
+
     // Fetch merchant to check balance
     const merchant = await Merchant.findById(merchantId);
     if (!merchant) return res.status(404).json({ error: 'Merchant not found' });
-    
+
     // Check if sufficient funds
     if (merchant.kesBalance < amount) {
       return res.status(400).json({ error: 'Insufficient KES balance for this transfer' });
