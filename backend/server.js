@@ -22,12 +22,20 @@ const app = express();
 
 // Middleware
 const allowedOrigins = [
+  // Public marketing site
   'https://www.paychain.co.ke',
   'https://paychain.co.ke',
+  // Admin console
+  'https://www.admin.paychain.co.ke',
   'https://admin.paychain.co.ke',
-  'https://demo.paychain.co.ke',
-  'https://merchant.paychain.co.ke',
+  // Merchant dashboard
+  'https://www.app.paychain.co.ke',
   'https://app.paychain.co.ke',
+  // Demo dashboard
+  'https://www.demo.paychain.co.ke',
+  'https://demo.paychain.co.ke',
+  // Legacy alias (kept short-term so existing magic links still work)
+  'https://merchant.paychain.co.ke',
   'http://localhost:5173',
   'http://localhost:5174',
   'http://localhost:5175',

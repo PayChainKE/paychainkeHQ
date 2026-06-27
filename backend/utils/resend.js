@@ -166,7 +166,7 @@ export const sendWalletActivationEmail = async (email, name, stellarPublicKey) =
 
             <!-- CTA -->
             <div style="text-align: center; margin-top: 40px; margin-bottom: 40px;">
-              <a href="https://merchant.paychain.co.ke/wallet" style="display: inline-block; background-color: #FCD535; color: #111827; text-decoration: none; font-weight: 700; font-size: 16px; padding: 14px 32px; border-radius: 4px; transition: background-color 0.2s;">
+              <a href="https://app.paychain.co.ke/wallet" style="display: inline-block; background-color: #FCD535; color: #111827; text-decoration: none; font-weight: 700; font-size: 16px; padding: 14px 32px; border-radius: 4px; transition: background-color 0.2s;">
                 Go to Dashboard
               </a>
             </div>
@@ -178,7 +178,7 @@ export const sendWalletActivationEmail = async (email, name, stellarPublicKey) =
               </h3>
               <ul style="font-size: 13px; color: #9CA3AF; line-height: 1.6; padding-left: 20px; margin: 0;">
                 <li style="margin-bottom: 8px;">PayChain staff will <strong>never</strong> ask for your passwords or private keys.</li>
-                <li style="margin-bottom: 8px;">Always verify you are on <strong>merchant.paychain.co.ke</strong> before logging in.</li>
+                <li style="margin-bottom: 8px;">Always verify you are on <strong>app.paychain.co.ke</strong> before logging in.</li>
                 <li>Do not share your screen with anyone claiming to provide support.</li>
               </ul>
             </div>
@@ -540,7 +540,7 @@ export const sendBatchReceiptEmail = async (email, businessName, batchRows, tota
             </div>
 
             <div style="text-align: center; margin-top: 40px;">
-              <a href="https://merchant.paychain.co.ke/transactions" style="display: inline-block; background-color: #0A2540; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 14px; padding: 14px 28px; border-radius: 6px;">
+              <a href="https://app.paychain.co.ke/transactions" style="display: inline-block; background-color: #0A2540; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 14px; padding: 14px 28px; border-radius: 6px;">
                 View in Dashboard
               </a>
             </div>

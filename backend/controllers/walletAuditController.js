@@ -90,9 +90,10 @@ export const runWalletAudit = async (req, res) => {
     const activeWallets = auditResults.filter(r => r.status === 'Active').length;
     const inactiveWallets = auditResults.filter(r => r.status === 'Inactive').length;
     const noWallet = auditResults.filter(r => r.status === 'No Wallet').length;
+    // 4-decimal precision matches the on-chain USDC display convention.
     const totalUsdcFloat = auditResults
       .reduce((sum, r) => sum + parseFloat(r.usdcBalance || 0), 0)
-      .toFixed(7);
+      .toFixed(4);
 
     // 4. Emit clean console.table for CLI script usage
     console.table(

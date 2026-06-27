@@ -81,7 +81,7 @@ const generateUniquePaybillAccount = async () => {
 };
 
 const MERCHANT_DASHBOARD_URL =
-  process.env.MERCHANT_DASHBOARD_URL || 'https://merchant.paychain.co.ke';
+  process.env.MERCHANT_DASHBOARD_URL || 'https://app.paychain.co.ke';
 
 // Generate every common storage variation of a Kenyan phone number so we can
 // detect duplicates regardless of how a previous record was saved (e.g. `0790...`,

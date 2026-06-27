@@ -5,7 +5,7 @@ import Merchant from '../models/Merchant.js';
 import { sendWaitlistConfirmation, sendMerchantInvite } from '../utils/resend.js';
 
 const MERCHANT_DASHBOARD_URL =
-  process.env.MERCHANT_DASHBOARD_URL || 'https://merchant.paychain.co.ke';
+  process.env.MERCHANT_DASHBOARD_URL || 'https://app.paychain.co.ke';
 
 const ALLOWED_STATUSES = ['pending', 'contacted', 'approved', 'rejected', 'converted'];
 
