@@ -10,6 +10,7 @@ import {
   biometricLogin,
   resendMerchantOTP,
   forgotPassword,
+  verifyResetOTP,
   resetPassword,
   changeMerchantPassword,
   getMerchantMe,
@@ -79,8 +80,9 @@ router.post('/merchant/verify-otp', merchantOtpLimiter, verifyMerchantOTP);
 router.post('/merchant/login', merchantLoginLimiter, loginMerchant);
 router.post('/merchant/biometric-login', merchantLoginLimiter, biometricLogin);
 router.post('/merchant/resend-otp', merchantOtpLimiter, resendMerchantOTP);
-router.post('/merchant/forgot-password', merchantLoginLimiter, forgotPassword);
-router.post('/merchant/reset-password', merchantOtpLimiter, resetPassword);
+router.post('/merchant/forgot-password',  merchantLoginLimiter, forgotPassword);
+router.post('/merchant/verify-reset-otp', merchantOtpLimiter,   verifyResetOTP);
+router.post('/merchant/reset-password',   merchantOtpLimiter,   resetPassword);
 router.get('/merchant/setup-password/:token', validateSetupToken);
 router.post('/merchant/setup-password', merchantOtpLimiter, setupPassword);
 router.put('/merchant/change-password', protectMerchant, changeMerchantPassword);
