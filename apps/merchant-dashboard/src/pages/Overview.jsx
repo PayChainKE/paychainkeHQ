@@ -34,31 +34,45 @@ export default function Overview() {
     localStorage.setItem('paychain_show_wallet', newVal)
   }
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
-        const token = localStorage.getItem('paychain_merchant_token')
-        const config = { headers: { Authorization: `Bearer ${token}` } }
-        
-        const [txRes, trustRes] = await Promise.all([
-          axios.get(`${API_URL}/api/transactions`, config),
-          axios.get(`${API_URL}/api/trust-score`, config).catch(() => ({ data: { current: 0, eligibleForAdvance: false } }))
-        ])
-        setLiveTransactions(txRes.data)
-        setTrustData(trustRes.data)
-      } catch (err) {
-        console.error('Failed to fetch dashboard data', err)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    if (merchant) {
-      fetchData()
-    } else {
+  const fetchData = React.useCallback(async () => {
+    if (!merchant) return
+    try {
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+      const token = localStorage.getItem('paychain_merchant_token')
+      const config = { headers: { Authorization: `Bearer ${token}` } }
+
+      const [txRes, trustRes] = await Promise.all([
+        axios.get(`${API_URL}/api/transactions`, config),
+        axios.get(`${API_URL}/api/trust-score`, config).catch(() => ({ data: { current: 0, eligibleForAdvance: false } }))
+      ])
+      setLiveTransactions(txRes.data)
+      setTrustData(trustRes.data)
+    } catch (err) {
+      console.error('Failed to fetch dashboard data', err)
+    } finally {
       setIsLoading(false)
     }
   }, [merchant])
+
+  // Initial load
+  useEffect(() => {
+    if (merchant) fetchData()
+    else setIsLoading(false)
+  }, [merchant, fetchData])
+
+  // Poll every 30 s so revenue chart and recent transactions stay live
+  useEffect(() => {
+    if (!merchant) return
+    const interval = setInterval(fetchData, 30000)
+    return () => clearInterval(interval)
+  }, [merchant, fetchData])
+
+  // Also refresh instantly when the user returns to the tab
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchData() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [fetchData])
 
   // Dynamic calculations
   const today = new Date()
@@ -430,46 +444,75 @@ export default function Overview() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-20">
         {/* Section 4: Recent Collections */}
         <section className="lg:col-span-2 bg-white rounded-[16px] border border-slate-300 shadow-sm editorial-shadow overflow-hidden">
-          <div className="p-8 border-b border-slate-300 flex justify-between items-center">
-            <h3 className="font-headline font-bold text-3xl text-primary">Recent Transactions</h3>
-            <button onClick={() => navigate('/transactions')} className="text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 px-4 py-2 rounded-lg transition-colors border border-emerald-100">
+          <div className="p-6 lg:p-8 border-b border-slate-200 flex justify-between items-center gap-4">
+            <div className="flex items-center gap-3">
+              <h3 className="font-headline font-bold text-2xl lg:text-3xl text-primary">Recent Transactions</h3>
+              <button
+                onClick={fetchData}
+                className="w-7 h-7 rounded-full bg-slate-100 hover:bg-emerald-100 flex items-center justify-center text-slate-400 hover:text-emerald-600 transition-colors"
+                title="Refresh"
+              >
+                <span className="material-symbols-outlined text-base">refresh</span>
+              </button>
+            </div>
+            <button onClick={() => navigate('/transactions')} className="text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 px-4 py-2 rounded-lg transition-colors border border-emerald-100 shrink-0">
               View All
             </button>
           </div>
           <div className="flex flex-col">
             {recentTx.length === 0 ? (
               <div className="p-8 text-center text-on-surface-variant font-medium">
-                No recent transactions found.
+                No recent transactions yet.
               </div>
             ) : (
-              recentTx.map(tx => (
-                <div key={tx._id || tx.id} className="px-4 lg:px-8 py-2 lg:py-3 flex items-center justify-between hover:bg-[#00351D] transition-all group cursor-pointer border-b border-slate-300">
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="w-8 h-8 lg:w-9 lg:h-9 rounded-full bg-emerald-100 flex items-center justify-center overflow-hidden font-black text-primary text-[9px] lg:text-[10px] border border-white/20 shadow-sm transition-all duration-300 shrink-0">
-                      {tx.senderName ? tx.senderName.substring(0, 2).toUpperCase() : 'TX'}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[12px] lg:text-[13px] font-black text-primary leading-tight group-hover:text-white transition-colors truncate">{tx.senderName || 'Customer'}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <p className="text-[8px] lg:text-[9px] text-on-surface-variant font-black uppercase tracking-widest opacity-40 group-hover:text-white/40 group-hover:opacity-100 transition-colors truncate">REF: {tx.receiptNumber || tx.reference}</p>
+              recentTx.map(tx => {
+                const party = tx.sender?.name || tx.recipient?.name || 'PayChain'
+                const initials = party.slice(0, 2).toUpperCase()
+                const isIn  = tx.type === 'inbound'
+                const isSwp = tx.type === 'fx_swap'
+                const sign  = isIn ? '+' : isSwp ? '±' : '-'
+                const displayAmt = isSwp
+                  ? `${(tx.usdcAmount || 0).toFixed(4)} USDC`
+                  : formatKES(tx.kesAmount || tx.amount || 0)
+                const amtColor = isIn
+                  ? 'text-emerald-700 group-hover:text-[#5EFEB3]'
+                  : isSwp ? 'text-purple-400 group-hover:text-purple-300'
+                  : 'text-rose-500 group-hover:text-rose-400'
+                const TYPE_LABEL = { inbound: 'Payment In', outbound: 'Withdrawal', fx_swap: 'FX Swap', bulk_pay: 'Bulk Pay', settlement: 'Settlement' }
+                return (
+                  <div key={tx._id || tx.id} className="px-4 lg:px-8 py-2.5 lg:py-3 flex items-center justify-between hover:bg-[#00351D] transition-all group cursor-pointer border-b border-slate-200 last:border-0">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="w-8 h-8 lg:w-9 lg:h-9 rounded-full bg-emerald-100 flex items-center justify-center font-black text-primary text-[9px] lg:text-[10px] border border-white/20 shadow-sm shrink-0 group-hover:bg-emerald-900 group-hover:text-emerald-300 transition-colors">
+                        {initials}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="text-[12px] lg:text-[13px] font-black text-primary leading-tight group-hover:text-white transition-colors truncate">{party}</p>
+                          <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${
+                            isIn ? 'bg-emerald-100 text-emerald-700 group-hover:bg-emerald-900 group-hover:text-emerald-300' :
+                            isSwp ? 'bg-purple-100 text-purple-700 group-hover:bg-purple-900 group-hover:text-purple-300' :
+                            'bg-amber-100 text-amber-700 group-hover:bg-amber-900 group-hover:text-amber-300'
+                          } transition-colors`}>
+                            {TYPE_LABEL[tx.type] || tx.type}
+                          </span>
+                        </div>
+                        <p className="text-[8px] lg:text-[9px] text-on-surface-variant font-mono opacity-40 group-hover:text-white/40 group-hover:opacity-100 transition-colors truncate mt-0.5">
+                          {tx.reference}
+                        </p>
                       </div>
                     </div>
+
+                    <div className="flex flex-col items-end shrink-0 ml-3">
+                      <p className={`text-[12px] lg:text-[13px] font-black transition-colors leading-none mb-1 ${amtColor}`}>
+                        {sign}{displayAmt}
+                      </p>
+                      <p className="text-[8px] text-on-surface-variant font-bold opacity-30 tracking-widest group-hover:text-white/30 transition-colors uppercase">
+                        {new Date(tx.createdAt || tx.timestamp).toLocaleDateString('en-KE', { day: '2-digit', month: 'short' })}
+                      </p>
+                    </div>
                   </div>
-                  
-                  <div className="flex flex-col items-end shrink-0">
-                    <p className={`text-[12px] lg:text-[13px] font-black ${
-                      tx.type === 'inbound' ? 'text-emerald-700 group-hover:text-[#5EFEB3]' : 
-                      (tx.type === 'outbound' || tx.type === 'settlement' || tx.type === 'bulk_pay' || tx.type === 'fx_swap') ? 'text-rose-600 group-hover:text-rose-400' :
-                      'text-primary group-hover:text-white'
-                    } transition-colors leading-none mb-1`}>
-                      {tx.type === 'inbound' ? '+' : (tx.type === 'outbound' || tx.type === 'settlement' || tx.type === 'bulk_pay' || tx.type === 'fx_swap' ? '-' : '')}{tx.type === 'fx_swap' ? formatKES(tx.kesAmount || 0) : formatKES(tx.kesAmount || tx.amount || 0)}
-                    </p>
-                    <p className="text-[8px] lg:text-[9px] text-on-surface-variant font-black opacity-30 tracking-widest group-hover:text-white/30 transition-colors uppercase">
-                      {new Date(tx.createdAt || tx.timestamp).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-              ))
+                )
+              })
             )}
           </div>
           <div className="p-6 text-center bg-surface-container-low/30 border-t border-slate-300">

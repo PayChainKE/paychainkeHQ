@@ -1,5 +1,3 @@
-import mongoose from 'express'; // Wait, mongoose from mongoose
-
 import mongooseModule from 'mongoose';
 const { Schema, model } = mongooseModule;
 
@@ -7,7 +5,8 @@ const stkRequestSchema = new Schema({
   merchantId: {
     type: Schema.Types.ObjectId,
     ref: 'Merchant',
-    required: true
+    required: false,
+    default: null,
   },
   checkoutRequestId: {
     type: String,

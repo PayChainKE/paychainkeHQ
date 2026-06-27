@@ -187,6 +187,7 @@ export const verifyMerchantOTP = async (req, res) => {
         settlementBankName: merchant.settlementBankName,
         settlementBankAccount: merchant.settlementBankAccount,
         hasBulkPayPin: !!merchant.bulkPayPin,
+        hasAppPin: !!merchant.appPin,
         biometricsEnabled: merchant.biometricsEnabled
       },
       token: generateToken(merchant._id)
@@ -355,6 +356,7 @@ export const biometricLogin = async (req, res) => {
         settlementBankName: merchant.settlementBankName,
         settlementBankAccount: merchant.settlementBankAccount,
         hasBulkPayPin: !!merchant.bulkPayPin,
+        hasAppPin: !!merchant.appPin,
         biometricsEnabled: merchant.biometricsEnabled
       },
       token: generateToken(merchant._id)
@@ -651,7 +653,7 @@ export const changeMerchantPassword = async (req, res) => {
 // @access  Private (Merchant)
 export const getMerchantMe = async (req, res) => {
   try {
-    const merchant = await Merchant.findById(req.merchant._id).select('+bulkPayPin');
+    const merchant = await Merchant.findById(req.merchant._id).select('+bulkPayPin +appPin');
     if (!merchant) {
       return res.status(404).json({ error: 'Merchant not found' });
     }
@@ -692,6 +694,7 @@ export const getMerchantMe = async (req, res) => {
         settlementBankName: merchant.settlementBankName,
         settlementBankAccount: merchant.settlementBankAccount,
         hasBulkPayPin: !!merchant.bulkPayPin,
+        hasAppPin: !!merchant.appPin,
         biometricsEnabled: merchant.biometricsEnabled
       }
     });
@@ -778,6 +781,7 @@ export const updateMerchantProfile = async (req, res) => {
         settlementMobile: merchant.settlementMobile,
         settlementBankAccount: merchant.settlementBankAccount,
         hasBulkPayPin: !!merchant.bulkPayPin,
+        hasAppPin: !!merchant.appPin,
         biometricsEnabled: merchant.biometricsEnabled
       }
     });
@@ -922,10 +926,51 @@ export const setAppPin = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'App PIN synced successfully'
+      message: 'Payment PIN set successfully.',
+      hasAppPin: true,
     });
   } catch (error) {
     console.error('Set App PIN Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Verify Payment PIN (used before authorising money movements)
+// @route   POST /api/auth/merchant/verify-payment-pin
+// @access  Private (Merchant)
+export const verifyPaymentPin = async (req, res) => {
+  try {
+    const { pin } = req.body || {};
+    if (!pin || String(pin).length !== 4) {
+      return res.status(400).json({ error: 'A valid 4-digit PIN is required.' });
+    }
+
+    const merchant = await Merchant.findById(req.merchant._id).select('+appPin');
+    if (!merchant) return res.status(404).json({ error: 'Merchant not found.' });
+
+    if (!merchant.appPin) {
+      return res.status(400).json({ error: 'No payment PIN has been set. Please set one first.', pinNotSet: true });
+    }
+
+    const isMatch = await bcrypt.compare(String(pin), merchant.appPin);
+    if (!isMatch) {
+      logAudit({
+        action: 'merchant.payment_pin.failed', category: 'security', severity: 'warning',
+        message: 'Payment PIN verification failed',
+        merchant, req,
+      });
+      return res.status(401).json({ error: 'Incorrect PIN. Please try again.' });
+    }
+
+    logAudit({
+      action: 'merchant.payment_pin.verified', category: 'security', severity: 'info',
+      message: 'Payment PIN verified successfully',
+      merchant, req,
+    });
+
+    res.json({ success: true, message: 'PIN verified.' });
+  } catch (error) {
+    console.error('Verify Payment PIN Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };

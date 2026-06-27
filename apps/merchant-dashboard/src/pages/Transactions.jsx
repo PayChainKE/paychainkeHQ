@@ -25,7 +25,10 @@ export default function Transactions() {
     const fetchTransactions = async () => {
       try {
         const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
-        const res = await axios.get(`${API_URL}/api/transactions`);
+        const token = localStorage.getItem('paychain_merchant_token');
+        const res = await axios.get(`${API_URL}/api/transactions`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
         setLiveTransactions(res.data);
       } catch (err) {
         console.error('Failed to load transactions', err);
@@ -34,7 +37,7 @@ export default function Transactions() {
         setIsLoading(false);
       }
     };
-    
+
     if (merchant) {
       fetchTransactions();
     } else {
@@ -377,6 +380,38 @@ export default function Transactions() {
     setCurrentPage(1)
   }, [activeTab, searchQuery])
 
+  const TX_LABEL = {
+    inbound:    'Payment In',
+    outbound:   'Withdrawal',
+    bulk_pay:   'Bulk Pay',
+    settlement: 'Settlement',
+    fx_swap:    'FX Swap',
+  }
+  const TX_COLOR = {
+    inbound:    'bg-emerald-500/10 text-emerald-700',
+    outbound:   'bg-amber-500/10  text-amber-700',
+    bulk_pay:   'bg-orange-500/10 text-orange-700',
+    settlement: 'bg-blue-500/10   text-blue-700',
+    fx_swap:    'bg-purple-500/10 text-purple-700',
+  }
+  const txLabel = (type) => TX_LABEL[type] || type.replace(/_/g,' ')
+  const txColor = (type) => TX_COLOR[type] || 'bg-slate-500/10 text-slate-700'
+
+  const txAmount = (tx) => {
+    if (tx.type === 'fx_swap') return `${(tx.usdcAmount || 0).toFixed(4)} USDC`
+    return formatKES(tx.amount || tx.kesAmount || 0)
+  }
+  const txSign = (tx) => {
+    if (tx.type === 'inbound') return '+'
+    if (tx.type === 'fx_swap') return '±'
+    return '-'
+  }
+  const txAmountColor = (tx) => {
+    if (tx.type === 'inbound') return 'text-emerald-600'
+    if (tx.type === 'fx_swap') return 'text-purple-600'
+    return 'text-primary'
+  }
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const weekAgo = new Date(today);
@@ -399,7 +434,7 @@ export default function Transactions() {
         {/* Page Title & Subtext */}
         <div className="mb-6 lg:mb-8">
           <h2 className="font-headline font-bold text-3xl lg:text-4xl text-primary tracking-tight">Transactions</h2>
-          <p className="text-on-surface-variant text-[11px] lg:text-sm font-medium mt-1.5 opacity-80">All verified inbound payments to Till {merchant?.paybillAccount || '84729'}</p>
+          <p className="text-on-surface-variant text-[11px] lg:text-sm font-medium mt-1.5 opacity-80">All money movements — payments in, withdrawals, swaps and bulk pays for account {merchant?.paybillAccount || '—'}</p>
         </div>
 
         {liveTransactions.length === 0 ? (
@@ -497,21 +532,17 @@ export default function Transactions() {
                           <p className="text-[10px] text-on-surface-variant leading-tight">{formatDateISO(tx.createdAt || tx.timestamp).split(',')[1]}</p>
                         </td>
                         <td className="px-6 py-2">
-                          <span className={`px-2 py-1 text-[9px] font-bold rounded-full uppercase tracking-tighter ${
-                            tx.type === 'inbound' ? 'bg-green-500/10 text-green-700' :
-                            tx.type === 'fx_swap' ? 'bg-blue-500/10 text-blue-700' :
-                            'bg-amber-500/10 text-amber-700'
-                          }`}>
-                            {tx.type.replace('_', ' ')}
+                          <span className={`px-2 py-1 text-[9px] font-bold rounded-full uppercase tracking-tighter ${txColor(tx.type)}`}>
+                            {txLabel(tx.type)}
                           </span>
                         </td>
                         <td className="px-6 py-2">
-                          <p className="text-[13px] font-semibold text-primary leading-tight">{tx.sender?.name || tx.recipient?.name || 'Treasury'}</p>
+                          <p className="text-[13px] font-semibold text-primary leading-tight">{tx.sender?.name || tx.recipient?.name || 'PayChain'}</p>
                           <p className="text-[10px] font-mono text-on-surface-variant group-hover:text-primary transition-colors leading-tight">{tx.reference}</p>
                         </td>
                         <td className="px-6 py-2">
-                          <p className={`text-[13px] font-bold transition-all duration-300 ${tx.type === 'inbound' ? 'text-green-600' : 'text-primary'}`}>
-                            {tx.type === 'fx_swap' ? formatUSDC(tx.usdcAmount) : formatKES(tx.amount || tx.kesAmount || 0)}
+                          <p className={`text-[13px] font-bold transition-all duration-300 ${txAmountColor(tx)}`}>
+                            {txSign(tx)}{txAmount(tx)}
                           </p>
                         </td>
                         <td className="px-6 py-2">
@@ -547,26 +578,22 @@ export default function Transactions() {
 
                   {/* Type Badge */}
                   <div className="flex items-center gap-2 mb-1">
-                    <span className={`text-[8px] font-black px-1.5 py-0.5 uppercase tracking-tighter border ${
-                      tx.type === 'inbound' ? 'bg-emerald-500/5 text-emerald-700 border-emerald-500/10' : 
-                      tx.type === 'fx_swap' ? 'bg-blue-500/5 text-blue-700 border-blue-500/10' : 
-                      'bg-amber-500/5 text-amber-700 border-amber-500/10'
-                    }`}>
-                      {tx.type.replace('_', ' ')}
+                    <span className={`text-[8px] font-black px-1.5 py-0.5 uppercase tracking-tighter rounded ${txColor(tx.type)}`}>
+                      {txLabel(tx.type)}
                     </span>
                   </div>
 
                   {/* Party & Reference */}
                   <p className="text-base font-bold text-primary leading-tight">
-                    {tx.sender?.name || tx.recipient?.name || 'Treasury'}
+                    {tx.sender?.name || tx.recipient?.name || 'PayChain'}
                   </p>
                   <p className="text-[10px] text-on-surface-variant/40 font-mono tracking-tight mb-2">
                     {tx.reference}
                   </p>
 
                   {/* Amount */}
-                  <p className={`text-xl font-headline tracking-tighter ${tx.type === 'inbound' ? 'text-emerald-700' : 'text-primary'}`}>
-                    {tx.type === 'inbound' ? '+' : '-'}{tx.type === 'fx_swap' ? formatUSDC(tx.usdcAmount) : formatKES(tx.amount || tx.kesAmount || 0)}
+                  <p className={`text-xl font-headline tracking-tighter ${txAmountColor(tx)}`}>
+                    {txSign(tx)}{txAmount(tx)}
                   </p>
 
                   {/* Status */}
