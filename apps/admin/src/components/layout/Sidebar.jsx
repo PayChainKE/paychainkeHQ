@@ -14,6 +14,7 @@ const Sidebar = ({ isOpen, onClose }) => {
     { icon: 'group', label: 'Merchants', path: '/merchants' },
     { icon: 'hourglass_empty', label: 'Waitlist', path: '/waitlist' },
     { icon: 'analytics', label: 'Insights', path: '/analytics' },
+    { icon: 'trending_up', label: 'Revenue', path: '/revenue' },
     { icon: 'mail', label: 'Messages', path: '/messages' },
     { icon: 'support_agent', label: 'Call Centre', path: '/call-centre' },
     { icon: 'newspaper', label: 'Newsletter', path: '/newsletter' },
