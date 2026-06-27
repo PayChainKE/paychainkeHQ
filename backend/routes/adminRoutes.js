@@ -20,6 +20,13 @@ import {
   addCommunicationNote,
   deleteCommunication,
 } from '../controllers/communicationController.js';
+import {
+  listTeam,
+  inviteTeamMember,
+  updateTeamMember,
+  removeTeamMember,
+  resendInvite,
+} from '../controllers/teamController.js';
 import { runWalletAudit } from '../controllers/walletAuditController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
@@ -75,5 +82,12 @@ router.get('/communications',                protect, getCommunications);
 router.patch('/communications/:id',          protect, updateCommunication);
 router.post('/communications/:id/notes',     protect, addCommunicationNote);
 router.delete('/communications/:id',         protect, deleteCommunication);
+
+// Team management (owner-only mutations enforced inside the controller).
+router.get('/team',                          protect, listTeam);
+router.post('/team',                         protect, sensitiveActionLimiter, inviteTeamMember);
+router.patch('/team/:id',                    protect, updateTeamMember);
+router.delete('/team/:id',                   protect, removeTeamMember);
+router.post('/team/:id/resend-invite',       protect, sensitiveActionLimiter, resendInvite);
 
 export default router;

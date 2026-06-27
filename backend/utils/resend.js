@@ -418,6 +418,46 @@ export const sendMerchantInvite = async (email, name, businessName, paybillAccou
   }
 };
 
+// Invite a new admin team member — sends a one-time setup link.
+export const sendTeamInvite = async (email, name, role, invitedByName, setupLink) => {
+  try {
+    const data = await resend.emails.send({
+      from: 'PayChain Console <info@paychain.co.ke>',
+      to: [email],
+      subject: `You're invited to the PayChain admin console`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 16px; overflow: hidden; background: #fff;">
+          <div style="background: linear-gradient(135deg, #06201B 0%, #0a3029 100%); padding: 50px 30px; text-align: center; color: #fff;">
+            <h1 style="margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.5px;">You're on the team</h1>
+            <p style="margin: 10px 0 0; color: #5EFEB3; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 2px;">PayChain Admin Console</p>
+          </div>
+          <div style="padding: 40px 30px;">
+            <h2 style="margin: 0 0 16px; color: #111; font-size: 22px;">Hi ${name || email.split('@')[0]},</h2>
+            <p style="color: #444; line-height: 1.7; font-size: 15px;"><strong>${invitedByName}</strong> has invited you to join the PayChain admin console as a <strong>${role}</strong>. Set up your password using the secure link below to activate your account.</p>
+            <div style="margin: 30px 0; text-align: center;">
+              <a href="${setupLink}" style="background: #00351D; color: #fff; padding: 14px 32px; text-decoration: none; border-radius: 10px; font-weight: 700; font-size: 15px; display: inline-block;">Activate My Account</a>
+            </div>
+            <p style="color: #666; font-size: 13px; line-height: 1.6; text-align: center; margin: 0;">This link will expire in <strong>48 hours</strong>. If the button doesn't work, paste this URL into your browser:</p>
+            <p style="word-break: break-all; color: #0066FF; font-size: 12px; text-align: center; margin: 8px 0 0;"><a href="${setupLink}" style="color: #0066FF; text-decoration: none;">${setupLink}</a></p>
+            <div style="margin-top: 32px; padding: 18px; background: #fff7ed; border-radius: 10px; border: 1px solid #fed7aa;">
+              <p style="margin: 0; color: #9a3412; font-size: 12px; line-height: 1.6;"><strong>Security:</strong> Admin sessions use 2FA via emailed OTP, are rate-limited, and expire after 12 hours. If you did not expect this invitation, please ignore this email.</p>
+            </div>
+          </div>
+          <div style="padding: 28px; background: #fafafa; border-top: 1px solid #eee; text-align: center;">
+            <p style="margin: 0; color: #aaa; font-size: 11px;">For assistance contact <a href="mailto:support@paychain.co.ke" style="color: #06201B; text-decoration: none;">support@paychain.co.ke</a></p>
+            <p style="margin: 10px 0 0; color: #bbb; font-size: 11px;">&copy; ${new Date().getFullYear()} PayChainKE. All rights reserved.</p>
+          </div>
+        </div>
+      `,
+    });
+    console.log(`📧 Admin team invite sent to ${email}`);
+    return data;
+  } catch (error) {
+    console.error('❌ Resend Team Invite Error:', error);
+    throw new Error('Failed to send team invite email');
+  }
+};
+
 // Send Batch Payment Receipt Email
 export const sendBatchReceiptEmail = async (email, businessName, batchRows, totalGross, totalNet, totalTax) => {
   try {
