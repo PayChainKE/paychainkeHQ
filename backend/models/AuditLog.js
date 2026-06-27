@@ -45,6 +45,10 @@ const AuditLogSchema = new mongoose.Schema({
   // Network metadata captured at request time.
   ip:        { type: String, default: null },
   userAgent: { type: String, default: null },
+  // Which client surfaced this event — important for audit clarity ("did the
+  // merchant sign in from web or the mobile app?"). Set explicitly via the
+  // X-Client-Platform header from each frontend, with UA-pattern fallback.
+  platform:  { type: String, enum: ['web', 'mobile', 'unknown'], default: 'unknown', index: true },
 
   // Free-form payload (request shape, what changed, error codes, etc.). Capped
   // softly via .slice on the helper to keep documents small.

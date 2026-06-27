@@ -73,7 +73,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'X-Client-Platform'],
   optionsSuccessStatus: 200 // Some older browsers (IE11, various SmartTVs) choke on 204
 }));
 // Trust Render's proxy so req.ip reflects the real client (needed for rate limiting).

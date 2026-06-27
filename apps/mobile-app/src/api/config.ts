@@ -28,6 +28,9 @@ const api = axios.create({
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
+    // Tell the backend (audit log + analytics) this request is from the
+    // mobile app, not a browser, so admin reports can split web vs mobile.
+    'X-Client-Platform': 'mobile',
   },
 });
 

@@ -80,6 +80,19 @@ const ACTOR_OPTIONS = [
   { v: 'system', l: 'System' },
 ];
 
+const PLATFORM_OPTIONS = [
+  { v: 'all',     l: 'Any platform' },
+  { v: 'web',     l: 'Web dashboard' },
+  { v: 'mobile',  l: 'Mobile app' },
+  { v: 'unknown', l: 'Unknown' },
+];
+
+const PLATFORM_META = {
+  web:     { label: 'Web',     icon: 'desktop_windows', tone: 'bg-blue-100   text-blue-800   border-blue-200' },
+  mobile:  { label: 'Mobile',  icon: 'smartphone',      tone: 'bg-violet-100 text-violet-800 border-violet-200' },
+  unknown: { label: 'Unknown', icon: 'help',            tone: 'bg-gray-100   text-gray-700   border-gray-200' },
+};
+
 const RANGE_OPTIONS = [
   { v: '24h', l: 'Last 24h', hours: 24 },
   { v: '7d',  l: 'Last 7d',  hours: 24 * 7 },
@@ -118,6 +131,7 @@ export default function AuditLog() {
   const [category, setCategory] = useState('all');
   const [severity, setSeverity] = useState('all');
   const [actor, setActor] = useState('all');
+  const [platform, setPlatform] = useState('all');
   const [range, setRange] = useState('7d');
   const [drawerEntry, setDrawerEntry] = useState(null);
 
@@ -127,12 +141,13 @@ export default function AuditLog() {
     if (category !== 'all') p.category = category;
     if (severity !== 'all') p.severity = severity;
     if (actor    !== 'all') p.actor    = actor;
+    if (platform !== 'all') p.platform = platform;
     const rangeMeta = RANGE_OPTIONS.find((r) => r.v === range);
     if (rangeMeta?.hours) {
       p.from = new Date(Date.now() - rangeMeta.hours * 60 * 60 * 1000).toISOString();
     }
     return p;
-  }, [page, search, category, severity, actor, range]);
+  }, [page, search, category, severity, actor, platform, range]);
 
   const fetchLog = useCallback(async () => {
     setLoading(true);
@@ -156,10 +171,10 @@ export default function AuditLog() {
   useEffect(() => { fetchLog(); }, [fetchLog]);
 
   // Reset to page 1 whenever a filter changes (but not when the page itself changes).
-  useEffect(() => { setPage(1); }, [search, category, severity, actor, range]);
+  useEffect(() => { setPage(1); }, [search, category, severity, actor, platform, range]);
 
   function clearFilters() {
-    setSearch(''); setCategory('all'); setSeverity('all'); setActor('all'); setRange('7d');
+    setSearch(''); setCategory('all'); setSeverity('all'); setActor('all'); setPlatform('all'); setRange('7d');
   }
 
   return (
@@ -189,7 +204,7 @@ export default function AuditLog() {
         </div>
 
         {/* KPIs — last 24h, independent of the current filter */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9 gap-3">
           <KpiCard label="24h Events"      value={kpis?.total}        tone="primary" />
           <KpiCard label="Critical"        value={kpis?.critical}     tone="red" />
           <KpiCard label="Warnings"        value={kpis?.warnings}     tone="amber" />
@@ -197,6 +212,8 @@ export default function AuditLog() {
           <KpiCard label="Failed sign-ins" value={kpis?.failedLogins} tone="amber" />
           <KpiCard label="Password resets" value={kpis?.resets}       tone="red" />
           <KpiCard label="Admin actions"   value={kpis?.adminActions} tone="violet" />
+          <KpiCard label="From web"        value={kpis?.webEvents}    tone="primary" icon="desktop_windows" />
+          <KpiCard label="From mobile"     value={kpis?.mobileEvents} tone="violet"  icon="smartphone" />
         </div>
 
         {/* Filters */}
@@ -214,7 +231,8 @@ export default function AuditLog() {
           <FilterSelect value={category} onChange={setCategory} options={CATEGORY_OPTIONS} />
           <FilterSelect value={severity} onChange={setSeverity} options={SEVERITY_OPTIONS} />
           <FilterSelect value={actor}    onChange={setActor}    options={ACTOR_OPTIONS} />
-          {(search || category !== 'all' || severity !== 'all' || actor !== 'all' || range !== '7d') && (
+          <FilterSelect value={platform} onChange={setPlatform} options={PLATFORM_OPTIONS} />
+          {(search || category !== 'all' || severity !== 'all' || actor !== 'all' || platform !== 'all' || range !== '7d') && (
             <button
               onClick={clearFilters}
               className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/70 hover:text-error px-2"
@@ -234,6 +252,7 @@ export default function AuditLog() {
                   <Th>Merchant</Th>
                   <Th>Action</Th>
                   <Th>Category</Th>
+                  <Th>Platform</Th>
                   <Th>Actor</Th>
                   <Th>IP / Device</Th>
                   <Th className="text-right"></Th>
@@ -243,20 +262,20 @@ export default function AuditLog() {
                 {loading ? (
                   [...Array(6)].map((_, i) => (
                     <tr key={i}>
-                      <td colSpan="7" className="px-3 py-3">
+                      <td colSpan="8" className="px-3 py-3">
                         <div className="h-5 bg-on-surface/5 rounded animate-pulse" />
                       </td>
                     </tr>
                   ))
                 ) : error ? (
                   <tr>
-                    <td colSpan="7" className="py-10 text-center text-error text-sm">
+                    <td colSpan="8" className="py-10 text-center text-error text-sm">
                       {error}
                     </td>
                   </tr>
                 ) : rows.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="py-10 text-center text-on-surface-variant/40 text-sm">
+                    <td colSpan="8" className="py-10 text-center text-on-surface-variant/40 text-sm">
                       No audit events match the current filters.
                     </td>
                   </tr>
@@ -265,6 +284,7 @@ export default function AuditLog() {
                   const sevCls = SEVERITY_TONE[r.severity] || SEVERITY_TONE.info;
                   const catCls = CATEGORY_TONE[r.category] || CATEGORY_TONE.system;
                   const actCls = ACTOR_TONE[r.actor?.type] || ACTOR_TONE.system;
+                  const platMeta = PLATFORM_META[r.platform] || PLATFORM_META.unknown;
                   return (
                     <tr
                       key={r._id}
@@ -306,6 +326,12 @@ export default function AuditLog() {
                       <td className="py-2 px-3 border-b border-outline-variant/5 align-top">
                         <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest ${catCls}`}>
                           {r.category}
+                        </span>
+                      </td>
+                      <td className="py-2 px-3 border-b border-outline-variant/5 align-top">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${platMeta.tone}`}>
+                          <span className="material-symbols-outlined text-[12px]">{platMeta.icon}</span>
+                          {platMeta.label}
                         </span>
                       </td>
                       <td className="py-2 px-3 border-b border-outline-variant/5 align-top">
@@ -356,11 +382,14 @@ const KPI_TONE = {
   violet:  { bg: 'bg-violet-50',      text: 'text-violet-700' },
 };
 
-const KpiCard = ({ label, value, tone = 'primary' }) => {
+const KpiCard = ({ label, value, tone = 'primary', icon = null }) => {
   const t = KPI_TONE[tone] || KPI_TONE.primary;
   return (
     <div className={`p-3 rounded-xl border border-outline-variant/20 ${t.bg}`}>
-      <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60">{label}</p>
+      <div className="flex items-center gap-1">
+        {icon && <span className={`material-symbols-outlined text-[14px] ${t.text}`}>{icon}</span>}
+        <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60">{label}</p>
+      </div>
       <p className={`text-[22px] font-bold tabular-nums tracking-tight mt-0.5 ${t.text}`}>
         {value == null ? '—' : value}
       </p>
@@ -413,6 +442,7 @@ const EntryDrawer = ({ entry, onClose }) => {
             <DrawerField label="Category" value={entry.category} mono />
             <DrawerField label="Action" value={entry.action} mono />
             <DrawerField label="Actor" value={entry.actor?.type || 'self'} mono />
+            <DrawerField label="Platform" value={entry.platform || 'unknown'} mono />
           </div>
 
           {entry.merchantEmail && (

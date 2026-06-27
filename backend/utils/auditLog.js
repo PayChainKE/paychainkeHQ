@@ -15,6 +15,23 @@ function clipUa(req) {
   return String(req?.headers?.['user-agent'] || '').slice(0, 220) || null;
 }
 
+// Detect which client a request came from. Two-pronged:
+//   1. Explicit X-Client-Platform header sent by our own apps (most reliable).
+//   2. UA-pattern fallback for legacy builds or third-party callers.
+// Returns 'web' | 'mobile' | 'unknown'.
+export function detectPlatform(req) {
+  if (!req) return 'unknown';
+  const hdr = String(req.headers?.['x-client-platform'] || '').toLowerCase().trim();
+  if (hdr === 'mobile' || hdr === 'web') return hdr;
+  const ua = String(req.headers?.['user-agent'] || '').toLowerCase();
+  if (!ua) return 'unknown';
+  // Native HTTP clients used by React Native / Expo on iOS + Android.
+  if (/okhttp|cfnetwork|darwin|expo|reactnative|paychain.?mobile/i.test(ua)) return 'mobile';
+  // Standard browsers.
+  if (/mozilla|chrome|safari|firefox|edg\/|opr\//i.test(ua)) return 'web';
+  return 'unknown';
+}
+
 // Fire-and-forget audit write. Never throws — if Mongo is down or the schema
 // rejects something we just log and move on; never block the user's request.
 //
@@ -66,6 +83,7 @@ export function logAudit({
         message: String(message || '').slice(0, 280),
         ip: extractIp(req),
         userAgent: clipUa(req),
+        platform: detectPlatform(req),
         metadata: safeMeta,
       });
     } catch (err) {
