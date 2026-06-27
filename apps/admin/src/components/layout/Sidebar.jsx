@@ -1,12 +1,12 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import React, { useEffect, useState, useCallback } from 'react';
+import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../api/api';
 import logo from '../../assets/logo.png';
 
-// Grouped, hierarchical navigation. Each section has a label; each item can
-// declare `sub` children that render indented beneath the parent and only
-// expand when the parent or any child is active.
+// Grouped navigation. Every item in a section renders flat under the section
+// label — no parent/child nesting. The order within a section reflects the
+// information hierarchy (most-used first) but all entries share equal weight.
 const NAV_SECTIONS = [
   {
     title: 'Business Core',
@@ -19,36 +19,24 @@ const NAV_SECTIONS = [
   {
     title: 'Merchant Relations',
     items: [
-      {
-        icon: 'group', label: 'Merchants', path: '/merchants',
-        sub: [
-          { icon: 'hourglass_empty', label: 'Waitlist', path: '/waitlist' },
-        ],
-      },
+      { icon: 'group',           label: 'Merchants', path: '/merchants' },
+      { icon: 'hourglass_empty', label: 'Waitlist',  path: '/waitlist'  },
     ],
   },
   {
     title: 'Financials & Compliance',
     items: [
-      {
-        icon: 'account_balance', label: 'Ledger', path: '/ledger',
-        sub: [
-          { icon: 'security',    label: 'Wallet Audit', path: '/wallet-audit' },
-          { icon: 'fact_check',  label: 'Audit Log',    path: '/audit-log'    },
-        ],
-      },
+      { icon: 'account_balance', label: 'Ledger',       path: '/ledger'       },
+      { icon: 'security',        label: 'Wallet Audit', path: '/wallet-audit' },
+      { icon: 'fact_check',      label: 'Audit Log',    path: '/audit-log'    },
     ],
   },
   {
     title: 'Communications',
     items: [
-      {
-        icon: 'support_agent', label: 'Call Centre', path: '/call-centre',
-        sub: [
-          { icon: 'mail',      label: 'Messages',   path: '/messages'   },
-          { icon: 'newspaper', label: 'Newsletter', path: '/newsletter' },
-        ],
-      },
+      { icon: 'support_agent', label: 'Call Centre', path: '/call-centre' },
+      { icon: 'mail',          label: 'Messages',    path: '/messages'    },
+      { icon: 'newspaper',     label: 'Newsletter',  path: '/newsletter'  },
     ],
   },
   {
@@ -62,16 +50,8 @@ const NAV_SECTIONS = [
 
 const Sidebar = ({ isOpen, onClose }) => {
   const { logout } = useAuth();
-  const location = useLocation();
   const [status, setStatus] = useState(null);
   const [loadingStatus, setLoadingStatus] = useState(true);
-
-  // A parent or any of its subs is active. Used to keep the sub-tree visible
-  // when an interior page is open without forcing a click-to-expand.
-  const isGroupActive = (item) => {
-    if (location.pathname === item.path || location.pathname.startsWith(`${item.path}/`)) return true;
-    return !!item.sub?.some((s) => location.pathname === s.path || location.pathname.startsWith(`${s.path}/`));
-  };
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -126,55 +106,23 @@ const Sidebar = ({ isOpen, onClose }) => {
               {section.title}
             </div>
             <div className="space-y-0.5">
-              {section.items.map((item) => {
-                const groupActive = isGroupActive(item);
-                return (
-                  <div key={item.path}>
-                    <NavLink
-                      to={item.path}
-                      onClick={handleNavClick}
-                      className={({ isActive }) =>
-                        `flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-[12.5px] font-body font-bold leading-tight tracking-tight relative ${
-                          isActive
-                            ? 'bg-[#0E3D2E] text-[#5EFEB3] shadow-[0_0_15px_rgba(94,254,179,0.05)] after:absolute after:left-0 after:top-1 after:bottom-1 after:w-[3px] after:bg-[#5EFEB3] after:rounded-full'
-                            : 'text-[#c0c9c0] hover:text-white hover:bg-emerald-900/30'
-                        }`
-                      }
-                    >
-                      <span className="material-symbols-outlined text-[19px]">{item.icon}</span>
-                      <span className="flex-1 truncate">{item.label}</span>
-                      {item.sub?.length > 0 && (
-                        <span className={`material-symbols-outlined text-[14px] transition-transform ${groupActive ? 'rotate-90 text-[#5EFEB3]/70' : 'text-[#c0c9c0]/40'}`}>
-                          chevron_right
-                        </span>
-                      )}
-                    </NavLink>
-
-                    {/* Subpages — visible when the parent group is active. */}
-                    {item.sub?.length > 0 && groupActive && (
-                      <div className="mt-0.5 ml-5 pl-3 border-l border-white/10 space-y-0.5">
-                        {item.sub.map((child) => (
-                          <NavLink
-                            key={child.path}
-                            to={child.path}
-                            onClick={handleNavClick}
-                            className={({ isActive }) =>
-                              `flex items-center gap-2 px-2.5 py-1.5 rounded-md transition-all text-[12px] font-body font-medium leading-tight relative ${
-                                isActive
-                                  ? 'bg-[#0E3D2E]/60 text-[#5EFEB3]'
-                                  : 'text-[#c0c9c0]/70 hover:text-white hover:bg-emerald-900/20'
-                              }`
-                            }
-                          >
-                            <span className="material-symbols-outlined text-[16px] opacity-80">{child.icon}</span>
-                            <span className="truncate">{child.label}</span>
-                          </NavLink>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+              {section.items.map((item) => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  onClick={handleNavClick}
+                  className={({ isActive }) =>
+                    `flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-[12.5px] font-body font-bold leading-tight tracking-tight relative ${
+                      isActive
+                        ? 'bg-[#0E3D2E] text-[#5EFEB3] shadow-[0_0_15px_rgba(94,254,179,0.05)] after:absolute after:left-0 after:top-1 after:bottom-1 after:w-[3px] after:bg-[#5EFEB3] after:rounded-full'
+                        : 'text-[#c0c9c0] hover:text-white hover:bg-emerald-900/30'
+                    }`
+                  }
+                >
+                  <span className="material-symbols-outlined text-[19px]">{item.icon}</span>
+                  <span className="flex-1 truncate">{item.label}</span>
+                </NavLink>
+              ))}
             </div>
           </div>
         ))}
