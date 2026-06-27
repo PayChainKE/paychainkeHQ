@@ -779,14 +779,14 @@ export default function Login() {
               {/* Header */}
               <div className="mb-8 text-center">
                 <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[#06201B] mb-5 shadow-lg">
-                  <span className="material-symbols-outlined text-emerald-400 text-2xl" style={{ fontVariationSettings: "’FILL’ 1" }}>lock</span>
+                  <span className="material-symbols-outlined text-emerald-400 text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>lock</span>
                 </div>
                 <h3 className="font-headline text-3xl lg:text-4xl text-primary tracking-tight font-black">
-                  {otpFlowType === ‘reset’ ? ‘Verify your identity’ : ‘Enter security code’}
+                  {otpFlowType === 'reset' ? 'Verify your identity' : 'Enter security code'}
                 </h3>
                 <p className="text-on-surface-variant text-sm mt-2 opacity-60 leading-relaxed max-w-xs mx-auto">
-                  {otpFlowType === ‘reset’ ? (
-                    <>6-digit code sent to <span className="text-primary font-bold opacity-100">{maskedResetEmail || ‘your inbox’}</span></>
+                  {otpFlowType === 'reset' ? (
+                    <>6-digit code sent to <span className="text-primary font-bold opacity-100">{maskedResetEmail || 'your inbox'}</span></>
                   ) : (
                     <>6-digit code sent to your registered email</>
                   )}
@@ -800,10 +800,10 @@ export default function Login() {
                   </span>
                 </div>
 
-                {otpFlowType === ‘reset’ && (
+                {otpFlowType === 'reset' && (
                   <button
                     type="button"
-                    onClick={() => exitResetFlow(‘reset’)}
+                    onClick={() => exitResetFlow('reset')}
                     className="mt-3 flex items-center gap-1 mx-auto text-[10px] font-black uppercase tracking-[0.2em] text-primary/40 hover:text-emerald-600 transition-colors"
                   >
                     <span className="material-symbols-outlined text-[12px]">arrow_back</span>
@@ -827,7 +827,7 @@ export default function Login() {
                         type="text"
                         inputMode="numeric"
                         pattern="[0-9]*"
-                        autoComplete={index === 0 ? ‘one-time-code’ : ‘off’}
+                        autoComplete={index === 0 ? 'one-time-code' : 'off'}
                         maxLength="1"
                         value={digit}
                         onChange={e => handleOtpChange(e.target, index)}
@@ -838,8 +838,8 @@ export default function Login() {
                           w-10 h-12 lg:w-12 lg:h-14 rounded-xl text-center font-black text-xl lg:text-2xl
                           outline-none transition-all duration-200 select-none caret-transparent
                           ${digit
-                            ? ‘bg-emerald-400 text-[#06201B] shadow-[0_0_20px_rgba(52,211,153,0.4)] scale-105’
-                            : ‘bg-white/8 text-white/20 border border-white/10 focus:bg-white/15 focus:border-emerald-400/60 focus:shadow-[0_0_0_3px_rgba(52,211,153,0.15)]’
+                            ? 'bg-emerald-400 text-[#06201B] shadow-[0_0_20px_rgba(52,211,153,0.4)] scale-105'
+                            : 'bg-white/8 text-white/20 border border-white/10 focus:bg-white/15 focus:border-emerald-400/60 focus:shadow-[0_0_0_3px_rgba(52,211,153,0.15)]'
                           }
                         `}
                       />
@@ -852,7 +852,7 @@ export default function Login() {
                       <div
                         key={i}
                         className={`h-1 rounded-full transition-all duration-300 ${
-                          digit ? ‘w-5 bg-emerald-400’ : ‘w-1.5 bg-white/15’
+                          digit ? 'w-5 bg-emerald-400' : 'w-1.5 bg-white/15'
                         }`}
                       />
                     ))}
@@ -891,7 +891,7 @@ export default function Login() {
                     disabled={resendTimer > 0 || loading}
                     className="text-[11px] font-black text-emerald-600 hover:text-emerald-700 transition-colors disabled:text-primary/30 disabled:cursor-not-allowed"
                   >
-                    {resendTimer > 0 ? `Resend in ${resendTimer}s` : ‘Resend code’}
+                    {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend code'}
                   </button>
                 </div>
               </form>
