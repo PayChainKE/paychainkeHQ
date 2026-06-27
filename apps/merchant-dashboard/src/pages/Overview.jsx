@@ -22,6 +22,12 @@ export default function Overview() {
   const [activeFundMethod, setActiveFundMethod] = useState(null)
   const [showDigitalWallet, setShowDigitalWallet] = useState(() => localStorage.getItem('paychain_show_wallet') !== 'false')
 
+  // A merchant only sees the Digital Wallet card after they've provisioned a
+  // Stellar wallet (presence of `stellarPublicKey`). Until then the card —
+  // and its show/hide toggle — would just be a confusing empty surface.
+  const walletActivated = !!merchant?.stellarPublicKey
+  const showWalletCard  = walletActivated && showDigitalWallet
+
   const toggleDigitalWallet = () => {
     const newVal = !showDigitalWallet
     setShowDigitalWallet(newVal)
@@ -167,21 +173,23 @@ export default function Overview() {
           <p className="text-on-surface-variant text-[11px] lg:text-sm mt-1.5 opacity-80 font-medium leading-relaxed">Here's how your business is doing today.</p>
         </div>
         
-        <button 
-          onClick={toggleDigitalWallet}
-          className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-[#E5E7EB] hover:bg-surface-container-low transition-all shadow-sm group"
-        >
-          <span className={`material-symbols-outlined text-[16px] transition-colors ${showDigitalWallet ? 'text-primary/60 group-hover:text-red-500' : 'text-emerald-500'}`}>
-            {showDigitalWallet ? 'visibility_off' : 'account_balance_wallet'}
-          </span>
-          <span className="text-[10px] font-bold text-primary opacity-80 uppercase tracking-widest">
-            {showDigitalWallet ? 'Hide Wallet' : 'Show Wallet'}
-          </span>
-        </button>
+        {walletActivated && (
+          <button
+            onClick={toggleDigitalWallet}
+            className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-[#E5E7EB] hover:bg-surface-container-low transition-all shadow-sm group"
+          >
+            <span className={`material-symbols-outlined text-[16px] transition-colors ${showDigitalWallet ? 'text-primary/60 group-hover:text-red-500' : 'text-emerald-500'}`}>
+              {showDigitalWallet ? 'visibility_off' : 'account_balance_wallet'}
+            </span>
+            <span className="text-[10px] font-bold text-primary opacity-80 uppercase tracking-widest">
+              {showDigitalWallet ? 'Hide Wallet' : 'Show Wallet'}
+            </span>
+          </button>
+        )}
       </section>
 
       {/* Section 1: Balance Cards Row */}
-      <section className={`grid grid-cols-1 ${showDigitalWallet ? 'lg:grid-cols-2' : ''} gap-8 animate-fade-in-up [animation-delay:100ms] relative z-20`}>
+      <section className={`grid grid-cols-1 ${showWalletCard ? 'lg:grid-cols-2' : ''} gap-8 animate-fade-in-up [animation-delay:100ms] relative z-20`}>
         {/* KES Balance Card */}
         <div className="bg-gradient-to-br from-[#00351D] via-[#022916] to-[#011C0F] text-white p-6 lg:p-8 rounded-[24px] shadow-[0_20px_40px_-15px_rgba(0,53,29,0.5)] relative z-20 group border border-emerald-900/50 hover:border-emerald-500/30 transition-all duration-500">
           {/* Ambient Glow */}
@@ -333,8 +341,8 @@ export default function Overview() {
           </div>
         </div>
 
-        {/* USDC Balance Card */}
-        {showDigitalWallet && (
+        {/* USDC Balance Card — only after the merchant has activated their Stellar wallet */}
+        {showWalletCard && (
           <div className="bg-gradient-to-br from-[#0A162B] via-[#050B14] to-[#02050A] text-white p-6 lg:p-8 rounded-[24px] shadow-[0_20px_40px_-15px_rgba(10,22,43,0.6)] relative z-10 group border border-blue-900/30 hover:border-blue-500/30 transition-all duration-500 animate-in fade-in zoom-in duration-500">
             {/* Ambient Glow */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-[24px]">
