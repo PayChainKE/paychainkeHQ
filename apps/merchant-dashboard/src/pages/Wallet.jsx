@@ -261,7 +261,7 @@ export default function Wallet() {
       await axios.post(`${API_URL}/api/transactions/activate-wallet`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      addToast({ title: 'Wallet Activated', message: 'Your Web3 Digital Wallet has been provisioned!', type: 'success' });
+      addToast({ title: 'Wallet Activated', message: 'Your Stellar wallet address is ready. Inflation Shield is now unlocked.', type: 'success' });
       await refreshSession();
     } catch (err) {
       addToast({ title: 'Activation Failed', message: err.response?.data?.error || 'Failed to activate wallet', type: 'error' });
@@ -475,13 +475,25 @@ export default function Wallet() {
               </div>
             </div>
           ) : (
-            <div className="bg-gradient-to-br from-[#0F141E] to-[#0A0D14] text-white p-6 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-[#1E2532] mx-auto w-full max-w-[340px] flex flex-col items-center justify-center min-h-[214px] text-center">
-              <div className="w-16 h-16 rounded-full bg-[#1A212D] flex items-center justify-center border border-[#2A3441] mb-4 shadow-lg">
-                <span className="material-symbols-outlined text-3xl text-[#2775CA]">account_balance_wallet</span>
+            <div className="bg-gradient-to-br from-[#0F141E] to-[#0A0D14] text-white p-6 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-[#1E2532] mx-auto w-full flex flex-col items-center justify-center min-h-[214px] text-center relative overflow-hidden">
+              {/* glow */}
+              <div className="absolute top-0 right-0 w-40 h-40 bg-[#2775CA]/20 rounded-full -mr-10 -mt-10 blur-3xl pointer-events-none"></div>
+
+              {/* one-time badge */}
+              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#2775CA]/10 border border-[#2775CA]/20 text-[#2775CA] text-[9px] font-black uppercase tracking-[0.2em] mb-4">
+                <span className="material-symbols-outlined text-[10px]">stars</span>
+                One-time setup
+              </span>
+
+              <div className="w-14 h-14 rounded-full bg-[#1A212D] flex items-center justify-center border border-[#2A3441] mb-3 shadow-lg">
+                <span className="material-symbols-outlined text-2xl text-[#2775CA]">account_balance_wallet</span>
               </div>
-              <h3 className="text-sm font-bold text-white mb-2">Digital Wallet Inactive</h3>
-              <p className="text-[10px] text-[#8B98A9] mb-6 max-w-[200px]">Activate your Web3 wallet to enable USDC settlements and the Inflation Shield.</p>
-              <button 
+              <h3 className="text-sm font-bold text-white mb-1">Digital Wallet Not Yet Active</h3>
+              <p className="text-[10px] text-[#8B98A9] mb-2 max-w-[220px] leading-relaxed">
+                Activate once to get your Stellar wallet address. Unlocks USDC settlement and Inflation Shield.
+              </p>
+              <p className="text-[9px] text-[#8B98A9]/50 mb-5 font-medium">Takes under 10 seconds. Cannot be undone.</p>
+              <button
                 onClick={handleActivateWallet}
                 disabled={isActivatingWallet}
                 className="w-full py-3 bg-gradient-to-b from-[#2775CA] to-[#1A5AA3] hover:from-[#2C84E3] hover:to-[#1C64B4] text-white rounded-xl text-[11px] font-black transition-all shadow-[0_0_20px_rgba(39,117,202,0.3)] border border-[#3E8BE0]/50 uppercase tracking-[0.15em] flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
@@ -491,7 +503,7 @@ export default function Wallet() {
                 ) : (
                   <span className="material-symbols-outlined text-lg">bolt</span>
                 )}
-                {isActivatingWallet ? 'Activating...' : 'Activate Now'}
+                {isActivatingWallet ? 'Activating...' : 'Activate Digital Wallet'}
               </button>
             </div>
           )}

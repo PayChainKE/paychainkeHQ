@@ -152,12 +152,10 @@ const merchantSchema = new mongoose.Schema({
     type: String,
     unique: true,
     sparse: true,
-    default: null,
   },
   stellarEncryptedSecretKey: {
     type: String,
     select: false,
-    default: null,
   },
   usdcBalance: {
     type: Number,

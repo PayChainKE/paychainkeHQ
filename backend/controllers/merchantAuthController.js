@@ -23,34 +23,44 @@ const generateUniquePaybillAccount = async () => {
 // @route   POST /api/auth/merchant/register
 // @access  Public
 export const registerMerchant = async (req, res) => {
-  let { name, email, phone, businessName, password, registrationSource, kraPin, businessNumber } = req.body;
-  const certificateFile = req.file;
-
-  if (phone) phone = phone.replace(/\s+/g, '');
-  if (email) email = String(email).trim().toLowerCase();
-  if (kraPin) kraPin = String(kraPin).trim().toUpperCase();
-  if (businessNumber) businessNumber = String(businessNumber).trim();
-
-  // Build phone variations (handles 0790…, 254790…, +254790…, 790…) to
-  // catch duplicates regardless of stored format.
-  const phoneBase = (() => {
-    let b = phone || '';
-    if (b.startsWith('+254')) b = b.substring(4);
-    else if (b.startsWith('254')) b = b.substring(3);
-    else if (b.startsWith('0')) b = b.substring(1);
-    return b;
-  })();
-  const phoneVars = phone
-    ? Array.from(new Set([phone, phoneBase, `0${phoneBase}`, `254${phoneBase}`, `+254${phoneBase}`]))
-    : [];
-
   try {
-    if (await Merchant.exists({ email })) {
-      return res.status(400).json({ error: 'A merchant with that email already exists.' });
+    let { name, email, phone, businessName, password, registrationSource, kraPin, businessNumber } = req.body || {};
+    const certificateFile = req.file;
+
+    if (phone) phone = String(phone).replace(/\s+/g, '');
+    if (email) email = String(email).trim().toLowerCase();
+    if (kraPin) kraPin = String(kraPin).trim().toUpperCase();
+    if (businessNumber) businessNumber = String(businessNumber).trim();
+
+    if (!name?.trim() || !email || !phone || !businessName?.trim() || !password) {
+      return res.status(400).json({ error: 'Name, email, phone, business name and password are all required.' });
     }
-    if (phoneVars.length && await Merchant.exists({ phone: { $in: phoneVars } })) {
-      return res.status(400).json({ error: 'A merchant with that phone number already exists.' });
+
+    // Build phone variations (handles 0790…, 254790…, +254790…, 790…) to
+    // catch duplicates regardless of stored format.
+    const phoneBase = (() => {
+      let b = phone;
+      if (b.startsWith('+254')) b = b.substring(4);
+      else if (b.startsWith('254')) b = b.substring(3);
+      else if (b.startsWith('0')) b = b.substring(1);
+      return b;
+    })();
+    const phoneVars = Array.from(new Set([phone, phoneBase, `0${phoneBase}`, `254${phoneBase}`, `+254${phoneBase}`]));
+
+    const NO_PASSWORD_MSG = 'An account with these details already exists but has no password set. Use "Reset Password" to create one and gain access.';
+
+    const existingByEmail = await Merchant.findOne({ email }).select('+password');
+    if (existingByEmail) {
+      const msg = !existingByEmail.password ? NO_PASSWORD_MSG : 'A merchant with that email already exists.';
+      return res.status(400).json({ error: msg });
     }
+
+    const existingByPhone = await Merchant.findOne({ phone: { $in: phoneVars } }).select('+password');
+    if (existingByPhone) {
+      const msg = !existingByPhone.password ? NO_PASSWORD_MSG : 'A merchant with that phone number already exists.';
+      return res.status(400).json({ error: msg });
+    }
+
     if (kraPin && await Merchant.exists({ kraPin })) {
       return res.status(400).json({ error: 'A merchant with that KRA PIN already exists.' });
     }
@@ -59,10 +69,8 @@ export const registerMerchant = async (req, res) => {
     }
 
     const certificateUrl = certificateFile ? certificateFile.path : null;
-
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
     const paybillAccount = await generateUniquePaybillAccount();
 
     const merchant = await Merchant.create({
@@ -79,40 +87,33 @@ export const registerMerchant = async (req, res) => {
       paybillAccount,
       kesBalance: 0,
       usdcBalance: 0,
-      stellarPublicKey: null,
-      stellarEncryptedSecretKey: null,
-      isVerified: true, // The user requested immediate login redirection, setting isVerified true for smoother flow.
+      isVerified: true,
       registrationSource: registrationSource === 'mobile' ? 'mobile' : 'web'
     });
 
-    if (merchant) {
-      console.log(`📧 Dispatching Welcome Email to: ${merchant.email}`);
-      sendWelcomeEmail(merchant.email, merchant.name, password, merchant.phone, merchant.paybillAccount).catch(err => {
-        console.error(`📧 Resend Error: Failed to send Welcome Email to ${merchant.email}:`, err);
-      });
+    console.log(`📧 Dispatching Welcome Email to: ${merchant.email}`);
+    sendWelcomeEmail(merchant.email, merchant.name, password, merchant.phone, merchant.paybillAccount).catch(err => {
+      console.error(`📧 Resend Error: Failed to send Welcome Email to ${merchant.email}:`, err);
+    });
 
-      logAudit({
-        action: 'merchant.signup', category: 'auth', severity: 'success',
-        message: `Merchant signed up — ${merchant.businessName || merchant.email}`,
-        merchant, req,
-        metadata: { source: merchant.registrationSource || 'web' },
-      });
+    logAudit({
+      action: 'merchant.signup', category: 'auth', severity: 'success',
+      message: `Merchant signed up — ${merchant.businessName || merchant.email}`,
+      merchant, req,
+      metadata: { source: merchant.registrationSource || 'web' },
+    });
 
-      res.status(201).json({
-        success: true,
-        message: 'Registration successful. Account created.',
-        email: merchant.email
-      });
-    } else {
-      res.status(400).json({ error: 'Invalid merchant data' });
-    }
+    res.status(201).json({
+      success: true,
+      message: 'Registration successful. Account created.',
+      email: merchant.email
+    });
   } catch (error) {
     console.error('Register Merchant Error:', error);
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map(val => val.message);
       return res.status(400).json({ error: messages.join(', ') });
     }
-    // Unique-index violation — surface which field collided.
     if (error.code === 11000) {
       const key = Object.keys(error.keyPattern || {})[0];
       const labels = {
@@ -239,6 +240,15 @@ export const loginMerchant = async (req, res) => {
         req, metadata: { identifier: loginIdentifier, reason: 'no_account' },
       });
       return res.status(401).json({ error: 'Invalid email/phone or password' });
+    }
+
+    if (!merchant.password) {
+      logAudit({
+        action: 'merchant.login.failed', category: 'auth', severity: 'warning',
+        message: 'Failed sign-in — account has no password (admin-onboarded)',
+        merchant, req, metadata: { reason: 'no_password' },
+      });
+      return res.status(401).json({ error: 'Your account was set up without a password. Please use "Reset Password" to create one.' });
     }
 
     const isMatch = await merchant.matchPassword(password);

@@ -5,7 +5,12 @@
 const VALID = { valid: true };
 
 export const formatters = {
-  phoneKE:      (raw) => raw.replace(/\D/g, '').slice(0, 12),
+  phoneKE: (raw) => {
+    let d = raw.replace(/\D/g, '');
+    // Normalize +254 0xxx (double-prefix) → 0xxx so the validator accepts it
+    if (d.startsWith('2540')) d = '0' + d.slice(4);
+    return d.slice(0, 12);
+  },
   kraPin:       (raw) => raw.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11),
   nationalId:   (raw) => raw.replace(/\D/g, '').slice(0, 8),
   paybill:      (raw) => raw.replace(/\D/g, '').slice(0, 7),
@@ -43,8 +48,10 @@ export const formatters = {
 export const validators = {
   phoneKE: (v) => {
     if (!v) return { valid: false, error: 'Phone number is required.' };
-    const clean = v.replace(/\D/g, '');
-    if (!/^(?:254)?(7\d{8}|1\d{8})$/.test(clean) && !/^0?(7\d{8}|1\d{8})$/.test(clean)) {
+    let clean = v.replace(/\D/g, '');
+    // Strip country code prefix (formatter already handles 2540→0, but handle 254 here too)
+    if (clean.startsWith('254')) clean = clean.slice(3);
+    if (!/^0?[71]\d{8}$/.test(clean)) {
       return { valid: false, error: 'Enter a valid Kenyan number (e.g. 0712345678).' };
     }
     return VALID;

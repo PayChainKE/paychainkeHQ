@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { useNotification } from '../context/NotificationContext'
@@ -59,6 +59,8 @@ export default function Login() {
   // OTP Flow States
   const [isOTPMode, setIsOTPMode] = useState(false)
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
+
+  const signupSubmittingRef = useRef(false)
 
   // Navigation Tabs
   const [activeTab, setActiveTab] = useState('login')
@@ -306,11 +308,17 @@ export default function Login() {
 
   async function handleSignup(e) {
     e.preventDefault()
+    if (!signupPhone || signupPhone.length < 9) {
+      setErr('Please enter a valid Kenyan phone number before continuing.')
+      return
+    }
+    setErr('')
     setIsSignupPasswordStep(true)
   }
 
   async function handleSignupCreateAccount(e) {
     e.preventDefault()
+    if (signupSubmittingRef.current) return
     if (!Object.values(strength).every(v => v)) {
       setErr('Please meet all security requirements.')
       return
@@ -319,19 +327,21 @@ export default function Login() {
       setErr('Passwords do not match.')
       return
     }
+    const payload = {
+      name: signupName.trim(),
+      email: signupEmail.trim(),
+      phone: signupPhone.trim(),
+      businessName: signupBusinessName.trim(),
+      password: newPassword,
+      ecommerce: signupEcommerce,
+    }
 
-    const formData = new FormData()
-    formData.append('name', signupName)
-    formData.append('email', signupEmail)
-    formData.append('phone', signupPhone)
-    formData.append('businessName', signupBusinessName)
-    formData.append('password', newPassword)
-    formData.append('ecommerce', signupEcommerce)
-
+    signupSubmittingRef.current = true
     setLoading(true)
-    const res = await signup(formData)
+    const res = await signup(payload)
     setLoading(false)
-    
+    signupSubmittingRef.current = false
+
     if (res.success) {
       setIsSignupPasswordStep(false)
       if (window.PublicKeyCredential) {
@@ -447,7 +457,7 @@ export default function Login() {
         <div className="max-w-md w-full animate-fade-in-up">
           {/* Navigation Tabs */}
           <div className="flex bg-surface-container-low p-1.5 rounded-2xl mb-8 lg:mb-12 border border-outline-variant/10 shadow-inner">
-            {['signup', 'login', 'reset'].filter(t => t !== 'signup' || !hasAccount).map((tab) => (
+            {['signup', 'login', 'reset'].map((tab) => (
               <button
                 key={tab}
                 type="button"
@@ -627,22 +637,21 @@ export default function Login() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Your Phone *</label>
-                    <div className="flex group">
-                      <div className="bg-surface-container-low border border-outline-variant/15 border-r-0 rounded-l-xl px-3 flex items-center justify-center text-primary/40 group-focus-within:border-primary transition-colors">
-                        <span className="material-symbols-outlined text-sm">smartphone</span>
-                      </div>
-                      <ValidatedInput kind="phoneKE" required value={signupPhone} onChange={e => setSignupPhone(e.target.value)} placeholder="0712 345 678"
-                        className="flex-1 w-full bg-white border border-outline-variant/15 rounded-r-xl py-3 px-3 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" />
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Your Phone *</label>
+                  <div className="flex group">
+                    <div className="bg-surface-container-low border border-outline-variant/15 border-r-0 rounded-l-xl px-3 flex items-center justify-center text-primary/40 group-focus-within:border-primary transition-colors">
+                      <span className="material-symbols-outlined text-sm">smartphone</span>
                     </div>
+                    <ValidatedInput kind="phoneKE" value={signupPhone} onChange={e => setSignupPhone(e.target.value)} placeholder="0712 345 678"
+                      className="flex-1 w-full bg-white border border-outline-variant/15 rounded-r-xl py-3 px-3 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Business Name *</label>
-                    <ValidatedInput kind="businessName" required value={signupBusinessName} onChange={e => setSignupBusinessName(e.target.value)} placeholder="Acme Corp"
-                      className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" />
-                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Business Name *</label>
+                  <ValidatedInput kind="businessName" required value={signupBusinessName} onChange={e => setSignupBusinessName(e.target.value)} placeholder="Acme Corp"
+                    className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" />
                 </div>
 
                 <div className="space-y-2">
