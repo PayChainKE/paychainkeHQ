@@ -48,10 +48,22 @@ const Analytics = () => {
       else setError(res.data?.error || 'Could not load insights.');
     } catch (err) {
       console.error('Insights fetch failed:', err);
-      const status = err?.response?.status;
+      const status  = err?.response?.status;
+      const apiMsg  = err?.response?.data?.error || err?.response?.data?.message;
+      // 401 is already handled globally by the response interceptor (redirects
+      // to /login with a reason banner) — but if it slips through (e.g. mid-
+      // redirect), still show a useful message instead of "404 endpoint missing"
+      // copy that's been wrong for months.
       setError(
-        err?.response?.data?.error
-        || (status === 404 ? 'Insights endpoint not available — backend needs to be redeployed.' : 'Could not load insights.')
+        apiMsg
+          ? apiMsg
+          : status === 401
+            ? 'Your session expired. Sign in again.'
+            : status === 404
+              ? 'Insights API path not found. Check VITE_API_BASE_URL on the admin deploy.'
+              : status >= 500
+                ? `Backend error (${status}). Try again in a moment.`
+                : 'Cannot reach the PayChain API. Check your connection or wait for the deploy to finish.'
       );
     } finally {
       setLoading(false);
