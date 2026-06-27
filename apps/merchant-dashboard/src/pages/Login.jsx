@@ -18,7 +18,7 @@ const KENYAN_COUNTIES = [
 ]
 
 export default function Login() {
-  const { login, biometricLogin, signup, verifyOTP, resendOTP, forgotPassword, resetPassword, isAuthenticated } = useMerchantAuth()
+  const { login, biometricLogin, signup, verifyOTP, resendOTP, forgotPassword, verifyResetOTP, resetPassword, isAuthenticated } = useMerchantAuth()
   const { addNotification } = useNotification()
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
@@ -48,6 +48,13 @@ export default function Login() {
   const [newPassword, setNewPasswordInput] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [strength, setStrength] = useState({ length: false, upper: false, number: false, symbol: false })
+  // Reset step 2 → 3 hands off a short-lived single-use server token. We only
+  // ever hold the raw token in component state — never localStorage.
+  const [resetToken, setResetToken] = useState('')
+  const [maskedResetEmail, setMaskedResetEmail] = useState('')
+  // Renders a final confirmation card after a successful reset, with a CTA
+  // back to the login tab. Avoids the user being silently dumped to login.
+  const [resetSuccess, setResetSuccess] = useState(false)
 
   // OTP Flow States
   const [isOTPMode, setIsOTPMode] = useState(false)
@@ -150,6 +157,7 @@ export default function Login() {
 
   async function handleSetPassword(e) {
     e.preventDefault()
+    setErr('')
     if (!Object.values(strength).every(v => v)) {
       setErr('Please meet all security requirements.')
       return
@@ -158,18 +166,29 @@ export default function Login() {
       setErr('Passwords do not match.')
       return
     }
+    if (!resetToken) {
+      setErr('Your reset session has expired. Start over.')
+      setIsResetMode(false)
+      setActiveTab('reset')
+      return
+    }
 
     setLoading(true)
-    const code = otp.join('')
-    const res = await resetPassword(authEmail, code, newPassword)
+    const res = await resetPassword(resetToken, newPassword)
     setLoading(false)
-    
+
     if (res.success) {
-      setIsResetMode(false)
-      setActiveTab('login')
-      setPassword('')
+      setResetSuccess(true)
+      setResetToken('')
+      setOtp(['', '', '', '', '', ''])
       setNewPasswordInput('')
       setConfirmPassword('')
+      setPassword('')
+      addNotification({
+        title: 'Password Reset',
+        message: 'A confirmation email has been sent to your inbox.',
+        type: 'success',
+      })
     } else {
       setErr(res.error)
     }
@@ -177,23 +196,35 @@ export default function Login() {
 
   async function handleVerifyOTP(e) {
     e.preventDefault()
+    setErr('')
     const code = otp.join('')
     if (code.length < 6) return
-    
+
+    // Reset flow has its own verify endpoint that mints a short-lived
+    // reset token. Sign-in / signup verification still uses verifyOTP.
+    if (otpFlowType === 'reset') {
+      setLoading(true)
+      const res = await verifyResetOTP(authEmail, code)
+      setLoading(false)
+      if (res.success) {
+        setResetToken(res.resetToken)
+        setIsOTPMode(false)
+        setIsResetMode(true)
+      } else {
+        setErr(res.error)
+      }
+      return
+    }
+
     setLoading(true)
     const res = await verifyOTP(authEmail, code)
     setLoading(false)
-    
+
     if (res.success) {
       setIsOTPMode(false)
-      if (otpFlowType === 'login' || otpFlowType === 'signup') {
-        localStorage.setItem('hasAccount', 'true')
-        setHasAccount(true)
-        nav('/overview')
-      } else {
-        setIsResetMode(true) // Move to Reset Password after OTP
-      }
-      setErr('')
+      localStorage.setItem('hasAccount', 'true')
+      setHasAccount(true)
+      nav('/overview')
     } else {
       setErr(res.error)
     }
@@ -201,19 +232,47 @@ export default function Login() {
 
   async function handleForgotPassword(e) {
     e.preventDefault()
-    const loginInput = e.target[0].value
+    setErr('')
+    const loginInput = e.target[0].value.trim()
+    if (!loginInput) {
+      setErr('Enter your email or registered phone number.')
+      return
+    }
     setLoading(true)
     const res = await forgotPassword(loginInput)
     setLoading(false)
     if (res.success) {
       setAuthEmail(loginInput)
+      setMaskedResetEmail(res.maskedEmail || '')
       setOtpFlowType('reset')
       setIsOTPMode(true)
       setResendTimer(59)
       setActiveTab('login')
+      addNotification({
+        title: 'Verification Code Sent',
+        message: res.maskedEmail
+          ? `We sent a 6-digit code to ${res.maskedEmail}. It expires in 10 minutes.`
+          : 'If an account exists, a 6-digit code is on its way.',
+        type: 'success',
+      })
     } else {
       setErr(res.error)
     }
+  }
+
+  // Bail-out used by the success card / "Start over" affordances to scrub
+  // any in-progress reset state before we route the user somewhere else.
+  function exitResetFlow(targetTab = 'login') {
+    setIsResetMode(false)
+    setIsOTPMode(false)
+    setResetToken('')
+    setMaskedResetEmail('')
+    setResetSuccess(false)
+    setOtp(['', '', '', '', '', ''])
+    setNewPasswordInput('')
+    setConfirmPassword('')
+    setErr('')
+    setActiveTab(targetTab)
   }
 
   async function handleResendOTP() {
@@ -822,10 +881,32 @@ export default function Login() {
             <div className="animate-fade-in-up duration-500">
               <div className="mb-6 lg:mb-10 text-center flex flex-col items-center">
                  <img src={footerBrandsLogo} alt="PayChain Logo" className="h-10 mb-6 w-auto object-contain" />
-                 <h3 className="font-headline text-2xl lg:text-5xl text-primary tracking-tight font-black">Security Code</h3>
+                 <h3 className="font-headline text-2xl lg:text-5xl text-primary tracking-tight font-black">
+                   {otpFlowType === 'reset' ? 'Verify it’s you' : 'Security Code'}
+                 </h3>
                  <p className="text-on-surface-variant font-medium mt-1.5 text-sm lg:text-base lg:mt-2 opacity-70 leading-relaxed max-w-sm">
-                   Enter the 6-digit code sent to your phone ending in <span className="text-primary font-black">...{phone.slice(-3)}</span>
+                   {otpFlowType === 'reset' ? (
+                     <>
+                       Enter the 6-digit code we sent to {' '}
+                       <span className="text-primary font-black">{maskedResetEmail || 'your inbox'}</span>.
+                       The code expires in 10 minutes.
+                     </>
+                   ) : (
+                     <>
+                       Enter the 6-digit code sent to your phone ending in {' '}
+                       <span className="text-primary font-black">...{phone.slice(-3)}</span>
+                     </>
+                   )}
                  </p>
+                 {otpFlowType === 'reset' && (
+                   <button
+                     type="button"
+                     onClick={() => exitResetFlow('reset')}
+                     className="mt-4 text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600 hover:text-emerald-700"
+                   >
+                     ← Use a different email
+                   </button>
+                 )}
               </div>
 
               <form onSubmit={handleVerifyOTP} className="space-y-6 lg:space-y-8">
@@ -878,14 +959,44 @@ export default function Login() {
                 </div>
               </form>
             </div>
+          ) : resetSuccess ? (
+            /* RESET SUCCESS — final confirmation card */
+            <div className="animate-fade-in-up duration-500">
+              <div className="flex flex-col items-center text-center">
+                <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center mb-6 border-4 border-emerald-200/40">
+                  <span className="material-symbols-outlined text-emerald-600 text-5xl" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                </div>
+                <h3 className="font-headline text-3xl lg:text-5xl text-primary tracking-tight font-black">Password reset</h3>
+                <p className="text-on-surface-variant font-medium mt-3 text-sm lg:text-base opacity-70 leading-relaxed max-w-sm">
+                  Your new password is active. A security receipt has been emailed to {' '}
+                  <span className="text-primary font-black">{maskedResetEmail || 'your inbox'}</span> with the time, IP and device of this change.
+                </p>
+                <div className="mt-7 w-full max-w-xs space-y-3">
+                  <button
+                    onClick={() => exitResetFlow('login')}
+                    className="w-full bg-[#06201B] text-white py-4 rounded-2xl font-black text-base shadow-2xl hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-white/5"
+                  >
+                    Continue to sign in
+                    <span className="material-symbols-outlined">arrow_forward</span>
+                  </button>
+                  <p className="text-[10px] uppercase tracking-[0.2em] font-black text-on-surface-variant/40">
+                    For your security we never email the actual password.
+                  </p>
+                </div>
+              </div>
+            </div>
           ) : (
-            /* RESET PASSWORD FORM */
+            /* SET NEW PASSWORD FORM (covers post-OTP reset AND signup setup) */
             <div className="animate-fade-in-up duration-500">
               <div className="mb-6 lg:mb-10 flex flex-col items-center text-center">
                  <img src={footerBrandsLogo} alt="PayChain Logo" className="h-10 mb-6 w-auto object-contain" />
-                 <h3 className="font-headline text-2xl lg:text-5xl text-primary tracking-tight font-black">Set Custom Access</h3>
+                 <h3 className="font-headline text-2xl lg:text-5xl text-primary tracking-tight font-black">
+                   {otpFlowType === 'reset' ? 'Choose a new password' : 'Set Custom Access'}
+                 </h3>
                  <p className="text-on-surface-variant font-medium mt-1.5 text-sm lg:text-base lg:mt-2 opacity-70 leading-relaxed max-w-sm">
-                   To complete onboarding, please create a high-security password.
+                   {otpFlowType === 'reset'
+                     ? 'Pick something only you know. Your old password will stop working as soon as you save.'
+                     : 'To complete onboarding, please create a high-security password.'}
                  </p>
               </div>
 

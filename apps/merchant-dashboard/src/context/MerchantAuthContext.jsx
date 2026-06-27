@@ -129,18 +129,41 @@ export function MerchantAuthProvider({ children }) {
   async function forgotPassword(email) {
     try {
       const res = await axios.post(`${API_URL}/api/auth/merchant/forgot-password`, { email });
-      return { success: true, message: res.data.message };
+      return {
+        success: true,
+        message: res.data.message,
+        maskedEmail: res.data.maskedEmail || null,
+      };
     } catch (err) {
-      return { success: false, error: err.response?.data?.error || 'Failed to request reset' };
+      return { success: false, error: err.response?.data?.error || 'Failed to send verification code.' };
     }
   }
 
-  async function resetPassword(email, otp, newPassword) {
+  async function verifyResetOTP(email, otp) {
     try {
-      const res = await axios.post(`${API_URL}/api/auth/merchant/reset-password`, { email, otp, newPassword });
+      const res = await axios.post(`${API_URL}/api/auth/merchant/verify-reset-otp`, { email, otp });
+      return {
+        success: true,
+        message: res.data.message,
+        resetToken: res.data.resetToken,
+        expiresInSeconds: res.data.expiresInSeconds,
+      };
+    } catch (err) {
+      return { success: false, error: err.response?.data?.error || 'Code verification failed.' };
+    }
+  }
+
+  // Accepts the new (resetToken, newPassword) shape AND the legacy
+  // (email, otp, newPassword) shape so older mobile/web clients keep working.
+  async function resetPassword(arg1, arg2, arg3) {
+    try {
+      const payload = (arg2 != null && arg3 != null)
+        ? { email: arg1, otp: arg2, newPassword: arg3 }
+        : { resetToken: arg1, newPassword: arg2 };
+      const res = await axios.post(`${API_URL}/api/auth/merchant/reset-password`, payload);
       return { success: true, message: res.data.message };
     } catch (err) {
-      return { success: false, error: err.response?.data?.error || 'Failed to reset password' };
+      return { success: false, error: err.response?.data?.error || 'Failed to reset password.' };
     }
   }
 
@@ -164,6 +187,7 @@ export function MerchantAuthProvider({ children }) {
       verifyOTP,
       resendOTP,
       forgotPassword,
+      verifyResetOTP,
       resetPassword,
       logout,
       refreshSession

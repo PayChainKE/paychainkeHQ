@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import Merchant from '../models/Merchant.js';
-import { sendOTP, sendWelcomeEmail } from '../utils/resend.js';
+import { sendOTP, sendWelcomeEmail, sendPasswordResetConfirmation } from '../utils/resend.js';
 import generateToken from '../utils/generateToken.js';
 import { provisionMerchantWallet, getWalletBalance } from '../utils/stellarHelper.js';
 import { encryptKey } from '../utils/cryptoHelper.js';
@@ -356,65 +356,185 @@ export const resendMerchantOTP = async (req, res) => {
   }
 };
 
-// @desc    Forgot Password - Send OTP
-// @route   POST /api/auth/merchant/forgot-password
-// @access  Public
-export const forgotPassword = async (req, res) => {
-  const { email } = req.body;
+// Mask an email for safe display in the UI: jane@example.com → j••e@e••••e.com
+const maskEmail = (raw) => {
+  if (!raw || typeof raw !== 'string' || !raw.includes('@')) return null;
+  const [local, domain] = raw.split('@');
+  const m = (s) => s.length <= 2
+    ? s[0] + '•'
+    : s[0] + '•'.repeat(Math.max(1, s.length - 2)) + s[s.length - 1];
+  const dot = domain.lastIndexOf('.');
+  const base = dot === -1 ? domain : domain.slice(0, dot);
+  const tld  = dot === -1 ? '' : domain.slice(dot);
+  return `${m(local)}@${m(base)}${tld}`;
+};
 
+// @desc    Forgot Password — step 1 of 3. Mints a 6-digit OTP (10 min TTL)
+//          and emails it to the merchant's registered address. Always
+//          responds 200 success to prevent account enumeration; the OTP
+//          only dispatches when a real account matched.
+// @route   POST /api/auth/merchant/forgot-password
+// @access  Public (rate-limited at the route layer)
+export const forgotPassword = async (req, res) => {
+  const { email } = req.body || {};
   try {
-    const merchant = await Merchant.findOne({ 
-      $or: [{ email: email }, { phone: email }] 
-    });
-    if (!merchant) {
-      return res.status(404).json({ error: 'No account found with that email or phone number.' });
+    const lookup = String(email || '').trim();
+    if (!lookup) {
+      return res.status(400).json({ error: 'Enter your email or registered phone number.' });
     }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
-
-    merchant.otp = otp;
-    merchant.otpExpires = otpExpires;
-    await merchant.save();
-
-    console.log(`📧 Dispatching Forgot Password OTP via Resend to: ${merchant.email}`);
-    sendOTP(merchant.email, otp).catch(err => {
-      console.error(`📧 Resend Error: Failed to send OTP to ${merchant.email}:`, err);
+    const merchant = await Merchant.findOne({
+      $or: [{ email: lookup.toLowerCase() }, { phone: lookup }],
     });
 
-    res.json({ success: true, message: 'If an account exists, an OTP has been sent.' });
+    if (merchant) {
+      const otp = crypto.randomInt(100000, 1000000).toString();
+      merchant.otp = otp;
+      merchant.otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+      // Fresh reset attempt invalidates any prior reset token.
+      merchant.passwordResetToken = null;
+      merchant.passwordResetExpires = null;
+      await merchant.save();
+
+      console.log(`📧 Reset OTP → ${merchant.email}`);
+      sendOTP(merchant.email, otp).catch((err) =>
+        console.error(`📧 Reset OTP send failed for ${merchant.email}:`, err)
+      );
+    }
+
+    res.json({
+      success: true,
+      message: 'If an account exists, a 6-digit verification code has been sent.',
+      // Echoes the masked address ONLY when a real account matched, so the UI
+      // can render "code sent to j••e@e••••e.com" without leaking unknowns.
+      maskedEmail: merchant ? maskEmail(merchant.email) : null,
+    });
   } catch (error) {
     console.error('Forgot Password Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };
 
-// @desc    Reset Password
-// @route   POST /api/auth/merchant/reset-password
-// @access  Public
-export const resetPassword = async (req, res) => {
-  const { email, otp, newPassword } = req.body;
-
+// @desc    Verify Reset OTP — step 2 of 3. Validates the 6-digit code
+//          (timing-safe), clears it, and mints a single-use sha256-hashed
+//          reset token (15 min TTL) returned to the caller. The caller
+//          must present this token to set the new password — meaning the
+//          OTP itself never has to leave the client again.
+// @route   POST /api/auth/merchant/verify-reset-otp
+// @access  Public (rate-limited at the route layer)
+export const verifyResetOTP = async (req, res) => {
+  const { email, otp } = req.body || {};
   try {
-    const merchant = await Merchant.findOne({ email });
-    if (!merchant) {
-      return res.status(401).json({ error: 'Invalid request' });
+    const lookup = String(email || '').trim();
+    if (!lookup || !/^\d{6}$/.test(String(otp || ''))) {
+      return res.status(400).json({ error: 'Email and 6-digit code are required.' });
     }
 
-    if (!merchant.otp || merchant.otp !== otp) {
-      return res.status(401).json({ error: 'Invalid OTP' });
+    const merchant = await Merchant.findOne({
+      $or: [{ email: lookup.toLowerCase() }, { phone: lookup }],
+    });
+
+    if (!merchant || !merchant.otp || !merchant.otpExpires) {
+      return res.status(400).json({ error: 'Invalid code. Request a new one and try again.' });
+    }
+
+    // Timing-safe OTP comparison.
+    const provided = Buffer.from(String(otp).padEnd(6));
+    const stored   = Buffer.from(String(merchant.otp).padEnd(6));
+    if (provided.length !== stored.length || !crypto.timingSafeEqual(provided, stored)) {
+      return res.status(400).json({ error: 'Invalid code. Check your inbox and try again.' });
     }
 
     if (new Date() > merchant.otpExpires) {
-      return res.status(401).json({ error: 'OTP expired' });
+      return res.status(400).json({ error: 'Code has expired. Request a new one.' });
     }
 
-    merchant.password = newPassword;
+    const rawToken    = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+    merchant.passwordResetToken   = hashedToken;
+    merchant.passwordResetExpires = new Date(Date.now() + 15 * 60 * 1000);
     merchant.otp = null;
     merchant.otpExpires = null;
     await merchant.save();
 
-    res.json({ success: true, message: 'Password has been successfully reset.' });
+    res.json({
+      success: true,
+      message: 'Code verified. Set your new password to continue.',
+      resetToken: rawToken,
+      expiresInSeconds: 15 * 60,
+    });
+  } catch (error) {
+    console.error('Verify Reset OTP Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Reset Password — step 3 of 3. Validates the reset token, sets
+//          the new password (Merchant pre-save hook bcrypt-hashes at 12
+//          rounds), clears all reset state, and fires a confirmation
+//          email so the merchant has an audit trail. We intentionally do
+//          NOT email the plaintext password — that's a long-recognised
+//          anti-pattern (the email lives in inbox + backups + ESP logs
+//          indefinitely). Legacy `{ email, otp, newPassword }` shape is
+//          still accepted for backward-compat with older clients.
+// @route   POST /api/auth/merchant/reset-password
+// @access  Public (rate-limited at the route layer)
+export const resetPassword = async (req, res) => {
+  const { resetToken, email, otp, newPassword } = req.body || {};
+  try {
+    if (!newPassword || String(newPassword).length < 8) {
+      return res.status(400).json({ error: 'New password must be at least 8 characters.' });
+    }
+
+    let merchant;
+
+    if (resetToken) {
+      const hashedToken = crypto.createHash('sha256').update(String(resetToken)).digest('hex');
+      merchant = await Merchant.findOne({
+        passwordResetToken: hashedToken,
+        passwordResetExpires: { $gt: new Date() },
+      }).select('+passwordResetToken +passwordResetExpires +password');
+      if (!merchant) {
+        return res.status(401).json({
+          error: 'This reset link has expired. Start the password reset flow again.',
+        });
+      }
+    } else if (email && otp) {
+      // Legacy single-shot path (kept so older mobile builds keep working).
+      const lookup = String(email).trim().toLowerCase();
+      merchant = await Merchant.findOne({ email: lookup }).select('+password');
+      if (!merchant || !merchant.otp || merchant.otp !== String(otp)) {
+        return res.status(401).json({ error: 'Invalid verification code.' });
+      }
+      if (!merchant.otpExpires || new Date() > merchant.otpExpires) {
+        return res.status(401).json({ error: 'Verification code has expired.' });
+      }
+    } else {
+      return res.status(400).json({ error: 'Reset token (or email + code) is required.' });
+    }
+
+    merchant.password = String(newPassword);
+    merchant.otp = null;
+    merchant.otpExpires = null;
+    merchant.passwordResetToken = null;
+    merchant.passwordResetExpires = null;
+    await merchant.save();
+
+    // Confirmation email — paper trail + recovery path if it wasn't them.
+    const when = new Date().toLocaleString('en-KE', {
+      timeZone: 'Africa/Nairobi', dateStyle: 'medium', timeStyle: 'short',
+    });
+    const ip = (req.headers['x-forwarded-for'] || req.ip || 'unknown').toString().split(',')[0].trim();
+    const ua = String(req.headers['user-agent'] || 'unknown device').slice(0, 200);
+
+    sendPasswordResetConfirmation(merchant.email, merchant.name, when, ip, ua)
+      .catch((err) => console.error('📧 Reset confirmation email failed:', err));
+
+    res.json({
+      success: true,
+      message: 'Password has been reset. Sign in with your new password.',
+    });
   } catch (error) {
     console.error('Reset Password Error:', error);
     res.status(500).json({ error: 'Server Error' });

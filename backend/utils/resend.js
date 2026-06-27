@@ -458,6 +458,74 @@ export const sendTeamInvite = async (email, name, role, invitedByName, setupLink
   }
 };
 
+// Confirmation email sent after a merchant successfully resets their
+// password. Industry best-practice: never email the new password itself —
+// emails sit in inboxes, backups and ESP logs indefinitely. Instead we send
+// a security receipt: when it happened, where from, and a clear recovery
+// path if it WASN'T them (so a compromised account is recoverable quickly).
+export const sendPasswordResetConfirmation = async (email, name, when, ip, ua) => {
+  try {
+    const safeName = (name || 'there').toString().replace(/</g, '&lt;');
+    const safeWhen = String(when || '').replace(/</g, '&lt;');
+    const safeIp   = String(ip   || 'unknown').replace(/</g, '&lt;');
+    const safeUa   = String(ua   || 'unknown device').replace(/</g, '&lt;').slice(0, 200);
+
+    const data = await resend.emails.send({
+      from: 'PayChain Security <info@paychain.co.ke>',
+      to: [email],
+      subject: 'Your PayChain password was changed',
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 560px; margin: auto; background: #ffffff; border: 1px solid #eef0ee; border-radius: 18px; overflow: hidden;">
+          <div style="background: linear-gradient(135deg, #06201B 0%, #0a3029 100%); padding: 36px 32px;">
+            <div style="display: inline-flex; align-items: center; gap: 10px;">
+              <span style="display: inline-block; width: 36px; height: 36px; border-radius: 999px; background: rgba(94, 254, 179, 0.15); text-align: center; line-height: 36px; color: #5EFEB3; font-size: 18px; font-weight: 800;">✓</span>
+              <div>
+                <p style="margin: 0; color: #5EFEB3; font-size: 11px; font-weight: 800; letter-spacing: 2.5px; text-transform: uppercase;">PayChain Security</p>
+                <h1 style="margin: 4px 0 0; color: #fff; font-size: 22px; font-weight: 800; letter-spacing: -0.3px;">Password changed</h1>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding: 36px 32px;">
+            <p style="margin: 0 0 16px; color: #111; font-size: 15px;">Hi ${safeName},</p>
+            <p style="margin: 0 0 22px; color: #4b5563; font-size: 15px; line-height: 1.6;">
+              The password for your PayChain merchant account was successfully changed. You can sign in to the merchant dashboard with your new password right away.
+            </p>
+
+            <div style="background: #f6fbf7; border: 1px solid #d8ecdd; border-radius: 12px; padding: 18px 20px; margin: 0 0 26px;">
+              <p style="margin: 0 0 10px; color: #06201B; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;">When &amp; where</p>
+              <table style="width: 100%; border-collapse: collapse; font-size: 13px; color: #1f2937;">
+                <tr><td style="padding: 4px 0; color: #6b7280; width: 90px;">Time</td><td style="padding: 4px 0; font-weight: 600;">${safeWhen} EAT</td></tr>
+                <tr><td style="padding: 4px 0; color: #6b7280;">IP address</td><td style="padding: 4px 0; font-family: ui-monospace, Menlo, monospace;">${safeIp}</td></tr>
+                <tr><td style="padding: 4px 0; color: #6b7280;">Device</td><td style="padding: 4px 0; word-break: break-word;">${safeUa}</td></tr>
+              </table>
+            </div>
+
+            <div style="background: #fff7ed; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 16px 18px; margin: 0 0 26px;">
+              <p style="margin: 0 0 6px; color: #92400e; font-size: 13px; font-weight: 700;">Didn't change your password?</p>
+              <p style="margin: 0; color: #78350f; font-size: 13px; line-height: 1.5;">
+                Reply to this email or contact <a href="mailto:support@paychain.co.ke" style="color: #b45309; font-weight: 700;">support@paychain.co.ke</a> immediately — we'll lock the account and verify your identity before anyone else can sign in.
+              </p>
+            </div>
+
+            <a href="https://www.app.paychain.co.ke/login" style="display: inline-block; background: #06201B; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 12px; font-weight: 800; font-size: 14px; letter-spacing: 0.4px;">Sign in to dashboard →</a>
+          </div>
+
+          <div style="padding: 22px 30px; background: #fafafa; border-top: 1px solid #eef0ee; text-align: center;">
+            <p style="margin: 0; color: #9ca3af; font-size: 11px;">For your security we never include passwords in email. PayChain will never ask for your password.</p>
+            <p style="margin: 8px 0 0; color: #bbb; font-size: 11px;">&copy; ${new Date().getFullYear()} PayChainKE · Nairobi, Kenya</p>
+          </div>
+        </div>
+      `,
+    });
+    console.log(`📧 Reset confirmation → ${email}`);
+    return data;
+  } catch (error) {
+    console.error('❌ Resend Reset Confirmation Error:', error);
+    throw error;
+  }
+};
+
 // Send Batch Payment Receipt Email
 export const sendBatchReceiptEmail = async (email, businessName, batchRows, totalGross, totalNet, totalTax) => {
   try {
