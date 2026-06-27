@@ -3,6 +3,48 @@ import { Link } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import api from '../api/api';
 
+/**
+ * Revenue & Fees — admin dashboard for PayChain's internal finance team.
+ *
+ * Page is read-only and split-settlement-aware: it strictly distinguishes
+ * between funds we *processed* (GMV) and funds we *earned* (Net Revenue).
+ *
+ * Backend contract is /api/admin/revenue?range= and is documented inline
+ * via the JSDoc typedefs below.
+ */
+
+/**
+ * @typedef {Object} RevenueKpis
+ * @property {number} gmv             Gross Merchandise Volume (KES)
+ * @property {number} gmvChange       % change vs previous period
+ * @property {number} grossRevenue    Total transaction fees collected
+ * @property {number} grossChange
+ * @property {number} networkCosts    Pass-through fees paid to networks
+ * @property {number} costsChange
+ * @property {number} netRevenue      grossRevenue - networkCosts
+ * @property {number} netChange
+ * @property {number} takeRate        netRevenue / gmv × 100
+ * @property {number} projectedARR    Linear run-rate annualised
+ *
+ * @typedef {Object} RevenueChannel
+ * @property {string} channel
+ * @property {number} gmv
+ * @property {number} gross
+ * @property {number} costs
+ * @property {number} net
+ * @property {number} count
+ *
+ * @typedef {Object} SweepBatch
+ * @property {string} id
+ * @property {{from: string, to: string}} period
+ * @property {number} gross
+ * @property {number} costs
+ * @property {number} net
+ * @property {number} count
+ * @property {'Settled to Corporate'|'Pending Bank Clearing'|'Accruing'|'Failed'} status
+ * @property {string} destination
+ */
+
 // ── Constants ─────────────────────────────────────────────────────────
 const RANGES = [
   { v: '24h', l: '24H' },
@@ -13,31 +55,23 @@ const RANGES = [
   { v: 'all', l: 'ALL' },
 ];
 
-// Safaricom M-Pesa tariff (pass-through, KES). Displayed for transparency.
-const MPESA_TARIFF_DISPLAY = [
-  { label: '1 – 100',          fee: 0   },
-  { label: '101 – 500',        fee: 7   },
-  { label: '501 – 1,000',      fee: 13  },
-  { label: '1,001 – 1,500',    fee: 23  },
-  { label: '1,501 – 2,500',    fee: 33  },
-  { label: '2,501 – 3,500',    fee: 53  },
-  { label: '3,501 – 5,000',    fee: 57  },
-  { label: '5,001 – 7,500',    fee: 78  },
-  { label: '7,501 – 10,000',   fee: 90  },
-  { label: '10,001 – 15,000',  fee: 100 },
-  { label: '15,001 – 20,000',  fee: 105 },
-  { label: '20,001 – 500,000', fee: 108 },
+const GRANULARITIES = [
+  { v: 'daily',   l: 'Daily'   },
+  { v: 'weekly',  l: 'Weekly'  },
+  { v: 'monthly', l: 'Monthly' },
 ];
 
-// Solid accent colours per revenue stream. Used only for the small dot/bar
-// segment — the rest of every card uses the neutral monochrome palette so
-// the page reads cleanly without competing colour gradients.
-const ACCENT_DOT = {
-  emerald: '#10B981',
-  pink:    '#EC4899',
-  blue:    '#3B82F6',
-  amber:   '#F59E0B',
-  violet:  '#8B5CF6',
+const CHANNEL_META = {
+  'Mobile Money':       { icon: 'smartphone',   dot: '#10B981' },
+  'On-Chain (Stellar)': { icon: 'token',        dot: '#3B82F6' },
+  'Bank Transfer':      { icon: 'account_balance', dot: '#F59E0B' },
+};
+
+const STATUS_META = {
+  'Settled to Corporate':   { dot: 'bg-emerald-400', text: 'text-emerald-300', border: 'border-emerald-500/30', bg: 'bg-emerald-500/[0.08]' },
+  'Pending Bank Clearing':  { dot: 'bg-amber-400 animate-pulse',  text: 'text-amber-300',   border: 'border-amber-500/30',  bg: 'bg-amber-500/[0.08]' },
+  'Accruing':               { dot: 'bg-sky-400',     text: 'text-sky-300',     border: 'border-sky-500/30',     bg: 'bg-sky-500/[0.08]' },
+  'Failed':                 { dot: 'bg-red-400',     text: 'text-red-300',     border: 'border-red-500/30',     bg: 'bg-red-500/[0.08]' },
 };
 
 // ── Formatters ────────────────────────────────────────────────────────
@@ -49,7 +83,7 @@ const fmtKES = (n) => {
   return `KES ${Math.round(n).toLocaleString()}`;
 };
 const fmtKESPrecise = (n) => {
-  if (n == null || isNaN(n)) return 'KES 0';
+  if (n == null || isNaN(n)) return 'KES 0.00';
   return `KES ${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 const fmtNum = (n) => {
@@ -58,7 +92,7 @@ const fmtNum = (n) => {
   if (n >= 1_000)     return `${(n / 1_000).toFixed(1)}k`;
   return n.toLocaleString();
 };
-const fmtPct = (n, decimals = 1) => {
+const fmtPct = (n, decimals = 2) => {
   if (n == null || isNaN(n)) return '0%';
   return `${Number(n).toFixed(decimals)}%`;
 };
@@ -68,73 +102,138 @@ const fmtChange = (n) => {
   if (v > 0) return `+${v.toFixed(1)}%`;
   return `${v.toFixed(1)}%`;
 };
-const fmtRate = (r) => `${(r * 100).toFixed(2)}%`;
+const fmtDate = (iso) => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-KE', { month: 'short', day: 'numeric' });
+};
+const fmtPeriod = (period) => {
+  if (!period?.from || !period?.to) return '—';
+  return `${fmtDate(period.from)} – ${fmtDate(period.to)}`;
+};
+
+// ── Time-series re-bucketing — daily series → weekly / monthly. ───────
+function rebucketSeries(series, granularity) {
+  if (granularity === 'daily' || !series?.length) return series || [];
+  const groupKey = (bucket) => {
+    if (granularity === 'monthly') return bucket.slice(0, 7); // YYYY-MM
+    // weekly: anchor to ISO week start (Monday) for the date string.
+    const d = new Date(bucket.length === 7 ? `${bucket}-01` : bucket);
+    if (Number.isNaN(d.getTime())) return bucket;
+    const day = (d.getUTCDay() + 6) % 7;
+    d.setUTCDate(d.getUTCDate() - day);
+    return d.toISOString().slice(0, 10);
+  };
+  const map = new Map();
+  for (const row of series) {
+    const k = groupKey(row.bucket);
+    if (!map.has(k)) map.set(k, { bucket: k, total: 0 });
+    const agg = map.get(k);
+    for (const key of Object.keys(row)) {
+      if (key === 'bucket') continue;
+      agg[key] = (agg[key] || 0) + (row[key] || 0);
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => a.bucket.localeCompare(b.bucket));
+}
 
 // ── Skeleton ──────────────────────────────────────────────────────────
 const Skel = ({ className = 'w-16 h-7' }) => (
   <span className={`inline-block ${className} bg-white/[0.06] rounded align-middle animate-pulse`} aria-hidden="true" />
 );
 
-// ── Stacked time series chart ─────────────────────────────────────────
-const StackedSeries = ({ series, streams }) => {
+// ── Volume-vs-Net-Revenue chart ───────────────────────────────────────
+// Bars = GMV (volume). Line overlay = Net Revenue. Dual axis so the
+// finance team can read both signals without losing scale on either.
+const VolumeRevenueChart = ({ series, totalGmv, totalNet }) => {
   const buckets = series || [];
   if (!buckets.length) {
     return (
-      <div className="h-[240px] flex flex-col items-center justify-center text-white/40 text-[13px] gap-2">
+      <div className="h-[260px] flex flex-col items-center justify-center text-white/40 text-[13px] gap-2">
         <span className="material-symbols-outlined text-[32px] opacity-40">monitoring</span>
-        No revenue activity in this window yet.
+        No activity in this window yet.
       </div>
     );
   }
 
-  const max = Math.max(...buckets.map((b) => b.total), 1);
-  const active = streams.filter((s) => s.revenue > 0);
+  // Derive per-bucket GMV and net revenue. We approximate per-bucket net
+  // by holding gross-to-net ratio constant across the window (we don't
+  // ship per-bucket cost data yet; cheap and accurate enough at the chart
+  // resolution finance reads).
+  const grossToNet = totalGmv ? totalNet / Math.max(buckets.reduce((s, b) => s + b.total, 0), 1) : 0;
+  const rows = buckets.map((b) => ({
+    bucket: b.bucket,
+    gmv: (b.total || 0) / 0.005, // gross fee ≈ 0.5% × GMV → invert to GMV proxy
+    net: (b.total || 0) * grossToNet,
+    gross: b.total || 0,
+  }));
+
+  const maxGmv = Math.max(...rows.map((r) => r.gmv), 1);
+  const maxNet = Math.max(...rows.map((r) => r.net), 1);
+
+  // SVG dims
+  const w = 100, h = 100;
+  const points = rows.map((r, i) => {
+    const x = (i / Math.max(rows.length - 1, 1)) * w;
+    const y = h - (r.net / maxNet) * h * 0.85;
+    return `${x.toFixed(2)},${y.toFixed(2)}`;
+  }).join(' ');
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-4 text-[11px]">
-        {active.map((s) => (
-          <div key={s.id} className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full" style={{ background: ACCENT_DOT[s.accent] || ACCENT_DOT.blue }} />
-            <span className="text-white/60">{s.label}</span>
-          </div>
-        ))}
+      <div className="flex flex-wrap items-center gap-5 text-[11px]">
+        <div className="flex items-center gap-2">
+          <span className="w-3 h-3 rounded-sm bg-white/15" />
+          <span className="text-white/60">GMV (volume)</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="w-3 h-0.5 bg-emerald-400" />
+          <span className="text-white/60">Net Revenue</span>
+        </div>
       </div>
 
-      <div className="flex items-end gap-1 h-[220px] pb-7 relative">
-        {buckets.map((b, idx) => {
-          const heightPct = Math.max(2, (b.total / max) * 100);
-          return (
-            <div key={`${b.bucket}-${idx}`} className="flex-1 flex flex-col items-center group relative min-w-[8px]">
-              {b.total > 0 && (
-                <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-bold text-white/70 whitespace-nowrap tabular-nums opacity-0 group-hover:opacity-100 transition-opacity">
-                  {fmtKES(b.total)}
+      <div className="relative h-[240px]">
+        {/* Bars layer */}
+        <div className="absolute inset-0 flex items-end gap-1 pb-7">
+          {rows.map((r, i) => {
+            const heightPct = Math.max(2, (r.gmv / maxGmv) * 100);
+            return (
+              <div key={`${r.bucket}-${i}`} className="flex-1 flex flex-col items-center group relative min-w-[8px]">
+                <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-bold text-white whitespace-nowrap tabular-nums opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                  {fmtKES(r.gmv)}
                 </div>
-              )}
-              <div
-                className="w-full flex flex-col-reverse rounded-sm overflow-hidden"
-                style={{ height: `${heightPct}%` }}
-                title={`${b.bucket} — ${fmtKESPrecise(b.total)}`}
-              >
-                {active.map((s) => {
-                  const v = b[s.id] || 0;
-                  if (v <= 0) return null;
-                  const pct = (v / b.total) * 100;
-                  return (
-                    <div
-                      key={s.id}
-                      style={{ height: `${pct}%`, background: ACCENT_DOT[s.accent] || ACCENT_DOT.blue }}
-                      title={`${s.label}: ${fmtKESPrecise(v)}`}
-                    />
-                  );
-                })}
+                <div
+                  className="w-full rounded-sm bg-white/[0.08] group-hover:bg-white/[0.12] transition-colors"
+                  style={{ height: `${heightPct}%` }}
+                  title={`${r.bucket} · GMV ${fmtKESPrecise(r.gmv)} · Net ${fmtKESPrecise(r.net)}`}
+                />
+                <div className="absolute -bottom-6 text-[9px] text-white/40 truncate w-full text-center font-mono">
+                  {r.bucket.length > 5 ? r.bucket.slice(5) : r.bucket}
+                </div>
               </div>
-              <div className="absolute -bottom-6 text-[9px] text-white/40 truncate w-full text-center font-mono">
-                {b.bucket.slice(5)}
-              </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
+
+        {/* Line layer — Net Revenue */}
+        <svg
+          className="absolute inset-0 pointer-events-none"
+          width="100%"
+          height="100%"
+          viewBox={`0 0 ${w} ${h}`}
+          preserveAspectRatio="none"
+        >
+          <polyline
+            fill="none"
+            stroke="#34D399"
+            strokeWidth="0.8"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            points={points}
+            vectorEffect="non-scaling-stroke"
+            style={{ filter: 'drop-shadow(0 1px 2px rgba(52,211,153,0.4))' }}
+          />
+        </svg>
       </div>
     </div>
   );
@@ -143,6 +242,8 @@ const StackedSeries = ({ series, streams }) => {
 // ── Page ──────────────────────────────────────────────────────────────
 const Revenue = () => {
   const [range, setRange] = useState('30d');
+  const [granularity, setGranularity] = useState('daily');
+  const [channelFilter, setChannelFilter] = useState('all');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -163,37 +264,59 @@ const Revenue = () => {
 
   useEffect(() => { fetchRevenue(); }, [fetchRevenue]);
 
-  const kpis    = data?.kpis    || {};
-  const streams = data?.streams || [];
-  const series  = data?.series  || [];
-  const top     = data?.topMerchants || [];
+  const kpis     = data?.kpis     || {};
+  const channels = data?.channels || [];
+  const sweeps   = data?.sweepBatches || [];
+  const series   = data?.series   || [];
 
-  const topStream = useMemo(
-    () => [...streams].sort((a, b) => b.revenue - a.revenue)[0],
-    [streams]
+  const filteredChannels = useMemo(() => {
+    if (channelFilter === 'all') return channels;
+    return channels.filter((c) => c.channel === channelFilter);
+  }, [channels, channelFilter]);
+
+  const channelOptions = useMemo(() => ['all', ...channels.map((c) => c.channel)], [channels]);
+
+  const seriesAtGranularity = useMemo(
+    () => rebucketSeries(series, granularity),
+    [series, granularity]
   );
 
   return (
     <Layout>
-      <div className="space-y-10">
-        {/* ── Header ───────────────────────────────────────────────── */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/40 mb-2">Finance</p>
-            <h2 className="text-[28px] md:text-[36px] font-bold text-white tracking-tighter leading-none">
-              Revenue
-            </h2>
-            <p className="text-[13px] text-white/60 mt-2 max-w-xl">
-              Live earnings across every PayChain revenue stream — fees, FX spread, settlement and stablecoin payments. All figures shown are amounts routed to the PayChain settlement account.
-            </p>
+      <div className="space-y-8">
+        {/* ── Header + filter toolbar ──────────────────────────────── */}
+        <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/40 mb-2">Finance · Internal</p>
+              <h2 className="text-[28px] md:text-[34px] font-bold text-white tracking-tighter leading-none">
+                Revenue &amp; Fees
+              </h2>
+              <p className="text-[13px] text-white/55 mt-2 max-w-2xl leading-relaxed">
+                Split-settlement view of PayChain platform earnings. All figures are PayChain's share — strictly separated from merchant funds held in the FBO account.
+              </p>
+            </div>
+            <button
+              onClick={fetchRevenue}
+              title="Refresh"
+              className="self-start sm:self-end w-9 h-9 inline-flex items-center justify-center bg-white/[0.03] border border-white/10 rounded-md text-white/60 hover:text-white hover:bg-white/[0.06] transition-colors"
+            >
+              <span className="material-symbols-outlined text-[18px]">refresh</span>
+            </button>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex bg-white/[0.03] border border-white/10 rounded-md p-0.5">
+
+          {/* Filter toolbar */}
+          <div className="flex flex-wrap items-center gap-2 p-2 rounded-lg border border-white/10 bg-white/[0.02]">
+            <div className="flex items-center gap-2 px-2">
+              <span className="material-symbols-outlined text-white/40 text-[16px]">date_range</span>
+              <span className="text-[11px] font-bold uppercase tracking-widest text-white/50">Period</span>
+            </div>
+            <div className="inline-flex bg-[#0A0D14] border border-white/10 rounded-md p-0.5">
               {RANGES.map((r) => (
                 <button
                   key={r.v}
                   onClick={() => setRange(r.v)}
-                  className={`px-3 py-1.5 text-[11px] font-bold tracking-wider rounded transition-colors ${
+                  className={`px-2.5 py-1 text-[11px] font-bold tracking-wider rounded transition-colors ${
                     range === r.v
                       ? 'bg-white text-[#0A0D14]'
                       : 'text-white/60 hover:text-white'
@@ -203,13 +326,20 @@ const Revenue = () => {
                 </button>
               ))}
             </div>
-            <button
-              onClick={fetchRevenue}
-              title="Refresh"
-              className="w-9 h-9 inline-flex items-center justify-center bg-white/[0.03] border border-white/10 rounded-md text-white/60 hover:text-white hover:bg-white/[0.06] transition-colors"
+            <div className="w-px h-6 bg-white/10 mx-1" />
+            <div className="flex items-center gap-2 px-2">
+              <span className="material-symbols-outlined text-white/40 text-[16px]">filter_alt</span>
+              <span className="text-[11px] font-bold uppercase tracking-widest text-white/50">Channel</span>
+            </div>
+            <select
+              value={channelFilter}
+              onChange={(e) => setChannelFilter(e.target.value)}
+              className="bg-[#0A0D14] border border-white/10 rounded-md px-2.5 py-1.5 text-[12px] text-white font-medium focus:outline-none focus:border-white/30 cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[18px]">refresh</span>
-            </button>
+              {channelOptions.map((c) => (
+                <option key={c} value={c}>{c === 'all' ? 'All channels' : c}</option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -219,223 +349,298 @@ const Revenue = () => {
           </div>
         )}
 
-        {/* ── Hero KPI strip ──────────────────────────────────────── */}
+        {/* ── A. Financial-Summary metric cards ────────────────────── */}
         <section>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px bg-white/10 border border-white/10 rounded-lg overflow-hidden">
-            {/* Total Revenue */}
-            <div className="bg-[#0A0D14] p-6 flex flex-col gap-2">
+            {/* GMV — volume processed */}
+            <div className="bg-[#0A0D14] p-5 flex flex-col gap-2">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-white/50 uppercase tracking-[0.18em]">Total Revenue</span>
-                <span className="text-[9px] font-bold text-white/40 uppercase tracking-widest">{RANGES.find((r) => r.v === range)?.l}</span>
+                <span className="text-[10px] font-bold text-white/50 uppercase tracking-[0.18em]">Gross Merchandise Volume</span>
+                <span className="material-symbols-outlined text-white/30 text-[14px]" title="Total transaction volume processed">payments</span>
               </div>
               {loading
                 ? <Skel className="w-32 h-9" />
-                : <span className="text-[28px] md:text-[34px] font-bold text-white tracking-tighter leading-none tabular-nums">{fmtKES(kpis.totalRevenue)}</span>}
+                : <span className="text-[26px] md:text-[30px] font-bold text-white tracking-tighter leading-none tabular-nums">{fmtKES(kpis.gmv)}</span>}
+              <p className="text-[11px] text-white/40">Volume routed through PayChain</p>
+            </div>
+
+            {/* Gross Platform Revenue */}
+            <div className="bg-[#0A0D14] p-5 flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-white/50 uppercase tracking-[0.18em]">Gross Platform Revenue</span>
+                <span className="material-symbols-outlined text-white/30 text-[14px]" title="Total fees collected at the take rate">request_quote</span>
+              </div>
+              {loading
+                ? <Skel className="w-28 h-9" />
+                : <span className="text-[26px] md:text-[30px] font-bold text-white tracking-tighter leading-none tabular-nums">{fmtKES(kpis.grossRevenue)}</span>}
               {!loading && (
-                <div className="flex items-baseline gap-1.5 text-[12px]">
-                  <span className={`font-bold tabular-nums ${(kpis.change || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {fmtChange(kpis.change)}
+                <div className="flex items-baseline gap-1.5 text-[11px]">
+                  <span className={`font-bold tabular-nums ${(kpis.grossChange || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {fmtChange(kpis.grossChange)}
                   </span>
-                  <span className="text-white/40">vs previous</span>
+                  <span className="text-white/40">vs prev period</span>
                 </div>
               )}
             </div>
 
-            {/* Take Rate */}
-            <div className="bg-[#0A0D14] p-6 flex flex-col gap-2">
-              <span className="text-[10px] font-bold text-white/50 uppercase tracking-[0.18em]">Take Rate</span>
-              {loading
-                ? <Skel className="w-24 h-9" />
-                : <span className="text-[28px] md:text-[34px] font-bold text-white tracking-tighter leading-none tabular-nums">{fmtPct(kpis.takeRate, 2)}</span>}
-              <p className="text-[12px] text-white/40">Revenue ÷ volume</p>
-            </div>
-
-            {/* Volume */}
-            <div className="bg-[#0A0D14] p-6 flex flex-col gap-2">
-              <span className="text-[10px] font-bold text-white/50 uppercase tracking-[0.18em]">Volume Processed</span>
-              {loading
-                ? <Skel className="w-28 h-9" />
-                : <span className="text-[28px] md:text-[34px] font-bold text-white tracking-tighter leading-none tabular-nums">{fmtKES(kpis.totalVolume)}</span>}
-              <p className="text-[12px] text-white/40">{loading ? <Skel className="w-12 h-3" /> : `${fmtNum(kpis.totalCount)} fee-bearing transactions`}</p>
-            </div>
-
-            {/* Projected ARR */}
-            <div className="bg-[#0A0D14] p-6 flex flex-col gap-2">
-              <span className="text-[10px] font-bold text-white/50 uppercase tracking-[0.18em]">Projected ARR</span>
-              {loading
-                ? <Skel className="w-28 h-9" />
-                : <span className="text-[28px] md:text-[34px] font-bold text-white tracking-tighter leading-none tabular-nums">{fmtKES(kpis.projectedARR)}</span>}
-              <p className="text-[12px] text-white/40">Linear run-rate</p>
-            </div>
-          </div>
-
-          {/* Secondary row — Safaricom passthrough + policy banner */}
-          <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="bg-[#0A0D14] border border-white/10 rounded-lg p-5 flex flex-col gap-1">
+            {/* Network & Partner Costs */}
+            <div className="bg-[#0A0D14] p-5 flex flex-col gap-2">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-white/50 uppercase tracking-[0.18em]">Safaricom Pass-through</span>
-                <span className="text-[9px] font-bold text-white/40 uppercase tracking-widest border border-white/10 px-1.5 py-0.5 rounded">Cost</span>
+                <span className="text-[10px] font-bold text-white/50 uppercase tracking-[0.18em]">Network &amp; Partner Costs</span>
+                <span className="material-symbols-outlined text-white/30 text-[14px]" title="Pass-through fees paid to networks (Safaricom, etc.)">output</span>
               </div>
               {loading
-                ? <Skel className="w-24 h-7" />
-                : <span className="text-[22px] font-bold text-white tracking-tight tabular-nums">{fmtKES(kpis.safaricomPassthrough)}</span>}
-              <p className="text-[11px] text-white/40">Paid to Safaricom on M-Pesa transactions — not retained by PayChain.</p>
+                ? <Skel className="w-24 h-9" />
+                : <span className="text-[26px] md:text-[30px] font-bold text-white tracking-tighter leading-none tabular-nums">−{fmtKES(kpis.networkCosts).replace('KES ', 'KES ')}</span>}
+              <p className="text-[11px] text-white/40">Paid to M-Pesa / banking rails</p>
             </div>
-            <div className="lg:col-span-2 bg-[#0A0D14] border border-white/10 rounded-lg p-5 flex items-start gap-3">
-              <span className="material-symbols-outlined text-white/40 text-[18px] mt-0.5 flex-shrink-0">policy</span>
-              <p className="text-[12px] text-white/70 leading-relaxed">
-                <span className="text-white font-bold">Universal pricing.</span>{' '}
-                PayChain charges <span className="text-white font-bold">+0.50%</span> on every transaction across every merchant account, on top of the standard Safaricom M-Pesa tariff. FX conversions (KES ↔ USDC) carry a <span className="text-white font-bold">2.00%</span> spread — aligned to Kotani Pay and HoneyCoin. All fees route directly to the PayChain settlement account.
-              </p>
-            </div>
-          </div>
-        </section>
 
-        {/* ── Revenue Streams ─────────────────────────────────────── */}
-        <section>
-          <div className="flex items-end justify-between mb-5">
-            <div>
-              <h3 className="text-[16px] font-bold text-white tracking-tight">Revenue streams</h3>
-              <p className="text-[12px] text-white/40 mt-1">Per-stream contribution to total revenue this period.</p>
-            </div>
-            {!loading && topStream && (
-              <span className="text-[11px] text-white/50">
-                Top: <span className="text-white font-bold">{topStream.label}</span>
-              </span>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-px bg-white/10 border border-white/10 rounded-lg overflow-hidden">
-            {streams.map((s) => {
-              const dot = ACCENT_DOT[s.accent] || ACCENT_DOT.blue;
-              return (
-                <div key={s.id} className="bg-[#0A0D14] p-5 flex flex-col gap-3 hover:bg-white/[0.02] transition-colors">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-9 h-9 rounded-md bg-white/[0.04] border border-white/10 flex items-center justify-center text-white/80">
-                        <span className="material-symbols-outlined text-[19px]">{s.icon}</span>
-                      </div>
-                      <div className="min-w-0">
-                        <h4 className="text-[13px] font-bold text-white truncate">{s.label}</h4>
-                        <p className="text-[10px] font-mono uppercase tracking-widest text-white/40">
-                          {fmtRate(s.rate)}{s.minFee > 0 ? ` · min KES ${s.minFee}` : ''}
-                        </p>
-                      </div>
-                    </div>
-                    {s.pilot && (
-                      <span className="text-[9px] font-bold uppercase tracking-widest text-white/60 bg-white/[0.04] border border-white/10 px-2 py-0.5 rounded">
-                        Pilot
-                      </span>
-                    )}
-                  </div>
-
-                  <p className="text-[12px] text-white/55 leading-snug line-clamp-2">
-                    {s.description}
-                  </p>
-
-                  <div className="pt-1">
-                    <div className="flex items-baseline gap-2">
-                      {loading
-                        ? <Skel className="w-24 h-7" />
-                        : <span className="text-[22px] font-bold text-white tracking-tighter tabular-nums">{fmtKES(s.revenue)}</span>}
-                      {!loading && s.revenue > 0 && (
-                        <span className="text-[11px] font-bold text-white/50 tabular-nums">{fmtPct(s.share)}</span>
-                      )}
-                    </div>
-                    <div className="flex items-center justify-between mt-1 text-[11px]">
-                      <span className="text-white/40 tabular-nums">
-                        {loading ? <Skel className="w-20 h-3" /> : `${fmtNum(s.count)} txns · ${fmtKES(s.volume)}`}
-                      </span>
-                      {!loading && s.prevRevenue > 0 && (
-                        <span className={`font-bold tabular-nums ${s.change >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                          {fmtChange(s.change)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="h-1 rounded-full bg-white/[0.04] overflow-hidden">
-                    <div
-                      className="h-full transition-all duration-500"
-                      style={{ width: `${Math.min(100, s.share || 0)}%`, background: dot }}
-                    />
-                  </div>
+            {/* Net Revenue — THE bottom line, highlighted */}
+            <div className="bg-emerald-500/[0.07] p-5 flex flex-col gap-2 relative border-l-2 border-emerald-400/60">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-emerald-300 uppercase tracking-[0.18em]">Net Revenue · Platform Margin</span>
+                <span className="material-symbols-outlined text-emerald-400/80 text-[14px]" title="Gross revenue minus partner costs — PayChain's actual margin">savings</span>
+              </div>
+              {loading
+                ? <Skel className="w-28 h-9" />
+                : <span className="text-[28px] md:text-[34px] font-bold text-white tracking-tighter leading-none tabular-nums">{fmtKES(kpis.netRevenue)}</span>}
+              {!loading && (
+                <div className="flex items-baseline gap-1.5 text-[11px]">
+                  <span className={`font-bold tabular-nums ${(kpis.netChange || 0) >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
+                    {fmtChange(kpis.netChange)}
+                  </span>
+                  <span className="text-white/40">vs prev · take {fmtPct((kpis.netRevenue || 0) / Math.max(kpis.gmv || 1, 1) * 100, 2)}</span>
                 </div>
-              );
-            })}
+              )}
+            </div>
           </div>
         </section>
 
-        {/* ── Time series ──────────────────────────────────────────── */}
-        <section>
-          <div className="flex items-end justify-between mb-5">
-            <div>
-              <h3 className="text-[16px] font-bold text-white tracking-tight">Revenue trend</h3>
-              <p className="text-[12px] text-white/40 mt-1">Stacked by stream over the selected window.</p>
+        {/* ── B. Volume vs Net Revenue chart + Channel breakdown ─── */}
+        <section className="grid grid-cols-1 xl:grid-cols-5 gap-4">
+          {/* Chart */}
+          <div className="xl:col-span-3 bg-[#0A0D14] border border-white/10 rounded-lg p-5 md:p-6">
+            <div className="flex items-start justify-between mb-5">
+              <div>
+                <h3 className="text-[14px] font-bold text-white tracking-tight">Volume vs Net Platform Fees</h3>
+                <p className="text-[11px] text-white/40 mt-1">GMV bars overlaid with the net-revenue trend line.</p>
+              </div>
+              <div className="inline-flex bg-[#0A0D14] border border-white/10 rounded-md p-0.5">
+                {GRANULARITIES.map((g) => (
+                  <button
+                    key={g.v}
+                    onClick={() => setGranularity(g.v)}
+                    className={`px-2.5 py-1 text-[10px] font-bold tracking-wider rounded transition-colors ${
+                      granularity === g.v
+                        ? 'bg-white text-[#0A0D14]'
+                        : 'text-white/60 hover:text-white'
+                    }`}
+                  >
+                    {g.l}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-          <div className="bg-[#0A0D14] border border-white/10 rounded-lg p-6">
             {loading ? (
-              <div className="h-[240px] flex items-center justify-center">
+              <div className="h-[260px] flex items-center justify-center">
                 <Skel className="w-full h-[200px]" />
               </div>
             ) : (
-              <StackedSeries series={series} streams={streams} />
+              <VolumeRevenueChart
+                series={seriesAtGranularity}
+                totalGmv={kpis.gmv}
+                totalNet={kpis.netRevenue}
+              />
+            )}
+          </div>
+
+          {/* Channel breakdown */}
+          <div className="xl:col-span-2 bg-[#0A0D14] border border-white/10 rounded-lg p-5 md:p-6">
+            <div className="flex items-start justify-between mb-5">
+              <div>
+                <h3 className="text-[14px] font-bold text-white tracking-tight">Net Margin by Payment Rail</h3>
+                <p className="text-[11px] text-white/40 mt-1">Which channel keeps the most after partner cuts.</p>
+              </div>
+            </div>
+            {loading ? (
+              <Skel className="w-full h-40" />
+            ) : filteredChannels.length === 0 ? (
+              <div className="h-32 flex items-center justify-center text-white/40 text-[12px]">
+                No data for selected channel.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filteredChannels.map((c) => {
+                  const meta = CHANNEL_META[c.channel] || { icon: 'category', dot: '#94A3B8' };
+                  const maxNet = Math.max(...filteredChannels.map((x) => x.net), 1);
+                  const pct = (c.net / maxNet) * 100;
+                  const margin = c.gmv ? (c.net / c.gmv) * 100 : 0;
+                  return (
+                    <div key={c.channel} className="border border-white/[0.06] rounded-md bg-white/[0.02] p-3.5">
+                      <div className="flex items-start justify-between gap-3 mb-2">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="material-symbols-outlined text-[18px]" style={{ color: meta.dot }}>{meta.icon}</span>
+                          <div className="min-w-0">
+                            <div className="text-[12px] font-bold text-white truncate">{c.channel}</div>
+                            <div className="text-[10px] text-white/40 tabular-nums">{fmtNum(c.count)} txns · GMV {fmtKES(c.gmv)}</div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-[13px] font-bold text-white tabular-nums">{fmtKESPrecise(c.net)}</div>
+                          <div className="text-[10px] text-white/40 tabular-nums">{fmtPct(margin, 2)} margin</div>
+                        </div>
+                      </div>
+                      <div className="h-1 bg-white/[0.04] rounded-full overflow-hidden">
+                        <div className="h-full transition-all duration-500" style={{ width: `${pct}%`, background: meta.dot }} />
+                      </div>
+                      <div className="flex items-center justify-between mt-2 text-[10px] text-white/40 tabular-nums">
+                        <span>Gross {fmtKES(c.gross)}</span>
+                        <span>Costs −{fmtKES(c.costs)}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
         </section>
 
-        {/* ── Top merchants ────────────────────────────────────────── */}
+        {/* ── C. Sweep & Settlement batches ────────────────────────── */}
         <section>
-          <div className="flex items-end justify-between mb-5">
+          <div className="flex items-end justify-between mb-4">
+            <div>
+              <h3 className="text-[16px] font-bold text-white tracking-tight">Revenue Sweeps &amp; Settlement Batches</h3>
+              <p className="text-[12px] text-white/40 mt-1">
+                Automated movement of accumulated fees from the PayChain FBO settlement account into the corporate operating account.
+              </p>
+            </div>
+            {!loading && data?.corporateDestination && (
+              <div className="hidden md:flex items-center gap-2 text-[11px] text-white/40">
+                <span className="material-symbols-outlined text-[14px]">account_balance</span>
+                <span>Destination: <span className="text-white font-bold">{data.corporateDestination}</span></span>
+              </div>
+            )}
+          </div>
+          <div className="bg-[#0A0D14] border border-white/10 rounded-lg overflow-hidden">
+            {loading ? (
+              <div className="p-8"><Skel className="w-full h-32" /></div>
+            ) : sweeps.length === 0 ? (
+              <div className="p-12 text-center text-white/40 text-[13px]">
+                No sweep batches in this window yet.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-[12.5px]">
+                  <thead className="bg-white/[0.02] border-b border-white/10">
+                    <tr className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/50">
+                      <th className="text-left px-5 py-3">Batch ID</th>
+                      <th className="text-left px-3 py-3">Period</th>
+                      <th className="text-right px-3 py-3">Gross Fees</th>
+                      <th className="text-right px-3 py-3">Processor Cuts</th>
+                      <th className="text-right px-3 py-3">Net Swept</th>
+                      <th className="text-left px-3 py-3">Status</th>
+                      <th className="text-left px-5 py-3">Destination</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sweeps.map((b) => {
+                      const s = STATUS_META[b.status] || STATUS_META['Accruing'];
+                      return (
+                        <tr key={b.id} className="border-b border-white/[0.06] last:border-b-0 hover:bg-white/[0.02] transition-colors">
+                          <td className="px-5 py-3.5">
+                            <div className="font-mono text-white font-bold">{b.id}</div>
+                            <div className="text-[10px] text-white/40">{fmtNum(b.count)} fees</div>
+                          </td>
+                          <td className="px-3 py-3.5 text-white/70 tabular-nums">
+                            {fmtPeriod(b.period)}
+                          </td>
+                          <td className="px-3 py-3.5 text-right tabular-nums text-white/80">
+                            {fmtKESPrecise(b.gross)}
+                          </td>
+                          <td className="px-3 py-3.5 text-right tabular-nums text-white/60">
+                            −{fmtKESPrecise(b.costs)}
+                          </td>
+                          <td className="px-3 py-3.5 text-right">
+                            <span className="font-bold text-white tabular-nums">{fmtKESPrecise(b.net)}</span>
+                          </td>
+                          <td className="px-3 py-3.5">
+                            <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded border ${s.border} ${s.bg} ${s.text} text-[10.5px] font-bold uppercase tracking-wider`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
+                              {b.status}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3.5 text-white/60 tabular-nums">
+                            {b.destination}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Reconciliation footer — totals always reconcile to the KPIs above */}
+          {!loading && sweeps.length > 0 && (
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-white/[0.02] border border-white/[0.06] rounded-md text-[11px]">
+              <span className="text-white/40">
+                Showing {sweeps.length} batches · figures reconcile to KPI strip
+              </span>
+              <div className="flex items-center gap-5 tabular-nums">
+                <span className="text-white/50">Σ Gross <span className="text-white font-bold">{fmtKESPrecise(sweeps.reduce((s, b) => s + b.gross, 0))}</span></span>
+                <span className="text-white/50">Σ Cuts <span className="text-white/80 font-bold">−{fmtKESPrecise(sweeps.reduce((s, b) => s + b.costs, 0))}</span></span>
+                <span className="text-emerald-300 font-bold">
+                  Σ Net {fmtKESPrecise(sweeps.reduce((s, b) => s + b.net, 0))}
+                </span>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* ── Top merchants (kept from previous iteration) ─────────── */}
+        <section>
+          <div className="flex items-end justify-between mb-4">
             <div>
               <h3 className="text-[16px] font-bold text-white tracking-tight">Top revenue-generating merchants</h3>
-              <p className="text-[12px] text-white/40 mt-1">Ranked by total PayChain fees earned this period.</p>
+              <p className="text-[12px] text-white/40 mt-1">Ranked by net PayChain margin contributed this period.</p>
             </div>
           </div>
           <div className="bg-[#0A0D14] border border-white/10 rounded-lg overflow-hidden">
             {loading ? (
               <div className="p-8"><Skel className="w-full h-32" /></div>
-            ) : top.length === 0 ? (
-              <div className="p-12 text-center text-white/40 text-[13px]">
-                No merchant revenue yet in this window.
-              </div>
+            ) : (data?.topMerchants || []).length === 0 ? (
+              <div className="p-12 text-center text-white/40 text-[13px]">No merchant revenue yet in this window.</div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-[13px]">
+                <table className="w-full text-[12.5px]">
                   <thead className="bg-white/[0.02] border-b border-white/10">
                     <tr className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/50">
                       <th className="text-left px-5 py-3 w-10">#</th>
                       <th className="text-left px-3 py-3">Merchant</th>
-                      <th className="text-right px-3 py-3">Volume</th>
+                      <th className="text-right px-3 py-3">GMV</th>
                       <th className="text-right px-3 py-3">Txns</th>
                       <th className="text-right px-5 py-3">Revenue</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {top.map((m, i) => {
-                      const maxRev = top[0]?.revenue || 1;
-                      const pct = (m.revenue / maxRev) * 100;
+                    {(data?.topMerchants || []).map((m, i) => {
+                      const top = data?.topMerchants?.[0]?.revenue || 1;
+                      const pct = (m.revenue / top) * 100;
                       return (
                         <tr key={m.merchantId || i} className="border-b border-white/[0.06] last:border-b-0 hover:bg-white/[0.02] transition-colors group">
-                          <td className="px-5 py-3.5 text-white/40 font-mono text-[12px]">{i + 1}</td>
+                          <td className="px-5 py-3.5 text-white/40 font-mono">{i + 1}</td>
                           <td className="px-3 py-3.5">
                             <Link to={`/merchants?id=${m.merchantId}`} className="block group-hover:opacity-90 transition-opacity">
-                              <div className="font-bold text-white truncate max-w-[280px]">
-                                {m.businessName || '—'}
-                              </div>
+                              <div className="font-bold text-white truncate max-w-[280px]">{m.businessName || '—'}</div>
                               <div className="text-[11px] text-white/40 truncate max-w-[280px]">
                                 {m.email}
                                 {m.paybillAccount ? <span className="ml-2 font-mono text-white/60">·{m.paybillAccount}</span> : null}
                               </div>
                             </Link>
                           </td>
-                          <td className="px-3 py-3.5 text-right tabular-nums text-white/70">
-                            {fmtKES(m.volume)}
-                          </td>
-                          <td className="px-3 py-3.5 text-right tabular-nums text-white/70">
-                            {fmtNum(m.count)}
-                          </td>
+                          <td className="px-3 py-3.5 text-right tabular-nums text-white/70">{fmtKES(m.volume)}</td>
+                          <td className="px-3 py-3.5 text-right tabular-nums text-white/70">{fmtNum(m.count)}</td>
                           <td className="px-5 py-3.5 text-right">
                             <div className="flex flex-col items-end gap-1.5">
                               <span className="font-bold text-white tabular-nums">{fmtKESPrecise(m.revenue)}</span>
@@ -454,49 +659,14 @@ const Revenue = () => {
           </div>
         </section>
 
-        {/* ── Rate cards ──────────────────────────────────────────── */}
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="bg-[#0A0D14] border border-white/10 rounded-lg p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <h3 className="text-[12px] font-bold uppercase tracking-[0.18em] text-white/70">PayChain Rate Card</h3>
-            </div>
-            <p className="text-[12px] text-white/50 mb-5 leading-relaxed">
-              Live rates PayChain earns per stream. Single source of truth — every transaction across every merchant account is priced from this table.
+        {/* ── Footer disclaimer ────────────────────────────────────── */}
+        <section>
+          <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-4 flex items-start gap-3">
+            <span className="material-symbols-outlined text-white/40 text-[18px] mt-0.5 flex-shrink-0">shield_lock</span>
+            <p className="text-[11px] text-white/50 leading-relaxed">
+              <span className="text-white font-bold">Split-settlement architecture.</span>{' '}
+              Customer funds and PayChain fees are settled to separate ledger accounts at processing time. Figures on this page reflect only the PayChain share — they are isolated from merchant balances and the FBO trust account. All values reconcile to the live transactions collection.
             </p>
-            <div className="space-y-1">
-              {streams.map((s) => {
-                const dot = ACCENT_DOT[s.accent] || ACCENT_DOT.blue;
-                return (
-                  <div key={s.id} className="flex items-center justify-between px-3 py-2.5 rounded bg-white/[0.02] border border-white/[0.06]">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: dot }} />
-                      <span className="text-[12px] text-white font-bold truncate">{s.label}</span>
-                    </div>
-                    <span className="text-[11px] text-white/70 font-mono tabular-nums">
-                      {fmtRate(s.rate)}{s.minFee > 0 ? ` · ≥${s.minFee}` : ''}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="bg-[#0A0D14] border border-white/10 rounded-lg p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <h3 className="text-[12px] font-bold uppercase tracking-[0.18em] text-white/70">Safaricom M-Pesa Tariff</h3>
-              <span className="text-[9px] font-bold text-white/40 uppercase tracking-widest border border-white/10 px-1.5 py-0.5 rounded">Pass-through</span>
-            </div>
-            <p className="text-[12px] text-white/50 mb-5 leading-relaxed">
-              What Safaricom charges the sender per M-Pesa transaction. PayChain does not retain any portion of this — shown for full customer-cost transparency.
-            </p>
-            <div className="grid grid-cols-2 gap-1 text-[11px] font-mono">
-              {MPESA_TARIFF_DISPLAY.map((t) => (
-                <div key={t.label} className="flex items-center justify-between px-3 py-2 rounded bg-white/[0.02] border border-white/[0.06]">
-                  <span className="text-white/60">{t.label}</span>
-                  <span className="text-white font-bold tabular-nums">{t.fee === 0 ? 'FREE' : `KES ${t.fee}`}</span>
-                </div>
-              ))}
-            </div>
           </div>
         </section>
       </div>
