@@ -1,10 +1,13 @@
-import React from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import api from '../../api/api';
 import logo from '../../assets/logo.png';
 
 const Sidebar = ({ isOpen, onClose }) => {
   const { logout } = useAuth();
+  const [status, setStatus] = useState(null);
+  const [loadingStatus, setLoadingStatus] = useState(true);
 
   const navItems = [
     { icon: 'dashboard', label: 'Overview', path: '/overview' },
@@ -12,12 +15,45 @@ const Sidebar = ({ isOpen, onClose }) => {
     { icon: 'hourglass_empty', label: 'Waitlist', path: '/waitlist' },
     { icon: 'analytics', label: 'Insights', path: '/analytics' },
     { icon: 'mail', label: 'Messages', path: '/messages' },
+    { icon: 'support_agent', label: 'Call Centre', path: '/call-centre' },
     { icon: 'newspaper', label: 'Newsletter', path: '/newsletter' },
     { icon: 'badge', label: 'Team', path: '/team' },
     { icon: 'account_balance', label: 'Ledger', path: '/ledger' },
     { icon: 'security', label: 'Wallet Audit', path: '/wallet-audit' },
     { icon: 'settings', label: 'Settings', path: '/settings' },
   ];
+
+  const fetchStatus = useCallback(async () => {
+    try {
+      const res = await api.get('/api/admin/system-status');
+      if (res.data?.success) setStatus(res.data.data);
+    } catch (e) {
+      // Stay silent — sidebar should not break on a transient failure.
+    } finally {
+      setLoadingStatus(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchStatus();
+    const id = setInterval(fetchStatus, 60_000); // refresh every minute
+    const h = () => fetchStatus();
+    window.addEventListener('paychain:sync', h);
+    return () => { clearInterval(id); window.removeEventListener('paychain:sync', h); };
+  }, [fetchStatus]);
+
+  const statRows = [
+    { icon: 'hourglass_empty', label: 'Waitlist',  value: status?.waitlist?.total,  badge: status?.waitlist?.pending,  badgeTone: 'amber',   path: '/waitlist'  },
+    { icon: 'storefront',      label: 'Merchants', value: status?.merchants?.total, badge: status?.merchants?.flagged, badgeTone: 'red',     path: '/merchants' },
+    { icon: 'mail',            label: 'Messages',  value: status?.messages?.total,  badge: status?.messages?.unread,   badgeTone: 'emerald', path: '/messages'  },
+    { icon: 'call',            label: 'Calls',     value: status?.calls?.total,     badge: status?.calls?.open,        badgeTone: 'emerald', path: '/call-centre' },
+  ];
+
+  const badgeToneMap = {
+    amber:   'bg-amber-500/20 text-amber-300 border-amber-500/40',
+    red:     'bg-red-500/20 text-red-300 border-red-500/40',
+    emerald: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+  };
 
   return (
     <aside className={`fixed left-0 top-0 h-full w-[240px] bg-[#162723] flex flex-col py-6 px-4 z-50 transition-transform duration-300 lg:translate-x-0 ${isOpen ? 'translate-x-0 shadow-editorial' : '-translate-x-full'}`}>
@@ -50,22 +86,40 @@ const Sidebar = ({ isOpen, onClose }) => {
         ))}
       </nav>
       <div className="mt-auto pt-6 border-t border-white/10 space-y-4">
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-widest text-[#c0c9c0]/50 px-2 font-label">
             <span>System Status</span>
+            <button
+              onClick={fetchStatus}
+              title="Refresh"
+              className="text-[#c0c9c0]/40 hover:text-emerald-300 transition-colors"
+            >
+              <span className="material-symbols-outlined text-[14px]">refresh</span>
+            </button>
           </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 text-slate-400 text-[12px] font-medium font-body">
-            <span className="material-symbols-outlined text-[16px]">hourglass_empty</span>
-            <span>Waitlist: 30</span>
-          </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 text-slate-400 text-[12px] font-medium font-body">
-            <span className="material-symbols-outlined text-[16px]">storefront</span>
-            <span>Merchants: 18</span>
-          </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 text-slate-400 text-[12px] font-medium font-body">
-            <span className="material-symbols-outlined text-[16px] opacity-60">mail</span>
-            <span>Messages: 6</span>
-          </div>
+          {statRows.map((row) => (
+            <NavLink
+              key={row.label}
+              to={row.path}
+              onClick={() => window.innerWidth < 1024 && onClose()}
+              className="flex items-center gap-2 px-3 py-1.5 text-slate-400 text-[12px] font-medium font-body rounded-lg hover:bg-emerald-900/30 hover:text-white transition-colors"
+            >
+              <span className="material-symbols-outlined text-[16px] opacity-70">{row.icon}</span>
+              <span className="flex-1">{row.label}</span>
+              {loadingStatus ? (
+                <span className="inline-block w-6 h-3 bg-white/10 rounded animate-pulse"></span>
+              ) : (
+                <>
+                  <span className="tabular-nums font-bold text-white/80">{(row.value ?? 0).toLocaleString()}</span>
+                  {row.badge > 0 && (
+                    <span className={`tabular-nums text-[9px] font-bold px-1.5 py-0.5 rounded border ${badgeToneMap[row.badgeTone]}`}>
+                      {row.badge}
+                    </span>
+                  )}
+                </>
+              )}
+            </NavLink>
+          ))}
         </div>
         <button
           onClick={logout}
