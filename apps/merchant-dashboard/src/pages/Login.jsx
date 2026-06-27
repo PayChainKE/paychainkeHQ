@@ -247,16 +247,42 @@ export default function Login() {
     }
   }
 
+  const otpRefs = useRef([])
+
   const handleOtpChange = (element, index) => {
     const val = element.value.replace(/\D/g, '')
-    if (element.value !== '' && val === '') return // Reject if they typed a non-number
-    
+    if (element.value !== '' && val === '') return
     const newOtp = [...otp]
     newOtp[index] = val
     setOtp(newOtp)
-    if (element.nextSibling && val) {
-      element.nextSibling.focus()
+    if (val && index < 5) otpRefs.current[index + 1]?.focus()
+  }
+
+  const handleOtpKeyDown = (e, index) => {
+    if (e.key === 'Backspace') {
+      if (otp[index]) {
+        const newOtp = [...otp]
+        newOtp[index] = ''
+        setOtp(newOtp)
+      } else if (index > 0) {
+        otpRefs.current[index - 1]?.focus()
+      }
+    } else if (e.key === 'ArrowLeft' && index > 0) {
+      otpRefs.current[index - 1]?.focus()
+    } else if (e.key === 'ArrowRight' && index < 5) {
+      otpRefs.current[index + 1]?.focus()
     }
+  }
+
+  const handleOtpPaste = (e) => {
+    e.preventDefault()
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
+    if (!pasted) return
+    const newOtp = [...otp]
+    for (let i = 0; i < 6; i++) newOtp[i] = pasted[i] || ''
+    setOtp(newOtp)
+    const nextEmpty = newOtp.findIndex(v => !v)
+    otpRefs.current[nextEmpty === -1 ? 5 : nextEmpty]?.focus()
   }
 
   async function handleSignup(e) {
@@ -749,82 +775,123 @@ export default function Login() {
           ) : isOTPMode ? (
             /* OTP VERIFICATION VIEW */
             <div className="animate-fade-in-up duration-500">
-              <div className="mb-6 lg:mb-10 text-center flex flex-col items-center">
-                 <img src={footerBrandsLogo} alt="PayChain Logo" className="h-10 mb-6 w-auto object-contain" />
-                 <h3 className="font-headline text-2xl lg:text-5xl text-primary tracking-tight font-black">
-                   {otpFlowType === 'reset' ? 'Verify it’s you' : 'Security Code'}
-                 </h3>
-                 <p className="text-on-surface-variant font-medium mt-1.5 text-sm lg:text-base lg:mt-2 opacity-70 leading-relaxed max-w-sm">
-                   {otpFlowType === 'reset' ? (
-                     <>
-                       Enter the 6-digit code we sent to {' '}
-                       <span className="text-primary font-black">{maskedResetEmail || 'your inbox'}</span>.
-                       The code expires in 10 minutes.
-                     </>
-                   ) : (
-                     <>
-                       Enter the 6-digit code sent to your phone ending in {' '}
-                       <span className="text-primary font-black">...{phone.slice(-3)}</span>
-                     </>
-                   )}
-                 </p>
-                 {otpFlowType === 'reset' && (
-                   <button
-                     type="button"
-                     onClick={() => exitResetFlow('reset')}
-                     className="mt-4 text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600 hover:text-emerald-700"
-                   >
-                     ← Use a different email
-                   </button>
-                 )}
-              </div>
 
-              <form onSubmit={handleVerifyOTP} className="space-y-6 lg:space-y-8">
-                <div className="flex justify-between gap-1.5 sm:gap-3">
-                  {otp.map((data, index) => (
-                    <input
-                      key={index}
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      autoComplete={index === 0 ? "one-time-code" : "off"}
-                      maxLength="1"
-                      className="w-full aspect-square bg-slate-50 border-2 border-outline-variant/10 rounded-xl lg:rounded-2xl text-center text-xl lg:text-2xl font-black text-primary focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all"
-                      value={data}
-                      onChange={e => handleOtpChange(e.target, index)}
-                      onFocus={e => e.target.select()}
-                    />
-                  ))}
+              {/* Header */}
+              <div className="mb-8 text-center">
+                <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[#06201B] mb-5 shadow-lg">
+                  <span className="material-symbols-outlined text-emerald-400 text-2xl" style={{ fontVariationSettings: "’FILL’ 1" }}>lock</span>
+                </div>
+                <h3 className="font-headline text-3xl lg:text-4xl text-primary tracking-tight font-black">
+                  {otpFlowType === ‘reset’ ? ‘Verify your identity’ : ‘Enter security code’}
+                </h3>
+                <p className="text-on-surface-variant text-sm mt-2 opacity-60 leading-relaxed max-w-xs mx-auto">
+                  {otpFlowType === ‘reset’ ? (
+                    <>6-digit code sent to <span className="text-primary font-bold opacity-100">{maskedResetEmail || ‘your inbox’}</span></>
+                  ) : (
+                    <>6-digit code sent to your registered email</>
+                  )}
+                </p>
+
+                {/* Expiry pill */}
+                <div className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200">
+                  <span className="material-symbols-outlined text-amber-500 text-[13px]">timer</span>
+                  <span className="text-[11px] font-black text-amber-700 uppercase tracking-widest">
+                    Expires in {resendTimer}s
+                  </span>
                 </div>
 
+                {otpFlowType === ‘reset’ && (
+                  <button
+                    type="button"
+                    onClick={() => exitResetFlow(‘reset’)}
+                    className="mt-3 flex items-center gap-1 mx-auto text-[10px] font-black uppercase tracking-[0.2em] text-primary/40 hover:text-emerald-600 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[12px]">arrow_back</span>
+                    Use a different email
+                  </button>
+                )}
+              </div>
+
+              <form onSubmit={handleVerifyOTP}>
+                {/* Digit entry — dark glass card */}
+                <div className="bg-[#06201B] rounded-3xl p-5 lg:p-6 mb-5 shadow-[0_20px_60px_rgba(6,32,27,0.25)]">
+                  <p className="text-center text-[9px] font-black uppercase tracking-[0.3em] text-emerald-400/60 mb-4">
+                    Security Code
+                  </p>
+
+                  <div className="flex items-center justify-center gap-2 lg:gap-3">
+                    {otp.map((digit, index) => (
+                      <input
+                        key={index}
+                        ref={el => { otpRefs.current[index] = el }}
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        autoComplete={index === 0 ? ‘one-time-code’ : ‘off’}
+                        maxLength="1"
+                        value={digit}
+                        onChange={e => handleOtpChange(e.target, index)}
+                        onKeyDown={e => handleOtpKeyDown(e, index)}
+                        onPaste={index === 0 ? handleOtpPaste : undefined}
+                        onFocus={e => e.target.select()}
+                        className={`
+                          w-10 h-12 lg:w-12 lg:h-14 rounded-xl text-center font-black text-xl lg:text-2xl
+                          outline-none transition-all duration-200 select-none caret-transparent
+                          ${digit
+                            ? ‘bg-emerald-400 text-[#06201B] shadow-[0_0_20px_rgba(52,211,153,0.4)] scale-105’
+                            : ‘bg-white/8 text-white/20 border border-white/10 focus:bg-white/15 focus:border-emerald-400/60 focus:shadow-[0_0_0_3px_rgba(52,211,153,0.15)]’
+                          }
+                        `}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Progress dots */}
+                  <div className="flex justify-center gap-1.5 mt-4">
+                    {otp.map((digit, i) => (
+                      <div
+                        key={i}
+                        className={`h-1 rounded-full transition-all duration-300 ${
+                          digit ? ‘w-5 bg-emerald-400’ : ‘w-1.5 bg-white/15’
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Error */}
                 {err && (
-                  <div className="bg-red-50 border border-red-200 p-4 rounded-xl flex items-center gap-3 text-red-700">
-                    <span className="material-symbols-outlined text-lg">error_outline</span>
-                    <p className="text-xs font-bold">{err}</p>
+                  <div className="flex items-center gap-2.5 bg-red-50 border border-red-200 rounded-2xl px-4 py-3 mb-4 animate-shake">
+                    <span className="material-symbols-outlined text-red-500 text-base shrink-0">error_outline</span>
+                    <p className="text-xs font-bold text-red-700">{err}</p>
                   </div>
                 )}
 
-                <div className="space-y-4">
-                  <button 
-                    className="w-full bg-[#06201B] text-white py-4 lg:py-5 rounded-2xl font-black text-lg shadow-2xl hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-white/10 disabled:opacity-30" 
-                    disabled={loading || otp.some(v => !v)}
-                  >
-                    {loading ? (
-                      <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    ) : (
-                      <>
-                        Verify Account
-                        <span className="material-symbols-outlined">arrow_forward</span>
-                      </>
-                    )}
-                  </button>
-                  <button 
-                    type="button" 
+                {/* Submit */}
+                <button
+                  className="w-full bg-[#06201B] text-white py-4 lg:py-5 rounded-2xl font-black text-base lg:text-lg shadow-xl hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-white/5 disabled:opacity-30 disabled:cursor-not-allowed mb-4"
+                  disabled={loading || otp.some(v => !v)}
+                >
+                  {loading ? (
+                    <div className="w-5 h-5 border-[3px] border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-emerald-400 text-lg">verified</span>
+                      Verify &amp; Sign In
+                    </>
+                  )}
+                </button>
+
+                {/* Resend */}
+                <div className="text-center">
+                  <span className="text-[11px] text-primary/40 font-medium">Didn&apos;t receive it? </span>
+                  <button
+                    type="button"
                     onClick={handleResendOTP}
                     disabled={resendTimer > 0 || loading}
-                    className="w-full text-center text-[10px] uppercase font-black tracking-[0.2em] text-primary/40 hover:text-emerald-600 transition-colors disabled:opacity-50 disabled:hover:text-primary/40 disabled:cursor-not-allowed"
+                    className="text-[11px] font-black text-emerald-600 hover:text-emerald-700 transition-colors disabled:text-primary/30 disabled:cursor-not-allowed"
                   >
-                    {resendTimer > 0 ? `Resend Code (${resendTimer}s)` : 'Resend Code'}
+                    {resendTimer > 0 ? `Resend in ${resendTimer}s` : ‘Resend code’}
                   </button>
                 </div>
               </form>
