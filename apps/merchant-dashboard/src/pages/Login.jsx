@@ -18,7 +18,7 @@ const KENYAN_COUNTIES = [
 ]
 
 export default function Login() {
-  const { login, biometricLogin, signup, verifyOTP, resendOTP, forgotPassword, verifyResetOTP, resetPassword, isAuthenticated } = useMerchantAuth()
+  const { login, signup, verifyOTP, resendOTP, forgotPassword, verifyResetOTP, resetPassword, isAuthenticated } = useMerchantAuth()
   const { addNotification } = useNotification()
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
@@ -65,10 +65,8 @@ export default function Login() {
   // Navigation Tabs
   const [activeTab, setActiveTab] = useState('login')
   const [isSignupPasswordStep, setIsSignupPasswordStep] = useState(false)
-  const [isSignupBiometricStep, setIsSignupBiometricStep] = useState(false)
   const [otpFlowType, setOtpFlowType] = useState('') // 'login' or 'reset'
   const [authEmail, setAuthEmail] = useState('') // Captured from backend for OTP verification
-  const [hasBiometrics, setHasBiometrics] = useState(!!localStorage.getItem('last_biometric_user'))
   const [resendTimer, setResendTimer] = useState(59)
   const [hasAccount, setHasAccount] = useState(() => localStorage.getItem('hasAccount') === 'true')
   
@@ -109,51 +107,6 @@ export default function Login() {
       }
     } else {
       setErr(res.error)
-    }
-  }
-
-  async function handleBiometricSignIn() {
-    setErr('')
-    try {
-      if (!window.PublicKeyCredential) {
-        setErr("Biometrics are not supported on this device.")
-        return
-      }
-
-      const challenge = new Uint8Array(32)
-      window.crypto.getRandomValues(challenge)
-
-      // Physically triggers OS-level Face ID / Touch ID prompt
-      const assertion = await navigator.credentials.get({
-        publicKey: {
-          challenge: challenge,
-          timeout: 60000,
-          userVerification: "required"
-        }
-      })
-
-      if (assertion) {
-        // OS verified the user physically. 
-        // We log them in bypassing the password check on the backend for demo purposes.
-        const userEmail = localStorage.getItem('last_biometric_user')
-        if (!userEmail) {
-          setErr("No registered biometric user found.")
-          return
-        }
-
-        setLoading(true)
-        const res = await biometricLogin(userEmail)
-        setLoading(false)
-
-        if (res.success) {
-          nav('/overview')
-        } else {
-          setErr(res.error)
-        }
-      }
-    } catch (error) {
-      console.error(error)
-      setErr("Biometric authentication cancelled or failed.")
     }
   }
 
@@ -344,18 +297,13 @@ export default function Login() {
 
     if (res.success) {
       setIsSignupPasswordStep(false)
-      if (window.PublicKeyCredential) {
-        setIsSignupBiometricStep(true)
-      } else {
-        finishSignup()
-      }
+      finishSignup()
     } else {
       setErr(res.error)
     }
   }
 
   function finishSignup() {
-    setIsSignupBiometricStep(false)
     setActiveTab('login')
     setPassword('')
     addNotification({
@@ -363,47 +311,6 @@ export default function Login() {
       message: 'Sign in with your new credentials to access your dashboard.',
       type: 'success',
     })
-  }
-
-  async function handleSetupBiometric() {
-    try {
-      setLoading(true)
-      const challenge = new Uint8Array(32)
-      window.crypto.getRandomValues(challenge)
-      const userId = new Uint8Array(16)
-      window.crypto.getRandomValues(userId)
-
-      const credential = await navigator.credentials.create({
-        publicKey: {
-          challenge: challenge,
-          rp: { name: "PayChain Merchant", id: window.location.hostname },
-          user: {
-            id: userId,
-            name: signupEmail,
-            displayName: signupName
-          },
-          pubKeyCredParams: [{ type: "public-key", alg: -7 }],
-          authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required" },
-          timeout: 60000
-        }
-      })
-
-      if (credential) {
-        localStorage.setItem('last_biometric_user', signupEmail)
-        setHasBiometrics(true)
-        addNotification({ title: 'Biometrics Enabled', message: 'You can now log in using Face ID or Touch ID.', type: 'success' })
-      }
-    } catch (e) {
-      console.error(e)
-      setErr('Biometric setup failed or was cancelled.')
-    } finally {
-      setLoading(false)
-      finishSignup()
-    }
-  }
-
-  function skipBiometric() {
-    finishSignup()
   }
 
   const SecurityRequirement = ({ met, label }) => (
@@ -484,34 +391,7 @@ export default function Login() {
           {activeTab === 'signup' ? (
             /* SIGN UP FORM */
             <div className="animate-fade-in-up">
-              {isSignupBiometricStep ? (
-                /* BIOMETRIC SETUP STEP */
-                <div className="flex flex-col items-center justify-center text-center py-10 px-4 animate-fade-in-up">
-                  <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mb-6 shadow-inner">
-                    <span className="material-symbols-outlined text-4xl text-emerald-500">fingerprint</span>
-                  </div>
-                  <h3 className="font-headline text-3xl text-primary tracking-tight font-black mb-3">Enable Biometrics</h3>
-                  <p className="text-on-surface-variant font-medium opacity-80 mb-8 max-w-sm leading-relaxed">
-                    Set up Face ID or Touch ID for instant, secure access to your merchant dashboard without needing a password.
-                  </p>
-                  <div className="flex flex-col w-full gap-4 max-w-xs mx-auto">
-                    <button 
-                      onClick={handleSetupBiometric}
-                      disabled={loading}
-                      className="bg-[#06201B] text-white py-4 rounded-xl font-black text-sm shadow-xl hover:bg-[#0a3029] transition-all flex items-center justify-center gap-2"
-                    >
-                      {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : 'Set Up Now'}
-                    </button>
-                    <button 
-                      onClick={skipBiometric}
-                      disabled={loading}
-                      className="text-primary/60 font-bold text-sm py-2 hover:text-primary transition-all"
-                    >
-                      Skip for now
-                    </button>
-                  </div>
-                </div>
-              ) : isSignupPasswordStep ? (
+              {isSignupPasswordStep ? (
                 /* SIGN UP PASSWORD STEP */
                 <div className="animate-fade-in-up">
                   <div className="mb-6 lg:mb-10 flex flex-col items-center text-center">
@@ -791,25 +671,6 @@ export default function Login() {
               </div>
 
               <form onSubmit={handleLogin} className="space-y-5 lg:space-y-6">
-                
-                {hasBiometrics && (
-                  <div className="mb-6 animate-fade-in-up">
-                    <button 
-                      type="button"
-                      onClick={handleBiometricSignIn}
-                      className="w-full bg-emerald-50 text-emerald-700 py-4 lg:py-5 rounded-2xl font-black text-sm lg:text-base shadow-sm hover:bg-emerald-100 active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-emerald-200"
-                    >
-                      <span className="material-symbols-outlined text-2xl">fingerprint</span>
-                      Sign in with Passkey / Biometrics
-                    </button>
-                    
-                    <div className="flex items-center gap-4 my-6 opacity-40">
-                      <div className="flex-1 h-px bg-primary"></div>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-primary">Or use password</span>
-                      <div className="flex-1 h-px bg-primary"></div>
-                    </div>
-                  </div>
-                )}
 
                 {/* Unified Login Field (Email or Phone Number) */}
                 <div className="space-y-2">
