@@ -1,7 +1,14 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useMemo } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import logo from '../assets/logo.png';
+
+// Human-readable banner shown when the API forced us back to /login.
+const REASON_COPY = {
+  'session-expired':  { tone: 'amber', text: 'Your session expired. Please sign in again.' },
+  'account-missing':  { tone: 'red',   text: 'Your admin account is no longer active. Sign in with a current account.' },
+  'session-invalid':  { tone: 'amber', text: 'Your session is no longer valid. Please sign in again.' },
+};
 
 // Mask an email for display so observers can't read it off the OTP screen.
 // "admin@paychain.co.ke" → "a•••n@p••••••.co.ke"
@@ -23,12 +30,22 @@ function maskEmail(raw) {
 const Login = () => {
   const { login, verifyOtp } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1); // 1: Password, 2: OTP
+
+  // Surface the reason the API interceptor sent us here (token expired, etc.)
+  const reasonBanner = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    const key = params.get('reason') || sessionStorage.getItem('paychain_login_reason');
+    if (!key || !REASON_COPY[key]) return null;
+    sessionStorage.removeItem('paychain_login_reason');
+    return REASON_COPY[key];
+  }, [location.search]);
 
   const [showPassword, setShowPassword] = useState(false);
 
@@ -130,6 +147,13 @@ const Login = () => {
             autoComplete="off"
             spellCheck={false}
           >
+            {reasonBanner && !error && (
+              <div className={`${reasonBanner.tone === 'red' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-amber-50 border-amber-200 text-amber-800'} border p-3 rounded-xl flex items-center gap-3`}>
+                <span className="material-symbols-outlined text-lg">info</span>
+                <p className="text-xs font-semibold">{reasonBanner.text}</p>
+              </div>
+            )}
+
             {error && (
               <div className="bg-red-50 border border-red-200 p-4 rounded-xl flex items-center gap-3 text-red-700 animate-shake">
                 <span className="material-symbols-outlined text-lg">error_outline</span>
