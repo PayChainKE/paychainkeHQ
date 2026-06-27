@@ -11,6 +11,16 @@ import Waitlist from '../models/Waitlist.js';
 import Contact from '../models/Contact.js';
 import Communication from '../models/Communication.js';
 import { sendMerchantInvite, sendAdminActionOTP } from '../utils/resend.js';
+import { logAudit } from '../utils/auditLog.js';
+
+// Build an `actor` shape from req.admin so audit rows attribute admin-initiated
+// actions to the right operator even when the merchant is the subject.
+const adminActor = (admin) => admin ? ({
+  type: 'admin',
+  id:    admin._id || null,
+  email: admin.email || null,
+  name:  admin.name || admin.email || 'admin',
+}) : { type: 'admin', id: null, email: null, name: 'admin' };
 
 // Allowed sensitive actions an admin can request against a merchant.
 const ACTION_LABELS = {
@@ -262,14 +272,30 @@ export const confirmMerchantAction = async (req, res) => {
       merchant.lockedAt = new Date();
       merchant.lockedBy = admin._id;
       await merchant.save();
+      logAudit({
+        action: 'admin.merchant.locked', category: 'admin', severity: 'critical',
+        message: 'Account locked by admin (OTP-verified)',
+        merchant, actor: adminActor(admin), req,
+      });
     } else if (action === 'unlock') {
       merchant.status = 'active';
       merchant.lockedAt = null;
       merchant.lockedBy = null;
       await merchant.save();
+      logAudit({
+        action: 'admin.merchant.unlocked', category: 'admin', severity: 'success',
+        message: 'Account unlocked by admin (OTP-verified)',
+        merchant, actor: adminActor(admin), req,
+      });
     } else if (action === 'delete') {
       // Hard delete: remove merchant + all owned records. We don't drop
       // Transactions tied to other merchants — only this one's.
+      // Log BEFORE deletion so we keep the merchant denormalised metadata.
+      logAudit({
+        action: 'admin.merchant.deleted', category: 'admin', severity: 'critical',
+        message: `Account permanently deleted — "${merchant.businessName || merchant.email}"`,
+        merchant, actor: adminActor(admin), req,
+      });
       await Promise.all([
         Transaction.deleteMany({ merchantId: merchant._id }),
         PayoutBatch.deleteMany({ merchantId: merchant._id }),
@@ -329,6 +355,13 @@ export const flagMerchant = async (req, res) => {
     merchant.flaggedBy = req.admin._id;
     await merchant.save();
 
+    logAudit({
+      action: 'admin.merchant.flagged', category: 'admin', severity: 'warning',
+      message: `Flagged for review — "${trimmed}"`,
+      merchant, actor: adminActor(req.admin), req,
+      metadata: { reason: trimmed },
+    });
+
     res.json({ success: true, message: 'Merchant flagged for review.' });
   } catch (error) {
     console.error('Flag Merchant Error:', error);
@@ -353,6 +386,12 @@ export const unflagMerchant = async (req, res) => {
     merchant.flaggedAt = null;
     merchant.flaggedBy = null;
     await merchant.save();
+
+    logAudit({
+      action: 'admin.merchant.unflagged', category: 'admin', severity: 'success',
+      message: 'Cleared suspicious-activity flag',
+      merchant, actor: adminActor(req.admin), req,
+    });
 
     res.json({ success: true, message: 'Flag cleared.' });
   } catch (error) {
@@ -523,6 +562,13 @@ export const createMerchant = async (req, res) => {
 
     sendMerchantInvite(email, name, businessName, paybillAccount, setupLink).catch((err) => {
       console.error(`📧 Failed to send invite to ${email}:`, err);
+    });
+
+    logAudit({
+      action: 'admin.merchant.created', category: 'admin', severity: 'success',
+      message: `Onboarded by admin — invite sent to ${email}`,
+      merchant, actor: adminActor(req.admin), req,
+      metadata: { paybillAccount },
     });
 
     res.status(201).json({

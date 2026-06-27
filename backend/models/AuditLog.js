@@ -1,0 +1,59 @@
+import mongoose from 'mongoose';
+
+// Compact, denormalised audit trail. We copy `merchantEmail`/`merchantName`
+// onto each row at write-time so the log stays readable forever — even if the
+// merchant record is later deleted, renamed or rebranded. The same denorm
+// holds for the acting admin (when an admin took the action).
+//
+// `category` is the broad bucket the UI groups by (auth, security, profile,
+// admin, wallet, system). `severity` controls the colour in the table:
+// info | success | warning | critical.
+
+const AuditLogSchema = new mongoose.Schema({
+  // Subject (whose log this entry belongs to). Most actions are merchant-scoped.
+  merchantId:    { type: mongoose.Schema.Types.ObjectId, ref: 'Merchant', default: null, index: true },
+  merchantEmail: { type: String, default: null },
+  merchantName:  { type: String, default: null },
+
+  // Who performed the action. Self = same merchant; admin = an admin acted
+  // on the merchant; system = automated process / boot migration.
+  actor: {
+    type: { type: String, enum: ['self', 'admin', 'system'], default: 'self', index: true },
+    id:    { type: mongoose.Schema.Types.ObjectId, default: null },
+    email: { type: String, default: null },
+    name:  { type: String, default: null },
+  },
+
+  // What happened. Use dot-namespaced verbs so they group naturally
+  // (e.g. merchant.login.success, admin.merchant.flagged).
+  action:   { type: String, required: true, index: true },
+  category: {
+    type: String,
+    enum: ['auth', 'security', 'profile', 'admin', 'wallet', 'system'],
+    default: 'auth',
+    index: true,
+  },
+  severity: {
+    type: String,
+    enum: ['info', 'success', 'warning', 'critical'],
+    default: 'info',
+  },
+
+  // Human-readable short message rendered as the primary cell in the table.
+  message: { type: String, default: '' },
+
+  // Network metadata captured at request time.
+  ip:        { type: String, default: null },
+  userAgent: { type: String, default: null },
+
+  // Free-form payload (request shape, what changed, error codes, etc.). Capped
+  // softly via .slice on the helper to keep documents small.
+  metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
+}, { timestamps: true });
+
+// Compound index — the most common query is "this merchant's recent activity".
+AuditLogSchema.index({ merchantId: 1, createdAt: -1 });
+AuditLogSchema.index({ createdAt: -1 });
+
+const AuditLog = mongoose.model('AuditLog', AuditLogSchema);
+export default AuditLog;

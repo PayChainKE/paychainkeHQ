@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import Merchant from '../models/Merchant.js';
 import { sendOTP, sendWelcomeEmail, sendPasswordResetConfirmation } from '../utils/resend.js';
+import { logAudit } from '../utils/auditLog.js';
 import generateToken from '../utils/generateToken.js';
 import { provisionMerchantWallet, getWalletBalance } from '../utils/stellarHelper.js';
 import { encryptKey } from '../utils/cryptoHelper.js';
@@ -90,6 +91,13 @@ export const registerMerchant = async (req, res) => {
         console.error(`📧 Resend Error: Failed to send Welcome Email to ${merchant.email}:`, err);
       });
 
+      logAudit({
+        action: 'merchant.signup', category: 'auth', severity: 'success',
+        message: `Merchant signed up — ${merchant.businessName || merchant.email}`,
+        merchant, req,
+        metadata: { source: merchant.registrationSource || 'web' },
+      });
+
       res.status(201).json({
         success: true,
         message: 'Registration successful. Account created.',
@@ -148,6 +156,13 @@ export const verifyMerchantOTP = async (req, res) => {
     merchant.loginCount = (merchant.loginCount || 0) + 1;
     merchant.lastLogin = new Date();
     await merchant.save();
+
+    logAudit({
+      action: 'merchant.login.success', category: 'auth', severity: 'success',
+      message: 'Signed in successfully',
+      merchant, req,
+      metadata: { loginCount: merchant.loginCount, method: 'password+otp' },
+    });
 
     res.json({
       success: true,
@@ -218,15 +233,30 @@ export const loginMerchant = async (req, res) => {
     }).select('+password +bulkPayPin');
     
     if (!merchant) {
+      logAudit({
+        action: 'merchant.login.failed', category: 'auth', severity: 'warning',
+        message: `Failed sign-in — no account for "${loginIdentifier}"`,
+        req, metadata: { identifier: loginIdentifier, reason: 'no_account' },
+      });
       return res.status(401).json({ error: 'Invalid email/phone or password' });
     }
 
     const isMatch = await merchant.matchPassword(password);
     if (!isMatch) {
+      logAudit({
+        action: 'merchant.login.failed', category: 'auth', severity: 'warning',
+        message: 'Failed sign-in — incorrect password',
+        merchant, req, metadata: { reason: 'bad_password' },
+      });
       return res.status(401).json({ error: 'Invalid email/phone or password' });
     }
 
     if (merchant.status === 'locked') {
+      logAudit({
+        action: 'merchant.login.blocked', category: 'security', severity: 'critical',
+        message: 'Sign-in blocked — account is locked',
+        merchant, req,
+      });
       return res.status(403).json({ error: 'This account has been locked. Please contact PayChain support.' });
     }
 
@@ -243,11 +273,17 @@ export const loginMerchant = async (req, res) => {
       console.error(`📧 Resend Error: Failed to send OTP to ${merchant.email}:`, err);
     });
 
-    return res.json({ 
-      success: true, 
-      mfaRequired: true, 
+    logAudit({
+      action: 'merchant.login.otp_requested', category: 'auth', severity: 'info',
+      message: 'Password validated — OTP dispatched',
+      merchant, req,
+    });
+
+    return res.json({
+      success: true,
+      mfaRequired: true,
       email: merchant.email,
-      message: 'OTP sent to your email. Proceed to Stage 2.' 
+      message: 'OTP sent to your email. Proceed to Stage 2.'
     });
   } catch (error) {
     console.error('Login Merchant Error:', error);
@@ -292,8 +328,15 @@ export const biometricLogin = async (req, res) => {
     if (merchant.loginHistory.length > 10) {
       merchant.loginHistory = merchant.loginHistory.slice(0, 10);
     }
-    
+
     await merchant.save();
+
+    logAudit({
+      action: 'merchant.login.biometric', category: 'auth', severity: 'success',
+      message: 'Signed in via biometrics / passkey',
+      merchant, req,
+      metadata: { loginCount: merchant.loginCount, method: 'biometric' },
+    });
 
     res.json({
       success: true,
@@ -400,6 +443,20 @@ export const forgotPassword = async (req, res) => {
       sendOTP(merchant.email, otp).catch((err) =>
         console.error(`📧 Reset OTP send failed for ${merchant.email}:`, err)
       );
+
+      logAudit({
+        action: 'merchant.password.reset_requested', category: 'security', severity: 'warning',
+        message: 'Password reset requested — OTP dispatched',
+        merchant, req,
+        metadata: { lookup: lookup.includes('@') ? 'email' : 'phone' },
+      });
+    } else {
+      // Still log the attempt so we can spot enumeration / spray attacks.
+      logAudit({
+        action: 'merchant.password.reset_attempt_unknown', category: 'security', severity: 'warning',
+        message: `Reset requested for unknown identifier "${lookup}"`,
+        req, metadata: { identifier: lookup },
+      });
     }
 
     res.json({
@@ -457,6 +514,12 @@ export const verifyResetOTP = async (req, res) => {
     merchant.otp = null;
     merchant.otpExpires = null;
     await merchant.save();
+
+    logAudit({
+      action: 'merchant.password.reset_verified', category: 'security', severity: 'info',
+      message: 'Reset OTP verified — reset token minted',
+      merchant, req,
+    });
 
     res.json({
       success: true,
@@ -531,6 +594,13 @@ export const resetPassword = async (req, res) => {
     sendPasswordResetConfirmation(merchant.email, merchant.name, when, ip, ua)
       .catch((err) => console.error('📧 Reset confirmation email failed:', err));
 
+    logAudit({
+      action: 'merchant.password.reset_completed', category: 'security', severity: 'critical',
+      message: 'Password reset completed — receipt email dispatched',
+      merchant, req,
+      metadata: { via: resetToken ? 'reset_token' : 'legacy_otp' },
+    });
+
     res.json({
       success: true,
       message: 'Password has been reset. Sign in with your new password.',
@@ -555,11 +625,22 @@ export const changeMerchantPassword = async (req, res) => {
 
     const isMatch = await merchant.matchPassword(currentPassword);
     if (!isMatch) {
+      logAudit({
+        action: 'merchant.password.change_failed', category: 'security', severity: 'warning',
+        message: 'In-dashboard password change failed — wrong current password',
+        merchant, req,
+      });
       return res.status(400).json({ error: 'Current password is incorrect' });
     }
 
     merchant.password = newPassword;
     await merchant.save();
+
+    logAudit({
+      action: 'merchant.password.changed', category: 'security', severity: 'critical',
+      message: 'Password changed from dashboard (authenticated)',
+      merchant, req,
+    });
 
     res.json({ success: true, message: 'Password updated successfully' });
   } catch (error) {
@@ -651,12 +732,32 @@ export const updateMerchantProfile = async (req, res) => {
       merchant.isKRAVerified = true;
     }
 
-    if (businessNumber !== undefined) merchant.businessNumber = businessNumber;
-    if (settlementMobile !== undefined) merchant.settlementMobile = settlementMobile;
-    if (settlementBankName !== undefined) merchant.settlementBankName = settlementBankName;
-    if (settlementBankAccount !== undefined) merchant.settlementBankAccount = settlementBankAccount;
+    const changedFields = [];
+    if (businessNumber !== undefined && businessNumber !== merchant.businessNumber) {
+      merchant.businessNumber = businessNumber; changedFields.push('businessNumber');
+    }
+    if (settlementMobile !== undefined && settlementMobile !== merchant.settlementMobile) {
+      merchant.settlementMobile = settlementMobile; changedFields.push('settlementMobile');
+    }
+    if (settlementBankName !== undefined && settlementBankName !== merchant.settlementBankName) {
+      merchant.settlementBankName = settlementBankName; changedFields.push('settlementBankName');
+    }
+    if (settlementBankAccount !== undefined && settlementBankAccount !== merchant.settlementBankAccount) {
+      merchant.settlementBankAccount = settlementBankAccount; changedFields.push('settlementBankAccount');
+    }
 
     await merchant.save();
+
+    if (changedFields.length > 0 || kraPin) {
+      const fields = [...changedFields];
+      if (kraPin) fields.push('kraPin');
+      logAudit({
+        action: 'merchant.profile.updated', category: 'profile', severity: 'info',
+        message: `Profile updated — ${fields.join(', ')}`,
+        merchant, req,
+        metadata: { fields },
+      });
+    }
 
     res.json({
       success: true,
@@ -699,8 +800,20 @@ export const toggleBiometrics = async (req, res) => {
       return res.status(404).json({ error: 'Merchant not found' });
     }
 
-    merchant.biometricsEnabled = req.body.enabled;
+    const wasEnabled = !!merchant.biometricsEnabled;
+    const nowEnabled = !!req.body.enabled;
+    merchant.biometricsEnabled = nowEnabled;
     await merchant.save();
+
+    if (wasEnabled !== nowEnabled) {
+      logAudit({
+        action: nowEnabled ? 'merchant.biometrics.enabled' : 'merchant.biometrics.disabled',
+        category: 'security',
+        severity: nowEnabled ? 'success' : 'warning',
+        message: `Biometric sign-in ${nowEnabled ? 'enabled' : 'disabled'}`,
+        merchant, req,
+      });
+    }
 
     res.json({
       success: true,

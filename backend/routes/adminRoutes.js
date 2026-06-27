@@ -21,6 +21,10 @@ import {
   deleteCommunication,
 } from '../controllers/communicationController.js';
 import {
+  getAuditLog,
+  getMerchantAuditLog,
+} from '../controllers/auditLogController.js';
+import {
   listTeam,
   inviteTeamMember,
   updateTeamMember,
@@ -64,6 +68,7 @@ router.post('/merchants/:id/request-action', protect, sensitiveActionLimiter, re
 router.post('/merchants/:id/confirm-action', protect, sensitiveActionLimiter, confirmMerchantAction);
 router.post('/merchants/:id/flag', protect, sensitiveActionLimiter, flagMerchant);
 router.post('/merchants/:id/unflag', protect, sensitiveActionLimiter, unflagMerchant);
+router.get('/merchants/:id/audit-log', protect, getMerchantAuditLog);
 
 // Executive insights — aggregated KPIs / GTV / funnel / leaderboards.
 router.get('/insights', protect, getInsights);
@@ -76,6 +81,9 @@ router.get('/wallet-audit', protect, runWalletAudit);
 
 // Compact health pulse for the sidebar widget.
 router.get('/system-status', protect, getSystemStatus);
+
+// Global audit log (filterable, paginated).
+router.get('/audit-log', protect, getAuditLog);
 
 // Call-centre / inbound communications console.
 router.get('/communications',                protect, getCommunications);
