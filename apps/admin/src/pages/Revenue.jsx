@@ -149,7 +149,7 @@ const VolumeRevenueChart = ({ series, totalGmv, totalNet }) => {
   const buckets = series || [];
   if (!buckets.length) {
     return (
-      <div className="h-[260px] flex flex-col items-center justify-center text-white/40 text-[13px] gap-2">
+      <div className="h-[260px] flex flex-col items-center justify-center text-white/65 text-[13px] gap-2">
         <span className="material-symbols-outlined text-[32px] opacity-40">monitoring</span>
         No activity in this window yet.
       </div>
@@ -184,11 +184,11 @@ const VolumeRevenueChart = ({ series, totalGmv, totalNet }) => {
       <div className="flex flex-wrap items-center gap-5 text-[11px]">
         <div className="flex items-center gap-2">
           <span className="w-3 h-3 rounded-sm bg-white/15" />
-          <span className="text-white/60">GMV (volume)</span>
+          <span className="text-white/80">GMV (volume)</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="w-3 h-0.5 bg-emerald-400" />
-          <span className="text-white/60">Net Revenue</span>
+          <span className="text-white/80">Net Revenue</span>
         </div>
       </div>
 
@@ -199,15 +199,15 @@ const VolumeRevenueChart = ({ series, totalGmv, totalNet }) => {
             const heightPct = Math.max(2, (r.gmv / maxGmv) * 100);
             return (
               <div key={`${r.bucket}-${i}`} className="flex-1 flex flex-col items-center group relative min-w-[8px]">
-                <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-bold text-white whitespace-nowrap tabular-nums opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-bold text-white/85 whitespace-nowrap tabular-nums z-10">
                   {fmtKES(r.gmv)}
                 </div>
                 <div
-                  className="w-full rounded-sm bg-white/[0.08] group-hover:bg-white/[0.12] transition-colors"
+                  className="w-full rounded-sm bg-white/25 group-hover:bg-white/40 transition-colors"
                   style={{ height: `${heightPct}%` }}
                   title={`${r.bucket} · GMV ${fmtKESPrecise(r.gmv)} · Net ${fmtKESPrecise(r.net)}`}
                 />
-                <div className="absolute -bottom-6 text-[9px] text-white/40 truncate w-full text-center font-mono">
+                <div className="absolute -bottom-6 text-[10px] text-white/70 truncate w-full text-center font-mono">
                   {r.bucket.length > 5 ? r.bucket.slice(5) : r.bucket}
                 </div>
               </div>
@@ -226,12 +226,11 @@ const VolumeRevenueChart = ({ series, totalGmv, totalNet }) => {
           <polyline
             fill="none"
             stroke="#34D399"
-            strokeWidth="0.8"
+            strokeWidth="2"
             strokeLinejoin="round"
             strokeLinecap="round"
             points={points}
             vectorEffect="non-scaling-stroke"
-            style={{ filter: 'drop-shadow(0 1px 2px rgba(52,211,153,0.4))' }}
           />
         </svg>
       </div>
@@ -288,28 +287,28 @@ const Revenue = () => {
         <div className="flex flex-col gap-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/40 mb-2">Finance · Internal</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/65 mb-2">Finance · Internal</p>
               <h2 className="text-[28px] md:text-[34px] font-bold text-white tracking-tighter leading-none">
                 Revenue &amp; Fees
               </h2>
-              <p className="text-[13px] text-white/55 mt-2 max-w-2xl leading-relaxed">
+              <p className="text-[13px] text-white/80 mt-2 max-w-2xl leading-relaxed">
                 Split-settlement view of PayChain platform earnings. All figures are PayChain's share — strictly separated from merchant funds held in the FBO account.
               </p>
             </div>
             <button
               onClick={fetchRevenue}
               title="Refresh"
-              className="self-start sm:self-end w-9 h-9 inline-flex items-center justify-center bg-white/[0.03] border border-white/10 rounded-md text-white/60 hover:text-white hover:bg-white/[0.06] transition-colors"
+              className="self-start sm:self-end w-9 h-9 inline-flex items-center justify-center bg-white/[0.03] border border-white/10 rounded-md text-white/80 hover:text-white hover:bg-white/[0.06] transition-colors"
             >
               <span className="material-symbols-outlined text-[18px]">refresh</span>
             </button>
           </div>
 
           {/* Filter toolbar */}
-          <div className="flex flex-wrap items-center gap-2 p-2 rounded-lg border border-white/10 bg-white/[0.02]">
+          <div className="flex flex-wrap items-center gap-2 p-2 rounded-lg border border-white/10 bg-white/[0.04]">
             <div className="flex items-center gap-2 px-2">
-              <span className="material-symbols-outlined text-white/40 text-[16px]">date_range</span>
-              <span className="text-[11px] font-bold uppercase tracking-widest text-white/50">Period</span>
+              <span className="material-symbols-outlined text-white/65 text-[16px]">date_range</span>
+              <span className="text-[11px] font-bold uppercase tracking-widest text-white/75">Period</span>
             </div>
             <div className="inline-flex bg-[#0A0D14] border border-white/10 rounded-md p-0.5">
               {RANGES.map((r) => (
@@ -319,7 +318,7 @@ const Revenue = () => {
                   className={`px-2.5 py-1 text-[11px] font-bold tracking-wider rounded transition-colors ${
                     range === r.v
                       ? 'bg-white text-[#0A0D14]'
-                      : 'text-white/60 hover:text-white'
+                      : 'text-white/80 hover:text-white'
                   }`}
                 >
                   {r.l}
@@ -328,8 +327,8 @@ const Revenue = () => {
             </div>
             <div className="w-px h-6 bg-white/10 mx-1" />
             <div className="flex items-center gap-2 px-2">
-              <span className="material-symbols-outlined text-white/40 text-[16px]">filter_alt</span>
-              <span className="text-[11px] font-bold uppercase tracking-widest text-white/50">Channel</span>
+              <span className="material-symbols-outlined text-white/65 text-[16px]">filter_alt</span>
+              <span className="text-[11px] font-bold uppercase tracking-widest text-white/75">Channel</span>
             </div>
             <select
               value={channelFilter}
@@ -355,19 +354,19 @@ const Revenue = () => {
             {/* GMV — volume processed */}
             <div className="bg-[#0A0D14] p-5 flex flex-col gap-2">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-white/50 uppercase tracking-[0.18em]">Gross Merchandise Volume</span>
+                <span className="text-[10px] font-bold text-white/75 uppercase tracking-[0.18em]">Gross Merchandise Volume</span>
                 <span className="material-symbols-outlined text-white/30 text-[14px]" title="Total transaction volume processed">payments</span>
               </div>
               {loading
                 ? <Skel className="w-32 h-9" />
                 : <span className="text-[26px] md:text-[30px] font-bold text-white tracking-tighter leading-none tabular-nums">{fmtKES(kpis.gmv)}</span>}
-              <p className="text-[11px] text-white/40">Volume routed through PayChain</p>
+              <p className="text-[11px] text-white/65">Volume routed through PayChain</p>
             </div>
 
             {/* Gross Platform Revenue */}
             <div className="bg-[#0A0D14] p-5 flex flex-col gap-2">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-white/50 uppercase tracking-[0.18em]">Gross Platform Revenue</span>
+                <span className="text-[10px] font-bold text-white/75 uppercase tracking-[0.18em]">Gross Platform Revenue</span>
                 <span className="material-symbols-outlined text-white/30 text-[14px]" title="Total fees collected at the take rate">request_quote</span>
               </div>
               {loading
@@ -378,7 +377,7 @@ const Revenue = () => {
                   <span className={`font-bold tabular-nums ${(kpis.grossChange || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                     {fmtChange(kpis.grossChange)}
                   </span>
-                  <span className="text-white/40">vs prev period</span>
+                  <span className="text-white/65">vs prev period</span>
                 </div>
               )}
             </div>
@@ -386,20 +385,22 @@ const Revenue = () => {
             {/* Network & Partner Costs */}
             <div className="bg-[#0A0D14] p-5 flex flex-col gap-2">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-white/50 uppercase tracking-[0.18em]">Network &amp; Partner Costs</span>
+                <span className="text-[10px] font-bold text-white/75 uppercase tracking-[0.18em]">Network &amp; Partner Costs</span>
                 <span className="material-symbols-outlined text-white/30 text-[14px]" title="Pass-through fees paid to networks (Safaricom, etc.)">output</span>
               </div>
               {loading
                 ? <Skel className="w-24 h-9" />
                 : <span className="text-[26px] md:text-[30px] font-bold text-white tracking-tighter leading-none tabular-nums">−{fmtKES(kpis.networkCosts).replace('KES ', 'KES ')}</span>}
-              <p className="text-[11px] text-white/40">Paid to M-Pesa / banking rails</p>
+              <p className="text-[11px] text-white/65">Paid to M-Pesa / banking rails</p>
             </div>
 
-            {/* Net Revenue — THE bottom line, highlighted */}
-            <div className="bg-emerald-500/[0.07] p-5 flex flex-col gap-2 relative border-l-2 border-emerald-400/60">
+            {/* Net Revenue — THE bottom line. Solid dark background with
+                an emerald left border + label so the value stays at full
+                white-on-black contrast (no translucent wash). */}
+            <div className="bg-[#0A0D14] p-5 flex flex-col gap-2 relative border-l-2 border-emerald-400">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-bold text-emerald-300 uppercase tracking-[0.18em]">Net Revenue · Platform Margin</span>
-                <span className="material-symbols-outlined text-emerald-400/80 text-[14px]" title="Gross revenue minus partner costs — PayChain's actual margin">savings</span>
+                <span className="material-symbols-outlined text-emerald-400 text-[14px]" title="Gross revenue minus partner costs — PayChain's actual margin">savings</span>
               </div>
               {loading
                 ? <Skel className="w-28 h-9" />
@@ -409,7 +410,7 @@ const Revenue = () => {
                   <span className={`font-bold tabular-nums ${(kpis.netChange || 0) >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
                     {fmtChange(kpis.netChange)}
                   </span>
-                  <span className="text-white/40">vs prev · take {fmtPct((kpis.netRevenue || 0) / Math.max(kpis.gmv || 1, 1) * 100, 2)}</span>
+                  <span className="text-white/75">vs prev · take {fmtPct((kpis.netRevenue || 0) / Math.max(kpis.gmv || 1, 1) * 100, 2)}</span>
                 </div>
               )}
             </div>
@@ -423,7 +424,7 @@ const Revenue = () => {
             <div className="flex items-start justify-between mb-5">
               <div>
                 <h3 className="text-[14px] font-bold text-white tracking-tight">Volume vs Net Platform Fees</h3>
-                <p className="text-[11px] text-white/40 mt-1">GMV bars overlaid with the net-revenue trend line.</p>
+                <p className="text-[11px] text-white/65 mt-1">GMV bars overlaid with the net-revenue trend line.</p>
               </div>
               <div className="inline-flex bg-[#0A0D14] border border-white/10 rounded-md p-0.5">
                 {GRANULARITIES.map((g) => (
@@ -433,7 +434,7 @@ const Revenue = () => {
                     className={`px-2.5 py-1 text-[10px] font-bold tracking-wider rounded transition-colors ${
                       granularity === g.v
                         ? 'bg-white text-[#0A0D14]'
-                        : 'text-white/60 hover:text-white'
+                        : 'text-white/80 hover:text-white'
                     }`}
                   >
                     {g.l}
@@ -459,13 +460,13 @@ const Revenue = () => {
             <div className="flex items-start justify-between mb-5">
               <div>
                 <h3 className="text-[14px] font-bold text-white tracking-tight">Net Margin by Payment Rail</h3>
-                <p className="text-[11px] text-white/40 mt-1">Which channel keeps the most after partner cuts.</p>
+                <p className="text-[11px] text-white/65 mt-1">Which channel keeps the most after partner cuts.</p>
               </div>
             </div>
             {loading ? (
               <Skel className="w-full h-40" />
             ) : filteredChannels.length === 0 ? (
-              <div className="h-32 flex items-center justify-center text-white/40 text-[12px]">
+              <div className="h-32 flex items-center justify-center text-white/65 text-[12px]">
                 No data for selected channel.
               </div>
             ) : (
@@ -476,24 +477,24 @@ const Revenue = () => {
                   const pct = (c.net / maxNet) * 100;
                   const margin = c.gmv ? (c.net / c.gmv) * 100 : 0;
                   return (
-                    <div key={c.channel} className="border border-white/[0.06] rounded-md bg-white/[0.02] p-3.5">
+                    <div key={c.channel} className="border border-white/15 rounded-md bg-white/[0.04] p-3.5">
                       <div className="flex items-start justify-between gap-3 mb-2">
                         <div className="flex items-center gap-2.5 min-w-0">
                           <span className="material-symbols-outlined text-[18px]" style={{ color: meta.dot }}>{meta.icon}</span>
                           <div className="min-w-0">
                             <div className="text-[12px] font-bold text-white truncate">{c.channel}</div>
-                            <div className="text-[10px] text-white/40 tabular-nums">{fmtNum(c.count)} txns · GMV {fmtKES(c.gmv)}</div>
+                            <div className="text-[10px] text-white/65 tabular-nums">{fmtNum(c.count)} txns · GMV {fmtKES(c.gmv)}</div>
                           </div>
                         </div>
                         <div className="text-right">
                           <div className="text-[13px] font-bold text-white tabular-nums">{fmtKESPrecise(c.net)}</div>
-                          <div className="text-[10px] text-white/40 tabular-nums">{fmtPct(margin, 2)} margin</div>
+                          <div className="text-[10px] text-white/65 tabular-nums">{fmtPct(margin, 2)} margin</div>
                         </div>
                       </div>
                       <div className="h-1 bg-white/[0.04] rounded-full overflow-hidden">
                         <div className="h-full transition-all duration-500" style={{ width: `${pct}%`, background: meta.dot }} />
                       </div>
-                      <div className="flex items-center justify-between mt-2 text-[10px] text-white/40 tabular-nums">
+                      <div className="flex items-center justify-between mt-2 text-[10px] text-white/65 tabular-nums">
                         <span>Gross {fmtKES(c.gross)}</span>
                         <span>Costs −{fmtKES(c.costs)}</span>
                       </div>
@@ -510,12 +511,12 @@ const Revenue = () => {
           <div className="flex items-end justify-between mb-4">
             <div>
               <h3 className="text-[16px] font-bold text-white tracking-tight">Revenue Sweeps &amp; Settlement Batches</h3>
-              <p className="text-[12px] text-white/40 mt-1">
+              <p className="text-[12px] text-white/65 mt-1">
                 Automated movement of accumulated fees from the PayChain FBO settlement account into the corporate operating account.
               </p>
             </div>
             {!loading && data?.corporateDestination && (
-              <div className="hidden md:flex items-center gap-2 text-[11px] text-white/40">
+              <div className="hidden md:flex items-center gap-2 text-[11px] text-white/65">
                 <span className="material-symbols-outlined text-[14px]">account_balance</span>
                 <span>Destination: <span className="text-white font-bold">{data.corporateDestination}</span></span>
               </div>
@@ -525,14 +526,14 @@ const Revenue = () => {
             {loading ? (
               <div className="p-8"><Skel className="w-full h-32" /></div>
             ) : sweeps.length === 0 ? (
-              <div className="p-12 text-center text-white/40 text-[13px]">
+              <div className="p-12 text-center text-white/65 text-[13px]">
                 No sweep batches in this window yet.
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-[12.5px]">
-                  <thead className="bg-white/[0.02] border-b border-white/10">
-                    <tr className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/50">
+                  <thead className="bg-white/[0.04] border-b border-white/10">
+                    <tr className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/75">
                       <th className="text-left px-5 py-3">Batch ID</th>
                       <th className="text-left px-3 py-3">Period</th>
                       <th className="text-right px-3 py-3">Gross Fees</th>
@@ -546,18 +547,18 @@ const Revenue = () => {
                     {sweeps.map((b) => {
                       const s = STATUS_META[b.status] || STATUS_META['Accruing'];
                       return (
-                        <tr key={b.id} className="border-b border-white/[0.06] last:border-b-0 hover:bg-white/[0.02] transition-colors">
+                        <tr key={b.id} className="border-b border-white/15 last:border-b-0 hover:bg-white/[0.04] transition-colors">
                           <td className="px-5 py-3.5">
                             <div className="font-mono text-white font-bold">{b.id}</div>
-                            <div className="text-[10px] text-white/40">{fmtNum(b.count)} fees</div>
+                            <div className="text-[10px] text-white/65">{fmtNum(b.count)} fees</div>
                           </td>
-                          <td className="px-3 py-3.5 text-white/70 tabular-nums">
+                          <td className="px-3 py-3.5 text-white/85 tabular-nums">
                             {fmtPeriod(b.period)}
                           </td>
                           <td className="px-3 py-3.5 text-right tabular-nums text-white/80">
                             {fmtKESPrecise(b.gross)}
                           </td>
-                          <td className="px-3 py-3.5 text-right tabular-nums text-white/60">
+                          <td className="px-3 py-3.5 text-right tabular-nums text-white/80">
                             −{fmtKESPrecise(b.costs)}
                           </td>
                           <td className="px-3 py-3.5 text-right">
@@ -569,7 +570,7 @@ const Revenue = () => {
                               {b.status}
                             </span>
                           </td>
-                          <td className="px-5 py-3.5 text-white/60 tabular-nums">
+                          <td className="px-5 py-3.5 text-white/80 tabular-nums">
                             {b.destination}
                           </td>
                         </tr>
@@ -583,13 +584,13 @@ const Revenue = () => {
 
           {/* Reconciliation footer — totals always reconcile to the KPIs above */}
           {!loading && sweeps.length > 0 && (
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-white/[0.02] border border-white/[0.06] rounded-md text-[11px]">
-              <span className="text-white/40">
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-white/[0.04] border border-white/15 rounded-md text-[11px]">
+              <span className="text-white/65">
                 Showing {sweeps.length} batches · figures reconcile to KPI strip
               </span>
               <div className="flex items-center gap-5 tabular-nums">
-                <span className="text-white/50">Σ Gross <span className="text-white font-bold">{fmtKESPrecise(sweeps.reduce((s, b) => s + b.gross, 0))}</span></span>
-                <span className="text-white/50">Σ Cuts <span className="text-white/80 font-bold">−{fmtKESPrecise(sweeps.reduce((s, b) => s + b.costs, 0))}</span></span>
+                <span className="text-white/75">Σ Gross <span className="text-white font-bold">{fmtKESPrecise(sweeps.reduce((s, b) => s + b.gross, 0))}</span></span>
+                <span className="text-white/75">Σ Cuts <span className="text-white/80 font-bold">−{fmtKESPrecise(sweeps.reduce((s, b) => s + b.costs, 0))}</span></span>
                 <span className="text-emerald-300 font-bold">
                   Σ Net {fmtKESPrecise(sweeps.reduce((s, b) => s + b.net, 0))}
                 </span>
@@ -603,19 +604,19 @@ const Revenue = () => {
           <div className="flex items-end justify-between mb-4">
             <div>
               <h3 className="text-[16px] font-bold text-white tracking-tight">Top revenue-generating merchants</h3>
-              <p className="text-[12px] text-white/40 mt-1">Ranked by net PayChain margin contributed this period.</p>
+              <p className="text-[12px] text-white/65 mt-1">Ranked by net PayChain margin contributed this period.</p>
             </div>
           </div>
           <div className="bg-[#0A0D14] border border-white/10 rounded-lg overflow-hidden">
             {loading ? (
               <div className="p-8"><Skel className="w-full h-32" /></div>
             ) : (data?.topMerchants || []).length === 0 ? (
-              <div className="p-12 text-center text-white/40 text-[13px]">No merchant revenue yet in this window.</div>
+              <div className="p-12 text-center text-white/65 text-[13px]">No merchant revenue yet in this window.</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-[12.5px]">
-                  <thead className="bg-white/[0.02] border-b border-white/10">
-                    <tr className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/50">
+                  <thead className="bg-white/[0.04] border-b border-white/10">
+                    <tr className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/75">
                       <th className="text-left px-5 py-3 w-10">#</th>
                       <th className="text-left px-3 py-3">Merchant</th>
                       <th className="text-right px-3 py-3">GMV</th>
@@ -628,19 +629,19 @@ const Revenue = () => {
                       const top = data?.topMerchants?.[0]?.revenue || 1;
                       const pct = (m.revenue / top) * 100;
                       return (
-                        <tr key={m.merchantId || i} className="border-b border-white/[0.06] last:border-b-0 hover:bg-white/[0.02] transition-colors group">
-                          <td className="px-5 py-3.5 text-white/40 font-mono">{i + 1}</td>
+                        <tr key={m.merchantId || i} className="border-b border-white/15 last:border-b-0 hover:bg-white/[0.04] transition-colors group">
+                          <td className="px-5 py-3.5 text-white/65 font-mono">{i + 1}</td>
                           <td className="px-3 py-3.5">
                             <Link to={`/merchants?id=${m.merchantId}`} className="block group-hover:opacity-90 transition-opacity">
                               <div className="font-bold text-white truncate max-w-[280px]">{m.businessName || '—'}</div>
-                              <div className="text-[11px] text-white/40 truncate max-w-[280px]">
+                              <div className="text-[11px] text-white/65 truncate max-w-[280px]">
                                 {m.email}
-                                {m.paybillAccount ? <span className="ml-2 font-mono text-white/60">·{m.paybillAccount}</span> : null}
+                                {m.paybillAccount ? <span className="ml-2 font-mono text-white/80">·{m.paybillAccount}</span> : null}
                               </div>
                             </Link>
                           </td>
-                          <td className="px-3 py-3.5 text-right tabular-nums text-white/70">{fmtKES(m.volume)}</td>
-                          <td className="px-3 py-3.5 text-right tabular-nums text-white/70">{fmtNum(m.count)}</td>
+                          <td className="px-3 py-3.5 text-right tabular-nums text-white/85">{fmtKES(m.volume)}</td>
+                          <td className="px-3 py-3.5 text-right tabular-nums text-white/85">{fmtNum(m.count)}</td>
                           <td className="px-5 py-3.5 text-right">
                             <div className="flex flex-col items-end gap-1.5">
                               <span className="font-bold text-white tabular-nums">{fmtKESPrecise(m.revenue)}</span>
@@ -661,9 +662,9 @@ const Revenue = () => {
 
         {/* ── Footer disclaimer ────────────────────────────────────── */}
         <section>
-          <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-4 flex items-start gap-3">
-            <span className="material-symbols-outlined text-white/40 text-[18px] mt-0.5 flex-shrink-0">shield_lock</span>
-            <p className="text-[11px] text-white/50 leading-relaxed">
+          <div className="bg-white/[0.04] border border-white/15 rounded-lg p-4 flex items-start gap-3">
+            <span className="material-symbols-outlined text-white/65 text-[18px] mt-0.5 flex-shrink-0">shield_lock</span>
+            <p className="text-[11px] text-white/75 leading-relaxed">
               <span className="text-white font-bold">Split-settlement architecture.</span>{' '}
               Customer funds and PayChain fees are settled to separate ledger accounts at processing time. Figures on this page reflect only the PayChain share — they are isolated from merchant balances and the FBO trust account. All values reconcile to the live transactions collection.
             </p>
