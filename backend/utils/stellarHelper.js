@@ -40,31 +40,27 @@ export const provisionMerchantWallet = async () => {
     console.warn('⚠️ Production wallet funding not implemented. Ensure account is funded externally.');
   }
 
-  // Establish a Trustline to the USDC issuer
+  // Establish a trustline to the USDC issuer
+  console.log(`🔗 Establishing USDC trustline (issuer ${USDC_ISSUER_ADDRESS.slice(0,8)}...)...`);
   try {
     const account = await server.loadAccount(publicKey);
-    
-    // Create the transaction
+    const networkPassphrase = NETWORK === 'PUBLIC' ? StellarSdk.Networks.PUBLIC : StellarSdk.Networks.TESTNET;
+
     const transaction = new StellarSdk.TransactionBuilder(account, {
       fee: await server.fetchBaseFee(),
-      networkPassphrase: NETWORK === 'PUBLIC' ? StellarSdk.Networks.PUBLIC : StellarSdk.Networks.TESTNET
+      networkPassphrase,
     })
-    .addOperation(StellarSdk.Operation.changeTrust({
-      asset: usdcAsset
-    }))
+    .addOperation(StellarSdk.Operation.changeTrust({ asset: usdcAsset }))
     .setTimeout(30)
     .build();
 
-    // Sign with the new merchant's secret key
     transaction.sign(pair);
-
-    // Submit the transaction
-    console.log(`🔗 Submitting changeTrust operation for USDC...`);
     await server.submitTransaction(transaction);
-    console.log(`✅ Trustline established successfully.`);
+    console.log(`✅ Trustline established.`);
 
   } catch (error) {
-    console.error('❌ Failed to establish trustline:', error.response?.data?.extras?.result_codes || error.message);
+    const codes = error.response?.data?.extras?.result_codes;
+    console.error('❌ Trustline error:', JSON.stringify(codes) || error.message);
     throw new Error('Trustline establishment failed.');
   }
 
@@ -76,38 +72,51 @@ export const provisionMerchantWallet = async () => {
  * @param {string} destinationPublicKey - The merchant's Stellar public key
  * @param {number} amount - The amount in USDC to send
  */
+// Stellar only accepts amounts with up to 7 decimal places.
+const toStellarAmount = (n) => parseFloat(n).toFixed(7);
+
 export const settleInflationShield = async (destinationPublicKey, amount) => {
-  if (!MASTER_SECRET_KEY) {
-    throw new Error('Master Secret Key is missing from environment.');
-  }
+  if (!MASTER_SECRET_KEY) throw new Error('PAYCHAIN_MASTER_SECRET_KEY is not set.');
+
+  const stellarAmount = toStellarAmount(amount);
+  if (parseFloat(stellarAmount) <= 0) throw new Error('Swap amount too small (rounds to 0 USDC).');
 
   const masterKeypair = StellarSdk.Keypair.fromSecret(MASTER_SECRET_KEY);
-  
+  const networkPassphrase = NETWORK === 'PUBLIC' ? StellarSdk.Networks.PUBLIC : StellarSdk.Networks.TESTNET;
+
   try {
     const masterAccount = await server.loadAccount(masterKeypair.publicKey());
-    
+
     const transaction = new StellarSdk.TransactionBuilder(masterAccount, {
       fee: await server.fetchBaseFee(),
-      networkPassphrase: NETWORK === 'PUBLIC' ? StellarSdk.Networks.PUBLIC : StellarSdk.Networks.TESTNET
+      networkPassphrase,
     })
     .addOperation(StellarSdk.Operation.payment({
       destination: destinationPublicKey,
       asset: usdcAsset,
-      amount: amount.toString()
+      amount: stellarAmount,
     }))
     .setTimeout(30)
     .build();
 
     transaction.sign(masterKeypair);
 
-    console.log(`🚀 Sending ${amount} USDC to ${destinationPublicKey}...`);
+    console.log(`🚀 Sending ${stellarAmount} USDC (issuer ${USDC_ISSUER_ADDRESS.slice(0,8)}) → ${destinationPublicKey}`);
     const response = await server.submitTransaction(transaction);
-    console.log(`✅ Payment successful! Hash: ${response.hash}`);
+    console.log(`✅ Settlement hash: ${response.hash}`);
     return response.hash;
 
   } catch (error) {
-    console.error('❌ Inflation Shield Settlement Error:', error.response?.data?.extras?.result_codes || error.message);
-    throw new Error('Blockchain settlement failed.');
+    const codes = error.response?.data?.extras?.result_codes;
+    console.error('❌ Settlement error — result_codes:', JSON.stringify(codes), '| message:', error.message);
+    const hint = codes?.operations?.includes('op_no_trust')
+      ? 'Merchant wallet has no USDC trustline for this issuer.'
+      : codes?.operations?.includes('op_underfunded')
+      ? 'Master wallet has insufficient USDC balance.'
+      : codes?.operations?.includes('op_no_destination')
+      ? 'Destination account does not exist on the network.'
+      : null;
+    throw new Error(hint || `Blockchain settlement failed (${JSON.stringify(codes) || error.message}).`);
   }
 };
 
@@ -137,38 +146,48 @@ export const getWalletBalance = async (publicKey) => {
  * @param {number} amount - The amount in USDC to send
  */
 export const swapUsdcToKesOnChain = async (encryptedSecretKey, amount) => {
-  if (!MASTER_SECRET_KEY) {
-    throw new Error('Master Secret Key is missing from environment.');
-  }
+  if (!MASTER_SECRET_KEY) throw new Error('PAYCHAIN_MASTER_SECRET_KEY is not set.');
+
+  const stellarAmount = toStellarAmount(amount);
+  if (parseFloat(stellarAmount) <= 0) throw new Error('Swap amount too small (rounds to 0 USDC).');
 
   const merchantSecretKey = decryptKey(encryptedSecretKey);
+  if (!merchantSecretKey) throw new Error('Could not decrypt merchant secret key.');
+
   const merchantKeypair = StellarSdk.Keypair.fromSecret(merchantSecretKey);
-  const masterKeypair = StellarSdk.Keypair.fromSecret(MASTER_SECRET_KEY);
+  const masterKeypair   = StellarSdk.Keypair.fromSecret(MASTER_SECRET_KEY);
+  const networkPassphrase = NETWORK === 'PUBLIC' ? StellarSdk.Networks.PUBLIC : StellarSdk.Networks.TESTNET;
 
   try {
     const merchantAccount = await server.loadAccount(merchantKeypair.publicKey());
-    
+
     const transaction = new StellarSdk.TransactionBuilder(merchantAccount, {
       fee: await server.fetchBaseFee(),
-      networkPassphrase: NETWORK === 'PUBLIC' ? StellarSdk.Networks.PUBLIC : StellarSdk.Networks.TESTNET
+      networkPassphrase,
     })
     .addOperation(StellarSdk.Operation.payment({
       destination: masterKeypair.publicKey(),
       asset: usdcAsset,
-      amount: amount.toString()
+      amount: stellarAmount,
     }))
     .setTimeout(30)
     .build();
 
     transaction.sign(merchantKeypair);
 
-    console.log(`🚀 Sweeping ${amount} USDC from ${merchantKeypair.publicKey()} to Master Wallet...`);
+    console.log(`🚀 Sweeping ${stellarAmount} USDC from ${merchantKeypair.publicKey()} → master`);
     const response = await server.submitTransaction(transaction);
-    console.log(`✅ Swap (USDC->KES) successful! Hash: ${response.hash}`);
+    console.log(`✅ USDC sweep hash: ${response.hash}`);
     return response.hash;
 
   } catch (error) {
-    console.error('❌ USDC to KES Swap Error:', error.response?.data?.extras?.result_codes || error.message);
-    throw new Error('Blockchain settlement failed.');
+    const codes = error.response?.data?.extras?.result_codes;
+    console.error('❌ USDC sweep error — result_codes:', JSON.stringify(codes), '| message:', error.message);
+    const hint = codes?.operations?.includes('op_underfunded')
+      ? 'Merchant wallet has insufficient USDC to sweep.'
+      : codes?.operations?.includes('op_no_trust')
+      ? 'Merchant wallet has no USDC trustline for this issuer.'
+      : null;
+    throw new Error(hint || `Blockchain sweep failed (${JSON.stringify(codes) || error.message}).`);
   }
 };

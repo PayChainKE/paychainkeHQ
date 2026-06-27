@@ -143,10 +143,10 @@ export const swapKesToUsdc = async (req, res) => {
         });
 
       } catch (e) {
-        console.error('❌ Swap Failed on blockchain:', e.message);
+        console.error('❌ KES→USDC swap failed:', e.message);
         merchant.kesBalance += amount;
         await merchant.save();
-        return res.status(500).json({ error: 'Blockchain settlement failed. Balance refunded.' });
+        return res.status(500).json({ error: e.message || 'Blockchain settlement failed. KES balance refunded.' });
       }
     } else if (direction === 'USDC_TO_KES') {
       const liveUsdcBalance = await getWalletBalance(merchant.stellarPublicKey);
@@ -186,8 +186,8 @@ export const swapKesToUsdc = async (req, res) => {
           txHash
         });
       } catch (e) {
-        console.error('❌ Swap Failed on blockchain:', e.message);
-        return res.status(500).json({ error: 'Blockchain settlement failed. USDC not swept.' });
+        console.error('❌ USDC→KES sweep failed:', e.message);
+        return res.status(500).json({ error: e.message || 'Blockchain sweep failed. USDC was not converted.' });
       }
     } else {
       return res.status(400).json({ error: 'Invalid swap direction' });
