@@ -263,14 +263,14 @@ export const loginMerchant = async (req, res) => {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
 
-    merchant.otp = otp;
-    merchant.otpExpires = otpExpires;
-    await merchant.save();
-
+    // Fire email and DB write in parallel — don't wait for one before the other
     console.log(`📧 Dispatching OTP via Resend to: ${merchant.email}`);
-    sendOTP(merchant.email, otp).catch(err => {
-      console.error(`📧 Resend Error: Failed to send OTP to ${merchant.email}:`, err);
-    });
+    await Promise.all([
+      Merchant.updateOne({ _id: merchant._id }, { $set: { otp, otpExpires } }),
+      sendOTP(merchant.email, otp).catch(err => {
+        console.error(`📧 Resend Error: Failed to send OTP to ${merchant.email}:`, err);
+      }),
+    ]);
 
     logAudit({
       action: 'merchant.login.otp_requested', category: 'auth', severity: 'info',
@@ -382,14 +382,13 @@ export const resendMerchantOTP = async (req, res) => {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
 
-    merchant.otp = otp;
-    merchant.otpExpires = otpExpires;
-    await merchant.save();
-
     console.log(`📧 Dispatching Resend OTP via Resend to: ${merchant.email}`);
-    sendOTP(merchant.email, otp).catch(err => {
-      console.error(`📧 Resend Error: Failed to resend OTP to ${merchant.email}:`, err);
-    });
+    await Promise.all([
+      Merchant.updateOne({ _id: merchant._id }, { $set: { otp, otpExpires } }),
+      sendOTP(merchant.email, otp).catch(err => {
+        console.error(`📧 Resend Error: Failed to resend OTP to ${merchant.email}:`, err);
+      }),
+    ]);
 
     res.json({ success: true, message: 'New security code sent successfully.' });
   } catch (error) {
@@ -431,17 +430,18 @@ export const forgotPassword = async (req, res) => {
 
     if (merchant) {
       const otp = crypto.randomInt(100000, 1000000).toString();
-      merchant.otp = otp;
-      merchant.otpExpires = new Date(Date.now() + 10 * 60 * 1000);
-      // Fresh reset attempt invalidates any prior reset token.
-      merchant.passwordResetToken = null;
-      merchant.passwordResetExpires = null;
-      await merchant.save();
+      const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
 
       console.log(`📧 Reset OTP → ${merchant.email}`);
-      sendOTP(merchant.email, otp).catch((err) =>
-        console.error(`📧 Reset OTP send failed for ${merchant.email}:`, err)
-      );
+      await Promise.all([
+        // Fresh reset attempt invalidates any prior reset token
+        Merchant.updateOne({ _id: merchant._id }, {
+          $set: { otp, otpExpires, passwordResetToken: null, passwordResetExpires: null },
+        }),
+        sendOTP(merchant.email, otp).catch((err) => {
+          console.error(`📧 Reset OTP send failed for ${merchant.email}:`, err);
+        }),
+      ]);
 
       logAudit({
         action: 'merchant.password.reset_requested', category: 'security', severity: 'warning',
