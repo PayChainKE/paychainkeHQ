@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Modal, FlatList, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, Modal, FlatList, Image } from 'react-native';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
@@ -18,7 +18,8 @@ const KENYAN_COUNTIES = [
 ];
 
 export default function Login({ route }: any) {
-  const { login, biometricLogin, signup, verifyOTP, resendOTP, forgotPassword, resetPassword } = useAuth();
+  const { login, biometricLogin, signup, verifyOTP, forgotPassword, resetPassword,
+          isBiometricsEnabled, hasBiometricToken } = useAuth();
   const { authenticate: authenticateBiometric } = useBiometrics();
   
   const [phone, setPhone] = useState('');
@@ -62,19 +63,18 @@ export default function Login({ route }: any) {
   const [isSignupBiometricStep, setIsSignupBiometricStep] = useState(false);
   const [otpFlowType, setOtpFlowType] = useState('');
   const [authEmail, setAuthEmail] = useState('');
-  const [hasBiometrics, setHasBiometrics] = useState(false);
   const [resendTimer, setResendTimer] = useState(59);
 
   const [hasAccount, setHasAccount] = useState(false);
 
+  // isBiometricsEnabled = server flag (set by web or native app, unified).
+  // hasBiometricToken = there is a JWT stored in SecureStore to unlock.
+  // Both must be true to show the biometric quick-login button.
+  const showBiometricButton = isBiometricsEnabled && hasBiometricToken;
+
   useEffect(() => {
-    AsyncStorage.getItem('last_biometric_user').then(val => {
-      setHasBiometrics(!!val);
-    });
     AsyncStorage.getItem('hasAccount').then(val => {
-      if (val === 'true') {
-        setHasAccount(true);
-      }
+      if (val === 'true') setHasAccount(true);
     });
   }, []);
 
@@ -119,22 +119,17 @@ export default function Login({ route }: any) {
 
   const handleBiometricSignIn = async () => {
     setErr('');
-    const auth = await authenticateBiometric('Login to PayChain');
+    // Step 1: verify identity locally on the device
+    const auth = await authenticateBiometric('Sign in to PayChain');
     if (!auth.success) {
       if (!auth.cancelled) setErr(auth.error);
       return;
     }
-
-    const userEmail = await AsyncStorage.getItem('last_biometric_user');
-    if (!userEmail) {
-      setErr('No registered biometric user found.');
-      return;
-    }
-
+    // Step 2: retrieve the JWT from the OS Keychain/Keystore and rehydrate session
     setLoading(true);
-    const res = await biometricLogin(userEmail);
+    const res = await biometricLogin();
     setLoading(false);
-    if (!res.success) setErr(res.error);
+    if (!res.success) setErr(res.error || 'Session expired. Please sign in with your password.');
   };
 
   const handleVerifyOTP = async () => {
@@ -248,8 +243,7 @@ export default function Login({ route }: any) {
     setLoading(true);
     const result = await authenticateBiometric('Enable Biometrics for PayChain');
     if (result.success) {
-      await AsyncStorage.setItem('last_biometric_user', signupEmail);
-      setHasBiometrics(true);
+      // biometric setup is handled by BiometricSetup screen in the navigator
     } else if (!result.cancelled) {
       setErr(result.error);
     }
@@ -323,7 +317,7 @@ export default function Login({ route }: any) {
                 <Text className="text-[#1b1c1a] text-[24px] font-jakarta-bold mb-2">Sign in</Text>
                 <Text className="text-[#707971] text-[14px] font-jakarta-medium mb-6">Enter credentials provided during onboarding.</Text>
 
-                {hasBiometrics && (
+                {showBiometricButton && (
                   <TouchableOpacity onPress={handleBiometricSignIn} className="bg-[#ecfdf5] border border-[#a7f3d0] py-4 rounded-2xl flex-row justify-center items-center mb-6">
                     <Feather name="target" size={20} color="#047857" />
                     <Text className="text-[#047857] font-jakarta-bold text-[14px] ml-3">Sign in with Passkey / Biometrics</Text>

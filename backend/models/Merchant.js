@@ -161,6 +161,29 @@ const merchantSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  // WebAuthn Passkeys — each device gets its own entry.
+  // credentialID is base64url, publicKey is base64.
+  // `select: false` keeps passkey data out of every normal query.
+  passkeys: {
+    type: [{
+      credentialID: { type: String, required: true },
+      publicKey:    { type: String, required: true },
+      counter:      { type: Number, required: true, default: 0 },
+      deviceType:   { type: String, default: 'singleDevice' },
+      backedUp:     { type: Boolean, default: false },
+      transports:   [String],
+      createdAt:    { type: Date, default: Date.now },
+      lastUsed:     { type: Date, default: null },
+    }],
+    select: false,
+    default: [],
+  },
+  // Temporary WebAuthn challenge stored server-side between options and verify calls.
+  currentChallenge: {
+    type: String,
+    select: false,
+    default: null,
+  },
   otp: {
     type: String,
     default: null,

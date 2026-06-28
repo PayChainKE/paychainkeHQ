@@ -4,6 +4,14 @@ import { login, verifyOTP, getMe, updateMe, changePassword } from '../controller
 import { validateSetupToken as validateAdminSetupToken, setupPasswordWithToken } from '../controllers/teamController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import {
+  getRegistrationOptions,
+  verifyRegistration,
+  getLoginOptions,
+  verifyLogin,
+  getPasskeys,
+  deletePasskey,
+} from '../controllers/webauthnController.js';
+import {
   registerMerchant,
   verifyMerchantOTP,
   loginMerchant,
@@ -92,5 +100,15 @@ router.put('/merchant/profile', protectMerchant, updateMerchantProfile);
 router.put('/merchant/biometrics', protectMerchant, toggleBiometrics);
 router.post('/merchant/set-app-pin', protectMerchant, setAppPin);
 router.post('/merchant/verify-payment-pin', protectMerchant, verifyPaymentPin);
+
+// WebAuthn / Passkey routes
+// Public — called before the user holds a JWT
+router.post('/merchant/webauthn/login-options',   getLoginOptions);
+router.post('/merchant/webauthn/verify-login',    verifyLogin);
+// Private — merchant must be logged in to register/manage passkeys
+router.get ('/merchant/webauthn/register-options', protectMerchant, getRegistrationOptions);
+router.post('/merchant/webauthn/verify-registration', protectMerchant, verifyRegistration);
+router.get ('/merchant/webauthn/passkeys', protectMerchant, getPasskeys);
+router.delete('/merchant/webauthn/passkeys/:credentialID', protectMerchant, deletePasskey);
 
 export default router;
