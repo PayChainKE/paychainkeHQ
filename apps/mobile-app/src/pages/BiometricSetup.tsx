@@ -93,17 +93,23 @@ function biometricLabel(types: LocalAuthentication.AuthenticationType[]): string
 // ── Main screen ──────────────────────────────────────────────────────────────
 export default function BiometricSetup() {
   const insets = useSafeAreaInsets();
-  const { completeBiometricSetup, unlockApp } = useAuth();
+  const { completeBiometricSetup, unlockApp, isBiometricsEnabled } = useAuth();
   const { support, checking, authenticate } = useBiometrics();
-  const [phase, setPhase]     = useState<Phase>('idle');
+  const [phase, setPhase]       = useState<Phase>('idle');
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
+    // Already enabled on another platform (e.g. web) — skip setup, proceed directly.
+    if (isBiometricsEnabled) {
+      completeBiometricSetup(true);
+      unlockApp();
+      return;
+    }
     if (!checking && !support.available) {
       completeBiometricSetup(false);
       unlockApp();
     }
-  }, [checking, support.available]);
+  }, [checking, support.available, isBiometricsEnabled]);
 
   const method = biometricLabel(support.types);
 

@@ -5,75 +5,73 @@ import api from '../api/config';
 
 const AuthContext = createContext<any>(null);
 
-// Merchant profile (non-sensitive) stored in AsyncStorage — readable without biometrics.
-const STORAGE_KEY = 'paychain_merchant_session';
-// JWT stored in the OS secure enclave (iOS Keychain / Android Keystore).
-// Requires biometric authentication to read when biometrics are enabled.
-const TOKEN_KEY = 'paychain_merchant_token';
-// Flag stored in AsyncStorage: 'true' means SecureStore holds a valid JWT
-// and the user has enabled biometric login for this device.
-const BIOMETRIC_ENABLED_KEY = 'paychain_biometrics_enabled';
+const STORAGE_KEY        = 'paychain_merchant_session'; // merchant profile (non-sensitive)
+const TOKEN_KEY          = 'paychain_merchant_token';   // JWT in OS secure enclave
+const BIOMETRIC_DONE_KEY = 'paychain_biometrics_setup'; // 'true' once setup screen is shown
 
 // ── SecureStore helpers ──────────────────────────────────────────────────────
-async function storeToken(jwt: string) {
-  await SecureStore.setItemAsync(TOKEN_KEY, jwt);
-}
-async function loadToken(): Promise<string | null> {
-  return SecureStore.getItemAsync(TOKEN_KEY);
-}
-async function clearToken() {
-  await SecureStore.deleteItemAsync(TOKEN_KEY);
-}
+async function storeToken(jwt: string) { await SecureStore.setItemAsync(TOKEN_KEY, jwt); }
+async function loadToken(): Promise<string | null> { return SecureStore.getItemAsync(TOKEN_KEY); }
+async function clearToken() { await SecureStore.deleteItemAsync(TOKEN_KEY); }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [merchant, setMerchant] = useState<any>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [merchant,               setMerchant]               = useState<any>(null);
+  const [token,                  setToken]                  = useState<string | null>(null);
+  const [isLoading,              setIsLoading]              = useState(true);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
-  const [appPin, setAppPinState] = useState<string | null>(null);
-  const [isPinUnlocked, setIsPinUnlocked] = useState(false);
-  const [hasSetBiometrics, setHasSetBiometrics] = useState(false);
+  const [appPin,                 setAppPinState]            = useState<string | null>(null);
+  const [isPinUnlocked,          setIsPinUnlocked]          = useState(false);
+  const [hasSetBiometrics,       setHasSetBiometrics]       = useState(false);
+
+  // isBiometricsEnabled = the SERVER'S biometricsEnabled flag, synced on every login.
+  // This is the single source of truth across all platforms.
   const [isBiometricsEnabled, setIsBiometricsEnabled] = useState(false);
+
+  // hasBiometricToken = true when a JWT is stored in SecureStore (OS encrypted).
+  // Biometric quick-login only works when this is true (there's a credential to unlock).
+  const [hasBiometricToken, setHasBiometricToken] = useState(false);
 
   // ── Session restore on app launch ─────────────────────────────────────────
   useEffect(() => {
     const loadSession = async () => {
       try {
-        const [rawMerchant, rawOnboarding, rawPin, rawBiometricSetup, rawBiometricEnabled] =
-          await Promise.all([
-            AsyncStorage.getItem(STORAGE_KEY),
-            AsyncStorage.getItem('paychain_onboarding_complete'),
-            AsyncStorage.getItem('paychain_app_pin'),
-            AsyncStorage.getItem('paychain_biometrics_setup'),
-            AsyncStorage.getItem(BIOMETRIC_ENABLED_KEY),
-          ]);
+        const [rawMerchant, rawOnboarding, rawPin, rawBiometricDone] = await Promise.all([
+          AsyncStorage.getItem(STORAGE_KEY),
+          AsyncStorage.getItem('paychain_onboarding_complete'),
+          AsyncStorage.getItem('paychain_app_pin'),
+          AsyncStorage.getItem(BIOMETRIC_DONE_KEY),
+        ]);
 
-        if (rawOnboarding === 'true')   setHasCompletedOnboarding(true);
-        if (rawPin)                     setAppPinState(rawPin);
-        if (rawBiometricSetup === 'true') setHasSetBiometrics(true);
-        if (rawBiometricEnabled === 'true') setIsBiometricsEnabled(true);
+        if (rawOnboarding === 'true') setHasCompletedOnboarding(true);
+        if (rawPin)                   setAppPinState(rawPin);
+        if (rawBiometricDone === 'true') setHasSetBiometrics(true);
 
-        if (rawMerchant) {
-          // JWT is in SecureStore — retrieve it and restore the axios header.
-          const jwt = await loadToken();
-          if (jwt) {
-            const parsed = JSON.parse(rawMerchant);
-            setMerchant(parsed);
-            setToken(jwt);
-            api.defaults.headers.common['Authorization'] = `Bearer ${jwt}`;
+        // Check whether a JWT is available in the secure enclave.
+        const jwt = await loadToken();
+        setHasBiometricToken(!!jwt);
 
-            // Refresh from server in the background
-            api.get('/api/auth/merchant/me')
-              .then(async (res) => {
-                if (res.data.success && res.data.merchant) {
-                  setMerchant(res.data.merchant);
-                  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(res.data.merchant));
-                }
-              })
-              .catch((err) => {
-                if (err.response?.status === 401) logout();
-              });
-          }
+        if (rawMerchant && jwt) {
+          const parsed = JSON.parse(rawMerchant);
+          setMerchant(parsed);
+          setToken(jwt);
+          api.defaults.headers.common['Authorization'] = `Bearer ${jwt}`;
+
+          // Sync biometricsEnabled from the stored profile immediately,
+          // then refresh from server in the background.
+          if (parsed.biometricsEnabled) applyBiometricsEnabled(true);
+
+          api.get('/api/auth/merchant/me')
+            .then(async (res) => {
+              if (res.data.success && res.data.merchant) {
+                const fresh = res.data.merchant;
+                setMerchant(fresh);
+                await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
+                applyBiometricsEnabled(!!fresh.biometricsEnabled);
+              }
+            })
+            .catch((err) => {
+              if (err.response?.status === 401) logout();
+            });
         }
       } catch (e) {
         console.error('Failed to restore session:', e);
@@ -85,13 +83,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loadSession();
   }, []);
 
-  // ── Internal helper: persist a successful login ───────────────────────────
+  // ── applyBiometricsEnabled ────────────────────────────────────────────────
+  // Syncs the server flag to all relevant local state in one place.
+  // If the server says biometrics are enabled (e.g. from web registration),
+  // we also mark hasSetBiometrics = true so the BiometricSetup screen is
+  // skipped — no need to set up again on this platform.
+  function applyBiometricsEnabled(enabled: boolean) {
+    setIsBiometricsEnabled(enabled);
+    if (enabled) {
+      setHasSetBiometrics(true);
+      AsyncStorage.setItem(BIOMETRIC_DONE_KEY, 'true').catch(() => {});
+    }
+  }
+
+  // ── Internal: persist a successful login ───────────────────────────────────
   async function persistSession(userData: any, jwt: string) {
     setMerchant(userData);
     setToken(jwt);
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
     await storeToken(jwt);
     api.defaults.headers.common['Authorization'] = `Bearer ${jwt}`;
+    setHasBiometricToken(true);
+
+    // The server's biometricsEnabled is authoritative — sync it now.
+    applyBiometricsEnabled(!!userData.biometricsEnabled);
   }
 
   // ── Auth functions ─────────────────────────────────────────────────────────
@@ -100,8 +115,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await api.get('/api/auth/merchant/me');
       if (res.data.success && res.data.merchant) {
-        setMerchant(res.data.merchant);
-        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(res.data.merchant));
+        const fresh = res.data.merchant;
+        setMerchant(fresh);
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
+        applyBiometricsEnabled(!!fresh.biometricsEnabled);
       }
     } catch (err) {
       console.error('Failed to refresh session:', err);
@@ -111,11 +128,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function login(email: string, password: string) {
     try {
       const res = await api.post('/api/auth/merchant/login', { email, password });
-
       if (!res.data.mfaRequired) {
         await persistSession(res.data.merchant, res.data.token);
       }
-
       return { success: true, email: res.data.email, mfaRequired: res.data.mfaRequired };
     } catch (err: any) {
       return { success: false, error: err.response?.data?.error || 'Login failed' };
@@ -123,31 +138,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   // ── Biometric login ────────────────────────────────────────────────────────
-  // Security model: after the caller verifies biometrics locally with
-  // expo-local-authentication, it calls this function. We retrieve the JWT that
-  // was stored in the OS Keychain/Keystore on the last password+OTP login and
-  // rehydrate the session. If the JWT has expired the server will 401 and we
-  // force a full re-login — same behaviour as all major banking apps.
+  // Caller must already have verified the biometric locally via
+  // expo-local-authentication before calling this. We retrieve the JWT
+  // stored in the OS Keychain/Keystore from the most recent password login
+  // and validate it against the server. Expired JWTs force a password re-login.
   async function biometricLogin() {
     try {
       const jwt = await loadToken();
       if (!jwt) {
-        return { success: false, error: 'No biometric credential found. Please sign in with your password.' };
+        return {
+          success: false,
+          error: 'No saved session found. Please sign in with your password first.',
+        };
       }
-
-      // Verify the token is still accepted by the server
-      const tempHeader = { Authorization: `Bearer ${jwt}` };
-      const res = await api.get('/api/auth/merchant/me', { headers: tempHeader });
-
+      const res = await api.get('/api/auth/merchant/me', {
+        headers: { Authorization: `Bearer ${jwt}` },
+      });
       if (!res.data.success || !res.data.merchant) {
         return { success: false, error: 'Session expired. Please sign in with your password.' };
       }
-
       await persistSession(res.data.merchant, jwt);
       return { success: true };
     } catch (err: any) {
       if (err.response?.status === 401) {
-        return { success: false, error: 'Session expired. Please sign in with your password to continue.' };
+        return { success: false, error: 'Session expired. Please sign in with your password.' };
       }
       return { success: false, error: err.response?.data?.error || 'Biometric login failed.' };
     }
@@ -155,8 +169,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function signup(formData: any) {
     try {
-      const payload = { ...formData, registrationSource: 'mobile' };
-      const res = await api.post('/api/auth/merchant/register', payload);
+      const res = await api.post('/api/auth/merchant/register', {
+        ...formData,
+        registrationSource: 'mobile',
+      });
       return { success: true, email: res.data.email, message: res.data.message };
     } catch (err: any) {
       return { success: false, error: err.response?.data?.error || 'Registration failed' };
@@ -211,6 +227,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setMerchant(null);
     setToken(null);
     setIsPinUnlocked(false);
+    setHasBiometricToken(false);
+    // Note: isBiometricsEnabled and hasSetBiometrics are deliberately NOT
+    // cleared here — they survive logout so the biometric button and setup
+    // screen behave correctly on next login.
   }
 
   async function completeOnboarding() {
@@ -228,14 +248,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAppPinState(pin);
   }
 
-  // Called from BiometricSetup after the user confirms the biometric prompt.
-  // `enabled = true`  → marks this device as having biometric login active.
-  // `enabled = false` → clears the flag (user opted out or hardware unavailable).
+  // completeBiometricSetup — called from BiometricSetup screen after the user
+  // taps "Enable" and expo-local-authentication succeeds.
+  //
+  // When `enabled = true` we also tell the server so the flag is consistent
+  // across all platforms (web dashboard, mobile web, native app).
   async function completeBiometricSetup(enabled: boolean) {
-    await AsyncStorage.setItem('paychain_biometrics_setup', 'true');
-    await AsyncStorage.setItem(BIOMETRIC_ENABLED_KEY, enabled ? 'true' : 'false');
-    setHasSetBiometrics(true);
-    setIsBiometricsEnabled(enabled);
+    if (enabled) {
+      try {
+        // Sync to server so web sees biometricsEnabled = true immediately.
+        await api.put('/api/auth/merchant/biometrics', { enabled: true });
+      } catch (err) {
+        console.warn('Failed to sync biometrics flag to server:', err);
+      }
+    }
+    await AsyncStorage.setItem(BIOMETRIC_DONE_KEY, 'true');
+    applyBiometricsEnabled(enabled);
   }
 
   function unlockApp() {
@@ -247,12 +275,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       merchant,
       token,
       isLoading,
-      isAuthenticated: !!merchant && !!token,
+      isAuthenticated:        !!merchant && !!token,
       hasCompletedOnboarding,
       appPin,
       isPinUnlocked,
       hasSetBiometrics,
       isBiometricsEnabled,
+      hasBiometricToken,
       completeOnboarding,
       setAppPin,
       completeBiometricSetup,
