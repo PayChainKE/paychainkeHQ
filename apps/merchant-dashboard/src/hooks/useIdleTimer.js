@@ -6,63 +6,70 @@ const ACTIVITY_EVENTS = [
 ]
 
 /**
- * Calls onWarn() when the user has been idle for (timeout - warningMs),
- * then calls onIdle() after the full timeout.  Any user activity resets
- * both timers and calls onActive() so the warning modal can be dismissed.
+ * Silent idle-logout timer based on a last-active timestamp.
  *
- * @param {object} opts
- * @param {number}   opts.timeout    Total idle ms before logout (default 15 min)
- * @param {number}   opts.warningMs  How many ms before logout to show warning (default 2 min)
- * @param {function} opts.onWarn     Called when warning countdown starts
- * @param {function} opts.onIdle     Called when the full timeout expires → logout
- * @param {function} opts.onActive   Called when activity is detected after warning
- * @param {boolean}  opts.enabled    Pass false to disable (e.g. when logged out)
+ * Rules:
+ *   - Any user interaction on this tab stamps Date.now() as "last active".
+ *   - Away from tab < timeout  → fine, re-arm countdown for remaining time.
+ *   - Away from tab >= timeout → silent logout the moment they return.
+ *   - Idle on tab for >= timeout → silent logout, no warning shown.
  */
 export default function useIdleTimer({
-  timeout    = 15 * 60 * 1000,
-  warningMs  = 2  * 60 * 1000,
-  onWarn     = () => {},
-  onIdle     = () => {},
-  onActive   = () => {},
-  enabled    = true,
+  timeout = 40 * 60 * 1000, // 40 minutes
+  onIdle  = () => {},
+  enabled = true,
 } = {}) {
-  const warnTimer  = useRef(null)
-  const idleTimer  = useRef(null)
-  const isWarning  = useRef(false)
+  const lastActiveAt = useRef(Date.now())
+  const idleTimer    = useRef(null)
+  const pollInterval = useRef(null)
 
-  const clearTimers = () => {
-    clearTimeout(warnTimer.current)
+  const clearAll = () => {
     clearTimeout(idleTimer.current)
+    clearInterval(pollInterval.current)
   }
 
   const reset = useCallback(() => {
-    clearTimers()
     if (!enabled) return
+    lastActiveAt.current = Date.now()
+    clearTimeout(idleTimer.current)
+    idleTimer.current = setTimeout(onIdle, timeout)
+  }, [enabled, timeout, onIdle])
 
-    if (isWarning.current) {
-      isWarning.current = false
-      onActive()
-    }
-
-    warnTimer.current = setTimeout(() => {
-      isWarning.current = true
-      onWarn()
-      idleTimer.current = setTimeout(() => {
-        onIdle()
-      }, warningMs)
-    }, timeout - warningMs)
-  }, [enabled, timeout, warningMs, onWarn, onIdle, onActive])
+  const checkElapsed = useCallback(() => {
+    if (!enabled) return
+    if (Date.now() - lastActiveAt.current >= timeout) onIdle()
+  }, [enabled, timeout, onIdle])
 
   useEffect(() => {
-    if (!enabled) { clearTimers(); return }
+    if (!enabled) { clearAll(); return }
 
     reset()
     ACTIVITY_EVENTS.forEach(e => window.addEventListener(e, reset, { passive: true }))
-    return () => {
-      clearTimers()
-      ACTIVITY_EVENTS.forEach(e => window.removeEventListener(e, reset))
+
+    // Poll every 30 s to catch the timeout even if the user never moves the mouse
+    pollInterval.current = setInterval(checkElapsed, 30_000)
+
+    // On tab return: check how long they were actually away
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        const elapsed = Date.now() - lastActiveAt.current
+        if (elapsed >= timeout) {
+          onIdle()
+        } else {
+          // Re-arm for the remaining window
+          clearTimeout(idleTimer.current)
+          idleTimer.current = setTimeout(onIdle, timeout - elapsed)
+        }
+      }
     }
-  }, [enabled, reset])
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    return () => {
+      clearAll()
+      ACTIVITY_EVENTS.forEach(e => window.removeEventListener(e, reset))
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [enabled, reset, checkElapsed, timeout, onIdle])
 
   return { reset }
 }
