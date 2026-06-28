@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { MerchantAuthProvider, useMerchantAuth } from './context/MerchantAuthContext'
 import { NotificationProvider } from './context/NotificationContext'
@@ -21,6 +21,13 @@ import RequestMoney from './pages/RequestMoney'
 import PaymentPage from './pages/PaymentPage'
 import ToastHost from './components/ui/Toast'
 import { Analytics as VercelAnalytics } from '@vercel/analytics/react'
+import useIdleTimer from './hooks/useIdleTimer'
+import SessionTimeoutModal from './components/modals/SessionTimeoutModal'
+
+// 40 minutes of on-tab inactivity → logout  |  warn 5 minutes before
+const IDLE_TIMEOUT_MS  = 40 * 60 * 1000
+const WARNING_BEFORE_MS =  5 * 60 * 1000
+
 // Branded full-page loading spinner shown while session state is resolving
 function LoadingScreen() {
   return (
@@ -34,14 +41,37 @@ function LoadingScreen() {
   )
 }
 
-// Wraps every authenticated route; enforces auth check
+// Wraps every authenticated route. Enforces auth check and idle-timeout.
+// The timer only counts time the user spends on THIS tab — switching tabs
+// pauses the countdown; returning resets it.
 function Protected({ children }) {
-  const { isAuthenticated, isLoading } = useMerchantAuth()
+  const { isAuthenticated, isLoading, logout } = useMerchantAuth()
+  const [showWarning, setShowWarning] = useState(false)
+
+  useIdleTimer({
+    timeout:   IDLE_TIMEOUT_MS,
+    warningMs: WARNING_BEFORE_MS,
+    enabled:   isAuthenticated,
+    onWarn:    () => setShowWarning(true),
+    onIdle:    () => { setShowWarning(false); logout() },
+    onActive:  () => setShowWarning(false),
+  })
 
   if (isLoading) return <LoadingScreen />
   if (!isAuthenticated) return <Navigate to="/login" replace />
 
-  return children
+  return (
+    <>
+      {children}
+      {showWarning && (
+        <SessionTimeoutModal
+          countdownSec={WARNING_BEFORE_MS / 1000}
+          onStay={() => setShowWarning(false)}
+          onLogout={() => { setShowWarning(false); logout() }}
+        />
+      )}
+    </>
+  )
 }
 
 // Redirects already-authenticated users away from /login to the dashboard

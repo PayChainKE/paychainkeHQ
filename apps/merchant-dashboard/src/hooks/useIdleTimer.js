@@ -6,25 +6,26 @@ const ACTIVITY_EVENTS = [
 ]
 
 /**
- * Calls onWarn() when the user has been idle for (timeout - warningMs),
- * then calls onIdle() after the full timeout.  Any user activity resets
- * both timers and calls onActive() so the warning modal can be dismissed.
+ * Logout-on-idle timer that is TAB-AWARE:
+ *   • The timer only counts time the user is actively on this tab.
+ *   • Switching to another tab PAUSES the countdown.
+ *   • Coming back to this tab RESETS the countdown (they're active again).
  *
- * @param {object} opts
- * @param {number}   opts.timeout    Total idle ms before logout (default 15 min)
- * @param {number}   opts.warningMs  How many ms before logout to show warning (default 2 min)
+ * @param {object}   opts
+ * @param {number}   opts.timeout    Total idle ms before logout (default 40 min)
+ * @param {number}   opts.warningMs  ms before logout to show the warning (default 5 min)
  * @param {function} opts.onWarn     Called when warning countdown starts
- * @param {function} opts.onIdle     Called when the full timeout expires → logout
- * @param {function} opts.onActive   Called when activity is detected after warning
- * @param {boolean}  opts.enabled    Pass false to disable (e.g. when logged out)
+ * @param {function} opts.onIdle     Called when full timeout expires → trigger logout
+ * @param {function} opts.onActive   Called when activity detected after warning shown
+ * @param {boolean}  opts.enabled    Pass false to disable when logged out
  */
 export default function useIdleTimer({
-  timeout    = 15 * 60 * 1000,
-  warningMs  = 2  * 60 * 1000,
-  onWarn     = () => {},
-  onIdle     = () => {},
-  onActive   = () => {},
-  enabled    = true,
+  timeout   = 40 * 60 * 1000,
+  warningMs =  5 * 60 * 1000,
+  onWarn    = () => {},
+  onIdle    = () => {},
+  onActive  = () => {},
+  enabled   = true,
 } = {}) {
   const warnTimer  = useRef(null)
   const idleTimer  = useRef(null)
@@ -47,20 +48,35 @@ export default function useIdleTimer({
     warnTimer.current = setTimeout(() => {
       isWarning.current = true
       onWarn()
-      idleTimer.current = setTimeout(() => {
-        onIdle()
-      }, warningMs)
+      idleTimer.current = setTimeout(onIdle, warningMs)
     }, timeout - warningMs)
   }, [enabled, timeout, warningMs, onWarn, onIdle, onActive])
 
   useEffect(() => {
     if (!enabled) { clearTimers(); return }
 
+    // Start fresh
     reset()
+
+    // Reset on any real user interaction
     ACTIVITY_EVENTS.forEach(e => window.addEventListener(e, reset, { passive: true }))
+
+    // Tab visibility handler:
+    //   hidden  → pause (clear timers so they don't fire while away)
+    //   visible → reset (treat returning as activity; restart the full countdown)
+    const handleVisibility = () => {
+      if (document.hidden) {
+        clearTimers()
+      } else {
+        reset()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+
     return () => {
       clearTimers()
       ACTIVITY_EVENTS.forEach(e => window.removeEventListener(e, reset))
+      document.removeEventListener('visibilitychange', handleVisibility)
     }
   }, [enabled, reset])
 
