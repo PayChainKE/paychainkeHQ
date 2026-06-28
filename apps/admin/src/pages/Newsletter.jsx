@@ -3,6 +3,7 @@ import Layout from '../components/layout/Layout';
 import { exportCSV } from '../utils/exportCSV';
 import api from '../api/api';
 import TablePagination from '../components/ui/TablePagination';
+import NewsletterComposer from '../components/newsletter/NewsletterComposer';
 
 const PAGE_SIZE = 20;
 const EMAIL_RE = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
@@ -149,16 +150,16 @@ export default function Newsletter() {
     setShowPreview(false);
     setComposeOpen(true);
   }
-  async function sendCampaign() {
+  async function sendCampaign(htmlBody) {
     setComposeError('');
     if (composeSubject.trim().length < 3) { setComposeError('Subject must be at least 3 characters.'); return; }
-    if (composeBody.trim().length < 10) { setComposeError('Body must be at least 10 characters.'); return; }
     if (!confirm(`Send "${composeSubject.trim()}" to ${stats.active} active subscriber${stats.active === 1 ? '' : 's'}?`)) return;
     setComposeBusy(true);
     try {
       const res = await api.post('/api/newsletter/send', {
         subject: composeSubject.trim(),
-        body: composeBody,
+        body: htmlBody,
+        htmlMode: true,   // rich HTML from the editor is passed through to Resend as-is
       });
       if (res.data?.success) {
         setComposeDone(res.data);
@@ -403,19 +404,15 @@ export default function Newsletter() {
         </div>
       </div>
 
-      {/* Compose Modal */}
+      {/* Compose — rich email editor */}
       {composeOpen && (
-        <ComposeModal
+        <NewsletterComposer
           subject={composeSubject}
-          body={composeBody}
           onSubject={setComposeSubject}
-          onBody={setComposeBody}
+          activeCount={stats.active}
           busy={composeBusy}
           error={composeError}
           done={composeDone}
-          activeCount={stats.active}
-          preview={showPreview}
-          onTogglePreview={() => setShowPreview((p) => !p)}
           onSend={sendCampaign}
           onClose={() => { if (!composeBusy) { setComposeOpen(false); setComposeDone(null); } }}
         />
