@@ -362,42 +362,36 @@ export default function Newsletter() {
           )}
         </div>
 
-        {/* Past campaigns */}
+        {/* Past campaigns — delivery status */}
         <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 overflow-hidden shadow-editorial">
           <div className="px-6 py-4 border-b border-outline-variant/10 flex items-center justify-between">
             <div>
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">History</p>
-              <h3 className="text-base font-bold text-on-surface tracking-tight">Past Campaigns</h3>
+              <h3 className="text-base font-bold text-on-surface tracking-tight">Campaign Delivery Status</h3>
             </div>
-            <span className="text-[11px] text-on-surface-variant/40">{campaigns.length} sent</span>
-          </div>
-          {campaigns.length === 0 ? (
-            <div className="p-10 text-center text-on-surface-variant/40 text-sm">No campaigns sent yet. Click "Compose Newsletter" to send your first.</div>
-          ) : (
-            <div className="divide-y divide-outline-variant/10">
-              {campaigns.map((c) => (
-                <div key={c._id} className="px-6 py-4 hover:bg-secondary-container/5 transition-colors">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0 flex-1">
-                      <h4 className="font-bold text-on-surface tracking-tight truncate">{c.subject}</h4>
-                      <p className="text-[12px] text-on-surface-variant/60 mt-0.5">
-                        Sent {fmtDate(c.sentAt)} by {c.sentByEmail}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-4 flex-shrink-0">
-                      <div className="text-right">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">Delivered</p>
-                        <p className="text-base font-bold text-on-surface tracking-tight">{c.successCount} / {c.recipientCount}</p>
-                      </div>
-                      {c.failureCount > 0 && (
-                        <div className="text-right">
-                          <p className="text-[10px] font-bold uppercase tracking-widest text-red-600">Failed</p>
-                          <p className="text-base font-bold text-red-700">{c.failureCount}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+            <div className="flex items-center gap-3">
+              {campaigns.length > 0 && (
+                <div className="hidden sm:flex items-center gap-4 text-[11px] font-bold text-on-surface-variant/50">
+                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>Delivered</span>
+                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-400 inline-block"></span>Failed</span>
                 </div>
+              )}
+              <span className="text-[11px] font-bold text-on-surface-variant/40 bg-surface-container px-2.5 py-1 rounded-full">{campaigns.length} sent</span>
+            </div>
+          </div>
+
+          {campaigns.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 gap-3">
+              <div className="w-14 h-14 rounded-2xl bg-surface-container flex items-center justify-center">
+                <span className="material-symbols-outlined text-on-surface-variant/30 text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>campaign</span>
+              </div>
+              <p className="text-sm font-medium text-on-surface-variant/40">No campaigns sent yet</p>
+              <p className="text-[12px] text-on-surface-variant/30">Click "Compose Newsletter" to reach your subscribers.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-outline-variant/8">
+              {campaigns.map((c, idx) => (
+                <CampaignRow key={c._id} campaign={c} index={idx} />
               ))}
             </div>
           )}
@@ -425,6 +419,104 @@ export default function Newsletter() {
     </Layout>
   );
 }
+
+// ── Campaign delivery status row ──────────────────────────────────────
+function deliveryStatus(successCount, failureCount, recipientCount) {
+  if (recipientCount === 0) return { label: 'No Recipients', color: 'gray', icon: 'help' };
+  const rate = successCount / recipientCount;
+  if (rate === 1)   return { label: 'All Delivered',   color: 'emerald', icon: 'check_circle' };
+  if (rate >= 0.9)  return { label: 'High Delivery',   color: 'emerald', icon: 'check_circle' };
+  if (rate >= 0.5)  return { label: 'Partial Delivery', color: 'amber',  icon: 'warning' };
+  if (rate > 0)     return { label: 'Low Delivery',    color: 'orange',  icon: 'error' };
+  return             { label: 'Blocked / Failed',      color: 'red',     icon: 'cancel' };
+}
+
+const statusStyles = {
+  emerald: { badge: 'bg-emerald-50 text-emerald-700 border-emerald-200', bar: 'bg-emerald-500', dot: 'bg-emerald-500', icon: 'text-emerald-600' },
+  amber:   { badge: 'bg-amber-50  text-amber-700  border-amber-200',   bar: 'bg-amber-400',   dot: 'bg-amber-400',   icon: 'text-amber-600'  },
+  orange:  { badge: 'bg-orange-50 text-orange-700 border-orange-200',  bar: 'bg-orange-400',  dot: 'bg-orange-400',  icon: 'text-orange-600' },
+  red:     { badge: 'bg-red-50    text-red-700    border-red-200',     bar: 'bg-red-400',     dot: 'bg-red-400',     icon: 'text-red-600'    },
+  gray:    { badge: 'bg-gray-50   text-gray-600   border-gray-200',    bar: 'bg-gray-300',    dot: 'bg-gray-400',    icon: 'text-gray-500'   },
+};
+
+const CampaignRow = ({ campaign: c, index }) => {
+  const { successCount = 0, failureCount = 0, recipientCount = 0 } = c;
+  const { label, color, icon } = deliveryStatus(successCount, failureCount, recipientCount);
+  const styles = statusStyles[color];
+  const deliveredPct = recipientCount > 0 ? Math.round((successCount / recipientCount) * 100) : 0;
+  const failedPct    = recipientCount > 0 ? Math.round((failureCount  / recipientCount) * 100) : 0;
+
+  return (
+    <div className="px-6 py-5 hover:bg-secondary-container/5 transition-colors group">
+      <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+
+        {/* Left: index + subject */}
+        <div className="flex items-start gap-3 flex-1 min-w-0">
+          <div className="shrink-0 w-7 h-7 rounded-lg bg-surface-container flex items-center justify-center mt-0.5">
+            <span className="text-[10px] font-black text-on-surface-variant/40 tabular-nums">
+              {String(index + 1).padStart(2, '0')}
+            </span>
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap mb-0.5">
+              <h4 className="font-bold text-on-surface tracking-tight truncate text-[14px]">{c.subject}</h4>
+              {/* Status badge */}
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${styles.badge}`}>
+                <span className="material-symbols-outlined text-[11px]" style={{ fontVariationSettings: "'FILL' 1" }}>{icon}</span>
+                {label}
+              </span>
+            </div>
+            <p className="text-[11px] text-on-surface-variant/50 mb-3">
+              Sent {fmtDate(c.sentAt)}
+              {c.sentByEmail && <> · <span className="font-medium">{c.sentByEmail}</span></>}
+            </p>
+
+            {/* Delivery bar */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest">
+                <span>Delivery rate</span>
+                <span className={color === 'emerald' ? 'text-emerald-600' : color === 'amber' ? 'text-amber-600' : color === 'red' ? 'text-red-600' : 'text-orange-600'}>
+                  {deliveredPct}%
+                </span>
+              </div>
+              {/* The bar — stacked: delivered (green) + failed (red) */}
+              <div className="h-2 w-full bg-surface-container rounded-full overflow-hidden flex">
+                <div
+                  className={`h-full transition-all duration-700 ${styles.bar}`}
+                  style={{ width: `${deliveredPct}%` }}
+                />
+                {failedPct > 0 && (
+                  <div
+                    className="h-full bg-red-300 transition-all duration-700"
+                    style={{ width: `${failedPct}%` }}
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right: metric chips */}
+        <div className="flex items-center gap-2 sm:flex-col sm:items-end sm:gap-1.5 flex-shrink-0 pl-10 sm:pl-0">
+          {/* Delivered */}
+          <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-1.5">
+            <span className="material-symbols-outlined text-emerald-600 text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>mark_email_read</span>
+            <span className="text-emerald-800 font-black text-[13px] tabular-nums">{successCount.toLocaleString()}</span>
+            <span className="text-emerald-600/60 text-[10px] font-bold">/ {recipientCount.toLocaleString()}</span>
+          </div>
+          {/* Failed — only shown when > 0 */}
+          {failureCount > 0 && (
+            <div className="flex items-center gap-1.5 bg-red-50 border border-red-100 rounded-xl px-3 py-1.5">
+              <span className="material-symbols-outlined text-red-500 text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>unsubscribe</span>
+              <span className="text-red-700 font-black text-[13px] tabular-nums">{failureCount.toLocaleString()}</span>
+              <span className="text-red-500/60 text-[10px] font-bold">failed</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // ── Bits ──────────────────────────────────────────────────────────────
 const Th = ({ children }) => (
