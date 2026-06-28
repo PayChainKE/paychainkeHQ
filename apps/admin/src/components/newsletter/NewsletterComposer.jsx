@@ -62,35 +62,157 @@ function LinkDialog({ onConfirm, onCancel, initial = '' }) {
   );
 }
 
-// ── Image dialog ──────────────────────────────────────────────────────
+// ── Image upload dialog ───────────────────────────────────────────────
 function ImageDialog({ onConfirm, onCancel }) {
-  const [url, setUrl] = useState('');
-  const [alt, setAlt] = useState('');
+  const [tab, setTab]         = useState('upload')  // 'upload' | 'url'
+  const [file, setFile]       = useState(null)
+  const [preview, setPreview] = useState('')
+  const [alt, setAlt]         = useState('')
+  const [url, setUrl]         = useState('')
+  const [uploading, setUploading] = useState(false)
+  const [error, setError]     = useState('')
+  const [uploaded, setUploaded] = useState(null)  // { url, sizeKb, width, height }
+  const fileRef = React.useRef()
+  const API = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || ''
+
+  function pickFile(f) {
+    if (!f) return
+    if (f.size > 8 * 1024 * 1024) { setError('File must be under 8 MB.'); return }
+    setFile(f)
+    setError('')
+    setUploaded(null)
+    const reader = new FileReader()
+    reader.onload = e => setPreview(e.target.result)
+    reader.readAsDataURL(f)
+  }
+
+  function onDrop(e) {
+    e.preventDefault()
+    const f = e.dataTransfer.files[0]
+    if (f) pickFile(f)
+  }
+
+  async function handleUpload() {
+    if (!file) return
+    setUploading(true)
+    setError('')
+    try {
+      const token = localStorage.getItem('paychain_admin_token')
+      const form  = new FormData()
+      form.append('image', file)
+      const res = await fetch(`${API}/api/newsletter/upload-image`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Upload failed')
+      setUploaded(data)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const canInsert = tab === 'upload' ? !!uploaded?.url : !!url.trim()
+  const finalUrl  = tab === 'upload' ? uploaded?.url : url.trim()
+
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
-        <h4 className="font-bold text-on-surface mb-4">Insert Image</h4>
-        <div className="space-y-3">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="font-bold text-on-surface">Insert Image</h4>
+          <div className="flex rounded-lg overflow-hidden border border-outline-variant/30 text-[11px] font-bold uppercase tracking-widest">
+            {['upload', 'url'].map(t => (
+              <button key={t} type="button" onClick={() => { setTab(t); setError('') }}
+                className={`px-4 py-1.5 transition-colors ${tab === t ? 'bg-primary text-white' : 'text-on-surface-variant hover:bg-surface-container-low'}`}>
+                {t === 'upload' ? 'Upload file' : 'Paste URL'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {tab === 'upload' ? (
+          <div className="space-y-3">
+            {/* Drop zone */}
+            <div
+              onDrop={onDrop}
+              onDragOver={e => e.preventDefault()}
+              onClick={() => fileRef.current?.click()}
+              className={`relative border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${
+                file ? 'border-primary bg-primary/5' : 'border-outline-variant/40 hover:border-primary/50 hover:bg-surface-container-low'
+              }`}
+            >
+              <input ref={fileRef} type="file" accept="image/*" className="hidden"
+                onChange={e => pickFile(e.target.files[0])} />
+              {preview ? (
+                <img src={preview} alt="" className="max-h-36 mx-auto rounded-lg object-contain" />
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-4xl text-on-surface-variant/30 block mb-2">upload_file</span>
+                  <p className="text-sm font-medium text-on-surface-variant/60">
+                    Drag & drop an image here, or <span className="text-primary font-bold">browse</span>
+                  </p>
+                  <p className="text-[11px] text-on-surface-variant/40 mt-1">JPG, PNG, GIF, WebP, SVG · Max 8 MB</p>
+                </>
+              )}
+            </div>
+
+            {/* Upload status */}
+            {file && !uploaded && (
+              <div className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2 text-[12px]">
+                <span className="font-medium text-on-surface truncate mr-2">{file.name}</span>
+                <span className="text-on-surface-variant/50 shrink-0">{(file.size / 1024).toFixed(0)} KB</span>
+              </div>
+            )}
+            {uploaded && (
+              <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2 text-[12px]">
+                <span className="material-symbols-outlined text-emerald-600 text-base" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                <span className="text-emerald-800 font-medium">Uploaded · {uploaded.sizeKb} KB · {uploaded.width}×{uploaded.height}</span>
+                <button type="button" onClick={() => { setFile(null); setPreview(''); setUploaded(null) }}
+                  className="ml-auto text-emerald-600 hover:text-emerald-800 font-bold">Change</button>
+              </div>
+            )}
+
+            {!uploaded && file && (
+              <button type="button" onClick={handleUpload} disabled={uploading}
+                className="w-full py-2.5 rounded-lg bg-primary text-white text-sm font-bold flex items-center justify-center gap-2 hover:shadow-md disabled:opacity-50">
+                {uploading
+                  ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Uploading & compressing…</>
+                  : <><span className="material-symbols-outlined text-base">cloud_upload</span>Upload to PayChain</>
+                }
+              </button>
+            )}
+          </div>
+        ) : (
           <div>
-            <label className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/60 block mb-1">Image URL</label>
+            <label className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/60 block mb-1.5">Image URL</label>
             <input autoFocus value={url} onChange={e => setUrl(e.target.value)}
               placeholder="https://example.com/image.png"
               className="w-full px-3 py-2 border border-outline-variant/40 rounded-lg text-sm focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none" />
+            {url && <img src={url} alt="" className="mt-2 w-full max-h-36 object-contain rounded-lg border border-outline-variant/20"
+              onError={e => e.target.style.display='none'} />}
           </div>
-          <div>
-            <label className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/60 block mb-1">Alt text (optional)</label>
-            <input value={alt} onChange={e => setAlt(e.target.value)}
-              placeholder="Describe the image"
-              className="w-full px-3 py-2 border border-outline-variant/40 rounded-lg text-sm focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none" />
-          </div>
-          {url && <img src={url} alt={alt} className="w-full max-h-40 object-contain rounded-lg border border-outline-variant/20 mt-1" onError={e => e.target.style.display='none'} />}
+        )}
+
+        {/* Alt text */}
+        <div className="mt-3">
+          <label className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/60 block mb-1.5">Alt text (optional)</label>
+          <input value={alt} onChange={e => setAlt(e.target.value)}
+            placeholder="Describe the image for accessibility"
+            className="w-full px-3 py-2 border border-outline-variant/40 rounded-lg text-sm focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none" />
         </div>
-        <div className="flex gap-3 mt-5">
+
+        {error && <p className="mt-2 text-[12px] text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-1.5">{error}</p>}
+
+        <div className="flex gap-3 mt-4">
           <button onClick={onCancel} className="flex-1 py-2 rounded-lg border border-outline-variant/40 text-sm font-bold text-on-surface-variant hover:bg-surface-container-low">Cancel</button>
-          <button onClick={() => onConfirm(url.trim(), alt.trim())}
-            disabled={!url.trim()}
-            className="flex-1 py-2 rounded-lg bg-primary text-white text-sm font-bold hover:shadow-md disabled:opacity-40">
-            Insert
+          <button onClick={() => onConfirm(finalUrl, alt.trim())}
+            disabled={!canInsert}
+            className="flex-1 py-2 rounded-lg bg-primary text-white text-sm font-bold hover:shadow-md disabled:opacity-40 flex items-center justify-center gap-1.5">
+            <span className="material-symbols-outlined text-base">add_photo_alternate</span>
+            Insert Image
           </button>
         </div>
       </div>

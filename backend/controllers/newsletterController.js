@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import Subscription from '../models/Subscription.js';
 import NewsletterCampaign from '../models/NewsletterCampaign.js';
 import { sendNewsletterConfirmation, sendNewsletterEmail } from '../utils/resend.js';
+import { v2 as cloudinary } from 'cloudinary';
 
 const EMAIL_RE = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
 
@@ -186,6 +187,59 @@ export const sendCampaign = async (req, res) => {
   } catch (error) {
     console.error('Send Campaign Error:', error);
     res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Upload an image for use inside a newsletter campaign.
+//          The file is resized (max 800 px wide) and converted to WebP/JPEG by
+//          Cloudinary before storage — only the resulting URL is kept.  No raw
+//          binary data is persisted in MongoDB.
+// @route   POST /api/newsletter/upload-image
+// @access  Private (Admin)
+export const uploadNewsletterImage = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image file provided.' });
+    }
+
+    const allowedMime = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
+    if (!allowedMime.includes(req.file.mimetype)) {
+      return res.status(400).json({ error: 'Unsupported file type. Use JPG, PNG, GIF, WebP or SVG.' });
+    }
+
+    // Upload to Cloudinary via a stream from the in-memory buffer.
+    // Transformations applied server-side so we never store the full-size original:
+    //   • max 800 px wide (limit — never upscale)
+    //   • auto quality (Cloudinary picks the best quality/size trade-off)
+    //   • fetch_format: auto → serves WebP to modern browsers, JPEG as fallback
+    const result = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          folder: 'paychain_newsletter_images',
+          transformation: [
+            { width: 800, crop: 'limit' },
+            { quality: 'auto:good', fetch_format: 'auto' },
+          ],
+          resource_type: 'image',
+        },
+        (err, result) => (err ? reject(err) : resolve(result))
+      );
+      stream.end(req.file.buffer);
+    });
+
+    console.log(`📸 Newsletter image uploaded: ${result.public_id} (${Math.round(result.bytes / 1024)} KB)`);
+
+    res.json({
+      success: true,
+      url: result.secure_url,       // HTTPS Cloudinary URL — this is all that goes into the email HTML
+      width: result.width,
+      height: result.height,
+      sizeKb: Math.round(result.bytes / 1024),
+      format: result.format,
+    });
+  } catch (error) {
+    console.error('Newsletter image upload error:', error);
+    res.status(500).json({ error: 'Failed to upload image. Try again.' });
   }
 };
 
