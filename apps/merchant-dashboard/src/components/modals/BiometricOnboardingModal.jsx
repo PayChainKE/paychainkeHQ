@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { startRegistration } from '@simplewebauthn/browser'
 import { useMerchantAuth } from '../../context/MerchantAuthContext'
 
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+
 // Storage key — once set the modal never shows again on this browser.
 const PROMPTED_KEY = 'paychain_biometric_setup_done'
 
@@ -64,7 +66,7 @@ export default function BiometricOnboardingModal() {
     setErrMsg('')
     try {
       // 1 — Get options
-      const optRes = await fetch('/api/auth/merchant/webauthn/register-options', {
+      const optRes = await fetch(`${API_URL}/api/auth/merchant/webauthn/register-options`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       const optData = await optRes.json()
@@ -74,7 +76,7 @@ export default function BiometricOnboardingModal() {
       const regResponse = await startRegistration({ optionsJSON: optData.options })
 
       // 3 — Verify
-      const verifyRes = await fetch('/api/auth/merchant/webauthn/verify-registration', {
+      const verifyRes = await fetch(`${API_URL}/api/auth/merchant/webauthn/verify-registration`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(regResponse),

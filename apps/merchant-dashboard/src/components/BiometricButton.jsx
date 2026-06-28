@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { startAuthentication, startRegistration } from '@simplewebauthn/browser'
 
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+
 // Fingerprint SVG — used as the button icon.
 function FingerprintIcon({ size = 22, className = '' }) {
   return (
@@ -72,7 +74,7 @@ export function BiometricLoginButton({ email, onSuccess, onError }) {
     setScanPhase(false)
     try {
       // 1 — Get challenge from server
-      const optRes = await fetch('/api/auth/merchant/webauthn/login-options', {
+      const optRes = await fetch(`${API_URL}/api/auth/merchant/webauthn/login-options`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim() }),
@@ -89,7 +91,7 @@ export function BiometricLoginButton({ email, onSuccess, onError }) {
       setScanPhase(false)
 
       // 3 — Verify on the server and get JWT
-      const verifyRes = await fetch('/api/auth/merchant/webauthn/verify-login', {
+      const verifyRes = await fetch(`${API_URL}/api/auth/merchant/webauthn/verify-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim(), response: authResponse }),
@@ -195,7 +197,7 @@ export function BiometricRegisterButton({ token, onSuccess, onError }) {
     setDone(false)
     try {
       // 1 — Get registration options (requires authentication)
-      const optRes = await fetch('/api/auth/merchant/webauthn/register-options', {
+      const optRes = await fetch(`${API_URL}/api/auth/merchant/webauthn/register-options`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       const optData = await optRes.json()
@@ -210,7 +212,7 @@ export function BiometricRegisterButton({ token, onSuccess, onError }) {
       setScanPhase(false)
 
       // 3 — Verify and store on the server
-      const verifyRes = await fetch('/api/auth/merchant/webauthn/verify-registration', {
+      const verifyRes = await fetch(`${API_URL}/api/auth/merchant/webauthn/verify-registration`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
