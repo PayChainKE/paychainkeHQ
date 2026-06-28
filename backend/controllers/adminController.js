@@ -791,15 +791,29 @@ export const getInsights = async (req, res) => {
       $or: [{ lastLogin: { $lt: dormantSince } }, { lastLogin: null }],
     });
 
+    // KES-normalised volume: fx_swap and settlement transactions store their
+    // `amount` in USDC; `kesAmount` holds the correct KES equivalent for those.
+    // Using $amount directly causes USDC amounts (~2.12) to appear as KES 2,
+    // making FX Swaps and Settlements invisible in charts.
+    const kesVol = {
+      $sum: {
+        $cond: {
+          if: { $eq: ['$currency', 'USDC'] },
+          then: { $ifNull: ['$kesAmount', 0] },
+          else: '$amount',
+        },
+      },
+    };
+
     // ── Transaction / GTV ────────────────────────────────────────────
     const [gtvCurr, gtvPrev, gtvSeries] = await Promise.all([
       Transaction.aggregate([
         { $match: { createdAt: { $gte: since }, status: { $in: ['completed', 'verified'] } } },
-        { $group: { _id: null, count: { $sum: 1 }, volume: { $sum: '$amount' } } },
+        { $group: { _id: null, count: { $sum: 1 }, volume: kesVol } },
       ]),
       Transaction.aggregate([
         { $match: { createdAt: { $gte: prevSince, $lt: since }, status: { $in: ['completed', 'verified'] } } },
-        { $group: { _id: null, count: { $sum: 1 }, volume: { $sum: '$amount' } } },
+        { $group: { _id: null, count: { $sum: 1 }, volume: kesVol } },
       ]),
       // Daily volume series for the sparkline / area chart.
       Transaction.aggregate([
@@ -808,7 +822,7 @@ export const getInsights = async (req, res) => {
           $group: {
             _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
             count: { $sum: 1 },
-            volume: { $sum: '$amount' },
+            volume: kesVol,
           },
         },
         { $sort: { _id: 1 } },
@@ -967,14 +981,14 @@ export const getInsights = async (req, res) => {
     );
     const waitlistTotal = Object.values(wlByStatus).reduce((s, n) => s + n, 0);
 
-    // ── Top merchants by 30d volume ──────────────────────────────────
+    // ── Top merchants by volume ──────────────────────────────────────
     const topMerchantsRaw = await Transaction.aggregate([
       { $match: { createdAt: { $gte: since }, status: { $in: ['completed', 'verified'] }, merchantId: { $ne: null } } },
       {
         $group: {
           _id: '$merchantId',
           txnCount: { $sum: 1 },
-          volume: { $sum: '$amount' },
+          volume: kesVol,
         },
       },
       { $sort: { volume: -1 } },
@@ -1000,9 +1014,10 @@ export const getInsights = async (req, res) => {
     });
 
     // ── Transaction type mix ─────────────────────────────────────────
+    // All statuses included so fx_swap / settlement rows are never filtered out.
     const txnTypeMix = await Transaction.aggregate([
       { $match: { createdAt: { $gte: since } } },
-      { $group: { _id: '$type', count: { $sum: 1 }, volume: { $sum: '$amount' } } },
+      { $group: { _id: '$type', count: { $sum: 1 }, volume: kesVol } },
       { $sort: { volume: -1 } },
     ]);
 
