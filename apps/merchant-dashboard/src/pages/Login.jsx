@@ -6,6 +6,7 @@ import mainLogo from '../assets/signin-logo.png'
 import footerBrandsLogo from '../assets/signin-footer-logo.png'
 import poweredByLogo from '../assets/poweredby-logo.png'
 import { ValidatedInput } from '../components/ValidatedInput'
+import { BiometricLoginButton } from '../components/BiometricButton'
 
 const KENYAN_COUNTIES = [
   "Baringo", "Bomet", "Bungoma", "Busia", "Elgeyo-Marakwet", "Embu", "Garissa", 
@@ -18,7 +19,7 @@ const KENYAN_COUNTIES = [
 ]
 
 export default function Login() {
-  const { login, signup, verifyOTP, resendOTP, forgotPassword, verifyResetOTP, resetPassword, isAuthenticated } = useMerchantAuth()
+  const { login, loginWithPasskey, signup, verifyOTP, resendOTP, forgotPassword, verifyResetOTP, resetPassword, isAuthenticated } = useMerchantAuth()
   const { addNotification } = useNotification()
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
@@ -715,6 +716,25 @@ export default function Login() {
                       required
                     />
                   </div>
+                </div>
+
+                {/* Biometric fast-login — renders only when the device supports it */}
+                <div className="space-y-3">
+                  <BiometricLoginButton
+                    email={phone}
+                    onSuccess={(result) => {
+                      loginWithPasskey(result)
+                      nav('/overview')
+                    }}
+                    onError={(msg) => setErr(msg)}
+                  />
+                </div>
+
+                {/* Divider */}
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 h-px bg-outline-variant/10" />
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/30">or use password</span>
+                  <div className="flex-1 h-px bg-outline-variant/10" />
                 </div>
 
                 <div className="space-y-2">

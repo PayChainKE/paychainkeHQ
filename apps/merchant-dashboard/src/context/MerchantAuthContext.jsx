@@ -182,6 +182,16 @@ export function MerchantAuthProvider({ children }) {
     }
   }
 
+  // Called by BiometricLoginButton after the WebAuthn verify-login API returns
+  // { token, merchant }. Stores session identically to the password login path.
+  function loginWithPasskey({ token: jwt, merchant: userData }) {
+    setMerchant(userData);
+    setToken(jwt);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
+    localStorage.setItem(TOKEN_KEY, jwt);
+    axios.defaults.headers.common['Authorization'] = `Bearer ${jwt}`;
+  }
+
   function logout() {
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(TOKEN_KEY);
@@ -192,11 +202,13 @@ export function MerchantAuthProvider({ children }) {
   }
 
   return (
-    <MerchantAuthContext.Provider value={{ 
+    <MerchantAuthContext.Provider value={{
       merchant,
+      token,
       isLoading,
       isAuthenticated: !!merchant,
       login,
+      loginWithPasskey,
       signup,
       verifyOTP,
       resendOTP,

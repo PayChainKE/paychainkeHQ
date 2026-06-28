@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Modal, FlatList, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, Modal, FlatList, Image } from 'react-native';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
@@ -18,7 +18,7 @@ const KENYAN_COUNTIES = [
 ];
 
 export default function Login({ route }: any) {
-  const { login, biometricLogin, signup, verifyOTP, resendOTP, forgotPassword, resetPassword } = useAuth();
+  const { login, biometricLogin, signup, verifyOTP, forgotPassword, resetPassword } = useAuth();
   const { authenticate: authenticateBiometric } = useBiometrics();
   
   const [phone, setPhone] = useState('');
@@ -119,22 +119,17 @@ export default function Login({ route }: any) {
 
   const handleBiometricSignIn = async () => {
     setErr('');
-    const auth = await authenticateBiometric('Login to PayChain');
+    // Step 1: verify identity locally on the device
+    const auth = await authenticateBiometric('Sign in to PayChain');
     if (!auth.success) {
       if (!auth.cancelled) setErr(auth.error);
       return;
     }
-
-    const userEmail = await AsyncStorage.getItem('last_biometric_user');
-    if (!userEmail) {
-      setErr('No registered biometric user found.');
-      return;
-    }
-
+    // Step 2: retrieve the JWT from the OS Keychain/Keystore and rehydrate session
     setLoading(true);
-    const res = await biometricLogin(userEmail);
+    const res = await biometricLogin();
     setLoading(false);
-    if (!res.success) setErr(res.error);
+    if (!res.success) setErr(res.error || 'Session expired. Please sign in with your password.');
   };
 
   const handleVerifyOTP = async () => {
