@@ -23,7 +23,7 @@ import ToastHost from './components/ui/Toast'
 import { Analytics as VercelAnalytics } from '@vercel/analytics/react'
 import useIdleTimer from './hooks/useIdleTimer'
 
-const IDLE_TIMEOUT_MS = 40 * 60 * 1000 // 40 minutes
+const IDLE_TIMEOUT_MS = 50 * 60 * 1000 // 50 minutes
 
 // Branded full-page loading spinner shown while session state is resolving
 function LoadingScreen() {
