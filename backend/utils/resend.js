@@ -119,9 +119,9 @@ export const sendWalletActivationEmail = async (email, name, stellarPublicKey) =
       : 'N/A';
 
     const data = await resend.emails.send({
-      from: 'PayChain Web3 <info@paychain.co.ke>',
+      from: 'PayChain Digital Wallet <info@paychain.co.ke>',
       to: [email],
-      subject: 'Welcome to Web3: Your PayChain Wallet is Ready',
+      subject: 'Welcome to Digital Wallet: Your PayChain Wallet is Ready',
       html: `
         <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #0B0E14; color: #E5E7EB; border-radius: 8px; overflow: hidden; border: 1px solid #1F2937;">
           
@@ -139,7 +139,7 @@ export const sendWalletActivationEmail = async (email, name, stellarPublicKey) =
             
             <p style="font-size: 15px; line-height: 1.6; color: #9CA3AF; margin: 0 0 30px 0;">
               Dear ${name},<br><br>
-              Congratulations! Your PayChain Web3 Wallet has been successfully provisioned on the blockchain. You can now securely manage your digital assets, receive global settlements, and utilize our Inflation Shield.
+              Congratulations! Your PayChain Digital Wallet has been successfully provisioned on the blockchain. You can now securely manage your digital assets, receive global settlements, and utilize our Inflation Shield.
             </p>
 
             <!-- Address Box -->
