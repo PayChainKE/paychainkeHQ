@@ -21,9 +21,6 @@ import RequestMoney from './pages/RequestMoney'
 import PaymentPage from './pages/PaymentPage'
 import ToastHost from './components/ui/Toast'
 import { Analytics as VercelAnalytics } from '@vercel/analytics/react'
-import useIdleTimer from './hooks/useIdleTimer'
-
-const IDLE_TIMEOUT_MS = 50 * 60 * 1000 // 50 minutes
 
 // Branded full-page loading spinner shown while session state is resolving
 function LoadingScreen() {
@@ -38,16 +35,8 @@ function LoadingScreen() {
   )
 }
 
-// Wraps every authenticated route. Silently logs out after 40 min of
-// inactivity — no warning shown. Tab-aware: only on-tab idle time counts.
 function Protected({ children }) {
-  const { isAuthenticated, isLoading, logout } = useMerchantAuth()
-
-  useIdleTimer({
-    timeout: IDLE_TIMEOUT_MS,
-    enabled: isAuthenticated,
-    onIdle:  logout,
-  })
+  const { isAuthenticated, isLoading } = useMerchantAuth()
 
   if (isLoading) return <LoadingScreen />
   if (!isAuthenticated) return <Navigate to="/login" replace />
