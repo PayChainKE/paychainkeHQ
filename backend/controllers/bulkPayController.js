@@ -334,10 +334,14 @@ export const authorizeBatch = async (req, res) => {
       
       // Fire Daraja API if Mobile Money
       if (payee.paymentMethod === 'Mobile Money' && token) {
+        const mpesaEnv = (process.env.MPESA_ENVIRONMENT || 'sandbox').toLowerCase();
+        const mpesaBaseUrl = mpesaEnv === 'live' ? 'https://api.safaricom.co.ke' : 'https://sandbox.safaricom.co.ke';
+        const callbackBase = (process.env.MPESA_CALLBACK_URL || '').replace(/\/$/, '');
+        
         const isB2C = payee.mobileMoneyType === 'Personal Number';
         const url = isB2C 
-          ? 'https://sandbox.safaricom.co.ke/mpesa/b2c/v1/paymentrequest'
-          : 'https://sandbox.safaricom.co.ke/mpesa/b2b/v1/paymentrequest';
+          ? `${mpesaBaseUrl}/mpesa/b2c/v1/paymentrequest`
+          : `${mpesaBaseUrl}/mpesa/b2b/v1/paymentrequest`;
 
         const payload = isB2C ? {
           InitiatorName: process.env.MPESA_B2C_INITIATOR || 'testapi',
@@ -347,8 +351,8 @@ export const authorizeBatch = async (req, res) => {
           PartyA: process.env.MPESA_SHORTCODE || '600000',
           PartyB: payee.phone,
           Remarks: `Bulk Payout to ${payee.name}`,
-          QueueTimeOutURL: 'https://shiny-horses-write.loca.lt/api/callbacks/timeout',
-          ResultURL: 'https://shiny-horses-write.loca.lt/api/callbacks/result',
+          QueueTimeOutURL: callbackBase ? `${callbackBase}/api/callbacks/timeout` : 'https://sandbox.paychain.co.ke/api/callbacks/timeout',
+          ResultURL: callbackBase ? `${callbackBase}/api/callbacks/result` : 'https://sandbox.paychain.co.ke/api/callbacks/result',
           Occasion: 'PayChain Settlement'
         } : {
           // B2B Payload
@@ -362,8 +366,8 @@ export const authorizeBatch = async (req, res) => {
           PartyB: payee.paybillNumber || payee.tillNumber,
           AccountReference: payee.businessAccount || 'Settlement',
           Remarks: `Bulk B2B Payout to ${payee.name}`,
-          QueueTimeOutURL: 'https://shiny-horses-write.loca.lt/api/callbacks/timeout',
-          ResultURL: 'https://shiny-horses-write.loca.lt/api/callbacks/result',
+          QueueTimeOutURL: callbackBase ? `${callbackBase}/api/callbacks/timeout` : 'https://sandbox.paychain.co.ke/api/callbacks/timeout',
+          ResultURL: callbackBase ? `${callbackBase}/api/callbacks/result` : 'https://sandbox.paychain.co.ke/api/callbacks/result',
         };
 
         try {
