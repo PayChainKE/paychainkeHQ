@@ -110,6 +110,18 @@ const phoneVariations = (raw) => {
 //          + lastActivityAt = max(lastLogin, last completed txn)).
 // @route   GET /api/admin/merchants
 // @access  Private (Admin)
+// KES-normalised volume expression reused across all aggregations in this file.
+// fx_swap and settlement transactions store `amount` in USDC; `kesAmount` holds
+// the correct KES equivalent. Using raw $amount causes tiny USDC values to
+// appear instead of real KES figures in every chart and stat.
+const KES_VOL = {
+  $cond: {
+    if: { $eq: ['$currency', 'USDC'] },
+    then: { $ifNull: ['$kesAmount', 0] },
+    else: '$amount',
+  },
+};
+
 export const getMerchants = async (req, res) => {
   try {
     // Include passwordResetExpires (select:false by default) so we can compute
@@ -121,37 +133,69 @@ export const getMerchants = async (req, res) => {
       .lean();
 
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    // Single aggregation: per-merchant 30d + 24h counts + most recent txn date.
-    const txnAgg = await Transaction.aggregate([
-      { $match: { createdAt: { $gte: thirtyDaysAgo } } },
-      {
-        $group: {
-          _id: '$merchantId',
-          txnCount30d: { $sum: 1 },
-          txnCount24h: { $sum: { $cond: [{ $gte: ['$createdAt', oneDayAgo] }, 1, 0] } },
-          lastTxnAt: { $max: '$createdAt' },
+    const oneDayAgo    = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    // Run recent-activity and all-time aggregations in parallel.
+    const [txnAgg, lifetimeAgg] = await Promise.all([
+      // 30d window: counts + 30d KES volume + last txn timestamp
+      Transaction.aggregate([
+        { $match: { createdAt: { $gte: thirtyDaysAgo } } },
+        {
+          $group: {
+            _id: '$merchantId',
+            txnCount30d: { $sum: 1 },
+            txnCount24h: { $sum: { $cond: [{ $gte: ['$createdAt', oneDayAgo] }, 1, 0] } },
+            volume30d:   { $sum: KES_VOL },
+            lastTxnAt:   { $max: '$createdAt' },
+          },
         },
-      },
+      ]),
+      // All-time: total KES volume + count + per-type breakdown since account creation
+      Transaction.aggregate([
+        {
+          $group: {
+            _id: '$merchantId',
+            totalVolume: { $sum: KES_VOL },
+            totalCount:  { $sum: 1 },
+            inbound:     { $sum: { $cond: [{ $eq: ['$type', 'inbound']    }, KES_VOL, 0] } },
+            outbound:    { $sum: { $cond: [{ $eq: ['$type', 'outbound']   }, KES_VOL, 0] } },
+            bulk_pay:    { $sum: { $cond: [{ $eq: ['$type', 'bulk_pay']   }, KES_VOL, 0] } },
+            fx_swap:     { $sum: { $cond: [{ $eq: ['$type', 'fx_swap']    }, KES_VOL, 0] } },
+            settlement:  { $sum: { $cond: [{ $eq: ['$type', 'settlement'] }, KES_VOL, 0] } },
+          },
+        },
+      ]),
     ]);
-    const txnByMerchant = new Map(txnAgg.map((row) => [String(row._id), row]));
+
+    const txnByMerchant      = new Map(txnAgg.map((r) => [String(r._id), r]));
+    const lifetimeByMerchant = new Map(lifetimeAgg.map((r) => [String(r._id), r]));
 
     const enriched = merchants.map((m) => {
       const t = txnByMerchant.get(String(m._id));
+      const l = lifetimeByMerchant.get(String(m._id));
       const lastActivityAt = [m.lastLogin, t?.lastTxnAt]
         .filter(Boolean)
         .map((d) => new Date(d).getTime())
         .reduce((max, ts) => Math.max(max, ts), 0);
       const lastActivityDate = lastActivityAt ? new Date(lastActivityAt) : null;
       const riskSignals = computeRiskSignals(m, t);
-      // Strip the field we only fetched for signal computation.
       delete m.passwordResetExpires;
       return {
         ...m,
-        txnCount30d: t?.txnCount30d || 0,
-        txnCount24h: t?.txnCount24h || 0,
+        txnCount30d:  t?.txnCount30d  || 0,
+        txnCount24h:  t?.txnCount24h  || 0,
+        volume30d:    t?.volume30d     || 0,
+        totalVolume:  l?.totalVolume   || 0,
+        totalCount:   l?.totalCount    || 0,
+        volumeByType: {
+          inbound:    l?.inbound    || 0,
+          outbound:   l?.outbound   || 0,
+          bulk_pay:   l?.bulk_pay   || 0,
+          fx_swap:    l?.fx_swap    || 0,
+          settlement: l?.settlement || 0,
+        },
         lastActivityAt: lastActivityDate,
-        activityTier: tierFor(lastActivityDate),
+        activityTier:   tierFor(lastActivityDate),
         riskSignals,
       };
     });
@@ -427,12 +471,29 @@ export const getMerchantDetail = async (req, res) => {
     if (!merchant) return res.status(404).json({ error: 'Merchant not found.' });
 
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const [txnCount30d, txnCount24h, lastTxn] = await Promise.all([
+    const oneDayAgo    = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const [txnCount30d, txnCount24h, lastTxn, lifetimeAgg] = await Promise.all([
       Transaction.countDocuments({ merchantId: merchant._id, createdAt: { $gte: thirtyDaysAgo } }),
       Transaction.countDocuments({ merchantId: merchant._id, createdAt: { $gte: oneDayAgo } }),
-      Transaction.findOne({ merchantId: merchant._id }).sort('-createdAt').select('createdAt amount status').lean(),
+      Transaction.findOne({ merchantId: merchant._id }).sort('-createdAt').select('createdAt amount status type').lean(),
+      // All-time KES-normalised volume by transaction type
+      Transaction.aggregate([
+        { $match: { merchantId: merchant._id } },
+        {
+          $group: {
+            _id: null,
+            totalVolume: { $sum: KES_VOL },
+            totalCount:  { $sum: 1 },
+            inbound:     { $sum: { $cond: [{ $eq: ['$type', 'inbound']    }, KES_VOL, 0] } },
+            outbound:    { $sum: { $cond: [{ $eq: ['$type', 'outbound']   }, KES_VOL, 0] } },
+            bulk_pay:    { $sum: { $cond: [{ $eq: ['$type', 'bulk_pay']   }, KES_VOL, 0] } },
+            fx_swap:     { $sum: { $cond: [{ $eq: ['$type', 'fx_swap']    }, KES_VOL, 0] } },
+            settlement:  { $sum: { $cond: [{ $eq: ['$type', 'settlement'] }, KES_VOL, 0] } },
+          },
+        },
+      ]),
     ]);
+    const lt = lifetimeAgg[0] || { totalVolume: 0, totalCount: 0, inbound: 0, outbound: 0, bulk_pay: 0, fx_swap: 0, settlement: 0 };
 
     const lastActivityAt = [merchant.lastLogin, lastTxn?.createdAt]
       .filter(Boolean)

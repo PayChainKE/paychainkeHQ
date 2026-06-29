@@ -36,7 +36,8 @@
           "resizeMode": "contain",
           "backgroundColor": "#faf9f6"
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "web": {
       "favicon": "./assets/favicon.png"
