@@ -25,17 +25,7 @@ export function MerchantAuthProvider({ children }) {
       err => {
         if (err.response?.status === 401) {
           const url = err.config?.url || '';
-          // Don't intercept the login/auth endpoints themselves
-          const isAuthEndpoint = ['/login', '/register', '/verify-otp', '/forgot-password',
-            '/verify-reset-otp', '/reset-password', '/resend-otp'].some(p => url.includes(p));
-          if (!isAuthEndpoint) {
-            localStorage.removeItem(STORAGE_KEY);
-            localStorage.removeItem(TOKEN_KEY);
-            delete axios.defaults.headers.common['Authorization'];
-            setMerchant(null);
-            setToken(null);
-            navigate('/login');
-          }
+          console.warn('Received 401 on', url, '- automatic logout disabled per configuration.');
         }
         return Promise.reject(err);
       }
