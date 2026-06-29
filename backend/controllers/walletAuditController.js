@@ -95,9 +95,47 @@ export const runWalletAudit = async (req, res) => {
       .reduce((sum, r) => sum + parseFloat(r.usdcBalance || 0), 0)
       .toFixed(4);
 
+    // Fetch aggregate transaction volumes
+    const { default: Transaction } = await import('../models/Transaction.js');
+    const KES_VOL_REAL = {
+      $ifNull: ['$kesAmount', { $cond: [{ $eq: ['$currency', 'USDC'] }, 0, '$amount'] }]
+    };
+    
+    const USDC_VOL_REAL = {
+      $ifNull: ['$usdcAmount', { $cond: [{ $eq: ['$currency', 'USDC'] }, '$amount', 0] }]
+    };
+
+    const volumeAgg = await Transaction.aggregate([
+      { $match: { status: { $in: ['completed', 'verified'] } } },
+      { $group: { _id: null, kesVolume: { $sum: KES_VOL_REAL }, usdcVolume: { $sum: USDC_VOL_REAL } } }
+    ]);
+
+    const totalKesVolume = volumeAgg[0]?.kesVolume || 0;
+    const totalUsdcVolume = volumeAgg[0]?.usdcVolume || 0;
+
+    // Fetch lifetime volumes per merchant
+    const merchantVols = await Transaction.aggregate([
+      { $match: { status: { $in: ['completed', 'verified'] }, merchantId: { $ne: null } } },
+      { $group: { _id: '$merchantId', kesVolume: { $sum: KES_VOL_REAL }, usdcVolume: { $sum: USDC_VOL_REAL } } }
+    ]);
+    const volMap = new Map();
+    merchantVols.forEach(v => volMap.set(v._id.toString(), v));
+
+    // Map volumes back into auditResults
+    const enrichedAuditResults = auditResults.map((r, i) => {
+      const merchantId = merchants[i]._id.toString();
+      const vols = volMap.get(merchantId) || { kesVolume: 0, usdcVolume: 0 };
+      return {
+        ...r,
+        merchantId,
+        lifetimeKesVolume: vols.kesVolume,
+        lifetimeUsdcVolume: vols.usdcVolume
+      };
+    });
+
     // 4. Emit clean console.table for CLI script usage
     console.table(
-      auditResults.map(r => ({
+      enrichedAuditResults.map(r => ({
         Name: r.name,
         'Public Key': r.publicKey ? `${r.publicKey.slice(0, 6)}...${r.publicKey.slice(-4)}` : 'N/A',
         Status: r.status,
@@ -116,9 +154,11 @@ export const runWalletAudit = async (req, res) => {
         inactiveWallets,
         noWallet,
         totalUsdcFloat,
+        totalKesVolume,
+        totalUsdcVolume,
         auditedAt: new Date().toISOString(),
       },
-      data: auditResults,
+      data: enrichedAuditResults,
     });
   } catch (error) {
     console.error('❌ Wallet Audit Controller Error:', error.message);

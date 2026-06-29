@@ -44,6 +44,19 @@ function Protected({ children }) {
   return children
 }
 
+function FeatureGuard({ featureName, children }) {
+  const { merchant, isLoading } = useMerchantAuth()
+
+  if (isLoading) return <LoadingScreen />
+  // If the feature object doesn't exist, we assume true for backward compatibility.
+  // Otherwise we check if the flag is explicitly set to false.
+  if (merchant?.features && merchant.features[featureName] === false) {
+    return <Navigate to="/overview" replace />
+  }
+
+  return children
+}
+
 // Redirects already-authenticated users away from /login to the dashboard
 function LoginGuard({ children }) {
   const { isAuthenticated, isLoading } = useMerchantAuth()
@@ -66,16 +79,16 @@ export default function App(){
             <Route path="/overview" element={<Protected><Overview/></Protected>} />
             <Route path="/transactions" element={<Protected><Transactions/></Protected>} />
             <Route path="/bulk-pay" element={<Protected><BulkPay/></Protected>} />
-            <Route path="/inflation-shield" element={<Protected><InflationShield/></Protected>} />
+            <Route path="/inflation-shield" element={<Protected><FeatureGuard featureName="inflationShield"><InflationShield/></FeatureGuard></Protected>} />
             <Route path="/cash-advance" element={<Protected><CashAdvance/></Protected>} />
             <Route path="/tills" element={<Protected><MyTills/></Protected>} />
             <Route path="/trust-score" element={<Protected><TrustScore/></Protected>} />
             <Route path="/profile" element={<Protected><Profile/></Protected>} />
             <Route path="/support" element={<Protected><Support/></Protected>} />
             <Route path="/notifications" element={<Protected><Notifications/></Protected>} />
-            <Route path="/wallet" element={<Protected><Wallet/></Protected>} />
-            <Route path="/send-money" element={<Protected><SendMoney/></Protected>} />
-            <Route path="/request-money" element={<Protected><RequestMoney/></Protected>} />
+            <Route path="/wallet" element={<Protected><FeatureGuard featureName="digitalWallet"><Wallet/></FeatureGuard></Protected>} />
+            <Route path="/send-money" element={<Protected><FeatureGuard featureName="digitalWallet"><SendMoney/></FeatureGuard></Protected>} />
+            <Route path="/request-money" element={<Protected><FeatureGuard featureName="digitalWallet"><RequestMoney/></FeatureGuard></Protected>} />
             {/* Catch-all route for 404s and refreshes */}
             <Route path="*" element={<Navigate to="/overview" replace />} />
           </Routes>

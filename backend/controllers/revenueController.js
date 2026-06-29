@@ -253,6 +253,31 @@ export const getRevenue = async (req, res) => {
       },
     ]);
 
+    // Compute lifetime KES and USDC volumes for these top merchants
+    const topMerchantIds = topMerchantsAgg.map(m => m.merchantId);
+    if (topMerchantIds.length > 0) {
+      const KES_VOL_REAL = {
+        $ifNull: ['$kesAmount', { $cond: [{ $eq: ['$currency', 'USDC'] }, 0, '$amount'] }]
+      };
+      const USDC_VOL_REAL = {
+        $ifNull: ['$usdcAmount', { $cond: [{ $eq: ['$currency', 'USDC'] }, '$amount', 0] }]
+      };
+      
+      const lifetimeVolsAgg = await Transaction.aggregate([
+        { $match: { merchantId: { $in: topMerchantIds }, status: { $in: ['completed', 'verified'] } } },
+        { $group: { _id: '$merchantId', kesVolume: { $sum: KES_VOL_REAL }, usdcVolume: { $sum: USDC_VOL_REAL } } }
+      ]);
+      
+      const volMap = new Map();
+      lifetimeVolsAgg.forEach(v => volMap.set(v._id.toString(), v));
+      
+      topMerchantsAgg.forEach(m => {
+        const vols = volMap.get(m.merchantId.toString()) || { kesVolume: 0, usdcVolume: 0 };
+        m.lifetimeKesVolume = vols.kesVolume;
+        m.lifetimeUsdcVolume = vols.usdcVolume;
+      });
+    }
+
     // ─── Safaricom passthrough — what customers paid Safaricom in fees.
     // Pure transparency line, not PayChain revenue. We build a $switch
     // that picks the tier fee for each doc by KES amount.

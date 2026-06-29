@@ -6,7 +6,7 @@ import { useNotification } from '../../context/NotificationContext'
 import userIcon from '../../assets/user-icon.png'
 import logo from '../../assets/logo2.png'
 
-const navItems = [
+const baseNavItems = [
   { name: 'Overview', icon: 'dashboard', path: '/overview' },
   { name: 'Transactions', icon: 'receipt_long', path: '/transactions' },
   { name: 'Bulk Payments', icon: 'group_add', path: '/bulk-pay' },
@@ -16,8 +16,9 @@ const navItems = [
     path: '/wallet',
     showOverview: true,
     overviewLabel: 'Wallet Overview',
+    featureKey: 'digitalWallet',
     children: [
-      { name: 'Inflation Shield', icon: 'currency_exchange', path: '/inflation-shield' },
+      { name: 'Inflation Shield', icon: 'currency_exchange', path: '/inflation-shield', featureKey: 'inflationShield' },
     ]
   },
   { 
@@ -183,9 +184,26 @@ export default function MerchantSidebar({ isOpen, onClose }) {
 
       {/* Primary Navigation */}
       <nav className="flex-1 mt-6">
-        {navItems.map((item) => (
-          <NavItem key={item.path} item={item} />
-        ))}
+        {(() => {
+          const merchantFeatures = merchant?.features || { digitalWallet: true, inflationShield: true };
+          
+          return baseNavItems.map(item => {
+            // Check parent feature flag
+            if (item.featureKey && merchantFeatures[item.featureKey] === false) {
+              return null;
+            }
+            
+            // Clone item to filter children
+            let filteredItem = { ...item };
+            if (filteredItem.children) {
+              filteredItem.children = filteredItem.children.filter(child => 
+                !child.featureKey || merchantFeatures[child.featureKey] !== false
+              );
+            }
+            
+            return <NavItem key={filteredItem.path} item={filteredItem} />;
+          });
+        })()}
       </nav>
 
       {/* Available Funds Box & Footer Actions */}

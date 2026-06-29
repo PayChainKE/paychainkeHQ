@@ -53,8 +53,8 @@ export default function Transactions() {
       (t.reference || '').toLowerCase().includes(searchQuery.toLowerCase())
     
     if (activeTab === 'All') return matchesSearch
-    if (activeTab === 'Inbound') return matchesSearch && t.type === 'inbound'
-    if (activeTab === 'Outbound') return matchesSearch && (t.type === 'bulk_pay' || t.type === 'settlement' || t.type === 'outbound')
+    if (activeTab === 'Inbound') return matchesSearch && (t.type === 'inbound' || t.type === 'top_up')
+    if (activeTab === 'Outbound') return matchesSearch && (t.type === 'bulk_pay' || t.type === 'settlement' || t.type === 'outbound' || t.type === 'withdrawal')
     if (activeTab === 'FX Swaps') return matchesSearch && t.type === 'fx_swap'
     return matchesSearch
   })
@@ -171,8 +171,8 @@ export default function Transactions() {
         const dt = new Date(tx.createdAt || tx.timestamp)
         const dateStr = dt.toLocaleDateString('en-KE', { day: '2-digit', month: 'short', year: '2-digit' })
         const timeStr = dt.toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit', hour12: false })
-        const isIn  = tx.type === 'inbound'
-        const isOut = ['bulk_pay','settlement','outbound'].includes(tx.type)
+        const isIn  = ['inbound', 'top_up'].includes(tx.type)
+        const isOut = ['bulk_pay','settlement','outbound','withdrawal'].includes(tx.type)
         const isSwp = tx.type === 'fx_swap'
         const rawAmt = tx.amount || tx.kesAmount || 0
 
@@ -382,10 +382,12 @@ export default function Transactions() {
 
   const TX_LABEL = {
     inbound:    'Payment In',
-    outbound:   'Withdrawal',
+    outbound:   'Outbound',
     bulk_pay:   'Bulk Pay',
     settlement: 'Settlement',
     fx_swap:    'FX Swap',
+    top_up:     'Top Up',
+    withdrawal: 'Withdrawal',
   }
   const TX_COLOR = {
     inbound:    'bg-emerald-500/10 text-emerald-700',
@@ -393,6 +395,8 @@ export default function Transactions() {
     bulk_pay:   'bg-orange-500/10 text-orange-700',
     settlement: 'bg-blue-500/10   text-blue-700',
     fx_swap:    'bg-purple-500/10 text-purple-700',
+    top_up:     'bg-teal-500/10 text-teal-700',
+    withdrawal: 'bg-rose-500/10 text-rose-700',
   }
   const txLabel = (type) => TX_LABEL[type] || type.replace(/_/g,' ')
   const txColor = (type) => TX_COLOR[type] || 'bg-slate-500/10 text-slate-700'
@@ -402,12 +406,12 @@ export default function Transactions() {
     return formatKES(tx.amount || tx.kesAmount || 0)
   }
   const txSign = (tx) => {
-    if (tx.type === 'inbound') return '+'
+    if (['inbound', 'top_up'].includes(tx.type)) return '+'
     if (tx.type === 'fx_swap') return '±'
     return '-'
   }
   const txAmountColor = (tx) => {
-    if (tx.type === 'inbound') return 'text-emerald-600'
+    if (['inbound', 'top_up'].includes(tx.type)) return 'text-emerald-600'
     if (tx.type === 'fx_swap') return 'text-purple-600'
     return 'text-primary'
   }
@@ -419,7 +423,7 @@ export default function Transactions() {
   const monthAgo = new Date(today);
   monthAgo.setMonth(today.getMonth() - 1);
 
-  const inboundTxs = liveTransactions.filter(t => t.type === 'inbound');
+  const inboundTxs = liveTransactions.filter(t => ['inbound', 'top_up'].includes(t.type));
   
   const stats = {
     today: inboundTxs.filter(t => new Date(t.createdAt || t.timestamp) >= today).reduce((s, t) => s + (t.kesAmount || t.amount || 0), 0),

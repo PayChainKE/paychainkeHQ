@@ -1019,6 +1019,32 @@ const Chip = ({ children, onClear }) => (
 // Right-side slide-over showing every submitted field grouped by purpose so
 // the admin can sight-verify the merchant's KYB submission.
 const KybDrawer = ({ merchant, loading, error, onClose }) => {
+  const [updatingFeatures, setUpdatingFeatures] = React.useState(false);
+  const [features, setFeatures] = React.useState(merchant?.features || { digitalWallet: true, inflationShield: true });
+
+  React.useEffect(() => {
+    if (merchant?.features) {
+      setFeatures(merchant.features);
+    }
+  }, [merchant]);
+
+  const handleToggleFeature = async (featureName, value) => {
+    try {
+      setUpdatingFeatures(true);
+      const res = await api.patch(`/api/admin/merchants/${merchant._id}/features`, {
+        [featureName]: value
+      });
+      if (res.data.success) {
+        setFeatures(res.data.features);
+      }
+    } catch (err) {
+      console.error('Failed to update features', err);
+      alert('Failed to update feature access.');
+    } finally {
+      setUpdatingFeatures(false);
+    }
+  };
+
   const m = merchant;
   const ready = !loading && !error && m && m.email;
 
@@ -1178,12 +1204,54 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
               )}
             </Section>
 
+            {/* Volume */}
+            <Section title="Transaction Volume" icon="monitoring">
+              <Row label="KES Volume (30d)" value={`KES ${(m.volume30d ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`} />
+              <Row label="USDC Volume (30d)" value={`${(m.usdcVolume30d ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC`} />
+              <Row label="Lifetime KES Volume" value={`KES ${(m.totalVolume ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`} />
+              <Row label="Lifetime USDC Volume" value={`${(m.totalUsdcVolume ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC`} />
+            </Section>
+
             {/* Security flags */}
             <Section title="Security & Access" icon="shield">
               <Row label="Dashboard Password" value={<Badge tone={m.hasPassword ? 'emerald' : 'amber'} icon={m.hasPassword ? 'check' : 'pending'}>{m.hasPassword ? 'Set' : 'Not set (pending setup)'}</Badge>} />
               <Row label="Mobile App PIN" value={<Badge tone={m.hasAppPin ? 'emerald' : 'gray'} icon={m.hasAppPin ? 'check' : 'remove'}>{m.hasAppPin ? 'Configured' : 'Not set'}</Badge>} />
               <Row label="Bulk Pay PIN" value={<Badge tone={m.hasBulkPayPin ? 'emerald' : 'gray'} icon={m.hasBulkPayPin ? 'check' : 'remove'}>{m.hasBulkPayPin ? 'Configured' : 'Not set'}</Badge>} />
               <Row label="Biometrics" value={<Badge tone={m.biometricsEnabled ? 'emerald' : 'gray'} icon={m.biometricsEnabled ? 'check' : 'remove'}>{m.biometricsEnabled ? 'Enabled' : 'Disabled'}</Badge>} />
+            </Section>
+
+            {/* Feature Access */}
+            <Section title="Feature Access" icon="toggle_on">
+              <Row 
+                label="Digital Wallet" 
+                value={
+                  <div className="flex items-center gap-3">
+                    <button 
+                      onClick={() => handleToggleFeature('digitalWallet', !features.digitalWallet)}
+                      disabled={updatingFeatures}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${features.digitalWallet ? 'bg-primary' : 'bg-outline-variant/40'}`}
+                    >
+                      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${features.digitalWallet ? 'translate-x-4.5' : 'translate-x-1'}`} />
+                    </button>
+                    <span className="text-[12px] font-semibold text-on-surface-variant/80">{features.digitalWallet ? 'Enabled' : 'Disabled'}</span>
+                  </div>
+                } 
+              />
+              <Row 
+                label="Inflation Shield" 
+                value={
+                  <div className="flex items-center gap-3">
+                    <button 
+                      onClick={() => handleToggleFeature('inflationShield', !features.inflationShield)}
+                      disabled={updatingFeatures}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${features.inflationShield ? 'bg-primary' : 'bg-outline-variant/40'}`}
+                    >
+                      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${features.inflationShield ? 'translate-x-4.5' : 'translate-x-1'}`} />
+                    </button>
+                    <span className="text-[12px] font-semibold text-on-surface-variant/80">{features.inflationShield ? 'Enabled' : 'Disabled'}</span>
+                  </div>
+                } 
+              />
             </Section>
           </div>
         )}

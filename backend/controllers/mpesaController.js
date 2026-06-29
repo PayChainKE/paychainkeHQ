@@ -287,7 +287,7 @@ export const initiateSTKPush = async (req, res) => {
             await Transaction.create({
               merchantId: merchant._id,
               accountNumber: merchant.paybillAccount || 'WALLET_FUND',
-              type: 'inbound',
+              type: 'top_up',
               amount: intAmount,
               kesAmount: intAmount,
               currency: 'KES',
@@ -423,7 +423,7 @@ export const stkCallback = async (req, res) => {
         await Transaction.create({
           merchantId: merchant._id,
           accountNumber: merchant.paybillAccount || 'WALLET_FUND',
-          type: 'inbound',
+          type: 'top_up',
           amount: stkReq.amount,
           kesAmount: stkReq.amount,
           currency: 'KES',
@@ -522,7 +522,7 @@ export const initiateB2C = async (req, res) => {
     const tx = await Transaction.create({
       merchantId: merchant._id,
       accountNumber: merchant.paybillAccount || 'WALLET_FUND',
-      type: 'outbound',
+      type: 'withdrawal',
       amount: amount,
       kesAmount: amount,
       currency: 'KES',

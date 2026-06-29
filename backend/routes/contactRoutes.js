@@ -9,8 +9,12 @@ import {
   updateStatus,
   replyToMessage,
   deleteMessage,
+  bulkDeleteMessages,
+  getDeliveryStatus,
+  uploadAttachment
 } from '../controllers/contactController.js';
 import { protect } from '../middleware/authMiddleware.js';
+import { upload } from '../utils/cloudinary.js';
 
 const router = express.Router();
 
@@ -34,5 +38,8 @@ router.patch('/:id/priority', protect, togglePriority);
 router.patch('/:id/status', protect, updateStatus);
 router.post('/:id/reply', protect, replyLimiter, replyToMessage);
 router.delete('/:id', protect, deleteMessage);
+router.post('/bulk-delete', protect, bulkDeleteMessages);
+router.get('/delivery-status/:resendId', protect, getDeliveryStatus);
+router.post('/upload-attachment', protect, upload.single('file'), uploadAttachment);
 
 export default router;

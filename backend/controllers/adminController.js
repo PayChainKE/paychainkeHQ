@@ -122,6 +122,14 @@ const KES_VOL = {
   },
 };
 
+const KES_VOL_REAL = {
+  $ifNull: ['$kesAmount', { $cond: [{ $eq: ['$currency', 'USDC'] }, 0, '$amount'] }]
+};
+
+const USDC_VOL_REAL = {
+  $ifNull: ['$usdcAmount', { $cond: [{ $eq: ['$currency', 'USDC'] }, '$amount', 0] }]
+};
+
 export const getMerchants = async (req, res) => {
   try {
     // Include passwordResetExpires (select:false by default) so we can compute
@@ -145,7 +153,8 @@ export const getMerchants = async (req, res) => {
             _id: '$merchantId',
             txnCount30d: { $sum: 1 },
             txnCount24h: { $sum: { $cond: [{ $gte: ['$createdAt', oneDayAgo] }, 1, 0] } },
-            volume30d:   { $sum: KES_VOL },
+            volume30d:   { $sum: KES_VOL_REAL },
+            usdcVolume30d: { $sum: USDC_VOL_REAL },
             lastTxnAt:   { $max: '$createdAt' },
           },
         },
@@ -155,13 +164,14 @@ export const getMerchants = async (req, res) => {
         {
           $group: {
             _id: '$merchantId',
-            totalVolume: { $sum: KES_VOL },
+            totalVolume: { $sum: KES_VOL_REAL },
+            totalUsdcVolume: { $sum: USDC_VOL_REAL },
             totalCount:  { $sum: 1 },
-            inbound:     { $sum: { $cond: [{ $eq: ['$type', 'inbound']    }, KES_VOL, 0] } },
-            outbound:    { $sum: { $cond: [{ $eq: ['$type', 'outbound']   }, KES_VOL, 0] } },
-            bulk_pay:    { $sum: { $cond: [{ $eq: ['$type', 'bulk_pay']   }, KES_VOL, 0] } },
-            fx_swap:     { $sum: { $cond: [{ $eq: ['$type', 'fx_swap']    }, KES_VOL, 0] } },
-            settlement:  { $sum: { $cond: [{ $eq: ['$type', 'settlement'] }, KES_VOL, 0] } },
+            inbound:     { $sum: { $cond: [{ $eq: ['$type', 'inbound']    }, KES_VOL_REAL, 0] } },
+            outbound:    { $sum: { $cond: [{ $eq: ['$type', 'outbound']   }, KES_VOL_REAL, 0] } },
+            bulk_pay:    { $sum: { $cond: [{ $eq: ['$type', 'bulk_pay']   }, KES_VOL_REAL, 0] } },
+            fx_swap:     { $sum: { $cond: [{ $eq: ['$type', 'fx_swap']    }, KES_VOL_REAL, 0] } },
+            settlement:  { $sum: { $cond: [{ $eq: ['$type', 'settlement'] }, KES_VOL_REAL, 0] } },
           },
         },
       ]),
@@ -185,7 +195,9 @@ export const getMerchants = async (req, res) => {
         txnCount30d:  t?.txnCount30d  || 0,
         txnCount24h:  t?.txnCount24h  || 0,
         volume30d:    t?.volume30d     || 0,
+        usdcVolume30d: t?.usdcVolume30d || 0,
         totalVolume:  l?.totalVolume   || 0,
+        totalUsdcVolume: l?.totalUsdcVolume || 0,
         totalCount:   l?.totalCount    || 0,
         volumeByType: {
           inbound:    l?.inbound    || 0,
@@ -448,6 +460,56 @@ export const unflagMerchant = async (req, res) => {
   }
 };
 
+/**
+ * Update merchant features (digitalWallet, inflationShield)
+ * @route   PATCH /api/admin/merchants/:id/features
+ * @access  Private/Admin
+ */
+export const updateMerchantFeatures = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { digitalWallet, inflationShield } = req.body;
+    
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid merchant id.' });
+    }
+    
+    const merchant = await Merchant.findById(id);
+    if (!merchant) {
+      return res.status(404).json({ error: 'Merchant not found' });
+    }
+    
+    // Initialize if it doesn't exist
+    if (!merchant.features) {
+      merchant.features = { digitalWallet: true, inflationShield: true };
+    }
+    
+    if (digitalWallet !== undefined) {
+      merchant.features.digitalWallet = digitalWallet;
+    }
+    if (inflationShield !== undefined) {
+      merchant.features.inflationShield = inflationShield;
+    }
+    
+    await merchant.save();
+    
+    logAudit({
+      action: 'admin.merchant.features_updated', category: 'admin', severity: 'info',
+      message: `Updated feature access (Wallet: ${merchant.features.digitalWallet}, Shield: ${merchant.features.inflationShield})`,
+      merchant, actor: adminActor(req.admin), req,
+    });
+    
+    res.json({ 
+      success: true, 
+      features: merchant.features, 
+      message: 'Merchant features updated successfully' 
+    });
+  } catch (error) {
+    console.error('Update features error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
 // @desc    Get a single merchant's full profile for KYB review. Returns every
 //          submitted field plus computed activity metrics. Sensitive material
 //          (password hash, stellar secret, PIN hashes) is converted to
@@ -686,6 +748,13 @@ export const getLedger = async (req, res) => {
     const status = req.query.status && req.query.status !== 'all' ? req.query.status : null;
     const q = (req.query.q || '').trim();
 
+    const KES_VOL_REAL = {
+      $sum: { $ifNull: ['$kesAmount', { $cond: [{ $eq: ['$currency', 'USDC'] }, 0, '$amount'] }] }
+    };
+    const USDC_VOL_REAL = {
+      $sum: { $ifNull: ['$usdcAmount', { $cond: [{ $eq: ['$currency', 'USDC'] }, '$amount', 0] }] }
+    };
+
     const now = new Date();
     const days = range === '24h' ? 1 : range === '7d' ? 7 : range === '30d' ? 30 : 365 * 5;
     const since = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
@@ -703,7 +772,7 @@ export const getLedger = async (req, res) => {
       ];
     }
 
-    const [total, txns, allInRange, prev, typeAgg, daily] = await Promise.all([
+    const [total, txns, allInRange, prev, typeAgg, daily, lifetimeAgg] = await Promise.all([
       Transaction.countDocuments(baseFilter),
       Transaction.find(baseFilter)
         .sort('-createdAt')
@@ -718,9 +787,8 @@ export const getLedger = async (req, res) => {
           $group: {
             _id: null,
             count: { $sum: 1 },
-            volume: { $sum: '$amount' },
-            kesVolume: { $sum: '$kesAmount' },
-            usdcVolume: { $sum: '$usdcAmount' },
+            kesVolume: KES_VOL_REAL,
+            usdcVolume: USDC_VOL_REAL,
             completed: { $sum: { $cond: [{ $in: ['$status', ['completed', 'verified']] }, 1, 0] } },
             failed: { $sum: { $cond: [{ $eq: ['$status', 'failed'] }, 1, 0] } },
             pending: { $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] } },
@@ -729,11 +797,11 @@ export const getLedger = async (req, res) => {
       ]),
       Transaction.aggregate([
         { $match: { createdAt: { $gte: prevSince, $lt: since } } },
-        { $group: { _id: null, count: { $sum: 1 }, volume: { $sum: '$amount' } } },
+        { $group: { _id: null, count: { $sum: 1 }, kesVolume: KES_VOL_REAL, usdcVolume: USDC_VOL_REAL } },
       ]),
       Transaction.aggregate([
         { $match: { createdAt: { $gte: since } } },
-        { $group: { _id: '$type', count: { $sum: 1 }, volume: { $sum: '$amount' } } },
+        { $group: { _id: '$type', count: { $sum: 1 }, volume: KES_VOL_REAL } },
         { $sort: { volume: -1 } },
       ]),
       Transaction.aggregate([
@@ -741,38 +809,42 @@ export const getLedger = async (req, res) => {
         {
           $group: {
             _id: { $dateToString: { format: range === '24h' ? '%Y-%m-%d %H:00' : '%Y-%m-%d', date: '$createdAt' } },
-            volume: { $sum: '$amount' },
+            volume: KES_VOL_REAL,
             count: { $sum: 1 },
           },
         },
         { $sort: { _id: 1 } },
       ]),
+      Transaction.aggregate([
+        { $match: { status: { $in: ['completed', 'verified'] } } },
+        { $group: { _id: null, count: { $sum: 1 }, kesVolume: KES_VOL_REAL, usdcVolume: USDC_VOL_REAL } },
+      ]),
     ]);
 
-    const cur = allInRange[0] || { count: 0, volume: 0, kesVolume: 0, usdcVolume: 0, completed: 0, failed: 0, pending: 0 };
-    const prv = prev[0] || { count: 0, volume: 0 };
+    const cur = allInRange[0] || { count: 0, kesVolume: 0, usdcVolume: 0, completed: 0, failed: 0, pending: 0 };
+    const prv = prev[0] || { count: 0, kesVolume: 0, usdcVolume: 0 };
     const pct = (a, b) => (b ? Number((((a - b) / b) * 100).toFixed(1)) : (a > 0 ? 100 : 0));
 
     const settlementRatio = cur.count > 0 ? Number(((cur.completed / cur.count) * 100).toFixed(1)) : 100;
-    // Fee model placeholder — 1% of completed volume. Replace with real fee
-    // ledger once it's available.
-    const estimatedFees = cur.volume * 0.01;
-
+    
     res.json({
       success: true,
       data: {
         range,
         kpis: {
-          volume: { value: cur.volume, change: pct(cur.volume, prv.volume) },
+          volume: { value: cur.kesVolume, change: pct(cur.kesVolume, prv.kesVolume) },
+          usdcVolume: { value: cur.usdcVolume, change: pct(cur.usdcVolume, prv.usdcVolume) },
           count: { value: cur.count, change: pct(cur.count, prv.count) },
           settlementRatio,
-          estimatedFees,
+          estimatedFees: 0, // Removed mock fee data, real fee ledger not yet implemented
           failed: cur.failed,
           pending: cur.pending,
+          lifetimeVolume: lifetimeAgg[0]?.kesVolume || 0,
+          lifetimeUsdcVolume: lifetimeAgg[0]?.usdcVolume || 0,
         },
         assets: {
-          kes: cur.kesVolume || cur.volume,
-          usdc: cur.usdcVolume || 0,
+          kes: cur.kesVolume,
+          usdc: cur.usdcVolume,
         },
         typeMix: typeAgg.map((r) => ({ type: r._id || 'other', count: r.count, volume: r.volume })),
         series: daily.map((r) => ({ bucket: r._id, volume: r.volume, count: r.count })),
@@ -805,7 +877,7 @@ export const getLedger = async (req, res) => {
     });
   } catch (error) {
     console.error('Get Ledger Error:', error);
-    res.status(500).json({ error: 'Server Error' });
+    res.status(500).json({ error: error.message, stack: error.stack });
   }
 };
 
@@ -852,29 +924,23 @@ export const getInsights = async (req, res) => {
       $or: [{ lastLogin: { $lt: dormantSince } }, { lastLogin: null }],
     });
 
-    // KES-normalised volume: fx_swap and settlement transactions store their
-    // `amount` in USDC; `kesAmount` holds the correct KES equivalent for those.
-    // Using $amount directly causes USDC amounts (~2.12) to appear as KES 2,
-    // making FX Swaps and Settlements invisible in charts.
-    const kesVol = {
-      $sum: {
-        $cond: {
-          if: { $eq: ['$currency', 'USDC'] },
-          then: { $ifNull: ['$kesAmount', 0] },
-          else: '$amount',
-        },
-      },
+    // Real KES and USDC volume definitions
+    const kesVolReal = {
+      $sum: { $ifNull: ['$kesAmount', { $cond: [{ $eq: ['$currency', 'USDC'] }, 0, '$amount'] }] }
+    };
+    const usdcVolReal = {
+      $sum: { $ifNull: ['$usdcAmount', { $cond: [{ $eq: ['$currency', 'USDC'] }, '$amount', 0] }] }
     };
 
-    // ── Transaction / GTV ────────────────────────────────────────────
-    const [gtvCurr, gtvPrev, gtvSeries] = await Promise.all([
+    // ── Transaction / GTV / GMV ────────────────────────────────────────────
+    const [gtvCurr, gtvPrev, gtvSeries, lifetimeAgg] = await Promise.all([
       Transaction.aggregate([
         { $match: { createdAt: { $gte: since }, status: { $in: ['completed', 'verified'] } } },
-        { $group: { _id: null, count: { $sum: 1 }, volume: kesVol } },
+        { $group: { _id: null, count: { $sum: 1 }, kesVolume: kesVolReal, usdcVolume: usdcVolReal } },
       ]),
       Transaction.aggregate([
         { $match: { createdAt: { $gte: prevSince, $lt: since }, status: { $in: ['completed', 'verified'] } } },
-        { $group: { _id: null, count: { $sum: 1 }, volume: kesVol } },
+        { $group: { _id: null, count: { $sum: 1 }, kesVolume: kesVolReal, usdcVolume: usdcVolReal } },
       ]),
       // Daily volume series for the sparkline / area chart.
       Transaction.aggregate([
@@ -883,15 +949,22 @@ export const getInsights = async (req, res) => {
           $group: {
             _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
             count: { $sum: 1 },
-            volume: kesVol,
+            kesVolume: kesVolReal,
+            usdcVolume: usdcVolReal,
           },
         },
         { $sort: { _id: 1 } },
       ]),
+      Transaction.aggregate([
+        { $match: { status: { $in: ['completed', 'verified'] } } },
+        { $group: { _id: null, count: { $sum: 1 }, kesVolume: kesVolReal, usdcVolume: usdcVolReal } },
+      ]),
     ]);
 
-    const gtvVolume = gtvCurr[0]?.volume || 0;
-    const gtvVolumePrev = gtvPrev[0]?.volume || 0;
+    const gtvVolume = gtvCurr[0]?.kesVolume || 0;
+    const gtvVolumePrev = gtvPrev[0]?.kesVolume || 0;
+    const gmvVolume = gtvCurr[0]?.usdcVolume || 0;
+    const gmvVolumePrev = gtvPrev[0]?.usdcVolume || 0;
     const gtvCount = gtvCurr[0]?.count || 0;
     const gtvCountPrev = gtvPrev[0]?.count || 0;
 
@@ -1043,13 +1116,14 @@ export const getInsights = async (req, res) => {
     const waitlistTotal = Object.values(wlByStatus).reduce((s, n) => s + n, 0);
 
     // ── Top merchants by volume ──────────────────────────────────────
+    // ── Top merchants by volume ──────────────────────────────────────
     const topMerchantsRaw = await Transaction.aggregate([
       { $match: { createdAt: { $gte: since }, status: { $in: ['completed', 'verified'] }, merchantId: { $ne: null } } },
       {
         $group: {
           _id: '$merchantId',
           txnCount: { $sum: 1 },
-          volume: kesVol,
+          volume: kesVolReal,
         },
       },
       { $sort: { volume: -1 } },
@@ -1078,7 +1152,7 @@ export const getInsights = async (req, res) => {
     // All statuses included so fx_swap / settlement rows are never filtered out.
     const txnTypeMix = await Transaction.aggregate([
       { $match: { createdAt: { $gte: since } } },
-      { $group: { _id: '$type', count: { $sum: 1 }, volume: kesVol } },
+      { $group: { _id: '$type', count: { $sum: 1 }, volume: kesVolReal } },
       { $sort: { volume: -1 } },
     ]);
 
@@ -1102,6 +1176,11 @@ export const getInsights = async (req, res) => {
             prev: gtvVolumePrev,
             change: pctChange(gtvVolume, gtvVolumePrev),
           },
+          gmv: {
+            value: gmvVolume,
+            prev: gmvVolumePrev,
+            change: pctChange(gmvVolume, gmvVolumePrev),
+          },
           txnCount: {
             value: gtvCount,
             prev: gtvCountPrev,
@@ -1114,6 +1193,8 @@ export const getInsights = async (req, res) => {
           },
           totalMerchants,
           activeMerchants,
+          lifetimeVolume: lifetimeAgg[0]?.kesVolume || 0,
+          lifetimeUsdcVolume: lifetimeAgg[0]?.usdcVolume || 0,
         },
         // Health
         health: {
@@ -1136,7 +1217,7 @@ export const getInsights = async (req, res) => {
           activeMerchants,
         },
         // Series
-        gtvSeries: gtvSeries.map((r) => ({ date: r._id, count: r.count, volume: r.volume })),
+        gtvSeries: gtvSeries.map((r) => ({ date: r._id, count: r.count, volume: r.kesVolume })),
         signupsSeries: signupsSeries.map((r) => ({ date: r._id, count: r.count })),
         dailySignups,
         weeklySignups,

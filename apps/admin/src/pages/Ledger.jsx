@@ -16,6 +16,8 @@ const TYPE_META = {
   bulk_pay:   { label: 'Bulk Pay',    short: 'BP',  color: 'bg-violet-50 text-violet-700 border-violet-200',     dot: '#8B5CF6' },
   settlement: { label: 'Settlement',  short: 'SET', color: 'bg-amber-50 text-amber-700 border-amber-200',        dot: '#F59E0B' },
   fx_swap:    { label: 'FX Swap',     short: 'FX',  color: 'bg-pink-50 text-pink-700 border-pink-200',           dot: '#EC4899' },
+  top_up:     { label: 'Top Up',      short: 'TOP', color: 'bg-teal-50 text-teal-700 border-teal-200',           dot: '#14B8A6' },
+  withdrawal: { label: 'Withdrawal',  short: 'WDL', color: 'bg-orange-50 text-orange-700 border-orange-200',     dot: '#F97316' },
   other:      { label: 'Other',       short: '—',   color: 'bg-gray-50 text-gray-700 border-gray-200',           dot: '#6B7280' },
 };
 
@@ -257,7 +259,7 @@ const Ledger = () => {
                     amount={fmtKES(data.assets.kes)}
                     rawAmount={data.assets.kes}
                     color="emerald"
-                    chain="Mainnet"
+                    chain="PayChain Master Paybill"
                   />
                   <AssetTile
                     label="USD Coin"
@@ -265,7 +267,7 @@ const Ledger = () => {
                     amount={fmtUSDC(data.assets.usdc)}
                     rawAmount={data.assets.usdc}
                     color="blue"
-                    chain="Stellar"
+                    chain="PayChain Stellar Network"
                   />
                 </div>
                 <div className="mt-4 pt-4 border-t border-outline-variant/10 flex items-center justify-between text-[11px]">
@@ -275,11 +277,13 @@ const Ledger = () => {
               </div>
 
               {/* KPIs */}
-              <div className="lg:col-span-7 grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <KpiCard label="Volume" value={fmtKES(data.kpis.volume.value)} change={data.kpis.volume.change} icon="payments" tone="primary" />
-                <KpiCard label="Transactions" value={fmtNum(data.kpis.count.value)} change={data.kpis.count.change} icon="receipt_long" tone="blue" />
-                <KpiCard label="Settlement Ratio" value={`${data.kpis.settlementRatio}%`} icon="check_circle" tone="emerald" subtitle={`${data.kpis.failed} failed`} noDelta />
-                <KpiCard label="Est. Fees" value={fmtKES(data.kpis.estimatedFees)} icon="account_balance" tone="amber" subtitle="1% headline" noDelta />
+              <div className="lg:col-span-7 grid grid-cols-2 lg:grid-cols-3 gap-3">
+                <KpiCard label="KES Volume" value={fmtKES(data.kpis?.volume?.value)} change={data.kpis?.volume?.change} icon="payments" tone="primary" />
+                <KpiCard label="USDC Volume" value={fmtUSDC(data.kpis?.usdcVolume?.value)} change={data.kpis?.usdcVolume?.change} icon="currency_exchange" tone="blue" />
+                <KpiCard label="Transactions" value={fmtNum(data.kpis.count.value)} change={data.kpis.count.change} icon="receipt_long" tone="emerald" />
+                <KpiCard label="Settlement Ratio" value={`${data.kpis.settlementRatio}%`} icon="check_circle" tone="amber" subtitle={`${data.kpis.failed} failed`} noDelta />
+                <KpiCard label="Lifetime KES" value={fmtKES(data.kpis?.lifetimeVolume)} icon="account_balance" tone="emerald" subtitle="All time total" noDelta />
+                <KpiCard label="Lifetime USDC" value={`${fmtNum(data.kpis?.lifetimeUsdcVolume)} USDC`} icon="public" tone="blue" subtitle="All time total" noDelta />
               </div>
             </div>
 
