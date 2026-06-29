@@ -14,13 +14,13 @@
   "icons": [
     {
       "src": "/favicon.png",
-      "sizes": "192x192",
+      "sizes": "85x81",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
       "src": "/logo.png",
-      "sizes": "512x512",
+      "sizes": "340x89",
       "type": "image/png",
       "purpose": "any maskable"
     }
