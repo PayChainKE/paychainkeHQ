@@ -2,7 +2,8 @@ import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import helmet from 'helmet';
-import connectDB from './config/database.js';
+import connectDB, { isDbReady, startBackgroundDbRetry } from './config/database.js';
+import { requireDb } from './middleware/requireDb.js';
 import authRoutes from './routes/authRoutes.js';
 import waitlistRoutes from './routes/waitlistRoutes.js';
 import newsletterRoutes from './routes/newsletterRoutes.js';
@@ -17,18 +18,6 @@ import { backfillTransactionFees } from './migrations/backfillTransactionFees.js
 
 dotenv.config();
 
-// Connect to Database, then run idempotent boot-time migrations. In dev we
-// keep the process alive even if Mongo is unreachable (Atlas whitelist drift,
-// VPN flap) so nodemon doesn't crash-loop — operator just fixes the IP and
-// hits save to retry.
-connectDB()
-  .then(() => ensurePrimaryOwner())
-  .then(() => backfillTransactionFees())
-  .catch(() => { /* error already printed with actionable hint in connectDB */ });
-
-const app = express();
-
-// Middleware
 const allowedOrigins = [
   // Public marketing site
   'https://www.paychain.co.ke',
@@ -57,42 +46,50 @@ const allowedOrigins = [
   'http://127.0.0.1:8081',
 ];
 
+const app = express();
+
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    
+
     const isAllowed = allowedOrigins.includes(origin) || (origin && origin.includes('vercel.app'));
-    
+
     if (isAllowed) {
       callback(null, true);
     } else {
       console.warn(`⚠️ CORS blocked for origin: ${origin}`);
-      // Returning false instead of an Error prevents the CORS middleware from 
-      // skipping the response headers, which helps avoid "No Access-Control-Allow-Origin" errors
       callback(null, false);
     }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'X-Client-Platform'],
-  optionsSuccessStatus: 200 // Some older browsers (IE11, various SmartTVs) choke on 204
+  optionsSuccessStatus: 200,
 }));
-// Trust Render's proxy so req.ip reflects the real client (needed for rate limiting).
+
 app.set('trust proxy', 1);
 
-// Security headers: HSTS, frame guard, no-sniff, referrer policy, XSS protections, etc.
 app.use(helmet({
-  // The admin/merchant dashboards live on different origins; CSP is enforced at
-  // the frontend hosting layer (Vercel) so we keep the backend CSP off here to
-  // avoid blocking cross-origin API responses.
   contentSecurityPolicy: false,
   crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
 
 app.use(express.json({ limit: '1mb' }));
 
-// Routes
+app.get('/', (req, res) => {
+  res.send('PayChainKE API is running...');
+});
+
+app.get('/api/health', (req, res) => {
+  const dbReady = isDbReady();
+  res.status(dbReady ? 200 : 503).json({
+    ok: dbReady,
+    db: dbReady ? 'connected' : 'disconnected',
+  });
+});
+
+// All data routes require an active Mongo connection.
+app.use('/api', requireDb);
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/waitlist', waitlistRoutes);
@@ -103,12 +100,6 @@ app.use('/api/transactions', transactionRoutes);
 app.use('/api/callbacks', mpesaRoutes);
 app.use('/api/trust-score', trustScoreRoutes);
 
-// Basic Route
-app.get('/', (req, res) => {
-  res.send('PayChainKE API is running...');
-});
-
-// Global Error Handler to always return JSON (e.g. for Multer boundary errors)
 app.use((err, req, res, next) => {
   console.error('Unhandled Error:', err);
   res.status(500).json({ error: err.message || 'An unexpected server error occurred' });
@@ -116,6 +107,25 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
-});
+async function bootstrap() {
+  try {
+    await connectDB();
+    await ensurePrimaryOwner();
+    await backfillTransactionFees();
+  } catch (error) {
+    if (process.env.NODE_ENV === 'production') {
+      process.exit(1);
+    }
+    console.warn('⚠️ Starting API without Mongo — /api routes return 503 until connected');
+    startBackgroundDbRetry();
+  }
+
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+    if (!isDbReady()) {
+      console.warn('⚠️ MongoDB not connected — retrying in background');
+    }
+  });
+}
+
+bootstrap();

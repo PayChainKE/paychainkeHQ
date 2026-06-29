@@ -3,9 +3,17 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Detect the classic "IP not on Atlas allow-list" failure so we can give an
-// actionable hint instead of the generic stack trace. Atlas returns either an
-// ECONNREFUSED on every shard or a "whitelist" hint in the error message.
+// Fail fast instead of buffering queries for 10s when Mongo isn't connected yet.
+mongoose.set('bufferCommands', false);
+
+const CONNECT_OPTS = {
+  serverSelectionTimeoutMS: 12_000,
+  maxPoolSize: 10,
+  heartbeatFrequencyMS: 10_000,
+};
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 const looksLikeIpWhitelist = (err) => {
   const msg = String(err?.message || '').toLowerCase();
   return (
@@ -32,35 +40,102 @@ const printAtlasHelp = (err) => {
   console.error('Raw error:', err?.message || err, '\n');
 };
 
-const connectDB = async () => {
-  const dbUri = process.env.MONGO_URI || process.env.MONGODB_URI;
+const logConnectError = (error) => {
+  if (looksLikeIpWhitelist(error)) {
+    printAtlasHelp(error);
+  } else {
+    console.error(`❌ Connection Error: ${error.message}`);
+  }
+};
 
+export const isDbReady = () => mongoose.connection.readyState === 1;
+
+const getDbUri = () => {
+  const dbUri = process.env.MONGO_URI || process.env.MONGODB_URI;
   if (!dbUri) {
     console.error('❌ CRITICAL ERROR: Database URI is undefined.');
     console.error('Please ensure MONGO_URI or MONGODB_URI is set in your environment variables.');
     process.exit(1);
   }
+  return dbUri;
+};
 
-  try {
-    // Slightly longer initial timeout so users on slow links get a clean
-    // error instead of a premature "no servers" failure.
-    const conn = await mongoose.connect(dbUri, { serverSelectionTimeoutMS: 12_000 });
-    console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
-    console.log(`📂 Database Name: ${conn.connection.db.databaseName}`);
-    return conn;
-  } catch (error) {
-    if (looksLikeIpWhitelist(error)) {
-      printAtlasHelp(error);
-    } else {
-      console.error(`❌ Connection Error: ${error.message}`);
+let reconnectTimer = null;
+let reconnectInFlight = false;
+
+const scheduleReconnect = () => {
+  if (reconnectTimer || reconnectInFlight || isDbReady()) return;
+
+  reconnectTimer = setTimeout(async () => {
+    reconnectTimer = null;
+    reconnectInFlight = true;
+    try {
+      await connectDB({ silent: true });
+      console.log('✅ MongoDB reconnected');
+    } catch (error) {
+      logConnectError(error);
+      scheduleReconnect();
+    } finally {
+      reconnectInFlight = false;
     }
-    // In dev (NODE_ENV !== 'production'), keep the process alive so nodemon
-    // doesn't crash-loop. The API will 503 on DB-dependent routes until the
-    // operator fixes the network issue, then the next save restarts the
-    // server and we retry the connection.
-    if (process.env.NODE_ENV === 'production') process.exit(1);
-    throw error;
+  }, 5_000);
+};
+
+const attachConnectionHandlers = () => {
+  if (mongoose.connection.listenerCount('disconnected') > 0) return;
+
+  mongoose.connection.on('disconnected', () => {
+    console.warn('⚠️ MongoDB disconnected — scheduling reconnect');
+    scheduleReconnect();
+  });
+
+  mongoose.connection.on('reconnected', () => {
+    console.log('✅ MongoDB reconnected');
+  });
+
+  mongoose.connection.on('error', (err) => {
+    console.error('❌ MongoDB connection error:', err.message);
+  });
+};
+
+/**
+ * Connect to MongoDB with retries. Returns once connected.
+ * Throws after all attempts fail so callers can decide whether to exit.
+ */
+const connectDB = async ({ retries = 5, silent = false } = {}) => {
+  const dbUri = getDbUri();
+
+  if (isDbReady()) return mongoose.connection;
+
+  attachConnectionHandlers();
+
+  let lastError;
+  for (let attempt = 1; attempt <= retries; attempt += 1) {
+    try {
+      const conn = await mongoose.connect(dbUri, CONNECT_OPTS);
+      if (!silent) {
+        console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
+        console.log(`📂 Database Name: ${conn.connection.db.databaseName}`);
+      }
+      return conn;
+    } catch (error) {
+      lastError = error;
+      if (!silent) {
+        logConnectError(error);
+        if (attempt < retries) {
+          const delayMs = Math.min(2_000 * attempt, 10_000);
+          console.warn(`⏳ MongoDB retry ${attempt}/${retries} in ${delayMs / 1000}s…`);
+        }
+      }
+      if (attempt < retries) await sleep(Math.min(2_000 * attempt, 10_000));
+    }
   }
+
+  throw lastError;
+};
+
+export const startBackgroundDbRetry = () => {
+  scheduleReconnect();
 };
 
 export default connectDB;
