@@ -1,9 +1,9 @@
 import express from 'express';
 import { getTrustScore } from '../controllers/trustScoreController.js';
-import { protect } from '../middleware/authMiddleware.js';
+import { protectMerchant } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-router.get('/', protect, getTrustScore);
+router.get('/', protectMerchant, getTrustScore);
 
 export default router;

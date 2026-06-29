@@ -29,12 +29,16 @@ export function MerchantAuthProvider({ children }) {
           const isAuthEndpoint = ['/login', '/register', '/verify-otp', '/forgot-password',
             '/verify-reset-otp', '/reset-password', '/resend-otp'].some(p => url.includes(p));
           if (!isAuthEndpoint) {
-            localStorage.removeItem(STORAGE_KEY);
-            localStorage.removeItem(TOKEN_KEY);
-            delete axios.defaults.headers.common['Authorization'];
-            setMerchant(null);
-            setToken(null);
-            navigate('/login');
+            if (err.response?.data?.code === 'TOKEN_EXPIRED') {
+              localStorage.removeItem(STORAGE_KEY);
+              localStorage.removeItem(TOKEN_KEY);
+              delete axios.defaults.headers.common['Authorization'];
+              setMerchant(null);
+              setToken(null);
+              navigate('/login');
+            } else {
+              console.warn('Ignored 401 to prevent auto-logout on', url, err.response?.data);
+            }
           }
         }
         return Promise.reject(err);
