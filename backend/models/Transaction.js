@@ -13,7 +13,7 @@ const transactionSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['inbound', 'outbound', 'bulk_pay', 'settlement', 'fx_swap'],
+    enum: ['inbound', 'outbound', 'bulk_pay', 'settlement', 'fx_swap', 'top_up', 'withdrawal'],
     required: true
   },
   amount: {

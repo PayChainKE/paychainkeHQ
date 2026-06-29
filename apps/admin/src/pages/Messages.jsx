@@ -64,12 +64,17 @@ const Messages = () => {
 
   // Composer
   const [replyDraft, setReplyDraft] = useState('');
+  const [replySubject, setReplySubject] = useState('');
+  const [attachments, setAttachments] = useState([]);
+  const [uploading, setUploading] = useState(false);
   const [replyBusy, setReplyBusy] = useState(false);
   const [replyError, setReplyError] = useState('');
   const replyRef = useRef(null);
 
   // Confirm-delete modal
   const [deleteState, setDeleteState] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [bulkDeleteBusy, setBulkDeleteBusy] = useState(false);
 
   const fetchMessages = useCallback(async () => {
     setLoading(true);
@@ -135,7 +140,12 @@ const Messages = () => {
   }, [selected?._id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reset composer when conversation changes
-  useEffect(() => { setReplyDraft(''); setReplyError(''); }, [selectedId]);
+  useEffect(() => { 
+    setReplyDraft(''); 
+    setReplySubject(selected ? `Re: ${selected.subject}` : ''); 
+    setReplyError(''); 
+    setAttachments([]); 
+  }, [selectedId, selected]);
 
   // ── Actions ───────────────────────────────────────────────────────
   function selectMessage(id) {
@@ -177,7 +187,7 @@ const Messages = () => {
     setReplyBusy(true);
     setReplyError('');
     try {
-      const res = await api.post(`/api/contact/${selected._id}/reply`, { body });
+      const res = await api.post(`/api/contact/${selected._id}/reply`, { body, subject: replySubject, attachments });
       if (res.data?.success) {
         setMessages((arr) => arr.map((m) => (m._id === selected._id ? { ...m, ...res.data.data } : m)));
         setReplyDraft('');
@@ -210,6 +220,32 @@ const Messages = () => {
       alert(e?.response?.data?.error || 'Delete failed.');
       setDeleteState(null);
     }
+  }
+
+  async function bulkDelete() {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`Delete ${selectedIds.size} selected messages?`)) return;
+    setBulkDeleteBusy(true);
+    try {
+      await api.post('/api/contact/bulk-delete', { ids: Array.from(selectedIds) });
+      setMessages((arr) => arr.filter((m) => !selectedIds.has(m._id)));
+      if (selectedIds.has(selectedId)) {
+        setSelectedId(null);
+        setIsMobileDetailOpen(false);
+      }
+      setSelectedIds(new Set());
+    } catch (e) {
+      alert(e?.response?.data?.error || 'Bulk delete failed.');
+    } finally {
+      setBulkDeleteBusy(false);
+    }
+  }
+  
+  function toggleSelection(id) {
+    const newSet = new Set(selectedIds);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    setSelectedIds(newSet);
   }
 
   return (
@@ -260,6 +296,14 @@ const Messages = () => {
               <h2 className="text-sm font-bold text-on-surface uppercase tracking-widest">Inbox</h2>
               <span className="px-2 py-0.5 bg-secondary-container/20 text-secondary text-[10px] font-bold rounded-lg uppercase">{stats.unread} unread</span>
             </div>
+            {selectedIds.size > 0 && (
+              <div className="flex items-center justify-between bg-surface-container-low px-3 py-2 rounded-lg border border-outline-variant/20 mb-2">
+                <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-widest">{selectedIds.size} selected</span>
+                <button onClick={bulkDelete} disabled={bulkDeleteBusy} className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold uppercase tracking-widest rounded transition-colors disabled:opacity-50">
+                  {bulkDeleteBusy ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
+            )}
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant/40 text-[18px]">search</span>
               <input
@@ -297,47 +341,53 @@ const Messages = () => {
                 const isActive = selectedId === m._id;
                 const st = STATUS_META[m.status || 'open'];
                 return (
-                  <button
-                    key={m._id}
-                    onClick={() => selectMessage(m._id)}
-                    className={`w-full text-left px-4 py-3 border-b border-outline-variant/5 transition-all relative ${
-                      isActive ? 'bg-primary/5' : 'hover:bg-surface-container-lowest'
-                    }`}
-                  >
-                    {isActive && <span className="absolute left-0 top-0 bottom-0 w-1 bg-primary"></span>}
-                    {!m.isRead && !isActive && <span className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500"></span>}
-                    <div className="flex gap-3">
-                      <div className={`w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-[11px] uppercase shadow-sm ${
-                        !m.isRead ? 'bg-primary text-white' : 'bg-surface-container text-on-surface-variant/40'
-                      }`}>
-                        {initials(m.name)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-start mb-0.5 gap-2">
-                          <p className={`text-[13px] truncate ${!m.isRead ? 'font-bold text-on-surface' : 'font-medium text-on-surface-variant/70'}`}>{m.name}</p>
-                          <span className="text-[10px] font-bold text-on-surface-variant/40 whitespace-nowrap">{relativeTime(m.createdAt)}</span>
+                  <div key={m._id} className="relative group">
+                    <button
+                      onClick={() => selectMessage(m._id)}
+                      className={`w-full text-left px-4 py-3 border-b border-outline-variant/5 transition-all relative ${
+                        isActive ? 'bg-primary/5' : 'hover:bg-surface-container-lowest'
+                      }`}
+                    >
+                      {isActive && <span className="absolute left-0 top-0 bottom-0 w-1 bg-primary"></span>}
+                      {!m.isRead && !isActive && <span className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500"></span>}
+                      <div className="flex gap-3 items-center">
+                        <div className="flex-shrink-0" onClick={(e) => { e.stopPropagation(); toggleSelection(m._id); }}>
+                          <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors cursor-pointer ${selectedIds.has(m._id) ? 'bg-primary border-primary text-white' : 'border-outline-variant/40 bg-white group-hover:border-primary/50'}`}>
+                            {selectedIds.has(m._id) && <span className="material-symbols-outlined text-[12px] font-bold">check</span>}
+                          </div>
                         </div>
-                        <p className={`text-[12px] truncate mb-1 ${!m.isRead ? 'font-bold text-on-surface' : 'font-medium text-on-surface-variant/70'}`}>{m.subject}</p>
-                        <p className={`text-[11px] line-clamp-1 ${!m.isRead ? 'text-on-surface-variant/60' : 'text-on-surface-variant/40'}`}>{m.message}</p>
-                        <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest border ${st.pill}`}>
-                            <span className={`w-1 h-1 rounded-full ${st.dot}`}></span>
-                            {st.label}
-                          </span>
-                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest border ${(TYPE_META[m.contactType] || TYPE_META.other).color}`}>
-                            {(TYPE_META[m.contactType] || TYPE_META.other).label}
-                          </span>
-                          {m.priority && <span className="material-symbols-outlined text-amber-500 text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>flag</span>}
-                          {m.replies && m.replies.length > 0 && (
-                            <span className="inline-flex items-center gap-0.5 text-[10px] text-on-surface-variant/50 font-bold">
-                              <span className="material-symbols-outlined text-[11px]">reply</span>
-                              {m.replies.length}
+                        <div className={`w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-[11px] uppercase shadow-sm ${
+                          !m.isRead ? 'bg-primary text-white' : 'bg-surface-container text-on-surface-variant/40'
+                        }`}>
+                          {initials(m.name)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-start mb-0.5 gap-2">
+                            <p className={`text-[13px] truncate ${!m.isRead ? 'font-bold text-on-surface' : 'font-medium text-on-surface-variant/70'}`}>{m.name}</p>
+                            <span className="text-[10px] font-bold text-on-surface-variant/40 whitespace-nowrap">{relativeTime(m.createdAt)}</span>
+                          </div>
+                          <p className={`text-[12px] truncate mb-1 ${!m.isRead ? 'font-bold text-on-surface' : 'font-medium text-on-surface-variant/70'}`}>{m.subject}</p>
+                          <p className={`text-[11px] line-clamp-1 ${!m.isRead ? 'text-on-surface-variant/60' : 'text-on-surface-variant/40'}`}>{m.message}</p>
+                          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest border ${st.pill}`}>
+                              <span className={`w-1 h-1 rounded-full ${st.dot}`}></span>
+                              {st.label}
                             </span>
-                          )}
+                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest border ${(TYPE_META[m.contactType] || TYPE_META.other).color}`}>
+                              {(TYPE_META[m.contactType] || TYPE_META.other).label}
+                            </span>
+                            {m.priority && <span className="material-symbols-outlined text-amber-500 text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>flag</span>}
+                            {m.replies && m.replies.length > 0 && (
+                              <span className="inline-flex items-center gap-0.5 text-[10px] text-on-surface-variant/50 font-bold">
+                                <span className="material-symbols-outlined text-[11px]">reply</span>
+                                {m.replies.length}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </button>
+                    </button>
+                  </div>
                 );
               })
             )}
@@ -352,6 +402,12 @@ const Messages = () => {
               m={selected}
               draft={replyDraft}
               onDraft={setReplyDraft}
+              replySubject={replySubject}
+              onSubject={setReplySubject}
+              attachments={attachments}
+              setAttachments={setAttachments}
+              uploading={uploading}
+              setUploading={setUploading}
               busy={replyBusy}
               error={replyError}
               onSend={sendReply}
@@ -377,7 +433,7 @@ const Messages = () => {
 };
 
 // ── Conversation Panel ────────────────────────────────────────────────
-const Conversation = ({ m, draft, onDraft, busy, error, onSend, onBack, onToggleUnread, onTogglePriority, onChangeStatus, onDelete, replyRef }) => {
+const Conversation = ({ m, draft, onDraft, replySubject, onSubject, attachments, setAttachments, uploading, setUploading, busy, error, onSend, onBack, onToggleUnread, onTogglePriority, onChangeStatus, onDelete, replyRef }) => {
   const st = STATUS_META[m.status || 'open'];
   const typeMeta = TYPE_META[m.contactType] || TYPE_META.other;
   return (
@@ -440,9 +496,21 @@ const Conversation = ({ m, draft, onDraft, busy, error, onSend, onBack, onToggle
               <div className="bg-primary text-white rounded-2xl rounded-tr-md shadow-sm max-w-[80%] overflow-hidden">
                 <div className="px-4 py-2.5 border-b border-emerald-900/40 bg-[#06201B]/40">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-200">Replied by {r.sentByEmail || 'admin'}</p>
-                  <p className="text-[10px] text-emerald-100/60">{fmtDate(r.sentAt)}</p>
+                  <div className="flex items-center gap-1">
+                    <p className="text-[10px] text-emerald-100/60">{fmtDate(r.sentAt)}</p>
+                    <DeliveryStatus resendId={r.resendId} />
+                  </div>
                 </div>
                 <div className="px-4 py-3 text-[14px] leading-[1.7] whitespace-pre-wrap">{r.body}</div>
+                {r.attachments && r.attachments.length > 0 && (
+                  <div className="px-4 pb-3 flex gap-2 flex-wrap">
+                    {r.attachments.map((url, i) => (
+                      <a key={i} href={url} target="_blank" rel="noreferrer" className="block w-16 h-16 rounded-lg overflow-hidden border border-emerald-900/30">
+                        <img src={url} alt="attachment" className="w-full h-full object-cover" />
+                      </a>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-[10px] font-bold flex-shrink-0 mt-1">
                 <span className="material-symbols-outlined text-[14px]">support_agent</span>
@@ -461,21 +529,64 @@ const Conversation = ({ m, draft, onDraft, busy, error, onSend, onBack, onToggle
               <span className="material-symbols-outlined text-[16px]">support_agent</span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/60 mb-1">Reply to {m.name} <span className="text-on-surface-variant/40">({m.email})</span></p>
+              <div className="flex justify-between items-center mb-2">
+                <p className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/60">Reply to {m.name} <span className="text-on-surface-variant/40">({m.email})</span></p>
+              </div>
+              <input 
+                type="text" 
+                value={replySubject} 
+                onChange={(e) => onSubject(e.target.value)} 
+                placeholder="Subject..."
+                className="w-full px-3 py-1.5 border border-outline-variant/40 rounded-t-lg text-[13px] font-medium focus:border-primary outline-none border-b-0"
+                disabled={busy}
+              />
               <textarea
                 value={draft}
                 onChange={(e) => onDraft(e.target.value)}
                 rows={3}
                 placeholder="Type your reply…"
                 disabled={busy}
-                className="w-full px-3 py-2.5 border border-outline-variant/40 rounded-lg text-[14px] focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none resize-none disabled:opacity-50"
+                className="w-full px-3 py-2.5 border border-outline-variant/40 rounded-b-lg text-[14px] focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none resize-none disabled:opacity-50"
                 onKeyDown={(e) => {
                   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); onSend(); }
                 }}
               />
+              {attachments.length > 0 && (
+                <div className="flex gap-2 mt-2 flex-wrap">
+                  {attachments.map((url, i) => (
+                    <div key={i} className="relative w-12 h-12 rounded overflow-hidden border border-outline-variant/30">
+                      <img src={url} alt="attachment" className="w-full h-full object-cover" />
+                      <button onClick={() => setAttachments(attachments.filter((_, idx) => idx !== i))} className="absolute top-0 right-0 bg-red-600 text-white w-4 h-4 flex items-center justify-center text-[10px] rounded-bl">×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
               {error && <p className="text-[12px] text-red-600 font-medium mt-1">{error}</p>}
               <div className="flex items-center justify-between mt-2">
-                <p className="text-[10px] text-on-surface-variant/40 font-medium">Ctrl/⌘ + Enter to send</p>
+                <div className="flex items-center gap-3">
+                  <label className="cursor-pointer text-on-surface-variant hover:text-primary transition-colors flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[20px]">attach_file</span>
+                    <span className="text-[11px] font-bold uppercase tracking-widest">{uploading ? 'Uploading...' : 'Attach'}</span>
+                    <input type="file" className="hidden" accept="image/*,application/pdf" onChange={async (e) => {
+                      const file = e.target.files[0];
+                      if (!file) return;
+                      setUploading(true);
+                      const formData = new FormData();
+                      formData.append('file', file);
+                      try {
+                        const res = await api.post('/api/contact/upload-attachment', formData, {
+                          headers: { 'Content-Type': 'multipart/form-data' }
+                        });
+                        if (res.data?.url) setAttachments([...attachments, res.data.url]);
+                      } catch (err) {
+                        alert('Upload failed');
+                      } finally {
+                        setUploading(false);
+                      }
+                    }} disabled={uploading || busy} />
+                  </label>
+                  <p className="text-[10px] text-on-surface-variant/40 font-medium">Ctrl/⌘ + Enter to send</p>
+                </div>
                 <div className="flex gap-2">
                   {m.status !== 'resolved' && (
                     <button onClick={() => onChangeStatus('resolved')} className="px-3 py-2 rounded-lg border border-outline-variant/40 text-on-surface text-[11px] font-bold uppercase tracking-widest hover:bg-surface-container-low transition-all">
@@ -497,6 +608,25 @@ const Conversation = ({ m, draft, onDraft, busy, error, onSend, onBack, onToggle
         </div>
       </div>
     </>
+  );
+};
+
+const DeliveryStatus = ({ resendId }) => {
+  const [status, setStatus] = React.useState('loading');
+  
+  React.useEffect(() => {
+    if (!resendId) { setStatus('unknown'); return; }
+    api.get(`/api/contact/delivery-status/${resendId}`)
+      .then(r => setStatus(r.data.status))
+      .catch(() => setStatus('unknown'));
+  }, [resendId]);
+
+  if (!resendId) return null;
+  if (status === 'loading') return <span className="text-[9px] text-emerald-600/50">...</span>;
+  return (
+    <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-700 ml-2 border border-emerald-200/50">
+      {status}
+    </span>
   );
 };
 

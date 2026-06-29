@@ -125,14 +125,38 @@ const Analytics = () => {
             <NorthStarCard data={data} />
 
             {/* KPI grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4">
               <KpiCard
-                label="Gross Transaction Volume"
-                value={fmtKES(data.kpis.gtv.value)}
-                change={data.kpis.gtv.change}
+                label="GTV (KES)"
+                value={fmtKES(data.kpis?.gtv?.value)}
+                change={data.kpis?.gtv?.change}
                 icon="payments"
                 tone="primary"
-                subtitle={`vs ${fmtKES(data.kpis.gtv.prev)} prev period`}
+                subtitle="Master Paybill"
+              />
+              <KpiCard
+                label="GMV (USDC)"
+                value={`${fmtNum(data.kpis?.gmv?.value)} USDC`}
+                change={data.kpis?.gmv?.change}
+                icon="currency_exchange"
+                tone="blue"
+                subtitle="Stellar Network"
+              />
+              <KpiCard
+                label="Lifetime KES"
+                value={fmtKES(data.kpis?.lifetimeVolume)}
+                icon="account_balance"
+                tone="emerald"
+                subtitle="All time total"
+                noDelta
+              />
+              <KpiCard
+                label="Lifetime USDC"
+                value={`${fmtNum(data.kpis?.lifetimeUsdcVolume)} USDC`}
+                icon="public"
+                tone="blue"
+                subtitle="All time total"
+                noDelta
               />
               <KpiCard
                 label="Transactions"

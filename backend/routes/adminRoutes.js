@@ -10,6 +10,7 @@ import {
   confirmMerchantAction,
   flagMerchant,
   unflagMerchant,
+  updateMerchantFeatures,
   getInsights,
   getLedger,
   getSystemStatus,
@@ -69,6 +70,7 @@ router.post('/merchants/:id/request-action', protect, sensitiveActionLimiter, re
 router.post('/merchants/:id/confirm-action', protect, sensitiveActionLimiter, confirmMerchantAction);
 router.post('/merchants/:id/flag', protect, sensitiveActionLimiter, flagMerchant);
 router.post('/merchants/:id/unflag', protect, sensitiveActionLimiter, unflagMerchant);
+router.patch('/merchants/:id/features', protect, sensitiveActionLimiter, updateMerchantFeatures);
 router.get('/merchants/:id/audit-log', protect, getMerchantAuditLog);
 
 // Executive insights — aggregated KPIs / GTV / funnel / leaderboards.

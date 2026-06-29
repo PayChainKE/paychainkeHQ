@@ -148,6 +148,16 @@ const merchantSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  features: {
+    digitalWallet: {
+      type: Boolean,
+      default: true
+    },
+    inflationShield: {
+      type: Boolean,
+      default: true
+    }
+  },
   stellarPublicKey: {
     type: String,
     unique: true,

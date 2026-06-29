@@ -86,6 +86,10 @@ const fmtKESPrecise = (n) => {
   if (n == null || isNaN(n)) return 'KES 0.00';
   return `KES ${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
+const fmtUSDC = (n) => {
+  if (n == null || isNaN(n)) return '0.00 USDC';
+  return `${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDC`;
+};
 const fmtNum = (n) => {
   if (n == null || isNaN(n)) return '0';
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -621,6 +625,8 @@ const Revenue = () => {
                       <th className="text-left px-3 py-3">Merchant</th>
                       <th className="text-right px-3 py-3">GMV</th>
                       <th className="text-right px-3 py-3">Txns</th>
+                      <th className="text-right px-3 py-3">Lifetime KES</th>
+                      <th className="text-right px-3 py-3">Lifetime USDC</th>
                       <th className="text-right px-5 py-3">Revenue</th>
                     </tr>
                   </thead>
@@ -642,6 +648,8 @@ const Revenue = () => {
                           </td>
                           <td className="px-3 py-3.5 text-right tabular-nums text-on-surface">{fmtKES(m.volume)}</td>
                           <td className="px-3 py-3.5 text-right tabular-nums text-on-surface">{fmtNum(m.count)}</td>
+                          <td className="px-3 py-3.5 text-right tabular-nums text-emerald-600 font-bold">{fmtKES(m.lifetimeKesVolume)}</td>
+                          <td className="px-3 py-3.5 text-right tabular-nums text-blue-600 font-bold">{fmtUSDC(m.lifetimeUsdcVolume)}</td>
                           <td className="px-5 py-3.5 text-right">
                             <div className="flex flex-col items-end gap-1.5">
                               <span className="font-bold text-on-surface tabular-nums">{fmtKESPrecise(m.revenue)}</span>

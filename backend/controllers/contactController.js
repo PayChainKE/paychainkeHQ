@@ -118,7 +118,7 @@ export const updateStatus = async (req, res) => {
 // @access  Private (Admin)
 export const replyToMessage = async (req, res) => {
   try {
-    const { body } = req.body || {};
+    const { body, subject, attachments } = req.body || {};
     if (!body || String(body).trim().length < 2) {
       return res.status(400).json({ error: 'Reply body cannot be empty.' });
     }
@@ -133,7 +133,8 @@ export const replyToMessage = async (req, res) => {
 
     let resendId = null;
     try {
-      const sent = await sendSupportReply(contact.email, contact.name, contact.subject, body, req.admin?.email);
+      const emailSubject = subject || contact.subject;
+      const sent = await sendSupportReply(contact.email, contact.name, emailSubject, body, req.admin?.email, attachments || []);
       resendId = sent?.data?.id || sent?.id || null;
     } catch (mailErr) {
       // Surface the email failure to the admin — don't silently log a reply
@@ -143,6 +144,8 @@ export const replyToMessage = async (req, res) => {
 
     contact.replies.push({
       body: String(body).trim(),
+      subject: subject || contact.subject,
+      attachments: attachments || [],
       sentByEmail: req.admin?.email || 'support@paychain.co.ke',
       sentBy: req.admin?._id || null,
       sentAt: new Date(),
@@ -170,6 +173,64 @@ export const deleteMessage = async (req, res) => {
     res.json({ success: true, message: 'Message removed.' });
   } catch (error) {
     console.error('Delete Message Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Bulk delete messages
+// @route   POST /api/contact/bulk-delete
+// @access  Private (Admin)
+export const bulkDeleteMessages = async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'No message IDs provided' });
+    }
+    const result = await Contact.deleteMany({ _id: { $in: ids } });
+    res.json({ success: true, message: `Deleted ${result.deletedCount} messages.` });
+  } catch (error) {
+    console.error('Bulk Delete Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Get delivery status for a reply
+// @route   GET /api/contact/delivery-status/:resendId
+// @access  Private (Admin)
+export const getDeliveryStatus = async (req, res) => {
+  try {
+    const { resendId } = req.params;
+    if (!resendId) return res.status(400).json({ error: 'No resend ID provided' });
+    
+    // We import Resend dynamically to fetch status
+    const { Resend } = await import('resend');
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    
+    const emailData = await resend.emails.get(resendId);
+    if (emailData?.data) {
+      // Return status which can be "sent", "delivered", "bounced", etc.
+      res.json({ success: true, status: emailData.data.last_event || 'sent' });
+    } else {
+      res.json({ success: true, status: 'unknown' });
+    }
+  } catch (error) {
+    console.error('Get Delivery Status Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Upload an attachment for a reply
+// @route   POST /api/contact/upload-attachment
+// @access  Private (Admin)
+export const uploadAttachment = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded.' });
+    }
+    // req.file.path is the Cloudinary URL if using multer-storage-cloudinary
+    res.json({ success: true, url: req.file.path });
+  } catch (error) {
+    console.error('Upload Attachment Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };

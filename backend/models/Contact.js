@@ -2,6 +2,8 @@ import mongoose from 'mongoose';
 
 const ReplySchema = new mongoose.Schema({
   body: { type: String, required: true, trim: true },
+  subject: { type: String, trim: true },
+  attachments: { type: [String], default: [] },
   sentByEmail: { type: String, required: true, trim: true, lowercase: true },
   sentBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },
   sentAt: { type: Date, default: Date.now },

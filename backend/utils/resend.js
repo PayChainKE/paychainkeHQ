@@ -371,18 +371,22 @@ export const sendWelcomeEmail = async (email, name, password, phone, paybillAcco
 // Send a support reply to a customer who submitted the contact form.
 // `inReplyToSubject` is rendered in the email header so the customer sees
 // the original subject they wrote in.
-export const sendSupportReply = async (toEmail, toName, inReplyToSubject, replyBody, fromAdminEmail) => {
+export const sendSupportReply = async (toEmail, toName, inReplyToSubject, replyBody, fromAdminEmail, attachments = []) => {
   try {
     const data = await resend.emails.send({
       from: 'PayChain Support <support@paychain.co.ke>',
       to: [toEmail],
       reply_to: fromAdminEmail || 'support@paychain.co.ke',
-      subject: `Re: ${inReplyToSubject || 'Your inquiry'}`,
+      subject: inReplyToSubject || 'Your inquiry',
+      attachments: attachments.map(url => {
+        const filename = url.split('/').pop().split('?')[0] || 'attachment';
+        return { filename, path: url };
+      }),
       html: `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 16px; overflow: hidden; background: #fff;">
           <div style="background: #06201B; padding: 28px 30px;">
             <p style="margin: 0; color: #5EFEB3; font-size: 12px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase;">PayChain Support</p>
-            <h1 style="margin: 6px 0 0; font-size: 22px; color: #fff; font-weight: 700;">Re: ${inReplyToSubject || 'Your inquiry'}</h1>
+            <h1 style="margin: 6px 0 0; font-size: 22px; color: #fff; font-weight: 700;">${inReplyToSubject || 'Your inquiry'}</h1>
           </div>
           <div style="padding: 36px 30px;">
             <p style="margin: 0 0 18px; color: #111; font-size: 15px;">Hi ${toName || 'there'},</p>

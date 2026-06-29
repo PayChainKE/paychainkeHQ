@@ -289,7 +289,7 @@ export const sendMoney = async (req, res) => {
       amount: totalDeduction,
       kesAmount: totalDeduction,
       currency: 'KES',
-      type: 'outbound',
+      type: 'withdrawal',
       status: 'completed',
       reference: ref,
       sender: { name: merchant.businessName, id: merchant.phone },
