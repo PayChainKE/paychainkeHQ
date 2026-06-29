@@ -1,4 +1,4 @@
-const CACHE_NAME = 'paychain-merchant-v2';
+const CACHE_NAME = 'paychain-merchant-v3';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

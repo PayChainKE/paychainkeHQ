@@ -102,7 +102,23 @@ export const settleInflationShield = async (destinationPublicKey, amount) => {
     transaction.sign(masterKeypair);
 
     console.log(`🚀 Sending ${stellarAmount} USDC (issuer ${USDC_ISSUER_ADDRESS.slice(0,8)}) → ${destinationPublicKey}`);
-    const response = await server.submitTransaction(transaction);
+    
+    let response;
+    let attempts = 0;
+    while (attempts < 3) {
+      try {
+        response = await server.submitTransaction(transaction);
+        break;
+      } catch (err) {
+        attempts++;
+        if (attempts >= 3 || (err.response && err.response.data && err.response.data.extras && err.response.data.extras.result_codes)) {
+          throw err;
+        }
+        console.warn(`⚠️ Stellar network fetch failed. Retrying attempt ${attempts}...`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    }
+
     console.log(`✅ Settlement hash: ${response.hash}`);
     return response.hash;
 
@@ -176,7 +192,23 @@ export const swapUsdcToKesOnChain = async (encryptedSecretKey, amount) => {
     transaction.sign(merchantKeypair);
 
     console.log(`🚀 Sweeping ${stellarAmount} USDC from ${merchantKeypair.publicKey()} → master`);
-    const response = await server.submitTransaction(transaction);
+    
+    let response;
+    let attempts = 0;
+    while (attempts < 3) {
+      try {
+        response = await server.submitTransaction(transaction);
+        break;
+      } catch (err) {
+        attempts++;
+        if (attempts >= 3 || (err.response && err.response.data && err.response.data.extras && err.response.data.extras.result_codes)) {
+          throw err;
+        }
+        console.warn(`⚠️ Stellar network fetch failed. Retrying attempt ${attempts}...`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    }
+
     console.log(`✅ USDC sweep hash: ${response.hash}`);
     return response.hash;
 
