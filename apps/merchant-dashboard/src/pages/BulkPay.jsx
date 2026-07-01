@@ -8,6 +8,7 @@ import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { formatKES } from '../utils/formatCurrency'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useNotification } from '../context/NotificationContext'
+import { isValidPhoneKE } from '../utils/validators'
 import paychainLogo from '../../images/logo.png'
 import axios from 'axios'
 
@@ -144,9 +145,8 @@ export default function BulkPay() {
     // Professional Settlement Format Validation
     if (newPayee.paymentMethod === 'Mobile Money') {
       if (newPayee.mobileMoneyType === 'Personal Number') {
-        const phoneRegex = /^(?:254|\+254|0)?(7[0-9]{8}|1[0-9]{8})$/;
-        if (!phoneRegex.test(newPayee.phone?.replace(/\s+/g, ''))) {
-          addNotification({ title: 'Invalid Format', message: 'Please enter a valid 10-digit Kenyan phone number.', type: 'error' });
+        if (!isValidPhoneKE(newPayee.phone)) {
+          addNotification({ title: 'Invalid Format', message: 'Please enter a valid Kenyan phone number (07..., 01..., +2547..., +2541...).', type: 'error' });
           return;
         }
       } else if (newPayee.mobileMoneyType === 'Paybill') {
