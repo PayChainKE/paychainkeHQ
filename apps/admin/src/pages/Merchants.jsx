@@ -5,6 +5,15 @@ import TablePagination from '../components/ui/TablePagination';
 
 const PAGE_SIZE = 20;
 
+const normalizePhoneKE = (value) => {
+  let digits = String(value ?? '').replace(/\D/g, '');
+  if (digits.startsWith('254')) digits = digits.slice(3);
+  if (digits.startsWith('0')) digits = digits.slice(1);
+  return digits;
+};
+
+const isValidPhoneKE = (value) => /^(?:7\d{8}|1\d{8})$/.test(normalizePhoneKE(value));
+
 // Default filter state — every dimension at "all" means no filtering.
 const defaultFilters = {
   status: 'all',       // all | active | locked
@@ -223,7 +232,7 @@ const Merchants = () => {
   function validate() {
     if (!form.name.trim()) return 'Contact name is required.';
     if (!form.email.trim() || !/^\S+@\S+\.\S+$/.test(form.email)) return 'A valid email is required.';
-    if (!form.phone.trim() || form.phone.replace(/\D/g, '').length < 9) return 'A valid phone number is required.';
+    if (!isValidPhoneKE(form.phone)) return 'Enter a valid Kenyan phone number (07..., 01..., +2547..., +2541...).';
     if (!form.businessName.trim()) return 'Business name is required.';
     if (form.kraPin && !/^[AP][0-9]{9}[A-Z]$/i.test(form.kraPin.trim())) return 'KRA PIN format invalid (e.g. P123456789A).';
     return null;

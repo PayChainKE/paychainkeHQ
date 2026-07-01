@@ -4,6 +4,15 @@
 
 const VALID = { valid: true };
 
+export const normalizePhoneKE = (raw) => {
+  let digits = String(raw ?? '').replace(/\D/g, '');
+  if (digits.startsWith('254')) digits = digits.slice(3);
+  if (digits.startsWith('0')) digits = digits.slice(1);
+  return digits;
+};
+
+export const isValidPhoneKE = (raw) => /^(?:7\d{8}|1\d{8})$/.test(normalizePhoneKE(raw));
+
 export const formatters = {
   phoneKE: (raw) => {
     let d = raw.replace(/\D/g, '');
@@ -48,11 +57,8 @@ export const formatters = {
 export const validators = {
   phoneKE: (v) => {
     if (!v) return { valid: false, error: 'Phone number is required.' };
-    let clean = v.replace(/\D/g, '');
-    // Strip country code prefix (formatter already handles 2540→0, but handle 254 here too)
-    if (clean.startsWith('254')) clean = clean.slice(3);
-    if (!/^0?[71]\d{8}$/.test(clean)) {
-      return { valid: false, error: 'Enter a valid Kenyan number (e.g. 0712345678).' };
+    if (!isValidPhoneKE(v)) {
+      return { valid: false, error: 'Enter a valid Kenyan number (e.g. 0712345678, 0112345678, +254712345678).' };
     }
     return VALID;
   },
