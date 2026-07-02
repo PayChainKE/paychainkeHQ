@@ -11,6 +11,7 @@ import Messages from './pages/Messages';
 import Settings from './pages/Settings';
 import Team from './pages/Team';
 import Ledger from './pages/Ledger';
+import CashAdvanceRequests from './pages/CashAdvanceRequests';
 import UserDashboard from './pages/UserDashboard';
 import Newsletter from './pages/Newsletter';
 import WalletAudit from './pages/WalletAudit';
@@ -46,6 +47,7 @@ export default function App(){
             <Route path="/analytics" element={<Protected><Analytics/></Protected>} />
             <Route path="/messages" element={<Protected><Messages/></Protected>} />
             <Route path="/call-centre" element={<Protected><CallCentre/></Protected>} />
+            <Route path="/cash-advance-requests" element={<Protected><CashAdvanceRequests/></Protected>} />
             <Route path="/ledger" element={<Protected><Ledger/></Protected>} />
             <Route path="/revenue" element={<Protected><Revenue/></Protected>} />
             <Route path="/wallet-audit" element={<Protected><WalletAudit/></Protected>} />
