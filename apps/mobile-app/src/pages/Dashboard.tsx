@@ -102,7 +102,7 @@ export default function Dashboard({ navigation }: any) {
 
           {/* Action Buttons (overlapping) */}
           <View className="px-6 flex-row justify-between -mt-6 mb-10 z-10">
-            <TouchableOpacity className="items-center" activeOpacity={0.8}>
+            <TouchableOpacity className="items-center" activeOpacity={0.8} onPress={() => navigation?.navigate('Collections')}>
               <View className="w-[72px] h-[72px] rounded-full bg-white shadow-lg shadow-black/10 items-center justify-center mb-2.5">
                 <View className="w-12 h-12 rounded-full bg-[#b1f1c6] items-center justify-center">
                   <Feather name="plus-circle" size={24} color="#00351d" />
@@ -111,7 +111,7 @@ export default function Dashboard({ navigation }: any) {
               <Text className="text-[11px] font-jakarta-bold text-[#1b1c1a] uppercase tracking-widest">Collect</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity className="items-center" activeOpacity={0.8}>
+            <TouchableOpacity className="items-center" activeOpacity={0.8} onPress={() => navigation?.navigate('Pay')}>
               <View className="w-[72px] h-[72px] rounded-full bg-white shadow-lg shadow-black/10 items-center justify-center mb-2.5">
                 <View className="w-12 h-12 rounded-full bg-[#efeeeb] items-center justify-center">
                   <MaterialIcons name="payments" size={24} color="#00351d" />
@@ -126,10 +126,10 @@ export default function Dashboard({ navigation }: any) {
                   <MaterialIcons name="swap-horiz" size={24} color="#00351d" />
                 </View>
               </View>
-              <Text className="text-[11px] font-jakarta-bold text-[#1b1c1a] uppercase tracking-widest">Swap</Text>
+              <Text className="text-[11px] font-jakarta-bold text-[#1b1c1a] uppercase tracking-widest">Move Money</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity className="items-center" activeOpacity={0.8}>
+            <TouchableOpacity className="items-center" activeOpacity={0.8} onPress={() => navigation?.navigate('Advance')}>
               <View className="w-[72px] h-[72px] rounded-full bg-white shadow-lg shadow-black/10 items-center justify-center mb-2.5">
                 <View className="w-12 h-12 rounded-full bg-[#e8eaf6] items-center justify-center">
                   <Feather name="trending-up" size={24} color="#3f51b5" />

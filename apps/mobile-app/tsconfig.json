@@ -3,7 +3,10 @@
     "allowJs": true,
     "esModuleInterop": true,
     "jsx": "react-native",
-    "lib": ["dom", "esnext"],
+    "lib": [
+      "dom",
+      "esnext"
+    ],
     "module": "esnext",
     "moduleDetection": "force",
     "moduleResolution": "node",
@@ -13,7 +16,9 @@
     "skipLibCheck": true,
     "target": "ESNext",
     "strict": true,
-    "types": ["nativewind/types"]
+    "types": [
+      "nativewind/types"
+    ]
   },
   "exclude": [
     "node_modules",
@@ -22,5 +27,6 @@
     "jest.config.js",
     "android",
     "ios"
-  ]
+  ],
+  "extends": "expo/tsconfig.base"
 }
