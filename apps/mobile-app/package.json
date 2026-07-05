@@ -13,6 +13,7 @@
     "@react-navigation/native-stack": "^7.17.5",
     "axios": "^1.18.1",
     "expo": "~56.0.12",
+    "expo-clipboard": "~56.0.4",
     "expo-dev-client": "~56.0.20",
     "expo-document-picker": "~56.0.4",
     "expo-font": "~56.0.7",

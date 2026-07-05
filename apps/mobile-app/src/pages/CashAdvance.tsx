@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import api from '../api/config';
 import { useAuth } from '../context/AuthContext';
 
@@ -9,6 +10,7 @@ export default function CashAdvance({ navigation }: any) {
   const { merchant } = useAuth();
   const [trustData, setTrustData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const initials = merchant?.businessName ? merchant.businessName.substring(0, 2).toUpperCase() : '??';
 
   useEffect(() => {
     const fetchScore = async () => {
@@ -43,24 +45,32 @@ export default function CashAdvance({ navigation }: any) {
 
   return (
     <SafeAreaView className="flex-1 bg-[#faf9f6]" edges={['top', 'left', 'right']}>
-      <View className="w-full z-50 bg-[#f4f3f0] pt-2 pb-4">
-        <View className="w-full max-w-lg mx-auto flex-row justify-between items-center px-6">
+      <LinearGradient
+        colors={['#0B4D2E', '#1D9E75']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        className="w-full pt-[40px] pb-[16px] px-6 z-40 rounded-b-[24px] shadow-sm shadow-[#0b4d2e]/10"
+      >
+        <View className="w-full max-w-lg mx-auto flex-row items-center justify-between">
           <View className="flex-row items-center gap-3">
-            <View className="w-[42px] h-[42px] rounded-full bg-[#efeeeb] flex items-center justify-center overflow-hidden border border-[#c0c9c0]/20">
-              <Image 
-                source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDT_TCBfPtbFc1Ud_JlyySnGTrR6kWG4-FDxCWiud06FawPuJIGnGkGmFpQiQfR3lb4Wi9mE6XnhhaL3Dlwh8Y6XBt8wkMwJJP1z-EfqRCMbk_rJk74-7A6SljJJjLjeZyUwMyLmSW1yTtYEAbNev34tE6B4_D_tuVYONSncBjLFNgASjHsvddu0uTJZHFxfGQT7dUKXNcX3q2wAS76NSeVOFIkAEtxpaYG56urTH9ozzJhftQjnhmUeUos3-Hoy7Eb9XcGxiH1hwg' }}
-                className="w-full h-full"
-              />
+            <View className="w-10 h-10 rounded-full bg-white/20 items-center justify-center border border-white/30">
+              <Text className="text-white font-jakarta-bold text-sm">{initials}</Text>
             </View>
-            <Text style={{ fontFamily: 'DMSerifDisplay_400Regular_Italic' }} className="text-[26px] text-[#00351d] tracking-tight">PayChain</Text>
+            <View>
+              <Text className="text-white text-[20px] font-jakarta-bold tracking-tight leading-tight">Cash Advance</Text>
+              <Text className="text-white/70 text-[12px] font-jakarta-medium tracking-wide">
+                {isEligible ? 'Eligible for advance' : 'Building eligibility'}
+              </Text>
+            </View>
           </View>
-          <View className="flex-row items-center gap-4">
-            <TouchableOpacity className="w-10 h-10 items-center justify-center">
-              <MaterialIcons name="notifications" size={26} color="#00351d" />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Notifications')}
+            className="w-10 h-10 rounded-full bg-white/15 items-center justify-center border border-white/25"
+          >
+            <Feather name="bell" size={17} color="#ffffff" />
+          </TouchableOpacity>
         </View>
-      </View>
+      </LinearGradient>
 
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
         {isEligible ? (
@@ -134,26 +144,9 @@ export default function CashAdvance({ navigation }: any) {
                 <MaterialIcons name="lock" size={28} color="rgba(0,53,29,0.3)" />
               </View>
               <Text className="text-[20px] font-jakarta-extrabold text-[#00351d] tracking-tight mb-2">Keep building your Trust Score</Text>
-              <Text className="text-[14px] text-[#707971] font-jakarta-medium text-center leading-relaxed max-w-[260px] mb-6">
+              <Text className="text-[14px] text-[#707971] font-jakarta-medium text-center leading-relaxed max-w-[260px]">
                 You need a Trust Score of at least 85 to unlock Cash Advances. Keep processing payments!
               </Text>
-              <TouchableOpacity className="bg-[#00351d] px-8 py-3.5 rounded-xl shadow-lg active:opacity-80">
-                <Text className="text-white font-jakarta-bold text-[13px] uppercase tracking-widest">View Trust Score</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View className="flex-row gap-4 mb-6">
-              <View className="flex-1 bg-white p-7 rounded-[32px] shadow-sm border border-[#c0c9c0]/10">
-                <Text className="text-[#404942] text-[10px] font-jakarta-bold uppercase tracking-[0.15em] mb-4">Trust Score</Text>
-                <View className="flex-row items-baseline">
-                  <Text className="text-[#00351d] text-[40px] font-jakarta-extrabold tracking-tight">{trustData?.current || 0}</Text>
-                  <Text className="text-[#00c48c] font-jakarta-bold text-[13px] ml-1">/100</Text>
-                </View>
-              </View>
-              <View className="flex-1 bg-white p-7 rounded-[32px] shadow-sm border border-[#c0c9c0]/10">
-                <Text className="text-[#404942] text-[10px] font-jakarta-bold uppercase tracking-[0.15em] mb-4">Days Active</Text>
-                <Text className="text-[#00351d] text-[40px] font-jakarta-extrabold tracking-tight">68</Text>
-              </View>
             </View>
 
             <View className="bg-[#f4f3f0] rounded-[40px] p-8 border border-[#c0c9c0]/20 mb-8">

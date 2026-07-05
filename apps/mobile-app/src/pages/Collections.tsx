@@ -590,64 +590,64 @@ export default function Collections() {
                 colors={['#00351d', '#0B4D2E']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                className="p-4 shadow-lg shadow-[#00351d]/20"
-                style={{ minHeight: 124, borderRadius: 22, overflow: 'hidden' }}
+                className="p-5 shadow-lg shadow-[#00351d]/25 border border-white/5"
+                style={{ minHeight: 132, borderRadius: 26, overflow: 'hidden' }}
               >
-                <View className="flex-row items-center justify-between mb-3">
-                  <View className="w-9 h-9 rounded-full bg-white/15 items-center justify-center border border-white/20">
+                <View className="flex-row items-center justify-between mb-4">
+                  <View className="w-9 h-9 rounded-xl bg-white/15 items-center justify-center border border-white/20">
                     <Feather name="sun" size={15} color="#a7f3d0" />
                   </View>
                   <View className="bg-white/15 px-2 py-0.5 rounded-full">
-                    <Text className="text-[9px] font-jakarta-bold text-white tracking-wider">LIVE</Text>
+                    <Text className="text-[8.5px] font-jakarta-bold text-white tracking-[0.15em]">LIVE</Text>
                   </View>
                 </View>
-                <Text className="text-[10px] font-jakarta-bold text-white/70 uppercase tracking-[0.12em] mb-1">Today</Text>
-                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[20px] text-white leading-tight" numberOfLines={1} adjustsFontSizeToFit>
+                <Text className="text-[9.5px] font-jakarta-bold text-white/60 uppercase tracking-[0.15em] mb-1.5">Today</Text>
+                <Text className="text-[21px] font-jakarta-extrabold text-white tracking-tight leading-tight" numberOfLines={1} adjustsFontSizeToFit>
                   {formatCurrency(stats.today.total)}
                 </Text>
               </LinearGradient>
             </View>
 
             <View className="w-1/2 px-1.5 mb-3">
-              <View className="bg-white rounded-[22px] p-4 shadow-sm border border-[#c0c9c0]/20" style={{ minHeight: 124 }}>
-                <View className="flex-row items-center justify-between mb-3">
-                  <View className="w-9 h-9 rounded-full bg-[#e7f8ef] items-center justify-center">
-                    <Feather name="trending-up" size={15} color="#006c4e" />
+              <View className="bg-white rounded-[26px] p-5 shadow-sm shadow-[#00351d]/5 border border-[#efeeeb]" style={{ minHeight: 132 }}>
+                <View className="flex-row items-center justify-between mb-4">
+                  <View className="w-9 h-9 rounded-xl bg-[#eef2ff] items-center justify-center">
+                    <Feather name="trending-up" size={15} color="#1d4ed8" />
                   </View>
-                  <Feather name="arrow-up-right" size={14} color="#68dbae" />
+                  <Feather name="arrow-up-right" size={14} color="#a5b4fc" />
                 </View>
-                <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-1">This Week</Text>
-                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[20px] text-[#1b1c1a] leading-tight" numberOfLines={1} adjustsFontSizeToFit>
+                <Text className="text-[9.5px] font-jakarta-bold text-[#707971] uppercase tracking-[0.15em] mb-1.5">This Week</Text>
+                <Text className="text-[21px] font-jakarta-extrabold text-[#00351d] tracking-tight leading-tight" numberOfLines={1} adjustsFontSizeToFit>
                   {formatCurrency(stats.week.total)}
                 </Text>
               </View>
             </View>
 
             <View className="w-1/2 px-1.5">
-              <View className="bg-white rounded-[22px] p-4 shadow-sm border border-[#c0c9c0]/20" style={{ minHeight: 124 }}>
-                <View className="flex-row items-center justify-between mb-3">
-                  <View className="w-9 h-9 rounded-full bg-[#fef3e7] items-center justify-center">
+              <View className="bg-white rounded-[26px] p-5 shadow-sm shadow-[#00351d]/5 border border-[#efeeeb]" style={{ minHeight: 132 }}>
+                <View className="flex-row items-center justify-between mb-4">
+                  <View className="w-9 h-9 rounded-xl bg-[#fef3e7] items-center justify-center">
                     <Feather name="calendar" size={15} color="#b87333" />
                   </View>
-                  <Feather name="arrow-up-right" size={14} color="#d4a574" />
+                  <Feather name="arrow-up-right" size={14} color="#e7c9a3" />
                 </View>
-                <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-1">This Month</Text>
-                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[20px] text-[#1b1c1a] leading-tight" numberOfLines={1} adjustsFontSizeToFit>
+                <Text className="text-[9.5px] font-jakarta-bold text-[#707971] uppercase tracking-[0.15em] mb-1.5">This Month</Text>
+                <Text className="text-[21px] font-jakarta-extrabold text-[#00351d] tracking-tight leading-tight" numberOfLines={1} adjustsFontSizeToFit>
                   {formatCurrency(stats.month.total)}
                 </Text>
               </View>
             </View>
 
             <View className="w-1/2 px-1.5">
-              <View className="bg-[#f4f3f0] rounded-[22px] p-4 border border-[#c0c9c0]/30" style={{ minHeight: 124 }}>
-                <View className="flex-row items-center justify-between mb-3">
-                  <View className="w-9 h-9 rounded-full bg-white items-center justify-center shadow-sm">
-                    <Feather name="award" size={15} color="#404942" />
+              <View className="bg-[#1b1c2e] rounded-[26px] p-5 shadow-lg shadow-[#1b1c2e]/25 border border-white/5" style={{ minHeight: 132 }}>
+                <View className="flex-row items-center justify-between mb-4">
+                  <View className="w-9 h-9 rounded-xl bg-white/10 items-center justify-center border border-white/10">
+                    <Feather name="award" size={15} color="#e5c07b" />
                   </View>
-                  <View className="w-1.5 h-1.5 rounded-full bg-[#006c4e]" />
+                  <Text className="text-[8.5px] font-jakarta-bold text-white/50 uppercase tracking-[0.15em]">Lifetime</Text>
                 </View>
-                <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-1">All Time</Text>
-                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[20px] text-[#1b1c1a] leading-tight" numberOfLines={1} adjustsFontSizeToFit>
+                <Text className="text-[9.5px] font-jakarta-bold text-white/60 uppercase tracking-[0.15em] mb-1.5">All Time</Text>
+                <Text className="text-[21px] font-jakarta-extrabold text-white tracking-tight leading-tight" numberOfLines={1} adjustsFontSizeToFit>
                   {formatCurrency(stats.allTime.total)}
                 </Text>
               </View>
@@ -727,7 +727,7 @@ export default function Collections() {
                   <ActivityIndicator color="#0B4D2E" />
                 </View>
               ) : filteredTransactions.length > 0 ? (
-                filteredTransactions.map((tx, index) => {
+                filteredTransactions.slice(0, 20).map((tx, index, visible) => {
                   const name = counterpartyName(tx);
                   const inboundRow = isInboundType(tx.type);
                   const isSwap = tx.type === 'fx_swap';
@@ -747,7 +747,7 @@ export default function Collections() {
                       activeOpacity={0.8}
                       onPress={() => openReceipt(tx)}
                       className={`flex-row items-center py-3 px-4 ${
-                        index !== filteredTransactions.length - 1 ? 'border-b border-[#efeeeb]/50' : ''
+                        index !== visible.length - 1 ? 'border-b border-[#efeeeb]/50' : ''
                       }`}
                     >
                       <View className="w-10 h-10 rounded-full bg-[#efeeeb] items-center justify-center overflow-hidden mr-3">

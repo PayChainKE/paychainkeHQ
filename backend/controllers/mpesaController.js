@@ -5,6 +5,8 @@ import { sendSMS } from '../utils/sms.js';
 import { settleInflationShield } from '../utils/stellarHelper.js';
 import { getLiveKesToUsdcRate } from '../utils/rateEngine.js';
 import STKRequest from '../models/STKRequest.js';
+import PayoutBatch from '../models/PayoutBatch.js';
+import { createNotification } from './notificationController.js';
 
 // ── M-PESA configuration ──────────────────────────────────────────────────────
 // MPESA_ENVIRONMENT controls which Daraja endpoint is used.
@@ -227,6 +229,13 @@ export const confirmationURL = async (req, res) => {
 
     console.log(`✅ Successfully processed M-PESA payment of KES ${amount} for account ${accountNumber}`);
 
+    createNotification({
+      merchantId: merchant._id,
+      kind: 'payment',
+      title: 'Payment received',
+      message: `You received KES ${amount.toLocaleString()} from ${senderName || 'a customer'} via Till ${merchant.paybillAccount}.`,
+    });
+
     // Send SMS notification to the customer
     if (MSISDN) {
       const smsMessage = `Confirmed. Ksh${amount.toLocaleString()} paid to ${merchant.businessName} (Acc: ${merchant.paybillAccount}). Ref: ${TransID}. Thank you for your payment.`;
@@ -432,6 +441,13 @@ export const stkCallback = async (req, res) => {
           sender: { name: 'M-PESA Express', id: stkReq.phone },
           recipient: { name: merchant.businessName, id: 'WALLET' }
         });
+
+        createNotification({
+          merchantId: merchant._id,
+          kind: 'wallet',
+          title: 'Wallet topped up',
+          message: `KES ${stkReq.amount.toLocaleString()} was added to your balance via M-PESA.`,
+        });
       }
     } else {
       // Cancelled or Failed
@@ -549,10 +565,56 @@ export const initiateB2C = async (req, res) => {
 export const b2cCallback = async (req, res) => {
   console.log('--- DARAJA B2C CALLBACK RECEIVED ---');
   console.log(JSON.stringify(req.body, null, 2));
-  
-  // Acknowledge receipt
-  res.status(200).json({
-    ResultCode: 0,
-    ResultDesc: "Accepted"
-  });
+
+  // Acknowledge receipt immediately — Safaricom retries on anything but a fast 200.
+  res.status(200).json({ ResultCode: 0, ResultDesc: 'Accepted' });
+
+  try {
+    const result = req.body?.Result;
+    if (!result) return;
+
+    const reference = result.OriginatorConversationID || result.ConversationID;
+    if (!reference) return;
+
+    const succeeded = result.ResultCode === 0;
+
+    // Update the ledger entry this callback confirms (single B2C transfer or a bulk-pay row)
+    const transaction = await Transaction.findOne({ reference });
+    if (transaction && transaction.status === 'pending') {
+      transaction.status = succeeded ? 'completed' : 'failed';
+      await transaction.save();
+
+      if (!succeeded) {
+        // The payout never landed — return the funds to the merchant's balance
+        await Merchant.findByIdAndUpdate(transaction.merchantId, { $inc: { kesBalance: transaction.amount } });
+      }
+
+      createNotification({
+        merchantId: transaction.merchantId,
+        kind: 'payment',
+        title: succeeded ? 'Payout completed' : 'Payout failed',
+        message: succeeded
+          ? `KES ${transaction.amount.toLocaleString()} was successfully paid to ${transaction.recipient?.name || 'the recipient'}.`
+          : `KES ${transaction.amount.toLocaleString()} payout to ${transaction.recipient?.name || 'the recipient'} failed and was refunded to your balance.`,
+      });
+    }
+
+    // Update the matching row inside a bulk-pay batch, if this reference belongs to one
+    const batch = await PayoutBatch.findOne({ 'transactions.receiptNumber': reference });
+    if (batch) {
+      const row = batch.transactions.find((t) => t.receiptNumber === reference);
+      if (row && row.status === 'pending') {
+        row.status = succeeded ? 'completed' : 'failed';
+
+        const statuses = batch.transactions.map((t) => t.status);
+        if (statuses.every((s) => s === 'completed')) batch.status = 'Processed';
+        else if (statuses.some((s) => s === 'pending')) batch.status = 'Pending';
+        else if (statuses.some((s) => s === 'failed')) batch.status = 'Partial';
+
+        await batch.save();
+      }
+    }
+  } catch (error) {
+    console.error('❌ Error processing B2C callback:', error);
+  }
 };

@@ -63,16 +63,14 @@ export default function InflationShield({ navigation }: any) {
                 <MaterialIcons name="account-balance-wallet" size={100} color="white" />
               </View>
               <Text className="text-[#96d4ab] text-[10px] font-jakarta-bold uppercase tracking-[0.1em] mb-3">KES Balance</Text>
-              <Text className="text-white text-[28px] font-jakarta-extrabold tracking-tight leading-tight">KES{'
-'}184,250</Text>
+              <Text className="text-white text-[28px] font-jakarta-extrabold tracking-tight leading-tight">KES{'\n'}184,250</Text>
             </View>
             <View className="flex-1 bg-[#1e293b] p-6 rounded-[32px] relative overflow-hidden shadow-lg shadow-[#1e293b]/20">
               <View className="absolute -right-6 -top-6 opacity-10">
                 <MaterialIcons name="verified-user" size={100} color="white" />
               </View>
               <Text className="text-[#94a3b8] text-[10px] font-jakarta-bold uppercase tracking-[0.1em] mb-3">Move Money</Text>
-              <Text className="text-white text-[28px] font-jakarta-extrabold tracking-tight leading-tight">Secure{'
-'}Hub</Text>
+              <Text className="text-white text-[28px] font-jakarta-extrabold tracking-tight leading-tight">Secure{'\n'}Hub</Text>
             </View>
           </View>
 

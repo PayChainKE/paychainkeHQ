@@ -6,6 +6,7 @@ import generateToken from '../utils/generateToken.js';
 import { provisionMerchantWallet, getWalletBalance } from '../utils/stellarHelper.js';
 import { encryptKey } from '../utils/cryptoHelper.js';
 import bcrypt from 'bcryptjs';
+import { createNotification } from './notificationController.js';
 
 // Helper to generate unique 5-digit account number
 const generateUniquePaybillAccount = async () => {
@@ -164,6 +165,13 @@ export const verifyMerchantOTP = async (req, res) => {
       metadata: { loginCount: merchant.loginCount, method: 'password+otp' },
     });
 
+    createNotification({
+      merchantId: merchant._id,
+      kind: 'security',
+      title: 'New sign-in detected',
+      message: 'Your account was just accessed with a verified sign-in code.',
+    });
+
     res.json({
       success: true,
       merchant: {
@@ -188,7 +196,8 @@ export const verifyMerchantOTP = async (req, res) => {
         settlementBankAccount: merchant.settlementBankAccount,
         hasBulkPayPin: !!merchant.bulkPayPin,
         hasAppPin: !!merchant.appPin,
-        biometricsEnabled: merchant.biometricsEnabled
+        biometricsEnabled: merchant.biometricsEnabled,
+        features: merchant.features
       },
       token: generateToken(merchant._id)
     });
@@ -337,6 +346,13 @@ export const biometricLogin = async (req, res) => {
       metadata: { loginCount: merchant.loginCount, method: 'biometric' },
     });
 
+    createNotification({
+      merchantId: merchant._id,
+      kind: 'security',
+      title: 'New sign-in detected',
+      message: `Your account was accessed via biometrics from a device in ${merchant.loginHistory[0]?.location || 'an unknown location'}.`,
+    });
+
     res.json({
       success: true,
       mfaRequired: false,
@@ -357,7 +373,8 @@ export const biometricLogin = async (req, res) => {
         settlementBankAccount: merchant.settlementBankAccount,
         hasBulkPayPin: !!merchant.bulkPayPin,
         hasAppPin: !!merchant.appPin,
-        biometricsEnabled: merchant.biometricsEnabled
+        biometricsEnabled: merchant.biometricsEnabled,
+        features: merchant.features
       },
       token: generateToken(merchant._id)
     });
@@ -695,7 +712,8 @@ export const getMerchantMe = async (req, res) => {
         settlementBankAccount: merchant.settlementBankAccount,
         hasBulkPayPin: !!merchant.bulkPayPin,
         hasAppPin: !!merchant.appPin,
-        biometricsEnabled: merchant.biometricsEnabled
+        biometricsEnabled: merchant.biometricsEnabled,
+        features: merchant.features
       }
     });
   } catch (error) {

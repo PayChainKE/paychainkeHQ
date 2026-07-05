@@ -30,7 +30,7 @@ const payoutBatchSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['Pending', 'Processed', 'Failed'],
+      enum: ['Pending', 'Processed', 'Partial', 'Failed'],
       default: 'Pending',
     },
     fundingSource: {
@@ -54,6 +54,11 @@ const payoutBatchSchema = new mongoose.Schema(
         method: String,
         accountReference: String,
         receiptNumber: String,
+        status: {
+          type: String,
+          enum: ['pending', 'completed', 'failed'],
+          default: 'pending',
+        },
       },
     ],
   },

@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/config';
 
@@ -11,6 +12,23 @@ export default function Dashboard({ navigation }: any) {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [trustScore, setTrustScore] = useState<any>({ current: 0, eligibleForAdvance: false });
   const [isLoading, setIsLoading] = useState(true);
+  const [now, setNow] = useState(new Date());
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useFocusEffect(
+    useCallback(() => {
+      api.get('/api/notifications/unread-count')
+        .then((res) => {
+          if (res.data?.success) setUnreadCount(res.data.count);
+        })
+        .catch(() => {});
+    }, [])
+  );
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60 * 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -41,13 +59,20 @@ export default function Dashboard({ navigation }: any) {
     }
   }, [merchant]);
 
-  const initials = merchant?.businessName 
-    ? merchant.businessName.substring(0, 2).toUpperCase() 
+  const initials = merchant?.businessName
+    ? merchant.businessName.substring(0, 2).toUpperCase()
     : '??';
+
+  const features = merchant?.features || { digitalWallet: true, inflationShield: true };
+  const digitalWalletEnabled = features.digitalWallet !== false;
+  const inflationShieldEnabled = features.inflationShield !== false;
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(amount);
   };
+
+  const hour = now.getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
 
   return (
@@ -74,12 +99,18 @@ export default function Dashboard({ navigation }: any) {
                   <Text className="text-white font-jakarta-bold text-sm">{initials}</Text>
                 </TouchableOpacity>
                 <View>
-                  <Text className="text-white/80 text-[11px] font-jakarta-bold uppercase tracking-wider mb-0.5">Good morning 👋</Text>
+                  <Text className="text-white/80 text-[11px] font-jakarta-bold uppercase tracking-wider mb-0.5">{greeting} 👋</Text>
                   <Text className="text-white text-base font-jakarta-bold tracking-tight">{merchant?.businessName || 'Merchant'}</Text>
                 </View>
               </View>
-              <TouchableOpacity className="w-10 h-10 rounded-full bg-white/10 items-center justify-center border border-white/10 mr-3">
+              <TouchableOpacity
+                onPress={() => navigation?.navigate('Notifications')}
+                className="w-10 h-10 rounded-full bg-white/10 items-center justify-center border border-white/10 mr-3"
+              >
                 <MaterialIcons name="notifications" size={20} color="white" />
+                {unreadCount > 0 && (
+                  <View className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#ff5a5f] border border-[#0b4d2e]" />
+                )}
               </TouchableOpacity>
             </View>
 
@@ -88,11 +119,7 @@ export default function Dashboard({ navigation }: any) {
               <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', letterSpacing: -1 }} className="text-4xl text-white leading-none">
                 {formatCurrency(merchant?.kesBalance || 0)}
               </Text>
-              <View className="flex-row items-center justify-between mt-4">
-                <View className="flex-row items-center gap-1.5 bg-[#83f5c6]/20 px-3 py-1.5 rounded-full border border-[#83f5c6]/20">
-                  <Feather name="trending-up" size={14} color="#83f5c6" />
-                  <Text className="text-[#83f5c6] font-jakarta-bold text-sm">Active</Text>
-                </View>
+              <View className="flex-row items-center justify-end mt-4">
                 <View className="bg-white/10 px-3 py-1.5 rounded-full border border-white/20 mb-1">
                   <Text className="text-white text-[10px] font-jakarta-bold uppercase tracking-widest">Till No: {merchant?.paybillAccount || 'PENDING'}</Text>
                 </View>
@@ -120,14 +147,16 @@ export default function Dashboard({ navigation }: any) {
               <Text className="text-[11px] font-jakarta-bold text-[#1b1c1a] uppercase tracking-widest">Pay</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity className="items-center" activeOpacity={0.8} onPress={() => navigation?.navigate('InflationShield')}>
-              <View className="w-[72px] h-[72px] rounded-full bg-white shadow-lg shadow-black/10 items-center justify-center mb-2.5">
-                <View className="w-12 h-12 rounded-full bg-[#83f5c6] items-center justify-center">
-                  <MaterialIcons name="swap-horiz" size={24} color="#00351d" />
+            {inflationShieldEnabled && (
+              <TouchableOpacity className="items-center" activeOpacity={0.8} onPress={() => navigation?.navigate('InflationShield')}>
+                <View className="w-[72px] h-[72px] rounded-full bg-white shadow-lg shadow-black/10 items-center justify-center mb-2.5">
+                  <View className="w-12 h-12 rounded-full bg-[#83f5c6] items-center justify-center">
+                    <MaterialIcons name="swap-horiz" size={24} color="#00351d" />
+                  </View>
                 </View>
-              </View>
-              <Text className="text-[11px] font-jakarta-bold text-[#1b1c1a] uppercase tracking-widest">Move Money</Text>
-            </TouchableOpacity>
+                <Text className="text-[11px] font-jakarta-bold text-[#1b1c1a] uppercase tracking-widest">Move Money</Text>
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity className="items-center" activeOpacity={0.8} onPress={() => navigation?.navigate('Advance')}>
               <View className="w-[72px] h-[72px] rounded-full bg-white shadow-lg shadow-black/10 items-center justify-center mb-2.5">
@@ -157,75 +186,52 @@ export default function Dashboard({ navigation }: any) {
           </View>
 
           {/* Digital Ledgers */}
-          <View className="mb-8">
-            <View className="px-6 flex-row items-center justify-between mb-4">
-              <Text className="text-lg font-jakarta-bold text-[#1b1c1a]">Digital Ledgers</Text>
-              <TouchableOpacity>
-                <Text className="text-[#006c4e] text-[11px] font-jakarta-bold uppercase tracking-widest">View All</Text>
-              </TouchableOpacity>
-            </View>
-            
-            <ScrollView 
-              horizontal={true}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingLeft: 24, paddingRight: 24 }}
-              snapToInterval={296} // 280 (card) + 16 (margin)
-              decelerationRate="fast"
-              bounces={true}
-              alwaysBounceHorizontal={true}
-              overScrollMode="always"
-              className="w-full"
-            >
-              <View className="bg-[#0b4d2e] w-[280px] h-[160px] rounded-[32px] p-6 mr-4 relative overflow-hidden shadow-md shadow-[#0b4d2e]/30">
-                <View className="absolute -right-8 -top-8 opacity-10">
-                  <MaterialIcons name="account-balance-wallet" size={140} color="white" />
-                </View>
-                <Text className="text-[#96d4ab] text-[11px] font-jakarta-bold uppercase tracking-[0.15em] mb-2">Operating Balance</Text>
-                <Text className="text-white text-3xl font-jakarta-extrabold tracking-tight mb-auto">{formatCurrency(merchant?.kesBalance || 0)}</Text>
-                <View className="flex-row items-center gap-1.5 mt-4">
-                  <Feather name="arrow-up" size={14} color="#96d4ab" />
-                  <Text className="text-[#96d4ab] text-[13px] font-jakarta-medium">12.4% vs last month</Text>
-                </View>
+          {digitalWalletEnabled && (
+            <View className="mb-8">
+              <View className="px-6 flex-row items-center justify-between mb-4">
+                <Text className="text-lg font-jakarta-bold text-[#1b1c1a]">Digital Ledgers</Text>
+                <TouchableOpacity>
+                  <Text className="text-[#006c4e] text-[11px] font-jakarta-bold uppercase tracking-widest">View All</Text>
+                </TouchableOpacity>
               </View>
 
-              <View className="bg-[#1e293b] w-[280px] h-[160px] rounded-[32px] p-6 mr-4 relative overflow-hidden shadow-md shadow-[#1e293b]/30">
-                <View className="absolute -right-4 -top-4 opacity-10">
-                  <MaterialIcons name="shield" size={100} color="white" />
-                </View>
-                <Text className="text-[#94a3b8] text-[11px] font-jakarta-bold uppercase tracking-[0.15em] mb-2">USDC Vault</Text>
-                <Text className="text-white text-3xl font-jakarta-extrabold tracking-tight mb-auto">{(merchant?.usdcBalance || 0).toFixed(2)}</Text>
-                <View className="flex-row items-center gap-1.5 mt-4">
-                  <Feather name="refresh-cw" size={14} color="#94a3b8" />
-                  <Text className="text-[#94a3b8] text-[13px] font-jakarta-medium">≈ KES 40,625</Text>
-                </View>
-              </View>
-            </ScrollView>
-          </View>
-
-          {/* This Month Performance */}
-          <View className="px-6 mb-8">
-            <View className="bg-white rounded-[32px] p-6 shadow-sm border border-[#c0c9c0]/10">
-              <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-[0.15em] mb-6">This Month Performance</Text>
-              <View className="flex-row justify-between">
-                <View>
-                  <Text className="text-[#1b1c1a] text-[10px] font-jakarta-bold uppercase tracking-wider mb-1">Revenue</Text>
-                  <Text className="text-[#006c4e] text-[16px] font-jakarta-extrabold">{formatCurrency(transactions.filter(t => t.type === 'inbound').reduce((acc, t) => acc + (t.kesAmount || t.amount || 0), 0))}</Text>
-                </View>
-                <View className="w-[1px] h-full bg-[#efeeeb]" />
-                <View>
-                  <Text className="text-[#1b1c1a] text-[10px] font-jakarta-bold uppercase tracking-wider mb-1">Payments</Text>
-                  <Text className="text-[#1b1c1a] text-[16px] font-jakarta-extrabold">{transactions.length}</Text>
-                </View>
-                <View className="w-[1px] h-full bg-[#efeeeb]" />
-                <View>
-                  <Text className="text-[#1b1c1a] text-[10px] font-jakarta-bold uppercase tracking-wider mb-1">Trust Score</Text>
-                  <View className="flex-row items-center gap-1.5">
-                    <Text className="text-[#1b1c1a] text-[16px] font-jakarta-extrabold">{trustScore.current}/100</Text>
+              <ScrollView
+                horizontal={true}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingLeft: 24, paddingRight: 24 }}
+                snapToInterval={296} // 280 (card) + 16 (margin)
+                decelerationRate="fast"
+                bounces={true}
+                alwaysBounceHorizontal={true}
+                overScrollMode="always"
+                className="w-full"
+              >
+                <View className="bg-[#0b4d2e] w-[280px] h-[160px] rounded-[32px] p-6 mr-4 relative overflow-hidden shadow-md shadow-[#0b4d2e]/30">
+                  <View className="absolute -right-8 -top-8 opacity-10">
+                    <MaterialIcons name="account-balance-wallet" size={140} color="white" />
+                  </View>
+                  <Text className="text-[#96d4ab] text-[11px] font-jakarta-bold uppercase tracking-[0.15em] mb-2">Operating Balance</Text>
+                  <Text className="text-white text-3xl font-jakarta-extrabold tracking-tight mb-auto">{formatCurrency(merchant?.kesBalance || 0)}</Text>
+                  <View className="flex-row items-center gap-1.5 mt-4">
+                    <Feather name="arrow-up" size={14} color="#96d4ab" />
+                    <Text className="text-[#96d4ab] text-[13px] font-jakarta-medium">12.4% vs last month</Text>
                   </View>
                 </View>
-              </View>
+
+                <View className="bg-[#1e293b] w-[280px] h-[160px] rounded-[32px] p-6 mr-4 relative overflow-hidden shadow-md shadow-[#1e293b]/30">
+                  <View className="absolute -right-4 -top-4 opacity-10">
+                    <MaterialIcons name="shield" size={100} color="white" />
+                  </View>
+                  <Text className="text-[#94a3b8] text-[11px] font-jakarta-bold uppercase tracking-[0.15em] mb-2">USDC Vault</Text>
+                  <Text className="text-white text-3xl font-jakarta-extrabold tracking-tight mb-auto">{(merchant?.usdcBalance || 0).toFixed(2)}</Text>
+                  <View className="flex-row items-center gap-1.5 mt-4">
+                    <Feather name="refresh-cw" size={14} color="#94a3b8" />
+                    <Text className="text-[#94a3b8] text-[13px] font-jakarta-medium">≈ KES 40,625</Text>
+                  </View>
+                </View>
+              </ScrollView>
             </View>
-          </View>
+          )}
 
           {/* Recent Activity */}
           <View className="px-6 mb-8">
@@ -294,23 +300,20 @@ export default function Dashboard({ navigation }: any) {
                     {trustScore.eligibleForAdvance ? 'KES 150,000' : 'KES 0'}
                   </Text>
                 </View>
-                <View className={`w-14 h-14 rounded-full border-4 items-center justify-center border-r-[#efeeeb] rotate-45 ${trustScore.current >= 50 ? 'border-[#006c4e]' : 'border-[#fcd34d]'}`}>
-                  <View className="-rotate-45 items-center justify-center">
-                    <Text className="font-jakarta-bold text-[#1b1c1a] text-xs">{trustScore.current}</Text>
-                    <Text className="text-[7px] text-[#707971] font-jakarta-bold uppercase tracking-wider">Score</Text>
-                  </View>
+                <View className={`w-14 h-14 rounded-2xl items-center justify-center ${trustScore.eligibleForAdvance ? 'bg-[#e7f8ef]' : 'bg-[#faf9f6]'}`}>
+                  <MaterialIcons
+                    name={trustScore.eligibleForAdvance ? 'lock-open' : 'lock-outline'}
+                    size={24}
+                    color={trustScore.eligibleForAdvance ? '#006c4e' : '#b3b9b4'}
+                  />
                 </View>
               </View>
 
-              <View className="h-3 w-full bg-[#efeeeb] rounded-full mb-6 overflow-hidden">
-                <View className="h-full bg-[#006c4e] rounded-full" style={{ width: `${trustScore.current}%` }} />
-              </View>
-
               <View className="flex-row items-center justify-between">
-                <View className="flex-row items-center gap-1.5">
+                <View className="flex-row items-center gap-1.5 flex-1 pr-3">
                   <MaterialIcons name={trustScore.eligibleForAdvance ? "check-circle" : "info"} size={16} color={trustScore.eligibleForAdvance ? "#006c4e" : "#707971"} />
-                  <Text className={`text-[11px] font-jakarta-bold uppercase tracking-wider ${trustScore.eligibleForAdvance ? 'text-[#006c4e]' : 'text-[#707971]'}`}>
-                    {trustScore.eligibleForAdvance ? 'Cash Advance Eligible' : 'Build Score to Unlock'}
+                  <Text numberOfLines={1} className={`flex-1 text-[11px] font-jakarta-bold uppercase tracking-wider ${trustScore.eligibleForAdvance ? 'text-[#006c4e]' : 'text-[#707971]'}`}>
+                    {trustScore.eligibleForAdvance ? 'Cash Advance Eligible' : 'Keep Processing to Unlock'}
                   </Text>
                 </View>
                 <TouchableOpacity 
