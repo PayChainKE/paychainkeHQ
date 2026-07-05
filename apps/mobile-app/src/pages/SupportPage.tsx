@@ -43,7 +43,7 @@ const FAQItem = ({ question, answer }: { question: string, answer: string }) => 
   );
 };
 
-export default function SupportPage() {
+export default function SupportPage({ navigation }: any) {
   return (
     <SafeAreaView className="flex-1 bg-[#faf9f6]" edges={['top', 'left', 'right']}>
       {/* App Header */}
@@ -55,7 +55,7 @@ export default function SupportPage() {
             </View>
             <Text className="font-jakarta-bold tracking-tight text-[#00351d] text-[18px]">Merchant Store</Text>
           </View>
-          <TouchableOpacity className="w-10 h-10 items-center justify-center">
+          <TouchableOpacity onPress={() => navigation.navigate('Notifications')} className="w-10 h-10 items-center justify-center">
             <MaterialIcons name="notifications" size={26} color="#00351d" />
           </TouchableOpacity>
         </View>

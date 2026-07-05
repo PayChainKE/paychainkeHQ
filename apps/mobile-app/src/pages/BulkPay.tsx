@@ -10,8 +10,6 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import { useAuth } from '../context/AuthContext';
-import { useBiometrics } from '../hooks/useBiometrics';
-import { ValidatedTextInput } from '../components/ValidatedTextInput';
 import api from '../api/config';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -48,6 +46,7 @@ interface Receipt {
   phone?: string;
   reference: string;
   timestamp: string;
+  status?: string;
 }
 
 interface BatchHistory {
@@ -94,10 +93,16 @@ const formatKES = (amount?: number) => {
 const validatePhone = (phone: string) =>
   /^(?:254|\+254|0)?(7\d{8}|1\d{8})$/.test((phone || '').replace(/\s+/g, ''));
 
+const BATCH_STATUS_META: Record<string, { bg: string; text: string }> = {
+  Processed: { bg: '#e7f8ef', text: '#006c4e' },
+  Pending: { bg: '#fef3e7', text: '#b87333' },
+  Partial: { bg: '#fef3e7', text: '#b87333' },
+  Failed: { bg: '#fef2f2', text: '#b91c1c' },
+};
+
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function BulkPay() {
-  const { merchant, isBiometricsEnabled } = useAuth();
-  const { authenticate: authenticateBiometric } = useBiometrics();
+  const { merchant } = useAuth();
 
   const [activeTab, setActiveTab] = useState<'Payees' | 'Batches'>('Payees');
   const [activeFilter, setActiveFilter] = useState<Filter>('All');
@@ -168,6 +173,7 @@ export default function BulkPay() {
   // Receipts after a batch
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [lastBatchReference, setLastBatchReference] = useState<string>('');
+  const [lastBatchStatus, setLastBatchStatus] = useState<string>('Processed');
 
   // ── Profile gate ──
   const isProfileComplete = Boolean(merchant?.kraPin && merchant?.businessNumber);
@@ -225,6 +231,7 @@ export default function BulkPay() {
       if (doc.canceled || !doc.assets?.[0]) return;
 
       setCsvUploadLoading(true);
+      setAuthPin('');
       const file = doc.assets[0];
 
       // Read file content
@@ -278,7 +285,11 @@ export default function BulkPay() {
   // ── Process CSV Batch ──
   const processCsvBatch = async () => {
     if (csvPreview.length === 0) return;
-    
+    if (authPin.length !== 4) {
+      Alert.alert('Invalid PIN', 'Enter your 4-digit Bulk Pay PIN.');
+      return;
+    }
+
     setIsAuthorizing(true);
     try {
       const batchRows = csvPreview.map((row: any) => ({
@@ -299,6 +310,7 @@ export default function BulkPay() {
       const processedBatch = res.data?.batch;
       const ref = processedBatch?.batchReference || `B-${Date.now()}`;
       setLastBatchReference(ref);
+      setLastBatchStatus(processedBatch?.status || 'Pending');
 
       const newReceipts: Receipt[] = (processedBatch?.transactions || batchRows).map((tx: any, idx: number) => ({
         id: tx.receiptNumber || `R-${idx + 1}`,
@@ -308,6 +320,7 @@ export default function BulkPay() {
         phone: tx.accountReference || tx.phone,
         reference: ref,
         timestamp: new Date().toLocaleString('en-KE'),
+        status: tx.status || 'pending',
       }));
 
       setReceipts(newReceipts);
@@ -349,6 +362,7 @@ export default function BulkPay() {
 
   const balance = merchant?.kesBalance ?? 0;
   const isLiquidityLow = batchTotal > balance && batchTotal > 0;
+  const merchantInitials = merchant?.businessName ? merchant.businessName.substring(0, 2).toUpperCase() : '??';
 
   // ── Selection ──
   const togglePayee = (id: string) => {
@@ -508,7 +522,7 @@ export default function BulkPay() {
   };
 
   // ── Authorize batch ──
-  const startAuthorize = async () => {
+  const startAuthorize = () => {
     if (selectedIds.length === 0) {
       Alert.alert('No selection', 'Select at least one payee.');
       return;
@@ -522,15 +536,6 @@ export default function BulkPay() {
       Alert.alert('Low balance', `Batch total exceeds your KES balance (${formatKES(balance)}).`);
       return;
     }
-
-    if (isBiometricsEnabled) {
-      const auth = await authenticateBiometric(`Authorize ${formatKES(batchTotal)} batch payment`);
-      if (!auth.success) {
-        if (!auth.cancelled) Alert.alert('Authorization blocked', auth.error);
-        return;
-      }
-    }
-
     setAuthPin('');
     setShowAuthorize(true);
   };
@@ -562,6 +567,7 @@ export default function BulkPay() {
       const processedBatch = res.data?.batch;
       const ref = processedBatch?.batchReference || `B-${Date.now()}`;
       setLastBatchReference(ref);
+      setLastBatchStatus(processedBatch?.status || 'Pending');
 
       const newReceipts: Receipt[] = (processedBatch?.transactions || batchRows).map((tx: any) => ({
         id: tx.receiptNumber || `R-${Math.random().toString(36).slice(2, 9).toUpperCase()}`,
@@ -573,6 +579,7 @@ export default function BulkPay() {
         timestamp: new Date().toLocaleString('en-KE', {
           day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
         }),
+        status: tx.status || 'pending',
       }));
 
       setReceipts(newReceipts);
@@ -680,9 +687,16 @@ export default function BulkPay() {
     return (
       <SafeAreaView className="flex-1 bg-[#faf9f6]" edges={['top', 'left', 'right']}>
         <LinearGradient colors={['#0B4D2E', '#1D9E75']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-          className="w-full pt-[40px] pb-[16px] px-6 rounded-b-[24px]">
-          <Text className="text-white text-[22px] font-jakarta-bold">Bulk Payments</Text>
-          <Text className="text-white/70 text-[12px] font-jakarta-medium mt-1">Profile required to unlock</Text>
+          className="w-full pt-[40px] pb-[16px] px-6 rounded-b-[24px] shadow-sm shadow-[#0b4d2e]/10">
+          <View className="w-full max-w-lg mx-auto flex-row items-center gap-3">
+            <View className="w-10 h-10 rounded-full bg-white/20 items-center justify-center border border-white/30">
+              <Text className="text-white font-jakarta-bold text-sm">{merchantInitials}</Text>
+            </View>
+            <View>
+              <Text className="text-white text-[20px] font-jakarta-bold tracking-tight leading-tight">Bulk Payments</Text>
+              <Text className="text-white/70 text-[12px] font-jakarta-medium tracking-wide">Profile required to unlock</Text>
+            </View>
+          </View>
         </LinearGradient>
         <View className="flex-1 items-center justify-center px-8">
           <View className="w-20 h-20 rounded-full bg-[#fef3e7] items-center justify-center mb-6">
@@ -701,20 +715,22 @@ export default function BulkPay() {
     <SafeAreaView className="flex-1 bg-[#faf9f6]" edges={['top', 'left', 'right']}>
       {/* Header */}
       <LinearGradient colors={['#0B4D2E', '#1D9E75']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-        className="w-full pt-[40px] pb-[16px] px-6 rounded-b-[24px]">
-        <View className="w-full max-w-lg mx-auto">
-          <View className="flex-row items-center justify-between mb-2">
+        className="w-full pt-[40px] pb-[16px] px-6 rounded-b-[24px] shadow-sm shadow-[#0b4d2e]/10">
+        <View className="w-full max-w-lg mx-auto flex-row items-center justify-between mb-2">
+          <View className="flex-row items-center gap-3">
+            <View className="w-10 h-10 rounded-full bg-white/20 items-center justify-center border border-white/30">
+              <Text className="text-white font-jakarta-bold text-sm">{merchantInitials}</Text>
+            </View>
             <View>
               <Text className="text-white text-[20px] font-jakarta-bold tracking-tight leading-tight">Bulk Payments</Text>
               <Text className="text-white/70 text-[12px] font-jakarta-medium tracking-wide">
                 Balance: {formatKES(balance)}
               </Text>
             </View>
-            <TouchableOpacity onPress={openAddPayee} className="bg-white/15 border border-white/25 px-3.5 py-2 rounded-full flex-row items-center gap-1.5">
-              <Feather name="plus" size={14} color="#ffffff" />
-              <Text className="text-white font-jakarta-bold text-[12px]">Add Payee</Text>
-            </TouchableOpacity>
           </View>
+          <TouchableOpacity onPress={openAddPayee} className="w-10 h-10 rounded-full bg-white/15 items-center justify-center border border-white/25">
+            <Feather name="plus" size={17} color="#ffffff" />
+          </TouchableOpacity>
         </View>
       </LinearGradient>
 
@@ -892,19 +908,21 @@ export default function BulkPay() {
 
             {/* Batch History */}
             <View className="mb-4">
-              <View className="flex-row items-center justify-between mb-3">
-                <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em]">Batch History</Text>
-                <View className="flex-row gap-2">
-                  {['All', 'Processed', 'Pending'].map((status) => (
-                    <TouchableOpacity
-                      key={status}
-                      onPress={() => setBatchFilter(status)}
-                      className={`px-3 py-1 rounded-full ${batchFilter === status ? 'bg-[#00351d]' : 'bg-[#faf9f6] border border-[#c0c9c0]/30'}`}
-                    >
-                      <Text className={`text-[9px] font-jakarta-bold uppercase tracking-wider ${batchFilter === status ? 'text-white' : 'text-[#707971]'}`}>{status}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+              <View className="mb-3">
+                <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-2">Batch History</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-1">
+                  <View className="flex-row gap-2 px-1">
+                    {['All', 'Processed', 'Pending', 'Partial', 'Failed'].map((status) => (
+                      <TouchableOpacity
+                        key={status}
+                        onPress={() => setBatchFilter(status)}
+                        className={`px-3 py-1 rounded-full ${batchFilter === status ? 'bg-[#00351d]' : 'bg-[#faf9f6] border border-[#c0c9c0]/30'}`}
+                      >
+                        <Text className={`text-[9px] font-jakarta-bold uppercase tracking-wider ${batchFilter === status ? 'text-white' : 'text-[#707971]'}`}>{status}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
               </View>
 
               {batchHistory.length === 0 ? (
@@ -933,8 +951,8 @@ export default function BulkPay() {
                               {new Date(batch.createdAt).toLocaleDateString('en-KE')}
                             </Text>
                           </View>
-                          <View className={`px-2.5 py-1 rounded-full ${batch.status === 'Processed' ? 'bg-[#e7f8ef]' : 'bg-[#fef2f2]'}`}>
-                            <Text className={`text-[9px] font-jakarta-bold uppercase tracking-wider ${batch.status === 'Processed' ? 'text-[#006c4e]' : 'text-[#b91c1c]'}`}>
+                          <View style={{ backgroundColor: (BATCH_STATUS_META[batch.status] || BATCH_STATUS_META.Failed).bg }} className="px-2.5 py-1 rounded-full">
+                            <Text style={{ color: (BATCH_STATUS_META[batch.status] || BATCH_STATUS_META.Failed).text }} className="text-[9px] font-jakarta-bold uppercase tracking-wider">
                               {batch.status}
                             </Text>
                           </View>
@@ -1023,11 +1041,27 @@ export default function BulkPay() {
                 <Text className="text-[#707971] font-jakarta-medium text-[12px] mt-1 text-center">A 4-digit PIN is required to authorize batches.</Text>
               </View>
               <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-2">New PIN</Text>
-              <ValidatedTextInput kind="pin4" value={setupPin} onChangeText={setSetupPin} secureTextEntry placeholder="••••" placeholderTextColor="#a1a1aa"
-                className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-5 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[18px] tracking-[0.5em] text-center mb-4" />
+              <TextInput
+                value={setupPin}
+                onChangeText={(t) => setSetupPin(t.replace(/\D/g, '').slice(0, 4))}
+                keyboardType="numeric"
+                secureTextEntry
+                maxLength={4}
+                className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-5 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[18px] tracking-[0.5em] text-center mb-4"
+                placeholder="••••"
+                placeholderTextColor="#a1a1aa"
+              />
               <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-2">Confirm PIN</Text>
-              <ValidatedTextInput kind="pin4" value={confirmPin} onChangeText={setConfirmPin} secureTextEntry placeholder="••••" placeholderTextColor="#a1a1aa"
-                className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-5 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[18px] tracking-[0.5em] text-center mb-6" />
+              <TextInput
+                value={confirmPin}
+                onChangeText={(t) => setConfirmPin(t.replace(/\D/g, '').slice(0, 4))}
+                keyboardType="numeric"
+                secureTextEntry
+                maxLength={4}
+                className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-5 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[18px] tracking-[0.5em] text-center mb-6"
+                placeholder="••••"
+                placeholderTextColor="#a1a1aa"
+              />
               <TouchableOpacity onPress={handleSetupPin} className="w-full bg-[#00351d] h-[56px] rounded-full flex-row items-center justify-center">
                 <Text className="text-white font-jakarta-bold text-[15px]">Save PIN</Text>
               </TouchableOpacity>
@@ -1047,9 +1081,15 @@ export default function BulkPay() {
               <Text className="text-[#707971] font-jakarta-medium text-[12px] mb-5" numberOfLines={1}>For {showAmountEditor?.name}</Text>
               <View className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-5 py-4 mb-5 flex-row items-center">
                 <Text className="text-[#707971] font-jakarta-bold text-[18px] mr-2">KES</Text>
-                <ValidatedTextInput kind="amount" value={amountInput} onChangeText={setAmountInput} placeholder="0" placeholderTextColor="#a1a1aa" autoFocus
-                  containerClassName="flex-1"
-                  className="text-[#1b1c1a] font-jakarta-bold text-[20px]" />
+                <TextInput
+                  value={amountInput}
+                  onChangeText={(t) => setAmountInput(t.replace(/[^\d.]/g, ''))}
+                  keyboardType="decimal-pad"
+                  className="flex-1 text-[#1b1c1a] font-jakarta-bold text-[20px]"
+                  placeholder="0"
+                  placeholderTextColor="#a1a1aa"
+                  autoFocus
+                />
               </View>
               <TouchableOpacity onPress={saveAmount} className="w-full bg-[#00351d] h-[56px] rounded-full flex-row items-center justify-center">
                 <Text className="text-white font-jakarta-bold text-[15px]">Confirm</Text>
@@ -1083,8 +1123,18 @@ export default function BulkPay() {
                   <Text className="font-jakarta-bold text-[#00351d] text-[16px]">{formatKES(batchTotal)}</Text>
                 </View>
               </View>
-              <ValidatedTextInput kind="pin4" value={authPin} onChangeText={setAuthPin} secureTextEntry editable={!isAuthorizing} placeholder="••••" placeholderTextColor="#a1a1aa" autoFocus
-                className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-5 py-4 text-[#1b1c1a] font-jakarta-bold text-[20px] tracking-[0.5em] text-center mb-6" />
+              <TextInput
+                value={authPin}
+                onChangeText={(t) => setAuthPin(t.replace(/\D/g, '').slice(0, 4))}
+                keyboardType="numeric"
+                secureTextEntry
+                maxLength={4}
+                editable={!isAuthorizing}
+                className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-5 py-4 text-[#1b1c1a] font-jakarta-bold text-[20px] tracking-[0.5em] text-center mb-6"
+                placeholder="••••"
+                placeholderTextColor="#a1a1aa"
+                autoFocus
+              />
               <TouchableOpacity
                 onPress={handleAuthorize}
                 disabled={isAuthorizing}
@@ -1103,6 +1153,87 @@ export default function BulkPay() {
         </KeyboardAvoidingView>
       </Modal>
 
+      {/* ── CSV Upload Preview Modal ── */}
+      <Modal visible={showCsvUpload} transparent animationType="slide" onRequestClose={() => !isAuthorizing && setShowCsvUpload(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
+          <View className="flex-1 justify-end bg-black/50">
+            <TouchableOpacity className="absolute inset-0" activeOpacity={1} onPress={() => !isAuthorizing && setShowCsvUpload(false)} />
+            <View className="w-full max-w-lg mx-auto bg-white rounded-t-[36px] px-6 pt-4 pb-8 mt-auto" style={{ maxHeight: '90%' }}>
+              <View className="items-center mb-4"><View className="w-12 h-1.5 bg-[#e9e8e5] rounded-full" /></View>
+              <View className="items-center mb-4">
+                <View className="w-14 h-14 rounded-full bg-[#dbeafe] items-center justify-center mb-3">
+                  <Feather name="file-text" size={22} color="#1e40af" />
+                </View>
+                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#1b1c1a]">Review CSV Batch</Text>
+                <Text className="text-[#707971] font-jakarta-medium text-[12px] mt-1">{csvPreview.length} row{csvPreview.length === 1 ? '' : 's'} detected</Text>
+              </View>
+
+              <View className="bg-[#faf9f6] rounded-2xl p-4 mb-4 border border-[#e9e8e5]">
+                <View className="flex-row justify-between items-center mb-2">
+                  <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider">Gross Total</Text>
+                  <Text className="font-jakarta-bold text-[#1b1c1a] text-[14px]">{formatKES(csvSummary?.totalGross)}</Text>
+                </View>
+                <View className="flex-row justify-between items-center">
+                  <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider">Net Payout</Text>
+                  <Text className="font-jakarta-bold text-[#00351d] text-[16px]">{formatKES(csvSummary?.totalNet)}</Text>
+                </View>
+              </View>
+
+              <ScrollView className="mb-4" showsVerticalScrollIndicator={false} style={{ maxHeight: 220 }}>
+                {csvPreview.map((row: any, idx: number) => (
+                  <View key={idx} className="bg-white rounded-2xl p-3 mb-2 border border-[#e9e8e5] flex-row items-center">
+                    <View className="w-9 h-9 rounded-full bg-[#faf9f6] items-center justify-center mr-3 border border-[#c0c9c0]/30">
+                      <Text className="font-jakarta-bold text-[10px] text-[#404942]">{initials(row.name)}</Text>
+                    </View>
+                    <View className="flex-1 min-w-0 mr-2">
+                      <Text className="font-jakarta-bold text-[13px] text-[#1b1c1a]" numberOfLines={1}>{row.name}</Text>
+                      <Text
+                        className={`text-[10px] font-jakarta-medium ${row.status?.startsWith('Warning') ? 'text-[#b87333]' : 'text-[#707971]'}`}
+                        numberOfLines={1}
+                      >
+                        {row.status || 'Valid'}
+                      </Text>
+                    </View>
+                    <Text className="font-jakarta-bold text-[13px] text-[#1b1c1a]" style={{ flexShrink: 0 }}>
+                      {formatKES(row.netAmount ?? row.amount)}
+                    </Text>
+                  </View>
+                ))}
+              </ScrollView>
+
+              <TextInput
+                value={authPin}
+                onChangeText={(t) => setAuthPin(t.replace(/\D/g, '').slice(0, 4))}
+                keyboardType="numeric"
+                secureTextEntry
+                maxLength={4}
+                editable={!isAuthorizing}
+                className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-5 py-4 text-[#1b1c1a] font-jakarta-bold text-[20px] tracking-[0.5em] text-center mb-6"
+                placeholder="••••"
+                placeholderTextColor="#a1a1aa"
+              />
+
+              <TouchableOpacity
+                onPress={processCsvBatch}
+                disabled={isAuthorizing || csvPreview.length === 0}
+                className="w-full bg-[#00351d] h-[56px] rounded-full flex-row items-center justify-center"
+                style={{ opacity: isAuthorizing || csvPreview.length === 0 ? 0.7 : 1 }}
+              >
+                {isAuthorizing ? <ActivityIndicator color="#fff" /> : (
+                  <>
+                    <Feather name="check-circle" size={16} color="#fff" />
+                    <Text className="text-white font-jakarta-bold text-[15px] ml-2">Confirm & Send</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => !isAuthorizing && setShowCsvUpload(false)} className="items-center py-3 mt-2">
+                <Text className="text-[#707971] font-jakarta-semibold text-[13px]">Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
       {/* ── Receipts Modal ── */}
       <Modal visible={showReceipts} transparent animationType="slide" onRequestClose={() => setShowReceipts(false)}>
         <View className="flex-1 justify-end bg-black/40">
@@ -1110,31 +1241,126 @@ export default function BulkPay() {
           <View className="w-full max-w-lg mx-auto bg-white rounded-t-[36px] px-6 pt-4 pb-8 mt-auto" style={{ maxHeight: '90%' }}>
             <View className="items-center mb-4"><View className="w-12 h-1.5 bg-[#e9e8e5] rounded-full" /></View>
             <View className="items-center mb-4">
-              <View className="w-14 h-14 rounded-full bg-[#e7f8ef] items-center justify-center mb-3">
-                <Feather name="check-circle" size={22} color="#006c4e" />
+              <View
+                style={{ backgroundColor: lastBatchStatus === 'Processed' ? '#e7f8ef' : lastBatchStatus === 'Failed' ? '#fef2f2' : '#fef3e7' }}
+                className="w-14 h-14 rounded-full items-center justify-center mb-3"
+              >
+                <Feather
+                  name={lastBatchStatus === 'Processed' ? 'check-circle' : lastBatchStatus === 'Failed' ? 'x-circle' : 'clock'}
+                  size={22}
+                  color={lastBatchStatus === 'Processed' ? '#006c4e' : lastBatchStatus === 'Failed' ? '#b91c1c' : '#b87333'}
+                />
               </View>
-              <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#1b1c1a]">Batch Settled</Text>
-              <Text className="text-[#707971] font-jakarta-medium text-[12px] mt-1" numberOfLines={1}>Ref: {lastBatchReference}</Text>
+              <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#1b1c1a]">
+                {lastBatchStatus === 'Processed' ? 'Batch Settled' : lastBatchStatus === 'Failed' ? 'Batch Failed' : lastBatchStatus === 'Partial' ? 'Batch Partially Settled' : 'Batch Submitted'}
+              </Text>
+              <Text className="text-[#707971] font-jakarta-medium text-[12px] mt-1 text-center" numberOfLines={2}>
+                {lastBatchStatus === 'Processed'
+                  ? `Ref: ${lastBatchReference}`
+                  : lastBatchStatus === 'Failed'
+                  ? `Ref: ${lastBatchReference} · Failed payouts were refunded to your balance.`
+                  : `Ref: ${lastBatchReference} · Some payouts are awaiting M-PESA confirmation.`}
+              </Text>
             </View>
             <ScrollView className="mb-4" showsVerticalScrollIndicator={false}>
-              {receipts.map((r) => (
-                <View key={r.id} className="bg-[#faf9f6] rounded-2xl p-3 mb-2 border border-[#e9e8e5] flex-row items-center">
-                  <View className="w-9 h-9 rounded-full bg-white items-center justify-center mr-3 border border-[#c0c9c0]/30">
-                    <Text className="font-jakarta-bold text-[10px] text-[#404942]">{initials(r.name)}</Text>
+              {receipts.map((r) => {
+                const rowMeta = r.status === 'completed'
+                  ? { color: '#006c4e', label: 'Completed' }
+                  : r.status === 'failed'
+                  ? { color: '#b91c1c', label: 'Failed · Refunded' }
+                  : { color: '#b87333', label: 'Pending' };
+                return (
+                  <View key={r.id} className="bg-[#faf9f6] rounded-2xl p-3 mb-2 border border-[#e9e8e5] flex-row items-center">
+                    <View className="w-9 h-9 rounded-full bg-white items-center justify-center mr-3 border border-[#c0c9c0]/30">
+                      <Text className="font-jakarta-bold text-[10px] text-[#404942]">{initials(r.name)}</Text>
+                    </View>
+                    <View className="flex-1 min-w-0 mr-2">
+                      <Text className="font-jakarta-bold text-[13px] text-[#1b1c1a]" numberOfLines={1}>{r.name}</Text>
+                      <Text className="text-[#707971] font-jakarta-medium text-[10px]" numberOfLines={1}>{r.id}</Text>
+                    </View>
+                    <View className="items-end" style={{ flexShrink: 0 }}>
+                      <Text className="font-jakarta-bold text-[13px] text-[#1b1c1a]">{formatKES(r.amount)}</Text>
+                      <Text style={{ color: rowMeta.color }} className="text-[9px] font-jakarta-bold uppercase tracking-wider mt-0.5">{rowMeta.label}</Text>
+                    </View>
                   </View>
-                  <View className="flex-1 min-w-0 mr-2">
-                    <Text className="font-jakarta-bold text-[13px] text-[#1b1c1a]" numberOfLines={1}>{r.name}</Text>
-                    <Text className="text-[#707971] font-jakarta-medium text-[10px]" numberOfLines={1}>{r.id}</Text>
-                  </View>
-                  <Text className="font-jakarta-bold text-[13px] text-[#006c4e]" style={{ flexShrink: 0 }}>{formatKES(r.amount)}</Text>
-                </View>
-              ))}
+                );
+              })}
             </ScrollView>
             <TouchableOpacity onPress={downloadBatchReceipts} className="w-full bg-[#00351d] h-[56px] rounded-full flex-row items-center justify-center">
               <Feather name="download" size={16} color="#fff" />
               <Text className="text-white font-jakarta-bold text-[15px] ml-2">Download Report</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setShowReceipts(false)} className="items-center py-3 mt-2">
+              <Text className="text-[#707971] font-jakarta-semibold text-[13px]">Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Batch Details Modal ── */}
+      <Modal visible={!!showBatchDetails} transparent animationType="slide" onRequestClose={() => setShowBatchDetails(null)}>
+        <View className="flex-1 justify-end bg-black/40">
+          <TouchableOpacity className="absolute inset-0" activeOpacity={1} onPress={() => setShowBatchDetails(null)} />
+          <View className="w-full max-w-lg mx-auto bg-white rounded-t-[36px] px-6 pt-4 pb-8 mt-auto" style={{ maxHeight: '85%' }}>
+            <View className="items-center mb-4"><View className="w-12 h-1.5 bg-[#e9e8e5] rounded-full" /></View>
+            {showBatchDetails && (
+              <>
+                <View className="flex-row items-center justify-between mb-4">
+                  <View>
+                    <Text className="font-jakarta-bold text-[16px] text-[#1b1c1a]">{showBatchDetails.batchReference}</Text>
+                    <Text className="text-[#707971] font-jakarta-medium text-[11px] mt-0.5">
+                      {new Date(showBatchDetails.createdAt).toLocaleString('en-KE')}
+                    </Text>
+                  </View>
+                  <View style={{ backgroundColor: (BATCH_STATUS_META[showBatchDetails.status] || BATCH_STATUS_META.Failed).bg }} className="px-2.5 py-1 rounded-full">
+                    <Text style={{ color: (BATCH_STATUS_META[showBatchDetails.status] || BATCH_STATUS_META.Failed).text }} className="text-[9px] font-jakarta-bold uppercase tracking-wider">
+                      {showBatchDetails.status}
+                    </Text>
+                  </View>
+                </View>
+
+                <View className="flex-row gap-2 mb-4">
+                  <View className="flex-1 bg-[#faf9f6] rounded-2xl p-3">
+                    <Text className="text-[9px] font-jakarta-medium text-[#707971] uppercase tracking-wider mb-1">Net Paid</Text>
+                    <Text className="text-[#00351d] font-jakarta-bold text-[15px]">{formatKES(showBatchDetails.totalNetAmount)}</Text>
+                  </View>
+                  <View className="flex-1 bg-[#faf9f6] rounded-2xl p-3">
+                    <Text className="text-[9px] font-jakarta-medium text-[#707971] uppercase tracking-wider mb-1">Tax Withheld</Text>
+                    <Text className="text-[#00351d] font-jakarta-bold text-[15px]">{formatKES(showBatchDetails.totalTaxDeductions)}</Text>
+                  </View>
+                  <View className="flex-1 bg-[#faf9f6] rounded-2xl p-3">
+                    <Text className="text-[9px] font-jakarta-medium text-[#707971] uppercase tracking-wider mb-1">Payees</Text>
+                    <Text className="text-[#00351d] font-jakarta-bold text-[15px]">{showBatchDetails.payeeCount}</Text>
+                  </View>
+                </View>
+
+                <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-2">Transactions</Text>
+                <ScrollView className="mb-2" showsVerticalScrollIndicator={false}>
+                  {showBatchDetails.transactions.map((tx: any, idx: number) => {
+                    const rowStatus = tx.status || 'pending';
+                    const meta = BATCH_STATUS_META[rowStatus === 'completed' ? 'Processed' : rowStatus === 'failed' ? 'Failed' : 'Pending'];
+                    return (
+                      <View key={tx.receiptNumber || idx} className="bg-[#faf9f6] rounded-2xl p-3 mb-2 border border-[#e9e8e5] flex-row items-center">
+                        <View className="w-9 h-9 rounded-full bg-white items-center justify-center mr-3 border border-[#c0c9c0]/30">
+                          <Text className="font-jakarta-bold text-[10px] text-[#404942]">{initials(tx.name)}</Text>
+                        </View>
+                        <View className="flex-1 min-w-0 mr-2">
+                          <Text className="font-jakarta-bold text-[13px] text-[#1b1c1a]" numberOfLines={1}>{tx.name}</Text>
+                          <Text className="text-[#707971] font-jakarta-medium text-[10px]" numberOfLines={1}>{tx.accountReference}</Text>
+                        </View>
+                        <View className="items-end" style={{ flexShrink: 0 }}>
+                          <Text className="font-jakarta-bold text-[13px] text-[#1b1c1a]">{formatKES(tx.amount)}</Text>
+                          <View style={{ backgroundColor: meta.bg }} className="px-2 py-0.5 rounded-full mt-1">
+                            <Text style={{ color: meta.text }} className="text-[8px] font-jakarta-bold uppercase tracking-wider">{rowStatus}</Text>
+                          </View>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </ScrollView>
+              </>
+            )}
+            <TouchableOpacity onPress={() => setShowBatchDetails(null)} className="items-center py-3 mt-1">
               <Text className="text-[#707971] font-jakarta-semibold text-[13px]">Close</Text>
             </TouchableOpacity>
           </View>
@@ -1192,14 +1418,12 @@ export default function BulkPay() {
                     <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-2">
                       {newPayee.type === 'utility' ? 'Utility Name' : 'Recipient Name'}
                     </Text>
-                    <ValidatedTextInput
-                      kind={newPayee.type === 'utility' ? 'businessName' : 'personName'}
+                    <TextInput
                       value={newPayee.name}
                       onChangeText={(t) => setNewPayee({ ...newPayee, name: t })}
                       placeholder={newPayee.type === 'utility' ? 'e.g. Kenya Power' : 'e.g. John Kamau'}
                       placeholderTextColor="#a1a1aa"
-                      containerClassName="mb-4"
-                      className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-semibold text-[14px]"
+                      className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-semibold text-[14px] mb-4"
                     />
 
                     {/* KRA Employee fields */}
@@ -1207,25 +1431,43 @@ export default function BulkPay() {
                       <View className="bg-[#f0fdf4] rounded-2xl p-4 mb-4 border border-[#bbf7d0]">
                         <Text className="text-[10px] font-jakarta-bold text-[#006c4e] uppercase tracking-wider mb-3">KRA Payroll Details</Text>
                         <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">KRA PIN *</Text>
-                        <ValidatedTextInput kind="kraPin" value={newPayee.kraPin} onChangeText={(t) => setNewPayee({ ...newPayee, kraPin: t })}
-                          placeholder="A000000000A" placeholderTextColor="#a1a1aa" containerClassName="mb-3"
-                          className="bg-white border border-[#e9e8e5] rounded-xl px-4 py-3 text-[#1b1c1a] font-jakarta-bold text-[14px]" />
+                        <TextInput
+                          value={newPayee.kraPin}
+                          onChangeText={(t) => setNewPayee({ ...newPayee, kraPin: t.toUpperCase() })}
+                          autoCapitalize="characters"
+                          placeholder="A000000000A"
+                          placeholderTextColor="#a1a1aa"
+                          className="bg-white border border-[#e9e8e5] rounded-xl px-4 py-3 text-[#1b1c1a] font-jakarta-bold text-[14px] mb-3"
+                        />
                         <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">ID Number *</Text>
-                        <ValidatedTextInput kind="nationalId" value={newPayee.idNumber} onChangeText={(t) => setNewPayee({ ...newPayee, idNumber: t })}
-                          placeholder="12345678" placeholderTextColor="#a1a1aa" containerClassName="mb-3"
-                          className="bg-white border border-[#e9e8e5] rounded-xl px-4 py-3 text-[#1b1c1a] font-jakarta-bold text-[14px]" />
+                        <TextInput
+                          value={newPayee.idNumber}
+                          onChangeText={(t) => setNewPayee({ ...newPayee, idNumber: t.replace(/\D/g, '') })}
+                          keyboardType="numeric"
+                          placeholder="12345678"
+                          placeholderTextColor="#a1a1aa"
+                          className="bg-white border border-[#e9e8e5] rounded-xl px-4 py-3 text-[#1b1c1a] font-jakarta-bold text-[14px] mb-3"
+                        />
                         <View className="flex-row gap-2">
                           <View className="flex-1">
                             <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">NSSF</Text>
-                            <ValidatedTextInput kind="nssf" optional value={newPayee.nssfNumber} onChangeText={(t) => setNewPayee({ ...newPayee, nssfNumber: t })}
-                              placeholder="123456789" placeholderTextColor="#a1a1aa"
-                              className="bg-white border border-[#e9e8e5] rounded-xl px-3 py-3 text-[#1b1c1a] font-jakarta-bold text-[13px]" />
+                            <TextInput
+                              value={newPayee.nssfNumber}
+                              onChangeText={(t) => setNewPayee({ ...newPayee, nssfNumber: t })}
+                              placeholder="123456789"
+                              placeholderTextColor="#a1a1aa"
+                              className="bg-white border border-[#e9e8e5] rounded-xl px-3 py-3 text-[#1b1c1a] font-jakarta-bold text-[13px]"
+                            />
                           </View>
                           <View className="flex-1">
                             <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">SHIF</Text>
-                            <ValidatedTextInput kind="shif" optional value={newPayee.shifNumber} onChangeText={(t) => setNewPayee({ ...newPayee, shifNumber: t })}
-                              placeholder="1234567" placeholderTextColor="#a1a1aa"
-                              className="bg-white border border-[#e9e8e5] rounded-xl px-3 py-3 text-[#1b1c1a] font-jakarta-bold text-[13px]" />
+                            <TextInput
+                              value={newPayee.shifNumber}
+                              onChangeText={(t) => setNewPayee({ ...newPayee, shifNumber: t })}
+                              placeholder="1234567"
+                              placeholderTextColor="#a1a1aa"
+                              className="bg-white border border-[#e9e8e5] rounded-xl px-3 py-3 text-[#1b1c1a] font-jakarta-bold text-[13px]"
+                            />
                           </View>
                         </View>
                       </View>
@@ -1236,25 +1478,43 @@ export default function BulkPay() {
                       <View className="bg-[#eef2ff] rounded-2xl p-4 mb-4 border border-[#c7d2fe]">
                         <Text className="text-[10px] font-jakarta-bold text-[#3730a3] uppercase tracking-wider mb-3">KRA eTIMS Details</Text>
                         <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">Supplier KRA PIN *</Text>
-                        <ValidatedTextInput kind="kraPin" value={newPayee.kraPin} onChangeText={(t) => setNewPayee({ ...newPayee, kraPin: t })}
-                          placeholder="P000000000A" placeholderTextColor="#a1a1aa" containerClassName="mb-3"
-                          className="bg-white border border-[#e9e8e5] rounded-xl px-4 py-3 text-[#1b1c1a] font-jakarta-bold text-[14px]" />
+                        <TextInput
+                          value={newPayee.kraPin}
+                          onChangeText={(t) => setNewPayee({ ...newPayee, kraPin: t.toUpperCase() })}
+                          autoCapitalize="characters"
+                          placeholder="P000000000A"
+                          placeholderTextColor="#a1a1aa"
+                          className="bg-white border border-[#e9e8e5] rounded-xl px-4 py-3 text-[#1b1c1a] font-jakarta-bold text-[14px] mb-3"
+                        />
                         <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">eTIMS Invoice *</Text>
-                        <ValidatedTextInput kind="etims" value={newPayee.etimsInvoiceNumber} onChangeText={(t) => setNewPayee({ ...newPayee, etimsInvoiceNumber: t })}
-                          placeholder="INV-123" placeholderTextColor="#a1a1aa" containerClassName="mb-3"
-                          className="bg-white border border-[#e9e8e5] rounded-xl px-4 py-3 text-[#1b1c1a] font-jakarta-bold text-[14px]" />
+                        <TextInput
+                          value={newPayee.etimsInvoiceNumber}
+                          onChangeText={(t) => setNewPayee({ ...newPayee, etimsInvoiceNumber: t })}
+                          placeholder="INV-123"
+                          placeholderTextColor="#a1a1aa"
+                          className="bg-white border border-[#e9e8e5] rounded-xl px-4 py-3 text-[#1b1c1a] font-jakarta-bold text-[14px] mb-3"
+                        />
                         <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">Control Unit (CU) *</Text>
-                        <ValidatedTextInput kind="cuNumber" value={newPayee.cuNumber} onChangeText={(t) => setNewPayee({ ...newPayee, cuNumber: t })}
-                          placeholder="123456789" placeholderTextColor="#a1a1aa"
-                          className="bg-white border border-[#e9e8e5] rounded-xl px-4 py-3 text-[#1b1c1a] font-jakarta-bold text-[14px]" />
+                        <TextInput
+                          value={newPayee.cuNumber}
+                          onChangeText={(t) => setNewPayee({ ...newPayee, cuNumber: t })}
+                          placeholder="123456789"
+                          placeholderTextColor="#a1a1aa"
+                          className="bg-white border border-[#e9e8e5] rounded-xl px-4 py-3 text-[#1b1c1a] font-jakarta-bold text-[14px]"
+                        />
                       </View>
                     )}
 
                     {/* Default Amount */}
                     <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-2">Default Amount (KES)</Text>
-                    <ValidatedTextInput kind="amount" optional value={newPayee.amount} onChangeText={(t) => setNewPayee({ ...newPayee, amount: t })}
-                      placeholder="0" placeholderTextColor="#a1a1aa" containerClassName="mb-4"
-                      className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[14px]" />
+                    <TextInput
+                      value={newPayee.amount}
+                      onChangeText={(t) => setNewPayee({ ...newPayee, amount: t.replace(/[^\d.]/g, '') })}
+                      keyboardType="decimal-pad"
+                      placeholder="0"
+                      placeholderTextColor="#a1a1aa"
+                      className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[14px] mb-4"
+                    />
 
                     {/* Payment Method */}
                     <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-2">Settlement Method</Text>
@@ -1285,36 +1545,64 @@ export default function BulkPay() {
                           ))}
                         </View>
                         {newPayee.mobileMoneyType === 'Personal Number' && (
-                          <ValidatedTextInput kind="phoneKE" value={newPayee.phone} onChangeText={(t) => setNewPayee({ ...newPayee, phone: t })}
-                            placeholder="07XX XXX XXX" placeholderTextColor="#a1a1aa" containerClassName="mb-2"
-                            className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[14px]" />
+                          <TextInput
+                            value={newPayee.phone}
+                            onChangeText={(t) => setNewPayee({ ...newPayee, phone: t.replace(/\D/g, '').slice(0, 12) })}
+                            keyboardType="phone-pad"
+                            placeholder="07XX XXX XXX"
+                            placeholderTextColor="#a1a1aa"
+                            className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[14px] mb-2"
+                          />
                         )}
                         {newPayee.mobileMoneyType === 'Paybill' && (
                           <View className="flex-row gap-2 mb-2">
-                            <ValidatedTextInput kind="paybill" value={newPayee.paybillNumber} onChangeText={(t) => setNewPayee({ ...newPayee, paybillNumber: t })}
-                              placeholder="Paybill" placeholderTextColor="#a1a1aa" containerClassName="flex-1"
-                              className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[14px]" />
-                            <ValidatedTextInput kind="text" value={newPayee.businessAccount} onChangeText={(t) => setNewPayee({ ...newPayee, businessAccount: t })}
-                              placeholder="Account #" placeholderTextColor="#a1a1aa" containerClassName="flex-1"
-                              className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[14px]" />
+                            <TextInput
+                              value={newPayee.paybillNumber}
+                              onChangeText={(t) => setNewPayee({ ...newPayee, paybillNumber: t.replace(/\D/g, '').slice(0, 7) })}
+                              keyboardType="numeric"
+                              placeholder="Paybill"
+                              placeholderTextColor="#a1a1aa"
+                              className="flex-1 bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[14px]"
+                            />
+                            <TextInput
+                              value={newPayee.businessAccount}
+                              onChangeText={(t) => setNewPayee({ ...newPayee, businessAccount: t })}
+                              placeholder="Account #"
+                              placeholderTextColor="#a1a1aa"
+                              className="flex-1 bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[14px]"
+                            />
                           </View>
                         )}
                         {newPayee.mobileMoneyType === 'Buy Goods' && (
-                          <ValidatedTextInput kind="till" value={newPayee.tillNumber} onChangeText={(t) => setNewPayee({ ...newPayee, tillNumber: t })}
-                            placeholder="Till Number" placeholderTextColor="#a1a1aa" containerClassName="mb-2"
-                            className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[14px]" />
+                          <TextInput
+                            value={newPayee.tillNumber}
+                            onChangeText={(t) => setNewPayee({ ...newPayee, tillNumber: t.replace(/\D/g, '').slice(0, 8) })}
+                            keyboardType="numeric"
+                            placeholder="Till Number"
+                            placeholderTextColor="#a1a1aa"
+                            className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[14px] mb-2"
+                          />
                         )}
                       </View>
                     )}
 
                     {newPayee.paymentMethod === 'Bank' && (
                       <View>
-                        <ValidatedTextInput kind="businessName" value={newPayee.bankName} onChangeText={(t) => setNewPayee({ ...newPayee, bankName: t })}
-                          placeholder="Bank Name (e.g. KCB)" placeholderTextColor="#a1a1aa" containerClassName="mb-2"
-                          className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[14px]" />
-                        <ValidatedTextInput kind="bankAccount" value={newPayee.accountNumber} onChangeText={(t) => setNewPayee({ ...newPayee, accountNumber: t })}
-                          placeholder="Account Number" placeholderTextColor="#a1a1aa"
-                          className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[14px]" />
+                        <TextInput
+                          value={newPayee.bankName}
+                          onChangeText={(t) => setNewPayee({ ...newPayee, bankName: t })}
+                          placeholder="Bank Name (e.g. KCB)"
+                          placeholderTextColor="#a1a1aa"
+                          className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[14px] mb-2"
+                        />
+                        <TextInput
+                          value={newPayee.accountNumber}
+                          onChangeText={(t) => setNewPayee({ ...newPayee, accountNumber: t.replace(/\D/g, '').slice(0, 14) })}
+                          keyboardType="numeric"
+                          placeholder="Account Number"
+                          placeholderTextColor="#a1a1aa"
+                          className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[14px]"
+                        />
                       </View>
                     )}
                   </View>

@@ -2,7 +2,7 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { NavigationContainer } from '@react-navigation/native';
-import { Feather, MaterialIcons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 
 import Dashboard from '../pages/Dashboard';
 import Collections from '../pages/Collections';
@@ -11,6 +11,7 @@ import CashAdvance from '../pages/CashAdvance';
 import Profile from '../pages/Profile';
 import InflationShield from '../pages/InflationShield';
 import SupportPage from '../pages/SupportPage';
+import Notifications from '../pages/Notifications';
 import Login from '../pages/Login';
 import SetPassword from '../pages/SetPassword';
 import Transactions from '../pages/Transactions';
@@ -84,14 +85,34 @@ function MainTabs() {
           )
         }}
       />
-      <Tab.Screen 
-        name="More" 
-        component={Profile} 
+      <Tab.Screen
+        name="More"
+        component={Profile}
         options={{
           tabBarIcon: ({ color }) => (
             <Feather name="grid" size={22} color={color} />
           )
         }}
+      />
+      <Tab.Screen
+        name="InflationShield"
+        component={InflationShield}
+        options={{ tabBarButton: () => null, tabBarItemStyle: { flex: 0, width: 0, padding: 0 } }}
+      />
+      <Tab.Screen
+        name="Transactions"
+        component={Transactions}
+        options={{ tabBarButton: () => null, tabBarItemStyle: { flex: 0, width: 0, padding: 0 } }}
+      />
+      <Tab.Screen
+        name="SupportPage"
+        component={SupportPage}
+        options={{ tabBarButton: () => null, tabBarItemStyle: { flex: 0, width: 0, padding: 0 } }}
+      />
+      <Tab.Screen
+        name="Notifications"
+        component={Notifications}
+        options={{ tabBarButton: () => null, tabBarItemStyle: { flex: 0, width: 0, padding: 0 } }}
       />
     </Tab.Navigator>
   );
@@ -131,12 +152,7 @@ export default function AppNavigator() {
         ) : !isPinUnlocked ? (
           <Stack.Screen name="PinEntry" component={PinEntry} />
         ) : (
-          <>
-            <Stack.Screen name="Main" component={MainTabs} />
-            <Stack.Screen name="InflationShield" component={InflationShield} />
-            <Stack.Screen name="SupportPage" component={SupportPage} />
-            <Stack.Screen name="Transactions" component={Transactions} />
-          </>
+          <Stack.Screen name="Main" component={MainTabs} />
         )}
       </Stack.Navigator>
     </NavigationContainer>

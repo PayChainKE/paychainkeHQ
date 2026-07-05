@@ -8,6 +8,7 @@ import { settleInflationShield, provisionMerchantWallet, getWalletBalance, swapU
 import { encryptKey } from '../utils/cryptoHelper.js';
 import { getLiveKesToUsdcRate } from '../utils/rateEngine.js';
 import { sendWalletActivationEmail } from '../utils/resend.js';
+import { createNotification } from './notificationController.js';
 
 // @desc    Get merchant transactions
 // @route   GET /api/transactions
@@ -68,6 +69,13 @@ export const simulateIncomingPayment = async (req, res) => {
     // Update merchant's balance
     merchant.kesBalance = (merchant.kesBalance || 0) + Number(amount);
     await merchant.save();
+
+    createNotification({
+      merchantId: merchant._id,
+      kind: 'payment',
+      title: 'Payment received',
+      message: `You received KES ${Number(amount).toLocaleString()} from ${senderName || 'a customer'} via Till ${merchant.paybillAccount}.`,
+    });
 
     res.status(201).json({
       message: 'Payment simulated successfully',
@@ -226,6 +234,13 @@ export const activateWallet = async (req, res) => {
     console.log(`📧 Dispatching Wallet Activation Congratulations Email to: ${merchant.email}`);
     sendWalletActivationEmail(merchant.email, merchant.name, merchant.stellarPublicKey).catch(err => {
       console.error(`📧 Resend Error: Failed to send wallet activation email to ${merchant.email}:`, err);
+    });
+
+    createNotification({
+      merchantId: merchant._id,
+      kind: 'wallet',
+      title: 'Digital Wallet activated',
+      message: 'Your PayChain digital wallet is now active and ready to receive USDC settlements.',
     });
 
     res.status(200).json({
@@ -401,6 +416,32 @@ export const generatePaymentLink = async (req, res) => {
   }
 };
 
+// @desc    List merchant's recent payment links
+// @route   GET /api/transactions/payment-link
+// @access  Private
+export const listPaymentLinks = async (req, res) => {
+  try {
+    const links = await PaymentLink.find({ merchantId: req.merchant._id })
+      .sort({ createdAt: -1 })
+      .limit(20);
+
+    res.json({
+      success: true,
+      links: links.map((link) => ({
+        linkId: link.linkId,
+        amount: link.amount,
+        currency: link.currency,
+        status: link.status,
+        expiresAt: link.expiresAt,
+        createdAt: link.createdAt,
+      })),
+    });
+  } catch (error) {
+    console.error('❌ Error listing payment links:', error);
+    res.status(500).json({ error: 'Failed to fetch payment link history.' });
+  }
+};
+
 // @desc    Get Secure Payment Link Details
 // @route   GET /api/transactions/payment-link/:linkId
 // @access  Public
@@ -495,6 +536,13 @@ export const processPaymentLink = async (req, res) => {
 
     link.status = 'paid';
     await link.save();
+
+    createNotification({
+      merchantId: link.merchantId._id,
+      kind: 'payment',
+      title: 'Payment link paid',
+      message: `Your KES ${link.amount.toLocaleString()} payment link was paid by a customer.`,
+    });
 
     res.status(200).json({ success: true, checkoutRequestId, message: 'STK Push sent to phone' });
 

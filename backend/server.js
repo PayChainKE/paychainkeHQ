@@ -13,6 +13,7 @@ import bulkPayRoutes from './routes/bulkPayRoutes.js';
 import transactionRoutes from './routes/transactionRoutes.js';
 import mpesaRoutes from './routes/mpesaRoutes.js';
 import trustScoreRoutes from './routes/trustScoreRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 import { ensurePrimaryOwner } from './migrations/ensurePrimaryOwner.js';
 import { backfillTransactionFees } from './migrations/backfillTransactionFees.js';
 
@@ -99,6 +100,7 @@ app.use('/api/bulkpay', bulkPayRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/callbacks', mpesaRoutes);
 app.use('/api/trust-score', trustScoreRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 app.use((err, req, res, next) => {
   console.error('Unhandled Error:', err);

@@ -9,6 +9,7 @@ import csv from 'csv-parser';
 import fs from 'fs';
 import bcrypt from 'bcryptjs';
 import { sendBatchReceiptEmail } from '../utils/resend.js';
+import { createNotification } from './notificationController.js';
 
 // @desc    Get all payees for a merchant
 // @route   GET /api/bulkpay/payees
@@ -308,13 +309,20 @@ export const authorizeBatch = async (req, res) => {
     const b2cPassword = process.env.MPESA_B2C_PASSWORD || 'Safaricom999!@#';
     const securityCredential = generateSecurityCredential(b2cPassword);
 
+    const mpesaEnv = (process.env.MPESA_ENVIRONMENT || 'sandbox').toLowerCase();
+    const isLiveMpesa = mpesaEnv === 'live';
+    const liveBlocked = isLiveMpesa && process.env.MPESA_LIVE_ENABLED !== 'true';
+    const callbackBase = (process.env.MPESA_CALLBACK_URL || '').replace(/\/$/, '');
+
+    let refundAmount = 0;
+
     // 4. Process each row
     for (const row of batchRows) {
       let payee = null;
       if (row.payeeMatch) {
         payee = await Payee.findById(row.payeeMatch);
       }
-      
+
       // If no payee found or it's a new one, create on the fly
       if (!payee) {
         payee = new Payee({
@@ -329,54 +337,66 @@ export const authorizeBatch = async (req, res) => {
         await payee.save();
       }
 
-      let darajaStatus = 'completed'; // Default to complete for simulation
-      let darajaRef = `SIM_${Date.now()}_${Math.floor(Math.random()*1000)}`;
-      
-      // Fire Daraja API if Mobile Money
-      if (payee.paymentMethod === 'Mobile Money' && token) {
-        const mpesaEnv = (process.env.MPESA_ENVIRONMENT || 'sandbox').toLowerCase();
-        const mpesaBaseUrl = mpesaEnv === 'live' ? 'https://api.safaricom.co.ke' : 'https://sandbox.safaricom.co.ke';
-        const callbackBase = (process.env.MPESA_CALLBACK_URL || '').replace(/\/$/, '');
-        
-        const isB2C = payee.mobileMoneyType === 'Personal Number';
-        const url = isB2C 
-          ? `${mpesaBaseUrl}/mpesa/b2c/v1/paymentrequest`
-          : `${mpesaBaseUrl}/mpesa/b2b/v1/paymentrequest`;
+      // Bank transfers aren't wired to a live settlement rail yet — leave them
+      // pending for manual processing rather than pretending they were paid.
+      let darajaStatus = 'pending';
+      let darajaRef = `BULK_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
-        const payload = isB2C ? {
-          InitiatorName: process.env.MPESA_B2C_INITIATOR || 'testapi',
-          SecurityCredential: securityCredential,
-          CommandID: 'BusinessPayment',
-          Amount: row.netAmount,
-          PartyA: process.env.MPESA_SHORTCODE || '600000',
-          PartyB: payee.phone,
-          Remarks: `Bulk Payout to ${payee.name}`,
-          QueueTimeOutURL: callbackBase ? `${callbackBase}/api/callbacks/timeout` : 'https://sandbox.paychain.co.ke/api/callbacks/timeout',
-          ResultURL: callbackBase ? `${callbackBase}/api/callbacks/result` : 'https://sandbox.paychain.co.ke/api/callbacks/result',
-          Occasion: 'PayChain Settlement'
-        } : {
-          // B2B Payload
-          Initiator: process.env.MPESA_B2C_INITIATOR || 'testapi',
-          SecurityCredential: securityCredential,
-          CommandID: payee.mobileMoneyType === 'Paybill' ? 'BusinessPayBill' : 'BusinessBuyGoods',
-          SenderIdentifierType: '4',
-          RecieverIdentifierType: '4',
-          Amount: row.netAmount,
-          PartyA: process.env.MPESA_SHORTCODE || '600000',
-          PartyB: payee.paybillNumber || payee.tillNumber,
-          AccountReference: payee.businessAccount || 'Settlement',
-          Remarks: `Bulk B2B Payout to ${payee.name}`,
-          QueueTimeOutURL: callbackBase ? `${callbackBase}/api/callbacks/timeout` : 'https://sandbox.paychain.co.ke/api/callbacks/timeout',
-          ResultURL: callbackBase ? `${callbackBase}/api/callbacks/result` : 'https://sandbox.paychain.co.ke/api/callbacks/result',
-        };
+      if (payee.paymentMethod === 'Mobile Money') {
+        if (liveBlocked) {
+          darajaStatus = 'failed';
+          refundAmount += row.netAmount;
+          console.error(`❌ Bulk payout to ${payee.name} blocked: live M-PESA is not enabled (set MPESA_LIVE_ENABLED=true).`);
+        } else if (!token) {
+          darajaStatus = 'failed';
+          refundAmount += row.netAmount;
+          console.error(`❌ Bulk payout to ${payee.name} failed: no Daraja auth token available.`);
+        } else {
+          const mpesaBaseUrl = isLiveMpesa ? 'https://api.safaricom.co.ke' : 'https://sandbox.safaricom.co.ke';
+          const isB2C = payee.mobileMoneyType === 'Personal Number';
+          const url = isB2C
+            ? `${mpesaBaseUrl}/mpesa/b2c/v1/paymentrequest`
+            : `${mpesaBaseUrl}/mpesa/b2b/v1/paymentrequest`;
 
-        try {
-          const mpesaRes = await axios.post(url, payload, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          darajaRef = mpesaRes.data.OriginatorConversationID || darajaRef;
-        } catch (err) {
-          console.warn(`Daraja API failed for ${payee.name}, falling back to simulation. Error:`, err.response?.data?.errorMessage || err.message);
+          const payload = isB2C ? {
+            InitiatorName: process.env.MPESA_B2C_INITIATOR || 'testapi',
+            SecurityCredential: securityCredential,
+            CommandID: 'BusinessPayment',
+            Amount: row.netAmount,
+            PartyA: process.env.MPESA_SHORTCODE || '600000',
+            PartyB: payee.phone,
+            Remarks: `Bulk Payout to ${payee.name}`,
+            QueueTimeOutURL: callbackBase ? `${callbackBase}/api/callbacks/b2c-timeout` : 'https://sandbox.paychain.co.ke/api/callbacks/b2c-timeout',
+            ResultURL: callbackBase ? `${callbackBase}/api/callbacks/b2c-callback` : 'https://sandbox.paychain.co.ke/api/callbacks/b2c-callback',
+            Occasion: 'PayChain Settlement'
+          } : {
+            // B2B Payload
+            Initiator: process.env.MPESA_B2C_INITIATOR || 'testapi',
+            SecurityCredential: securityCredential,
+            CommandID: payee.mobileMoneyType === 'Paybill' ? 'BusinessPayBill' : 'BusinessBuyGoods',
+            SenderIdentifierType: '4',
+            RecieverIdentifierType: '4',
+            Amount: row.netAmount,
+            PartyA: process.env.MPESA_SHORTCODE || '600000',
+            PartyB: payee.paybillNumber || payee.tillNumber,
+            AccountReference: payee.businessAccount || 'Settlement',
+            Remarks: `Bulk B2B Payout to ${payee.name}`,
+            QueueTimeOutURL: callbackBase ? `${callbackBase}/api/callbacks/b2c-timeout` : 'https://sandbox.paychain.co.ke/api/callbacks/b2c-timeout',
+            ResultURL: callbackBase ? `${callbackBase}/api/callbacks/b2c-callback` : 'https://sandbox.paychain.co.ke/api/callbacks/b2c-callback',
+          };
+
+          try {
+            const mpesaRes = await axios.post(url, payload, {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+            // Daraja only accepted the request — real completion is confirmed
+            // asynchronously via the b2c-callback webhook.
+            darajaRef = mpesaRes.data.OriginatorConversationID || darajaRef;
+          } catch (err) {
+            console.error(`❌ Daraja API rejected payout for ${payee.name}:`, err.response?.data?.errorMessage || err.message);
+            darajaStatus = 'failed';
+            refundAmount += row.netAmount;
+          }
         }
       }
 
@@ -403,8 +423,26 @@ export const authorizeBatch = async (req, res) => {
         method: payee.paymentMethod,
         accountReference: payee.phone || payee.paybillNumber || payee.tillNumber || payee.accountNumber || 'N/A',
         receiptNumber: darajaRef,
+        status: darajaStatus,
       });
     }
+
+    // Refund whatever was rejected synchronously so the batch deduction stays accurate
+    if (refundAmount > 0) {
+      merchant.kesBalance += refundAmount;
+      await merchant.save();
+    }
+
+    // Batch status reflects reality: rows still 'pending' await the Daraja
+    // callback, which will flip the batch to Processed/Partial once resolved.
+    const rowStatuses = transactions.map((t) => t.status);
+    const batchStatus = rowStatuses.every((s) => s === 'failed')
+      ? 'Failed'
+      : rowStatuses.some((s) => s === 'failed')
+      ? 'Partial'
+      : rowStatuses.some((s) => s === 'pending')
+      ? 'Pending'
+      : 'Processed';
 
     // 5. Record Batch
     const batch = new PayoutBatch({
@@ -414,12 +452,19 @@ export const authorizeBatch = async (req, res) => {
       totalTaxDeductions: totalTax,
       totalNetAmount: totalNet,
       payeeCount: transactions.length,
-      status: 'Processed',
+      status: batchStatus,
       fundingSource: fundingSource || 'Main Business Till',
       transactions,
     });
 
     const savedBatch = await batch.save();
+
+    createNotification({
+      merchantId: req.merchant._id,
+      kind: 'payment',
+      title: 'Bulk payout submitted',
+      message: `Batch of ${transactions.length} payout${transactions.length === 1 ? '' : 's'} (KES ${totalNet.toLocaleString()}) has been submitted${refundAmount > 0 ? `; KES ${refundAmount.toLocaleString()} was refunded for payouts that failed to send.` : '.'}`,
+    });
 
     // Trigger Email Receipt in the background if email exists
     if (merchant.email) {
@@ -432,7 +477,7 @@ export const authorizeBatch = async (req, res) => {
         totalTax
       ).catch(e => console.error("Batch Email Error:", e));
     }
-    
+
     res.status(200).json({
       message: 'Batch authorized and processed successfully via Daraja M-PESA.',
       batch: savedBatch,
