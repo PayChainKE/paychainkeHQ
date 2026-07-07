@@ -1,5 +1,5 @@
 import React from 'react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import { usePrivacyMode } from '../../hooks/usePrivacyMode'
 import { useMerchantAuth } from '../../context/MerchantAuthContext'
 import { useNotification } from '../../context/NotificationContext'
@@ -21,16 +21,15 @@ const baseNavItems = [
       { name: 'Inflation Shield', icon: 'currency_exchange', path: '/inflation-shield', featureKey: 'inflationShield' },
     ]
   },
-  { 
-    name: 'Cash Advance', 
-    icon: 'payments', 
+  {
+    name: 'Cash Advance',
+    icon: 'payments',
     path: '/cash-advance',
     showOverview: false,
-    children: [
-      { name: 'Trust Score', icon: 'verified_user', path: '/trust-score' },
-    ]
   },
   { name: 'My Tills', icon: 'point_of_sale', path: '/tills' },
+  { name: 'Support', icon: 'help_outline', path: '/support' },
+  { name: 'Settings', icon: 'settings', path: '/profile' },
 ]
 
 function NavItem({ item, depth = 0 }) {
@@ -143,8 +142,14 @@ function NavItem({ item, depth = 0 }) {
 
 export default function MerchantSidebar({ isOpen, onClose }) {
   const { showAmounts } = usePrivacyMode()
-  const { merchant } = useMerchantAuth()
+  const { merchant, logout } = useMerchantAuth()
   const { unreadCount } = useNotification()
+  const navigate = useNavigate()
+
+  const handleLogout = () => {
+    logout()
+    navigate('/login')
+  }
 
   return (
     <aside className={`fixed left-0 top-0 h-full w-[240px] z-[50] bg-[#162723] flex flex-col overflow-y-auto transition-transform duration-300 ease-in-out lg:translate-x-0 ${isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}`}>
@@ -213,16 +218,8 @@ export default function MerchantSidebar({ isOpen, onClose }) {
           <p className={`text-white font-headline text-2xl tracking-tight mb-0.5 transition-all duration-300 ${!showAmounts && 'blur-md'}`}>KES {new Intl.NumberFormat().format(merchant?.kesBalance ?? 0)}</p>
           <p className={`text-[#a8b3a8] text-[10px] transition-all duration-300 ${!showAmounts && 'blur-sm'}`}>{(merchant?.kesBalance ? (merchant.kesBalance / 130).toFixed(2) : '0.00')} USDC</p>
         </div>
-        
+
         <div className="space-y-1 pt-4 border-t border-white/5">
-          <NavLink to="/profile" className="flex items-center gap-3 text-[#c0c9c0] hover:text-white py-2 px-1 transition-colors group">
-            <span className="material-symbols-outlined text-lg opacity-60 group-hover:opacity-100 transition-opacity">settings</span>
-            <span className="text-xs">Settings</span>
-          </NavLink>
-          <NavLink to="/support" className="flex items-center gap-3 text-[#c0c9c0] hover:text-white py-2 px-1 transition-colors group">
-            <span className="material-symbols-outlined text-lg opacity-60 group-hover:opacity-100 transition-opacity">help_outline</span>
-            <span className="text-xs">Support</span>
-          </NavLink>
           <NavLink to="/notifications" className="flex items-center justify-between text-[#c0c9c0] hover:text-white py-2 px-1 transition-colors group">
             <div className="flex items-center gap-3">
               <span className="material-symbols-outlined text-lg opacity-60 group-hover:opacity-100 transition-opacity">notifications</span>
@@ -232,6 +229,13 @@ export default function MerchantSidebar({ isOpen, onClose }) {
               <span className="w-1.5 h-1.5 bg-red-600 rounded-full"></span>
             )}
           </NavLink>
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 text-[#c0c9c0] hover:text-white py-2 px-1 transition-colors group"
+          >
+            <span className="material-symbols-outlined text-lg opacity-60 group-hover:opacity-100 transition-opacity">logout</span>
+            <span className="text-xs">Sign Out</span>
+          </button>
         </div>
       </div>
     </aside>

@@ -4,6 +4,40 @@ import MerchantLayout from '../components/layout/MerchantLayout'
 import { formatKES } from '../utils/formatCurrency'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
+import { ShieldCheck, X } from 'lucide-react'
+
+const CASH_ADVANCE_LEARN_MORE_URL = 'https://www.paychain.co.ke/products/cash-advance'
+
+function UnavailableNotice() {
+  const [dismissed, setDismissed] = useState(false)
+
+  if (dismissed) return null
+
+  return (
+    <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 mb-6 lg:mb-8">
+      <span className="material-symbols-outlined text-amber-500 text-xl mt-0.5">info</span>
+      <p className="text-[13px] text-amber-900 font-medium leading-relaxed flex-1">
+        Cash advance is not available at this time. Keep using your PayChain account and check for your loan limit updates.{' '}
+        <a
+          href={CASH_ADVANCE_LEARN_MORE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-bold underline hover:text-amber-950"
+        >
+          Learn more about cash advance
+        </a>
+      </p>
+      <button
+        type="button"
+        onClick={() => setDismissed(true)}
+        aria-label="Dismiss notification"
+        className="shrink-0 text-amber-500 hover:text-amber-800 hover:bg-amber-100 rounded-full p-1 transition-colors"
+      >
+        <X className="w-4 h-4" strokeWidth={2} />
+      </button>
+    </div>
+  )
+}
 
 export default function CashAdvance() {
   const { merchant } = useMerchantAuth()
@@ -47,22 +81,23 @@ export default function CashAdvance() {
     return (
       <MerchantLayout title="Cash Advance">
         <div className="px-1 lg:px-0 max-w-4xl mx-auto w-full space-y-8 lg:space-y-12">
+          <UnavailableNotice />
           <div className="mb-6 lg:mb-10">
             <h2 className="font-headline font-bold text-3xl lg:text-4xl text-primary tracking-tight leading-tight">Cash Advance</h2>
             <p className="text-on-surface-variant text-[11px] lg:text-sm font-medium mt-1.5 opacity-80 leading-relaxed max-w-2xl">
-              Access liquidity against your future collections. Your repayment is automated based on your daily revenue.
+              Get extra cash for your business today. We take back a small bit from your daily sales until it's paid — no paperwork needed.
             </p>
           </div>
           <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/10 editorial-shadow p-12 lg:p-20 flex flex-col items-center justify-center text-center animate-fade-in-up">
-            <div className="w-24 h-24 bg-surface-container-low rounded-full flex items-center justify-center mb-6 border border-slate-200">
-              <span className="material-symbols-outlined text-5xl text-amber-600/50">lock</span>
+            <div className="w-24 h-24 rounded-full bg-surface-container-low flex items-center justify-center mb-6 border border-outline-variant/20 shadow-sm">
+              <ShieldCheck className="w-10 h-10 text-primary" strokeWidth={1.5} />
             </div>
             <h3 className="text-2xl font-headline font-bold text-primary mb-3">Keep building your Trust Score</h3>
             <p className="text-[15px] text-on-surface-variant font-medium max-w-md mx-auto leading-relaxed opacity-80 mb-6">
-              You need a Trust Score of at least 85 to unlock Cash Advances. Keep processing payments through your Paybill to increase your score!
+              Your Trust Score needs to reach 85 before you can get a Cash Advance. Keep transacting through your PayChain account and your score will keep going up!
             </p>
-            <a href="/trust-score" className="bg-[#0B0E14] text-white px-8 py-3 rounded-xl font-bold text-sm shadow-md hover:shadow-lg hover:bg-black active:scale-95 transition-all">
-              View Trust Score
+            <a href={CASH_ADVANCE_LEARN_MORE_URL} target="_blank" rel="noopener noreferrer" className="bg-[#0B0E14] text-white px-8 py-3 rounded-xl font-bold text-sm shadow-md hover:shadow-lg hover:bg-black active:scale-95 transition-all">
+              Learn More
             </a>
           </div>
         </div>
@@ -77,7 +112,7 @@ export default function CashAdvance() {
         <div className="mb-6 lg:mb-10">
           <h2 className="font-headline font-bold text-3xl lg:text-4xl text-primary tracking-tight leading-tight">Cash Advance</h2>
           <p className="text-on-surface-variant text-[11px] lg:text-sm font-medium mt-1.5 opacity-80 leading-relaxed max-w-2xl">
-            Access liquidity against your future collections. Your repayment is automated based on your daily revenue.
+            Get extra cash for your business today. We take back a small bit from your daily sales until it's paid — no paperwork needed.
           </p>
         </div>
 

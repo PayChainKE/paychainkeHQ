@@ -68,7 +68,7 @@ const transactionSchema = new mongoose.Schema({
 // and `new Transaction().save()`. We re-stamp on amount/type change because
 // admins may correct a transaction before it's finalised, but never re-stamp
 // once the doc is saved (`isNew` guard) so historical fees stay immutable.
-transactionSchema.pre('save', function(next) {
+transactionSchema.pre('save', function() {
   if (this.isNew || this.isModified('amount') || this.isModified('kesAmount') || this.isModified('type')) {
     const basis = this.kesAmount > 0 ? this.kesAmount : this.amount;
     const { paychainFee, safaricomFee, streamId } = calculateFees(this.type, basis);
@@ -76,12 +76,11 @@ transactionSchema.pre('save', function(next) {
     this.safaricomFee = safaricomFee;
     this.revenueStream = streamId;
   }
-  next();
 });
 
 // Mirror the hook for bulk insertMany — Mongoose does NOT run document
 // middleware on insertMany unless `ordered: false` and we ask for it.
-transactionSchema.pre('insertMany', function(next, docs) {
+transactionSchema.pre('insertMany', function(docs) {
   for (const doc of docs) {
     const basis = (doc.kesAmount && doc.kesAmount > 0) ? doc.kesAmount : doc.amount;
     const { paychainFee, safaricomFee, streamId } = calculateFees(doc.type, basis);
@@ -89,7 +88,6 @@ transactionSchema.pre('insertMany', function(next, docs) {
     doc.safaricomFee = safaricomFee;
     doc.revenueStream = streamId;
   }
-  next();
 });
 
 const Transaction = mongoose.model('Transaction', transactionSchema);

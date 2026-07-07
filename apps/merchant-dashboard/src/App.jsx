@@ -10,7 +10,6 @@ import Transactions from './pages/Transactions'
 import BulkPay from './pages/BulkPay'
 import InflationShield from './pages/InflationShield'
 import CashAdvance from './pages/CashAdvance'
-import TrustScore from './pages/TrustScore'
 import Profile from './pages/Profile'
 import Support from './pages/Support'
 import Notifications from './pages/Notifications'
@@ -82,7 +81,6 @@ export default function App(){
             <Route path="/inflation-shield" element={<Protected><FeatureGuard featureName="inflationShield"><InflationShield/></FeatureGuard></Protected>} />
             <Route path="/cash-advance" element={<Protected><CashAdvance/></Protected>} />
             <Route path="/tills" element={<Protected><MyTills/></Protected>} />
-            <Route path="/trust-score" element={<Protected><TrustScore/></Protected>} />
             <Route path="/profile" element={<Protected><Profile/></Protected>} />
             <Route path="/support" element={<Protected><Support/></Protected>} />
             <Route path="/notifications" element={<Protected><Notifications/></Protected>} />

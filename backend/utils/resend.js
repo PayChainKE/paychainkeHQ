@@ -5,6 +5,21 @@ dotenv.config();
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+// Hosted on Cloudinary so the logo renders inline in the email body as a
+// normal remote image — not as a downloadable attachment on the message.
+const LOGO_DARK_URL = 'https://res.cloudinary.com/dvnxgd9fv/image/upload/v1783459542/paychain_email_assets/paychain-logo-dark.png';
+const LOGO_WHITE_URL = 'https://res.cloudinary.com/dvnxgd9fv/image/upload/v1783459543/paychain_email_assets/paychain-logo-white.png';
+
+// Dark wordmark for light/white header backgrounds. `margin:0 auto` centers
+// it inside a `text-align:center` container despite `display:block`; pass
+// align:'left' for headers whose surrounding copy isn't centered.
+const logoImgDark = (width = 130, align = 'center') =>
+  `<img src="${LOGO_DARK_URL}" alt="PayChain" width="${width}" style="display:block;margin:${align === 'left' ? '0' : '0 auto'};border:0;outline:none;text-decoration:none;height:auto;" />`;
+
+// White wordmark for dark/colored header backgrounds.
+const logoImgWhite = (width = 130, align = 'center') =>
+  `<img src="${LOGO_WHITE_URL}" alt="PayChain" width="${width}" style="display:block;margin:${align === 'left' ? '0' : '0 auto'};border:0;outline:none;text-decoration:none;height:auto;" />`;
+
 // Send OTP for Admin Login
 export const sendOTP = async (email, otp) => {
   try {
@@ -13,22 +28,25 @@ export const sendOTP = async (email, otp) => {
       to: [email],
       subject: `[PayChain] Your Login Code: ${otp}`,
       html: `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 500px; margin: auto; padding: 40px 20px; border: 1px solid #f0f0f0; border-radius: 16px; background: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 480px; margin: auto; padding: 44px 36px; border: 1px solid #eef0ee; border-radius: 20px; background: #fff; box-shadow: 0 10px 32px rgba(6,32,27,0.08);">
+          <div style="text-align: center; margin-bottom: 32px;">
+            ${logoImgDark(120)}
+          </div>
           <div style="text-align: center; margin-bottom: 30px;">
-            <h2 style="margin: 0; color: #111; font-size: 24px; font-weight: 700;">Identity Verification</h2>
-            <p style="margin: 10px 0 0; color: #666; font-size: 15px;">Enter this code to access your Admin Dashboard</p>
+            <h2 style="margin: 0; color: #06201B; font-size: 22px; font-weight: 800; letter-spacing: -0.3px;">Identity Verification</h2>
+            <p style="margin: 10px 0 0; color: #6b7280; font-size: 14px;">Enter this code to access your Dashboard</p>
           </div>
-          <div style="background: #f8faff; border-radius: 12px; padding: 30px; text-align: center; margin-bottom: 30px; border: 1px solid #eef2ff;">
-            <span style="font-family: 'Courier New', Courier, monospace; font-size: 38px; font-weight: 800; letter-spacing: 8px; color: #0066FF;">${otp}</span>
+          <div style="background: #f6fbf7; border-radius: 14px; padding: 28px; text-align: center; margin-bottom: 30px; border: 1px solid #d8ecdd;">
+            <span style="font-family: 'Courier New', Courier, monospace; font-size: 36px; font-weight: 800; letter-spacing: 8px; color: #06201B;">${otp}</span>
           </div>
-          <div style="color: #888; font-size: 13px; text-align: center; line-height: 1.6;">
-            <p>This code will expire in <strong>10 minutes</strong>.</p>
-            <p style="margin-top: 15px;">If you did not request this code, someone may be trying to access your account. Please secure your credentials.</p>
+          <div style="color: #8a8f8c; font-size: 13px; text-align: center; line-height: 1.6;">
+            <p style="margin: 0;">This code will expire in <strong>10 minutes</strong>.</p>
+            <p style="margin-top: 12px;">If you did not request this code, someone may be trying to access your account. Please secure your credentials.</p>
           </div>
-          <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center;">
+          <div style="margin-top: 36px; padding-top: 20px; border-top: 1px solid #eee; text-align: center;">
             <p style="margin: 0; color: #aaa; font-size: 11px;">This is an automated <strong>no-reply</strong> email. Do not reply to this address.</p>
-            <p style="margin: 5px 0 0; color: #aaa; font-size: 11px;">Need help? Contact <a href="mailto:support@paychain.co.ke" style="color: #0066FF; text-decoration: none;">support@paychain.co.ke</a> or call <strong>0790889066</strong></p>
-            <p style="margin: 15px 0 0; color: #ccc; font-size: 10px;">&copy; 2025 PayChainKE. All rights reserved.</p>
+            <p style="margin: 5px 0 0; color: #aaa; font-size: 11px;">Need help? Contact <a href="mailto:support@paychain.co.ke" style="color: #06201B; text-decoration: none; font-weight: 600;">support@paychain.co.ke</a> or call <strong>0790889066</strong></p>
+            <p style="margin: 15px 0 0; color: #ccc; font-size: 10px;">&copy; ${new Date().getFullYear()} PayChainKE. All rights reserved.</p>
           </div>
         </div>
       `
@@ -50,16 +68,17 @@ export const sendWaitlistConfirmation = async (email, name) => {
       subject: "You're on the Exclusive Waitlist!",
       html: `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 16px; overflow: hidden; background: #fff;">
-          <div style="background: linear-gradient(135deg, #0066FF 0%, #003399 100%); padding: 50px 30px; text-align: center; color: #fff;">
-            <h1 style="margin: 0; font-size: 32px; font-weight: 800; letter-spacing: -0.5px;">Welcome to PayChain</h1>
-            <p style="margin: 10px 0 0; opacity: 0.9; font-size: 16px;">The Future of Payments in Kenya</p>
+          <div style="background: linear-gradient(135deg, #06201B 0%, #0a3029 100%); padding: 44px 30px 46px; text-align: center; color: #fff;">
+            <div style="margin-bottom: 22px;">${logoImgWhite(126)}</div>
+            <h1 style="margin: 0; font-size: 30px; font-weight: 800; letter-spacing: -0.5px;">Welcome to PayChain</h1>
+            <p style="margin: 10px 0 0; color: #5EFEB3; opacity: 0.95; font-size: 15px; font-weight: 600;">The Future of Payments in Kenya</p>
           </div>
           <div style="padding: 40px 30px;">
             <h2 style="margin: 0 0 20px; color: #111; font-size: 22px;">Hi ${name},</h2>
             <p style="color: #444; line-height: 1.7; font-size: 16px;">You've successfully secured your spot on the PayChain waitlist! We're building a next-generation payment OS for Kenyan merchants, and we're excited to have you join us early.</p>
             <p style="color: #444; line-height: 1.7; font-size: 16px;">Our team is working hard to finalize the first wave of dashboard invitations. You'll be among the first to receive access as we roll out in your region.</p>
-            <div style="margin-top: 40px; padding: 25px; background: #f8faff; border-radius: 12px; border: 1px solid #eef2ff;">
-              <h3 style="margin: 0 0 15px; color: #0066FF; font-size: 18px; font-weight: 700;">What's Coming Next?</h3>
+            <div style="margin-top: 40px; padding: 25px; background: #f6fbf7; border-radius: 12px; border: 1px solid #d8ecdd;">
+              <h3 style="margin: 0 0 15px; color: #06201B; font-size: 18px; font-weight: 700;">What's Coming Next?</h3>
               <div style="color: #555; font-size: 15px; line-height: 1.6;">
                 <p style="margin: 8px 0;">• <strong>Real-time M-PESA</strong> collection & automation</p>
                 <p style="margin: 8px 0;">• <strong>Bulk Pay</strong> for suppliers and payroll</p>
@@ -68,8 +87,8 @@ export const sendWaitlistConfirmation = async (email, name) => {
             </div>
           </div>
           <div style="padding: 30px; background: #fafafa; border-top: 1px solid #eee; text-align: center;">
-            <p style="margin: 0; color: #aaa; font-size: 11px;">This is a <strong>no-reply</strong> email. For assistance, reach out to <a href="mailto:support@paychain.co.ke" style="color: #0066FF; text-decoration: none;">support@paychain.co.ke</a> or <strong>0790889066</strong></p>
-            <p style="margin: 10px 0 0; color: #bbb; font-size: 11px;">&copy; 2025 PayChainKE. Empowering the next generation of African merchants.</p>
+            <p style="margin: 0; color: #aaa; font-size: 11px;">This is a <strong>no-reply</strong> email. For assistance, reach out to <a href="mailto:support@paychain.co.ke" style="color: #06201B; text-decoration: none; font-weight: 600;">support@paychain.co.ke</a> or <strong>0790889066</strong></p>
+            <p style="margin: 10px 0 0; color: #bbb; font-size: 11px;">&copy; ${new Date().getFullYear()} PayChainKE. Empowering the next generation of African merchants.</p>
           </div>
         </div>
       `
@@ -91,16 +110,18 @@ export const sendNewsletterConfirmation = async (email) => {
       subject: 'Welcome to the PayChain Newsletter 🚀',
       html: `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 500px; margin: auto; padding: 40px; background: #fff; border: 1px solid #eee; border-radius: 16px;">
+          <div style="text-align: center; margin-bottom: 28px;">${logoImgDark(120)}</div>
           <h1 style="color: #111; font-size: 26px; font-weight: 800; margin-bottom: 20px;">Stay Ahead of the Curve.</h1>
           <p style="color: #444; font-size: 16px; line-height: 1.6; margin-bottom: 30px;">Thanks for subscribing to the PayChain newsletter! You're now on the list to receive our latest product updates, merchant success stories, and insights into the digital economy in Kenya.</p>
           <div style="text-align: center; margin: 40px 0;">
-            <a href="https://www.paychain.co.ke" style="background: #0066FF; color: #fff; padding: 16px 32px; text-decoration: none; border-radius: 12px; font-weight: 600; font-size: 16px; display: inline-block;">Explore PayChain</a>
+            <a href="https://www.paychain.co.ke" style="background: #06201B; color: #fff; padding: 16px 32px; text-decoration: none; border-radius: 12px; font-weight: 700; font-size: 16px; display: inline-block;">Explore PayChain</a>
           </div>
           <hr style="border: 0; border-top: 1px solid #eee; margin: 40px 0;">
           <div style="text-align: center; color: #aaa; font-size: 11px;">
-            <p>This is a <strong>no-reply</strong> email. For support, contact <a href="mailto:support@paychain.co.ke" style="color: #0066FF; text-decoration: none;">support@paychain.co.ke</a> or call <strong>0790889066</strong></p>
-            <p style="margin-top: 10px;">&copy; 2025 PayChainKE. All rights reserved.</p>
+            <p>This is a <strong>no-reply</strong> email. For support, contact <a href="mailto:support@paychain.co.ke" style="color: #06201B; text-decoration: none; font-weight: 600;">support@paychain.co.ke</a> or call <strong>0790889066</strong></p>
+            <p style="margin-top: 10px;">&copy; ${new Date().getFullYear()} PayChainKE. All rights reserved.</p>
           </div>
+        </div>
       `
     });
     console.log(`📧 Newsletter Confirmation sent to ${email}`);
@@ -145,10 +166,7 @@ export const sendWalletActivationEmail = async (email, name, stellarPublicKey) =
                   <!-- Header -->
                   <tr>
                     <td style="padding: 32px 40px; border-bottom: 1px solid #1E2329; text-align: center; background-color: #0B0E11;">
-                      <div style="font-size: 22px; font-weight: 900; color: #FCD535; letter-spacing: 2px; text-transform: uppercase;">
-                        <span style="display: inline-block; width: 12px; height: 12px; background: #FCD535; border-radius: 2px; margin-right: 8px; vertical-align: middle;"></span>
-                        PayChain
-                      </div>
+                      ${logoImgWhite(118)}
                     </td>
                   </tr>
 
@@ -276,7 +294,8 @@ export const sendWelcomeEmail = async (email, name, password, phone, paybillAcco
     <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;">
 
       <!-- HEADER -->
-      <tr><td style="background:#06201B;border-radius:16px 16px 0 0;padding:40px 40px 36px;text-align:center;">
+      <tr><td style="background:#06201B;border-radius:16px 16px 0 0;padding:36px 40px 36px;text-align:center;">
+        <div style="margin:0 0 22px;">${logoImgWhite(122)}</div>
         <p style="margin:0 0 4px;font-size:11px;font-weight:800;letter-spacing:0.25em;text-transform:uppercase;color:#5EFEB3;">PayChain Kenya</p>
         <h1 style="margin:0;font-size:28px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;line-height:1.2;">Your Merchant Account<br>is Now Active</h1>
         <p style="margin:16px 0 0;font-size:14px;color:rgba(255,255,255,0.6);line-height:1.6;">
@@ -439,6 +458,7 @@ export const sendSupportReply = async (toEmail, toName, inReplyToSubject, replyB
       html: `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 16px; overflow: hidden; background: #fff;">
           <div style="background: #06201B; padding: 28px 30px;">
+            <div style="margin: 0 0 16px;">${logoImgWhite(104, 'left')}</div>
             <p style="margin: 0; color: #5EFEB3; font-size: 12px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase;">PayChain Support</p>
             <h1 style="margin: 6px 0 0; font-size: 22px; color: #fff; font-weight: 700;">${inReplyToSubject || 'Your inquiry'}</h1>
           </div>
@@ -473,7 +493,8 @@ export const sendNewsletterEmail = async (toEmail, subject, htmlBody) => {
       subject,
       html: `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 640px; margin: auto; background: #fff;">
-          <div style="background: linear-gradient(135deg, #06201B 0%, #0a3029 100%); padding: 38px 30px; text-align: center;">
+          <div style="background: linear-gradient(135deg, #06201B 0%, #0a3029 100%); padding: 34px 30px 38px; text-align: center;">
+            <div style="margin-bottom: 18px;">${logoImgWhite(112)}</div>
             <div style="font-size: 12px; font-weight: 800; letter-spacing: 4px; color: #5EFEB3; text-transform: uppercase; margin-bottom: 8px;">PayChain Updates</div>
             <h1 style="margin: 0; color: #fff; font-size: 26px; font-weight: 800; letter-spacing: -0.4px; line-height: 1.2;">${subject}</h1>
           </div>
@@ -503,19 +524,20 @@ export const sendAdminActionOTP = async (email, otp, actionLabel, target) => {
       to: [email],
       subject: `[PayChain] Confirm action: ${actionLabel} — ${otp}`,
       html: `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 520px; margin: auto; padding: 40px 20px; border: 1px solid #f0f0f0; border-radius: 16px; background: #fff;">
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 500px; margin: auto; padding: 44px 32px; border: 1px solid #eef0ee; border-radius: 20px; background: #fff; box-shadow: 0 10px 32px rgba(6,32,27,0.08);">
+          <div style="text-align: center; margin-bottom: 28px;">${logoImgDark(116)}</div>
           <div style="text-align: center; margin-bottom: 24px;">
-            <h2 style="margin: 0; color: #111; font-size: 22px; font-weight: 700;">Confirm Sensitive Action</h2>
-            <p style="margin: 8px 0 0; color: #666; font-size: 14px;">Enter this code to ${actionLabel.toLowerCase()}.</p>
+            <h2 style="margin: 0; color: #06201B; font-size: 21px; font-weight: 800; letter-spacing: -0.3px;">Confirm Sensitive Action</h2>
+            <p style="margin: 8px 0 0; color: #6b7280; font-size: 14px;">Enter this code to ${actionLabel.toLowerCase()}.</p>
           </div>
           <div style="background: #fff7ed; border: 1px solid #fed7aa; border-radius: 10px; padding: 16px 20px; margin-bottom: 22px;">
             <p style="margin: 0; color: #9a3412; font-size: 13px; line-height: 1.5;"><strong>Target:</strong> ${target}</p>
             <p style="margin: 6px 0 0; color: #9a3412; font-size: 13px; line-height: 1.5;"><strong>Action:</strong> ${actionLabel}</p>
           </div>
-          <div style="background: #f8faff; border-radius: 12px; padding: 26px; text-align: center; margin-bottom: 22px; border: 1px solid #eef2ff;">
-            <span style="font-family: 'Courier New', Courier, monospace; font-size: 34px; font-weight: 800; letter-spacing: 8px; color: #0066FF;">${otp}</span>
+          <div style="background: #f6fbf7; border-radius: 12px; padding: 26px; text-align: center; margin-bottom: 22px; border: 1px solid #d8ecdd;">
+            <span style="font-family: 'Courier New', Courier, monospace; font-size: 34px; font-weight: 800; letter-spacing: 8px; color: #06201B;">${otp}</span>
           </div>
-          <div style="color: #888; font-size: 12px; text-align: center; line-height: 1.6;">
+          <div style="color: #8a8f8c; font-size: 12px; text-align: center; line-height: 1.6;">
             <p style="margin: 0;">This code expires in <strong>10 minutes</strong> and is bound to this exact action.</p>
             <p style="margin: 8px 0 0;">If you did not initiate this action, change your admin password immediately.</p>
           </div>
@@ -543,8 +565,9 @@ export const sendMerchantInvite = async (email, name, businessName, paybillAccou
       subject: 'You have been invited to PayChain — Set up your account',
       html: `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 16px; overflow: hidden; background: #fff;">
-          <div style="background: linear-gradient(135deg, #06201B 0%, #0a3029 100%); padding: 50px 30px; text-align: center; color: #fff;">
-            <h1 style="margin: 0; font-size: 30px; font-weight: 800; letter-spacing: -0.5px;">Welcome to PayChain</h1>
+          <div style="background: linear-gradient(135deg, #06201B 0%, #0a3029 100%); padding: 44px 30px 46px; text-align: center; color: #fff;">
+            <div style="margin-bottom: 22px;">${logoImgWhite(126)}</div>
+            <h1 style="margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.5px;">Welcome to PayChain</h1>
             <p style="margin: 10px 0 0; color: #5EFEB3; font-size: 15px; font-weight: 600;">Your merchant account is ready</p>
           </div>
           <div style="padding: 40px 30px;">
@@ -595,8 +618,9 @@ export const sendTeamInvite = async (email, name, role, invitedByName, setupLink
       subject: `You're invited to the PayChain admin console`,
       html: `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 16px; overflow: hidden; background: #fff;">
-          <div style="background: linear-gradient(135deg, #06201B 0%, #0a3029 100%); padding: 50px 30px; text-align: center; color: #fff;">
-            <h1 style="margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.5px;">You're on the team</h1>
+          <div style="background: linear-gradient(135deg, #06201B 0%, #0a3029 100%); padding: 44px 30px 46px; text-align: center; color: #fff;">
+            <div style="margin-bottom: 22px;">${logoImgWhite(126)}</div>
+            <h1 style="margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -0.5px;">You're on the team</h1>
             <p style="margin: 10px 0 0; color: #5EFEB3; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 2px;">PayChain Admin Console</p>
           </div>
           <div style="padding: 40px 30px;">
@@ -644,7 +668,8 @@ export const sendPasswordResetConfirmation = async (email, name, when, ip, ua) =
       subject: 'Your PayChain password was changed',
       html: `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 560px; margin: auto; background: #ffffff; border: 1px solid #eef0ee; border-radius: 18px; overflow: hidden;">
-          <div style="background: linear-gradient(135deg, #06201B 0%, #0a3029 100%); padding: 36px 32px;">
+          <div style="background: linear-gradient(135deg, #06201B 0%, #0a3029 100%); padding: 32px 32px 36px;">
+            <div style="margin-bottom: 20px;">${logoImgWhite(108, 'left')}</div>
             <div style="display: inline-flex; align-items: center; gap: 10px;">
               <span style="display: inline-block; width: 36px; height: 36px; border-radius: 999px; background: rgba(94, 254, 179, 0.15); text-align: center; line-height: 36px; color: #5EFEB3; font-size: 18px; font-weight: 800;">✓</span>
               <div>
@@ -714,13 +739,11 @@ export const sendBatchReceiptEmail = async (email, businessName, batchRows, tota
       subject: `Batch Payment Receipt - ${businessName}`,
       html: `
         <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 650px; margin: 0 auto; background-color: #ffffff; color: #333; border-radius: 12px; overflow: hidden; border: 1px solid #e5e7eb; box-shadow: 0 10px 25px rgba(0,0,0,0.05);">
-          
+
           <!-- Header -->
-          <div style="background-color: #0A2540; padding: 35px 40px; text-align: center; border-bottom: 4px solid #10B981;">
-            <div style="font-size: 22px; font-weight: 800; color: #ffffff; letter-spacing: 2px; text-transform: uppercase;">
-              PAYCHAIN
-            </div>
-            <div style="color: #94A3B8; font-size: 12px; font-weight: 600; letter-spacing: 3px; margin-top: 5px;">
+          <div style="background-color: #0A2540; padding: 32px 40px 30px; text-align: center; border-bottom: 4px solid #10B981;">
+            <div style="margin-bottom: 16px;">${logoImgWhite(120)}</div>
+            <div style="color: #94A3B8; font-size: 12px; font-weight: 600; letter-spacing: 3px;">
               OFFICIAL BATCH RECEIPT
             </div>
           </div>

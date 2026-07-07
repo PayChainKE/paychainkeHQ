@@ -89,15 +89,6 @@ export default function MerchantHeader({ title, onMenuClick }) {
                 Business Profile
               </Link>
               
-              <Link 
-                to="/trust-score" 
-                onClick={() => setIsDropdownOpen(false)}
-                className="flex items-center gap-3 px-4 py-3 text-sm font-bold text-on-surface-variant hover:bg-emerald-50 hover:text-primary transition-all group"
-              >
-                <span className="material-symbols-outlined text-xl opacity-40 group-hover:opacity-100 group-hover:scale-110 transition-all">verified_user</span>
-                Trust Score
-              </Link>
-              
               <div className="h-px bg-outline-variant/10 my-1"></div>
               
               <button 
