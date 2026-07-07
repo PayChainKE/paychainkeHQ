@@ -7,7 +7,7 @@ import { formatKES, formatUSDC } from '../utils/formatCurrency'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useNotification } from '../context/NotificationContext'
 import logo from '../assets/logo2.png'
-import statementLogo from '../../images/sign in logo2.png'
+import statementLogo from '../assets/paychain-logo-white.png'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
@@ -83,8 +83,9 @@ export default function Transactions() {
     doc.setFillColor(6, 32, 27)   // #06201B
     doc.rect(0, 0, W, 38, 'F')
 
-    // Logo
-    try { doc.addImage(statementLogo, 'PNG', L, 8, 34, 18, undefined, 'FAST') } catch(_) {}
+    // Logo — transparent PNG, aspect-correct (source 968x230)
+    const logoW = 32, logoH = logoW * (230 / 968)
+    try { doc.addImage(statementLogo, 'PNG', L, (38 - logoH) / 2, logoW, logoH, undefined, 'FAST') } catch(_) {}
 
     // Right-side header text
     doc.setTextColor(255, 255, 255)
@@ -292,9 +293,10 @@ export default function Transactions() {
     doc.setFillColor(22, 39, 35) // #162723 matching the detail panel header
     doc.rect(0, 0, pageWidth, 40, 'F')
     
-    // Logo
-    doc.addImage(statementLogo, 'PNG', (pageWidth/2) - 20, 8, 40, 22)
-    
+    // Logo — transparent PNG, aspect-correct (source 968x230)
+    const auditLogoW = 42, auditLogoH = auditLogoW * (230 / 968)
+    doc.addImage(statementLogo, 'PNG', (pageWidth / 2) - (auditLogoW / 2), 7, auditLogoW, auditLogoH)
+
     // Receipt Title
     doc.setTextColor(255, 255, 255)
     doc.setFontSize(14)
