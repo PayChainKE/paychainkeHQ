@@ -63,6 +63,14 @@ const protectMerchant = async (req, res, next) => {
   try {
     const merchant = await Merchant.findById(decoded.id).select('-password');
     if (!merchant) return fail(res, 401, 'MERCHANT_NOT_FOUND', 'Merchant account no longer exists. Please sign in again.');
+
+    // Tokens issued before this field existed carry no tokenVersion claim —
+    // treat that as version 0 so old sessions keep working until the first
+    // "Sign Out All Devices" bumps the account forward.
+    if ((decoded.tokenVersion || 0) !== (merchant.tokenVersion || 0)) {
+      return fail(res, 401, 'SESSION_REVOKED', 'This session was signed out remotely. Please sign in again.');
+    }
+
     req.merchant = merchant;
     return next();
   } catch (err) {

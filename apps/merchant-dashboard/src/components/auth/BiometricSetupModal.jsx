@@ -1,83 +1,84 @@
 import React, { useState, useEffect } from 'react';
+import { startRegistration } from '@simplewebauthn/browser';
 import { useMerchantAuth } from '../../context/MerchantAuthContext';
 
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+
 export default function BiometricSetupModal() {
-  const { merchant, isAuthenticated } = useMerchantAuth();
+  const { merchant, token, isAuthenticated, refreshSession } = useMerchantAuth();
   const [showModal, setShowModal] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
-    // Only show if authenticated and hasn't explicitly skipped or completed setup
-    const hasBiometrics = localStorage.getItem(`biometrics_enabled_${merchant?.email}`);
+    // Only show if authenticated, doesn't already have a real passkey, and
+    // hasn't explicitly skipped setup on this device.
     const skippedSetup = localStorage.getItem(`biometrics_skipped_${merchant?.email}`);
-    
+
     // Slight delay so it doesn't pop instantly on navigation
-    if (isAuthenticated && !hasBiometrics && !skippedSetup) {
+    if (isAuthenticated && merchant && !merchant.biometricsEnabled && !skippedSetup) {
       const timer = setTimeout(() => setShowModal(true), 1500);
       return () => clearTimeout(timer);
     }
-  }, [isAuthenticated, merchant?.email]);
+  }, [isAuthenticated, merchant]);
 
   const handleEnableBiometrics = async () => {
     setIsRegistering(true);
+    setErrorMsg('');
     try {
-      // Check if WebAuthn is supported
       if (!window.PublicKeyCredential) {
-        alert("Your device or browser doesn't support biometric authentication.");
+        setErrorMsg("Your device or browser doesn't support biometric authentication.");
         setIsRegistering(false);
         return;
       }
 
-      // Generate a mock challenge
-      const challenge = new Uint8Array(32);
-      window.crypto.getRandomValues(challenge);
-      const userId = new Uint8Array(16);
-      window.crypto.getRandomValues(userId);
-
-      // This call physically triggers the OS-level Face ID / Touch ID hardware prompt
-      const credential = await navigator.credentials.create({
-        publicKey: {
-          challenge: challenge,
-          rp: {
-            name: "PayChain Financial Services",
-            id: window.location.hostname
-          },
-          user: {
-            id: userId,
-            name: merchant?.email,
-            displayName: merchant?.businessName || "Merchant"
-          },
-          pubKeyCredParams: [
-            { type: "public-key", alg: -7 }, // ES256
-            { type: "public-key", alg: -257 } // RS256
-          ],
-          authenticatorSelection: {
-            authenticatorAttachment: "platform", // Forces built-in biometrics (Face ID/Touch ID)
-            userVerification: "required"
-          },
-          timeout: 60000,
-          attestation: "direct"
-        }
+      // 1 — Get a real registration challenge from the server
+      const optRes = await fetch(`${API_URL}/api/auth/merchant/webauthn/register-options`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
-
-      if (credential) {
-        // Success! Native OS verified the biometrics.
-        setIsSuccess(true);
-        // Save the credential ID locally to simulate backend registration for demo purposes
-        const credentialIdBase64 = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)));
-        localStorage.setItem(`biometrics_enabled_${merchant?.email}`, credentialIdBase64);
-        localStorage.setItem('last_biometric_user', merchant?.email);
-        
-        setTimeout(() => {
-          setShowModal(false);
-        }, 2000);
+      const optData = await optRes.json();
+      if (!optRes.ok) {
+        setErrorMsg(optData.error || 'Failed to start passkey registration.');
+        setIsRegistering(false);
+        return;
       }
+
+      // 2 — Trigger the OS-level Face ID / Touch ID hardware prompt
+      const regResponse = await startRegistration({ optionsJSON: optData.options });
+
+      // 3 — Verify and persist the credential on the server
+      const verifyRes = await fetch(`${API_URL}/api/auth/merchant/webauthn/verify-registration`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(regResponse),
+      });
+      const result = await verifyRes.json();
+
+      if (!verifyRes.ok || !result.success) {
+        setErrorMsg(result.error || 'Passkey registration failed.');
+        setIsRegistering(false);
+        return;
+      }
+
+      setIsSuccess(true);
+      await refreshSession();
+
+      setTimeout(() => {
+        setShowModal(false);
+      }, 2000);
     } catch (err) {
-      console.error("Biometric registration failed:", err);
-      // If user cancels the prompt, we don't show success
+      // NotAllowedError = user cancelled the OS prompt — not a real error
+      if (err?.name !== 'NotAllowedError') {
+        setErrorMsg(err?.name === 'InvalidStateError'
+          ? 'This device is already registered as a passkey.'
+          : (err?.message || 'Biometric registration failed. Try again.'));
+      }
     } finally {
-      if (!isSuccess) setIsRegistering(false);
+      setIsRegistering(false);
     }
   };
 
@@ -122,7 +123,12 @@ export default function BiometricSetupModal() {
 
           {!isSuccess && (
             <div className="w-full space-y-3">
-              <button 
+              {errorMsg && (
+                <p className="text-xs font-bold text-red-600 bg-red-50 border border-red-100 rounded-xl py-3 px-4">
+                  {errorMsg}
+                </p>
+              )}
+              <button
                 onClick={handleEnableBiometrics}
                 disabled={isRegistering}
                 className="w-full bg-[#00351D] text-[#5EFEB3] py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-[#022916] transition-all disabled:opacity-70 disabled:scale-100 active:scale-95 flex items-center justify-center gap-2"

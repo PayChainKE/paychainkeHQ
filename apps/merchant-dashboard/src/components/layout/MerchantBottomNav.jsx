@@ -1,6 +1,6 @@
 import React from 'react'
 import { NavLink } from 'react-router-dom'
-import { Home, History, Users, Shield, CreditCard, Star, User, MessageSquare } from 'lucide-react'
+import { Home, History, Users, Shield, CreditCard, User, MessageSquare } from 'lucide-react'
 
 const items = [
   { to: '/overview', label: 'Overview', Icon: Home },
@@ -8,7 +8,6 @@ const items = [
   { to: '/bulk-pay', label: 'Bulk Payments', Icon: Users },
   { to: '/inflation-shield', label: 'Inflation Shield', Icon: Shield },
   { to: '/cash-advance', label: 'Cash Advance', Icon: CreditCard },
-  { to: '/trust-score', label: 'Trust Score', Icon: Star },
   { to: '/profile', label: 'Profile', Icon: User },
   { to: '/support', label: 'Support', Icon: MessageSquare }
 ]

@@ -1,10 +1,25 @@
+import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import axios from 'axios'
+import MerchantLayout from '../components/layout/MerchantLayout'
+import { ValidatedInput } from '../components/ValidatedInput'
 import { useNotification } from '../context/NotificationContext'
+import { useMerchantAuth } from '../context/MerchantAuthContext'
+
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
 
 export default function RequestMoney() {
   const navigate = useNavigate()
   const { addNotification } = useNotification()
+  const { merchant, refreshSession } = useMerchantAuth()
   const [step, setStep] = useState(1)
   const [selectedOption, setSelectedOption] = useState(null)
+
+  const [amount, setAmount] = useState('')
+  const [phone, setPhone] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [statusText, setStatusText] = useState('')
+  const [generatedLink, setGeneratedLink] = useState('')
 
   const steps = [
     { id: 1, label: 'Selection' },
@@ -33,16 +48,132 @@ export default function RequestMoney() {
     }
   ]
 
+  const resetForm = () => {
+    setAmount('')
+    setPhone('')
+    setGeneratedLink('')
+    setStatusText('')
+  }
+
   const handleSelect = (opt) => {
     setSelectedOption(opt)
+    resetForm()
     setStep(2)
+  }
+
+  const authHeaders = () => ({
+    Authorization: `Bearer ${localStorage.getItem('paychain_merchant_token')}`
+  })
+
+  const sendMpesaPrompt = async () => {
+    if (!amount || Number(amount) <= 0 || !phone) {
+      addNotification({ title: 'Missing Details', message: 'Enter a valid amount and phone number.', type: 'error' })
+      return
+    }
+
+    setIsSubmitting(true)
+    setStatusText('Sending M-PESA prompt...')
+    try {
+      const pushRes = await axios.post(`${API_URL}/api/callbacks/stk-push`, {
+        amount: Number(amount),
+        phone,
+        merchantId: merchant._id
+      }, { headers: authHeaders() })
+
+      const checkoutId = pushRes.data.checkoutRequestId
+      setStatusText('Awaiting PIN on their phone...')
+
+      let attempts = 0
+      const maxAttempts = 20 // 20 * 3s = 60s
+      const pollInterval = setInterval(async () => {
+        attempts++
+        try {
+          const statusRes = await axios.get(`${API_URL}/api/callbacks/stk-status/${checkoutId}`, { headers: authHeaders() })
+
+          if (statusRes.data.status === 'success') {
+            clearInterval(pollInterval)
+            setIsSubmitting(false)
+            setStatusText('')
+            await refreshSession()
+            addNotification({ title: 'Payment Received', message: `KES ${Number(amount).toLocaleString()} has been received.`, type: 'success' })
+            setStep(3)
+          } else if (statusRes.data.status === 'failed') {
+            clearInterval(pollInterval)
+            setIsSubmitting(false)
+            setStatusText('')
+            addNotification({ title: 'Request Failed', message: statusRes.data.resultDesc || 'They cancelled or the request failed.', type: 'error' })
+          } else if (attempts >= maxAttempts) {
+            clearInterval(pollInterval)
+            setIsSubmitting(false)
+            setStatusText('')
+            addNotification({ title: 'Timeout', message: 'The request timed out. Please try again.', type: 'error' })
+          }
+        } catch (e) {
+          console.error('STK status poll error', e)
+        }
+      }, 3000)
+    } catch (err) {
+      setIsSubmitting(false)
+      setStatusText('')
+      if (err.response?.status >= 500) {
+        addNotification({ title: 'Check Their Phone', message: 'The prompt may have been sent. If they see an M-PESA popup, they can still enter their PIN.', type: 'error' })
+      } else {
+        addNotification({ title: 'Request Failed', message: err.response?.data?.error || 'Could not send M-PESA prompt.', type: 'error' })
+      }
+    }
+  }
+
+  const createPaymentLink = async () => {
+    if (!amount || Number(amount) <= 0) {
+      addNotification({ title: 'Invalid Amount', message: 'Please enter a valid amount.', type: 'error' })
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      const res = await axios.post(`${API_URL}/api/transactions/payment-link`, {
+        amount: Number(amount)
+      }, { headers: authHeaders() })
+
+      if (res.data?.success) {
+        setGeneratedLink(`${window.location.origin}/pay/${res.data.linkId}`)
+        addNotification({ title: 'Link Generated', message: 'Secure payment link created. Expires in 24 hours.', type: 'success' })
+        setStep(3)
+      }
+    } catch (err) {
+      addNotification({ title: 'Generation Failed', message: err.response?.data?.error || 'Failed to generate payment link.', type: 'error' })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handlePrimaryAction = () => {
+    if (selectedOption?.id === 'mpesa') return sendMpesaPrompt()
+    if (selectedOption?.id === 'link') return createPaymentLink()
+  }
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(generatedLink)
+    addNotification({ title: 'Link Copied', message: 'Payment link copied to clipboard.', type: 'success' })
+  }
+
+  const shareLink = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: `Pay ${merchant?.businessName || 'PayChain'}`, url: generatedLink })
+      } catch (err) {
+        // user cancelled share sheet — nothing to do
+      }
+    } else {
+      copyLink()
+    }
   }
 
   return (
     <MerchantLayout title="Request Money">
       <div className="max-w-4xl mx-auto animate-fade-in-up">
         {/* Back Button */}
-        <button 
+        <button
           onClick={() => step === 1 ? navigate('/overview') : setStep(step - 1)}
           className="flex items-center gap-2 text-slate-400 hover:text-primary transition-colors mb-6 group"
         >
@@ -56,7 +187,7 @@ export default function RequestMoney() {
         <header className="mb-10 text-center lg:text-left">
           <h2 className="font-headline font-bold text-4xl text-primary tracking-tight mb-3">Request Money</h2>
           <p className="text-on-surface-variant font-medium opacity-70 max-w-2xl px-4 lg:px-0 mx-auto lg:mx-0">
-            {step === 1 
+            {step === 1
               ? "Easily request payment from your customers by any of the options below."
               : `Complete your request using the ${selectedOption?.title} option.`}
           </p>
@@ -87,7 +218,7 @@ export default function RequestMoney() {
               >
                 {/* Visual Accent */}
                 <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 w-48 h-48 bg-emerald-50 rounded-full opacity-40 blur-3xl group-hover:bg-[#5EFEB3]/20 transition-colors"></div>
-                
+
                 <div className="relative z-10 flex flex-col h-full">
                   <div className="flex items-center justify-between mb-8">
                     <div className={`w-14 h-14 rounded-2xl ${opt.color} ${opt.textColor} flex items-center justify-center shadow-lg group-hover:rotate-6 transition-transform`}>
@@ -97,15 +228,15 @@ export default function RequestMoney() {
                       {opt.tag}
                     </span>
                   </div>
-                  
+
                   <h3 className="text-2xl font-headline font-bold text-primary mb-2 group-hover:text-emerald-950 transition-colors">
                     {opt.title}
                   </h3>
                   <p className="text-[13px] text-on-surface-variant font-medium opacity-70 mb-8 leading-relaxed">
                     {opt.description}
                   </p>
-                  
-                  <button 
+
+                  <button
                     onClick={() => handleSelect(opt)}
                     className="mt-auto py-2.5 px-6 bg-[#5EFEB3] text-[#00351D] rounded-full text-[11px] font-black uppercase tracking-widest self-start hover:brightness-105 hover:scale-105 active:scale-95 transition-all shadow-md group-hover:shadow-emerald-200"
                   >
@@ -115,42 +246,109 @@ export default function RequestMoney() {
               </div>
             ))}
           </div>
+        ) : step === 2 ? (
+          <div className="bg-white rounded-[32px] border border-slate-200 shadow-2xl p-8 lg:p-12 relative max-w-2xl mx-auto lg:mx-0">
+            <div className="flex flex-col items-center text-center mb-10">
+              <div className={`w-16 h-16 rounded-3xl flex items-center justify-center mb-6 shadow-xl ${selectedOption?.color} ${selectedOption?.textColor}`}>
+                <span className="material-symbols-outlined text-3xl">{selectedOption?.icon}</span>
+              </div>
+              <h3 className="text-2xl font-headline font-bold text-primary mb-2">Payment Details</h3>
+              <p className="text-on-surface-variant font-medium max-w-sm mx-auto opacity-70 leading-relaxed">
+                {selectedOption?.id === 'mpesa'
+                  ? "We'll send an M-PESA prompt to this number for them to complete."
+                  : 'Set an amount and we\'ll generate a secure, shareable link.'}
+              </p>
+            </div>
+
+            <div className="space-y-6 max-w-sm mx-auto">
+              <div className="space-y-3">
+                <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Amount (KES)</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="1,000"
+                  className="w-full bg-surface-container-low border border-outline-variant/5 rounded-3xl py-5 px-6 text-2xl font-headline text-primary focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
+                />
+              </div>
+
+              {selectedOption?.id === 'mpesa' && (
+                <div className="space-y-3">
+                  <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Customer's M-PESA Number</label>
+                  <ValidatedInput
+                    kind="phoneKE"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="0712 345 678"
+                    className="w-full bg-surface-container-low border border-outline-variant/5 rounded-3xl py-5 px-6 text-lg font-headline text-primary focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
+                  />
+                </div>
+              )}
+
+              <div className="flex gap-4 pt-4">
+                <button
+                  onClick={() => setStep(1)}
+                  disabled={isSubmitting}
+                  className="flex-1 py-4 bg-slate-50 rounded-2xl text-[11px] font-black uppercase tracking-widest text-slate-400 hover:bg-slate-100 transition-all border border-slate-100 disabled:opacity-40"
+                >
+                  Back
+                </button>
+                <button
+                  onClick={handlePrimaryAction}
+                  disabled={isSubmitting || !amount || (selectedOption?.id === 'mpesa' && !phone)}
+                  className="flex-1 py-4 bg-[#00351D] text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:brightness-110 transition-all shadow-xl disabled:opacity-30 flex items-center justify-center gap-2"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      {statusText || 'Processing...'}
+                    </>
+                  ) : selectedOption?.id === 'mpesa' ? 'Send Prompt' : 'Generate Link'}
+                </button>
+              </div>
+            </div>
+          </div>
         ) : (
           <div className="bg-white rounded-[32px] border border-slate-200 shadow-2xl p-8 lg:p-12 relative max-w-2xl mx-auto lg:mx-0">
-            <div className="py-16 text-center">
-              <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-xl ${selectedOption?.color} ${selectedOption?.textColor}`}>
-                 <span className="material-symbols-outlined text-4xl animate-pulse">{selectedOption?.icon}</span>
+            <div className="py-10 text-center">
+              <div className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-xl bg-emerald-500 text-white">
+                <span className="material-symbols-outlined text-4xl">check_circle</span>
               </div>
-              <h3 className="text-2xl font-headline font-bold text-primary mb-3">Step {step}: {steps.find(s => s.id === step)?.label}</h3>
-              <p className="text-on-surface-variant font-medium max-w-sm mx-auto opacity-70 leading-relaxed mb-10">
-                You're requesting money via <strong>{selectedOption?.title}</strong>. This process is currently being finalized.
-              </p>
-              
-              <div className="flex gap-4">
-                 <button 
-                   onClick={() => setStep(step - 1)}
-                   className="flex-1 py-4 bg-slate-50 rounded-2xl text-[11px] font-black uppercase tracking-widest text-slate-400 hover:bg-slate-100 transition-all border border-slate-100"
-                 >
-                   Back
-                 </button>
-                 <button 
-                   onClick={() => {
-                     if (step === 3) {
-                       addNotification({
-                         type: 'notifications',
-                         message: `Payment request for ${selectedOption?.title} has been sent.`,
-                         title: 'Request Sent'
-                       })
-                       navigate('/overview')
-                     } else {
-                       setStep(step + 1)
-                     }
-                   }}
-                   className="flex-1 py-4 bg-[#00351D] text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:brightness-110 transition-all shadow-xl"
-                 >
-                   {step === 3 ? 'Confirm & Request' : 'Continue'}
-                 </button>
-              </div>
+
+              {selectedOption?.id === 'mpesa' ? (
+                <>
+                  <h3 className="text-2xl font-headline font-bold text-primary mb-3">Payment Received</h3>
+                  <p className="text-on-surface-variant font-medium max-w-sm mx-auto opacity-70 leading-relaxed mb-10">
+                    KES {Number(amount).toLocaleString()} has been credited to your PayChain balance.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h3 className="text-2xl font-headline font-bold text-primary mb-3">Link Ready to Share</h3>
+                  <p className="text-on-surface-variant font-medium max-w-sm mx-auto opacity-70 leading-relaxed mb-6">
+                    Share this link with your customer to collect KES {Number(amount).toLocaleString()}.
+                  </p>
+                  <div className="bg-surface-container-low border border-outline-variant/10 rounded-2xl p-4 mb-6 break-all text-sm font-medium text-primary">
+                    {generatedLink}
+                  </div>
+                  <div className="flex gap-3 justify-center mb-4">
+                    <button onClick={copyLink} className="px-5 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black uppercase tracking-widest text-primary hover:bg-slate-100 transition-all flex items-center gap-2">
+                      <span className="material-symbols-outlined text-base">content_copy</span> Copy
+                    </button>
+                    <button onClick={shareLink} className="px-5 py-3 bg-[#5EFEB3] text-[#00351D] rounded-xl text-xs font-black uppercase tracking-widest hover:brightness-105 transition-all flex items-center gap-2">
+                      <span className="material-symbols-outlined text-base">share</span> Share
+                    </button>
+                  </div>
+                </>
+              )}
+
+              <button
+                onClick={() => navigate('/overview')}
+                className="mt-4 py-4 px-10 bg-[#00351D] text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:brightness-110 transition-all shadow-xl"
+              >
+                Back to Dashboard
+              </button>
             </div>
           </div>
         )}
@@ -165,13 +363,16 @@ export default function RequestMoney() {
                   <h4 className="text-2xl font-headline font-bold tracking-tight">Integrate our Request API</h4>
                   <p className="text-emerald-100/60 text-sm mt-1">Automate collections with our REST endpoints.</p>
                 </div>
-                <button className="py-4 px-10 bg-[#5EFEB3] text-[#00351D] rounded-2xl text-[11px] font-black uppercase tracking-widest hover:brightness-110 hover:scale-105 active:scale-95 transition-all shadow-2xl">
-                  View API Docs
-                </button>
+                <a
+                  href="mailto:support@paychain.co.ke?subject=API%20Documentation%20Request"
+                  className="py-4 px-10 bg-[#5EFEB3] text-[#00351D] rounded-2xl text-[11px] font-black uppercase tracking-widest hover:brightness-110 hover:scale-105 active:scale-95 transition-all shadow-2xl"
+                >
+                  Contact Us
+                </a>
              </div>
           </div>
         )}
-        
+
         <p className="mt-12 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest opacity-60">
            Payments handled securely by PayChain Global Network
         </p>

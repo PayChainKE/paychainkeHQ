@@ -194,6 +194,16 @@ const merchantSchema = new mongoose.Schema({
     select: false,
     default: null,
   },
+  // Identity-recovery security questions. Answers are bcrypt-hashed and
+  // never returned to the client — only the question text is exposed.
+  securityQuestions: {
+    type: [{
+      question:   { type: String, required: true },
+      answerHash: { type: String, required: true },
+    }],
+    select: false,
+    default: [],
+  },
   otp: {
     type: String,
     default: null,
@@ -207,6 +217,13 @@ const merchantSchema = new mongoose.Schema({
     default: null,
   },
   loginCount: {
+    type: Number,
+    default: 0,
+  },
+  // Bumped whenever "Sign Out All Devices" runs. Embedded in every issued JWT
+  // (see generateToken) — a token whose tokenVersion doesn't match this value
+  // is treated as revoked, even though JWTs are otherwise stateless.
+  tokenVersion: {
     type: Number,
     default: 0,
   },

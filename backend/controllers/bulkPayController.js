@@ -404,7 +404,7 @@ export const authorizeBatch = async (req, res) => {
       await Transaction.create({
         merchantId: merchant._id,
         accountNumber: merchant.paybillAccount || 'WALLET_FUND',
-        type: 'outbound',
+        type: 'bulk_pay',
         amount: row.netAmount,
         kesAmount: row.netAmount,
         currency: 'KES',

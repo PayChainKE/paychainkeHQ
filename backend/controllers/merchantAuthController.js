@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import Merchant from '../models/Merchant.js';
+import AuditLog from '../models/AuditLog.js';
 import { sendOTP, sendWelcomeEmail, sendPasswordResetConfirmation } from '../utils/resend.js';
 import { logAudit } from '../utils/auditLog.js';
 import generateToken from '../utils/generateToken.js';
@@ -199,7 +200,7 @@ export const verifyMerchantOTP = async (req, res) => {
         biometricsEnabled: merchant.biometricsEnabled,
         features: merchant.features
       },
-      token: generateToken(merchant._id)
+      token: generateToken(merchant._id, '30d', { tokenVersion: merchant.tokenVersion || 0 })
     });
   } catch (error) {
     console.error('Verify Merchant OTP Error:', error);
@@ -376,7 +377,7 @@ export const biometricLogin = async (req, res) => {
         biometricsEnabled: merchant.biometricsEnabled,
         features: merchant.features
       },
-      token: generateToken(merchant._id)
+      token: generateToken(merchant._id, '30d', { tokenVersion: merchant.tokenVersion || 0 })
     });
   } catch (error) {
     console.error('Biometric Login Error:', error);
@@ -661,6 +662,143 @@ export const changeMerchantPassword = async (req, res) => {
     res.json({ success: true, message: 'Password updated successfully' });
   } catch (error) {
     console.error('Change Password Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Get configured security questions (text only — never answers)
+// @route   GET /api/auth/merchant/security-questions
+// @access  Private (Merchant)
+export const getSecurityQuestions = async (req, res) => {
+  try {
+    const merchant = await Merchant.findById(req.merchant._id).select('+securityQuestions');
+    if (!merchant) {
+      return res.status(404).json({ error: 'Merchant not found' });
+    }
+
+    res.json({
+      success: true,
+      configured: merchant.securityQuestions.length > 0,
+      count: merchant.securityQuestions.length,
+      questions: merchant.securityQuestions.map((q) => q.question),
+    });
+  } catch (error) {
+    console.error('Get Security Questions Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Set / replace security questions for identity recovery
+// @route   PUT /api/auth/merchant/security-questions
+// @access  Private (Merchant)
+export const updateSecurityQuestions = async (req, res) => {
+  const { questions, currentPassword } = req.body;
+
+  try {
+    if (!Array.isArray(questions) || questions.length < 3) {
+      return res.status(400).json({ error: 'Please answer all 3 security questions.' });
+    }
+    for (const q of questions) {
+      if (!q?.question?.trim() || !q?.answer?.trim()) {
+        return res.status(400).json({ error: 'Every question needs an answer.' });
+      }
+      if (q.answer.trim().length < 2) {
+        return res.status(400).json({ error: 'Answers must be at least 2 characters long.' });
+      }
+    }
+
+    const merchant = await Merchant.findById(req.merchant._id).select('+password');
+    if (!merchant) {
+      return res.status(404).json({ error: 'Merchant not found' });
+    }
+
+    // Re-authenticate before overwriting the recovery vault — same bar as a
+    // password change, since these answers can be used to regain access.
+    if (merchant.password) {
+      if (!currentPassword) {
+        return res.status(400).json({ error: 'Please confirm your current password to update security questions.' });
+      }
+      const isMatch = await merchant.matchPassword(currentPassword);
+      if (!isMatch) {
+        logAudit({
+          action: 'merchant.security_questions.update_failed', category: 'security', severity: 'warning',
+          message: 'Security questions update failed — wrong current password',
+          merchant, req,
+        });
+        return res.status(400).json({ error: 'Current password is incorrect' });
+      }
+    }
+
+    const salt = await bcrypt.genSalt(12);
+    merchant.securityQuestions = await Promise.all(
+      questions.map(async (q) => ({
+        question: q.question.trim(),
+        answerHash: await bcrypt.hash(q.answer.trim().toLowerCase(), salt),
+      }))
+    );
+    await merchant.save();
+
+    logAudit({
+      action: 'merchant.security_questions.updated', category: 'security', severity: 'critical',
+      message: 'Security questions updated from dashboard',
+      merchant, req,
+    });
+
+    res.json({ success: true, message: 'Security questions saved successfully' });
+  } catch (error) {
+    console.error('Update Security Questions Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Recent account-security activity (logins, password/PIN/security-question
+//          changes) — sourced from the same audit trail admins see, scoped to
+//          this merchant only.
+// @route   GET /api/auth/merchant/security-history
+// @access  Private (Merchant)
+export const getSecurityHistory = async (req, res) => {
+  try {
+    const events = await AuditLog.find({
+      merchantId: req.merchant._id,
+      category: { $in: ['auth', 'security'] },
+    })
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .select('action message severity ip userAgent platform createdAt')
+      .lean();
+
+    res.json({ success: true, events });
+  } catch (error) {
+    console.error('Get Security History Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Sign out every device/session by invalidating all previously
+//          issued JWTs at once (bumps tokenVersion — see generateToken /
+//          protectMerchant). This also signs out the session making the
+//          request; the client should clear its local token immediately.
+// @route   POST /api/auth/merchant/sign-out-all-devices
+// @access  Private (Merchant)
+export const signOutAllDevices = async (req, res) => {
+  try {
+    const merchant = await Merchant.findById(req.merchant._id);
+    if (!merchant) {
+      return res.status(404).json({ error: 'Merchant not found' });
+    }
+
+    merchant.tokenVersion = (merchant.tokenVersion || 0) + 1;
+    await merchant.save();
+
+    logAudit({
+      action: 'merchant.sessions.revoked_all', category: 'security', severity: 'critical',
+      message: 'Signed out of all devices',
+      merchant, req,
+    });
+
+    res.json({ success: true, message: 'Signed out of all devices' });
+  } catch (error) {
+    console.error('Sign Out All Devices Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };

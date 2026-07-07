@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 import api from '../api/config';
 
 const AuthContext = createContext<any>(null);
@@ -10,9 +11,18 @@ const TOKEN_KEY          = 'paychain_merchant_token';   // JWT in OS secure encl
 const BIOMETRIC_DONE_KEY = 'paychain_biometrics_setup'; // 'true' once setup screen is shown
 
 // ── SecureStore helpers ──────────────────────────────────────────────────────
-async function storeToken(jwt: string) { await SecureStore.setItemAsync(TOKEN_KEY, jwt); }
-async function loadToken(): Promise<string | null> { return SecureStore.getItemAsync(TOKEN_KEY); }
-async function clearToken() { await SecureStore.deleteItemAsync(TOKEN_KEY); }
+async function storeToken(jwt: string) {
+  if (Platform.OS === 'web') return;
+  await SecureStore.setItemAsync(TOKEN_KEY, jwt);
+}
+async function loadToken(): Promise<string | null> {
+  if (Platform.OS === 'web') return null;
+  return SecureStore.getItemAsync(TOKEN_KEY);
+}
+async function clearToken() {
+  if (Platform.OS === 'web') return;
+  await SecureStore.deleteItemAsync(TOKEN_KEY);
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [merchant,               setMerchant]               = useState<any>(null);

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import { useToast } from '../context/NotificationContext'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
@@ -6,9 +6,57 @@ import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { ValidatedInput } from '../components/ValidatedInput'
 import axios from 'axios'
 
+const DEFAULT_SECURITY_QUESTIONS = [
+  "What is the name of the first school you attended?",
+  "What is the name of your favorite musician or band?",
+  "What was the make and model of your first car?"
+]
+
+const EVENT_META = {
+  'merchant.login':           { icon: 'login', tone: 'text-emerald-400' },
+  'merchant.password':        { icon: 'lock_reset', tone: 'text-amber-400' },
+  'merchant.security_questions': { icon: 'quiz', tone: 'text-amber-400' },
+  'merchant.sessions':         { icon: 'phonelink_erase', tone: 'text-red-400' },
+  'merchant.payment_pin':      { icon: 'pin', tone: 'text-amber-400' },
+  'merchant.profile':          { icon: 'badge', tone: 'text-sky-400' },
+}
+function eventMeta(action = '') {
+  const key = Object.keys(EVENT_META).find((k) => action.startsWith(k))
+  return EVENT_META[key] || { icon: 'shield', tone: 'text-white/50' }
+}
+
+function deviceLabel(platform, userAgent = '') {
+  if (platform === 'mobile') return 'PayChain mobile app'
+  const ua = (userAgent || '').toLowerCase()
+  if (ua.includes('iphone') || ua.includes('ipad')) return 'iPhone / iPad browser'
+  if (ua.includes('android')) return 'Android browser'
+  if (ua.includes('mac os')) return 'Mac browser'
+  if (ua.includes('windows')) return 'Windows browser'
+  return 'Web browser'
+}
+
+function deviceIcon(platform, userAgent = '') {
+  if (platform === 'mobile') return 'smartphone'
+  const ua = (userAgent || '').toLowerCase()
+  if (ua.includes('iphone') || ua.includes('android')) return 'smartphone'
+  if (ua.includes('ipad')) return 'tablet_mac'
+  return 'laptop_mac'
+}
+
+function relativeTime(iso) {
+  if (!iso) return ''
+  const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
+  if (seconds < 60) return 'Just now'
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
+  const days = Math.floor(seconds / 86400)
+  if (days < 30) return `${days}d ago`
+  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
 export default function Profile() {
   const { showAmounts } = usePrivacyMode()
-  const { merchant } = useMerchantAuth()
+  const { merchant, logout } = useMerchantAuth()
   const [name, setName] = useState(merchant?.name || 'Admin')
   const [email, setEmail] = useState(merchant?.email || 'admin@paychain.ke')
   const [kraPin, setKraPin] = useState(merchant?.kraPin || '')
@@ -19,16 +67,131 @@ export default function Profile() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isUpdatingSecurity, setIsUpdatingSecurity] = useState(false)
-  
+
   // PIN Reset states
   const [currentPin, setCurrentPin] = useState('')
   const [newPin, setNewPin] = useState('')
   const [confirmNewPin, setConfirmNewPin] = useState('')
   const [isResettingPin, setIsResettingPin] = useState(false)
 
+  // Security Questions states
+  const [questionsConfig, setQuestionsConfig] = useState({ configured: false, count: 0, questions: DEFAULT_SECURITY_QUESTIONS })
+  const [isLoadingQuestions, setIsLoadingQuestions] = useState(false)
+  const [questionAnswers, setQuestionAnswers] = useState(['', '', ''])
+  const [questionsPassword, setQuestionsPassword] = useState('')
+  const [isSavingQuestions, setIsSavingQuestions] = useState(false)
+
   const [kraPinLocked, setKraPinLocked] = useState(!!merchant?.kraPin)
   const [businessNumberLocked, setBusinessNumberLocked] = useState(!!merchant?.businessNumber)
   const toast = useToast()
+
+  const fetchSecurityQuestions = useCallback(async () => {
+    setIsLoadingQuestions(true)
+    try {
+      const token = localStorage.getItem('paychain_merchant_token')
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+      const res = await axios.get(`${API_URL}/api/auth/merchant/security-questions`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (res.data.success) {
+        setQuestionsConfig({
+          configured: res.data.configured,
+          count: res.data.count,
+          questions: res.data.configured ? res.data.questions : DEFAULT_SECURITY_QUESTIONS,
+        })
+      }
+    } catch (err) {
+      // Non-fatal — fall back to the default question set already in state
+    } finally {
+      setIsLoadingQuestions(false)
+    }
+  }, [])
+
+  useEffect(() => { fetchSecurityQuestions() }, [fetchSecurityQuestions])
+
+  async function handleSecurityQuestionsSave() {
+    if (questionAnswers.some((a) => !a.trim())) {
+      toast.push({ message: 'Please answer all 3 security questions', type: 'error' })
+      return
+    }
+    if (!questionsPassword) {
+      toast.push({ message: 'Please confirm your current password', type: 'error' })
+      return
+    }
+
+    setIsSavingQuestions(true)
+    try {
+      const token = localStorage.getItem('paychain_merchant_token')
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+      const res = await axios.put(`${API_URL}/api/auth/merchant/security-questions`, {
+        questions: questionsConfig.questions.map((question, i) => ({ question, answer: questionAnswers[i] })),
+        currentPassword: questionsPassword,
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+
+      if (res.data.success) {
+        toast.push({ message: 'Security questions synchronized', type: 'success' })
+        setShowQuestions(false)
+        setQuestionAnswers(['', '', ''])
+        setQuestionsPassword('')
+        fetchSecurityQuestions()
+      }
+    } catch (err) {
+      toast.push({ message: err.response?.data?.error || 'Failed to update security questions', type: 'error' })
+    } finally {
+      setIsSavingQuestions(false)
+    }
+  }
+
+  function closeQuestions() {
+    setShowQuestions(false)
+    setQuestionAnswers(['', '', ''])
+    setQuestionsPassword('')
+  }
+
+  // Security History states
+  const [securityEvents, setSecurityEvents] = useState([])
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false)
+  const [confirmingSignOutAll, setConfirmingSignOutAll] = useState(false)
+  const [isSigningOutAll, setIsSigningOutAll] = useState(false)
+
+  const fetchSecurityHistory = useCallback(async () => {
+    setIsLoadingHistory(true)
+    try {
+      const token = localStorage.getItem('paychain_merchant_token')
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+      const res = await axios.get(`${API_URL}/api/auth/merchant/security-history`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (res.data.success) {
+        setSecurityEvents(res.data.events)
+      }
+    } catch (err) {
+      // Non-fatal — the card just shows its empty state
+    } finally {
+      setIsLoadingHistory(false)
+    }
+  }, [])
+
+  useEffect(() => { fetchSecurityHistory() }, [fetchSecurityHistory])
+
+  async function handleSignOutAllDevices() {
+    setIsSigningOutAll(true)
+    try {
+      const token = localStorage.getItem('paychain_merchant_token')
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+      await axios.post(`${API_URL}/api/auth/merchant/sign-out-all-devices`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      toast.push({ message: "You've been signed out everywhere. Please sign in again.", type: 'success' })
+      logout()
+    } catch (err) {
+      toast.push({ message: err.response?.data?.error || 'Failed to sign out all devices', type: 'error' })
+      setIsSigningOutAll(false)
+      setConfirmingSignOutAll(false)
+    }
+  }
 
   async function save() {
     setIsUpdatingProfile(true)
@@ -126,8 +289,6 @@ export default function Profile() {
     }
   }
 
-  const loginHistory = []
-
   return (
     <MerchantLayout title="Settings">
       <div className="px-1 lg:px-0 max-w-7xl mx-auto w-full">
@@ -138,11 +299,14 @@ export default function Profile() {
         </div>
 
         <div className="grid grid-cols-12 gap-8">
-          {/* Main Settings Area */}
-          <div className="col-span-12 lg:col-span-8 space-y-8">
-            
+          {/* Main Settings Area — `contents` dissolves this wrapper on mobile so
+              Profile/Security become independently orderable siblings of
+              Merchant ID / Security History below; `lg:block` restores the
+              normal nested column at desktop, unchanged from before. */}
+          <div className="contents lg:block lg:col-span-8 lg:space-y-8">
+
             {/* Section 1: Administrator Profile */}
-            <div className="bg-white p-6 lg:p-10 rounded-[32px] lg:rounded-[40px] border border-slate-100 shadow-sm editorial-shadow animate-fade-in-up [animation-delay:100ms]">
+            <div className="order-2 col-span-12 bg-white p-6 lg:p-10 rounded-[32px] lg:rounded-[40px] border border-slate-100 shadow-sm editorial-shadow animate-fade-in-up [animation-delay:100ms]">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
                 <div>
                   <h3 className="font-headline font-bold text-2xl text-primary tracking-tight">Profile</h3>
@@ -267,7 +431,7 @@ export default function Profile() {
             </div>
 
             {/* Section 2: Security & Authentication */}
-            <div className="bg-[#06201B] p-6 lg:p-10 rounded-[32px] lg:rounded-[40px] text-white shadow-2xl relative animate-fade-in-up [animation-delay:200ms]">
+            <div className="order-3 col-span-12 bg-[#06201B] p-6 lg:p-10 rounded-[32px] lg:rounded-[40px] text-white shadow-2xl relative animate-fade-in-up [animation-delay:200ms]">
               
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-10">
@@ -280,7 +444,7 @@ export default function Profile() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-10">
                   {/* Change Password Sub-section */}
                   <div className="space-y-6">
                     <h4 className="text-[10px] text-white/30 font-black uppercase tracking-widest flex items-center gap-2">
@@ -380,7 +544,9 @@ export default function Profile() {
                           </div>
                           <div className="text-left">
                             <p className="text-sm font-black text-white">Security Questions</p>
-                            <p className="text-[10px] text-white/30 font-medium">3 questions configured</p>
+                            <p className="text-[10px] text-white/30 font-medium">
+                              {isLoadingQuestions ? 'Loading…' : questionsConfig.configured ? `${questionsConfig.count} questions configured` : 'Not configured yet'}
+                            </p>
                           </div>
                         </div>
                         <span className="material-symbols-outlined text-white/20">chevron_right</span>
@@ -395,6 +561,38 @@ export default function Profile() {
                            Need help with your security keys? Reach out to your account manager or use the encrypted support portal.
                          </p>
                        </div>
+                    </div>
+                  </div>
+
+                  {/* Trust / Protection Panel */}
+                  <div className="lg:col-span-2 xl:col-span-1 bg-gradient-to-br from-emerald-500/10 via-white/[0.03] to-transparent rounded-[28px] border border-emerald-500/10 p-7 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-40 h-40 bg-emerald-400/10 rounded-full -mr-20 -mt-20 blur-3xl"></div>
+                    <div className="relative z-10">
+                      <div className="inline-flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest mb-6 border border-white/10">
+                        <span className="material-symbols-outlined text-xs text-emerald-400">verified_user</span>
+                        Bank-Grade Protection
+                      </div>
+                      <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-emerald-400/25 to-emerald-600/10 flex items-center justify-center mb-6 border border-emerald-400/10">
+                        <span className="material-symbols-outlined text-3xl text-emerald-400">encrypted</span>
+                      </div>
+                      <h4 className="font-headline text-lg text-white mb-2 leading-tight">Your account, fully shielded.</h4>
+                      <p className="text-[11px] text-white/40 leading-relaxed mb-6">
+                        Every credential you set here is encrypted at rest, never logged in plain text, and every change is recorded to your security audit trail.
+                      </p>
+                      <div className="space-y-3.5">
+                        <div className="flex items-center gap-3">
+                          <span className="material-symbols-outlined text-emerald-400 text-base">lock</span>
+                          <p className="text-[10px] text-white/50 font-medium">256-bit encrypted storage</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="material-symbols-outlined text-emerald-400 text-base">history</span>
+                          <p className="text-[10px] text-white/50 font-medium">Every change is audit-logged</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="material-symbols-outlined text-emerald-400 text-base">support_agent</span>
+                          <p className="text-[10px] text-white/50 font-medium">24/7 human security support</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -423,7 +621,7 @@ export default function Profile() {
                   <div className="flex items-center justify-between mb-8">
                     <div className="flex items-center gap-4">
                       <button 
-                        onClick={() => setShowQuestions(false)}
+                        onClick={closeQuestions}
                         className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-white/40 hover:text-white transition-colors"
                       >
                         <span className="material-symbols-outlined">arrow_back</span>
@@ -441,42 +639,67 @@ export default function Profile() {
                     </p>
                   </div>
 
+                  {questionsConfig.configured && (
+                    <div className="bg-amber-500/5 border border-amber-500/10 p-4 sm:p-5 rounded-2xl mb-6 lg:mb-8 shrink-0">
+                      <p className="text-[11px] sm:text-xs text-amber-200/60 font-medium leading-relaxed">
+                        You already have {questionsConfig.count} questions on file. Submitting below replaces all of them — for your security, previous answers are never shown back to you.
+                      </p>
+                    </div>
+                  )}
+
                   <div className="space-y-6 overflow-y-auto pr-2 custom-scrollbar flex-1 min-h-0">
-                    {[
-                      "What is the name of the first school you attended?",
-                      "What is the name of your favorite musician or band?",
-                      "What was the make and model of your first car?"
-                    ].map((q, i) => (
+                    {questionsConfig.questions.map((q, i) => (
                       <div key={i} className="space-y-3">
                         <label className="text-[10px] text-white/30 font-black uppercase tracking-widest flex items-center gap-2">
                           <span className="w-1 h-1 rounded-full bg-emerald-500"></span>
                           Question {i + 1}
                         </label>
                         <p className="text-sm font-black text-white px-1">{q}</p>
-                        <input 
+                        <input
                           type="text"
+                          value={questionAnswers[i]}
+                          onChange={(e) => setQuestionAnswers((prev) => prev.map((a, idx) => idx === i ? e.target.value : a))}
                           placeholder="Provide your answer"
-                          className="w-full bg-white/5 border border-white/10 rounded-xl py-3.5 px-5 text-sm font-medium text-white focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 outline-none transition-all placeholder:text-white/10"
+                          disabled={isSavingQuestions}
+                          className="w-full bg-white/5 border border-white/10 rounded-xl py-3.5 px-5 text-sm font-medium text-white focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 outline-none transition-all placeholder:text-white/10 disabled:opacity-50"
                         />
                       </div>
                     ))}
+                    <div className="space-y-3">
+                      <label className="text-[10px] text-white/30 font-black uppercase tracking-widest flex items-center gap-2">
+                        <span className="w-1 h-1 rounded-full bg-amber-500"></span>
+                        Confirm your password
+                      </label>
+                      <input
+                        type="password"
+                        value={questionsPassword}
+                        onChange={(e) => setQuestionsPassword(e.target.value)}
+                        placeholder="••••••••••••"
+                        disabled={isSavingQuestions}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl py-3.5 px-5 text-sm font-medium text-white focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 outline-none transition-all placeholder:text-white/10 disabled:opacity-50"
+                      />
+                    </div>
                   </div>
 
                   <div className="mt-8 lg:mt-10 flex justify-end gap-3 sm:gap-4 shrink-0 border-t border-white/5 pt-6">
-                    <button 
-                      onClick={() => setShowQuestions(false)}
-                      className="px-8 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest text-white/40 hover:text-white transition-all underline decoration-emerald-500/20 underline-offset-8"
+                    <button
+                      onClick={closeQuestions}
+                      disabled={isSavingQuestions}
+                      className="px-8 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest text-white/40 hover:text-white transition-all underline decoration-emerald-500/20 underline-offset-8 disabled:opacity-50"
                     >
                       Go back
                     </button>
-                    <button 
-                      onClick={() => {
-                        setShowQuestions(false)
-                        toast.push({ message: 'Security questions synchronized' })
-                      }}
-                      className="bg-emerald-500 text-[#06201B] px-10 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-2xl hover:bg-white transition-all active:scale-95"
+                    <button
+                      onClick={handleSecurityQuestionsSave}
+                      disabled={isSavingQuestions}
+                      className="bg-emerald-500 text-[#06201B] px-10 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-2xl hover:bg-white transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
                     >
-                      Submit
+                      {isSavingQuestions ? (
+                        <>
+                          <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>
+                          Saving...
+                        </>
+                      ) : 'Submit'}
                     </button>
                   </div>
                 </div>
@@ -484,11 +707,13 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* Sidebar Area */}
-          <div className="col-span-12 lg:col-span-4 space-y-8">
-            
+          {/* Sidebar Area — same `contents` treatment; Merchant ID sits before
+              Profile and Security History sits after Security on mobile,
+              while desktop keeps them stacked together in the right column. */}
+          <div className="contents lg:block lg:col-span-4 lg:space-y-8">
+
             {/* Merchant ID Card */}
-            <div className="bg-[#0A2540] p-8 rounded-[32px] text-white shadow-xl relative overflow-hidden group">
+            <div className="order-1 col-span-12 bg-[#0A2540] p-8 rounded-[32px] text-white shadow-xl relative overflow-hidden group">
               <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 rounded-full -mr-16 -mt-16 blur-3xl group-hover:scale-125 transition-transform duration-700"></div>
               <div className="relative z-10">
                 <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center text-white mb-6">
@@ -504,29 +729,101 @@ export default function Profile() {
               </div>
             </div>
 
-            {/* Security Mini-Bento */}
-            <div className="bg-surface-container-lowest p-8 rounded-[32px] border border-outline-variant/10 shadow-sm editorial-shadow">
-              <h3 className="font-headline font-bold text-lg text-primary mb-6">Security History</h3>
-              <div className="space-y-6">
-                {loginHistory.length === 0 ? (
-                  <p className="text-sm text-on-surface-variant font-medium text-center py-4 opacity-70">No recent security events.</p>
-                ) : (
-                  loginHistory.map((log, i) => (
-                    <div key={i} className="flex items-center gap-4">
-                      <div className="w-8 h-8 rounded-lg bg-surface-container-low flex items-center justify-center text-on-surface-variant">
-                        <span className="material-symbols-outlined text-sm">{log.device.includes('iPhone') ? 'smartphone' : 'laptop_mac'}</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-bold text-on-surface truncate">{log.device}</p>
-                        <p className="text-[10px] text-on-surface-variant font-medium">{log.location} • {log.time}</p>
+            {/* Security History */}
+            <div className="order-4 col-span-12 bg-surface-container-lowest p-8 rounded-[32px] border border-outline-variant/10 shadow-sm editorial-shadow">
+              <div className="flex items-center gap-3 mb-1">
+                <div className="w-9 h-9 rounded-xl bg-primary/5 flex items-center justify-center text-primary shrink-0">
+                  <span className="material-symbols-outlined text-lg">history</span>
+                </div>
+                <div>
+                  <h3 className="font-headline font-bold text-lg text-primary leading-tight">Security History</h3>
+                  <p className="text-[10px] text-on-surface-variant/60 font-medium">Recent activity on your account</p>
+                </div>
+              </div>
+
+              <div className="space-y-1 mt-6">
+                {isLoadingHistory ? (
+                  [...Array(3)].map((_, i) => (
+                    <div key={i} className="flex items-center gap-4 py-3 animate-pulse">
+                      <div className="w-9 h-9 rounded-xl bg-surface-container-low shrink-0" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-3 w-3/4 bg-surface-container-low rounded" />
+                        <div className="h-2 w-1/2 bg-surface-container-low rounded" />
                       </div>
                     </div>
                   ))
+                ) : securityEvents.length === 0 ? (
+                  <div className="text-center py-6">
+                    <div className="w-12 h-12 rounded-2xl bg-surface-container-low mx-auto flex items-center justify-center text-on-surface-variant/40 mb-3">
+                      <span className="material-symbols-outlined text-xl">visibility</span>
+                    </div>
+                    <p className="text-[13px] text-on-surface font-bold">Nothing to report yet</p>
+                    <p className="text-[11px] text-on-surface-variant/60 font-medium mt-1 max-w-[220px] mx-auto leading-relaxed">
+                      This fills up automatically as you sign in or update your password, PIN, and security questions.
+                    </p>
+                  </div>
+                ) : (
+                  securityEvents.map((ev, i) => {
+                    const meta = eventMeta(ev.action)
+                    return (
+                      <div key={i} className="flex items-start gap-4 py-3 border-b border-outline-variant/5 last:border-0">
+                        <div className="w-9 h-9 rounded-xl bg-surface-container-low flex items-center justify-center shrink-0">
+                          <span className={`material-symbols-outlined text-base ${meta.tone}`}>{meta.icon}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-on-surface leading-snug">{ev.message || ev.action}</p>
+                          <div className="flex items-center gap-1.5 mt-1 text-[10px] text-on-surface-variant/50 font-medium">
+                            <span className="material-symbols-outlined text-[12px]">{deviceIcon(ev.platform, ev.userAgent)}</span>
+                            <span>{deviceLabel(ev.platform, ev.userAgent)}</span>
+                            <span>·</span>
+                            <span>{relativeTime(ev.createdAt)}</span>
+                          </div>
+                        </div>
+                        {(ev.severity === 'warning' || ev.severity === 'critical') && (
+                          <span className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${ev.severity === 'critical' ? 'bg-red-500' : 'bg-amber-500'}`}></span>
+                        )}
+                      </div>
+                    )
+                  })
                 )}
               </div>
-              <button className="w-full mt-8 py-3.5 rounded-xl bg-emerald-500 text-[#06201B] text-xs font-black uppercase tracking-widest shadow-md hover:bg-[#06201B] hover:text-emerald-400 hover:shadow-xl transition-all duration-300 active:scale-95 disabled:opacity-50" disabled={loginHistory.length === 0}>
-                Sign Out All Devices
-              </button>
+
+              {confirmingSignOutAll ? (
+                <div className="mt-8 p-4 rounded-2xl bg-red-50 border border-red-100">
+                  <p className="text-[11px] text-red-700 font-medium leading-relaxed mb-3">
+                    This signs you out everywhere, including this browser. You'll need to log in again right after.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setConfirmingSignOutAll(false)}
+                      disabled={isSigningOutAll}
+                      className="flex-1 py-2.5 rounded-xl border border-outline-variant/30 text-on-surface text-[10px] font-black uppercase tracking-widest hover:bg-surface-container-low transition-all disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSignOutAllDevices}
+                      disabled={isSigningOutAll}
+                      className="flex-1 py-2.5 rounded-xl bg-red-600 text-white text-[10px] font-black uppercase tracking-widest shadow-md hover:bg-red-700 transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
+                    >
+                      {isSigningOutAll ? (
+                        <>
+                          <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
+                          Signing out…
+                        </>
+                      ) : 'Yes, sign out'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmingSignOutAll(true)}
+                  className="w-full mt-8 py-3.5 rounded-xl bg-emerald-500 text-[#06201B] text-xs font-black uppercase tracking-widest shadow-md hover:bg-[#06201B] hover:text-emerald-400 hover:shadow-xl transition-all duration-300 active:scale-95 flex items-center justify-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-base">phonelink_erase</span>
+                  Sign Out All Devices
+                </button>
+              )}
             </div>
           </div>
         </div>

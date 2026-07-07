@@ -240,7 +240,7 @@ export const verifyLogin = async (req, res) => {
     merchant.lastLogin = new Date();
     await merchant.save();
 
-    const token = generateToken(merchant._id);
+    const token = generateToken(merchant._id, '30d', { tokenVersion: merchant.tokenVersion || 0 });
 
     logAudit({
       action: 'merchant.login.passkey',

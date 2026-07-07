@@ -9,7 +9,8 @@ import { formatKES } from '../utils/formatCurrency'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useNotification } from '../context/NotificationContext'
 import { isValidPhoneKE } from '../utils/validators'
-import paychainLogo from '../../images/logo.png'
+import paychainLogo from '../assets/paychain-logo-dark.png'
+import paychainLogoWhite from '../assets/paychain-logo-white.png'
 import axios from 'axios'
 
 export default function BulkPay() {
@@ -183,16 +184,21 @@ export default function BulkPay() {
         type: newPayee.type.toLowerCase(),
         defaultAmount: numericAmount
       };
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
 
       if (isEditing) {
-        // Placeholder for editing, for now just update locally as backend edit is not fully implemented
-        setPayeesList(prev => prev.map(p => p.id === editingId ? { 
-          ...p, 
-          ...newPayee, 
-          type: newPayee.type.toLowerCase(),
-          salary: numericAmount,
-          amount: numericAmount
-        } : p));
+        const res = await axios.put(`${API_URL}/api/bulkpay/payees/${editingId}`, payload, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        const updated = {
+          ...res.data,
+          id: res.data._id,
+          salary: res.data.defaultAmount,
+          amount: res.data.defaultAmount
+        };
+
+        setPayeesList(prev => prev.map(p => p.id === editingId ? { ...p, ...updated } : p));
         setPayoutAmounts(prev => ({ ...prev, [editingId]: numericAmount }));
         addNotification({
           title: 'Payee Updated',
@@ -200,18 +206,17 @@ export default function BulkPay() {
           type: 'success'
         });
       } else {
-        const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
         const res = await axios.post(`${API_URL}/api/bulkpay/payees`, payload, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        
+
         const entry = {
           ...res.data,
           id: res.data._id, // map mongo id
           salary: res.data.defaultAmount,
           amount: res.data.defaultAmount
         };
-        
+
         setPayeesList(prev => [entry, ...prev]);
         setPayoutAmounts(prev => ({ ...prev, [entry.id]: numericAmount }));
         addNotification({
@@ -587,16 +592,21 @@ export default function BulkPay() {
       try {
         const pdf = new jsPDF();
         let y = 20;
-        const reportDate = new Date().toLocaleString('en-KE', { 
-          day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' 
+        const reportDate = new Date().toLocaleString('en-KE', {
+          day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
         });
+
+        // Logo — transparent PNG, aspect-correct (source 968x230)
+        const logoW = 32, logoH = logoW * (230 / 968);
+        try { pdf.addImage(paychainLogo, 'PNG', 20, y - 8, logoW, logoH, undefined, 'FAST') } catch (_) {}
+        y += logoH + 6;
 
         // Header
         pdf.setFontSize(16);
         pdf.setFont("helvetica", "bold");
         pdf.text('PAYCHAIN FINANCE - BATCH DISBURSEMENT REPORT', 20, y);
         y += 10;
-        
+
         pdf.setFontSize(12);
         pdf.setFont("helvetica", "normal");
         pdf.text(`Date: ${reportDate}`, 20, y);
@@ -1330,22 +1340,25 @@ export default function BulkPay() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar pb-10">
                     {authorizedReceipts.map((receipt) => (
                       <div key={receipt.id} id={`receipt-${receipt.id}`} className="bg-white border border-outline-variant/10 rounded-[24px] sm:rounded-[32px] overflow-hidden shadow-[0_10px_40px_rgba(0,0,0,0.03)] group hover:shadow-xl transition-all duration-500 hover:-translate-y-1">
-                        <div className="bg-[#00351D] p-5 md:p-6 flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
-                              <span className="material-symbols-outlined text-emerald-400">payments</span>
+                        <div className="bg-[#00351D] p-5 md:p-6 flex flex-col gap-4">
+                          <img src={paychainLogoWhite} alt="PayChain" className="h-4 object-contain" />
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
+                                <span className="material-symbols-outlined text-emerald-400">payments</span>
+                              </div>
+                              <div>
+                                <p className="text-[9px] text-white/40 font-black uppercase tracking-widest leading-none mb-1">Receipt No.</p>
+                                <p className="text-xs font-black text-white tracking-widest uppercase">{receipt.id}</p>
+                              </div>
                             </div>
-                            <div>
-                              <p className="text-[9px] text-white/40 font-black uppercase tracking-widest leading-none mb-1">Receipt No.</p>
-                              <p className="text-xs font-black text-white tracking-widest uppercase">{receipt.id}</p>
-                            </div>
+                            <button
+                              onClick={() => downloadReceipt(receipt)}
+                              className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center text-white/40 hover:text-emerald-400 hover:bg-white/10 transition-all"
+                            >
+                              <span className="material-symbols-outlined text-lg">download</span>
+                            </button>
                           </div>
-                          <button 
-                            onClick={() => downloadReceipt(receipt)}
-                            className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center text-white/40 hover:text-emerald-400 hover:bg-white/10 transition-all"
-                          >
-                            <span className="material-symbols-outlined text-lg">download</span>
-                          </button>
                         </div>
                         <div className="p-5 md:p-8 space-y-5 md:space-y-6">
                           <div className="flex flex-col sm:flex-row sm:justify-between items-start sm:items-center gap-3 sm:gap-0">
@@ -1382,7 +1395,7 @@ export default function BulkPay() {
                              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
                              <span className="text-[9px] font-black text-emerald-700 uppercase tracking-widest">Settled</span>
                           </div>
-                          <p className="text-[10px] text-on-surface-variant font-bold opacity-30 italic">PayChainKE Finance</p>
+                          <img src={paychainLogo} alt="PayChain" className="h-4 object-contain opacity-40" />
                         </div>
                       </div>
                     ))}
@@ -2007,7 +2020,7 @@ export default function BulkPay() {
                         {/* Inv Header */}
                         <div className="flex justify-between items-start mb-16">
                            <div>
-                              <img src={paychainLogo} alt="PayChain Logo" className="h-10 mb-4 object-contain contrast-125 saturate-150" />
+                              <img src={paychainLogo} alt="PayChain Logo" className="h-9 mb-4 object-contain" />
                               <h2 className="font-headline text-lg font-bold text-primary">{merchant?.businessName || 'PayChain'}</h2>
                               <p className="text-xs text-on-surface-variant mt-1 max-w-[150px] break-words">{merchant?.email || 'Nairobi, Kenya'}</p>
                               <p className="text-xs text-on-surface-variant max-w-[150px]">{merchant?.phone}</p>
