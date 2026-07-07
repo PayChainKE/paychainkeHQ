@@ -220,6 +220,13 @@ const merchantSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  // Bumped whenever "Sign Out All Devices" runs. Embedded in every issued JWT
+  // (see generateToken) — a token whose tokenVersion doesn't match this value
+  // is treated as revoked, even though JWTs are otherwise stateless.
+  tokenVersion: {
+    type: Number,
+    default: 0,
+  },
 }, {
   timestamps: true
 });

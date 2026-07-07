@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import Merchant from '../models/Merchant.js';
+import AuditLog from '../models/AuditLog.js';
 import { sendOTP, sendWelcomeEmail, sendPasswordResetConfirmation } from '../utils/resend.js';
 import { logAudit } from '../utils/auditLog.js';
 import generateToken from '../utils/generateToken.js';
@@ -199,7 +200,7 @@ export const verifyMerchantOTP = async (req, res) => {
         biometricsEnabled: merchant.biometricsEnabled,
         features: merchant.features
       },
-      token: generateToken(merchant._id)
+      token: generateToken(merchant._id, '30d', { tokenVersion: merchant.tokenVersion || 0 })
     });
   } catch (error) {
     console.error('Verify Merchant OTP Error:', error);
@@ -376,7 +377,7 @@ export const biometricLogin = async (req, res) => {
         biometricsEnabled: merchant.biometricsEnabled,
         features: merchant.features
       },
-      token: generateToken(merchant._id)
+      token: generateToken(merchant._id, '30d', { tokenVersion: merchant.tokenVersion || 0 })
     });
   } catch (error) {
     console.error('Biometric Login Error:', error);
@@ -746,6 +747,58 @@ export const updateSecurityQuestions = async (req, res) => {
     res.json({ success: true, message: 'Security questions saved successfully' });
   } catch (error) {
     console.error('Update Security Questions Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Recent account-security activity (logins, password/PIN/security-question
+//          changes) — sourced from the same audit trail admins see, scoped to
+//          this merchant only.
+// @route   GET /api/auth/merchant/security-history
+// @access  Private (Merchant)
+export const getSecurityHistory = async (req, res) => {
+  try {
+    const events = await AuditLog.find({
+      merchantId: req.merchant._id,
+      category: { $in: ['auth', 'security'] },
+    })
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .select('action message severity ip userAgent platform createdAt')
+      .lean();
+
+    res.json({ success: true, events });
+  } catch (error) {
+    console.error('Get Security History Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Sign out every device/session by invalidating all previously
+//          issued JWTs at once (bumps tokenVersion — see generateToken /
+//          protectMerchant). This also signs out the session making the
+//          request; the client should clear its local token immediately.
+// @route   POST /api/auth/merchant/sign-out-all-devices
+// @access  Private (Merchant)
+export const signOutAllDevices = async (req, res) => {
+  try {
+    const merchant = await Merchant.findById(req.merchant._id);
+    if (!merchant) {
+      return res.status(404).json({ error: 'Merchant not found' });
+    }
+
+    merchant.tokenVersion = (merchant.tokenVersion || 0) + 1;
+    await merchant.save();
+
+    logAudit({
+      action: 'merchant.sessions.revoked_all', category: 'security', severity: 'critical',
+      message: 'Signed out of all devices',
+      merchant, req,
+    });
+
+    res.json({ success: true, message: 'Signed out of all devices' });
+  } catch (error) {
+    console.error('Sign Out All Devices Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };
