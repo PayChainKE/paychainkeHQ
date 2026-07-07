@@ -21,6 +21,8 @@ import {
   verifyResetOTP,
   resetPassword,
   changeMerchantPassword,
+  getSecurityQuestions,
+  updateSecurityQuestions,
   getMerchantMe,
   updateMerchantProfile,
   toggleBiometrics,
@@ -95,6 +97,8 @@ router.post('/merchant/reset-password',   merchantOtpLimiter,   resetPassword);
 router.get('/merchant/setup-password/:token', validateSetupToken);
 router.post('/merchant/setup-password', merchantOtpLimiter, setupPassword);
 router.put('/merchant/change-password', protectMerchant, changeMerchantPassword);
+router.get('/merchant/security-questions', protectMerchant, getSecurityQuestions);
+router.put('/merchant/security-questions', protectMerchant, updateSecurityQuestions);
 router.get('/merchant/me', protectMerchant, getMerchantMe);
 router.put('/merchant/profile', protectMerchant, updateMerchantProfile);
 router.put('/merchant/biometrics', protectMerchant, toggleBiometrics);

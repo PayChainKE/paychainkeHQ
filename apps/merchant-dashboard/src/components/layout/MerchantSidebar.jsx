@@ -28,8 +28,8 @@ const baseNavItems = [
     showOverview: false,
   },
   { name: 'My Tills', icon: 'point_of_sale', path: '/tills' },
-  { name: 'Support', icon: 'help_outline', path: '/support' },
   { name: 'Settings', icon: 'settings', path: '/profile' },
+  { name: 'Support', icon: 'help_outline', path: '/support' },
 ]
 
 function NavItem({ item, depth = 0 }) {

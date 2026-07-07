@@ -194,6 +194,16 @@ const merchantSchema = new mongoose.Schema({
     select: false,
     default: null,
   },
+  // Identity-recovery security questions. Answers are bcrypt-hashed and
+  // never returned to the client — only the question text is exposed.
+  securityQuestions: {
+    type: [{
+      question:   { type: String, required: true },
+      answerHash: { type: String, required: true },
+    }],
+    select: false,
+    default: [],
+  },
   otp: {
     type: String,
     default: null,

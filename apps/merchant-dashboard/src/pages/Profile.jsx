@@ -1,10 +1,16 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import { useToast } from '../context/NotificationContext'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { ValidatedInput } from '../components/ValidatedInput'
 import axios from 'axios'
+
+const DEFAULT_SECURITY_QUESTIONS = [
+  "What is the name of the first school you attended?",
+  "What is the name of your favorite musician or band?",
+  "What was the make and model of your first car?"
+]
 
 export default function Profile() {
   const { showAmounts } = usePrivacyMode()
@@ -19,16 +25,88 @@ export default function Profile() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isUpdatingSecurity, setIsUpdatingSecurity] = useState(false)
-  
+
   // PIN Reset states
   const [currentPin, setCurrentPin] = useState('')
   const [newPin, setNewPin] = useState('')
   const [confirmNewPin, setConfirmNewPin] = useState('')
   const [isResettingPin, setIsResettingPin] = useState(false)
 
+  // Security Questions states
+  const [questionsConfig, setQuestionsConfig] = useState({ configured: false, count: 0, questions: DEFAULT_SECURITY_QUESTIONS })
+  const [isLoadingQuestions, setIsLoadingQuestions] = useState(false)
+  const [questionAnswers, setQuestionAnswers] = useState(['', '', ''])
+  const [questionsPassword, setQuestionsPassword] = useState('')
+  const [isSavingQuestions, setIsSavingQuestions] = useState(false)
+
   const [kraPinLocked, setKraPinLocked] = useState(!!merchant?.kraPin)
   const [businessNumberLocked, setBusinessNumberLocked] = useState(!!merchant?.businessNumber)
   const toast = useToast()
+
+  const fetchSecurityQuestions = useCallback(async () => {
+    setIsLoadingQuestions(true)
+    try {
+      const token = localStorage.getItem('paychain_merchant_token')
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+      const res = await axios.get(`${API_URL}/api/auth/merchant/security-questions`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (res.data.success) {
+        setQuestionsConfig({
+          configured: res.data.configured,
+          count: res.data.count,
+          questions: res.data.configured ? res.data.questions : DEFAULT_SECURITY_QUESTIONS,
+        })
+      }
+    } catch (err) {
+      // Non-fatal — fall back to the default question set already in state
+    } finally {
+      setIsLoadingQuestions(false)
+    }
+  }, [])
+
+  useEffect(() => { fetchSecurityQuestions() }, [fetchSecurityQuestions])
+
+  async function handleSecurityQuestionsSave() {
+    if (questionAnswers.some((a) => !a.trim())) {
+      toast.push({ message: 'Please answer all 3 security questions', type: 'error' })
+      return
+    }
+    if (!questionsPassword) {
+      toast.push({ message: 'Please confirm your current password', type: 'error' })
+      return
+    }
+
+    setIsSavingQuestions(true)
+    try {
+      const token = localStorage.getItem('paychain_merchant_token')
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+      const res = await axios.put(`${API_URL}/api/auth/merchant/security-questions`, {
+        questions: questionsConfig.questions.map((question, i) => ({ question, answer: questionAnswers[i] })),
+        currentPassword: questionsPassword,
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+
+      if (res.data.success) {
+        toast.push({ message: 'Security questions synchronized', type: 'success' })
+        setShowQuestions(false)
+        setQuestionAnswers(['', '', ''])
+        setQuestionsPassword('')
+        fetchSecurityQuestions()
+      }
+    } catch (err) {
+      toast.push({ message: err.response?.data?.error || 'Failed to update security questions', type: 'error' })
+    } finally {
+      setIsSavingQuestions(false)
+    }
+  }
+
+  function closeQuestions() {
+    setShowQuestions(false)
+    setQuestionAnswers(['', '', ''])
+    setQuestionsPassword('')
+  }
 
   async function save() {
     setIsUpdatingProfile(true)
@@ -380,7 +458,9 @@ export default function Profile() {
                           </div>
                           <div className="text-left">
                             <p className="text-sm font-black text-white">Security Questions</p>
-                            <p className="text-[10px] text-white/30 font-medium">3 questions configured</p>
+                            <p className="text-[10px] text-white/30 font-medium">
+                              {isLoadingQuestions ? 'Loading…' : questionsConfig.configured ? `${questionsConfig.count} questions configured` : 'Not configured yet'}
+                            </p>
                           </div>
                         </div>
                         <span className="material-symbols-outlined text-white/20">chevron_right</span>
@@ -423,7 +503,7 @@ export default function Profile() {
                   <div className="flex items-center justify-between mb-8">
                     <div className="flex items-center gap-4">
                       <button 
-                        onClick={() => setShowQuestions(false)}
+                        onClick={closeQuestions}
                         className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-white/40 hover:text-white transition-colors"
                       >
                         <span className="material-symbols-outlined">arrow_back</span>
@@ -441,42 +521,67 @@ export default function Profile() {
                     </p>
                   </div>
 
+                  {questionsConfig.configured && (
+                    <div className="bg-amber-500/5 border border-amber-500/10 p-4 sm:p-5 rounded-2xl mb-6 lg:mb-8 shrink-0">
+                      <p className="text-[11px] sm:text-xs text-amber-200/60 font-medium leading-relaxed">
+                        You already have {questionsConfig.count} questions on file. Submitting below replaces all of them — for your security, previous answers are never shown back to you.
+                      </p>
+                    </div>
+                  )}
+
                   <div className="space-y-6 overflow-y-auto pr-2 custom-scrollbar flex-1 min-h-0">
-                    {[
-                      "What is the name of the first school you attended?",
-                      "What is the name of your favorite musician or band?",
-                      "What was the make and model of your first car?"
-                    ].map((q, i) => (
+                    {questionsConfig.questions.map((q, i) => (
                       <div key={i} className="space-y-3">
                         <label className="text-[10px] text-white/30 font-black uppercase tracking-widest flex items-center gap-2">
                           <span className="w-1 h-1 rounded-full bg-emerald-500"></span>
                           Question {i + 1}
                         </label>
                         <p className="text-sm font-black text-white px-1">{q}</p>
-                        <input 
+                        <input
                           type="text"
+                          value={questionAnswers[i]}
+                          onChange={(e) => setQuestionAnswers((prev) => prev.map((a, idx) => idx === i ? e.target.value : a))}
                           placeholder="Provide your answer"
-                          className="w-full bg-white/5 border border-white/10 rounded-xl py-3.5 px-5 text-sm font-medium text-white focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 outline-none transition-all placeholder:text-white/10"
+                          disabled={isSavingQuestions}
+                          className="w-full bg-white/5 border border-white/10 rounded-xl py-3.5 px-5 text-sm font-medium text-white focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 outline-none transition-all placeholder:text-white/10 disabled:opacity-50"
                         />
                       </div>
                     ))}
+                    <div className="space-y-3">
+                      <label className="text-[10px] text-white/30 font-black uppercase tracking-widest flex items-center gap-2">
+                        <span className="w-1 h-1 rounded-full bg-amber-500"></span>
+                        Confirm your password
+                      </label>
+                      <input
+                        type="password"
+                        value={questionsPassword}
+                        onChange={(e) => setQuestionsPassword(e.target.value)}
+                        placeholder="••••••••••••"
+                        disabled={isSavingQuestions}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl py-3.5 px-5 text-sm font-medium text-white focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 outline-none transition-all placeholder:text-white/10 disabled:opacity-50"
+                      />
+                    </div>
                   </div>
 
                   <div className="mt-8 lg:mt-10 flex justify-end gap-3 sm:gap-4 shrink-0 border-t border-white/5 pt-6">
-                    <button 
-                      onClick={() => setShowQuestions(false)}
-                      className="px-8 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest text-white/40 hover:text-white transition-all underline decoration-emerald-500/20 underline-offset-8"
+                    <button
+                      onClick={closeQuestions}
+                      disabled={isSavingQuestions}
+                      className="px-8 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest text-white/40 hover:text-white transition-all underline decoration-emerald-500/20 underline-offset-8 disabled:opacity-50"
                     >
                       Go back
                     </button>
-                    <button 
-                      onClick={() => {
-                        setShowQuestions(false)
-                        toast.push({ message: 'Security questions synchronized' })
-                      }}
-                      className="bg-emerald-500 text-[#06201B] px-10 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-2xl hover:bg-white transition-all active:scale-95"
+                    <button
+                      onClick={handleSecurityQuestionsSave}
+                      disabled={isSavingQuestions}
+                      className="bg-emerald-500 text-[#06201B] px-10 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-2xl hover:bg-white transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
                     >
-                      Submit
+                      {isSavingQuestions ? (
+                        <>
+                          <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>
+                          Saving...
+                        </>
+                      ) : 'Submit'}
                     </button>
                   </div>
                 </div>
