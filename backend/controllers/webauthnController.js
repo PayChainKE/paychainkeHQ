@@ -6,7 +6,7 @@ import {
 } from '@simplewebauthn/server';
 import Merchant from '../models/Merchant.js';
 import generateToken from '../utils/generateToken.js';
-import { logAudit } from '../utils/auditLog.js';
+import { logAudit, clipUa, detectPlatform } from '../utils/auditLog.js';
 
 // ── Relying Party (RP) Configuration ────────────────────────────────────────
 // To go live, set these env vars on Render/Vercel:
@@ -100,6 +100,8 @@ export const verifyRegistration = async (req, res) => {
       deviceType:   credentialDeviceType,
       backedUp:     credentialBackedUp,
       transports:   req.body.response?.transports ?? [],
+      userAgent:    clipUa(req),
+      platform:     detectPlatform(req),
       createdAt:    new Date(),
       lastUsed:     null,
     };
@@ -288,6 +290,8 @@ export const getPasskeys = async (req, res) => {
       deviceType:   p.deviceType,
       backedUp:     p.backedUp,
       transports:   p.transports,
+      userAgent:    p.userAgent,
+      platform:     p.platform,
       createdAt:    p.createdAt,
       lastUsed:     p.lastUsed,
     }));

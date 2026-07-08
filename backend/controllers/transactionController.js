@@ -7,7 +7,7 @@ import STKRequest from '../models/STKRequest.js';
 import { settleInflationShield, provisionMerchantWallet, getWalletBalance, swapUsdcToKesOnChain } from '../utils/stellarHelper.js';
 import { encryptKey } from '../utils/cryptoHelper.js';
 import { getLiveKesToUsdcRate } from '../utils/rateEngine.js';
-import { sendWalletActivationEmail } from '../utils/resend.js';
+import { sendWalletActivationEmail, sendStatementEmail } from '../utils/resend.js';
 import { createNotification } from './notificationController.js';
 
 // @desc    Get merchant transactions
@@ -22,6 +22,32 @@ export const getTransactions = async (req, res) => {
   } catch (error) {
     console.error('❌ Error fetching transactions:', error);
     res.status(500).json({ error: 'Server Error: Failed to fetch transactions' });
+  }
+};
+
+// @desc    Email the merchant a copy of the statement PDF they just
+//          generated in the dashboard (same document, not regenerated).
+// @route   POST /api/transactions/statement/email
+// @access  Private
+export const emailStatement = async (req, res) => {
+  try {
+    const { pdfBase64, periodLabel, filename } = req.body;
+
+    if (!pdfBase64) return res.status(400).json({ error: 'No statement PDF was provided.' });
+    if (!req.merchant.email) return res.status(400).json({ error: 'No email address is on file for this account.' });
+
+    await sendStatementEmail({
+      to: req.merchant.email,
+      businessName: req.merchant.businessName,
+      periodLabel: periodLabel || 'All transactions',
+      pdfBase64,
+      filename,
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Error emailing statement:', error);
+    res.status(500).json({ error: 'Failed to email the statement.' });
   }
 };
 
@@ -388,9 +414,9 @@ export const generatePaymentLink = async (req, res) => {
     // Generate secure 8-character ID
     const linkId = crypto.randomBytes(4).toString('hex');
     
-    // Set exactly 24 hours expiration
+    // Every payment link on the platform expires exactly 48 hours after creation.
     const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 24);
+    expiresAt.setHours(expiresAt.getHours() + 48);
 
     const paymentLink = await PaymentLink.create({
       merchantId: merchant._id,
@@ -529,20 +555,16 @@ export const processPaymentLink = async (req, res) => {
     await STKRequest.create({
       merchantId: link.merchantId._id,
       checkoutRequestId,
+      linkId: link.linkId,
       amount: link.amount,
       phone: formattedPhone,
       status: 'pending'
     });
 
-    link.status = 'paid';
-    await link.save();
-
-    createNotification({
-      merchantId: link.merchantId._id,
-      kind: 'payment',
-      title: 'Payment link paid',
-      message: `Your KES ${link.amount.toLocaleString()} payment link was paid by a customer.`,
-    });
+    // Do NOT mark the link/invoice paid here — the customer has only just
+    // received the STK prompt and may still cancel or fail to enter their
+    // PIN. The real Safaricom confirmation lands on stkCallback, which
+    // resolves this STKRequest by linkId and flips status there.
 
     res.status(200).json({ success: true, checkoutRequestId, message: 'STK Push sent to phone' });
 

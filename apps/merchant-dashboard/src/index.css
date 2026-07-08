@@ -1,6 +1,11 @@
 @import "tailwindcss";
 
-:root {
+/* Tailwind v4 only turns theme tokens into utilities (bg-, text-, border-, etc.)
+   when they're declared inside @theme — a plain :root block (what used to
+   be here) defines the CSS variables but silently generates no utility
+   classes for them. That was invisibly breaking every bg-primary, text-primary,
+   font-headline, etc. utility in the app (e.g. white-on-white buttons). */
+@theme {
   --color-primary: #00351d;
   --color-primary-container: #0b4d2e;
   --color-primary-fixed-dim: #86f8c9;
@@ -19,15 +24,29 @@
   --color-outline-variant: #bfc9bf;
   --color-border-offwhite: #E5E7EB; /* Subtle off-white border */
   --color-error: #ba1a1a;
-  
-  --color-editorial-shadow: 0px 8px 32px rgba(0, 53, 29, 0.05);
-  --color-premium-glow: 0px 4px 24px rgba(0, 108, 78, 0.12);
-  
+
   --font-headline: "DM Serif Display", serif;
   --font-body: "Plus Jakarta Sans", sans-serif;
 }
 
+:root {
+  /* Box-shadow values, not colors — kept out of @theme so Tailwind doesn't
+     mistake them for color tokens and generate bogus bg-/text- utilities. */
+  --color-editorial-shadow: 0px 8px 32px rgba(0, 53, 29, 0.05);
+  --color-premium-glow: 0px 4px 24px rgba(0, 108, 78, 0.12);
+}
+
 @layer base {
+  /* 87.5% (≈14px) instead of the browser default 16px root. Every Tailwind
+     text-* size (text-sm, text-2xl, text-4xl, ...) is defined in rem, so
+     this scales every heading/body/label across every page down together
+     in one place — the alternative would be manually shrinking hundreds of
+     className strings across dozens of files, which risks landing on an
+     inconsistent size scale from page to page. */
+  html {
+    font-size: 87.5%;
+  }
+
   body {
     background-color: var(--color-surface);
     color: var(--color-on-surface);
@@ -126,6 +145,7 @@
     overflow: hidden;
     white-space: nowrap;
     line-height: 1;
+    -webkit-user-select: none;
     user-select: none;
   }
 
@@ -155,4 +175,5 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 input[type="number"] {
   -moz-appearance: textfield;
+  appearance: textfield;
 }

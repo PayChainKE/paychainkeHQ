@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import axios from 'axios'
 import MerchantLayout from '../components/layout/MerchantLayout'
+import CalendarRangePicker from '../components/ui/CalendarRangePicker'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { formatDateISO } from '../utils/formatDate'
 import { formatKES, formatUSDC } from '../utils/formatCurrency'
@@ -70,7 +71,93 @@ export default function Transactions() {
     currentPage * itemsPerPage
   )
 
-  const handleExport = () => {
+  // ── Statement export: period selection ────────────────────────────────
+  const [showExportModal, setShowExportModal] = useState(false)
+  const [exportPreset, setExportPreset] = useState('30d')
+  const [customFrom, setCustomFrom] = useState(null)
+  const [customTo, setCustomTo] = useState(null)
+
+  const EXPORT_PRESETS = [
+    { key: '7d',   label: 'Last 7 Days' },
+    { key: '30d',  label: 'Last 30 Days' },
+    { key: 'month', label: 'This Month' },
+    { key: 'year', label: 'This Year' },
+    { key: 'all',  label: 'All Time' },
+    { key: 'custom', label: 'Custom Range' },
+  ]
+
+  const resolveExportRange = () => {
+    const now = new Date()
+    const endOfToday = new Date(now); endOfToday.setHours(23, 59, 59, 999)
+
+    if (exportPreset === '7d') {
+      const from = new Date(now); from.setDate(from.getDate() - 7); from.setHours(0, 0, 0, 0)
+      return { from, to: endOfToday }
+    }
+    if (exportPreset === '30d') {
+      const from = new Date(now); from.setDate(from.getDate() - 30); from.setHours(0, 0, 0, 0)
+      return { from, to: endOfToday }
+    }
+    if (exportPreset === 'month') {
+      return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: endOfToday }
+    }
+    if (exportPreset === 'year') {
+      return { from: new Date(now.getFullYear(), 0, 1), to: endOfToday }
+    }
+    if (exportPreset === 'custom') {
+      const from = customFrom ? new Date(customFrom.getFullYear(), customFrom.getMonth(), customFrom.getDate(), 0, 0, 0) : null
+      const to = customTo ? new Date(customTo.getFullYear(), customTo.getMonth(), customTo.getDate(), 23, 59, 59) : endOfToday
+      return { from, to }
+    }
+    return { from: null, to: null } // All Time
+  }
+
+  const formatPeriodLabel = (from, to) => {
+    const fmt = (d) => d.toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })
+    if (!from && !to) return 'All transactions'
+    if (from && to) return `${fmt(from)} – ${fmt(to)}`
+    if (from) return `From ${fmt(from)}`
+    return `Up to ${fmt(to)}`
+  }
+
+  const confirmExport = async () => {
+    const { from, to } = resolveExportRange()
+
+    if (exportPreset === 'custom' && from && to && from > to) {
+      addNotification({ type: 'error', title: 'Invalid Range', message: 'The "from" date must be before the "to" date.' })
+      return
+    }
+
+    const rows = liveTransactions.filter(t => {
+      const d = new Date(t.createdAt || t.timestamp)
+      if (from && d < from) return false
+      if (to && d > to) return false
+      return true
+    })
+
+    if (rows.length === 0) {
+      addNotification({ type: 'error', title: 'No Transactions', message: 'No transactions were found in the selected period.' })
+      return
+    }
+
+    const periodLabel = formatPeriodLabel(from, to)
+    const { pdfBase64, filename } = handleExport(rows, periodLabel)
+    setShowExportModal(false)
+
+    try {
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+      const token = localStorage.getItem('paychain_merchant_token')
+      await axios.post(`${API_URL}/api/transactions/statement/email`, { pdfBase64, periodLabel, filename }, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      addNotification({ type: 'success', title: 'Statement Emailed', message: 'A copy was also sent to your registered email address.' })
+    } catch (err) {
+      console.error('Failed to email statement:', err)
+      addNotification({ type: 'error', title: 'Email Failed', message: 'The statement downloaded fine, but we could not email you a copy.' })
+    }
+  }
+
+  const handleExport = (rows, periodLabel) => {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
     const W = doc.internal.pageSize.getWidth()   // 210
     const H = doc.internal.pageSize.getHeight()  // 297
@@ -78,6 +165,18 @@ export default function Transactions() {
     const R = W - 14 // right margin
     const now = new Date()
     const statementId = `PC-${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}-${Math.random().toString(36).slice(2,8).toUpperCase()}`
+
+    // Truncates with an ellipsis at the current font/size if `text` would
+    // overflow `maxWidth` — prevents long emails/names from bleeding past
+    // their column and overlapping whatever's printed next to them.
+    const fitText = (text, maxWidth) => {
+      let str = String(text ?? '')
+      if (doc.getTextWidth(str) <= maxWidth) return str
+      while (str.length > 1 && doc.getTextWidth(str + '…') > maxWidth) {
+        str = str.slice(0, -1)
+      }
+      return str + '…'
+    }
 
     // ── HEADER BAND ─────────────────────────────────────────────────────────
     doc.setFillColor(6, 32, 27)   // #06201B
@@ -120,31 +219,32 @@ export default function Transactions() {
     const acctLines = [
       ['Account Name',   merchant?.name        || '—', 'Business',   merchant?.businessName || '—'],
       ['Paybill / Acc',  `400200 / ${merchant?.paybillAccount || '—'}`, 'Email', merchant?.email || '—'],
-      ['Phone',          merchant?.phone        || '—', 'Statement Period', 'All transactions'],
+      ['Phone',          merchant?.phone        || '—', 'Statement Period', periodLabel],
     ]
     acctLines.forEach(([lk, lv, rk, rv]) => {
       doc.setTextColor(100, 110, 105); doc.setFont('helvetica', 'normal')
       doc.text(lk + ':', L, y)
       doc.setTextColor(6, 32, 27); doc.setFont('helvetica', 'bold')
-      doc.text(String(lv), L + 32, y)
+      doc.text(fitText(lv, col2 - (L + 32) - 4), L + 32, y)
       doc.setTextColor(100, 110, 105); doc.setFont('helvetica', 'normal')
       doc.text(rk + ':', col2, y)
       doc.setTextColor(6, 32, 27); doc.setFont('helvetica', 'bold')
-      doc.text(String(rv), col2 + 30, y)
+      doc.text(fitText(rv, R - (col2 + 30)), col2 + 30, y)
       y += 7
     })
 
     // ── SUMMARY STRIP ────────────────────────────────────────────────────────
-    const totalIn   = filteredRows.filter(t => t.type === 'inbound').reduce((s, o) => s + (o.amount || 0), 0)
-    const totalOut  = filteredRows.filter(t => ['bulk_pay','settlement','outbound'].includes(t.type)).reduce((s, o) => s + (o.amount || 0), 0)
+    const totalIn   = rows.filter(t => t.type === 'inbound').reduce((s, o) => s + (o.amount || 0), 0)
+    const totalOut  = rows.filter(t => ['bulk_pay','settlement','outbound'].includes(t.type)).reduce((s, o) => s + (o.amount || 0), 0)
     const fmtKES    = (n) => `KES ${Number(n).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    const fmtNum    = (n) => Number(n).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
     y += 3
     const summaryItems = [
       { label: 'Total Money In',  value: fmtKES(totalIn),  color: [6, 32, 27] },
       { label: 'Total Money Out', value: fmtKES(totalOut), color: [180, 30, 30] },
       { label: 'Net Position',    value: fmtKES(totalIn - totalOut), color: totalIn >= totalOut ? [6, 32, 27] : [180, 30, 30] },
-      { label: 'Transactions',    value: String(filteredRows.length), color: [40, 80, 120] },
+      { label: 'Transactions',    value: String(rows.length), color: [40, 80, 120] },
     ]
     const boxW = (R - L) / summaryItems.length - 2
     summaryItems.forEach((item, i) => {
@@ -162,11 +262,11 @@ export default function Transactions() {
     doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(6, 32, 27)
     doc.text('Transaction Ledger', L, y)
     doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(120, 130, 125)
-    doc.text(`${filteredRows.length} record${filteredRows.length !== 1 ? 's' : ''}`, R, y, { align: 'right' })
+    doc.text(`${rows.length} record${rows.length !== 1 ? 's' : ''}`, R, y, { align: 'right' })
 
     // Build rows with running balance
     let runBalance = 0
-    const tableRows = [...filteredRows]
+    const tableRows = [...rows]
       .sort((a, b) => new Date(a.createdAt || a.timestamp) - new Date(b.createdAt || b.timestamp))
       .map(tx => {
         const dt = new Date(tx.createdAt || tx.timestamp)
@@ -178,14 +278,16 @@ export default function Transactions() {
         const rawAmt = tx.amount || tx.kesAmount || 0
 
         let paidIn = '', paidOut = ''
-        if (isIn)  { paidIn  = fmtKES(rawAmt); runBalance += rawAmt }
-        if (isOut) { paidOut = fmtKES(rawAmt); runBalance -= rawAmt }
-        if (isSwp) { paidOut = fmtKES(tx.kesAmount || 0); runBalance -= (tx.kesAmount || 0) }
+        if (isIn)  { paidIn  = fmtNum(rawAmt); runBalance += rawAmt }
+        if (isOut) { paidOut = fmtNum(rawAmt); runBalance -= rawAmt }
+        if (isSwp) { paidOut = fmtNum(tx.kesAmount || 0); runBalance -= (tx.kesAmount || 0) }
 
+        // Standard PDF Helvetica has no glyph for "→" — it renders as garbage.
+        // Use a plain ASCII arrow here (the on-screen UI still uses the real one).
         const desc = isSwp
-          ? `FX Swap → ${tx.usdcAmount || 0} USDC`
+          ? `FX Swap -> ${tx.usdcAmount || 0} USDC`
           : (tx.sender?.name !== tx.recipient?.name
-              ? `${tx.sender?.name || '—'} → ${tx.recipient?.name || '—'}`
+              ? `${tx.sender?.name || '—'} -> ${tx.recipient?.name || '—'}`
               : tx.sender?.name || tx.recipient?.name || '—')
 
         return [
@@ -194,20 +296,26 @@ export default function Transactions() {
           desc.slice(0, 32),
           paidIn,
           paidOut,
-          fmtKES(runBalance),
+          fmtNum(runBalance),
           (tx.status || '').toUpperCase().slice(0, 9),
         ]
       })
 
+    // Column widths are sized to the verified printable width (R - L = 182mm)
+    // and to the measured worst-case text width of their content at this
+    // font size, so no cell can overflow into its neighbour. Amounts drop
+    // the "KES" prefix per-cell (it's on the column header instead) — that
+    // alone was the difference between fitting and overflowing.
     autoTable(doc, {
       startY: y + 4,
-      head: [['DATE / TIME', 'REF', 'DESCRIPTION', 'PAID IN', 'PAID OUT', 'BALANCE', 'STATUS']],
+      head: [['DATE/TIME', 'REF', 'DESCRIPTION', 'PAID IN (KES)', 'PAID OUT (KES)', 'BALANCE (KES)', 'STATUS']],
       body: tableRows,
       theme: 'plain',
+      tableWidth: R - L,
       headStyles: {
         fillColor: [6, 32, 27],
         textColor: [255, 255, 255],
-        fontSize: 7.5,
+        fontSize: 6.8,
         fontStyle: 'bold',
         cellPadding: { top: 4, bottom: 4, left: 3, right: 3 },
         halign: 'left',
@@ -220,16 +328,17 @@ export default function Transactions() {
         lineColor: [230, 235, 232],
         lineWidth: 0.2,
         valign: 'middle',
+        overflow: 'linebreak',
       },
       alternateRowStyles: { fillColor: [246, 249, 247] },
       columnStyles: {
-        0: { cellWidth: 22, halign: 'left',  fontStyle: 'normal' },
-        1: { cellWidth: 24, halign: 'left',  fontStyle: 'normal', fontSize: 6.5 },
-        2: { cellWidth: 55, halign: 'left' },
+        0: { cellWidth: 20, halign: 'left',  fontStyle: 'normal' },
+        1: { cellWidth: 28, halign: 'left',  fontStyle: 'normal', fontSize: 6.5 },
+        2: { cellWidth: 32, halign: 'left' },
         3: { cellWidth: 26, halign: 'right', textColor: [6, 120, 60], fontStyle: 'bold' },
         4: { cellWidth: 26, halign: 'right', textColor: [160, 30, 30], fontStyle: 'bold' },
-        5: { cellWidth: 26, halign: 'right', fontStyle: 'bold' },
-        6: { cellWidth: 18, halign: 'center', fontSize: 6.5 },
+        5: { cellWidth: 28, halign: 'right', fontStyle: 'bold' },
+        6: { cellWidth: 22, halign: 'center', fontSize: 6.5 },
       },
       // Green highlight for paid-in cells, red for paid-out
       didParseCell(data) {
@@ -274,8 +383,14 @@ export default function Transactions() {
     doc.text('This is a computer-generated statement and requires no signature. For support: support@paychain.co.ke | +254 790 889 066', W / 2, footerY, { align: 'center' })
     doc.text(`© ${now.getFullYear()} PayChain Kenya Limited  •  Ref: ${statementId}  •  Page 1 of ${doc.internal.getNumberOfPages()}`, W / 2, footerY + 5, { align: 'center' })
 
-    doc.save(`PayChain_Statement_${now.toISOString().slice(0,10)}.pdf`)
+    const filename = `PayChain_Statement_${now.toISOString().slice(0,10)}.pdf`
+    doc.save(filename)
     addNotification({ type: 'notifications', title: 'Statement Downloaded', message: 'Your official transaction statement has been downloaded.' })
+
+    // Hand back the exact same PDF (as base64) so the caller can also email
+    // this merchant a copy — same document, not a separately regenerated one.
+    const pdfBase64 = doc.output('datauristring').split(',')[1]
+    return { pdfBase64, filename }
   }
 
   const generateAuditReceipt = () => {
@@ -498,11 +613,11 @@ export default function Transactions() {
               />
             </div>
             <button 
-              onClick={handleExport}
+              onClick={() => setShowExportModal(true)}
               className="bg-[#0A2540] backdrop-blur-md border border-white/10 text-blue-100 p-3 rounded-full transition-all flex items-center justify-center gap-2 md:px-6 shadow-xl hover:bg-[#0C2D4E] hover:text-white active:scale-95 duration-200 group shrink-0"
             >
               <span className="material-symbols-outlined text-lg transition-transform group-hover:-translate-y-0.5 text-blue-300">download</span>
-              <span className="text-xs font-black uppercase tracking-[0.2em] hidden md:inline">Export</span>
+              <span className="text-xs font-black uppercase tracking-[0.2em] hidden md:inline">Download Statement</span>
             </button>
           </div>
         </div>
@@ -751,6 +866,80 @@ export default function Transactions() {
                   <p className="text-[9px] text-white/30 font-bold uppercase tracking-[0.2em] leading-relaxed">
                     This transaction is cryptographically signed and stored on the immutable ledger.
                   </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Export Statement Modal — period selection */}
+          {showExportModal && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+              <div
+                className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-fade-in"
+                onClick={() => setShowExportModal(false)}
+              ></div>
+
+              <div className={`relative w-full bg-white rounded-3xl border border-outline-variant/10 shadow-2xl animate-fade-in-up overflow-hidden transition-all duration-200 ${exportPreset === 'custom' ? 'max-w-2xl' : 'max-w-md'}`}>
+                <div className="px-6 lg:px-8 pt-6 lg:pt-8 pb-5 border-b border-outline-variant/10">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h3 className="text-lg font-headline font-bold text-primary">Download Statement</h3>
+                      <p className="text-xs text-on-surface-variant opacity-70 mt-1">Choose the period this statement should cover.</p>
+                    </div>
+                    <button
+                      onClick={() => setShowExportModal(false)}
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant/50 hover:bg-surface-container-low hover:text-primary transition-colors shrink-0"
+                    >
+                      <span className="material-symbols-outlined text-lg">close</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="px-6 lg:px-8 py-6 space-y-5">
+                  <div className="grid grid-cols-2 gap-2">
+                    {EXPORT_PRESETS.map((p) => (
+                      <button
+                        key={p.key}
+                        onClick={() => setExportPreset(p.key)}
+                        className={`px-4 py-2.5 text-xs font-bold rounded-xl border transition-all text-left ${
+                          exportPreset === p.key
+                            ? 'bg-primary text-white border-primary shadow-sm'
+                            : 'bg-white text-on-surface-variant border-outline-variant/20 hover:border-primary/30 hover:text-primary'
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {exportPreset === 'custom' && (
+                    <div className="pt-1">
+                      <p className="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest mb-2">Pick a start and end date</p>
+                      <CalendarRangePicker
+                        from={customFrom}
+                        to={customTo}
+                        maxDate={new Date()}
+                        onChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="px-6 lg:px-8 pb-6 lg:pb-8 flex items-center gap-3">
+                  <button
+                    onClick={() => setShowExportModal(false)}
+                    className="flex-1 py-3 rounded-xl text-sm font-bold text-on-surface-variant border border-outline-variant/20 hover:bg-surface-container-low transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmExport}
+                    disabled={exportPreset === 'custom' && !customFrom}
+                    className="flex-1 py-3 rounded-xl text-sm font-bold text-white bg-[#0A2540] hover:bg-[#0C2D4E] disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                  >
+                    <span className="material-symbols-outlined text-base">download</span>
+                    Download
+                  </button>
                 </div>
               </div>
             </div>

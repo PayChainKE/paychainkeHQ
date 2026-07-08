@@ -1,5 +1,5 @@
 import express from 'express';
-import { getTransactions, simulateIncomingPayment, swapKesToUsdc, activateWallet, getLiveRate, sendMoney, syncWalletBalance, generatePaymentLink, listPaymentLinks, getPaymentLink, processPaymentLink } from '../controllers/transactionController.js';
+import { getTransactions, simulateIncomingPayment, swapKesToUsdc, activateWallet, getLiveRate, sendMoney, syncWalletBalance, generatePaymentLink, listPaymentLinks, getPaymentLink, processPaymentLink, emailStatement } from '../controllers/transactionController.js';
 import { protectMerchant } from '../middleware/authMiddleware.js';
 import { generateToken } from '../controllers/mpesaController.js';
 
@@ -16,6 +16,8 @@ router.get('/payment-link', protectMerchant, listPaymentLinks);
 // Public Payment Link Routes
 router.get('/payment-link/:linkId', getPaymentLink);
 router.post('/payment-link/:linkId/pay', generateToken, processPaymentLink);
+
+router.post('/statement/email', protectMerchant, emailStatement);
 
 router.get('/live-rate', protectMerchant, getLiveRate);
 router.get('/', protectMerchant, getTransactions);

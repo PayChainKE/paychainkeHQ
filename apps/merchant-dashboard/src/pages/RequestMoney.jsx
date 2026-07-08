@@ -137,7 +137,7 @@ export default function RequestMoney() {
 
       if (res.data?.success) {
         setGeneratedLink(`${window.location.origin}/pay/${res.data.linkId}`)
-        addNotification({ title: 'Link Generated', message: 'Secure payment link created. Expires in 24 hours.', type: 'success' })
+        addNotification({ title: 'Link Generated', message: 'Secure payment link created. Expires in 48 hours.', type: 'success' })
         setStep(3)
       }
     } catch (err) {

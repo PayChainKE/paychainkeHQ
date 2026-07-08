@@ -366,7 +366,7 @@ export default function Wallet() {
       
       if (res.data?.success) {
         setGeneratedLink(`${window.location.origin}/pay/${res.data.linkId}`)
-        addToast({ title: 'Link Generated', message: 'Secure payment link created successfully! Expires in 24 hours.', type: 'success' })
+        addToast({ title: 'Link Generated', message: 'Secure payment link created successfully! Expires in 48 hours.', type: 'success' })
       }
     } catch (err) {
       addToast({ title: 'Generation Failed', message: err.response?.data?.error || 'Failed to generate secure payment link', type: 'error' })

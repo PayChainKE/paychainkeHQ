@@ -97,65 +97,79 @@ export default function Overview() {
     .slice(0, 5)
 
   // --- Dynamic Chart Data Aggregation ---
+  // Outbound set mirrors the "Total Money Out" convention used on the
+  // Transactions statement export, for consistency across the app.
+  const OUTBOUND_TYPES = ['bulk_pay', 'settlement', 'outbound'];
+
   const generateChartData = () => {
     const inboundTxs = liveTransactions.filter(t => t.type === 'inbound');
+    const outboundTxs = liveTransactions.filter(t => OUTBOUND_TYPES.includes(t.type));
     const now = new Date();
-    
+
+    const sumFor = (txs, matches) => txs
+      .filter(matches)
+      .reduce((sum, t) => sum + (t.kesAmount || t.amount || 0), 0);
+
     // Helper to format date
     const getDayName = (date) => ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][date.getDay()];
     const getMonthName = (date) => ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'][date.getMonth()];
 
     // 1. 7D Data
     const labels7D = [];
-    const data7D = [];
+    const inbound7D = [];
+    const outbound7D = [];
     for (let i = 6; i >= 0; i--) {
       const d = new Date(now);
       d.setDate(d.getDate() - i);
       labels7D.push(getDayName(d));
-      const daySum = inboundTxs
-        .filter(t => new Date(t.createdAt).toDateString() === d.toDateString())
-        .reduce((sum, t) => sum + (t.kesAmount || t.amount || 0), 0);
-      data7D.push(daySum);
+      const sameDay = (t) => new Date(t.createdAt).toDateString() === d.toDateString();
+      inbound7D.push(sumFor(inboundTxs, sameDay));
+      outbound7D.push(sumFor(outboundTxs, sameDay));
     }
 
     // 2. 30D Data (Last 4 weeks basically)
     const labels30D = ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
-    const data30D = [0, 0, 0, 0];
+    const inbound30D = [0, 0, 0, 0];
+    const outbound30D = [0, 0, 0, 0];
     const thirtyDaysAgo = new Date(now);
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 28);
-    
-    inboundTxs.forEach(t => {
-      const txDate = new Date(t.createdAt);
-      if (txDate >= thirtyDaysAgo) {
-        const diffTime = Math.abs(now - txDate);
-        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-        const weekIndex = 3 - Math.floor(diffDays / 7);
-        if (weekIndex >= 0 && weekIndex < 4) {
-          data30D[weekIndex] += (t.kesAmount || t.amount || 0);
+
+    const bucketByWeek = (txs, bucket) => {
+      txs.forEach(t => {
+        const txDate = new Date(t.createdAt);
+        if (txDate >= thirtyDaysAgo) {
+          const diffTime = Math.abs(now - txDate);
+          const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+          const weekIndex = 3 - Math.floor(diffDays / 7);
+          if (weekIndex >= 0 && weekIndex < 4) {
+            bucket[weekIndex] += (t.kesAmount || t.amount || 0);
+          }
         }
-      }
-    });
+      });
+    };
+    bucketByWeek(inboundTxs, inbound30D);
+    bucketByWeek(outboundTxs, outbound30D);
 
     // 3. 6M Data
     const labels6M = [];
-    const data6M = [];
+    const inbound6M = [];
+    const outbound6M = [];
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now);
       d.setMonth(d.getMonth() - i);
       labels6M.push(getMonthName(d));
-      const monthSum = inboundTxs
-        .filter(t => {
-          const txDate = new Date(t.createdAt);
-          return txDate.getMonth() === d.getMonth() && txDate.getFullYear() === d.getFullYear();
-        })
-        .reduce((sum, t) => sum + (t.kesAmount || t.amount || 0), 0);
-      data6M.push(monthSum);
+      const sameMonth = (t) => {
+        const txDate = new Date(t.createdAt);
+        return txDate.getMonth() === d.getMonth() && txDate.getFullYear() === d.getFullYear();
+      };
+      inbound6M.push(sumFor(inboundTxs, sameMonth));
+      outbound6M.push(sumFor(outboundTxs, sameMonth));
     }
 
     return {
-      '7D': { labels: labels7D, data: data7D },
-      '30D': { labels: labels30D, data: data30D },
-      '6M': { labels: labels6M, data: data6M }
+      '7D': { labels: labels7D, inbound: inbound7D, outbound: outbound7D },
+      '30D': { labels: labels30D, inbound: inbound30D, outbound: outbound30D },
+      '6M': { labels: labels6M, inbound: inbound6M, outbound: outbound6M }
     };
   };
 
@@ -418,9 +432,12 @@ export default function Overview() {
       </section>
 
       {/* Section 3: Revenue Chart */}
-      <section className="bg-white p-4 lg:p-5 rounded-[12px] border border-[#E5E7EB] shadow-sm editorial-shadow">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 lg:mb-5">
-          <h3 className="font-headline font-bold text-lg lg:text-xl text-primary">Revenue Overview</h3>
+      <section className="bg-white p-4 lg:p-6 rounded-[16px] border border-[#E5E7EB] shadow-sm editorial-shadow">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-1">
+          <div>
+            <h3 className="font-headline font-bold text-lg lg:text-xl text-primary">Revenue Overview</h3>
+            <p className="text-[11px] lg:text-xs text-on-surface-variant opacity-60 font-medium mt-0.5">Money moving in and out of your account</p>
+          </div>
           <div className="flex bg-[#F0FDF4] p-0.5 rounded-md border border-emerald-100 self-end lg:self-auto">
             {['7D', '30D', '6M'].map((period) => (
               <button
@@ -433,12 +450,31 @@ export default function Overview() {
             ))}
           </div>
         </div>
+
+        {/* Legend + period totals — a compact "at a glance" summary above the graph */}
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-4 mb-3 lg:mb-4">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#00855D]"></span>
+            <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Money In</span>
+            <span className={`text-xs font-headline font-bold text-primary ${!showAmounts && 'blur-sm'}`}>
+              {formatKES(timeframes[activeTimeframe].inbound.reduce((s, v) => s + v, 0))}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#D97706]"></span>
+            <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Money Out</span>
+            <span className={`text-xs font-headline font-bold text-primary ${!showAmounts && 'blur-sm'}`}>
+              {formatKES(timeframes[activeTimeframe].outbound.reduce((s, v) => s + v, 0))}
+            </span>
+          </div>
+        </div>
+
         <div className="h-48 lg:h-60 w-full">
           <RevenueChart
             labels={timeframes[activeTimeframe].labels}
-            data={timeframes[activeTimeframe].data}
+            inbound={timeframes[activeTimeframe].inbound}
+            outbound={timeframes[activeTimeframe].outbound}
             key={activeTimeframe}
-            accentColor="#00855D"
           />
         </div>
       </section>
