@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import { ValidatedInput } from '../components/ValidatedInput';
-import paychainLogo from '../assets/paychain-logo-dark.png';
+import paychainLogoWhite from '../assets/paychain-logo-white.png';
 
 const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
@@ -92,17 +92,18 @@ export default function InvoiceView() {
       </div>
 
       <div className="w-full max-w-xl bg-white rounded-[40px] shadow-2xl overflow-hidden relative z-10 border border-outline-variant/10">
-        {/* Header */}
-        <div className="p-8 md:p-10 border-b border-surface-container">
-          <div className="flex items-start justify-between mb-8">
-            <img src={paychainLogo} alt="PayChain" className="h-9 object-contain" />
+        {/* Header Band */}
+        <div className="bg-[#06201B] p-8 md:p-10 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-72 h-72 bg-emerald-500/10 rounded-full -mr-24 -mt-24 blur-3xl pointer-events-none"></div>
+          <div className="relative z-10 flex items-start justify-between mb-8">
+            <img src={paychainLogoWhite} alt="PayChain" className="h-8 object-contain" />
             <div className="text-right">
-              <p className="text-[9px] text-on-surface-variant font-black uppercase tracking-widest opacity-60 mb-1">Invoice</p>
-              <p className="font-bold text-primary text-sm">#{invoice.invoiceNumber}</p>
+              <p className="text-[9px] text-[#5EFEB3] font-black uppercase tracking-[0.3em] mb-1">Invoice</p>
+              <p className="font-headline font-black text-white text-lg">#{invoice.invoiceNumber}</p>
             </div>
           </div>
-          <h2 className="font-headline text-2xl text-on-surface mb-1">{invoice.businessName}</h2>
-          <p className="text-sm text-on-surface-variant font-medium">Billed to {invoice.customer?.name}</p>
+          <h2 className="relative z-10 font-headline text-2xl text-white mb-1">{invoice.businessName}</h2>
+          <p className="relative z-10 text-sm text-white/50 font-medium">Billed to {invoice.customer?.name}</p>
         </div>
 
         {/* Amount + Status */}

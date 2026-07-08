@@ -301,6 +301,7 @@ export default function BulkPay() {
     recurring: false,
     items: [{ description: '', qty: 1, price: 0 }],
     payUrl: null,
+    status: 'draft',
   });
 
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -314,6 +315,23 @@ export default function BulkPay() {
 
   const invoiceSubtotal = invoiceDetails.items.reduce((sum, item) => sum + (item.qty * item.price), 0);
   const invoiceTotal = invoiceSubtotal; // Assuming no tax right now
+  const invoiceHasRealItems = invoiceDetails.items.some(i => i.description.trim() || i.price > 0);
+
+  const fmtInvoiceCurrency = (n) => `${invoiceDetails.currency} ${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  // Always renders as the professional local format (0XXXXXXXXX) regardless
+  // of how the number is stored — mirrors the backend's normalizePhoneKE.
+  const displayPhoneKE = (raw) => {
+    if (!raw) return null;
+    let d = String(raw).replace(/\D/g, '');
+    if (d.startsWith('254')) d = d.slice(3);
+    if (d.startsWith('0')) d = d.slice(1);
+    return /^[71]\d{8}$/.test(d) ? `0${d}` : raw;
+  };
+
+  const fmtInvoiceDate = (value) => value
+    ? new Date(value).toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' })
+    : null;
 
   const fetchInvoices = useCallback(async () => {
     try {
@@ -409,7 +427,7 @@ export default function BulkPay() {
 
       const saved = res.data.invoice;
       setActiveInvoiceId(saved._id);
-      setInvoiceDetails(prev => ({ ...prev, invoiceNumber: saved.invoiceNumber, payUrl: saved.payUrl }));
+      setInvoiceDetails(prev => ({ ...prev, invoiceNumber: saved.invoiceNumber, payUrl: saved.payUrl, status: saved.status }));
       upsertInvoiceInList(saved);
 
       setShowInvoiceModal(false);
@@ -453,7 +471,7 @@ export default function BulkPay() {
       const sendRes = await axios.post(`${API_URL}/api/invoices/${invoiceId}/send`, {}, { headers: { Authorization: `Bearer ${token}` } });
       const sent = sendRes.data.invoice;
 
-      setInvoiceDetails(prev => ({ ...prev, invoiceNumber: sent.invoiceNumber, payUrl: sent.payUrl }));
+      setInvoiceDetails(prev => ({ ...prev, invoiceNumber: sent.invoiceNumber, payUrl: sent.payUrl, status: sent.status }));
       upsertInvoiceInList(sent);
 
       setShowInvoiceModal(false);
@@ -1698,6 +1716,7 @@ export default function BulkPay() {
                                 recurring: inv.recurring,
                                 items: inv.items?.length ? inv.items : [{ description: '', qty: 1, price: 0 }],
                                 payUrl: inv.payUrl,
+                                status: inv.status,
                               });
                               setShowInvoiceModal(true);
                            }}
@@ -2183,87 +2202,117 @@ export default function BulkPay() {
                   {/* Document Container */}
                   <div className="flex-1 overflow-y-auto px-4 pb-12 pt-2 flex justify-center custom-scroll">
                      {/* The Target PDF Area */}
-                     <div id="invoice-pdf-pane" className="w-[640px] md:w-[700px] min-h-[900px] bg-white shadow-[0_10px_40px_rgba(0,0,0,0.06)] p-8 md:p-14 flex flex-col relative scale-[0.48] xs:scale-[0.55] sm:scale-[0.8] md:scale-[0.9] lg:scale-100 origin-top shadow-2xl transition-transform duration-500">
-                        
-                        {/* Inv Header */}
-                        <div className="flex justify-between items-start mb-16">
-                           <div>
-                              <img src={paychainLogo} alt="PayChain Logo" className="h-9 mb-4 object-contain" />
-                              <h2 className="font-headline text-lg font-bold text-primary">{merchant?.businessName || 'PayChain'}</h2>
-                              <p className="text-xs text-on-surface-variant mt-1 max-w-[150px] break-words">{merchant?.email || 'Nairobi, Kenya'}</p>
-                              <p className="text-xs text-on-surface-variant max-w-[150px]">{merchant?.phone}</p>
+                     <div id="invoice-pdf-pane" className="w-[640px] md:w-[700px] min-h-[900px] bg-white shadow-[0_10px_40px_rgba(0,0,0,0.06)] flex flex-col relative scale-[0.48] xs:scale-[0.55] sm:scale-[0.8] md:scale-[0.9] lg:scale-100 origin-top shadow-2xl transition-transform duration-500 overflow-hidden">
+
+                        {/* Header Band */}
+                        <div className="bg-[#06201B] px-8 md:px-14 py-8 md:py-10 flex items-start justify-between relative overflow-hidden shrink-0">
+                           <div className="absolute top-0 right-0 w-72 h-72 bg-emerald-500/10 rounded-full -mr-24 -mt-24 blur-3xl pointer-events-none"></div>
+                           <div className="relative z-10 min-w-0 max-w-[340px]">
+                              <img src={paychainLogoWhite} alt="PayChain" className="h-7 mb-5 object-contain" />
+                              <h2 className="font-headline text-lg font-bold text-white truncate">{merchant?.businessName || 'PayChain'}</h2>
+                              <p className="text-xs text-white/50 mt-1.5 truncate">{merchant?.email}</p>
+                              {displayPhoneKE(merchant?.phone) && (
+                                <p className="text-xs text-white/50 truncate">{displayPhoneKE(merchant?.phone)}</p>
+                              )}
                            </div>
-                           <div className="text-right">
-                              <h1 className="font-headline tracking-[0.2em] text-3xl font-black text-[#00351D] opacity-20 uppercase mb-2">Invoice</h1>
-                              <p className="font-bold text-primary text-sm">#{invoiceDetails.invoiceNumber || 'DRAFT'}</p>
+                           <div className="relative z-10 text-right shrink-0">
+                              <p className="text-[10px] text-[#5EFEB3] font-black uppercase tracking-[0.3em] mb-2">Invoice</p>
+                              <p className="font-headline text-2xl font-black text-white">#{invoiceDetails.invoiceNumber || '···'}</p>
+                              <span className={`inline-block mt-3 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest ${
+                                invoiceDetails.status === 'paid' ? 'bg-emerald-400/20 text-emerald-300' : 'bg-white/10 text-white/60'
+                              }`}>
+                                {invoiceDetails.status === 'paid' ? 'Paid' : 'Draft'}
+                              </span>
                            </div>
                         </div>
 
+                        <div className="p-8 md:p-14 pt-10 md:pt-12 flex flex-col flex-1">
+
                         {/* Addresses & Dates */}
-                        <div className="flex justify-between items-start mb-12">
-                           <div className="max-w-[300px]">
+                        <div className="flex justify-between items-start mb-12 gap-8">
+                           <div className="max-w-[300px] min-w-0">
                               <p className="text-[9px] text-on-surface-variant font-black uppercase tracking-widest opacity-60 mb-2">Bill To</p>
                               <h3 className="font-bold text-primary text-base mb-1 truncate">{invoiceDetails.customer.name || 'Unnamed Customer'}</h3>
-                              <p className="text-xs text-on-surface-variant italic mb-1 truncate">{invoiceDetails.customer.email || '—'}</p>
-                              <p className="text-xs text-on-surface-variant truncate">{invoiceDetails.customer.address || '—'}</p>
+                              {invoiceDetails.customer.email && (
+                                <p className="text-xs text-on-surface-variant truncate">{invoiceDetails.customer.email}</p>
+                              )}
+                              {displayPhoneKE(invoiceDetails.customer.phone) && (
+                                <p className="text-xs text-on-surface-variant truncate">{displayPhoneKE(invoiceDetails.customer.phone)}</p>
+                              )}
+                              {invoiceDetails.customer.address && (
+                                <p className="text-xs text-on-surface-variant truncate">{invoiceDetails.customer.address}</p>
+                              )}
+                              {!invoiceDetails.customer.email && !invoiceDetails.customer.phone && !invoiceDetails.customer.address && (
+                                <p className="text-xs text-on-surface-variant/40 italic">No contact details on file</p>
+                              )}
                            </div>
-                           <div className="text-right flex flex-col gap-3">
+                           <div className="text-right flex flex-col gap-4 shrink-0">
                               <div>
                                  <p className="text-[9px] text-on-surface-variant font-black uppercase tracking-widest opacity-60 mb-1">Issue Date</p>
-                                 <p className="font-bold text-sm text-primary">{invoiceDetails.issueDate}</p>
+                                 <p className="font-bold text-sm text-primary whitespace-nowrap">{fmtInvoiceDate(invoiceDetails.issueDate) || '—'}</p>
                               </div>
-                              <div>
-                                <p className="text-[9px] text-on-surface-variant font-black uppercase tracking-widest opacity-60 mb-1">Due Date</p>
-                                <p className="font-bold text-sm text-primary">{invoiceDetails.dueDate}</p>
-                              </div>
+                              {invoiceDetails.dueDate && (
+                                <div>
+                                  <p className="text-[9px] text-on-surface-variant font-black uppercase tracking-widest opacity-60 mb-1">Due Date</p>
+                                  <p className="font-bold text-sm text-primary whitespace-nowrap">{fmtInvoiceDate(invoiceDetails.dueDate)}</p>
+                                </div>
+                              )}
                            </div>
                         </div>
 
                         {/* Table */}
                         <div className="mb-12 flex-1">
-                           <div className="grid grid-cols-[1fr_80px_100px_100px] gap-4 border-b-2 border-[#00351D] pb-3 mb-4">
-                              <span className="text-[10px] text-[#00351D] font-black uppercase tracking-widest">Description</span>
-                              <span className="text-[10px] text-[#00351D] font-black uppercase tracking-widest text-center">Qty</span>
-                              <span className="text-[10px] text-[#00351D] font-black uppercase tracking-widest text-right">Price</span>
-                              <span className="text-[10px] text-[#00351D] font-black uppercase tracking-widest text-right">Amount</span>
+                           <div className="grid grid-cols-[1fr_80px_100px_100px] gap-4 bg-[#06201B] rounded-t-2xl px-5 py-3.5">
+                              <span className="text-[10px] text-white font-black uppercase tracking-widest">Description</span>
+                              <span className="text-[10px] text-white font-black uppercase tracking-widest text-center">Qty</span>
+                              <span className="text-[10px] text-white font-black uppercase tracking-widest text-right">Price</span>
+                              <span className="text-[10px] text-white font-black uppercase tracking-widest text-right">Amount</span>
                            </div>
 
-                           <div className="space-y-4">
-                             {invoiceDetails.items.map((item, index) => (
-                               <div key={index} className="grid grid-cols-[1fr_80px_100px_100px] gap-4 items-center border-b border-outline-variant/10 pb-4">
-                                  <span className="text-sm font-bold text-primary">{item.description || '—'}</span>
-                                  <span className="text-sm text-on-surface-variant text-center">{item.qty}</span>
-                                  <span className="text-sm text-on-surface-variant text-right">{item.price.toLocaleString()}</span>
-                                  <span className="text-sm font-bold text-primary text-right">{(item.qty * item.price).toLocaleString()}</span>
-                               </div>
-                             ))}
-                           </div>
+                           {invoiceHasRealItems ? (
+                             <div className="border border-t-0 border-outline-variant/10 rounded-b-2xl overflow-hidden">
+                               {invoiceDetails.items.filter(item => item.description.trim() || item.price > 0).map((item, index) => (
+                                 <div key={index} className={`grid grid-cols-[1fr_80px_100px_100px] gap-4 items-center px-5 py-4 ${index % 2 === 1 ? 'bg-surface-container-lowest/50' : ''}`}>
+                                    <span className="text-sm font-bold text-primary truncate">{item.description || 'Untitled item'}</span>
+                                    <span className="text-sm text-on-surface-variant text-center">{item.qty}</span>
+                                    <span className="text-sm text-on-surface-variant text-right whitespace-nowrap">{fmtInvoiceCurrency(item.price)}</span>
+                                    <span className="text-sm font-bold text-primary text-right whitespace-nowrap">{fmtInvoiceCurrency(item.qty * item.price)}</span>
+                                 </div>
+                               ))}
+                             </div>
+                           ) : (
+                             <div className="border border-t-0 border-outline-variant/10 rounded-b-2xl px-5 py-10 text-center">
+                               <p className="text-xs text-on-surface-variant/40 italic">No line items added yet</p>
+                             </div>
+                           )}
                         </div>
 
                         {/* Totals */}
-                        <div className="flex justify-end mb-16">
-                           <div className="w-1/2 flex flex-col gap-3">
-                              <div className="flex justify-between items-center pt-4">
+                        <div className="flex justify-end mb-12">
+                           <div className="w-full max-w-[260px] flex flex-col gap-2">
+                              <div className="flex justify-between items-center px-1">
                                  <p className="text-xs font-bold text-on-surface-variant opacity-60">Subtotal</p>
-                                 <p className="text-sm font-bold text-primary">{invoiceDetails.currency} {invoiceSubtotal.toLocaleString()}</p>
+                                 <p className="text-sm font-bold text-primary">{fmtInvoiceCurrency(invoiceSubtotal)}</p>
                               </div>
-                              <div className="flex justify-between items-center py-4 border-t-2 border-b-2 border-outline-variant/10">
-                                 <p className="text-sm text-[#00351D] font-black uppercase tracking-widest">Total</p>
-                                 <p className="font-headline text-2xl font-black text-primary">{invoiceDetails.currency} {invoiceTotal.toLocaleString()}</p>
+                              <div className="flex justify-between items-center mt-1 px-5 py-4 rounded-2xl bg-[#06201B]">
+                                 <p className="text-[10px] text-[#5EFEB3] font-black uppercase tracking-widest">Total</p>
+                                 <p className="font-headline text-xl font-black text-white">{fmtInvoiceCurrency(invoiceTotal)}</p>
                               </div>
                            </div>
                         </div>
 
                         {/* Footer Notes */}
                         {invoiceDetails.notes && (
-                           <div className="mb-12">
+                           <div className="mb-10 p-5 rounded-2xl bg-surface-container-lowest border border-outline-variant/10">
                              <p className="text-[9px] text-on-surface-variant font-black uppercase tracking-widest opacity-60 mb-2">Notes / Terms</p>
                              <p className="text-xs text-on-surface-variant whitespace-pre-wrap">{invoiceDetails.notes}</p>
                            </div>
                         )}
 
-                        <div className="mt-auto border-t border-outline-variant/10 pt-6">
+                        <div className="mt-auto pt-6 border-t border-outline-variant/10 flex flex-col items-center gap-2">
+                           <img src={paychainLogo} alt="PayChain" className="h-4 object-contain opacity-40" />
                            <p className="text-[9px] text-center text-on-surface-variant font-bold uppercase tracking-widest opacity-50">Powered by PayChain Finance • Nairobi, Kenya</p>
+                        </div>
                         </div>
                      </div>
                      
