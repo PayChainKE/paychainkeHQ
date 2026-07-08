@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import Invoice from '../models/Invoice.js';
 import PaymentLink from '../models/PaymentLink.js';
 import Merchant from '../models/Merchant.js';
+import Counter from '../models/Counter.js';
 import { sendInvoiceEmail } from '../utils/resend.js';
 
 const FRONTEND_URL = process.env.MERCHANT_DASHBOARD_URL || 'https://app.paychain.co.ke';
@@ -17,6 +18,40 @@ const sanitizeItems = (items) =>
     qty: Math.max(0, Number(i.qty) || 0),
     price: Math.max(0, Number(i.price) || 0),
   }));
+
+// Atomically reserves the next number in a single global sequence — this is
+// what guarantees invoice numbers are unique across every merchant, not just
+// within one account, and reads as a clean sequential "INV-000042" series.
+const getNextInvoiceNumber = async () => {
+  const counter = await Counter.findByIdAndUpdate(
+    'invoiceNumber',
+    { $inc: { seq: 1 } },
+    { new: true, upsert: true }
+  );
+  return `INV-${String(counter.seq).padStart(6, '0')}`;
+};
+
+// Kenyan mobile numbers are always stored/displayed in the professional
+// local format (0XXXXXXXXX) regardless of how the merchant typed it in —
+// "790889066", "254790889066" and "+254790889066" all normalize the same way.
+// Anything that isn't a recognisable KE mobile shape is left untouched
+// rather than silently corrupted.
+const normalizePhoneKE = (raw) => {
+  if (!raw) return null;
+  let digits = String(raw).replace(/\D/g, '');
+  if (digits.startsWith('254')) digits = digits.slice(3);
+  if (digits.startsWith('0')) digits = digits.slice(1);
+  if (/^[71]\d{8}$/.test(digits)) return `0${digits}`;
+  const trimmed = String(raw).trim();
+  return trimmed || null;
+};
+
+const sanitizeCustomer = (customer) => ({
+  name: customer.name.trim(),
+  email: customer.email?.trim() || null,
+  phone: normalizePhoneKE(customer.phone),
+  address: customer.address?.trim() || null,
+});
 
 const serializeInvoice = (inv) => {
   const { subtotal, total } = computeTotals(inv.items);
@@ -60,37 +95,63 @@ export const listInvoices = async (req, res) => {
   }
 };
 
+// @desc    Reserve the next globally-unique invoice number so the UI can show
+//          a real number immediately, before the invoice is actually saved.
+// @route   GET /api/invoices/next-number
+// @access  Private
+export const peekNextInvoiceNumber = async (req, res) => {
+  try {
+    const invoiceNumber = await getNextInvoiceNumber();
+    res.json({ success: true, invoiceNumber });
+  } catch (error) {
+    console.error('❌ Error reserving invoice number:', error);
+    res.status(500).json({ error: 'Failed to reserve an invoice number.' });
+  }
+};
+
 // @desc    Create a draft invoice
 // @route   POST /api/invoices
 // @access  Private
 export const createInvoice = async (req, res) => {
   try {
-    const { customer, items, currency, issueDate, dueDate, notes, recurring } = req.body;
+    const { customer, items, currency, issueDate, dueDate, notes, recurring, invoiceNumber: reservedNumber } = req.body;
 
     if (!customer?.name?.trim()) {
       return res.status(400).json({ error: 'Customer name is required.' });
     }
 
-    const invoiceNumber = `INV-${Date.now().toString(36).toUpperCase().slice(-5)}${crypto.randomBytes(1).toString('hex').toUpperCase()}`;
+    // Reuse a number already reserved via /next-number (so the number shown
+    // in the editor matches what actually gets saved); otherwise allocate
+    // a fresh one from the same global counter.
+    const invoiceNumber = /^INV-\d{6,}$/.test(reservedNumber || '')
+      ? reservedNumber
+      : await getNextInvoiceNumber();
     const publicToken = crypto.randomBytes(16).toString('hex');
 
-    const invoice = await Invoice.create({
+    const invoiceData = {
       merchantId: req.merchant._id,
-      invoiceNumber,
       publicToken,
-      customer: {
-        name: customer.name.trim(),
-        email: customer.email?.trim() || null,
-        phone: customer.phone?.trim() || null,
-        address: customer.address?.trim() || null,
-      },
+      customer: sanitizeCustomer(customer),
       items: sanitizeItems(items),
       currency: currency || 'KES',
       issueDate: issueDate ? new Date(issueDate) : new Date(),
       dueDate: dueDate ? new Date(dueDate) : null,
       notes: notes || '',
       recurring: !!recurring,
-    });
+    };
+
+    let invoice;
+    try {
+      invoice = await Invoice.create({ ...invoiceData, invoiceNumber });
+    } catch (err) {
+      // Extremely unlikely (reserved number already consumed) — fall back to
+      // a freshly allocated one rather than fail the whole request.
+      if (err.code === 11000) {
+        invoice = await Invoice.create({ ...invoiceData, invoiceNumber: await getNextInvoiceNumber() });
+      } else {
+        throw err;
+      }
+    }
 
     res.status(201).json({ success: true, invoice: serializeInvoice(invoice) });
   } catch (error) {
@@ -112,12 +173,7 @@ export const updateInvoice = async (req, res) => {
 
     if (customer) {
       if (!customer.name?.trim()) return res.status(400).json({ error: 'Customer name is required.' });
-      invoice.customer = {
-        name: customer.name.trim(),
-        email: customer.email?.trim() || null,
-        phone: customer.phone?.trim() || null,
-        address: customer.address?.trim() || null,
-      };
+      invoice.customer = sanitizeCustomer(customer);
     }
     if (items) invoice.items = sanitizeItems(items);
     if (currency) invoice.currency = currency;

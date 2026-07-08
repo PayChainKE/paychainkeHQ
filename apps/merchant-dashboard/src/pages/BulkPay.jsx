@@ -379,6 +379,9 @@ export default function BulkPay() {
     dueDate: invoiceDetails.dueDate || null,
     notes: invoiceDetails.notes,
     recurring: invoiceDetails.recurring,
+    // Reuse the number already reserved when the modal opened, so the
+    // number shown in the editor is the exact one that gets saved.
+    invoiceNumber: invoiceDetails.invoiceNumber || undefined,
   });
 
   const upsertInvoiceInList = (saved) => {
@@ -478,10 +481,21 @@ export default function BulkPay() {
     }
   };
 
-  const handleOpenInvoiceModal = () => {
+  const handleOpenInvoiceModal = async () => {
     setActiveInvoiceId(null);
     setInvoiceDetails(blankInvoice());
     setShowInvoiceModal(true);
+    // Reserve a real, globally-unique invoice number immediately so the
+    // editor never shows a "DRAFT" placeholder — it shows the number that
+    // will actually be saved.
+    try {
+      const token = localStorage.getItem('paychain_merchant_token');
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      const res = await axios.get(`${API_URL}/api/invoices/next-number`, { headers: { Authorization: `Bearer ${token}` } });
+      setInvoiceDetails(prev => ({ ...prev, invoiceNumber: res.data.invoiceNumber }));
+    } catch (err) {
+      // Non-fatal — invoiceNumber stays null and gets assigned on save
+    }
   };
 
   const [showLinkModal, setShowLinkModal] = useState(false);
@@ -2042,8 +2056,9 @@ export default function BulkPay() {
                     </div>
                     <div className="space-y-2">
                        <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60">Customer Phone</label>
-                       <input
-                         type="text"
+                       <ValidatedInput
+                         kind="phoneKE"
+                         optional
                          value={invoiceDetails.customer.phone}
                          onChange={e => setInvoiceDetails({...invoiceDetails, customer: { ...invoiceDetails.customer, phone: e.target.value }})}
                          placeholder="0712 345 678"
@@ -2186,11 +2201,11 @@ export default function BulkPay() {
 
                         {/* Addresses & Dates */}
                         <div className="flex justify-between items-start mb-12">
-                           <div>
+                           <div className="max-w-[300px]">
                               <p className="text-[9px] text-on-surface-variant font-black uppercase tracking-widest opacity-60 mb-2">Bill To</p>
-                              <h3 className="font-bold text-primary text-base mb-1">{invoiceDetails.customer.name || 'Unnamed Customer'}</h3>
-                              <p className="text-xs text-on-surface-variant italic mb-1">{invoiceDetails.customer.email || '—'}</p>
-                              <p className="text-xs text-on-surface-variant max-w-[150px]">{invoiceDetails.customer.address || '—'}</p>
+                              <h3 className="font-bold text-primary text-base mb-1 truncate">{invoiceDetails.customer.name || 'Unnamed Customer'}</h3>
+                              <p className="text-xs text-on-surface-variant italic mb-1 truncate">{invoiceDetails.customer.email || '—'}</p>
+                              <p className="text-xs text-on-surface-variant truncate">{invoiceDetails.customer.address || '—'}</p>
                            </div>
                            <div className="text-right flex flex-col gap-3">
                               <div>

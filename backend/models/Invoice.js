@@ -13,9 +13,13 @@ const invoiceSchema = new mongoose.Schema({
     required: true,
     index: true,
   },
+  // Globally unique across every merchant on the platform — allocated from a
+  // single atomic counter (see Counter.js / getNextInvoiceNumber), not scoped
+  // per-merchant, so two accounts can never issue the same invoice number.
   invoiceNumber: {
     type: String,
     required: true,
+    unique: true,
   },
   // Opaque token used in the public /invoice/:publicToken URL — never expose
   // the Mongo _id there, this is a separate unguessable identifier.
@@ -77,7 +81,6 @@ const invoiceSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
-invoiceSchema.index({ merchantId: 1, invoiceNumber: 1 }, { unique: true });
 invoiceSchema.index({ merchantId: 1, createdAt: -1 });
 
 export default mongoose.model('Invoice', invoiceSchema);
