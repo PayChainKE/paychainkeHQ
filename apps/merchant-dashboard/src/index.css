@@ -37,6 +37,16 @@
 }
 
 @layer base {
+  /* 87.5% (≈14px) instead of the browser default 16px root. Every Tailwind
+     text-* size (text-sm, text-2xl, text-4xl, ...) is defined in rem, so
+     this scales every heading/body/label across every page down together
+     in one place — the alternative would be manually shrinking hundreds of
+     className strings across dozens of files, which risks landing on an
+     inconsistent size scale from page to page. */
+  html {
+    font-size: 87.5%;
+  }
+
   body {
     background-color: var(--color-surface);
     color: var(--color-on-surface);
@@ -135,6 +145,7 @@
     overflow: hidden;
     white-space: nowrap;
     line-height: 1;
+    -webkit-user-select: none;
     user-select: none;
   }
 
@@ -164,4 +175,5 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 input[type="number"] {
   -moz-appearance: textfield;
+  appearance: textfield;
 }
