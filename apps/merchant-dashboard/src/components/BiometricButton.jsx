@@ -174,6 +174,7 @@ export function BiometricRegisterButton({ token, onSuccess, onError }) {
   const [loading, setLoading] = useState(false)
   const [scanPhase, setScanPhase] = useState(false)
   const [done, setDone] = useState(false)
+  const [unsupportedDismissed, setUnsupportedDismissed] = useState(false)
 
   useEffect(() => {
     const check = async () => {
@@ -250,14 +251,23 @@ export function BiometricRegisterButton({ token, onSuccess, onError }) {
   }
 
   if (!supported) {
+    if (unsupportedDismissed) return null
     return (
-      <div className="flex items-center gap-3 p-4 rounded-2xl bg-amber-50 border border-amber-200">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-amber-600 shrink-0">
+      <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-50 border border-amber-200">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-amber-600 shrink-0 mt-0.5">
           <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
-        <p className="text-xs font-bold text-amber-800">
+        <p className="text-xs font-bold text-amber-800 flex-1">
           This device or browser does not support passkeys. Try Chrome, Safari 16+, or Edge on a device with biometrics.
         </p>
+        <button
+          type="button"
+          onClick={() => setUnsupportedDismissed(true)}
+          className="shrink-0 w-6 h-6 rounded-lg flex items-center justify-center text-amber-600/60 hover:text-amber-800 hover:bg-amber-100 transition-colors"
+          aria-label="Dismiss"
+        >
+          <span className="material-symbols-outlined text-base">close</span>
+        </button>
       </div>
     )
   }

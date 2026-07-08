@@ -4,6 +4,7 @@ import { useToast } from '../context/NotificationContext'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { ValidatedInput } from '../components/ValidatedInput'
+import { BiometricRegisterButton } from '../components/BiometricButton'
 import axios from 'axios'
 
 const DEFAULT_SECURITY_QUESTIONS = [
@@ -11,19 +12,6 @@ const DEFAULT_SECURITY_QUESTIONS = [
   "What is the name of your favorite musician or band?",
   "What was the make and model of your first car?"
 ]
-
-const EVENT_META = {
-  'merchant.login':           { icon: 'login', tone: 'text-emerald-400' },
-  'merchant.password':        { icon: 'lock_reset', tone: 'text-amber-400' },
-  'merchant.security_questions': { icon: 'quiz', tone: 'text-amber-400' },
-  'merchant.sessions':         { icon: 'phonelink_erase', tone: 'text-red-400' },
-  'merchant.payment_pin':      { icon: 'pin', tone: 'text-amber-400' },
-  'merchant.profile':          { icon: 'badge', tone: 'text-sky-400' },
-}
-function eventMeta(action = '') {
-  const key = Object.keys(EVENT_META).find((k) => action.startsWith(k))
-  return EVENT_META[key] || { icon: 'shield', tone: 'text-white/50' }
-}
 
 function deviceLabel(platform, userAgent = '') {
   if (platform === 'mobile') return 'PayChain mobile app'
@@ -56,7 +44,7 @@ function relativeTime(iso) {
 
 export default function Profile() {
   const { showAmounts } = usePrivacyMode()
-  const { merchant, logout } = useMerchantAuth()
+  const { merchant, logout, token } = useMerchantAuth()
   const [name, setName] = useState(merchant?.name || 'Admin')
   const [email, setEmail] = useState(merchant?.email || 'admin@paychain.ke')
   const [kraPin, setKraPin] = useState(merchant?.kraPin || '')
@@ -150,31 +138,51 @@ export default function Profile() {
     setQuestionsPassword('')
   }
 
-  // Security History states
-  const [securityEvents, setSecurityEvents] = useState([])
-  const [isLoadingHistory, setIsLoadingHistory] = useState(false)
+  // Active Sessions & Devices states (real registered passkeys/biometrics)
+  const [passkeys, setPasskeys] = useState([])
+  const [isLoadingPasskeys, setIsLoadingPasskeys] = useState(false)
+  const [confirmRemoveId, setConfirmRemoveId] = useState(null)
+  const [removingId, setRemovingId] = useState(null)
   const [confirmingSignOutAll, setConfirmingSignOutAll] = useState(false)
   const [isSigningOutAll, setIsSigningOutAll] = useState(false)
 
-  const fetchSecurityHistory = useCallback(async () => {
-    setIsLoadingHistory(true)
+  const fetchPasskeys = useCallback(async () => {
+    setIsLoadingPasskeys(true)
     try {
-      const token = localStorage.getItem('paychain_merchant_token')
+      const authToken = localStorage.getItem('paychain_merchant_token')
       const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
-      const res = await axios.get(`${API_URL}/api/auth/merchant/security-history`, {
-        headers: { Authorization: `Bearer ${token}` }
+      const res = await axios.get(`${API_URL}/api/auth/merchant/webauthn/passkeys`, {
+        headers: { Authorization: `Bearer ${authToken}` }
       })
       if (res.data.success) {
-        setSecurityEvents(res.data.events)
+        setPasskeys(res.data.passkeys)
       }
     } catch (err) {
       // Non-fatal — the card just shows its empty state
     } finally {
-      setIsLoadingHistory(false)
+      setIsLoadingPasskeys(false)
     }
   }, [])
 
-  useEffect(() => { fetchSecurityHistory() }, [fetchSecurityHistory])
+  useEffect(() => { fetchPasskeys() }, [fetchPasskeys])
+
+  async function handleRemovePasskey(credentialID) {
+    setRemovingId(credentialID)
+    try {
+      const authToken = localStorage.getItem('paychain_merchant_token')
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+      await axios.delete(`${API_URL}/api/auth/merchant/webauthn/passkeys/${credentialID}`, {
+        headers: { Authorization: `Bearer ${authToken}` }
+      })
+      setPasskeys(prev => prev.filter(p => p.credentialID !== credentialID))
+      toast.push({ message: 'Device removed.', type: 'success' })
+    } catch (err) {
+      toast.push({ message: err.response?.data?.error || 'Failed to remove device', type: 'error' })
+    } finally {
+      setRemovingId(null)
+      setConfirmRemoveId(null)
+    }
+  }
 
   async function handleSignOutAllDevices() {
     setIsSigningOutAll(true)
@@ -301,7 +309,7 @@ export default function Profile() {
         <div className="grid grid-cols-12 gap-8">
           {/* Main Settings Area — `contents` dissolves this wrapper on mobile so
               Profile/Security become independently orderable siblings of
-              Merchant ID / Security History below; `lg:block` restores the
+              Merchant ID / Active Sessions below; `lg:block` restores the
               normal nested column at desktop, unchanged from before. */}
           <div className="contents lg:block lg:col-span-8 lg:space-y-8">
 
@@ -708,7 +716,7 @@ export default function Profile() {
           </div>
 
           {/* Sidebar Area — same `contents` treatment; Merchant ID sits before
-              Profile and Security History sits after Security on mobile,
+              Profile and Active Sessions sits after Security on mobile,
               while desktop keeps them stacked together in the right column. */}
           <div className="contents lg:block lg:col-span-4 lg:space-y-8">
 
@@ -729,21 +737,21 @@ export default function Profile() {
               </div>
             </div>
 
-            {/* Security History */}
+            {/* Active Sessions & Devices */}
             <div className="order-4 col-span-12 bg-surface-container-lowest p-8 rounded-[32px] border border-outline-variant/10 shadow-sm editorial-shadow">
               <div className="flex items-center gap-3 mb-1">
                 <div className="w-9 h-9 rounded-xl bg-primary/5 flex items-center justify-center text-primary shrink-0">
-                  <span className="material-symbols-outlined text-lg">history</span>
+                  <span className="material-symbols-outlined text-lg">devices</span>
                 </div>
                 <div>
-                  <h3 className="font-headline font-bold text-lg text-primary leading-tight">Security History</h3>
-                  <p className="text-[10px] text-on-surface-variant/60 font-medium">Recent activity on your account</p>
+                  <h3 className="font-headline font-bold text-lg text-primary leading-tight">Active Sessions &amp; Devices</h3>
+                  <p className="text-[10px] text-on-surface-variant/60 font-medium">Biometric devices with access to your account</p>
                 </div>
               </div>
 
               <div className="space-y-1 mt-6">
-                {isLoadingHistory ? (
-                  [...Array(3)].map((_, i) => (
+                {isLoadingPasskeys ? (
+                  [...Array(2)].map((_, i) => (
                     <div key={i} className="flex items-center gap-4 py-3 animate-pulse">
                       <div className="w-9 h-9 rounded-xl bg-surface-container-low shrink-0" />
                       <div className="flex-1 space-y-2">
@@ -752,40 +760,78 @@ export default function Profile() {
                       </div>
                     </div>
                   ))
-                ) : securityEvents.length === 0 ? (
+                ) : passkeys.length === 0 ? (
                   <div className="text-center py-6">
                     <div className="w-12 h-12 rounded-2xl bg-surface-container-low mx-auto flex items-center justify-center text-on-surface-variant/40 mb-3">
-                      <span className="material-symbols-outlined text-xl">visibility</span>
+                      <span className="material-symbols-outlined text-xl">fingerprint</span>
                     </div>
-                    <p className="text-[13px] text-on-surface font-bold">Nothing to report yet</p>
+                    <p className="text-[13px] text-on-surface font-bold">No devices registered yet</p>
                     <p className="text-[11px] text-on-surface-variant/60 font-medium mt-1 max-w-[220px] mx-auto leading-relaxed">
-                      This fills up automatically as you sign in or update your password, PIN, and security questions.
+                      Add Face ID, Touch ID, or Windows Hello for faster, passwordless sign-in on this device.
                     </p>
                   </div>
                 ) : (
-                  securityEvents.map((ev, i) => {
-                    const meta = eventMeta(ev.action)
-                    return (
-                      <div key={i} className="flex items-start gap-4 py-3 border-b border-outline-variant/5 last:border-0">
-                        <div className="w-9 h-9 rounded-xl bg-surface-container-low flex items-center justify-center shrink-0">
-                          <span className={`material-symbols-outlined text-base ${meta.tone}`}>{meta.icon}</span>
+                  // Reserve room for ~5 rows so the card holds its shape with
+                  // just one or two real devices, then scroll past ~10 rather
+                  // than growing the whole Settings page unbounded.
+                  <div className="min-h-[280px] max-h-[560px] overflow-y-auto pr-1 -mr-1">
+                    {passkeys.map((pk) => (
+                      <div key={pk.credentialID} className="flex items-center gap-4 py-3.5 px-1.5 -mx-1.5 rounded-xl border-b border-outline-variant/5 last:border-0 hover:bg-surface-container-low/50 transition-colors group">
+                        <div className="w-10 h-10 rounded-xl bg-surface-container-low flex items-center justify-center shrink-0 text-primary/70">
+                          <span className="material-symbols-outlined text-lg">{deviceIcon(pk.platform, pk.userAgent)}</span>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold text-on-surface leading-snug">{ev.message || ev.action}</p>
+                          <p className="text-xs font-bold text-on-surface leading-snug truncate">{deviceLabel(pk.platform, pk.userAgent)}</p>
                           <div className="flex items-center gap-1.5 mt-1 text-[10px] text-on-surface-variant/50 font-medium">
-                            <span className="material-symbols-outlined text-[12px]">{deviceIcon(ev.platform, ev.userAgent)}</span>
-                            <span>{deviceLabel(ev.platform, ev.userAgent)}</span>
-                            <span>·</span>
-                            <span>{relativeTime(ev.createdAt)}</span>
+                            <span>Registered {relativeTime(pk.createdAt)}</span>
+                            {pk.lastUsed && (
+                              <>
+                                <span>·</span>
+                                <span>Last signed in {relativeTime(pk.lastUsed)}</span>
+                              </>
+                            )}
                           </div>
                         </div>
-                        {(ev.severity === 'warning' || ev.severity === 'critical') && (
-                          <span className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${ev.severity === 'critical' ? 'bg-red-500' : 'bg-amber-500'}`}></span>
+                        {confirmRemoveId === pk.credentialID ? (
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              onClick={() => setConfirmRemoveId(null)}
+                              disabled={removingId === pk.credentialID}
+                              className="text-[9px] font-black uppercase tracking-widest text-on-surface-variant/60 hover:text-on-surface px-2 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => handleRemovePasskey(pk.credentialID)}
+                              disabled={removingId === pk.credentialID}
+                              className="text-[9px] font-black uppercase tracking-widest text-white bg-red-600 hover:bg-red-700 px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1"
+                            >
+                              {removingId === pk.credentialID ? (
+                                <span className="material-symbols-outlined animate-spin text-[11px]">progress_activity</span>
+                              ) : 'Remove'}
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setConfirmRemoveId(pk.credentialID)}
+                            className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant/30 hover:text-red-600 hover:bg-red-50 transition-colors"
+                            aria-label={`Remove ${deviceLabel(pk.platform, pk.userAgent)}`}
+                          >
+                            <span className="material-symbols-outlined text-lg">close</span>
+                          </button>
                         )}
                       </div>
-                    )
-                  })
+                    ))}
+                  </div>
                 )}
+              </div>
+
+              <div className="mt-6 pt-6 border-t border-outline-variant/10">
+                <BiometricRegisterButton
+                  token={token}
+                  onSuccess={fetchPasskeys}
+                  onError={(msg) => toast.push({ message: msg, type: 'error' })}
+                />
               </div>
 
               {confirmingSignOutAll ? (

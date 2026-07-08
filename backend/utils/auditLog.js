@@ -11,7 +11,7 @@ export function extractIp(req) {
 }
 
 // Trim long UAs so we don't bloat the collection.
-function clipUa(req) {
+export function clipUa(req) {
   return String(req?.headers?.['user-agent'] || '').slice(0, 220) || null;
 }
 

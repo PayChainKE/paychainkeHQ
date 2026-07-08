@@ -825,3 +825,123 @@ export const sendBatchReceiptEmail = async (email, businessName, batchRows, tota
     // Don't throw, just log so we don't break the payment flow
   }
 };
+
+// @desc  Deliver an invoice to a customer with a link to view and pay it.
+// Called from invoiceController.sendInvoice — the real delivery channel
+// backing the Bulk Pay "Invoicing" feature (no SMS provider is configured
+// in this project yet, so email is the only real channel here).
+export const sendInvoiceEmail = async ({
+  to, customerName, businessName, invoiceNumber, items, currency, subtotal, total, dueDate, notes, payUrl,
+}) => {
+  try {
+    const fmt = (n) => `${currency} ${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+    const rowHTML = (items || []).map((item, index) => `
+      <tr style="background-color: ${index % 2 === 0 ? '#f8f9fa' : '#ffffff'}; border-bottom: 1px solid #e9ecef;">
+        <td style="padding: 12px 15px; color: #333; font-size: 13px;">${item.description || '—'}</td>
+        <td style="padding: 12px 15px; color: #555; font-size: 13px; text-align: center;">${item.qty}</td>
+        <td style="padding: 12px 15px; color: #555; font-size: 13px; text-align: right;">${fmt(item.price)}</td>
+        <td style="padding: 12px 15px; color: #111; font-weight: 600; font-size: 13px; text-align: right;">${fmt(item.qty * item.price)}</td>
+      </tr>
+    `).join('');
+
+    const dueDateStr = dueDate ? new Date(dueDate).toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' }) : 'On receipt';
+
+    const data = await resend.emails.send({
+      from: 'PayChain Billing <info@paychain.co.ke>',
+      to: [to],
+      subject: `Invoice ${invoiceNumber} from ${businessName} — ${fmt(total)}`,
+      html: `
+        <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 650px; margin: 0 auto; background-color: #ffffff; color: #333; border-radius: 12px; overflow: hidden; border: 1px solid #e5e7eb; box-shadow: 0 10px 25px rgba(0,0,0,0.05);">
+
+          <!-- Header -->
+          <div style="background-color: #06201B; padding: 32px 40px 30px; text-align: center; border-bottom: 4px solid #5EFEB3;">
+            <div style="margin-bottom: 16px;">${logoImgWhite(120)}</div>
+            <div style="color: #94A3B8; font-size: 12px; font-weight: 600; letter-spacing: 3px;">
+              INVOICE ${invoiceNumber}
+            </div>
+          </div>
+
+          <!-- Body -->
+          <div style="padding: 40px;">
+            <h1 style="font-size: 20px; font-weight: 700; color: #111; margin: 0 0 10px 0;">You have a new invoice from ${businessName}</h1>
+            <p style="font-size: 14px; line-height: 1.6; color: #555; margin: 0 0 30px 0;">
+              Hello <strong>${customerName}</strong>,<br>
+              ${businessName} has sent you an invoice for ${fmt(total)}, due <strong>${dueDateStr}</strong>. You can review the full breakdown below and pay securely online.
+            </p>
+
+            <!-- Summary Cards -->
+            <div style="display: flex; gap: 15px; margin-bottom: 30px;">
+              <div style="flex: 1; background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 20px; text-align: center;">
+                <div style="font-size: 11px; font-weight: 700; color: #166534; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px;">Amount Due</div>
+                <div style="font-size: 20px; font-weight: 800; color: #14532d;">${fmt(total)}</div>
+              </div>
+              <div style="flex: 1; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; text-align: center;">
+                <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px;">Due Date</div>
+                <div style="font-size: 16px; font-weight: 800; color: #0A2540; margin-top: 4px;">${dueDateStr}</div>
+              </div>
+            </div>
+
+            <!-- Line Items Table -->
+            <h2 style="font-size: 15px; font-weight: 600; color: #333; margin: 0 0 15px 0;">Itemized Breakdown</h2>
+            <div style="border: 1px solid #e9ecef; border-radius: 8px; overflow: hidden; margin-bottom: 20px;">
+              <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                <thead>
+                  <tr style="background-color: #06201B; color: #ffffff;">
+                    <th style="padding: 12px 15px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Description</th>
+                    <th style="padding: 12px 15px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; text-align: center;">Qty</th>
+                    <th style="padding: 12px 15px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; text-align: right;">Price</th>
+                    <th style="padding: 12px 15px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; text-align: right;">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${rowHTML}
+                </tbody>
+              </table>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; margin-bottom: 30px;">
+              <div style="width: 260px;">
+                <div style="display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px; color: #64748b;">
+                  <span>Subtotal</span><span>${fmt(subtotal)}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding: 12px 0; border-top: 2px solid #e2e8f0; font-size: 15px; font-weight: 800; color: #06201B;">
+                  <span>Total</span><span>${fmt(total)}</span>
+                </div>
+              </div>
+            </div>
+
+            ${notes ? `
+            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 20px; margin-bottom: 30px;">
+              <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">Notes</div>
+              <div style="font-size: 13px; color: #475569; white-space: pre-wrap;">${notes}</div>
+            </div>` : ''}
+
+            <div style="text-align: center; margin-top: 10px;">
+              <a href="${payUrl}" style="display: inline-block; background-color: #06201B; color: #5EFEB3; text-decoration: none; font-weight: 800; font-size: 14px; padding: 16px 40px; border-radius: 10px; letter-spacing: 0.4px;">
+                View &amp; Pay Invoice
+              </a>
+              <p style="font-size: 11px; color: #94a3b8; margin: 14px 0 0 0;">Pay securely via M-PESA in one tap.</p>
+            </div>
+
+          </div>
+
+          <!-- Footer -->
+          <div style="background-color: #fafafa; padding: 25px 40px; text-align: center; border-top: 1px solid #e5e7eb;">
+            <p style="font-size: 11px; color: #9ca3af; margin: 0 0 8px 0;">
+              This invoice was issued by ${businessName} via PayChain. Do not reply to this email.
+            </p>
+            <p style="font-size: 11px; color: #9ca3af; margin: 0;">
+              &copy; ${new Date().getFullYear()} PayChainKE. All rights reserved.
+            </p>
+          </div>
+        </div>
+      `
+    });
+    console.log(`📧 Invoice ${invoiceNumber} emailed to ${to}`);
+    return data;
+  } catch (error) {
+    console.error('❌ Resend Invoice Email Error:', error);
+    throw error;
+  }
+};

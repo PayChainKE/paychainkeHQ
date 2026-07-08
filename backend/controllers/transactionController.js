@@ -1,6 +1,7 @@
 import Transaction from '../models/Transaction.js';
 import Merchant from '../models/Merchant.js';
 import PaymentLink from '../models/PaymentLink.js';
+import Invoice from '../models/Invoice.js';
 import crypto from 'crypto';
 import axios from 'axios';
 import STKRequest from '../models/STKRequest.js';
@@ -537,11 +538,15 @@ export const processPaymentLink = async (req, res) => {
     link.status = 'paid';
     await link.save();
 
+    if (link.invoiceId) {
+      await Invoice.findByIdAndUpdate(link.invoiceId, { status: 'paid', paidAt: new Date() });
+    }
+
     createNotification({
       merchantId: link.merchantId._id,
       kind: 'payment',
-      title: 'Payment link paid',
-      message: `Your KES ${link.amount.toLocaleString()} payment link was paid by a customer.`,
+      title: link.invoiceId ? 'Invoice paid' : 'Payment link paid',
+      message: `Your KES ${link.amount.toLocaleString()} ${link.invoiceId ? 'invoice' : 'payment link'} was paid by a customer.`,
     });
 
     res.status(200).json({ success: true, checkoutRequestId, message: 'STK Push sent to phone' });

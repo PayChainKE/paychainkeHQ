@@ -25,6 +25,14 @@ const paymentLinkSchema = new mongoose.Schema({
     enum: ['active', 'paid', 'expired'],
     default: 'active',
   },
+  // Set when this link was minted to collect payment on a specific invoice —
+  // lets processPaymentLink flip the invoice to 'paid' on success. Null for
+  // plain ad-hoc payment links (Wallet's "Request Money" -> Payment Link).
+  invoiceId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Invoice',
+    default: null,
+  },
   expiresAt: {
     type: Date,
     required: true,

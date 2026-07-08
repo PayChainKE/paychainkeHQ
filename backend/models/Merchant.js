@@ -182,6 +182,8 @@ const merchantSchema = new mongoose.Schema({
       deviceType:   { type: String, default: 'singleDevice' },
       backedUp:     { type: Boolean, default: false },
       transports:   [String],
+      userAgent:    { type: String, default: null },
+      platform:     { type: String, default: null },
       createdAt:    { type: Date, default: Date.now },
       lastUsed:     { type: Date, default: null },
     }],

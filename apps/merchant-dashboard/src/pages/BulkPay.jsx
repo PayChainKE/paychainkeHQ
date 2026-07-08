@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { jsPDF } from 'jspdf'
 import domtoimage from 'dom-to-image'
 import { ValidatedInput } from '../components/ValidatedInput'
@@ -291,35 +291,63 @@ export default function BulkPay() {
   };
 
   // Invoice Feature State
-  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
-  const [invoiceDetails, setInvoiceDetails] = useState({
-    customer: 'Acme Corp',
-    invoiceNumber: 'INV-00105',
-    issueDate: '2026-04-12',
-    dueDate: '2026-11-12',
+  const blankInvoice = () => ({
+    customer: { name: '', email: '', phone: '', address: '' },
+    invoiceNumber: null, // assigned by the server on first save
+    issueDate: new Date().toISOString().slice(0, 10),
+    dueDate: '',
     currency: 'KES',
-    notes: 'Payment terms, thank you note...',
+    notes: '',
     recurring: false,
-    items: [
-      { id: 1, description: 'Consulting Services - Oct', qty: 10, price: 100 },
-      { id: 2, description: 'Server Maintenance', qty: 1, price: 200 }
-    ]
+    items: [{ description: '', qty: 1, price: 0 }],
+    payUrl: null,
   });
+
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [activeInvoiceId, setActiveInvoiceId] = useState(null);
+  const [isSavingInvoice, setIsSavingInvoice] = useState(false);
+  const [isSendingInvoice, setIsSendingInvoice] = useState(false);
+  const [invoiceDetails, setInvoiceDetails] = useState(blankInvoice());
+
+  const [invoicesList, setInvoicesList] = useState([]);
+  const [invoiceFilter, setInvoiceFilter] = useState('All');
 
   const invoiceSubtotal = invoiceDetails.items.reduce((sum, item) => sum + (item.qty * item.price), 0);
   const invoiceTotal = invoiceSubtotal; // Assuming no tax right now
 
+  const fetchInvoices = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('paychain_merchant_token');
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      const res = await axios.get(`${API_URL}/api/invoices`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setInvoicesList(res.data.invoices || []);
+    } catch (err) {
+      // Non-fatal — the list just shows its empty state
+    }
+  }, []);
+
+  useEffect(() => { fetchInvoices() }, [fetchInvoices]);
+
   const handleAddInvoiceItem = () => {
     setInvoiceDetails(prev => ({
       ...prev,
-      items: [...prev.items, { id: Date.now(), description: '', qty: 1, price: 0 }]
+      items: [...prev.items, { description: '', qty: 1, price: 0 }]
     }))
   };
 
-  const handleUpdateInvoiceItem = (id, field, value) => {
+  const handleUpdateInvoiceItem = (index, field, value) => {
     setInvoiceDetails(prev => ({
       ...prev,
-      items: prev.items.map(item => item.id === id ? { ...item, [field]: value } : item)
+      items: prev.items.map((item, i) => i === index ? { ...item, [field]: value } : item)
+    }))
+  };
+
+  const handleRemoveInvoiceItem = (index) => {
+    setInvoiceDetails(prev => ({
+      ...prev,
+      items: prev.items.filter((_, i) => i !== index)
     }))
   };
 
@@ -335,7 +363,7 @@ export default function BulkPay() {
           format: [element.clientWidth, element.clientHeight]
         });
         pdf.addImage(dataUrl, 'PNG', 0, 0, element.clientWidth, element.clientHeight);
-        pdf.save(`Invoice_${invoiceDetails.invoiceNumber}.pdf`);
+        pdf.save(`Invoice_${invoiceDetails.invoiceNumber || 'Draft'}.pdf`);
         addNotification({ title: 'Download Complete', message: `Invoice saved successfully.`, type: 'success' });
       } catch (err) {
         addNotification({ title: 'Error', message: 'Failed to generate PDF: ' + err.message, type: 'error' });
@@ -343,83 +371,139 @@ export default function BulkPay() {
     }
   };
 
-  const handleSaveDraft = () => {
-    const isEditingExisting = invoicesList.find(inv => inv.id === invoiceDetails.invoiceNumber);
-    
-    if (isEditingExisting) {
-      setInvoicesList(prev => prev.map(inv => 
-        inv.id === invoiceDetails.invoiceNumber 
-          ? { ...inv, customer: invoiceDetails.customer, amount: invoiceTotal, status: 'Draft' }
-          : inv
-      ));
-    } else {
-      setInvoicesList(prev => [
-        { 
-          id: invoiceDetails.invoiceNumber, 
-          customer: invoiceDetails.customer || 'Unnamed Customer', 
-          amount: invoiceTotal, 
-          date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }), 
-          status: 'Draft' 
-        },
-        ...prev
-      ]);
-    }
+  const buildInvoicePayload = () => ({
+    customer: invoiceDetails.customer,
+    items: invoiceDetails.items,
+    currency: invoiceDetails.currency,
+    issueDate: invoiceDetails.issueDate,
+    dueDate: invoiceDetails.dueDate || null,
+    notes: invoiceDetails.notes,
+    recurring: invoiceDetails.recurring,
+  });
 
-    setShowInvoiceModal(false);
-    addNotification({
-      title: 'Draft Saved',
-      message: `Invoice #${invoiceDetails.invoiceNumber} safely stored in Invoices -> Drafts.`,
-      type: 'success'
+  const upsertInvoiceInList = (saved) => {
+    setInvoicesList(prev => {
+      const exists = prev.some(inv => inv._id === saved._id);
+      return exists ? prev.map(inv => inv._id === saved._id ? saved : inv) : [saved, ...prev];
     });
   };
 
-  const handleSendInvoice = () => {
-    setInvoicesList(prev => [
-      { 
-        id: invoiceDetails.invoiceNumber, 
-        customer: invoiceDetails.customer || 'Unnamed Customer', 
-        amount: invoiceTotal, 
-        date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }), 
-        status: 'Sent' 
-      },
-      ...prev.filter(inv => inv.id !== invoiceDetails.invoiceNumber)
-    ]);
+  const handleSaveDraft = async () => {
+    if (!invoiceDetails.customer.name.trim()) {
+      addNotification({ title: 'Missing Customer', message: 'Enter a customer name first.', type: 'error' });
+      return;
+    }
 
-    setShowInvoiceModal(false);
-    addNotification({
-      title: 'Invoice Sent',
-      message: `Invoice #${invoiceDetails.invoiceNumber} has been sent to ${invoiceDetails.customer}.`,
-      type: 'success'
-    });
+    setIsSavingInvoice(true);
+    try {
+      const token = localStorage.getItem('paychain_merchant_token');
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      const payload = buildInvoicePayload();
+
+      const res = activeInvoiceId
+        ? await axios.put(`${API_URL}/api/invoices/${activeInvoiceId}`, payload, { headers: { Authorization: `Bearer ${token}` } })
+        : await axios.post(`${API_URL}/api/invoices`, payload, { headers: { Authorization: `Bearer ${token}` } });
+
+      const saved = res.data.invoice;
+      setActiveInvoiceId(saved._id);
+      setInvoiceDetails(prev => ({ ...prev, invoiceNumber: saved.invoiceNumber, payUrl: saved.payUrl }));
+      upsertInvoiceInList(saved);
+
+      setShowInvoiceModal(false);
+      addNotification({
+        title: 'Draft Saved',
+        message: `Invoice #${saved.invoiceNumber} safely stored in Invoices -> Drafts.`,
+        type: 'success'
+      });
+    } catch (err) {
+      addNotification({ title: 'Error', message: err.response?.data?.error || 'Failed to save invoice draft', type: 'error' });
+    } finally {
+      setIsSavingInvoice(false);
+    }
+  };
+
+  const handleSendInvoice = async () => {
+    if (!invoiceDetails.customer.name.trim()) {
+      addNotification({ title: 'Missing Customer', message: 'Enter a customer name first.', type: 'error' });
+      return;
+    }
+    if (!invoiceDetails.customer.email?.trim()) {
+      addNotification({ title: 'Missing Email', message: "Add the customer's email address to send this invoice.", type: 'error' });
+      return;
+    }
+
+    setIsSendingInvoice(true);
+    try {
+      const token = localStorage.getItem('paychain_merchant_token');
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      const payload = buildInvoicePayload();
+
+      let invoiceId = activeInvoiceId;
+      if (!invoiceId) {
+        const createRes = await axios.post(`${API_URL}/api/invoices`, payload, { headers: { Authorization: `Bearer ${token}` } });
+        invoiceId = createRes.data.invoice._id;
+        setActiveInvoiceId(invoiceId);
+      } else {
+        await axios.put(`${API_URL}/api/invoices/${invoiceId}`, payload, { headers: { Authorization: `Bearer ${token}` } });
+      }
+
+      const sendRes = await axios.post(`${API_URL}/api/invoices/${invoiceId}/send`, {}, { headers: { Authorization: `Bearer ${token}` } });
+      const sent = sendRes.data.invoice;
+
+      setInvoiceDetails(prev => ({ ...prev, invoiceNumber: sent.invoiceNumber, payUrl: sent.payUrl }));
+      upsertInvoiceInList(sent);
+
+      setShowInvoiceModal(false);
+      addNotification({
+        title: 'Invoice Sent',
+        message: `Invoice #${sent.invoiceNumber} has been emailed to ${invoiceDetails.customer.email}.`,
+        type: 'success'
+      });
+    } catch (err) {
+      addNotification({ title: 'Error', message: err.response?.data?.error || 'Failed to send invoice', type: 'error' });
+    } finally {
+      setIsSendingInvoice(false);
+    }
+  };
+
+  const handleDeleteInvoice = async (inv) => {
+    try {
+      const token = localStorage.getItem('paychain_merchant_token');
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      await axios.delete(`${API_URL}/api/invoices/${inv._id}`, { headers: { Authorization: `Bearer ${token}` } });
+      setInvoicesList(prev => prev.filter(i => i._id !== inv._id));
+      addNotification({ title: 'Draft Deleted', message: `Invoice #${inv.invoiceNumber} was removed.`, type: 'success' });
+    } catch (err) {
+      addNotification({ title: 'Error', message: err.response?.data?.error || 'Failed to delete invoice', type: 'error' });
+    }
   };
 
   const handleOpenInvoiceModal = () => {
-    setInvoiceDetails(prev => ({
-        ...prev,
-        invoiceNumber: `INV-${String(Math.floor(Math.random() * 900000) + 100000)}`
-    }));
+    setActiveInvoiceId(null);
+    setInvoiceDetails(blankInvoice());
     setShowInvoiceModal(true);
   };
 
   const [showLinkModal, setShowLinkModal] = useState(false);
 
   const handleGenerateLink = () => {
+    if (!invoiceDetails.payUrl) {
+      addNotification({ title: 'Send First', message: 'Send this invoice to generate its secure payment link.', type: 'error' });
+      return;
+    }
     setShowLinkModal(true);
   };
 
   const handleCopyLink = () => {
-    const fakeLink = `https://app.paychain.co.ke/invoice/${invoiceDetails.invoiceNumber.replace('INV-', '')}`;
-    navigator.clipboard.writeText(fakeLink);
+    if (!invoiceDetails.payUrl) return;
+    navigator.clipboard.writeText(invoiceDetails.payUrl);
     addNotification({
       title: 'Link Copied',
-      message: `Invoice link (${fakeLink}) ready to share.`,
+      message: `Invoice link (${invoiceDetails.payUrl}) ready to share.`,
       type: 'success'
     });
     setShowLinkModal(false);
   };
-
-  const [invoicesList, setInvoicesList] = useState([]);
-  const [invoiceFilter, setInvoiceFilter] = useState('All');
 
   // Fund Account Modal State
   const [showFundModal, setShowFundModal] = useState(false)
@@ -1505,13 +1589,13 @@ export default function BulkPay() {
                     <p className="text-[10px] text-on-surface-variant font-medium mt-1 opacity-60 italic">Monitor the status of your issued billing.</p>
                   </div>
                   <div className="flex gap-2 p-1.5 bg-surface-container-lowest border border-outline-variant/5 rounded-xl self-start md:self-auto">
-                    {['All', 'Drafts', 'Sent'].map(f => (
-                      <button 
+                    {['All', 'Drafts', 'Sent', 'Paid'].map(f => (
+                      <button
                         key={f}
                         onClick={() => setInvoiceFilter(f)}
                         className={`px-4 py-2 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${
-                          invoiceFilter === f 
-                            ? 'bg-white text-primary shadow-[0_2px_10px_rgba(0,0,0,0.04)] border border-outline-variant/5' 
+                          invoiceFilter === f
+                            ? 'bg-white text-primary shadow-[0_2px_10px_rgba(0,0,0,0.04)] border border-outline-variant/5'
                             : 'text-on-surface-variant/60 hover:text-primary'
                         }`}
                       >
@@ -1535,7 +1619,7 @@ export default function BulkPay() {
                         </div>
                       </div>
                     </div>
-                    <p className="font-headline text-xl font-black text-primary group-hover:scale-105 origin-right transition-transform">0</p>
+                    <p className="font-headline text-xl font-black text-primary group-hover:scale-105 origin-right transition-transform">{invoicesList.length}</p>
                  </div>
                </div>
 
@@ -1549,44 +1633,68 @@ export default function BulkPay() {
                        <p className="text-sm font-bold text-primary mb-1">No recent invoices</p>
                        <p className="text-xs text-on-surface-variant opacity-70">Generate your first professional e-invoice to start getting paid.</p>
                      </div>
-                   ) : invoicesList.filter(inv => invoiceFilter === 'All' || inv.status === (invoiceFilter === 'Drafts' ? 'Draft' : invoiceFilter)).map(inv => (
-                     <div key={inv.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-[20px] bg-surface-container-lowest border border-outline-variant/10 shadow-sm hover:border-emerald-500/20 transition-all group gap-4">
+                   ) : invoicesList.filter(inv => invoiceFilter === 'All' || inv.status === (invoiceFilter === 'Drafts' ? 'draft' : invoiceFilter.toLowerCase())).map(inv => {
+                     const statusMeta = {
+                       draft: { label: 'Draft', icon: 'edit_document', tone: 'bg-amber-50 text-amber-600', badge: 'bg-amber-100 text-amber-800' },
+                       sent:  { label: 'Sent',  icon: 'send',          tone: 'bg-emerald-50 text-emerald-600', badge: 'bg-emerald-100 text-emerald-800' },
+                       paid:  { label: 'Paid',  icon: 'check_circle',  tone: 'bg-blue-50 text-blue-600', badge: 'bg-blue-100 text-blue-800' },
+                       void:  { label: 'Void',  icon: 'block',         tone: 'bg-slate-100 text-slate-500', badge: 'bg-slate-200 text-slate-600' },
+                     }[inv.status] || { label: inv.status, icon: 'receipt_long', tone: 'bg-amber-50 text-amber-600', badge: 'bg-amber-100 text-amber-800' };
+
+                     return (
+                     <div key={inv._id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-[20px] bg-surface-container-lowest border border-outline-variant/10 shadow-sm hover:border-emerald-500/20 transition-all group gap-4">
                        <div className="flex items-center gap-4">
-                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${inv.status === 'Sent' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
-                           <span className="material-symbols-outlined text-[18px]">{inv.status === 'Sent' ? 'send' : 'edit_document'}</span>
+                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${statusMeta.tone}`}>
+                           <span className="material-symbols-outlined text-[18px]">{statusMeta.icon}</span>
                          </div>
                          <div>
-                           <p className="text-sm font-bold text-primary">{inv.customer}</p>
+                           <p className="text-sm font-bold text-primary">{inv.customer?.name || 'Unnamed Customer'}</p>
                            <div className="flex items-center gap-2 mt-0.5">
-                             <p className="text-[10px] text-on-surface-variant font-medium opacity-60">#{inv.id.replace('INV-', '')} • {inv.date}</p>
-                             <div className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-widest ${inv.status === 'Sent' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                               {inv.status}
+                             <p className="text-[10px] text-on-surface-variant font-medium opacity-60">#{inv.invoiceNumber} • {new Date(inv.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                             <div className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-widest ${statusMeta.badge}`}>
+                               {statusMeta.label}
                              </div>
                            </div>
                          </div>
                        </div>
-                       
-                       <div className="flex items-center justify-between sm:gap-6 pl-14 sm:pl-0">
+
+                       <div className="flex items-center justify-between sm:gap-3 pl-14 sm:pl-0">
                          <div className="text-left sm:text-right">
-                           <p className="text-xs font-bold text-primary">KES {inv.amount.toLocaleString()}</p>
+                           <p className="text-xs font-bold text-primary">{inv.currency} {inv.total.toLocaleString()}</p>
                            <p className="text-[9px] text-on-surface-variant font-medium opacity-50 italic uppercase tracking-widest">Total value</p>
                          </div>
-                         <button 
+                         {inv.status === 'draft' && (
+                           <button
+                             onClick={() => handleDeleteInvoice(inv)}
+                             className="w-10 h-10 sm:w-8 sm:h-8 rounded-xl bg-red-50 text-red-500 hover:bg-red-100 flex items-center justify-center transition-colors shadow-sm active:scale-90"
+                           >
+                             <span className="material-symbols-outlined text-[18px] sm:text-sm">delete</span>
+                           </button>
+                         )}
+                         <button
                            onClick={() => {
-                              setInvoiceDetails(prev => ({
-                                  ...prev,
-                                  invoiceNumber: inv.id,
-                                  customer: inv.customer
-                              }));
+                              setActiveInvoiceId(inv._id);
+                              setInvoiceDetails({
+                                customer: inv.customer,
+                                invoiceNumber: inv.invoiceNumber,
+                                issueDate: inv.issueDate ? inv.issueDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
+                                dueDate: inv.dueDate ? inv.dueDate.slice(0, 10) : '',
+                                currency: inv.currency,
+                                notes: inv.notes,
+                                recurring: inv.recurring,
+                                items: inv.items?.length ? inv.items : [{ description: '', qty: 1, price: 0 }],
+                                payUrl: inv.payUrl,
+                              });
                               setShowInvoiceModal(true);
                            }}
-                           className="w-10 h-10 sm:w-8 sm:h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center transition-colors shadow-sm active:scale-90"
+                           disabled={inv.status === 'paid'}
+                           className="w-10 h-10 sm:w-8 sm:h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center transition-colors shadow-sm active:scale-90 disabled:opacity-30 disabled:pointer-events-none"
                          >
-                           <span className="material-symbols-outlined text-[18px] sm:text-sm">edit</span>
+                           <span className="material-symbols-outlined text-[18px] sm:text-sm">{inv.status === 'paid' ? 'visibility' : 'edit'}</span>
                          </button>
                        </div>
                      </div>
-                   ))}
+                   )})}
                  </div>
                </div>
 
@@ -1886,7 +1994,22 @@ export default function BulkPay() {
                 </div>
                 <div className="flex items-center gap-3">
                   <button onClick={() => setShowInvoiceModal(false)} className="px-4 py-2 text-xs font-bold text-on-surface-variant hover:text-primary transition-colors">Cancel</button>
-                  <button onClick={handleSaveDraft} className="px-4 py-2 text-xs font-bold text-primary border border-outline-variant/20 rounded-xl hover:bg-surface-container-low transition-all">Save Draft</button>
+                  <button onClick={handleSaveDraft} disabled={isSavingInvoice || isSendingInvoice} className="px-4 py-2 text-xs font-bold text-primary border border-outline-variant/20 rounded-xl hover:bg-surface-container-low transition-all disabled:opacity-50">
+                    {isSavingInvoice ? 'Saving...' : 'Save Draft'}
+                  </button>
+                  <button onClick={handleSendInvoice} disabled={isSavingInvoice || isSendingInvoice} className="px-5 py-2 text-xs font-bold text-white bg-[#00351D] rounded-xl hover:bg-emerald-950 transition-all disabled:opacity-50 flex items-center gap-2">
+                    {isSendingInvoice ? (
+                      <>
+                        <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-sm">send</span>
+                        Send Invoice
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
 
@@ -1898,22 +2021,52 @@ export default function BulkPay() {
                   
                   {/* Meta Group */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-                    <div className="space-y-4 md:col-span-2">
-                       <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60">Customer</label>
-                       <input 
-                         type="text" 
-                         value={invoiceDetails.customer} 
-                         onChange={e => setInvoiceDetails({...invoiceDetails, customer: e.target.value})} 
-                         className="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-2xl px-5 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50" 
+                    <div className="space-y-2">
+                       <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60">Customer Name</label>
+                       <input
+                         type="text"
+                         value={invoiceDetails.customer.name}
+                         onChange={e => setInvoiceDetails({...invoiceDetails, customer: { ...invoiceDetails.customer, name: e.target.value }})}
+                         className="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-2xl px-5 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50"
                        />
                     </div>
-                    
+                    <div className="space-y-2">
+                       <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60">Customer Email</label>
+                       <input
+                         type="email"
+                         value={invoiceDetails.customer.email}
+                         onChange={e => setInvoiceDetails({...invoiceDetails, customer: { ...invoiceDetails.customer, email: e.target.value }})}
+                         placeholder="billing@customer.com"
+                         className="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-2xl px-5 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50"
+                       />
+                    </div>
+                    <div className="space-y-2">
+                       <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60">Customer Phone</label>
+                       <input
+                         type="text"
+                         value={invoiceDetails.customer.phone}
+                         onChange={e => setInvoiceDetails({...invoiceDetails, customer: { ...invoiceDetails.customer, phone: e.target.value }})}
+                         placeholder="0712 345 678"
+                         className="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-2xl px-5 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50"
+                       />
+                    </div>
+                    <div className="space-y-2">
+                       <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60">Customer Address</label>
+                       <input
+                         type="text"
+                         value={invoiceDetails.customer.address}
+                         onChange={e => setInvoiceDetails({...invoiceDetails, customer: { ...invoiceDetails.customer, address: e.target.value }})}
+                         placeholder="Nairobi, Kenya"
+                         className="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-2xl px-5 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50"
+                       />
+                    </div>
+
                     <div className="space-y-2">
                       <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60 pr-1 flex items-center gap-1">
-                        Invoice Number 
+                        Invoice Number
                       </label>
                       <div className="w-full bg-surface-container-lowest/50 border border-outline-variant/10 rounded-xl px-4 py-2.5 flex items-center justify-between cursor-not-allowed">
-                         <span className="text-sm font-bold text-primary/70">{invoiceDetails.invoiceNumber}</span>
+                         <span className="text-sm font-bold text-primary/70">{invoiceDetails.invoiceNumber || 'Assigned on save'}</span>
                          <span className="material-symbols-outlined text-[14px] text-on-surface-variant/40">lock</span>
                       </div>
                     </div>
@@ -1945,21 +2098,21 @@ export default function BulkPay() {
 
                     <div className="space-y-4 mb-5">
                       {invoiceDetails.items.map((item, index) => (
-                        <div key={item.id} className="grid grid-cols-1 md:grid-cols-[1fr_80px_100px_100px_40px] gap-3 md:gap-4 items-center bg-surface-container-lowest border md:border-0 border-outline-variant/10 p-4 md:p-0 rounded-[24px] md:bg-transparent shadow-sm md:shadow-none">
-                          <input type="text" value={item.description} onChange={e => handleUpdateInvoiceItem(item.id, 'description', e.target.value)} placeholder="Item description" className="w-full bg-white border border-outline-variant/20 rounded-xl px-3 py-2.5 text-xs font-medium text-primary focus:ring-0 focus:border-emerald-500/50" />
+                        <div key={index} className="grid grid-cols-1 md:grid-cols-[1fr_80px_100px_100px_40px] gap-3 md:gap-4 items-center bg-surface-container-lowest border md:border-0 border-outline-variant/10 p-4 md:p-0 rounded-[24px] md:bg-transparent shadow-sm md:shadow-none">
+                          <input type="text" value={item.description} onChange={e => handleUpdateInvoiceItem(index, 'description', e.target.value)} placeholder="Item description" className="w-full bg-white border border-outline-variant/20 rounded-xl px-3 py-2.5 text-xs font-medium text-primary focus:ring-0 focus:border-emerald-500/50" />
                           <div className="flex items-center gap-2">
                             <span className="md:hidden text-[9px] font-bold text-on-surface-variant uppercase tracking-widest">Qty</span>
-                            <input type="number" value={item.qty} onChange={e => handleUpdateInvoiceItem(item.id, 'qty', parseInt(e.target.value) || 0)} className="w-full bg-white border border-outline-variant/20 rounded-xl px-3 py-2.5 text-xs font-medium text-center text-primary focus:ring-0 focus:border-emerald-500/50" />
+                            <input type="number" value={item.qty} onChange={e => handleUpdateInvoiceItem(index, 'qty', parseInt(e.target.value) || 0)} className="w-full bg-white border border-outline-variant/20 rounded-xl px-3 py-2.5 text-xs font-medium text-center text-primary focus:ring-0 focus:border-emerald-500/50" />
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="md:hidden text-[9px] font-bold text-on-surface-variant uppercase tracking-widest">Price</span>
-                            <input type="number" value={item.price} onChange={e => handleUpdateInvoiceItem(item.id, 'price', parseFloat(e.target.value) || 0)} className="w-full bg-white border border-outline-variant/20 rounded-xl px-3 py-2.5 text-xs font-medium text-right text-primary focus:ring-0 focus:border-emerald-500/50" />
+                            <input type="number" value={item.price} onChange={e => handleUpdateInvoiceItem(index, 'price', parseFloat(e.target.value) || 0)} className="w-full bg-white border border-outline-variant/20 rounded-xl px-3 py-2.5 text-xs font-medium text-right text-primary focus:ring-0 focus:border-emerald-500/50" />
                           </div>
                           <div className="text-right text-xs font-bold text-primary flex justify-between items-center md:items-end md:block">
                             <span className="md:hidden text-[9px] font-bold text-on-surface-variant uppercase tracking-widest">Total</span>
                             {(item.qty * item.price).toLocaleString()}
                           </div>
-                         <button onClick={() => setInvoiceDetails(prev => ({...prev, items: prev.items.filter(i => i.id !== item.id)}))} className="w-8 h-8 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 flex items-center justify-center transition-colors">
+                         <button onClick={() => handleRemoveInvoiceItem(index)} className="w-8 h-8 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 flex items-center justify-center transition-colors">
                            <span className="material-symbols-outlined text-sm">delete</span>
                          </button>
                         </div>
@@ -2027,7 +2180,7 @@ export default function BulkPay() {
                            </div>
                            <div className="text-right">
                               <h1 className="font-headline tracking-[0.2em] text-3xl font-black text-[#00351D] opacity-20 uppercase mb-2">Invoice</h1>
-                              <p className="font-bold text-primary text-sm">#{invoiceDetails.invoiceNumber}</p>
+                              <p className="font-bold text-primary text-sm">#{invoiceDetails.invoiceNumber || 'DRAFT'}</p>
                            </div>
                         </div>
 
@@ -2035,9 +2188,9 @@ export default function BulkPay() {
                         <div className="flex justify-between items-start mb-12">
                            <div>
                               <p className="text-[9px] text-on-surface-variant font-black uppercase tracking-widest opacity-60 mb-2">Bill To</p>
-                              <h3 className="font-bold text-primary text-base mb-1">{invoiceDetails.customer}</h3>
-                              <p className="text-xs text-on-surface-variant italic mb-1">billing@acmecorp.com</p>
-                              <p className="text-xs text-on-surface-variant max-w-[150px]">123 Market St, San Francisco, CA</p>
+                              <h3 className="font-bold text-primary text-base mb-1">{invoiceDetails.customer.name || 'Unnamed Customer'}</h3>
+                              <p className="text-xs text-on-surface-variant italic mb-1">{invoiceDetails.customer.email || '—'}</p>
+                              <p className="text-xs text-on-surface-variant max-w-[150px]">{invoiceDetails.customer.address || '—'}</p>
                            </div>
                            <div className="text-right flex flex-col gap-3">
                               <div>
@@ -2061,8 +2214,8 @@ export default function BulkPay() {
                            </div>
 
                            <div className="space-y-4">
-                             {invoiceDetails.items.map((item) => (
-                               <div key={item.id} className="grid grid-cols-[1fr_80px_100px_100px] gap-4 items-center border-b border-outline-variant/10 pb-4">
+                             {invoiceDetails.items.map((item, index) => (
+                               <div key={index} className="grid grid-cols-[1fr_80px_100px_100px] gap-4 items-center border-b border-outline-variant/10 pb-4">
                                   <span className="text-sm font-bold text-primary">{item.description || '—'}</span>
                                   <span className="text-sm text-on-surface-variant text-center">{item.qty}</span>
                                   <span className="text-sm text-on-surface-variant text-right">{item.price.toLocaleString()}</span>
@@ -2130,7 +2283,7 @@ export default function BulkPay() {
 
                 <div className="bg-surface-container-lowest/50 border border-outline-variant/20 rounded-2xl p-4 flex items-center justify-between gap-3 mb-6">
                    <p className="text-sm font-bold text-primary truncate flex-1">
-                     https://app.paychain.co.ke/invoice/{invoiceDetails.invoiceNumber.replace('INV-', '')}
+                     {invoiceDetails.payUrl}
                    </p>
                 </div>
 
