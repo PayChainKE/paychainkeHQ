@@ -31,7 +31,32 @@ export default function BulkPay() {
         const res = await axios.get(`${API_URL}/api/bulkpay/payees`, {
           headers: { Authorization: `Bearer ${token}` }
         })
-        setPayeesList(res.data)
+        // The rest of this page reads `p.id` (added/updated payees get it
+        // attached locally in handleSavePayee) — the raw API response only
+        // has Mongo's `_id`, so without this every payee loaded on initial
+        // fetch has `id === undefined`, silently breaking edit (PUTs to
+        // /payees/undefined) for any payee that isn't brand new this session.
+        // Same story for `salary`/`amount` — the Saved Payees sidebar reads
+        // `p.salary || p.amount`, which handleSavePayee sets locally but the
+        // raw fetch never did, so it showed "KES 0.00" for every payee that
+        // wasn't just added/edited in the current session.
+        const mapped = res.data.map(p => ({ ...p, id: p._id, salary: p.defaultAmount, amount: p.defaultAmount }))
+        setPayeesList(mapped)
+
+        // payoutAmounts is separate local state (it holds the amount the
+        // merchant is about to pay right now, editable per-batch) and was
+        // never seeded from each payee's saved `defaultAmount` — so every
+        // time this page reloaded, previously-set amounts appeared to
+        // "disappear" back to 0 even though they were still saved on the
+        // payee record. Seed it here, without clobbering anything already
+        // in progress in this session.
+        setPayoutAmounts(prev => {
+          const next = { ...prev }
+          mapped.forEach(p => {
+            if (next[p.id] === undefined) next[p.id] = p.defaultAmount || 0
+          })
+          return next
+        })
       } catch (error) {
         console.error('Error fetching payees:', error)
       }
@@ -312,6 +337,12 @@ export default function BulkPay() {
 
   const [invoicesList, setInvoicesList] = useState([]);
   const [invoiceFilter, setInvoiceFilter] = useState('All');
+  const [invoicePage, setInvoicePage] = useState(1);
+  const invoicesPerPage = 5;
+
+  const filteredInvoicesList = invoicesList.filter(inv => invoiceFilter === 'All' || inv.status === (invoiceFilter === 'Drafts' ? 'draft' : invoiceFilter.toLowerCase()));
+  const totalInvoicePages = Math.max(1, Math.ceil(filteredInvoicesList.length / invoicesPerPage));
+  const paginatedInvoicesList = filteredInvoicesList.slice((invoicePage - 1) * invoicesPerPage, invoicePage * invoicesPerPage);
 
   const invoiceSubtotal = invoiceDetails.items.reduce((sum, item) => sum + (item.qty * item.price), 0);
   const invoiceTotal = invoiceSubtotal; // Assuming no tax right now
@@ -347,6 +378,12 @@ export default function BulkPay() {
   }, []);
 
   useEffect(() => { fetchInvoices() }, [fetchInvoices]);
+
+  // Keep the current page in range as the (filtered) list shrinks — e.g.
+  // deleting the last invoice on the final page.
+  useEffect(() => {
+    setInvoicePage(prev => Math.min(prev, totalInvoicePages));
+  }, [totalInvoicePages]);
 
   const handleAddInvoiceItem = () => {
     setInvoiceDetails(prev => ({
@@ -487,13 +524,16 @@ export default function BulkPay() {
     }
   };
 
+  const [confirmDeleteInvoiceId, setConfirmDeleteInvoiceId] = useState(null);
+
   const handleDeleteInvoice = async (inv) => {
+    setConfirmDeleteInvoiceId(null);
     try {
       const token = localStorage.getItem('paychain_merchant_token');
       const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
       await axios.delete(`${API_URL}/api/invoices/${inv._id}`, { headers: { Authorization: `Bearer ${token}` } });
       setInvoicesList(prev => prev.filter(i => i._id !== inv._id));
-      addNotification({ title: 'Draft Deleted', message: `Invoice #${inv.invoiceNumber} was removed.`, type: 'success' });
+      addNotification({ title: 'Invoice Deleted', message: `Invoice #${inv.invoiceNumber} was removed.`, type: 'success' });
     } catch (err) {
       addNotification({ title: 'Error', message: err.response?.data?.error || 'Failed to delete invoice', type: 'error' });
     }
@@ -1624,7 +1664,7 @@ export default function BulkPay() {
                     {['All', 'Drafts', 'Sent', 'Paid'].map(f => (
                       <button
                         key={f}
-                        onClick={() => setInvoiceFilter(f)}
+                        onClick={() => { setInvoiceFilter(f); setInvoicePage(1); }}
                         className={`px-4 py-2 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${
                           invoiceFilter === f
                             ? 'bg-white text-primary shadow-[0_2px_10px_rgba(0,0,0,0.04)] border border-outline-variant/5'
@@ -1659,19 +1699,20 @@ export default function BulkPay() {
                <div className="mt-8">
                  <h4 className="text-xs font-black uppercase tracking-widest text-on-surface-variant opacity-50 mb-4">Recent Activity</h4>
                  <div className="flex flex-col gap-3">
-                   {invoicesList.length === 0 ? (
+                   {filteredInvoicesList.length === 0 ? (
                      <div className="p-8 rounded-[20px] bg-surface-container-lowest border border-outline-variant/10 text-center flex flex-col items-center">
                        <span className="material-symbols-outlined text-4xl text-on-surface-variant/40 mb-3">receipt_long</span>
                        <p className="text-sm font-bold text-primary mb-1">No recent invoices</p>
                        <p className="text-xs text-on-surface-variant opacity-70">Generate your first professional e-invoice to start getting paid.</p>
                      </div>
-                   ) : invoicesList.filter(inv => invoiceFilter === 'All' || inv.status === (invoiceFilter === 'Drafts' ? 'draft' : invoiceFilter.toLowerCase())).map(inv => {
+                   ) : paginatedInvoicesList.map(inv => {
                      const statusMeta = {
                        draft: { label: 'Draft', icon: 'edit_document', tone: 'bg-amber-50 text-amber-600', badge: 'bg-amber-100 text-amber-800' },
                        sent:  { label: 'Sent',  icon: 'send',          tone: 'bg-emerald-50 text-emerald-600', badge: 'bg-emerald-100 text-emerald-800' },
                        paid:  { label: 'Paid',  icon: 'check_circle',  tone: 'bg-blue-50 text-blue-600', badge: 'bg-blue-100 text-blue-800' },
                        void:  { label: 'Void',  icon: 'block',         tone: 'bg-slate-100 text-slate-500', badge: 'bg-slate-200 text-slate-600' },
                      }[inv.status] || { label: inv.status, icon: 'receipt_long', tone: 'bg-amber-50 text-amber-600', badge: 'bg-amber-100 text-amber-800' };
+                     const isConfirmingDelete = confirmDeleteInvoiceId === inv._id;
 
                      return (
                      <div key={inv._id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-[20px] bg-surface-container-lowest border border-outline-variant/10 shadow-sm hover:border-emerald-500/20 transition-all group gap-4">
@@ -1690,14 +1731,35 @@ export default function BulkPay() {
                          </div>
                        </div>
 
+                       {isConfirmingDelete ? (
+                         <div className="flex items-center justify-between gap-2 pl-14 sm:pl-0">
+                           <p className="text-[10px] text-red-600 font-bold leading-snug max-w-[180px]">
+                             {inv.status === 'sent' ? "This invoice's payment link will stop working. Delete anyway?" : 'Delete this draft?'}
+                           </p>
+                           <div className="flex items-center gap-2 shrink-0">
+                             <button
+                               onClick={() => setConfirmDeleteInvoiceId(null)}
+                               className="px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest text-on-surface-variant/60 hover:text-on-surface hover:bg-surface-container-low transition-colors"
+                             >
+                               Cancel
+                             </button>
+                             <button
+                               onClick={() => handleDeleteInvoice(inv)}
+                               className="px-3 py-2 rounded-xl bg-red-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-colors"
+                             >
+                               Delete
+                             </button>
+                           </div>
+                         </div>
+                       ) : (
                        <div className="flex items-center justify-between sm:gap-3 pl-14 sm:pl-0">
                          <div className="text-left sm:text-right">
                            <p className="text-xs font-bold text-primary">{inv.currency} {inv.total.toLocaleString()}</p>
                            <p className="text-[9px] text-on-surface-variant font-medium opacity-50 italic uppercase tracking-widest">Total value</p>
                          </div>
-                         {inv.status === 'draft' && (
+                         {inv.status !== 'paid' && (
                            <button
-                             onClick={() => handleDeleteInvoice(inv)}
+                             onClick={() => setConfirmDeleteInvoiceId(inv._id)}
                              className="w-10 h-10 sm:w-8 sm:h-8 rounded-xl bg-red-50 text-red-500 hover:bg-red-100 flex items-center justify-center transition-colors shadow-sm active:scale-90"
                            >
                              <span className="material-symbols-outlined text-[18px] sm:text-sm">delete</span>
@@ -1726,9 +1788,35 @@ export default function BulkPay() {
                            <span className="material-symbols-outlined text-[18px] sm:text-sm">{inv.status === 'paid' ? 'visibility' : 'edit'}</span>
                          </button>
                        </div>
+                       )}
                      </div>
                    )})}
                  </div>
+
+                 {filteredInvoicesList.length > invoicesPerPage && (
+                   <div className="mt-6 flex items-center justify-between">
+                     <p className="text-[10px] font-bold text-on-surface-variant opacity-60">
+                       Showing {paginatedInvoicesList.length} of {filteredInvoicesList.length}
+                     </p>
+                     <div className="flex items-center gap-2">
+                       <button
+                         onClick={() => setInvoicePage(prev => Math.max(1, prev - 1))}
+                         disabled={invoicePage === 1}
+                         className="w-8 h-8 rounded-full flex items-center justify-center bg-surface-container-lowest border border-outline-variant/10 text-primary shadow-sm hover:bg-primary hover:text-white disabled:opacity-20 disabled:hover:bg-surface-container-lowest disabled:hover:text-primary transition-all"
+                       >
+                         <span className="material-symbols-outlined text-lg">chevron_left</span>
+                       </button>
+                       <span className="text-[10px] font-bold text-primary px-1">{invoicePage} / {totalInvoicePages}</span>
+                       <button
+                         onClick={() => setInvoicePage(prev => Math.min(totalInvoicePages, prev + 1))}
+                         disabled={invoicePage >= totalInvoicePages}
+                         className="w-8 h-8 rounded-full flex items-center justify-center bg-surface-container-lowest border border-outline-variant/10 text-primary shadow-sm hover:bg-primary hover:text-white disabled:opacity-20 disabled:hover:bg-surface-container-lowest disabled:hover:text-primary transition-all"
+                       >
+                         <span className="material-symbols-outlined text-lg">chevron_right</span>
+                       </button>
+                     </div>
+                   </div>
+                 )}
                </div>
 
             </div>

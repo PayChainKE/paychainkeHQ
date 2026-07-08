@@ -201,6 +201,9 @@ export const sendInvoice = async (req, res) => {
     if (invoice.status === 'paid') return res.status(400).json({ error: 'This invoice has already been paid.' });
     if (!invoice.customer?.email) return res.status(400).json({ error: 'Add a customer email address before sending.' });
     if (!invoice.items?.length) return res.status(400).json({ error: 'Add at least one line item before sending.' });
+    if (invoice.items.some((i) => !i.description?.trim())) {
+      return res.status(400).json({ error: 'Every line item needs a description before sending.' });
+    }
 
     const { subtotal, total } = computeTotals(invoice.items);
     if (total <= 0) return res.status(400).json({ error: 'Invoice total must be greater than zero.' });
@@ -208,17 +211,18 @@ export const sendInvoice = async (req, res) => {
     const merchant = await Merchant.findById(req.merchant._id);
 
     // Reuse an existing active payment link if one is still valid, otherwise mint a fresh one.
+    // Invoice-backed links get 90 days — invoices are often issued against
+    // longer payment terms than an ad-hoc "request money" link, so they get
+    // a longer runway than the platform's default 48h payment-link expiry.
     let link = invoice.paymentLinkId;
     if (!link || link.status !== 'active') {
-      const dueMs = invoice.dueDate ? invoice.dueDate.getTime() : 0;
-      const minExpiry = Date.now() + 24 * 60 * 60 * 1000;
       link = await PaymentLink.create({
         merchantId: merchant._id,
         linkId: crypto.randomBytes(4).toString('hex'),
         amount: total,
         currency: invoice.currency,
         status: 'active',
-        expiresAt: new Date(Math.max(dueMs, minExpiry)),
+        expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
         invoiceId: invoice._id,
       });
       invoice.paymentLinkId = link._id;
@@ -259,7 +263,13 @@ export const deleteInvoice = async (req, res) => {
   try {
     const invoice = await Invoice.findOne({ _id: req.params.id, merchantId: req.merchant._id });
     if (!invoice) return res.status(404).json({ error: 'Invoice not found.' });
-    if (invoice.status !== 'draft') return res.status(400).json({ error: 'Only draft invoices can be deleted.' });
+    if (invoice.status === 'paid') return res.status(400).json({ error: 'Paid invoices cannot be deleted — they are kept for your financial records.' });
+
+    // Deleting a sent invoice also kills the M-PESA link the customer was
+    // emailed, so it can't be paid into after the merchant has cancelled it.
+    if (invoice.paymentLinkId) {
+      await PaymentLink.findByIdAndUpdate(invoice.paymentLinkId, { status: 'expired' });
+    }
 
     await invoice.deleteOne();
     res.json({ success: true });
@@ -305,5 +315,92 @@ export const getPublicInvoice = async (req, res) => {
   } catch (error) {
     console.error('❌ Error fetching public invoice:', error);
     res.status(500).json({ error: 'Failed to fetch invoice.' });
+  }
+};
+
+// @desc    List every invoice across every merchant, paginated/searchable —
+//          the platform-wide view for admin oversight.
+// @route   GET /api/admin/invoices
+// @access  Private (admin)
+export const adminListInvoices = async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(5, parseInt(req.query.limit, 10) || 25));
+    const status = req.query.status && req.query.status !== 'all' ? req.query.status : null;
+    const q = (req.query.q || '').trim();
+
+    const filter = {};
+    if (status) filter.status = status;
+    if (q) {
+      filter.$or = [
+        { invoiceNumber: { $regex: q, $options: 'i' } },
+        { 'customer.name': { $regex: q, $options: 'i' } },
+        { 'customer.email': { $regex: q, $options: 'i' } },
+      ];
+    }
+
+    // Per-document totals aren't stored (items can change while a draft is
+    // edited), so the summary is computed via aggregation rather than a
+    // stored field — keeps a single source of truth for "what's the total".
+    const totalsPipeline = [
+      { $match: filter },
+      { $addFields: {
+        computedTotal: { $sum: { $map: { input: '$items', as: 'i', in: { $multiply: ['$$i.qty', '$$i.price'] } } } },
+      } },
+      { $group: { _id: '$status', count: { $sum: 1 }, totalAmount: { $sum: '$computedTotal' } } },
+    ];
+
+    const [total, invoices, totalsByStatus] = await Promise.all([
+      Invoice.countDocuments(filter),
+      Invoice.find(filter)
+        .sort('-createdAt')
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .populate('merchantId', 'businessName email paybillAccount')
+        .populate('paymentLinkId', 'linkId status')
+        .lean(),
+      Invoice.aggregate(totalsPipeline),
+    ]);
+
+    const summary = { draft: { count: 0, totalAmount: 0 }, sent: { count: 0, totalAmount: 0 }, paid: { count: 0, totalAmount: 0 }, void: { count: 0, totalAmount: 0 } };
+    for (const row of totalsByStatus) {
+      if (summary[row._id]) summary[row._id] = { count: row.count, totalAmount: row.totalAmount };
+    }
+
+    res.json({
+      success: true,
+      invoices: invoices.map((inv) => {
+        const { subtotal, total: invTotal } = computeTotals(inv.items);
+        return {
+          _id: inv._id,
+          invoiceNumber: inv.invoiceNumber,
+          merchant: inv.merchantId ? {
+            _id: inv.merchantId._id,
+            businessName: inv.merchantId.businessName,
+            email: inv.merchantId.email,
+            paybillAccount: inv.merchantId.paybillAccount,
+          } : null,
+          customer: inv.customer,
+          currency: inv.currency,
+          subtotal,
+          total: invTotal,
+          status: inv.status,
+          issueDate: inv.issueDate,
+          dueDate: inv.dueDate,
+          sentAt: inv.sentAt,
+          paidAt: inv.paidAt,
+          createdAt: inv.createdAt,
+          paymentLinkStatus: inv.paymentLinkId?.status || null,
+        };
+      }),
+      page,
+      limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+      summary,
+    });
+  } catch (error) {
+    console.error('❌ Error listing invoices (admin):', error);
+    res.status(500).json({ error: 'Failed to fetch invoices.' });
   }
 };

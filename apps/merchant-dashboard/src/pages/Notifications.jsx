@@ -1,129 +1,161 @@
-import React from 'react'
+import React, { useState } from 'react'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import { useNotification } from '../context/NotificationContext'
 
+const ICON_META = {
+  payment:  { icon: 'payments',                bg: 'bg-emerald-50', text: 'text-emerald-600' },
+  wallet:   { icon: 'account_balance_wallet',   bg: 'bg-blue-50',    text: 'text-blue-600'    },
+  security: { icon: 'shield',                   bg: 'bg-amber-50',  text: 'text-amber-600'   },
+  default:  { icon: 'notifications',            bg: 'bg-slate-100', text: 'text-slate-500'   },
+}
+const metaFor = (type) => ICON_META[type] || ICON_META.default
+
+const timeAgo = (dateStr) => {
+  const diffMs = Date.now() - new Date(dateStr).getTime()
+  const min = Math.floor(diffMs / 60000)
+  if (min < 1) return 'Just now'
+  if (min < 60) return `${min}m ago`
+  const hr = Math.floor(min / 60)
+  if (hr < 24) return `${hr}h ago`
+  const day = Math.floor(hr / 24)
+  if (day < 7) return `${day}d ago`
+  return new Date(dateStr).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
 export default function Notifications() {
-  const { 
-    notifications, 
-    markAsRead, 
-    markAllAsRead, 
-    deleteNotification 
+  const {
+    notifications,
+    markAsRead,
+    markAllAsRead,
+    deleteNotification
   } = useNotification()
 
-  const getIcon = (type) => {
-    switch (type) {
-      case 'advance': return 'payments'
-      case 'trust_score': return 'trending_up'
-      case 'payment': return 'check_circle'
-      default: return 'notifications'
-    }
-  }
+  const [filter, setFilter] = useState('all')
 
-  const getIconColor = (type) => {
-    switch (type) {
-      case 'advance': return 'text-emerald-600'
-      case 'trust_score': return 'text-blue-600'
-      case 'payment': return 'text-purple-600'
-      default: return 'text-primary'
-    }
-  }
+  const unreadCount = notifications.filter(n => !n.isRead).length
+  const visible = filter === 'unread' ? notifications.filter(n => !n.isRead) : notifications
 
   return (
     <MerchantLayout title="Notifications">
-      <div className="max-w-4xl mx-auto px-4 lg:px-0 py-6 lg:py-10 animate-fade-in-up">
-        {/* Header Section */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 lg:mb-12">
+      <div className="max-w-3xl mx-auto px-4 lg:px-0 py-6 lg:py-10 animate-fade-in-up">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <div>
-            <h2 className="text-3xl lg:text-5xl font-headline font-bold tracking-tight text-primary">Alert Center</h2>
-            <p className="text-on-surface-variant font-medium mt-1 opacity-70">
-              Stay updated with your business performance and account alerts.
+            <h2 className="text-2xl lg:text-3xl font-headline font-bold tracking-tight text-primary">Notifications</h2>
+            <p className="text-on-surface-variant text-sm mt-1 opacity-70">
+              Everything happening in your business, in one place.
             </p>
           </div>
-          <button 
-            onClick={markAllAsRead}
-            className="px-4 py-2 bg-white text-emerald-700 text-xs font-black rounded-xl hover:bg-slate-50 transition-all flex items-center gap-1.5 border border-slate-200 shadow-sm active:scale-95"
-          >
-            <span className="material-symbols-outlined text-base">done_all</span>
-            Mark all as read
-          </button>
+          {unreadCount > 0 && (
+            <button
+              onClick={markAllAsRead}
+              className="px-4 py-2 bg-white text-primary text-xs font-semibold rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-1.5 border border-outline-variant/30"
+            >
+              <span className="material-symbols-outlined text-base">done_all</span>
+              Mark all as read
+            </button>
+          )}
+        </div>
+
+        {/* Filter tabs */}
+        <div className="flex items-center gap-1 mb-5 border-b border-outline-variant/20">
+          {[
+            { key: 'all', label: 'All' },
+            { key: 'unread', label: `Unread${unreadCount ? ` (${unreadCount})` : ''}` },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setFilter(tab.key)}
+              className={`px-4 py-2.5 text-sm font-semibold transition-colors border-b-2 -mb-px ${
+                filter === tab.key
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-on-surface-variant/60 hover:text-primary'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
         {/* Notifications List */}
-        <div className="space-y-4">
-          {notifications.length === 0 ? (
-            <div className="bg-white rounded-[32px] p-16 text-center border border-outline-variant/15 editorial-shadow">
-              <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                <span className="material-symbols-outlined text-4xl text-emerald-600 opacity-30">notifications_off</span>
+        <div className="bg-white rounded-2xl border border-outline-variant/15 overflow-hidden editorial-shadow">
+          {visible.length === 0 ? (
+            <div className="p-16 text-center">
+              <div className="w-14 h-14 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="material-symbols-outlined text-2xl text-slate-300">notifications_none</span>
               </div>
-              <h3 className="text-xl font-headline text-primary mb-2">Inbox is clear</h3>
-              <p className="text-on-surface-variant opacity-60">You're all caught up! No new notifications.</p>
+              <h3 className="text-base font-semibold text-primary mb-1">
+                {filter === 'unread' ? "You're all caught up" : 'Nothing here yet'}
+              </h3>
+              <p className="text-on-surface-variant text-sm opacity-60">
+                {filter === 'unread'
+                  ? 'No unread notifications right now.'
+                  : "We'll let you know the moment something needs your attention."}
+              </p>
             </div>
           ) : (
-            notifications.map((n) => (
-              <div 
-                key={n.id}
-                className={`group relative bg-white rounded-3xl p-5 lg:p-6 border transition-all duration-300 editorial-shadow hover:-translate-y-1 ${!n.isRead ? 'border-primary/20 bg-emerald-50/20 ring-1 ring-primary/5' : 'border-outline-variant/15 opacity-80 hover:opacity-100'}`}
-              >
-                {!n.isRead && (
-                  <div className="absolute top-6 right-6 w-2 h-2 bg-red-600 rounded-full ring-4 ring-red-600/10 animate-pulse"></div>
-                )}
-                
-                <div className="flex gap-4 lg:gap-6">
-                  <div className={`w-12 h-12 lg:w-14 lg:h-14 flex items-center justify-center shrink-0 transition-transform group-hover:scale-110 duration-500 ${getIconColor(n.type)}`}>
-                    <span className="material-symbols-outlined text-3xl lg:text-4xl">{getIcon(n.type)}</span>
+            visible.map((n, idx) => {
+              const meta = metaFor(n.type)
+              return (
+                <div
+                  key={n.id}
+                  className={`group flex gap-4 px-5 lg:px-6 py-4 lg:py-5 transition-colors ${idx !== 0 ? 'border-t border-outline-variant/10' : ''} ${
+                    !n.isRead ? 'bg-emerald-50/40' : 'hover:bg-slate-50/70'
+                  }`}
+                >
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${meta.bg} ${meta.text}`}>
+                    <span className="material-symbols-outlined text-xl">{meta.icon}</span>
                   </div>
-                  
-                  <div className="flex-1 pr-8">
-                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-1 mb-2">
-                       <p className="text-[10px] font-black uppercase tracking-widest text-primary/40">
-                         {new Date(n.createdAt).toLocaleDateString('en-KE', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                       </p>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          {!n.isRead && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />}
+                          <p className={`text-sm font-semibold truncate ${!n.isRead ? 'text-primary' : 'text-on-surface-variant'}`}>
+                            {n.title || 'Notification'}
+                          </p>
+                        </div>
+                        <p className="text-sm text-on-surface-variant/80 mt-0.5 leading-snug">{n.message}</p>
+                      </div>
+                      <span className="text-xs text-on-surface-variant/50 shrink-0 whitespace-nowrap pt-0.5">
+                        {timeAgo(n.createdAt)}
+                      </span>
                     </div>
-                    <p className={`text-base lg:text-lg font-bold leading-snug tracking-tight ${!n.isRead ? 'text-primary' : 'text-on-surface-variant'}`}>{n.message}</p>
-                    
-                    <div className="flex flex-wrap items-center gap-4 mt-4 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-all duration-300">
+
+                    <div className="flex items-center gap-4 mt-2.5 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                       {!n.isRead && (
-                        <button 
+                        <button
                           onClick={() => markAsRead(n.id)}
-                          className="text-xs font-black uppercase tracking-widest text-emerald-600 hover:text-emerald-700 transition-colors"
+                          className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 transition-colors"
                         >
                           Mark as read
                         </button>
                       )}
-                      <button 
+                      <button
                         onClick={() => deleteNotification(n.id)}
-                        className="text-xs font-black uppercase tracking-widest text-red-600 hover:text-red-700 transition-colors"
+                        className="text-xs font-semibold text-red-600 hover:text-red-700 transition-colors"
                       >
                         Delete
                       </button>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))
+              )
+            })
           )}
         </div>
 
-        {/* Info Box - Dark Green Premium Theme */}
-        <div className="mt-10 lg:mt-16 bg-[#06201B] p-6 lg:p-12 rounded-[32px] lg:rounded-[40px] relative overflow-hidden group shadow-2xl">
-          <div className="absolute -top-24 -right-24 w-80 h-80 bg-emerald-500 rounded-full blur-[100px] opacity-20 pointer-events-none transition-transform duration-1000 group-hover:scale-150"></div>
-          <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-emerald-600 rounded-full blur-[80px] opacity-10 pointer-events-none"></div>
-          
-          <div className="flex flex-col lg:flex-row items-center lg:items-center gap-8 lg:gap-12 relative z-10">
-            <div className="w-16 h-16 lg:w-20 lg:h-20 rounded-3xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-inner backdrop-blur-sm">
-              <span className="material-symbols-outlined text-4xl group-hover:scale-110 transition-transform duration-500">settings_suggest</span>
-            </div>
-            
-            <div className="flex-1 text-center lg:text-left">
-              <h4 className="text-white text-xl sm:text-2xl lg:text-4xl font-headline font-bold tracking-tight mb-3 lg:mb-4">Notification Settings</h4>
-              <p className="text-blue-100/70 text-sm lg:text-xl leading-relaxed max-w-2xl font-medium mx-auto lg:mx-0">
-                You're currently receiving all system alerts via the <span className="text-emerald-400 font-black">Merchant Dashboard</span> and <span className="text-white font-black">primary registered phone number</span>. 
-              </p>
-              <div className="mt-8 flex flex-col lg:flex-row items-center gap-3 text-emerald-400/60 transition-colors group-hover:text-emerald-400">
-                <span className="material-symbols-outlined text-xl">info</span>
-                <p className="text-[10px] lg:text-[12px] font-black uppercase tracking-[0.2em]">To adjust your preferences, contact your onboarding officer.</p>
-              </div>
-            </div>
+        {/* Settings note */}
+        <div className="mt-8 bg-[#06201B] rounded-2xl p-6 lg:p-8 flex flex-col sm:flex-row items-start gap-5">
+          <div className="w-11 h-11 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-emerald-400 shrink-0">
+            <span className="material-symbols-outlined text-xl">settings_suggest</span>
+          </div>
+          <div>
+            <h4 className="text-white text-base font-semibold mb-1.5">How you're notified</h4>
+            <p className="text-white/60 text-sm leading-relaxed">
+              Every alert lands here in your dashboard the moment it happens. Want that to change? Reach out to your onboarding officer and we'll sort it out.
+            </p>
           </div>
         </div>
       </div>

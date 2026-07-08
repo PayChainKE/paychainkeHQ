@@ -2,10 +2,13 @@ import axios from 'axios';
 import Transaction from '../models/Transaction.js';
 import Merchant from '../models/Merchant.js';
 import { sendSMS } from '../utils/sms.js';
+import { sendInvoicePaidReceiptEmail } from '../utils/resend.js';
 import { settleInflationShield } from '../utils/stellarHelper.js';
 import { getLiveKesToUsdcRate } from '../utils/rateEngine.js';
 import STKRequest from '../models/STKRequest.js';
 import PayoutBatch from '../models/PayoutBatch.js';
+import PaymentLink from '../models/PaymentLink.js';
+import Invoice from '../models/Invoice.js';
 import { createNotification } from './notificationController.js';
 
 // ── M-PESA configuration ──────────────────────────────────────────────────────
@@ -418,39 +421,96 @@ export const stkCallback = async (req, res) => {
       stkReq.resultDesc = ResultDesc;
       await stkReq.save();
 
-      // Automatically add funds to the merchant's KES balance 
-      // (For STK top up, we skip inflation shield since they are funding their local wallet intentionally)
-      const merchant = await Merchant.findById(stkReq.merchantId);
-      if (merchant) {
-        merchant.kesBalance = (merchant.kesBalance || 0) + stkReq.amount;
-        await merchant.save();
+      const receiptItem = CallbackMetadata?.Item.find(i => i.Name === 'MpesaReceiptNumber');
+      const receipt = receiptItem ? receiptItem.Value : CheckoutRequestID;
 
-        // Find the exact receipt number if possible
-        const receiptItem = CallbackMetadata?.Item.find(i => i.Name === 'MpesaReceiptNumber');
-        const receipt = receiptItem ? receiptItem.Value : CheckoutRequestID;
+      if (stkReq.linkId) {
+        // Settling a PaymentLink (optionally backing an Invoice) — this is
+        // the customer-facing "pay this link" flow, not a wallet top-up.
+        const link = await PaymentLink.findOne({ linkId: stkReq.linkId }).populate('merchantId');
+        if (link && link.status === 'active') {
+          link.status = 'paid';
+          await link.save();
 
-        await Transaction.create({
-          merchantId: merchant._id,
-          accountNumber: merchant.paybillAccount || 'WALLET_FUND',
-          type: 'top_up',
-          amount: stkReq.amount,
-          kesAmount: stkReq.amount,
-          currency: 'KES',
-          status: 'completed',
-          reference: receipt,
-          sender: { name: 'M-PESA Express', id: stkReq.phone },
-          recipient: { name: merchant.businessName, id: 'WALLET' }
-        });
+          let paidInvoice = null;
+          if (link.invoiceId) {
+            paidInvoice = await Invoice.findByIdAndUpdate(link.invoiceId, { status: 'paid', paidAt: new Date() }, { new: true });
+          }
 
-        createNotification({
-          merchantId: merchant._id,
-          kind: 'wallet',
-          title: 'Wallet topped up',
-          message: `KES ${stkReq.amount.toLocaleString()} was added to your balance via M-PESA.`,
-        });
+          const merchant = link.merchantId;
+          if (merchant) {
+            merchant.kesBalance = (merchant.kesBalance || 0) + stkReq.amount;
+            await merchant.save();
+
+            await Transaction.create({
+              merchantId: merchant._id,
+              accountNumber: merchant.paybillAccount || 'WALLET_FUND',
+              type: 'inbound',
+              amount: stkReq.amount,
+              kesAmount: stkReq.amount,
+              currency: 'KES',
+              status: 'completed',
+              reference: receipt,
+              sender: { name: 'M-PESA Express', id: stkReq.phone },
+              recipient: { name: merchant.businessName, id: merchant.paybillAccount },
+            });
+
+            createNotification({
+              merchantId: merchant._id,
+              kind: 'payment',
+              title: link.invoiceId ? 'Invoice paid' : 'Payment link paid',
+              message: `KES ${stkReq.amount.toLocaleString()} ${link.invoiceId ? 'invoice' : 'payment link'} was paid by a customer.`,
+            });
+
+            if (paidInvoice && merchant.email) {
+              const paidSubtotal = (paidInvoice.items || []).reduce((sum, i) => sum + i.qty * i.price, 0);
+              sendInvoicePaidReceiptEmail({
+                to: merchant.email,
+                businessName: merchant.businessName,
+                invoiceNumber: paidInvoice.invoiceNumber,
+                customerName: paidInvoice.customer?.name || 'Customer',
+                items: paidInvoice.items,
+                currency: paidInvoice.currency,
+                subtotal: paidSubtotal,
+                total: paidSubtotal,
+                paidAt: paidInvoice.paidAt,
+                mpesaReceipt: receipt,
+                payerPhone: stkReq.phone,
+              }).catch((e) => console.error('❌ Failed to send invoice-paid receipt email:', e.message));
+            }
+          }
+        }
+      } else {
+        // Plain wallet top-up.
+        // (For STK top up, we skip inflation shield since they are funding their local wallet intentionally)
+        const merchant = await Merchant.findById(stkReq.merchantId);
+        if (merchant) {
+          merchant.kesBalance = (merchant.kesBalance || 0) + stkReq.amount;
+          await merchant.save();
+
+          await Transaction.create({
+            merchantId: merchant._id,
+            accountNumber: merchant.paybillAccount || 'WALLET_FUND',
+            type: 'top_up',
+            amount: stkReq.amount,
+            kesAmount: stkReq.amount,
+            currency: 'KES',
+            status: 'completed',
+            reference: receipt,
+            sender: { name: 'M-PESA Express', id: stkReq.phone },
+            recipient: { name: merchant.businessName, id: 'WALLET' }
+          });
+
+          createNotification({
+            merchantId: merchant._id,
+            kind: 'wallet',
+            title: 'Wallet topped up',
+            message: `KES ${stkReq.amount.toLocaleString()} was added to your balance via M-PESA.`,
+          });
+        }
       }
     } else {
-      // Cancelled or Failed
+      // Cancelled or Failed — leave the PaymentLink 'active' so the customer can retry.
       stkReq.status = 'failed';
       stkReq.resultDesc = ResultDesc;
       await stkReq.save();

@@ -13,6 +13,14 @@ const stkRequestSchema = new Schema({
     required: true,
     unique: true
   },
+  // Set when this STK push was raised to settle a PaymentLink (and, via the
+  // link, possibly an Invoice) rather than a plain wallet top-up. Lets the
+  // callback route the confirmation to the right place instead of always
+  // crediting kesBalance.
+  linkId: {
+    type: String,
+    default: null,
+  },
   amount: {
     type: Number,
     required: true

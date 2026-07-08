@@ -76,7 +76,9 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
 
-app.use(express.json({ limit: '1mb' }));
+// 5mb to comfortably fit a base64-encoded multi-page statement PDF attachment
+// (statement emailing uploads the already-generated PDF for Resend to send).
+app.use(express.json({ limit: '5mb' }));
 
 app.get('/', (req, res) => {
   res.send('PayChainKE API is running...');

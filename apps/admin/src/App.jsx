@@ -15,6 +15,7 @@ import CashAdvanceRequests from './pages/CashAdvanceRequests';
 import UserDashboard from './pages/UserDashboard';
 import Newsletter from './pages/Newsletter';
 import WalletAudit from './pages/WalletAudit';
+import Invoices from './pages/Invoices';
 import CallCentre from './pages/CallCentre';
 import AuditLog from './pages/AuditLog';
 import Revenue from './pages/Revenue';
@@ -51,6 +52,7 @@ export default function App(){
             <Route path="/ledger" element={<Protected><Ledger/></Protected>} />
             <Route path="/revenue" element={<Protected><Revenue/></Protected>} />
             <Route path="/wallet-audit" element={<Protected><WalletAudit/></Protected>} />
+            <Route path="/invoices" element={<Protected><Invoices/></Protected>} />
             <Route path="/audit-log" element={<Protected><AuditLog/></Protected>} />
             <Route path="/settings" element={<Protected><Settings/></Protected>} />
             </Routes>

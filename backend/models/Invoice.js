@@ -1,7 +1,12 @@
 import mongoose from 'mongoose';
 
 const invoiceItemSchema = new mongoose.Schema({
-  description: { type: String, required: true, default: '' },
+  // Not required: a draft is explicitly allowed to have blank/unfilled line
+  // items (a merchant saving progress mid-edit) — Mongoose treats '' as
+  // "missing" for a required String, which was blocking every draft save
+  // that had an empty description. Completeness is enforced later, at
+  // send time, in invoiceController.sendInvoice — not at the schema level.
+  description: { type: String, default: '' },
   qty: { type: Number, required: true, default: 1 },
   price: { type: Number, required: true, default: 0 },
 }, { _id: false });

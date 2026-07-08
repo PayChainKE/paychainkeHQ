@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { usePrivacyMode } from '../../hooks/usePrivacyMode'
 import { useMerchantAuth } from '../../context/MerchantAuthContext'
 import { useNotification } from '../../context/NotificationContext'
+import { formatKES } from '../../utils/formatCurrency'
 import userIcon from '../../assets/user-icon.png'
 import logo from '../../assets/logo2.png'
 
@@ -215,7 +216,7 @@ export default function MerchantSidebar({ isOpen, onClose }) {
       <div className="p-6 mt-auto">
         <div className="bg-[#0D241E] rounded-[16px] p-5 mb-8 border border-white/5">
           <p className="text-[#5EFEB3] text-[9px] font-bold uppercase tracking-widest mb-2">Available Funds</p>
-          <p className={`text-white font-headline text-2xl tracking-tight mb-0.5 transition-all duration-300 ${!showAmounts && 'blur-md'}`}>KES {new Intl.NumberFormat().format(merchant?.kesBalance ?? 0)}</p>
+          <p className={`text-white font-headline text-2xl tracking-tight mb-0.5 transition-all duration-300 ${!showAmounts && 'blur-md'}`}>{formatKES(merchant?.kesBalance ?? 0)}</p>
           <p className={`text-[#a8b3a8] text-[10px] transition-all duration-300 ${!showAmounts && 'blur-sm'}`}>{(merchant?.kesBalance ? (merchant.kesBalance / 130).toFixed(2) : '0.00')} USDC</p>
         </div>
 
