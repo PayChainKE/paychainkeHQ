@@ -350,7 +350,20 @@ export const adminListInvoices = async (req, res) => {
       { $group: { _id: '$status', count: { $sum: 1 }, totalAmount: { $sum: '$computedTotal' } } },
     ];
 
-    const [total, invoices, totalsByStatus] = await Promise.all([
+    // Overdue = sent, has a due date, and that due date has passed. Computed
+    // independently of the status tab/filter (search term still applies) so
+    // the "Overdue" KPI stays a stable, always-visible signal rather than
+    // disappearing whenever a different status tab is selected.
+    const overdueMatch = { status: 'sent', dueDate: { $ne: null, $lt: new Date() } };
+    if (q) {
+      overdueMatch.$or = [
+        { invoiceNumber: { $regex: q, $options: 'i' } },
+        { 'customer.name': { $regex: q, $options: 'i' } },
+        { 'customer.email': { $regex: q, $options: 'i' } },
+      ];
+    }
+
+    const [total, invoices, totalsByStatus, overdueAgg] = await Promise.all([
       Invoice.countDocuments(filter),
       Invoice.find(filter)
         .sort('-createdAt')
@@ -360,12 +373,20 @@ export const adminListInvoices = async (req, res) => {
         .populate('paymentLinkId', 'linkId status')
         .lean(),
       Invoice.aggregate(totalsPipeline),
+      Invoice.aggregate([
+        { $match: overdueMatch },
+        { $addFields: {
+          computedTotal: { $sum: { $map: { input: '$items', as: 'i', in: { $multiply: ['$$i.qty', '$$i.price'] } } } },
+        } },
+        { $group: { _id: null, count: { $sum: 1 }, totalAmount: { $sum: '$computedTotal' } } },
+      ]),
     ]);
 
     const summary = { draft: { count: 0, totalAmount: 0 }, sent: { count: 0, totalAmount: 0 }, paid: { count: 0, totalAmount: 0 }, void: { count: 0, totalAmount: 0 } };
     for (const row of totalsByStatus) {
       if (summary[row._id]) summary[row._id] = { count: row.count, totalAmount: row.totalAmount };
     }
+    summary.overdue = overdueAgg[0] ? { count: overdueAgg[0].count, totalAmount: overdueAgg[0].totalAmount } : { count: 0, totalAmount: 0 };
 
     res.json({
       success: true,
