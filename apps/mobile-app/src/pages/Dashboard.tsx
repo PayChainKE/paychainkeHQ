@@ -63,16 +63,22 @@ export default function Dashboard({ navigation }: any) {
     ? merchant.businessName.substring(0, 2).toUpperCase()
     : '??';
 
-  const features = merchant?.features || { digitalWallet: true, inflationShield: true };
-  const digitalWalletEnabled = features.digitalWallet !== false;
-  const inflationShieldEnabled = features.inflationShield !== false;
-
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(amount);
   };
 
   const hour = now.getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+
+  const isSameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  const isSameMonth = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
+
+  const inboundTransactions = transactions.filter((tx) => tx.type === 'inbound');
+  const todayInbound = inboundTransactions.filter((tx) => isSameDay(new Date(tx.createdAt), now));
+  const monthInbound = inboundTransactions.filter((tx) => isSameMonth(new Date(tx.createdAt), now));
+  const todayTotal = todayInbound.reduce((sum, tx) => sum + (tx.kesAmount || tx.amount || 0), 0);
+  const monthTotal = monthInbound.reduce((sum, tx) => sum + (tx.kesAmount || tx.amount || 0), 0);
 
 
   return (
@@ -119,7 +125,13 @@ export default function Dashboard({ navigation }: any) {
               <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', letterSpacing: -1 }} className="text-4xl text-white leading-none">
                 {formatCurrency(merchant?.kesBalance || 0)}
               </Text>
-              <View className="flex-row items-center justify-end mt-4">
+              <View className="flex-row items-center justify-between mt-4">
+                {todayTotal > 0 ? (
+                  <View className="flex-row items-center gap-1.5 bg-[#83f5c6]/20 px-3 py-1.5 rounded-full border border-[#83f5c6]/20">
+                    <Feather name="trending-up" size={14} color="#83f5c6" />
+                    <Text className="text-[#83f5c6] font-jakarta-bold text-sm">+{formatCurrency(todayTotal)} today</Text>
+                  </View>
+                ) : <View />}
                 <View className="bg-white/10 px-3 py-1.5 rounded-full border border-white/20 mb-1">
                   <Text className="text-white text-[10px] font-jakarta-bold uppercase tracking-widest">Till No: {merchant?.paybillAccount || 'PENDING'}</Text>
                 </View>
@@ -147,16 +159,14 @@ export default function Dashboard({ navigation }: any) {
               <Text className="text-[11px] font-jakarta-bold text-[#1b1c1a] uppercase tracking-widest">Pay</Text>
             </TouchableOpacity>
 
-            {inflationShieldEnabled && (
-              <TouchableOpacity className="items-center" activeOpacity={0.8} onPress={() => navigation?.navigate('InflationShield')}>
-                <View className="w-[72px] h-[72px] rounded-full bg-white shadow-lg shadow-black/10 items-center justify-center mb-2.5">
-                  <View className="w-12 h-12 rounded-full bg-[#83f5c6] items-center justify-center">
-                    <MaterialIcons name="swap-horiz" size={24} color="#00351d" />
-                  </View>
+            <TouchableOpacity className="items-center" activeOpacity={0.8} onPress={() => navigation?.navigate('InflationShield')}>
+              <View className="w-[72px] h-[72px] rounded-full bg-white shadow-lg shadow-black/10 items-center justify-center mb-2.5">
+                <View className="w-12 h-12 rounded-full bg-[#83f5c6] items-center justify-center">
+                  <MaterialIcons name="swap-horiz" size={24} color="#00351d" />
                 </View>
-                <Text className="text-[11px] font-jakarta-bold text-[#1b1c1a] uppercase tracking-widest">Move Money</Text>
-              </TouchableOpacity>
-            )}
+              </View>
+              <Text className="text-[11px] font-jakarta-bold text-[#1b1c1a] uppercase tracking-widest">Move Money</Text>
+            </TouchableOpacity>
 
             <TouchableOpacity className="items-center" activeOpacity={0.8} onPress={() => navigation?.navigate('Advance')}>
               <View className="w-[72px] h-[72px] rounded-full bg-white shadow-lg shadow-black/10 items-center justify-center mb-2.5">
@@ -186,8 +196,7 @@ export default function Dashboard({ navigation }: any) {
           </View>
 
           {/* Digital Ledgers */}
-          {digitalWalletEnabled && (
-            <View className="mb-8">
+          <View className="mb-8">
               <View className="px-6 flex-row items-center justify-between mb-4">
                 <Text className="text-lg font-jakarta-bold text-[#1b1c1a]">Digital Ledgers</Text>
                 <TouchableOpacity>
@@ -230,8 +239,32 @@ export default function Dashboard({ navigation }: any) {
                   </View>
                 </View>
               </ScrollView>
+          </View>
+
+          {/* This Month Performance */}
+          <View className="px-6 mb-8">
+            <View className="bg-white rounded-[32px] p-6 shadow-sm border border-[#c0c9c0]/10">
+              <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-[0.15em] mb-6">This Month Performance</Text>
+              <View className="flex-row justify-between">
+                <View>
+                  <Text className="text-[#1b1c1a] text-[10px] font-jakarta-bold uppercase tracking-wider mb-1">Revenue</Text>
+                  <Text className="text-[#006c4e] text-[16px] font-jakarta-extrabold">{formatCurrency(monthTotal)}</Text>
+                </View>
+                <View className="w-[1px] h-full bg-[#efeeeb]" />
+                <View>
+                  <Text className="text-[#1b1c1a] text-[10px] font-jakarta-bold uppercase tracking-wider mb-1">Payments</Text>
+                  <Text className="text-[#1b1c1a] text-[16px] font-jakarta-extrabold">{monthInbound.length}</Text>
+                </View>
+                <View className="w-[1px] h-full bg-[#efeeeb]" />
+                <View>
+                  <Text className="text-[#1b1c1a] text-[10px] font-jakarta-bold uppercase tracking-wider mb-1">Trust Score</Text>
+                  <View className="flex-row items-center gap-1.5">
+                    <Text className="text-[#1b1c1a] text-[16px] font-jakarta-extrabold">{trustScore.current || 0}/100</Text>
+                  </View>
+                </View>
+              </View>
             </View>
-          )}
+          </View>
 
           {/* Recent Activity */}
           <View className="px-6 mb-8">
@@ -300,13 +333,19 @@ export default function Dashboard({ navigation }: any) {
                     {trustScore.eligibleForAdvance ? 'KES 150,000' : 'KES 0'}
                   </Text>
                 </View>
-                <View className={`w-14 h-14 rounded-2xl items-center justify-center ${trustScore.eligibleForAdvance ? 'bg-[#e7f8ef]' : 'bg-[#faf9f6]'}`}>
-                  <MaterialIcons
-                    name={trustScore.eligibleForAdvance ? 'lock-open' : 'lock-outline'}
-                    size={24}
-                    color={trustScore.eligibleForAdvance ? '#006c4e' : '#b3b9b4'}
-                  />
+                <View className="w-14 h-14 rounded-full border-4 border-[#006c4e] items-center justify-center border-r-[#efeeeb] rotate-45">
+                  <View className="-rotate-45 items-center justify-center">
+                    <Text className="font-jakarta-bold text-[#1b1c1a] text-xs">{trustScore.current || 0}</Text>
+                    <Text className="text-[7px] text-[#707971] font-jakarta-bold uppercase tracking-wider">Score</Text>
+                  </View>
                 </View>
+              </View>
+
+              <View className="h-3 w-full bg-[#efeeeb] rounded-full mb-6 overflow-hidden">
+                <View
+                  className="h-full bg-[#006c4e] rounded-full"
+                  style={{ width: `${Math.max(0, Math.min(100, trustScore.current || 0))}%` }}
+                />
               </View>
 
               <View className="flex-row items-center justify-between">
