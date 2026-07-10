@@ -198,14 +198,14 @@ export default function CashAdvanceRequests() {
           <div className="relative p-6 md:p-8 lg:p-10">
             <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
               <div className="max-w-3xl">
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.22em] text-white/85">
-                  <span className="material-symbols-outlined text-[15px]">account_balance</span>
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-3 py-1 text-2xs font-bold uppercase tracking-[0.22em] text-white/85">
+                  <span className="material-symbols-outlined text-sm">account_balance</span>
                   Loan Origination · Credit Operations
                 </div>
-                <h2 className="mt-4 text-[28px] md:text-[42px] font-black tracking-tighter leading-[0.95] font-headline">
+                <h2 className="mt-4 text-3xl md:text-5xl font-black tracking-tighter leading-[0.95] font-headline">
                   Cash advance underwriting queue
                 </h2>
-                <p className="mt-3 max-w-2xl text-[13px] md:text-[15px] text-white/70">
+                <p className="mt-3 max-w-2xl text-xs md:text-sm text-white/70">
                   Review each merchant's application, risk-grade it against Trust Score and settlement history, and issue a decision — approve with a credit limit, hold for review, or decline with a reason.
                 </p>
               </div>
@@ -231,8 +231,8 @@ export default function CashAdvanceRequests() {
             <div className="border-b border-outline-variant/20 px-5 md:px-6 py-4 md:py-5 bg-white/60 backdrop-blur-sm">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  <h3 className="text-[18px] md:text-[20px] font-black tracking-tight text-on-surface">Application queue</h3>
-                  <p className="text-[12px] text-on-surface-variant/60 mt-1">Sorted by most recent submission. Click a row to open the underwriting file.</p>
+                  <h3 className="text-lg md:text-xl font-black tracking-tight text-on-surface">Application queue</h3>
+                  <p className="text-xs text-on-surface-variant/60 mt-1">Sorted by most recent submission. Click a row to open the underwriting file.</p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
                   <div className="inline-flex rounded-2xl border border-outline-variant/25 bg-surface-container-high p-1 shadow-sm">
@@ -240,33 +240,33 @@ export default function CashAdvanceRequests() {
                       <button
                         key={option.v}
                         onClick={() => setStatusFilter(option.v)}
-                        className={`px-3.5 py-2 rounded-xl text-[11px] font-black uppercase tracking-[0.16em] transition-all ${statusFilter === option.v ? 'bg-primary text-white shadow-md' : 'text-on-surface-variant/65 hover:text-on-surface'}`}
+                        className={`px-3.5 py-2 rounded-xl text-2xs font-black uppercase tracking-[0.16em] transition-all ${statusFilter === option.v ? 'bg-primary text-white shadow-md' : 'text-on-surface-variant/65 hover:text-on-surface'}`}
                       >
                         {option.l}
                       </button>
                     ))}
                   </div>
                   <label className="relative min-w-[240px]">
-                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-on-surface-variant/45">search</span>
+                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-lg text-on-surface-variant/45">search</span>
                     <input
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                       placeholder="Search merchant, paybill, purpose..."
-                      className="w-full rounded-2xl border border-outline-variant/30 bg-white px-10 py-2.5 text-[13px] text-on-surface placeholder:text-on-surface-variant/40 outline-none focus:border-primary/50"
+                      className="w-full rounded-2xl border border-outline-variant/30 bg-white px-10 py-2.5 text-xs text-on-surface placeholder:text-on-surface-variant/40 outline-none focus:border-primary/50"
                     />
                   </label>
                 </div>
               </div>
             </div>
 
-            <div className="px-5 md:px-6 py-3 text-[11px] font-bold uppercase tracking-[0.18em] text-on-surface-variant/45 flex items-center justify-between">
+            <div className="px-5 md:px-6 py-3 text-2xs font-bold uppercase tracking-[0.18em] text-on-surface-variant/45 flex items-center justify-between">
               <span>Underwriting queue</span>
               <span>{loading ? 'Syncing…' : `${visibleRequests.length} visible`}</span>
             </div>
 
             <div className="overflow-x-auto">
               <table className="min-w-full">
-                <thead className="bg-surface-container-high/60 text-[10px] uppercase tracking-[0.16em] text-on-surface-variant/50">
+                <thead className="bg-surface-container-high/60 text-2xs uppercase tracking-[0.16em] text-on-surface-variant/50">
                   <tr>
                     <Th className="pl-6">Merchant</Th>
                     <Th>Requested</Th>
@@ -293,43 +293,43 @@ export default function CashAdvanceRequests() {
                           <div className="flex items-center gap-3 py-4">
                             <Avatar name={request.merchantName} />
                             <div>
-                              <p className="font-bold text-[13px] text-on-surface tracking-tight">{request.merchantName}</p>
-                              <p className="text-[11px] text-on-surface-variant/55">Paybill #{request.paybillAccount} · {request.merchantEmail}</p>
+                              <p className="font-bold text-xs text-on-surface tracking-tight">{request.merchantName}</p>
+                              <p className="text-2xs text-on-surface-variant/55">Paybill #{request.paybillAccount} · {request.merchantEmail}</p>
                             </div>
                           </div>
                         </Td>
                         <Td>
                           <div className="py-4">
-                            <p className="font-black text-[13px] text-on-surface">{formatKES(request.requestedAmount)}</p>
-                            <p className="text-[11px] text-on-surface-variant/55">{request.approvedLimit ? `Limit ${formatKES(request.approvedLimit)}` : 'No limit set'}</p>
+                            <p className="font-black text-xs text-on-surface">{formatKES(request.requestedAmount)}</p>
+                            <p className="text-2xs text-on-surface-variant/55">{request.approvedLimit ? `Limit ${formatKES(request.approvedLimit)}` : 'No limit set'}</p>
                           </div>
                         </Td>
                         <Td>
                           <div className="py-4">
-                            <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${risk.tone}`}>
+                            <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-2xs font-black uppercase tracking-wide ${risk.tone}`}>
                               {risk.grade} · {risk.label}
                             </span>
-                            <p className="mt-1 text-[11px] text-on-surface-variant/55">{request.trustScore}% trust score</p>
+                            <p className="mt-1 text-2xs text-on-surface-variant/55">{request.trustScore}% trust score</p>
                           </div>
                         </Td>
                         <Td>
                           <div className="py-4">
-                            <p className="font-black text-[13px] text-on-surface">{request.tenorDays} days</p>
-                            <p className="text-[11px] text-on-surface-variant/55">{request.settlementRate}% settlement</p>
+                            <p className="font-black text-xs text-on-surface">{request.tenorDays} days</p>
+                            <p className="text-2xs text-on-surface-variant/55">{request.settlementRate}% settlement</p>
                           </div>
                         </Td>
                         <Td>
                           <div className="py-4">
-                            <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${meta.tone}`}>
-                              <span className="material-symbols-outlined text-[12px]">{meta.icon}</span>
+                            <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-2xs font-black uppercase tracking-[0.16em] ${meta.tone}`}>
+                              <span className="material-symbols-outlined text-xs">{meta.icon}</span>
                               {meta.label}
                             </span>
                           </div>
                         </Td>
                         <Td className="pr-6 text-right">
                           <div className="py-4">
-                            <p className="font-medium text-[12px] text-on-surface">{relativeTime(request.updatedAt)}</p>
-                            <p className="text-[11px] text-on-surface-variant/55">{formatDateISO(request.requestedAt)}</p>
+                            <p className="font-medium text-xs text-on-surface">{relativeTime(request.updatedAt)}</p>
+                            <p className="text-2xs text-on-surface-variant/55">{formatDateISO(request.requestedAt)}</p>
                           </div>
                         </Td>
                       </tr>
@@ -341,16 +341,16 @@ export default function CashAdvanceRequests() {
 
             {!loading && !visibleRequests.length && !error && (
               <div className="px-6 py-16 text-center">
-                <span className="material-symbols-outlined text-[40px] text-on-surface-variant/25">{requests.length ? 'search_off' : 'inbox'}</span>
-                <p className="mt-3 text-[14px] font-bold text-on-surface">{requests.length ? 'No requests match this filter.' : 'No cash advance applications yet.'}</p>
-                <p className="text-[12px] text-on-surface-variant/60 mt-1">{requests.length ? 'Try clearing the search or switching the queue status.' : 'Applications will appear here as merchants apply from their dashboard.'}</p>
+                <span className="material-symbols-outlined text-5xl text-on-surface-variant/25">{requests.length ? 'search_off' : 'inbox'}</span>
+                <p className="mt-3 text-sm font-bold text-on-surface">{requests.length ? 'No requests match this filter.' : 'No cash advance applications yet.'}</p>
+                <p className="text-xs text-on-surface-variant/60 mt-1">{requests.length ? 'Try clearing the search or switching the queue status.' : 'Applications will appear here as merchants apply from their dashboard.'}</p>
               </div>
             )}
 
             {error && (
-              <div className="mx-5 md:mx-6 mb-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-[12px] text-rose-800 flex items-center justify-between gap-3">
+              <div className="mx-5 md:mx-6 mb-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800 flex items-center justify-between gap-3">
                 <span>{error}</span>
-                <button onClick={fetchRequests} className="shrink-0 text-[11px] font-black uppercase tracking-widest text-rose-700 hover:text-rose-900">Retry</button>
+                <button onClick={fetchRequests} className="shrink-0 text-2xs font-black uppercase tracking-widest text-rose-700 hover:text-rose-900">Retry</button>
               </div>
             )}
           </div>
@@ -363,12 +363,12 @@ export default function CashAdvanceRequests() {
                     <div className="flex items-center gap-3">
                       <Avatar name={selectedRequest.merchantName} size="lg" />
                       <div>
-                        <p className="text-[18px] font-black text-on-surface tracking-tight">{selectedRequest.merchantName}</p>
-                        <p className="text-[12px] text-on-surface-variant/60">{selectedRequest.merchantEmail}</p>
+                        <p className="text-lg font-black text-on-surface tracking-tight">{selectedRequest.merchantName}</p>
+                        <p className="text-xs text-on-surface-variant/60">{selectedRequest.merchantEmail}</p>
                       </div>
                     </div>
-                    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${STATUS_META[selectedRequest.status || 'pending'].tone}`}>
-                      <span className="material-symbols-outlined text-[12px]">{STATUS_META[selectedRequest.status || 'pending'].icon}</span>
+                    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-2xs font-black uppercase tracking-[0.16em] ${STATUS_META[selectedRequest.status || 'pending'].tone}`}>
+                      <span className="material-symbols-outlined text-xs">{STATUS_META[selectedRequest.status || 'pending'].icon}</span>
                       {STATUS_META[selectedRequest.status || 'pending'].label}
                     </span>
                   </div>
@@ -377,11 +377,11 @@ export default function CashAdvanceRequests() {
                   <div className="mt-5 flex items-center gap-4 rounded-2xl border border-outline-variant/20 bg-white p-4">
                     <TrustGauge score={selectedRequest.trustScore} />
                     <div className="flex-1 min-w-0">
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-on-surface-variant/45 mb-1.5">Credit Assessment</p>
-                      <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${riskGradeFor(selectedRequest.trustScore).tone}`}>
+                      <p className="text-2xs font-black uppercase tracking-[0.18em] text-on-surface-variant/45 mb-1.5">Credit Assessment</p>
+                      <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-2xs font-black uppercase tracking-wide ${riskGradeFor(selectedRequest.trustScore).tone}`}>
                         Grade {riskGradeFor(selectedRequest.trustScore).grade} · {riskGradeFor(selectedRequest.trustScore).label}
                       </span>
-                      <p className="mt-2 text-[11px] text-on-surface-variant/60 leading-relaxed">
+                      <p className="mt-2 text-2xs text-on-surface-variant/60 leading-relaxed">
                         {selectedRequest.settlementRate}% settlement rate on {fmtNum(selectedRequest.collections30d)} KES collected in the last 30 days.
                       </p>
                     </div>
@@ -393,28 +393,28 @@ export default function CashAdvanceRequests() {
                   </div>
 
                   <div className="mt-4 rounded-2xl bg-surface-container-high/60 border border-outline-variant/20 p-4">
-                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-on-surface-variant/45">Stated purpose</p>
-                    <p className="mt-2 text-[13px] text-on-surface leading-6">{selectedRequest.purpose}</p>
+                    <p className="text-2xs font-black uppercase tracking-[0.18em] text-on-surface-variant/45">Stated purpose</p>
+                    <p className="mt-2 text-xs text-on-surface leading-6">{selectedRequest.purpose}</p>
                   </div>
 
                   {/* Applicant / business profile captured on the application */}
                   {(selectedRequest.monthlyRevenueEstimate || selectedRequest.yearsInOperation || selectedRequest.businessAddress || selectedRequest.contactPhone) && (
                     <div className="mt-4 rounded-2xl bg-surface-container-high/60 border border-outline-variant/20 p-4">
-                      <p className="text-[11px] font-black uppercase tracking-[0.18em] text-on-surface-variant/45 mb-3">Applicant Profile</p>
+                      <p className="text-2xs font-black uppercase tracking-[0.18em] text-on-surface-variant/45 mb-3">Applicant Profile</p>
                       {(selectedRequest.monthlyRevenueEstimate || selectedRequest.yearsInOperation) && (
                         <div className="grid grid-cols-2 gap-3 mb-3">
                           <DetailBox label="Monthly revenue" value={selectedRequest.monthlyRevenueEstimate ? formatKES(selectedRequest.monthlyRevenueEstimate) : '—'} />
                           <DetailBox label="Years operating" value={selectedRequest.yearsInOperation ?? '—'} />
                         </div>
                       )}
-                      <div className="space-y-2.5 text-[12px] text-on-surface-variant/70">
+                      <div className="space-y-2.5 text-xs text-on-surface-variant/70">
                         <Row label="Business address" value={selectedRequest.businessAddress} />
                         <Row label="Contact phone" value={selectedRequest.contactPhone} />
                       </div>
                     </div>
                   )}
 
-                  <div className="mt-4 space-y-2.5 text-[12px] text-on-surface-variant/70">
+                  <div className="mt-4 space-y-2.5 text-xs text-on-surface-variant/70">
                     <Row label="Paybill" value={`#${selectedRequest.paybillAccount}`} />
                     <Row label="Assigned analyst" value={selectedRequest.manager} />
                     <Row label="Last decision" value={formatDateISO(selectedRequest.updatedAt)} />
@@ -423,12 +423,12 @@ export default function CashAdvanceRequests() {
 
                   {pendingDecision ? (
                     <div className="mt-5 rounded-2xl border border-outline-variant/30 bg-white p-4 space-y-3">
-                      <p className="text-[11px] font-black uppercase tracking-[0.18em] text-on-surface-variant/50">
+                      <p className="text-2xs font-black uppercase tracking-[0.18em] text-on-surface-variant/50">
                         {pendingDecision === 'approved' ? 'Approval details' : 'Decline reason'}
                       </p>
                       {pendingDecision === 'approved' && (
                         <div>
-                          <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/45">Approved credit limit (KES)</label>
+                          <label className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/45">Approved credit limit (KES)</label>
                           <input
                             type="number"
                             min="0"
@@ -439,7 +439,7 @@ export default function CashAdvanceRequests() {
                         </div>
                       )}
                       <div>
-                        <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/45">
+                        <label className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/45">
                           {pendingDecision === 'approved' ? 'Underwriting notes (optional)' : 'Reason for the merchant'}
                         </label>
                         <textarea
@@ -447,22 +447,22 @@ export default function CashAdvanceRequests() {
                           value={decisionNotes}
                           onChange={(e) => setDecisionNotes(e.target.value)}
                           placeholder={pendingDecision === 'approved' ? 'Any conditions or notes for the file…' : 'Explain why this application was declined…'}
-                          className="mt-1 w-full rounded-xl border border-outline-variant/30 bg-surface-container-low px-3 py-2.5 text-[13px] text-on-surface outline-none focus:border-primary/50 resize-none"
+                          className="mt-1 w-full rounded-xl border border-outline-variant/30 bg-surface-container-low px-3 py-2.5 text-xs text-on-surface outline-none focus:border-primary/50 resize-none"
                         />
                       </div>
-                      {decisionError && <p className="text-[11px] font-bold text-rose-600">{decisionError}</p>}
+                      {decisionError && <p className="text-2xs font-bold text-rose-600">{decisionError}</p>}
                       <div className="flex gap-2 pt-1">
                         <button
                           onClick={cancelDecision}
                           disabled={updatingStatus}
-                          className="flex-1 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest text-on-surface-variant/60 bg-surface-container-low hover:bg-surface-container-high transition-colors disabled:opacity-50"
+                          className="flex-1 py-2.5 rounded-xl text-2xs font-black uppercase tracking-widest text-on-surface-variant/60 bg-surface-container-low hover:bg-surface-container-high transition-colors disabled:opacity-50"
                         >
                           Cancel
                         </button>
                         <button
                           onClick={confirmDecision}
                           disabled={updatingStatus}
-                          className={`flex-1 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest text-white transition-colors disabled:opacity-50 ${pendingDecision === 'approved' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'}`}
+                          className={`flex-1 py-2.5 rounded-xl text-2xs font-black uppercase tracking-widest text-white transition-colors disabled:opacity-50 ${pendingDecision === 'approved' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'}`}
                         >
                           {updatingStatus ? 'Saving…' : pendingDecision === 'approved' ? 'Confirm Approval' : 'Confirm Decline'}
                         </button>
@@ -482,8 +482,8 @@ export default function CashAdvanceRequests() {
             </div>
 
             <div className="rounded-[24px] border border-outline-variant/40 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(243,247,245,0.92))] shadow-editorial p-5 md:p-6">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-on-surface-variant/45">Underwriting guidelines</p>
-              <ul className="mt-4 space-y-3 text-[13px] text-on-surface-variant/75 leading-6">
+              <p className="text-2xs font-black uppercase tracking-[0.18em] text-on-surface-variant/45">Underwriting guidelines</p>
+              <ul className="mt-4 space-y-3 text-xs text-on-surface-variant/75 leading-6">
                 <li><span className="font-black text-emerald-700">Grade A/B</span> — Trust Score 70+. Fast-track approval; set a limit at or above the requested amount when collections support it.</li>
                 <li><span className="font-black text-amber-700">Grade C</span> — Trust Score 55–69. Approve at a reduced limit or hold for review pending stronger settlement history.</li>
                 <li><span className="font-black text-rose-700">Grade D</span> — Trust Score below 55. Decline with a clear reason so the merchant knows what to improve.</li>
@@ -499,11 +499,11 @@ export default function CashAdvanceRequests() {
 function MiniMetric({ label, value, icon }) {
   return (
     <div className="rounded-2xl border border-white/14 bg-white/10 px-3 py-3 backdrop-blur-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
-      <div className="flex items-center gap-2 text-white/78 text-[10px] font-black uppercase tracking-[0.18em]">
-        <span className="material-symbols-outlined text-[15px]">{icon}</span>
+      <div className="flex items-center gap-2 text-white/78 text-2xs font-black uppercase tracking-[0.18em]">
+        <span className="material-symbols-outlined text-sm">{icon}</span>
         {label}
       </div>
-      <div className="mt-2 text-[18px] md:text-[21px] font-black tracking-tight">{value}</div>
+      <div className="mt-2 text-lg md:text-2xl font-black tracking-tight">{value}</div>
     </div>
   );
 }
@@ -520,12 +520,12 @@ function StatCard({ label, value, subtitle, icon, tone }) {
     <div className="rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-5 shadow-sm hover:shadow-md transition-shadow">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-on-surface-variant/45">{label}</p>
-          <p className="mt-2 text-[24px] md:text-[28px] font-black tracking-tighter text-on-surface">{value}</p>
-          <p className="mt-1 text-[12px] text-on-surface-variant/60">{subtitle}</p>
+          <p className="text-2xs font-black uppercase tracking-[0.18em] text-on-surface-variant/45">{label}</p>
+          <p className="mt-2 text-2xl md:text-3xl font-black tracking-tighter text-on-surface">{value}</p>
+          <p className="mt-1 text-xs text-on-surface-variant/60">{subtitle}</p>
         </div>
         <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-full ${toneMap[tone] || toneMap.emerald}`}>
-          <span className="material-symbols-outlined text-[22px]">{icon}</span>
+          <span className="material-symbols-outlined text-2xl">{icon}</span>
         </div>
       </div>
     </div>
@@ -552,8 +552,8 @@ function TrustGauge({ score }) {
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-[15px] font-black text-on-surface tracking-tight leading-none">{value}</span>
-        <span className="text-[7px] font-bold uppercase tracking-widest text-on-surface-variant/45 mt-0.5">Score</span>
+        <span className="text-sm font-black text-on-surface tracking-tight leading-none">{value}</span>
+        <span className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/45 mt-0.5">Score</span>
       </div>
     </div>
   );
@@ -561,7 +561,7 @@ function TrustGauge({ score }) {
 
 function Avatar({ name, size = 'md' }) {
   const initials = String(name || 'CA').split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase() || 'CA';
-  const sizeClass = size === 'lg' ? 'h-14 w-14 text-[15px]' : 'h-11 w-11 text-[12px]';
+  const sizeClass = size === 'lg' ? 'h-14 w-14 text-sm' : 'h-11 w-11 text-xs';
   return (
     <div className={`grid shrink-0 place-items-center rounded-2xl ${sizeClass} bg-[linear-gradient(135deg,#0F766E,#14532D)] text-white font-black shadow-[0_12px_24px_rgba(15,118,110,0.24)]`}>
       {initials}
@@ -572,8 +572,8 @@ function Avatar({ name, size = 'md' }) {
 function DetailBox({ label, value }) {
   return (
     <div className="rounded-2xl border border-outline-variant/20 bg-white px-4 py-3">
-      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-on-surface-variant/45">{label}</p>
-      <p className="mt-1 text-[14px] font-black text-on-surface tracking-tight">{value}</p>
+      <p className="text-2xs font-black uppercase tracking-[0.18em] text-on-surface-variant/45">{label}</p>
+      <p className="mt-1 text-sm font-black text-on-surface tracking-tight">{value}</p>
     </div>
   );
 }
@@ -581,7 +581,7 @@ function DetailBox({ label, value }) {
 function Row({ label, value }) {
   return (
     <div className="flex items-start justify-between gap-4 border-b border-outline-variant/12 pb-2 last:border-b-0 last:pb-0">
-      <span className="font-black uppercase tracking-[0.16em] text-[10px] text-on-surface-variant/45">{label}</span>
+      <span className="font-black uppercase tracking-[0.16em] text-2xs text-on-surface-variant/45">{label}</span>
       <span className="text-right text-on-surface font-medium break-words">{value || '—'}</span>
     </div>
   );
@@ -595,8 +595,8 @@ function ActionButton({ tone, icon, label, onClick, disabled }) {
   };
 
   return (
-    <button onClick={onClick} disabled={disabled} className={`inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-[12px] font-black uppercase tracking-[0.16em] transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${toneMap[tone] || toneMap.emerald}`}>
-      <span className="material-symbols-outlined text-[16px]">{icon}</span>
+    <button onClick={onClick} disabled={disabled} className={`inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-xs font-black uppercase tracking-[0.16em] transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${toneMap[tone] || toneMap.emerald}`}>
+      <span className="material-symbols-outlined text-base">{icon}</span>
       {label}
     </button>
   );
@@ -605,9 +605,9 @@ function ActionButton({ tone, icon, label, onClick, disabled }) {
 function EmptyDetail() {
   return (
     <div className="rounded-[22px] border border-dashed border-outline-variant/30 bg-surface-container-low/50 px-6 py-14 text-center">
-      <span className="material-symbols-outlined text-[42px] text-on-surface-variant/20">savings</span>
-      <p className="mt-3 text-[15px] font-black text-on-surface">Select a request</p>
-      <p className="mt-1 text-[12px] text-on-surface-variant/60">Open any merchant request to inspect its risk profile and issue a decision.</p>
+      <span className="material-symbols-outlined text-5xl text-on-surface-variant/20">savings</span>
+      <p className="mt-3 text-sm font-black text-on-surface">Select a request</p>
+      <p className="mt-1 text-xs text-on-surface-variant/60">Open any merchant request to inspect its risk profile and issue a decision.</p>
     </div>
   );
 }

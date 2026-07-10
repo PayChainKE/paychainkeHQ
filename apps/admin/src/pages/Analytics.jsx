@@ -85,13 +85,13 @@ const Analytics = () => {
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="material-symbols-outlined text-primary text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>insights</span>
-              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary">Executive Insights</p>
+              <span className="material-symbols-outlined text-primary text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>insights</span>
+              <p className="text-2xs font-bold uppercase tracking-[0.2em] text-primary">Executive Insights</p>
             </div>
-            <h2 className="text-[22px] md:text-[36px] font-bold text-on-surface tracking-tighter font-headline leading-none">
+            <h2 className="text-2xl md:text-4xl font-bold text-on-surface tracking-tighter font-headline leading-none">
               Pulse of the Network
             </h2>
-            <p className="text-on-surface-variant/60 mt-2 text-[13px] md:text-[14px] font-body max-w-xl">
+            <p className="text-on-surface-variant/60 mt-2 text-xs md:text-sm font-body max-w-xl">
               Real-time gross transaction volume, merchant health, and growth velocity across the PayChain ecosystem.
             </p>
           </div>
@@ -101,7 +101,7 @@ const Analytics = () => {
                 <button
                   key={r.v}
                   onClick={() => setRange(r.v)}
-                  className={`px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest rounded-lg transition-all ${
+                  className={`px-3 py-1.5 text-2xs font-bold uppercase tracking-widest rounded-lg transition-all ${
                     range === r.v ? 'bg-primary text-white shadow-md' : 'text-on-surface-variant/60 hover:text-on-surface'
                   }`}
                 >
@@ -110,7 +110,7 @@ const Analytics = () => {
               ))}
             </div>
             <button onClick={fetchData} className="p-2 rounded-lg bg-surface-container-low hover:bg-surface-container-high text-on-surface-variant transition-colors" title="Refresh">
-              <span className="material-symbols-outlined text-[18px]">refresh</span>
+              <span className="material-symbols-outlined text-lg">refresh</span>
             </button>
           </div>
         </div>
@@ -189,10 +189,10 @@ const Analytics = () => {
               <div className="lg:col-span-8 bg-surface-container-lowest rounded-2xl border border-outline-variant/20 p-6 shadow-editorial">
                 <div className="flex items-start justify-between mb-6">
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">Volume Trajectory</p>
+                    <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">Volume Trajectory</p>
                     <h3 className="text-lg font-bold text-on-surface tracking-tight">Daily GTV ({range.toUpperCase()})</h3>
                   </div>
-                  <div className="flex items-center gap-4 text-[11px] font-bold">
+                  <div className="flex items-center gap-4 text-2xs font-bold">
                     <Legend color="bg-primary" label="Volume" />
                     <Legend color="bg-emerald-500" label="Txn Count" />
                   </div>
@@ -211,10 +211,10 @@ const Analytics = () => {
               <div className="lg:col-span-7 bg-surface-container-lowest rounded-2xl border border-outline-variant/20 overflow-hidden shadow-editorial">
                 <div className="px-6 py-5 border-b border-outline-variant/10 flex items-center justify-between">
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">Leaderboard</p>
+                    <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">Leaderboard</p>
                     <h3 className="text-lg font-bold text-on-surface tracking-tight">Top Merchants by Volume</h3>
                   </div>
-                  <span className="text-[11px] text-on-surface-variant/40">Last {range === 'all' ? 'all time' : range}</span>
+                  <span className="text-2xs text-on-surface-variant/40">Last {range === 'all' ? 'all time' : range}</span>
                 </div>
                 <TopMerchantsTable rows={data.topMerchants} />
               </div>
@@ -222,7 +222,7 @@ const Analytics = () => {
               <div className="lg:col-span-5 bg-surface-container-lowest rounded-2xl border border-outline-variant/20 p-6 shadow-editorial">
                 <div className="flex items-start justify-between mb-4">
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">Acquisition</p>
+                    <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">Acquisition</p>
                     <h3 className="text-lg font-bold text-on-surface tracking-tight">Daily Signups</h3>
                   </div>
                 </div>
@@ -233,12 +233,12 @@ const Analytics = () => {
             {/* Transaction mix + Business types */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               <div className="lg:col-span-6 bg-surface-container-lowest rounded-2xl border border-outline-variant/20 p-6 shadow-editorial">
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">Product Mix</p>
+                <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">Product Mix</p>
                 <h3 className="text-lg font-bold text-on-surface tracking-tight mb-5">Volume by Transaction Type</h3>
                 <TypeMix mix={data.txnTypeMix} />
               </div>
               <div className="lg:col-span-6 bg-surface-container-lowest rounded-2xl border border-outline-variant/20 p-6 shadow-editorial">
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">Composition</p>
+                <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">Composition</p>
                 <h3 className="text-lg font-bold text-on-surface tracking-tight mb-5">Pipeline by Business Sector</h3>
                 <BusinessTypeList items={data.businessTypes} />
               </div>
@@ -265,23 +265,23 @@ const NorthStarCard = ({ data }) => {
         <div className="lg:col-span-2">
           <div className="flex items-center gap-2 mb-3">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-emerald-300">North Star · Live</p>
+            <p className="text-2xs font-bold uppercase tracking-[0.3em] text-emerald-300">North Star · Live</p>
           </div>
-          <p className="text-[12px] uppercase tracking-widest text-emerald-100/60 font-bold mb-2">Gross Transaction Volume</p>
-          <h1 className="text-[44px] md:text-[64px] font-bold text-white tracking-tighter font-headline leading-none">
+          <p className="text-xs uppercase tracking-widest text-emerald-100/60 font-bold mb-2">Gross Transaction Volume</p>
+          <h1 className="text-5xl md:text-6xl font-bold text-white tracking-tighter font-headline leading-none">
             {fmtKES(gtv.value)}
           </h1>
           <div className="flex items-center gap-3 mt-4">
-            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[12px] font-bold ${positive ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'}`}>
-              <span className="material-symbols-outlined text-[14px]">{positive ? 'trending_up' : 'trending_down'}</span>
+            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${positive ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'}`}>
+              <span className="material-symbols-outlined text-sm">{positive ? 'trending_up' : 'trending_down'}</span>
               {positive ? '+' : ''}{gtv.change}%
             </span>
-            <span className="text-[12px] text-emerald-100/50">vs previous period</span>
+            <span className="text-xs text-emerald-100/50">vs previous period</span>
           </div>
         </div>
         <div className="lg:col-span-1">
           <Sparkline values={trend} stroke="#5EFEB3" fill="#5EFEB3" height={100} />
-          <p className="text-[10px] text-emerald-100/50 font-bold uppercase tracking-widest mt-2 text-right">{data.gtvSeries.length} day trend</p>
+          <p className="text-2xs text-emerald-100/50 font-bold uppercase tracking-widest mt-2 text-right">{data.gtvSeries.length} day trend</p>
         </div>
       </div>
     </div>
@@ -301,20 +301,20 @@ const KpiCard = ({ label, value, change, icon, tone, subtitle, noDelta }) => {
   return (
     <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl p-5 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5">
       <div className="flex items-start justify-between mb-3">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40">{label}</p>
+        <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/40">{label}</p>
         <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${toneMap[tone] || toneMap.primary}`}>
-          <span className="material-symbols-outlined text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>{icon}</span>
+          <span className="material-symbols-outlined text-base" style={{ fontVariationSettings: "'FILL' 1" }}>{icon}</span>
         </div>
       </div>
       <p className="text-2xl md:text-3xl font-bold text-on-surface tracking-tighter">{value}</p>
       <div className="flex items-center justify-between mt-3">
         {!noDelta && (
-          <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[11px] font-bold ${positive ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
-            <span className="material-symbols-outlined text-[12px]">{positive ? 'arrow_upward' : 'arrow_downward'}</span>
+          <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-2xs font-bold ${positive ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+            <span className="material-symbols-outlined text-xs">{positive ? 'arrow_upward' : 'arrow_downward'}</span>
             {positive ? '+' : ''}{change}%
           </span>
         )}
-        {subtitle && <p className="text-[10px] text-on-surface-variant/50 ml-auto">{subtitle}</p>}
+        {subtitle && <p className="text-2xs text-on-surface-variant/50 ml-auto">{subtitle}</p>}
       </div>
     </div>
   );
@@ -332,15 +332,15 @@ const HealthCard = ({ health }) => {
     <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl p-5 shadow-editorial">
       <div className="flex items-start justify-between mb-4">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">Network Health</p>
+          <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">Network Health</p>
           <h3 className="text-base font-bold text-on-surface tracking-tight">Merchant Status</h3>
         </div>
-        <span className="material-symbols-outlined text-on-surface-variant/30 text-[20px]">monitor_heart</span>
+        <span className="material-symbols-outlined text-on-surface-variant/30 text-xl">monitor_heart</span>
       </div>
       <div className="space-y-3">
         {items.map((it) => (
           <div key={it.label}>
-            <div className="flex items-center justify-between text-[12px] mb-1">
+            <div className="flex items-center justify-between text-xs mb-1">
               <span className="font-bold text-on-surface-variant/70">{it.label}</span>
               <span className="font-bold text-on-surface">{it.value}</span>
             </div>
@@ -361,7 +361,7 @@ const HealthCard = ({ health }) => {
 
 const MiniStat = ({ label, value }) => (
   <div className="text-center">
-    <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40">{label}</p>
+    <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/40">{label}</p>
     <p className="text-base font-bold text-on-surface tracking-tight">{fmtNum(value)}</p>
   </div>
 );
@@ -380,10 +380,10 @@ const FunnelCard = ({ funnel }) => {
     <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl p-5 shadow-editorial">
       <div className="flex items-start justify-between mb-4">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">Acquisition Funnel</p>
+          <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">Acquisition Funnel</p>
           <h3 className="text-base font-bold text-on-surface tracking-tight">Pipeline → Platform</h3>
         </div>
-        <span className="material-symbols-outlined text-on-surface-variant/30 text-[20px]">filter_alt</span>
+        <span className="material-symbols-outlined text-on-surface-variant/30 text-xl">filter_alt</span>
       </div>
       <div className="space-y-2">
         {stages.map((s, i) => {
@@ -393,11 +393,11 @@ const FunnelCard = ({ funnel }) => {
           return (
             <div key={s.label} className="relative">
               <div className={`h-9 rounded-lg bg-gradient-to-r ${s.color} flex items-center px-3 transition-all`} style={{ width: `${Math.max(pct, 18)}%` }}>
-                <span className="text-[11px] font-bold text-white uppercase tracking-wide">{s.label}</span>
-                <span className="ml-auto text-[12px] font-bold text-white">{fmtNum(s.value)}</span>
+                <span className="text-2xs font-bold text-white uppercase tracking-wide">{s.label}</span>
+                <span className="ml-auto text-xs font-bold text-white">{fmtNum(s.value)}</span>
               </div>
               {stageRate != null && i > 0 && (
-                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-on-surface-variant/60 ml-2" style={{ left: `calc(${Math.max(pct, 18)}% + 8px)` }}>
+                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-2xs font-bold text-on-surface-variant/60 ml-2" style={{ left: `calc(${Math.max(pct, 18)}% + 8px)` }}>
                   {stageRate}%
                 </span>
               )}
@@ -421,19 +421,19 @@ const TopMerchantsTable = ({ rows }) => {
         const pct = (m.volume / max) * 100;
         return (
           <div key={m._id} className="px-6 py-3 flex items-center gap-4 hover:bg-secondary-container/5 transition-colors">
-            <span className="text-[18px] font-bold text-on-surface-variant/30 w-6 tabular-nums">{String(i + 1).padStart(2, '0')}</span>
-            <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-[10px] uppercase ring-2 ring-white shadow-sm ${m.flagged ? 'bg-red-500 text-white' : m.status === 'locked' ? 'bg-amber-500 text-white' : 'bg-primary-fixed-dim text-primary'}`}>
+            <span className="text-lg font-bold text-on-surface-variant/30 w-6 tabular-nums">{String(i + 1).padStart(2, '0')}</span>
+            <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-2xs uppercase ring-2 ring-white shadow-sm ${m.flagged ? 'bg-red-500 text-white' : m.status === 'locked' ? 'bg-amber-500 text-white' : 'bg-primary-fixed-dim text-primary'}`}>
               {m.flagged ? '!' : (m.businessName || 'M').substring(0, 2)}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-bold text-on-surface tracking-tight truncate">{m.businessName}</p>
-              <p className="text-[10px] text-on-surface-variant/60 font-mono">#{m.paybillAccount || '—'} · {fmtNum(m.txnCount)} txns</p>
+              <p className="text-xs font-bold text-on-surface tracking-tight truncate">{m.businessName}</p>
+              <p className="text-2xs text-on-surface-variant/60 font-mono">#{m.paybillAccount || '—'} · {fmtNum(m.txnCount)} txns</p>
               <div className="h-1 bg-surface-container-low rounded-full overflow-hidden mt-1.5">
                 <div className="h-full bg-gradient-to-r from-primary to-emerald-500 rounded-full" style={{ width: `${pct}%` }}></div>
               </div>
             </div>
             <div className="text-right">
-              <p className="text-[14px] font-bold text-on-surface tracking-tight tabular-nums">{fmtKES(m.volume)}</p>
+              <p className="text-sm font-bold text-on-surface tracking-tight tabular-nums">{fmtKES(m.volume)}</p>
             </div>
           </div>
         );
@@ -475,7 +475,7 @@ const TypeMix = ({ mix }) => {
           })}
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <p className="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant/40">Total</p>
+          <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/40">Total</p>
           <p className="text-base md:text-lg font-bold text-on-surface tracking-tight">{fmtKES(total)}</p>
         </div>
       </div>
@@ -483,9 +483,9 @@ const TypeMix = ({ mix }) => {
         {mix.map((r, i) => (
           <div key={i} className="flex items-center gap-3">
             <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: colors[i % colors.length] }}></span>
-            <span className="text-[12px] font-bold text-on-surface-variant/80 flex-1 truncate">{TXN_TYPE_LABEL[r.type] || r.type}</span>
-            <span className="text-[12px] font-bold text-on-surface tabular-nums">{fmtKES(r.volume)}</span>
-            <span className="text-[10px] text-on-surface-variant/50 tabular-nums w-12 text-right">{((r.volume / total) * 100).toFixed(1)}%</span>
+            <span className="text-xs font-bold text-on-surface-variant/80 flex-1 truncate">{TXN_TYPE_LABEL[r.type] || r.type}</span>
+            <span className="text-xs font-bold text-on-surface tabular-nums">{fmtKES(r.volume)}</span>
+            <span className="text-2xs text-on-surface-variant/50 tabular-nums w-12 text-right">{((r.volume / total) * 100).toFixed(1)}%</span>
           </div>
         ))}
       </div>
@@ -505,11 +505,11 @@ const BusinessTypeList = ({ items }) => {
         const pct = (t.count / max) * 100;
         return (
           <div key={idx} className="flex items-center gap-3">
-            <p className="text-[12px] font-bold text-on-surface w-32 truncate">{t.type}</p>
+            <p className="text-xs font-bold text-on-surface w-32 truncate">{t.type}</p>
             <div className="flex-1 h-2.5 bg-surface-container-low rounded-full overflow-hidden">
               <div className="h-full bg-gradient-to-r from-violet-500 to-violet-600 rounded-full transition-all" style={{ width: `${pct}%` }}></div>
             </div>
-            <p className="text-[12px] font-bold text-on-surface-variant tabular-nums w-10 text-right">{t.count}</p>
+            <p className="text-xs font-bold text-on-surface-variant tabular-nums w-10 text-right">{t.count}</p>
           </div>
         );
       })}
@@ -519,7 +519,7 @@ const BusinessTypeList = ({ items }) => {
 
 // ── Sparkline (used in North Star) ───────────────────────────────────
 const Sparkline = ({ values, stroke = '#06201B', fill, height = 60 }) => {
-  if (!values || values.length === 0) return <div style={{ height }} className="flex items-center justify-center text-[11px] text-white/40">No data</div>;
+  if (!values || values.length === 0) return <div style={{ height }} className="flex items-center justify-center text-2xs text-white/40">No data</div>;
   const w = 280;
   const h = height;
   const max = Math.max(...values, 1);
@@ -629,7 +629,7 @@ const BarChart = ({ series }) => {
         const pct = (d.count / max) * 100;
         return (
           <div key={i} className="flex-1 group relative">
-            <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-on-surface text-white text-[10px] px-2 py-0.5 rounded font-bold opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+            <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-on-surface text-white text-2xs px-2 py-0.5 rounded font-bold opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
               {d.count} on {d.date.slice(5)}
             </div>
             <div className="bg-gradient-to-t from-emerald-600 to-emerald-400 rounded-t-sm hover:from-emerald-700 hover:to-emerald-500 transition-all" style={{ height: `${Math.max(pct, 4)}%` }}></div>

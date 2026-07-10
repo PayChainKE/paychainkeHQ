@@ -388,14 +388,14 @@ const Merchants = () => {
         {/* Page Title */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
           <div>
-            <h2 className="text-[22px] md:text-[32px] font-bold text-on-surface tracking-tighter font-headline">Merchant Directory</h2>
-            <p className="text-[13px] md:text-[14px] text-on-surface-variant mt-1">Manage all registered businesses, their activity, and account status.</p>
+            <h2 className="text-2xl md:text-4xl font-bold text-on-surface tracking-tighter font-headline">Merchant Directory</h2>
+            <p className="text-xs md:text-sm text-on-surface-variant mt-1">Manage all registered businesses, their activity, and account status.</p>
           </div>
           <button
             onClick={openModal}
             className="w-full sm:w-auto bg-primary text-white px-5 py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:shadow-lg transition-all active:scale-95 font-label uppercase tracking-widest"
           >
-            <span className="material-symbols-outlined text-[18px]">add</span>
+            <span className="material-symbols-outlined text-lg">add</span>
             New Merchant
           </button>
         </div>
@@ -414,7 +414,7 @@ const Merchants = () => {
           <div className="px-4 md:px-6 py-4 border-b border-outline-variant/10 flex flex-col md:flex-row md:justify-between md:items-center gap-4 bg-white">
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full">
               <div className="relative flex-1 max-w-md">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant/40 text-[20px]">search</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant/40 text-xl">search</span>
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -428,7 +428,7 @@ const Merchants = () => {
                     className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md text-on-surface-variant/40 hover:bg-surface-container-high hover:text-on-surface"
                     aria-label="Clear search"
                   >
-                    <span className="material-symbols-outlined text-[16px]">close</span>
+                    <span className="material-symbols-outlined text-base">close</span>
                   </button>
                 )}
               </div>
@@ -441,10 +441,10 @@ const Merchants = () => {
                       : 'text-on-surface-variant bg-surface-container-low hover:bg-surface-container-high'
                   }`}
                 >
-                  <span className="material-symbols-outlined text-[18px]">filter_list</span>
+                  <span className="material-symbols-outlined text-lg">filter_list</span>
                   Filters
                   {activeFilterCount > 0 && (
-                    <span className="ml-1 px-1.5 py-0.5 rounded-full bg-white/25 text-[10px] font-bold">
+                    <span className="ml-1 px-1.5 py-0.5 rounded-full bg-white/25 text-2xs font-bold">
                       {activeFilterCount}
                     </span>
                   )}
@@ -463,12 +463,12 @@ const Merchants = () => {
                   onClick={clearFilters}
                   className="flex items-center justify-center gap-1 px-3 py-2 text-xs font-bold uppercase tracking-widest text-on-surface-variant/70 hover:text-error transition-colors"
                 >
-                  <span className="material-symbols-outlined text-[16px]">refresh</span>
+                  <span className="material-symbols-outlined text-base">refresh</span>
                   Clear all
                 </button>
               )}
             </div>
-            <p className="text-[12px] text-on-surface-variant/60 font-body whitespace-nowrap">
+            <p className="text-xs text-on-surface-variant/60 font-body whitespace-nowrap">
               {filteredMerchants.length} of {merchantsData.length}
             </p>
           </div>
@@ -515,7 +515,7 @@ const Merchants = () => {
                   <th className="py-3 px-4 border-b border-outline-variant/10 text-right"></th>
                 </tr>
               </thead>
-              <tbody className="text-[13px]">
+              <tbody className="text-xs">
                 {pagedMerchants.map((m, i) => {
                   const tier = ACTIVITY_STYLE[m.activityTier] || ACTIVITY_STYLE.dormant;
                   const locked = m.status === 'locked';
@@ -524,35 +524,35 @@ const Merchants = () => {
                   const highSeverity = riskSignals.some((s) => s.severity === 'high');
                   return (
                     <tr key={m._id || i} className={`hover:bg-secondary-container/5 transition-colors group cursor-pointer ${locked ? 'opacity-70' : ''} ${flagged ? 'bg-red-50/30' : ''}`} onClick={() => openDetail(m._id)}>
-                      <td className="py-2 px-3 text-on-surface-variant/40 border-b border-outline-variant/5 text-[11px] tabular-nums">{String((page - 1) * PAGE_SIZE + i + 1).padStart(2, '0')}</td>
+                      <td className="py-2 px-3 text-on-surface-variant/40 border-b border-outline-variant/5 text-2xs tabular-nums">{String((page - 1) * PAGE_SIZE + i + 1).padStart(2, '0')}</td>
                       <td className="py-2 px-3 border-b border-outline-variant/5">
                         <div className="flex items-center gap-2.5">
-                          <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-[10px] ring-2 ring-white shadow-sm uppercase ${flagged ? 'bg-red-500 text-white' : 'bg-primary-fixed-dim text-on-primary-fixed'}`}>
-                            {flagged ? <span className="material-symbols-outlined text-[14px]">flag</span> : (m.businessName ? m.businessName.substring(0, 2) : 'M')}
+                          <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-2xs ring-2 ring-white shadow-sm uppercase ${flagged ? 'bg-red-500 text-white' : 'bg-primary-fixed-dim text-on-primary-fixed'}`}>
+                            {flagged ? <span className="material-symbols-outlined text-sm">flag</span> : (m.businessName ? m.businessName.substring(0, 2) : 'M')}
                           </div>
                           <div className="min-w-0">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <p className="font-bold text-on-surface tracking-tight">{m.businessName || 'N/A'}</p>
                               {flagged && (
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-red-100 text-red-700 border border-red-200">
-                                  <span className="material-symbols-outlined text-[11px]">flag</span> Flagged
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-2xs font-bold uppercase tracking-widest bg-red-100 text-red-700 border border-red-200">
+                                  <span className="material-symbols-outlined text-2xs">flag</span> Flagged
                                 </span>
                               )}
                             </div>
-                            <p className="text-[11px] text-on-surface-variant/60">{m.name || 'Unknown'}</p>
+                            <p className="text-2xs text-on-surface-variant/60">{m.name || 'Unknown'}</p>
                             {riskSignals.length > 0 && (
                               <div className="flex items-center gap-1 mt-1 flex-wrap">
                                 {riskSignals.slice(0, 3).map((s) => {
                                   const tone = RISK_TONE[s.severity] || RISK_TONE.low;
                                   return (
-                                    <span key={s.id} title={s.label} className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold border ${tone.pill}`}>
+                                    <span key={s.id} title={s.label} className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-2xs font-semibold border ${tone.pill}`}>
                                       <span className={`w-1 h-1 rounded-full ${tone.dot}`}></span>
                                       {s.label}
                                     </span>
                                   );
                                 })}
                                 {riskSignals.length > 3 && (
-                                  <span className="text-[9px] text-on-surface-variant/50 font-semibold">+{riskSignals.length - 3} more</span>
+                                  <span className="text-2xs text-on-surface-variant/50 font-semibold">+{riskSignals.length - 3} more</span>
                                 )}
                               </div>
                             )}
@@ -561,38 +561,38 @@ const Merchants = () => {
                       </td>
                       <td className="py-2 px-3 border-b border-outline-variant/5">
                         <p className="text-on-surface-variant/80 font-medium">{m.phone}</p>
-                        <p className="text-[11px] text-on-surface-variant/60">{m.email}</p>
+                        <p className="text-2xs text-on-surface-variant/60">{m.email}</p>
                       </td>
                       <td className="py-2 px-3 border-b border-outline-variant/5">
-                        <span className="font-mono text-[12px] font-bold text-on-surface bg-surface-container-low px-2 py-1 rounded">
+                        <span className="font-mono text-xs font-bold text-on-surface bg-surface-container-low px-2 py-1 rounded">
                           {m.paybillAccount || '—'}
                         </span>
                       </td>
                       <td className="py-2 px-3 border-b border-outline-variant/5">
                         <div className="flex flex-col gap-1">
-                          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold border tracking-wider uppercase w-max ${tier.pill}`}>
+                          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-2xs font-bold border tracking-wider uppercase w-max ${tier.pill}`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${tier.dot}`}></span>
                             {tier.label}
                           </span>
-                          <p className="text-[10px] text-on-surface-variant/60">
+                          <p className="text-2xs text-on-surface-variant/60">
                             {m.txnCount30d || 0} txns / 30d · {relativeTime(m.lastActivityAt)}
                           </p>
                         </div>
                       </td>
                       <td className="py-2 px-3 border-b border-outline-variant/5">
                         {locked ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border tracking-tight uppercase bg-amber-100 text-amber-800 border-amber-200">
-                            <span className="material-symbols-outlined text-[12px]">lock</span> Locked
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-2xs font-bold border tracking-tight uppercase bg-amber-100 text-amber-800 border-amber-200">
+                            <span className="material-symbols-outlined text-xs">lock</span> Locked
                           </span>
                         ) : (
-                          <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border tracking-tight uppercase ${
+                          <span className={`px-2.5 py-1 rounded-full text-2xs font-bold border tracking-tight uppercase ${
                             m.isVerified ? 'bg-secondary-container/20 text-secondary border-secondary-container/50' : 'bg-amber-100 text-amber-700 border-amber-200'
                           }`}>
                             {m.isVerified ? 'Verified' : 'Unverified'}
                           </span>
                         )}
                       </td>
-                      <td className="py-2 px-3 border-b border-outline-variant/5 text-on-surface-variant/60 text-[11px]">
+                      <td className="py-2 px-3 border-b border-outline-variant/5 text-on-surface-variant/60 text-2xs">
                         {new Date(m.createdAt).toLocaleDateString()}
                       </td>
                       <td className="py-2 px-3 text-right border-b border-outline-variant/5 relative" onClick={(e) => e.stopPropagation()}>
@@ -600,7 +600,7 @@ const Merchants = () => {
                           onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === m._id ? null : m._id); }}
                           className="p-1 hover:bg-surface-container-high rounded-lg text-on-surface-variant/30 hover:text-secondary transition-colors"
                         >
-                          <span className="material-symbols-outlined text-[20px]">more_vert</span>
+                          <span className="material-symbols-outlined text-xl">more_vert</span>
                         </button>
                         {openMenuId === m._id && (
                           <div ref={menuRef} className="absolute right-3 top-10 z-20 w-56 bg-white rounded-xl shadow-xl border border-outline-variant/20 overflow-hidden">
@@ -632,7 +632,7 @@ const Merchants = () => {
                         : (
                           <div className="space-y-2">
                             <p>No merchants match the current search or filters.</p>
-                            <button onClick={clearFilters} className="text-primary font-bold underline text-[12px]">Clear all filters</button>
+                            <button onClick={clearFilters} className="text-primary font-bold underline text-xs">Clear all filters</button>
                           </div>
                         )}
                     </td>
@@ -642,7 +642,7 @@ const Merchants = () => {
             </table>
           </div>
           <TablePagination page={page} pageSize={PAGE_SIZE} total={filteredMerchants.length} onPage={setPage} />
-          <div className="px-4 py-2 bg-surface text-[11px] text-on-surface-variant/50 font-body border-t border-outline-variant/10">
+          <div className="px-4 py-2 bg-surface text-2xs text-on-surface-variant/50 font-body border-t border-outline-variant/10">
             Showing {filteredMerchants.length} of {merchantStats.total} merchants
             {(activeFilterCount > 0 || search) && <span className="text-on-surface-variant/40"> · filtered</span>}
           </div>
@@ -664,7 +664,7 @@ const Merchants = () => {
                   A password-setup link has been emailed to <strong>{success.email}</strong>.
                 </p>
                 <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 mb-5 inline-block">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-700 mb-1">Account Number</p>
+                  <p className="text-2xs font-bold uppercase tracking-widest text-emerald-700 mb-1">Account Number</p>
                   <p className="font-mono text-xl font-bold text-emerald-900">{success.paybillAccount}</p>
                 </div>
                 <div className="flex gap-2 justify-center">
@@ -677,7 +677,7 @@ const Merchants = () => {
                 <div className="px-6 py-4 border-b border-outline-variant/10 flex items-center justify-between bg-surface-container-low">
                   <div>
                     <h3 className="text-base font-bold text-on-surface tracking-tight">Onboard New Merchant</h3>
-                    <p className="text-[11px] text-on-surface-variant/60">A setup link will be emailed to the merchant.</p>
+                    <p className="text-2xs text-on-surface-variant/60">A setup link will be emailed to the merchant.</p>
                   </div>
                   <button onClick={closeModal} disabled={submitting} className="p-1 rounded-lg hover:bg-surface-container-high text-on-surface-variant/60 disabled:opacity-40">
                     <span className="material-symbols-outlined">close</span>
@@ -706,8 +706,8 @@ const Merchants = () => {
                       <input type="text" value={form.businessNumber} onChange={(e) => update('businessNumber', e.target.value)} placeholder="BN-2024-12345" className={fieldClass} />
                     </Field>
                   </div>
-                  {formError && <div className="text-[13px] text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium">{formError}</div>}
-                  <div className="bg-amber-50 border border-amber-100 rounded-lg px-3 py-2.5 text-[12px] text-amber-800">
+                  {formError && <div className="text-xs text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium">{formError}</div>}
+                  <div className="bg-amber-50 border border-amber-100 rounded-lg px-3 py-2.5 text-xs text-amber-800">
                     <strong>Note:</strong> A unique 5-digit account number will be auto-assigned. The merchant receives a secure link (24h) to set their own password.
                   </div>
                   <div className="flex gap-3 pt-2">
@@ -756,12 +756,12 @@ const Merchants = () => {
 const fieldClass = 'w-full px-3 py-2.5 border border-outline-variant/40 rounded-lg text-sm focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none';
 
 const Th = ({ children }) => (
-  <th className="py-3 px-4 border-b border-outline-variant/10 text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/40">{children}</th>
+  <th className="py-3 px-4 border-b border-outline-variant/10 text-2xs font-bold uppercase tracking-widest text-on-surface-variant/40">{children}</th>
 );
 
 const Field = ({ label, required, children }) => (
   <div>
-    <label className="block text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/60 mb-1.5">
+    <label className="block text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 mb-1.5">
       {label} {required && <span className="text-red-500">*</span>}
     </label>
     {children}
@@ -780,7 +780,7 @@ const StatCard = ({ label, value, icon, tone, className = '' }) => {
   return (
     <div className={`bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/20 flex items-center justify-between shadow-premium-glow transition-all hover:scale-[1.02] ${className}`}>
       <div>
-        <p className="text-[10px] md:text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/40 mb-1">{label}</p>
+        <p className="text-2xs md:text-2xs font-bold uppercase tracking-widest text-on-surface-variant/40 mb-1">{label}</p>
         <h3 className="text-xl md:text-2xl font-bold text-on-surface tracking-tight">{value}</h3>
       </div>
       <div className={`hidden sm:flex w-10 h-10 rounded-full items-center justify-center ${toneMap[tone] || toneMap.gray}`}>
@@ -799,7 +799,7 @@ const MenuItem = ({ icon, tone, onClick, children }) => {
   };
   return (
     <button onClick={onClick} className={`w-full flex items-center gap-2 px-4 py-3 text-sm font-semibold text-left ${toneMap[tone]} transition-colors`}>
-      <span className="material-symbols-outlined text-[18px]">{icon}</span>
+      <span className="material-symbols-outlined text-lg">{icon}</span>
       {children}
     </button>
   );
@@ -830,11 +830,11 @@ const ActionModal = ({ state, onClose, onConfirm, onSubmitOtp, onOtpChange }) =>
             <p className="text-sm text-on-surface-variant mb-4">
               You're about to <strong>{meta.verb}</strong> <strong>{state.merchant.businessName}</strong> ({state.merchant.email}).
             </p>
-            <div className={`text-[13px] px-3 py-2.5 rounded-lg mb-5 ${meta.tone === 'red' ? 'bg-red-50 text-red-800 border border-red-100' : 'bg-amber-50 text-amber-800 border border-amber-100'}`}>
+            <div className={`text-xs px-3 py-2.5 rounded-lg mb-5 ${meta.tone === 'red' ? 'bg-red-50 text-red-800 border border-red-100' : 'bg-amber-50 text-amber-800 border border-amber-100'}`}>
               {meta.copy}
             </div>
-            <p className="text-[12px] text-on-surface-variant/70 mb-5">For security, a 6-digit verification code will be sent to your admin email to confirm this action.</p>
-            {state.error && <div className="text-[13px] text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium mb-3">{state.error}</div>}
+            <p className="text-xs text-on-surface-variant/70 mb-5">For security, a 6-digit verification code will be sent to your admin email to confirm this action.</p>
+            {state.error && <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium mb-3">{state.error}</div>}
             <div className="flex gap-3">
               <button onClick={onClose} disabled={state.busy} className="flex-1 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40 transition-all">Cancel</button>
               <button onClick={onConfirm} disabled={state.busy} className={`flex-1 py-2.5 rounded-lg text-white text-sm font-semibold uppercase tracking-widest disabled:opacity-50 transition-all ${toneBtn}`}>
@@ -863,7 +863,7 @@ const ActionModal = ({ state, onClose, onConfirm, onSubmitOtp, onOtpChange }) =>
               placeholder="000000"
               className="w-full text-center text-2xl font-mono font-bold tracking-[0.5em] px-4 py-4 border-2 border-outline-variant/40 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none mb-3"
             />
-            {state.error && <div className="text-[13px] text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium mb-3">{state.error}</div>}
+            {state.error && <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium mb-3">{state.error}</div>}
             <div className="flex gap-3">
               <button onClick={onClose} disabled={state.busy} className="flex-1 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40 transition-all">Cancel</button>
               <button onClick={onSubmitOtp} disabled={state.busy || state.otp.length !== 6} className={`flex-1 py-2.5 rounded-lg text-white text-sm font-semibold uppercase tracking-widest disabled:opacity-50 transition-all ${toneBtn}`}>
@@ -911,7 +911,7 @@ const FlagModal = ({ state, onChange, onSubmit, onClose }) => {
             Flag <strong>{merchant.businessName}</strong> ({merchant.email}) for review. The merchant retains full account access; this is an internal label only.
           </p>
 
-          <label className="block text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/70 mb-2">Reason (required)</label>
+          <label className="block text-2xs font-bold uppercase tracking-widest text-on-surface-variant/70 mb-2">Reason (required)</label>
           <textarea
             value={reason}
             onChange={(e) => onChange({ reason: e.target.value })}
@@ -920,17 +920,17 @@ const FlagModal = ({ state, onChange, onSubmit, onClose }) => {
             placeholder="Explain what triggered the flag…"
             className="w-full px-3 py-2.5 border border-outline-variant/40 rounded-lg text-sm focus:border-red-500 focus:ring-2 focus:ring-red-100 outline-none resize-none"
           />
-          <p className="text-[10px] text-on-surface-variant/50 text-right mt-1">{reason.length}/500</p>
+          <p className="text-2xs text-on-surface-variant/50 text-right mt-1">{reason.length}/500</p>
 
           <div className="mt-3">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1.5">Quick reasons</p>
+            <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1.5">Quick reasons</p>
             <div className="flex flex-wrap gap-1.5">
               {SUGGESTED_FLAG_REASONS.map((r) => (
                 <button
                   key={r}
                   type="button"
                   onClick={() => onChange({ reason: r })}
-                  className="px-2 py-1 rounded-md text-[11px] font-semibold border border-outline-variant/40 text-on-surface-variant hover:bg-red-50 hover:text-red-700 hover:border-red-200 transition-colors"
+                  className="px-2 py-1 rounded-md text-2xs font-semibold border border-outline-variant/40 text-on-surface-variant hover:bg-red-50 hover:text-red-700 hover:border-red-200 transition-colors"
                 >
                   {r}
                 </button>
@@ -938,7 +938,7 @@ const FlagModal = ({ state, onChange, onSubmit, onClose }) => {
             </div>
           </div>
 
-          {error && <div className="mt-3 text-[13px] text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium">{error}</div>}
+          {error && <div className="mt-3 text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium">{error}</div>}
 
           <div className="mt-5 flex gap-3">
             <button onClick={onClose} disabled={busy} className="flex-1 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40 transition-all">Cancel</button>
@@ -977,15 +977,15 @@ const FILTER_GROUPS = [
 const FilterPopover = ({ filters, onChange, onReset, onClose }) => (
   <div className="absolute right-0 top-12 z-30 w-72 bg-white rounded-xl shadow-2xl border border-outline-variant/20 overflow-hidden animate-[fadeIn_0.15s_ease-out]">
     <div className="px-4 py-3 border-b border-outline-variant/10 flex items-center justify-between bg-surface-container-low">
-      <h4 className="text-[12px] font-bold uppercase tracking-widest text-on-surface">Filter Merchants</h4>
-      <button onClick={onReset} className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/60 hover:text-error transition-colors">
+      <h4 className="text-xs font-bold uppercase tracking-widest text-on-surface">Filter Merchants</h4>
+      <button onClick={onReset} className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 hover:text-error transition-colors">
         Reset
       </button>
     </div>
     <div className="max-h-[400px] overflow-y-auto custom-scrollbar p-4 space-y-4">
       {FILTER_GROUPS.map((g) => (
         <div key={g.key}>
-          <label className="block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60 mb-2">{g.label}</label>
+          <label className="block text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 mb-2">{g.label}</label>
           <div className="flex flex-wrap gap-1.5">
             {g.opts.map((o) => {
               const selected = filters[g.key] === o.v;
@@ -993,7 +993,7 @@ const FilterPopover = ({ filters, onChange, onReset, onClose }) => (
                 <button
                   key={o.v}
                   onClick={() => onChange({ [g.key]: o.v })}
-                  className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all ${
+                  className={`px-2.5 py-1 rounded-full text-2xs font-semibold border transition-all ${
                     selected
                       ? 'bg-primary text-white border-primary'
                       : 'bg-white text-on-surface-variant border-outline-variant/40 hover:border-primary/40'
@@ -1008,7 +1008,7 @@ const FilterPopover = ({ filters, onChange, onReset, onClose }) => (
       ))}
     </div>
     <div className="px-4 py-3 border-t border-outline-variant/10 bg-surface-container-low/50 flex justify-end">
-      <button onClick={onClose} className="px-4 py-1.5 rounded-lg bg-primary text-white text-[11px] font-bold uppercase tracking-widest hover:shadow-md transition-all">
+      <button onClick={onClose} className="px-4 py-1.5 rounded-lg bg-primary text-white text-2xs font-bold uppercase tracking-widest hover:shadow-md transition-all">
         Done
       </button>
     </div>
@@ -1016,10 +1016,10 @@ const FilterPopover = ({ filters, onChange, onReset, onClose }) => (
 );
 
 const Chip = ({ children, onClear }) => (
-  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20 text-[11px] font-semibold text-primary">
+  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20 text-2xs font-semibold text-primary">
     {children}
     <button onClick={onClear} className="ml-0.5 -mr-0.5 p-0.5 rounded-full hover:bg-primary/20 transition-colors" aria-label="Remove filter">
-      <span className="material-symbols-outlined text-[12px]">close</span>
+      <span className="material-symbols-outlined text-xs">close</span>
     </button>
   </span>
 );
@@ -1067,12 +1067,12 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
         {/* Sticky header */}
         <div className="sticky top-0 z-10 bg-white border-b border-outline-variant/20 px-6 py-4 flex items-start justify-between">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40 mb-0.5">KYB Profile</p>
+            <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/40 mb-0.5">KYB Profile</p>
             <h3 className="text-xl font-bold text-on-surface tracking-tight">
               {ready ? m.businessName : 'Loading…'}
             </h3>
             {ready && (
-              <p className="text-[12px] text-on-surface-variant/70 mt-0.5">{m.name} · {m.email}</p>
+              <p className="text-xs text-on-surface-variant/70 mt-0.5">{m.name} · {m.email}</p>
             )}
           </div>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-surface-container-low text-on-surface-variant/60">
@@ -1118,9 +1118,9 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
                 <div className="flex items-start gap-3">
                   <span className="material-symbols-outlined text-red-600 text-xl">flag</span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[11px] font-bold uppercase tracking-widest text-red-700 mb-1">Flagged for review</p>
+                    <p className="text-2xs font-bold uppercase tracking-widest text-red-700 mb-1">Flagged for review</p>
                     <p className="text-sm text-red-900 leading-relaxed">{m.flagReason || '—'}</p>
-                    <p className="text-[11px] text-red-700/70 mt-2">
+                    <p className="text-2xs text-red-700/70 mt-2">
                       Flagged {fmtDate(m.flaggedAt)}{m.flaggedBy?.email ? ` by ${m.flaggedBy.email}` : ''}
                     </p>
                   </div>
@@ -1135,10 +1135,10 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
                   {m.riskSignals.map((s) => {
                     const tone = RISK_TONE[s.severity] || RISK_TONE.low;
                     return (
-                      <span key={s.id} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide border ${tone.pill}`}>
+                      <span key={s.id} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-2xs font-bold uppercase tracking-wide border ${tone.pill}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${tone.dot}`}></span>
                         {s.label}
-                        <span className="text-[9px] opacity-60 ml-0.5">{s.severity}</span>
+                        <span className="text-2xs opacity-60 ml-0.5">{s.severity}</span>
                       </span>
                     );
                   })}
@@ -1190,7 +1190,7 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
               <Row
                 label="Stellar Public Key"
                 value={m.stellarPublicKey
-                  ? <span className="font-mono text-[12px] break-all">{m.stellarPublicKey}</span>
+                  ? <span className="font-mono text-xs break-all">{m.stellarPublicKey}</span>
                   : '— wallet not provisioned —'}
               />
               <Row label="USDC Balance" value={`${(m.usdcBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDC`} />
@@ -1208,7 +1208,7 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
               <Row label="Transactions (30d)" value={(m.txnCount30d ?? 0).toLocaleString()} />
               {m.lastTransaction && (
                 <Row label="Last Transaction" value={
-                  <span>KES {Number(m.lastTransaction.amount || 0).toLocaleString()} · <span className="text-on-surface-variant/60">{fmtDate(m.lastTransaction.createdAt)}</span> · <span className="uppercase text-[10px] font-bold tracking-widest text-on-surface-variant/60">{m.lastTransaction.status}</span></span>
+                  <span>KES {Number(m.lastTransaction.amount || 0).toLocaleString()} · <span className="text-on-surface-variant/60">{fmtDate(m.lastTransaction.createdAt)}</span> · <span className="uppercase text-2xs font-bold tracking-widest text-on-surface-variant/60">{m.lastTransaction.status}</span></span>
                 } />
               )}
             </Section>
@@ -1242,7 +1242,7 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
                     >
                       <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${features.digitalWallet ? 'translate-x-4.5' : 'translate-x-1'}`} />
                     </button>
-                    <span className="text-[12px] font-semibold text-on-surface-variant/80">{features.digitalWallet ? 'Enabled' : 'Disabled'}</span>
+                    <span className="text-xs font-semibold text-on-surface-variant/80">{features.digitalWallet ? 'Enabled' : 'Disabled'}</span>
                   </div>
                 } 
               />
@@ -1257,7 +1257,7 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
                     >
                       <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${features.inflationShield ? 'translate-x-4.5' : 'translate-x-1'}`} />
                     </button>
-                    <span className="text-[12px] font-semibold text-on-surface-variant/80">{features.inflationShield ? 'Enabled' : 'Disabled'}</span>
+                    <span className="text-xs font-semibold text-on-surface-variant/80">{features.inflationShield ? 'Enabled' : 'Disabled'}</span>
                   </div>
                 }
               />
@@ -1272,7 +1272,7 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
                     >
                       <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${features.cashAdvanceForm ? 'translate-x-4.5' : 'translate-x-1'}`} />
                     </button>
-                    <span className="text-[12px] font-semibold text-on-surface-variant/80">{features.cashAdvanceForm ? 'Enabled' : 'Disabled'}</span>
+                    <span className="text-xs font-semibold text-on-surface-variant/80">{features.cashAdvanceForm ? 'Enabled' : 'Disabled'}</span>
                   </div>
                 }
               />
@@ -1288,8 +1288,8 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
 const Section = ({ title, icon, children }) => (
   <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-xl overflow-hidden">
     <div className="px-4 py-3 border-b border-outline-variant/10 bg-surface-container-low flex items-center gap-2">
-      <span className="material-symbols-outlined text-on-surface-variant/60 text-[18px]">{icon}</span>
-      <h4 className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/80">{title}</h4>
+      <span className="material-symbols-outlined text-on-surface-variant/60 text-lg">{icon}</span>
+      <h4 className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/80">{title}</h4>
     </div>
     <div className="divide-y divide-outline-variant/10">{children}</div>
   </div>
@@ -1297,11 +1297,11 @@ const Section = ({ title, icon, children }) => (
 
 const Row = ({ label, value, mono, badge }) => (
   <div className="px-4 py-3 grid grid-cols-3 gap-3 items-start">
-    <div className="text-[12px] font-semibold text-on-surface-variant/60 uppercase tracking-wide">{label}</div>
-    <div className="col-span-2 text-[14px] text-on-surface flex items-center gap-2 flex-wrap">
+    <div className="text-xs font-semibold text-on-surface-variant/60 uppercase tracking-wide">{label}</div>
+    <div className="col-span-2 text-sm text-on-surface flex items-center gap-2 flex-wrap">
       <span className={mono ? 'font-mono' : ''}>{value ?? '—'}</span>
       {badge && (
-        <span className={`text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full border ${
+        <span className={`text-2xs font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full border ${
           badge.tone === 'emerald' ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
           : badge.tone === 'amber' ? 'bg-amber-50 text-amber-700 border-amber-200'
           : 'bg-gray-50 text-gray-600 border-gray-200'
@@ -1319,8 +1319,8 @@ const Badge = ({ tone, icon, children }) => {
     red:     'bg-red-50 text-red-700 border-red-200',
   };
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest border ${toneMap[tone] || toneMap.gray}`}>
-      {icon && <span className="material-symbols-outlined text-[12px]">{icon}</span>}
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-bold uppercase tracking-widest border ${toneMap[tone] || toneMap.gray}`}>
+      {icon && <span className="material-symbols-outlined text-xs">{icon}</span>}
       {children}
     </span>
   );

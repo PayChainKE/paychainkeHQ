@@ -196,16 +196,16 @@ const Ledger = () => {
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-emerald-300">Wallet Ledger · Live Chain Settlement</p>
+                <p className="text-2xs font-bold uppercase tracking-[0.3em] text-emerald-300">Wallet Ledger · Live Chain Settlement</p>
               </div>
-              <h1 className="text-[24px] md:text-[40px] font-bold text-white tracking-tighter font-headline leading-none">
+              <h1 className="text-2xl md:text-5xl font-bold text-white tracking-tighter font-headline leading-none">
                 On-Chain Treasury
               </h1>
-              <p className="text-emerald-100/60 mt-2 max-w-xl text-[13px] md:text-[14px]">
+              <p className="text-emerald-100/60 mt-2 max-w-xl text-xs md:text-sm">
                 Cryptographically auditable record of every M-Pesa collection, payout, FX swap, and on-chain USDC settlement across the PayChain network.
               </p>
               {refreshedAt && (
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-300/60 mt-3">
+                <p className="text-2xs font-bold uppercase tracking-[0.2em] text-emerald-300/60 mt-3">
                   Last refresh · {refreshedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                 </p>
               )}
@@ -216,7 +216,7 @@ const Ledger = () => {
                   <button
                     key={r.v}
                     onClick={() => { setRange(r.v); setPage(1); }}
-                    className={`px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest rounded-lg transition-all ${
+                    className={`px-3 py-1.5 text-2xs font-bold uppercase tracking-widest rounded-lg transition-all ${
                       range === r.v ? 'bg-emerald-500 text-white shadow-lg' : 'text-emerald-200/60 hover:text-white'
                     }`}
                   >
@@ -228,13 +228,13 @@ const Ledger = () => {
                 onClick={fetchData}
                 disabled={loading}
                 title="Refresh"
-                className="flex items-center gap-2 px-3.5 py-2 bg-white/10 hover:bg-white/15 backdrop-blur-sm border border-white/10 text-white text-[11px] font-bold rounded-xl uppercase tracking-widest transition-all disabled:opacity-60"
+                className="flex items-center gap-2 px-3.5 py-2 bg-white/10 hover:bg-white/15 backdrop-blur-sm border border-white/10 text-white text-2xs font-bold rounded-xl uppercase tracking-widest transition-all disabled:opacity-60"
               >
-                <span className={`material-symbols-outlined text-[16px] ${loading ? 'animate-spin' : ''}`}>refresh</span>
+                <span className={`material-symbols-outlined text-base ${loading ? 'animate-spin' : ''}`}>refresh</span>
                 Refresh
               </button>
-              <button onClick={exportCsv} className="flex items-center gap-2 px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-white text-[11px] font-bold rounded-xl uppercase tracking-widest transition-all shadow-lg">
-                <span className="material-symbols-outlined text-[16px]">file_download</span>
+              <button onClick={exportCsv} className="flex items-center gap-2 px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-white text-2xs font-bold rounded-xl uppercase tracking-widest transition-all shadow-lg">
+                <span className="material-symbols-outlined text-base">file_download</span>
                 Export CSV
               </button>
             </div>
@@ -251,7 +251,7 @@ const Ledger = () => {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
               {/* Treasury balance card */}
               <div className="lg:col-span-5 bg-gradient-to-br from-white to-emerald-50/30 border border-outline-variant/20 rounded-2xl p-6 shadow-editorial">
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-3">Settled Volume</p>
+                <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-3">Settled Volume</p>
                 <div className="grid grid-cols-2 gap-4">
                   <AssetTile
                     label="Kenyan Shilling"
@@ -270,7 +270,7 @@ const Ledger = () => {
                     chain="PayChain Stellar Network"
                   />
                 </div>
-                <div className="mt-4 pt-4 border-t border-outline-variant/10 flex items-center justify-between text-[11px]">
+                <div className="mt-4 pt-4 border-t border-outline-variant/10 flex items-center justify-between text-2xs">
                   <span className="text-on-surface-variant/60 font-bold uppercase tracking-widest">Total Movement</span>
                   <span className="font-bold text-on-surface">{fmtKESFull(data.kpis.volume.value)}</span>
                 </div>
@@ -292,10 +292,10 @@ const Ledger = () => {
               <div className="lg:col-span-8 bg-surface-container-lowest rounded-2xl border border-outline-variant/20 p-6 shadow-editorial">
                 <div className="flex items-start justify-between mb-5">
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">Throughput</p>
+                    <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">Throughput</p>
                     <h3 className="text-lg font-bold text-on-surface tracking-tight">Settlement Volume ({range.toUpperCase()})</h3>
                   </div>
-                  <div className="flex items-center gap-3 text-[11px] font-bold">
+                  <div className="flex items-center gap-3 text-2xs font-bold">
                     <Legend color="bg-primary" label="Volume" />
                     <Legend color="bg-emerald-500" label="Count" />
                   </div>
@@ -303,7 +303,7 @@ const Ledger = () => {
                 <AreaChart series={data.series} />
               </div>
               <div className="lg:col-span-4 bg-surface-container-lowest rounded-2xl border border-outline-variant/20 p-6 shadow-editorial">
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">Composition</p>
+                <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">Composition</p>
                 <h3 className="text-lg font-bold text-on-surface tracking-tight mb-5">Transaction Mix</h3>
                 <TypeMix mix={data.typeMix} />
               </div>
@@ -322,7 +322,7 @@ const Ledger = () => {
                   <button
                     key={qf.id}
                     onClick={() => applyQuickFilter(qf)}
-                    className={`px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-widest border transition-all ${
+                    className={`px-3 py-1.5 rounded-full text-2xs font-bold uppercase tracking-widest border transition-all ${
                       active
                         ? 'bg-primary text-white border-primary shadow'
                         : 'bg-white text-on-surface-variant/60 border-outline-variant/30 hover:border-primary hover:text-primary'
@@ -333,8 +333,8 @@ const Ledger = () => {
                 );
               })}
               {filtersActive && (
-                <button onClick={resetFilters} className="ml-auto px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-widest border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 transition-all flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[14px]">close</span>
+                <button onClick={resetFilters} className="ml-auto px-3 py-1.5 rounded-full text-2xs font-bold uppercase tracking-widest border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 transition-all flex items-center gap-1">
+                  <span className="material-symbols-outlined text-sm">close</span>
                   Clear filters
                 </button>
               )}
@@ -344,35 +344,35 @@ const Ledger = () => {
             <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 overflow-hidden shadow-editorial">
               <div className="px-6 py-4 border-b border-outline-variant/10 flex flex-col md:flex-row md:items-center md:justify-between gap-3 bg-white">
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-0.5">Cryptographic Audit Trail</p>
+                  <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-0.5">Cryptographic Audit Trail</p>
                   <h3 className="text-base font-bold text-on-surface tracking-tight">
                     Transaction Ledger
-                    <span className="ml-2 text-[11px] font-bold text-on-surface-variant/50 tabular-nums">· {data.pagination.total.toLocaleString()} entries</span>
+                    <span className="ml-2 text-2xs font-bold text-on-surface-variant/50 tabular-nums">· {data.pagination.total.toLocaleString()} entries</span>
                   </h3>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <div className="relative">
-                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/40 text-[18px]">search</span>
+                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/40 text-lg">search</span>
                     <input
                       value={searchInput}
                       onChange={(e) => setSearchInput(e.target.value)}
                       placeholder="Reference, account, sender..."
-                      className="pl-9 pr-3 py-2 bg-surface-container-low border-transparent focus:border-primary focus:ring-0 rounded-lg text-[13px] w-full sm:w-72"
+                      className="pl-9 pr-3 py-2 bg-surface-container-low border-transparent focus:border-primary focus:ring-0 rounded-lg text-xs w-full sm:w-72"
                     />
                     {searchInput && (
                       <button
                         onClick={() => setSearchInput('')}
                         className="absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-variant/40 hover:text-on-surface"
                       >
-                        <span className="material-symbols-outlined text-[16px]">close</span>
+                        <span className="material-symbols-outlined text-base">close</span>
                       </button>
                     )}
                   </div>
-                  <select value={type} onChange={(e) => { setType(e.target.value); setPage(1); }} className="px-3 py-2 border border-outline-variant/40 rounded-lg text-[12px] font-bold uppercase tracking-widest bg-white">
+                  <select value={type} onChange={(e) => { setType(e.target.value); setPage(1); }} className="px-3 py-2 border border-outline-variant/40 rounded-lg text-xs font-bold uppercase tracking-widest bg-white">
                     <option value="all">All types</option>
                     {Object.entries(TYPE_META).filter(([k]) => k !== 'other').map(([v, m]) => <option key={v} value={v}>{m.label}</option>)}
                   </select>
-                  <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className="px-3 py-2 border border-outline-variant/40 rounded-lg text-[12px] font-bold uppercase tracking-widest bg-white">
+                  <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className="px-3 py-2 border border-outline-variant/40 rounded-lg text-xs font-bold uppercase tracking-widest bg-white">
                     <option value="all">All status</option>
                     <option value="completed">Completed</option>
                     <option value="verified">Verified</option>
@@ -389,7 +389,7 @@ const Ledger = () => {
                   </div>
                   <p className="text-sm text-on-surface-variant/60 font-medium">No transactions match this view.</p>
                   {filtersActive && (
-                    <button onClick={resetFilters} className="mt-3 text-[12px] font-bold uppercase tracking-widest text-primary hover:underline">
+                    <button onClick={resetFilters} className="mt-3 text-xs font-bold uppercase tracking-widest text-primary hover:underline">
                       Clear filters
                     </button>
                   )}
@@ -410,7 +410,7 @@ const Ledger = () => {
                           <Th></Th>
                         </tr>
                       </thead>
-                      <tbody className="text-[13px]">
+                      <tbody className="text-xs">
                         {data.transactions.map((t) => {
                           const tm = TYPE_META[t.type] || TYPE_META.other;
                           const sm = STATUS_META[t.status] || STATUS_META.pending;
@@ -422,7 +422,7 @@ const Ledger = () => {
                             >
                               <td className="px-3 py-2 border-b border-outline-variant/5">
                                 <div className="flex items-center gap-1">
-                                  <span className="font-mono text-[11px] font-bold text-on-surface bg-surface-container-low px-2 py-1 rounded">
+                                  <span className="font-mono text-2xs font-bold text-on-surface bg-surface-container-low px-2 py-1 rounded">
                                     {t.reference?.length > 18 ? `${t.reference.slice(0, 14)}…` : t.reference || '—'}
                                   </span>
                                   {t.reference && (
@@ -431,7 +431,7 @@ const Ledger = () => {
                                       title="Copy reference"
                                       className="opacity-0 group-hover:opacity-100 text-on-surface-variant/40 hover:text-primary transition-all"
                                     >
-                                      <span className="material-symbols-outlined text-[14px]">
+                                      <span className="material-symbols-outlined text-sm">
                                         {copiedRef === t.reference ? 'check' : 'content_copy'}
                                       </span>
                                     </button>
@@ -440,7 +440,7 @@ const Ledger = () => {
                               </td>
                               <td className="px-3 py-2 border-b border-outline-variant/5 text-on-surface-variant/70 whitespace-nowrap">{fmtTime(t.createdAt)}</td>
                               <td className="px-3 py-2 border-b border-outline-variant/5">
-                                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest border ${tm.color}`}>
+                                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-2xs font-bold uppercase tracking-widest border ${tm.color}`}>
                                   <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: tm.dot }}></span>
                                   {tm.label}
                                 </span>
@@ -449,15 +449,15 @@ const Ledger = () => {
                                 {t.merchant ? (
                                   <div>
                                     <p className="font-bold text-on-surface tracking-tight">{t.merchant.businessName}</p>
-                                    <p className="text-[10px] text-on-surface-variant/60 font-mono">#{t.merchant.paybillAccount}</p>
+                                    <p className="text-2xs text-on-surface-variant/60 font-mono">#{t.merchant.paybillAccount}</p>
                                   </div>
                                 ) : t.sender?.name ? (
                                   <div>
                                     <p className="font-medium text-on-surface-variant">{t.sender.name}</p>
-                                    <p className="text-[10px] text-on-surface-variant/60 font-mono">{t.sender.id || t.accountNumber}</p>
+                                    <p className="text-2xs text-on-surface-variant/60 font-mono">{t.sender.id || t.accountNumber}</p>
                                   </div>
                                 ) : (
-                                  <p className="text-on-surface-variant/40 font-mono text-[12px]">{t.accountNumber || '—'}</p>
+                                  <p className="text-on-surface-variant/40 font-mono text-xs">{t.accountNumber || '—'}</p>
                                 )}
                               </td>
                               <td className="px-3 py-2 border-b border-outline-variant/5">
@@ -465,17 +465,17 @@ const Ledger = () => {
                                   {t.currency === 'USDC' ? `${fmtUSDC(t.amount)} USDC` : fmtKES(t.amount)}
                                 </p>
                                 {t.usdcAmount > 0 && t.kesAmount > 0 && (
-                                  <p className="text-[10px] text-on-surface-variant/60 font-mono">≈ {fmtUSDC(t.usdcAmount)} USDC</p>
+                                  <p className="text-2xs text-on-surface-variant/60 font-mono">≈ {fmtUSDC(t.usdcAmount)} USDC</p>
                                 )}
                               </td>
                               <td className="px-3 py-2 border-b border-outline-variant/5">
-                                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest border ${sm.pill}`}>
+                                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-2xs font-bold uppercase tracking-widest border ${sm.pill}`}>
                                   <span className={`w-1.5 h-1.5 rounded-full ${sm.dot}`}></span>
                                   {sm.label}
                                 </span>
                               </td>
                               <td className="px-2 py-3 border-b border-outline-variant/5 text-right">
-                                <span className="material-symbols-outlined text-on-surface-variant/30 text-[18px] group-hover:text-primary transition-colors">chevron_right</span>
+                                <span className="material-symbols-outlined text-on-surface-variant/30 text-lg group-hover:text-primary transition-colors">chevron_right</span>
                               </td>
                             </tr>
                           );
@@ -497,26 +497,26 @@ const Ledger = () => {
                         >
                           <div className="flex items-start justify-between gap-3 mb-2">
                             <div className="min-w-0 flex-1">
-                              <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest border mb-1 ${tm.color}`}>
+                              <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-2xs font-bold uppercase tracking-widest border mb-1 ${tm.color}`}>
                                 <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: tm.dot }}></span>
                                 {tm.label}
                               </span>
-                              <p className="font-bold text-on-surface text-[14px] tracking-tight truncate">
+                              <p className="font-bold text-on-surface text-sm tracking-tight truncate">
                                 {t.merchant?.businessName || t.sender?.name || t.accountNumber || '—'}
                               </p>
-                              <p className="text-[10px] font-mono text-on-surface-variant/60 truncate">{t.reference || '—'}</p>
+                              <p className="text-2xs font-mono text-on-surface-variant/60 truncate">{t.reference || '—'}</p>
                             </div>
                             <div className="text-right">
                               <p className="font-bold text-on-surface tabular-nums">
                                 {t.currency === 'USDC' ? `${fmtUSDC(t.amount)} USDC` : fmtKES(t.amount)}
                               </p>
-                              <span className={`mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest border ${sm.pill}`}>
+                              <span className={`mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-2xs font-bold uppercase tracking-widest border ${sm.pill}`}>
                                 <span className={`w-1.5 h-1.5 rounded-full ${sm.dot}`}></span>
                                 {sm.label}
                               </span>
                             </div>
                           </div>
-                          <p className="text-[10px] text-on-surface-variant/50">{fmtTime(t.createdAt)}</p>
+                          <p className="text-2xs text-on-surface-variant/50">{fmtTime(t.createdAt)}</p>
                         </button>
                       );
                     })}
@@ -527,16 +527,16 @@ const Ledger = () => {
               {/* Pagination */}
               {data.pagination.total > 0 && (
                 <div className="px-6 py-4 bg-surface flex items-center justify-between border-t border-outline-variant/10">
-                  <p className="text-[12px] text-on-surface-variant/60 font-body">
+                  <p className="text-xs text-on-surface-variant/60 font-body">
                     Page {data.pagination.page} of {data.pagination.totalPages}
                   </p>
                   <div className="flex items-center gap-1">
                     <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="p-1.5 rounded-lg hover:bg-surface-container-low text-on-surface-variant/40 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
-                      <span className="material-symbols-outlined text-[18px]">chevron_left</span>
+                      <span className="material-symbols-outlined text-lg">chevron_left</span>
                     </button>
                     <span className="px-3 py-1 rounded-lg bg-primary text-white text-xs font-bold tracking-tight">{page}</span>
                     <button onClick={() => setPage((p) => Math.min(data.pagination.totalPages, p + 1))} disabled={page === data.pagination.totalPages} className="p-1.5 rounded-lg hover:bg-surface-container-low text-on-surface-variant/40 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
-                      <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+                      <span className="material-symbols-outlined text-lg">chevron_right</span>
                     </button>
                   </div>
                 </div>
@@ -565,17 +565,17 @@ const TxnDrawer = ({ txn, onClose, onCopy, copiedRef }) => {
           <button onClick={onClose} className="absolute top-4 right-4 text-white/60 hover:text-white p-1">
             <span className="material-symbols-outlined">close</span>
           </button>
-          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest border mb-3 ${tm.color}`}>
+          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-2xs font-bold uppercase tracking-widest border mb-3 ${tm.color}`}>
             <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: tm.dot }}></span>
             {tm.label}
           </span>
-          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-emerald-300 mb-1">Transaction</p>
+          <p className="text-2xs font-bold uppercase tracking-[0.3em] text-emerald-300 mb-1">Transaction</p>
           <h3 className="text-2xl font-bold text-white tracking-tight mb-1 tabular-nums">
             {txn.currency === 'USDC' ? `${fmtUSDC(txn.amount)} USDC` : fmtKESFull(txn.amount)}
           </h3>
-          <p className="text-[12px] text-emerald-100/70">{fmtFullTime(txn.createdAt)}</p>
+          <p className="text-xs text-emerald-100/70">{fmtFullTime(txn.createdAt)}</p>
           <div className="mt-3">
-            <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border ${sm.pill}`}>
+            <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-2xs font-bold uppercase tracking-widest border ${sm.pill}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${sm.dot}`}></span>
               {sm.label}
             </span>
@@ -587,12 +587,12 @@ const TxnDrawer = ({ txn, onClose, onCopy, copiedRef }) => {
           {/* Reference */}
           <Section title="Reference">
             <div className="flex items-center gap-2">
-              <span className="font-mono text-[12px] font-bold text-on-surface bg-surface-container-low px-2 py-1.5 rounded flex-1 break-all">
+              <span className="font-mono text-xs font-bold text-on-surface bg-surface-container-low px-2 py-1.5 rounded flex-1 break-all">
                 {txn.reference || '—'}
               </span>
               {txn.reference && (
-                <button onClick={() => onCopy(txn.reference)} className="px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary rounded-lg text-[11px] font-bold uppercase tracking-widest flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[14px]">
+                <button onClick={() => onCopy(txn.reference)} className="px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary rounded-lg text-2xs font-bold uppercase tracking-widest flex items-center gap-1">
+                  <span className="material-symbols-outlined text-sm">
                     {copiedRef === txn.reference ? 'check' : 'content_copy'}
                   </span>
                   {copiedRef === txn.reference ? 'Copied' : 'Copy'}
@@ -606,18 +606,18 @@ const TxnDrawer = ({ txn, onClose, onCopy, copiedRef }) => {
             <Section title="Counterparty">
               {txn.merchant && (
                 <div className="bg-emerald-50/40 border border-emerald-200/40 rounded-lg p-3 mb-2">
-                  <p className="text-[9px] font-bold uppercase tracking-widest text-emerald-700 mb-1">Merchant</p>
-                  <p className="font-bold text-on-surface text-[14px]">{txn.merchant.businessName}</p>
+                  <p className="text-2xs font-bold uppercase tracking-widest text-emerald-700 mb-1">Merchant</p>
+                  <p className="font-bold text-on-surface text-sm">{txn.merchant.businessName}</p>
                   {txn.merchant.paybillAccount && (
-                    <p className="text-[11px] text-on-surface-variant/70 font-mono">Paybill #{txn.merchant.paybillAccount}</p>
+                    <p className="text-2xs text-on-surface-variant/70 font-mono">Paybill #{txn.merchant.paybillAccount}</p>
                   )}
                 </div>
               )}
               {txn.sender?.name && (
                 <div className="bg-blue-50/40 border border-blue-200/40 rounded-lg p-3">
-                  <p className="text-[9px] font-bold uppercase tracking-widest text-blue-700 mb-1">Sender</p>
-                  <p className="font-bold text-on-surface text-[14px]">{txn.sender.name}</p>
-                  {txn.sender.id && <p className="text-[11px] text-on-surface-variant/70 font-mono">{txn.sender.id}</p>}
+                  <p className="text-2xs font-bold uppercase tracking-widest text-blue-700 mb-1">Sender</p>
+                  <p className="font-bold text-on-surface text-sm">{txn.sender.name}</p>
+                  {txn.sender.id && <p className="text-2xs text-on-surface-variant/70 font-mono">{txn.sender.id}</p>}
                 </div>
               )}
             </Section>
@@ -649,15 +649,15 @@ const TxnDrawer = ({ txn, onClose, onCopy, copiedRef }) => {
 
 const Section = ({ title, children }) => (
   <div>
-    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/50 mb-2">{title}</p>
+    <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/50 mb-2">{title}</p>
     <div className="space-y-2">{children}</div>
   </div>
 );
 
 const DetailPill = ({ label, value, mono }) => (
   <div className="bg-surface-container-low/60 px-3 py-2 rounded-lg">
-    <p className="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant/50 mb-0.5">{label}</p>
-    <p className={`text-[13px] font-bold text-on-surface tracking-tight break-all ${mono ? 'font-mono' : ''}`}>{value}</p>
+    <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 mb-0.5">{label}</p>
+    <p className={`text-xs font-bold text-on-surface tracking-tight break-all ${mono ? 'font-mono' : ''}`}>{value}</p>
   </div>
 );
 
@@ -671,12 +671,12 @@ const AssetTile = ({ label, symbol, amount, rawAmount, color, chain }) => {
   return (
     <div className={`bg-gradient-to-br ${c.bg} border border-outline-variant/20 rounded-xl p-4`}>
       <div className="flex items-center justify-between mb-2">
-        <div className={`w-7 h-7 rounded-full ring-2 ${c.ring} bg-white flex items-center justify-center font-bold text-[9px] ${c.text}`}>
+        <div className={`w-7 h-7 rounded-full ring-2 ${c.ring} bg-white flex items-center justify-center font-bold text-2xs ${c.text}`}>
           {symbol}
         </div>
-        <span className="text-[8px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40">{chain}</span>
+        <span className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/40">{chain}</span>
       </div>
-      <p className="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1">{label}</p>
+      <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1">{label}</p>
       <p className={`text-xl font-bold tracking-tighter ${rawAmount > 0 ? 'text-on-surface' : 'text-on-surface-variant/40'}`}>{amount}</p>
     </div>
   );
@@ -694,16 +694,16 @@ const KpiCard = ({ label, value, change, icon, tone, subtitle, noDelta }) => {
   return (
     <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl p-4 shadow-sm transition-all hover:shadow-md">
       <div className="flex items-start justify-between mb-2">
-        <p className="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant/40">{label}</p>
+        <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/40">{label}</p>
         <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${toneMap[tone] || toneMap.primary}`}>
-          <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>{icon}</span>
+          <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>{icon}</span>
         </div>
       </div>
       <p className="text-xl font-bold text-on-surface tracking-tighter">{value}</p>
-      <div className="flex items-center justify-between mt-2 text-[10px]">
+      <div className="flex items-center justify-between mt-2 text-2xs">
         {!noDelta ? (
           <span className={`inline-flex items-center gap-0.5 px-1 py-0.5 rounded font-bold ${positive ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
-            <span className="material-symbols-outlined text-[10px]">{positive ? 'arrow_upward' : 'arrow_downward'}</span>
+            <span className="material-symbols-outlined text-2xs">{positive ? 'arrow_upward' : 'arrow_downward'}</span>
             {positive ? '+' : ''}{change}%
           </span>
         ) : <span></span>}
@@ -741,7 +741,7 @@ const TypeMix = ({ mix }) => {
           })}
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <p className="text-[8px] font-bold uppercase tracking-widest text-on-surface-variant/40">Total</p>
+          <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/40">Total</p>
           <p className="text-sm font-bold text-on-surface tracking-tight">{fmtKES(total)}</p>
         </div>
       </div>
@@ -749,7 +749,7 @@ const TypeMix = ({ mix }) => {
         {mix.map((r, i) => {
           const tm = TYPE_META[r.type] || TYPE_META.other;
           return (
-            <div key={i} className="flex items-center gap-2 text-[11px]">
+            <div key={i} className="flex items-center gap-2 text-2xs">
               <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: tm.dot }}></span>
               <span className="font-bold text-on-surface-variant/70 flex-1 truncate">{tm.label}</span>
               <span className="font-bold text-on-surface tabular-nums">{fmtKES(r.volume)}</span>
@@ -808,7 +808,7 @@ const AreaChart = ({ series }) => {
 };
 
 const Th = ({ children }) => (
-  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60">{children}</th>
+  <th className="px-3 py-2 text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60">{children}</th>
 );
 
 const Legend = ({ color, label }) => (
@@ -837,7 +837,7 @@ const ErrorState = ({ error, onRetry }) => (
     </div>
     <h3 className="text-lg font-bold text-red-900 mb-1">Ledger unavailable</h3>
     <p className="text-sm text-red-700 max-w-md mx-auto mb-4">{error}</p>
-    <button onClick={onRetry} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold uppercase tracking-widest rounded-lg">
+    <button onClick={onRetry} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-2xs font-bold uppercase tracking-widest rounded-lg">
       Retry
     </button>
   </div>

@@ -150,18 +150,18 @@ const Team = () => {
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-emerald-300">People Operations</p>
+                <p className="text-2xs font-bold uppercase tracking-[0.3em] text-emerald-300">People Operations</p>
               </div>
-              <h1 className="text-[24px] md:text-[40px] font-bold text-white tracking-tighter font-headline leading-none">
+              <h1 className="text-2xl md:text-5xl font-bold text-white tracking-tighter font-headline leading-none">
                 Team & Roles
               </h1>
-              <p className="text-emerald-100/60 mt-2 max-w-xl text-[13px] md:text-[14px]">
+              <p className="text-emerald-100/60 mt-2 max-w-xl text-xs md:text-sm">
                 Operators, analysts and owners running PayChain. Only the workspace owner can invite, edit, or remove members.
               </p>
             </div>
             {isOwner && (
-              <button onClick={() => setInviteOpen(true)} className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-white text-[11px] font-bold rounded-xl uppercase tracking-widest transition-all shadow-lg">
-                <span className="material-symbols-outlined text-[16px]">person_add</span>
+              <button onClick={() => setInviteOpen(true)} className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-white text-2xs font-bold rounded-xl uppercase tracking-widest transition-all shadow-lg">
+                <span className="material-symbols-outlined text-base">person_add</span>
                 Invite Member
               </button>
             )}
@@ -181,7 +181,7 @@ const Team = () => {
         {/* Roadmap — upcoming per-role consoles */}
         <div>
           <div className="flex items-center gap-3 mb-3 text-slate-400">
-            <span className="text-[11px] font-bold uppercase tracking-widest font-label">Coming Soon · Role Consoles</span>
+            <span className="text-2xs font-bold uppercase tracking-widest font-label">Coming Soon · Role Consoles</span>
             <div className="flex-1 h-[1px] bg-outline-variant/10"></div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -197,26 +197,26 @@ const Team = () => {
                 <button
                   key={tf.id}
                   onClick={() => setTier(tf.id)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-widest border transition-all ${
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-2xs font-bold uppercase tracking-widest border transition-all ${
                     tier === tf.id ? 'bg-primary text-white border-primary shadow' : 'bg-white text-on-surface-variant/70 border-outline-variant/30 hover:border-primary hover:text-primary'
                   }`}
                 >
-                  <span className="material-symbols-outlined text-[14px]">{tf.icon}</span>
+                  <span className="material-symbols-outlined text-sm">{tf.icon}</span>
                   {tf.label}
                 </button>
               ))}
             </div>
             <div className="flex flex-col sm:flex-row gap-2">
               <div className="relative flex-1">
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/40 text-[18px]">search</span>
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/40 text-lg">search</span>
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search by name, email, or role"
-                  className="w-full pl-9 pr-3 py-2 bg-surface-container-low border-transparent focus:border-primary focus:ring-0 rounded-lg text-[13px]"
+                  className="w-full pl-9 pr-3 py-2 bg-surface-container-low border-transparent focus:border-primary focus:ring-0 rounded-lg text-xs"
                 />
               </div>
-              <select value={status} onChange={(e) => setStatus(e.target.value)} className="px-3 py-2 border border-outline-variant/40 rounded-lg text-[12px] font-bold uppercase tracking-widest bg-white">
+              <select value={status} onChange={(e) => setStatus(e.target.value)} className="px-3 py-2 border border-outline-variant/40 rounded-lg text-xs font-bold uppercase tracking-widest bg-white">
                 <option value="all">All status</option>
                 <option value="active">Active</option>
                 <option value="pending">Pending</option>
@@ -230,10 +230,10 @@ const Team = () => {
         <div className="hidden md:block bg-surface-container-lowest rounded-2xl border border-outline-variant/20 shadow-editorial overflow-hidden">
           <div className="px-5 py-3 border-b border-outline-variant/10 bg-white flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-0.5">Active Roster</p>
+              <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-0.5">Active Roster</p>
               <h3 className="text-base font-bold text-on-surface tracking-tight">{filtered.length} member{filtered.length === 1 ? '' : 's'}</h3>
             </div>
-            {!isOwner && <div className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40">Read-only · owner controls hidden</div>}
+            {!isOwner && <div className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/40">Read-only · owner controls hidden</div>}
           </div>
           <div className="overflow-x-auto custom-scrollbar">
             <table className="w-full text-left font-body">
@@ -249,7 +249,7 @@ const Team = () => {
                   <Th></Th>
                 </tr>
               </thead>
-              <tbody className="text-[13px]">
+              <tbody className="text-xs">
                 {loading ? (
                   [...Array(3)].map((_, i) => <SkeletonRow key={i} />)
                 ) : filtered.length === 0 ? (
@@ -302,7 +302,7 @@ const Team = () => {
         )}
 
         {toast && (
-          <div className="fixed bottom-6 right-6 z-50 bg-on-surface text-on-inverse-surface px-4 py-2.5 rounded-xl shadow-lg text-[12px] font-bold animate-fadeIn">{toast}</div>
+          <div className="fixed bottom-6 right-6 z-50 bg-on-surface text-on-inverse-surface px-4 py-2.5 rounded-xl shadow-lg text-xs font-bold animate-fadeIn">{toast}</div>
         )}
       </div>
     </Layout>
@@ -335,9 +335,9 @@ const InviteModal = ({ onClose, onInvited }) => {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="px-6 py-5 bg-gradient-to-br from-[#06201B] to-[#0a3029] text-white">
-          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-emerald-300 mb-1">Invite team member</p>
+          <p className="text-2xs font-bold uppercase tracking-[0.3em] text-emerald-300 mb-1">Invite team member</p>
           <h3 className="text-xl font-bold tracking-tight">Send an invite</h3>
-          <p className="text-[12px] text-emerald-100/60 mt-1">A secure link valid for 48 hours will be emailed to set their password.</p>
+          <p className="text-xs text-emerald-100/60 mt-1">A secure link valid for 48 hours will be emailed to set their password.</p>
         </div>
         <form onSubmit={submit} className="p-6 space-y-4" autoComplete="off">
           <Field label="Email" required>
@@ -352,20 +352,20 @@ const InviteModal = ({ onClose, onInvited }) => {
                 <label key={r.v} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${role === r.v ? 'border-primary bg-primary/5' : 'border-outline-variant/30 hover:border-primary/50'}`}>
                   <input type="radio" name="role" value={r.v} checked={role === r.v} onChange={() => setRole(r.v)} className="mt-1 accent-primary" />
                   <div>
-                    <p className="font-bold text-[13px] text-on-surface tracking-tight">{r.label}</p>
-                    <p className="text-[11px] text-on-surface-variant/60">{r.desc}</p>
+                    <p className="font-bold text-xs text-on-surface tracking-tight">{r.label}</p>
+                    <p className="text-2xs text-on-surface-variant/60">{r.desc}</p>
                   </div>
                 </label>
               ))}
             </div>
           </Field>
-          {err && <div className="text-[13px] text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium">{err}</div>}
+          {err && <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium">{err}</div>}
           <div className="flex items-center justify-end gap-2 pt-2 border-t border-outline-variant/10">
-            <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/70 hover:bg-surface-container-low transition-all">
+            <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-2xs font-bold uppercase tracking-widest text-on-surface-variant/70 hover:bg-surface-container-low transition-all">
               Cancel
             </button>
-            <button type="submit" disabled={busy} className="px-5 py-2 rounded-lg bg-primary text-white text-[11px] font-bold uppercase tracking-widest disabled:opacity-50 flex items-center gap-2">
-              <span className="material-symbols-outlined text-[14px]">send</span>
+            <button type="submit" disabled={busy} className="px-5 py-2 rounded-lg bg-primary text-white text-2xs font-bold uppercase tracking-widest disabled:opacity-50 flex items-center gap-2">
+              <span className="material-symbols-outlined text-sm">send</span>
               {busy ? 'Sending…' : 'Send invite'}
             </button>
           </div>
@@ -391,14 +391,14 @@ const EditDrawer = ({ member, isSelf, isOwner, onClose, onSave, onRemove, onRese
           <button onClick={onClose} className="absolute top-4 right-4 text-white/60 hover:text-white p-1">
             <span className="material-symbols-outlined">close</span>
           </button>
-          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-emerald-300 mb-1">Team Member</p>
+          <p className="text-2xs font-bold uppercase tracking-[0.3em] text-emerald-300 mb-1">Team Member</p>
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-full bg-emerald-600 text-white flex items-center justify-center text-base font-bold ring-2 ring-emerald-500/40 overflow-hidden">
               {member.avatarUrl ? <img src={member.avatarUrl} alt="" className="w-full h-full object-cover" /> : (member.name || member.email).split(' ').map((s) => s[0]).slice(0, 2).join('').toUpperCase()}
             </div>
             <div className="min-w-0">
               <h3 className="text-xl font-bold tracking-tight truncate">{member.name || member.email}</h3>
-              <p className="text-[12px] text-emerald-100/60 truncate">{member.email}</p>
+              <p className="text-xs text-emerald-100/60 truncate">{member.email}</p>
             </div>
           </div>
         </div>
@@ -415,11 +415,11 @@ const EditDrawer = ({ member, isSelf, isOwner, onClose, onSave, onRemove, onRese
 
           {member.status === 'pending' && isOwner && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-3">
-              <span className="material-symbols-outlined text-amber-600 text-[20px] flex-shrink-0 mt-0.5">hourglass_empty</span>
+              <span className="material-symbols-outlined text-amber-600 text-xl flex-shrink-0 mt-0.5">hourglass_empty</span>
               <div className="flex-1">
-                <p className="text-[12px] font-bold text-amber-900">Invite pending</p>
-                <p className="text-[11px] text-amber-800">Member hasn't accepted yet. Resend the invite if they didn't receive it.</p>
-                <button onClick={onResend} className="mt-2 px-3 py-1.5 rounded-lg bg-amber-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-amber-700 transition-all">
+                <p className="text-xs font-bold text-amber-900">Invite pending</p>
+                <p className="text-2xs text-amber-800">Member hasn't accepted yet. Resend the invite if they didn't receive it.</p>
+                <button onClick={onResend} className="mt-2 px-3 py-1.5 rounded-lg bg-amber-600 text-white text-2xs font-bold uppercase tracking-widest hover:bg-amber-700 transition-all">
                   Resend invite
                 </button>
               </div>
@@ -431,13 +431,13 @@ const EditDrawer = ({ member, isSelf, isOwner, onClose, onSave, onRemove, onRese
           </Field>
 
           <Field label="Role" hint={isSelf ? 'You cannot demote yourself if you are the only owner.' : 'Changing role takes effect immediately on next request.'}>
-            <select value={role} onChange={(e) => setRole(e.target.value)} disabled={!isOwner} className={`w-full px-3 py-2.5 border border-outline-variant/40 rounded-lg text-[13px] font-bold bg-white ${!isOwner ? 'opacity-60 cursor-not-allowed' : ''}`}>
+            <select value={role} onChange={(e) => setRole(e.target.value)} disabled={!isOwner} className={`w-full px-3 py-2.5 border border-outline-variant/40 rounded-lg text-xs font-bold bg-white ${!isOwner ? 'opacity-60 cursor-not-allowed' : ''}`}>
               {ROLE_OPTIONS.map((r) => <option key={r.v} value={r.v}>{r.label}</option>)}
             </select>
           </Field>
 
           <Field label="Status" hint="Inactive members cannot sign in.">
-            <select value={status} onChange={(e) => setStatus(e.target.value)} disabled={!isOwner} className={`w-full px-3 py-2.5 border border-outline-variant/40 rounded-lg text-[13px] font-bold bg-white ${!isOwner ? 'opacity-60 cursor-not-allowed' : ''}`}>
+            <select value={status} onChange={(e) => setStatus(e.target.value)} disabled={!isOwner} className={`w-full px-3 py-2.5 border border-outline-variant/40 rounded-lg text-xs font-bold bg-white ${!isOwner ? 'opacity-60 cursor-not-allowed' : ''}`}>
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
               {member.status === 'pending' && <option value="pending">Pending</option>}
@@ -446,16 +446,16 @@ const EditDrawer = ({ member, isSelf, isOwner, onClose, onSave, onRemove, onRese
 
           {isOwner && (
             <div className="flex items-center justify-between pt-4 border-t border-outline-variant/10">
-              <button onClick={onRemove} disabled={isSelf} className="text-[11px] font-bold uppercase tracking-widest text-red-600 hover:text-red-700 flex items-center gap-1 disabled:opacity-30 disabled:cursor-not-allowed">
-                <span className="material-symbols-outlined text-[14px]">delete</span>
+              <button onClick={onRemove} disabled={isSelf} className="text-2xs font-bold uppercase tracking-widest text-red-600 hover:text-red-700 flex items-center gap-1 disabled:opacity-30 disabled:cursor-not-allowed">
+                <span className="material-symbols-outlined text-sm">delete</span>
                 Remove member
               </button>
               <button
                 onClick={() => onSave({ name, role, status })}
                 disabled={!dirty}
-                className="px-5 py-2 rounded-lg bg-primary text-white text-[11px] font-bold uppercase tracking-widest disabled:opacity-50 flex items-center gap-2"
+                className="px-5 py-2 rounded-lg bg-primary text-white text-2xs font-bold uppercase tracking-widest disabled:opacity-50 flex items-center gap-2"
               >
-                <span className="material-symbols-outlined text-[14px]">save</span>
+                <span className="material-symbols-outlined text-sm">save</span>
                 Save changes
               </button>
             </div>
@@ -471,22 +471,22 @@ const inputClass = 'w-full px-3 py-2.5 border border-outline-variant/40 rounded-
 
 const Field = ({ label, required, hint, children }) => (
   <div>
-    <label className="block text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/60 mb-1.5">
+    <label className="block text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 mb-1.5">
       {label} {required && <span className="text-red-500">*</span>}
     </label>
     {children}
-    {hint && <p className="text-[11px] text-on-surface-variant/50 mt-1">{hint}</p>}
+    {hint && <p className="text-2xs text-on-surface-variant/50 mt-1">{hint}</p>}
   </div>
 );
 
 const Th = ({ children, className = '' }) => (
-  <th className={`px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60 ${className}`}>{children}</th>
+  <th className={`px-3 py-2 text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 ${className}`}>{children}</th>
 );
 
 const DetailPill = ({ label, value }) => (
   <div className="bg-surface-container-low rounded-lg px-3 py-2">
-    <p className="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant/50 mb-0.5">{label}</p>
-    <p className="text-[13px] font-bold text-on-surface tracking-tight">{value}</p>
+    <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 mb-0.5">{label}</p>
+    <p className="text-xs font-bold text-on-surface tracking-tight">{value}</p>
   </div>
 );
 
@@ -506,35 +506,35 @@ const RosterRow = ({ member, isSelf, isOwner, onEdit }) => {
     <tr className="hover:bg-secondary-container/5 transition-colors group">
       <td className="px-3 py-2 border-b border-outline-variant/5">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-600 to-emerald-500 text-white text-[11px] flex items-center justify-center font-bold uppercase shadow-sm ring-2 ring-white overflow-hidden">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-600 to-emerald-500 text-white text-2xs flex items-center justify-center font-bold uppercase shadow-sm ring-2 ring-white overflow-hidden">
             {member.avatarUrl ? <img src={member.avatarUrl} alt="" className="w-full h-full object-cover" /> : initials}
           </div>
           <div>
-            <p className="font-bold text-on-surface tracking-tight text-[13px]">{member.name || '—'}{isSelf && <span className="ml-1.5 text-[9px] font-bold text-primary uppercase tracking-widest">You</span>}</p>
-            <p className="text-[11px] text-on-surface-variant/60">{member.email}</p>
+            <p className="font-bold text-on-surface tracking-tight text-xs">{member.name || '—'}{isSelf && <span className="ml-1.5 text-2xs font-bold text-primary uppercase tracking-widest">You</span>}</p>
+            <p className="text-2xs text-on-surface-variant/60">{member.email}</p>
           </div>
         </div>
       </td>
       <td className="px-3 py-2 border-b border-outline-variant/5">
-        <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest border ${roleStyle.tone}`}>
+        <span className={`inline-flex px-2 py-0.5 rounded text-2xs font-bold uppercase tracking-widest border ${roleStyle.tone}`}>
           {member.role}
         </span>
       </td>
       <td className="px-3 py-2 border-b border-outline-variant/5">
-        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest border ${statusStyle.pill}`}>
+        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-bold uppercase tracking-widest border ${statusStyle.pill}`}>
           <span className={`w-1.5 h-1.5 rounded-full ${statusStyle.dot}`}></span>
           {statusStyle.label}
         </span>
       </td>
-      <td className="px-3 py-2 border-b border-outline-variant/5 text-center font-bold tabular-nums text-[12px]">{(member.stats?.merchantsOnboarded ?? 0) || '—'}</td>
-      <td className="px-3 py-2 border-b border-outline-variant/5 text-center font-bold tabular-nums text-[12px]">{(member.stats?.ticketsResolved ?? 0) || '—'}</td>
-      <td className="px-3 py-2 border-b border-outline-variant/5 text-center font-bold tabular-nums text-[12px]">{(member.stats?.callsHandled ?? 0) || '—'}</td>
-      <td className="px-3 py-2 border-b border-outline-variant/5 text-[11px] text-on-surface-variant/50">
+      <td className="px-3 py-2 border-b border-outline-variant/5 text-center font-bold tabular-nums text-xs">{(member.stats?.merchantsOnboarded ?? 0) || '—'}</td>
+      <td className="px-3 py-2 border-b border-outline-variant/5 text-center font-bold tabular-nums text-xs">{(member.stats?.ticketsResolved ?? 0) || '—'}</td>
+      <td className="px-3 py-2 border-b border-outline-variant/5 text-center font-bold tabular-nums text-xs">{(member.stats?.callsHandled ?? 0) || '—'}</td>
+      <td className="px-3 py-2 border-b border-outline-variant/5 text-2xs text-on-surface-variant/50">
         {member.createdAt ? new Date(member.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
       </td>
       <td className="px-3 py-2 border-b border-outline-variant/5 text-right">
         <button onClick={onEdit} className="text-on-surface-variant/40 hover:text-primary transition-all">
-          <span className="material-symbols-outlined text-[18px]">{isOwner ? 'edit' : 'visibility'}</span>
+          <span className="material-symbols-outlined text-lg">{isOwner ? 'edit' : 'visibility'}</span>
         </button>
       </td>
     </tr>
@@ -552,19 +552,19 @@ const RosterCard = ({ member, isSelf, isOwner, onEdit }) => {
           {member.avatarUrl ? <img src={member.avatarUrl} alt="" className="w-full h-full object-cover" /> : initials}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-bold text-on-surface text-[13px]">{member.name || '—'}{isSelf && <span className="ml-1.5 text-[9px] font-bold text-primary uppercase tracking-widest">You</span>}</p>
-          <p className="text-[11px] text-on-surface-variant/60 truncate">{member.email}</p>
+          <p className="font-bold text-on-surface text-xs">{member.name || '—'}{isSelf && <span className="ml-1.5 text-2xs font-bold text-primary uppercase tracking-widest">You</span>}</p>
+          <p className="text-2xs text-on-surface-variant/60 truncate">{member.email}</p>
           <div className="mt-2 flex items-center gap-1.5 flex-wrap">
-            <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest border ${roleStyle.tone}`}>
+            <span className={`inline-flex px-2 py-0.5 rounded text-2xs font-bold uppercase tracking-widest border ${roleStyle.tone}`}>
               {member.role}
             </span>
-            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest border ${statusStyle.pill}`}>
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-bold uppercase tracking-widest border ${statusStyle.pill}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${statusStyle.dot}`}></span>
               {statusStyle.label}
             </span>
           </div>
         </div>
-        <span className="material-symbols-outlined text-on-surface-variant/30 text-[18px]">chevron_right</span>
+        <span className="material-symbols-outlined text-on-surface-variant/30 text-lg">chevron_right</span>
       </div>
     </button>
   );
@@ -580,9 +580,9 @@ const StatTile = ({ icon, label, value, tone, pulse }) => {
   return (
     <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
       <div className="flex items-center justify-between mb-2">
-        <p className="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant/50">{label}</p>
+        <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50">{label}</p>
         <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${toneMap[tone] || 'bg-surface-container text-on-surface-variant/70'}`}>
-          <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>{icon}</span>
+          <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>{icon}</span>
         </div>
       </div>
       <div className="flex items-baseline gap-2">
@@ -605,19 +605,19 @@ const FutureConsoleCard = ({ title, icon, tone, desc, capabilities, eta }) => {
       <div className="relative">
         <div className="flex items-start justify-between mb-3">
           <div className={`w-11 h-11 rounded-xl bg-white border ${c.ring} flex items-center justify-center ${c.text}`}>
-            <span className="material-symbols-outlined text-[22px]" style={{ fontVariationSettings: "'FILL' 1" }}>{icon}</span>
+            <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>{icon}</span>
           </div>
-          <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-white border border-outline-variant/30 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/70">
+          <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-white border border-outline-variant/30 text-2xs font-bold uppercase tracking-widest text-on-surface-variant/70">
             <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`}></span>
             ETA · {eta}
           </span>
         </div>
         <h3 className="text-base md:text-lg font-bold text-on-surface tracking-tight mb-1">{title}</h3>
-        <p className="text-[12px] text-on-surface-variant/70 mb-4">{desc}</p>
+        <p className="text-xs text-on-surface-variant/70 mb-4">{desc}</p>
         <ul className="space-y-1.5">
           {capabilities.map((cap) => (
-            <li key={cap} className="flex items-start gap-2 text-[12px] text-on-surface-variant/80">
-              <span className={`material-symbols-outlined text-[14px] ${c.text} flex-shrink-0 mt-0.5`}>check_circle</span>
+            <li key={cap} className="flex items-start gap-2 text-xs text-on-surface-variant/80">
+              <span className={`material-symbols-outlined text-sm ${c.text} flex-shrink-0 mt-0.5`}>check_circle</span>
               {cap}
             </li>
           ))}

@@ -184,21 +184,21 @@ export default function AuditLog() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="material-symbols-outlined text-primary text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>fact_check</span>
-              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary">Audit Log</p>
+              <span className="material-symbols-outlined text-primary text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>fact_check</span>
+              <p className="text-2xs font-bold uppercase tracking-[0.2em] text-primary">Audit Log</p>
             </div>
-            <h2 className="text-[22px] md:text-[32px] font-bold text-on-surface tracking-tighter font-headline">
+            <h2 className="text-2xl md:text-4xl font-bold text-on-surface tracking-tighter font-headline">
               Every action across PayChain
             </h2>
-            <p className="text-[13px] md:text-[14px] text-on-surface-variant mt-1">
+            <p className="text-xs md:text-sm text-on-surface-variant mt-1">
               Sign-ins, password resets, profile changes, and every admin action — with timestamps, IPs and devices.
             </p>
           </div>
           <button
             onClick={fetchLog}
-            className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant hover:text-on-surface flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-container-low border border-outline-variant/20"
+            className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant hover:text-on-surface flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-container-low border border-outline-variant/20"
           >
-            <span className={`material-symbols-outlined text-[16px] ${loading ? 'animate-spin' : ''}`}>refresh</span>
+            <span className={`material-symbols-outlined text-base ${loading ? 'animate-spin' : ''}`}>refresh</span>
             Refresh
           </button>
         </div>
@@ -219,7 +219,7 @@ export default function AuditLog() {
         {/* Filters */}
         <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/20 p-3 md:p-4 flex flex-col lg:flex-row gap-3 items-stretch lg:items-center">
           <div className="relative flex-1 min-w-0">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant/40 text-[18px]">search</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant/40 text-lg">search</span>
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -235,7 +235,7 @@ export default function AuditLog() {
           {(search || category !== 'all' || severity !== 'all' || actor !== 'all' || platform !== 'all' || range !== '7d') && (
             <button
               onClick={clearFilters}
-              className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/70 hover:text-error px-2"
+              className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/70 hover:text-error px-2"
             >
               Clear
             </button>
@@ -258,7 +258,7 @@ export default function AuditLog() {
                   <Th className="text-right"></Th>
                 </tr>
               </thead>
-              <tbody className="text-[13px]">
+              <tbody className="text-xs">
                 {loading ? (
                   [...Array(6)].map((_, i) => (
                     <tr key={i}>
@@ -292,62 +292,62 @@ export default function AuditLog() {
                       className="hover:bg-secondary-container/5 transition-colors cursor-pointer"
                     >
                       <td className="py-2 px-3 border-b border-outline-variant/5 align-top">
-                        <p className="text-[12px] font-bold text-on-surface tracking-tight">{relTime(r.createdAt)}</p>
-                        <p className="text-[10px] text-on-surface-variant/50 mt-0.5">{absTime(r.createdAt)}</p>
+                        <p className="text-xs font-bold text-on-surface tracking-tight">{relTime(r.createdAt)}</p>
+                        <p className="text-2xs text-on-surface-variant/50 mt-0.5">{absTime(r.createdAt)}</p>
                       </td>
                       <td className="py-2 px-3 border-b border-outline-variant/5 align-top">
                         {r.merchantEmail ? (
                           <>
-                            <p className="text-[12px] font-bold text-on-surface tracking-tight truncate max-w-[180px]">{r.merchantName || r.merchantEmail}</p>
-                            <p className="text-[10px] text-on-surface-variant/60 truncate max-w-[180px]">{r.merchantEmail}</p>
+                            <p className="text-xs font-bold text-on-surface tracking-tight truncate max-w-[180px]">{r.merchantName || r.merchantEmail}</p>
+                            <p className="text-2xs text-on-surface-variant/60 truncate max-w-[180px]">{r.merchantEmail}</p>
                           </>
                         ) : (
-                          <span className="text-[11px] text-on-surface-variant/40 italic">— platform —</span>
+                          <span className="text-2xs text-on-surface-variant/40 italic">— platform —</span>
                         )}
                       </td>
                       <td className="py-2 px-3 border-b border-outline-variant/5 align-top">
                         <div className="flex items-start gap-2">
-                          <span className={`material-symbols-outlined text-[16px] flex-shrink-0 mt-0.5 ${
+                          <span className={`material-symbols-outlined text-base flex-shrink-0 mt-0.5 ${
                             r.severity === 'critical' ? 'text-red-600' :
                             r.severity === 'warning'  ? 'text-amber-600' :
                             r.severity === 'success'  ? 'text-emerald-600' : 'text-blue-600'
                           }`}>{meta.icon}</span>
                           <div className="min-w-0">
-                            <p className="text-[12px] font-bold text-on-surface tracking-tight">{meta.label}</p>
+                            <p className="text-xs font-bold text-on-surface tracking-tight">{meta.label}</p>
                             {r.message && (
-                              <p className="text-[10px] text-on-surface-variant/60 mt-0.5 truncate max-w-[260px]">{r.message}</p>
+                              <p className="text-2xs text-on-surface-variant/60 mt-0.5 truncate max-w-[260px]">{r.message}</p>
                             )}
-                            <span className={`inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest border ${sevCls}`}>
+                            <span className={`inline-block mt-1 px-1.5 py-0.5 rounded text-2xs font-bold uppercase tracking-widest border ${sevCls}`}>
                               {r.severity}
                             </span>
                           </div>
                         </div>
                       </td>
                       <td className="py-2 px-3 border-b border-outline-variant/5 align-top">
-                        <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest ${catCls}`}>
+                        <span className={`inline-block px-2 py-0.5 rounded-full text-2xs font-bold uppercase tracking-widest ${catCls}`}>
                           {r.category}
                         </span>
                       </td>
                       <td className="py-2 px-3 border-b border-outline-variant/5 align-top">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${platMeta.tone}`}>
-                          <span className="material-symbols-outlined text-[12px]">{platMeta.icon}</span>
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-bold border ${platMeta.tone}`}>
+                          <span className="material-symbols-outlined text-xs">{platMeta.icon}</span>
                           {platMeta.label}
                         </span>
                       </td>
                       <td className="py-2 px-3 border-b border-outline-variant/5 align-top">
-                        <p className={`text-[11px] font-bold ${actCls}`}>
+                        <p className={`text-2xs font-bold ${actCls}`}>
                           {r.actor?.type === 'admin' ? r.actor?.name || r.actor?.email || 'admin'
                             : r.actor?.type === 'system' ? 'System'
                             : 'Merchant'}
                         </p>
-                        <p className="text-[10px] text-on-surface-variant/50 capitalize">{r.actor?.type || 'self'}</p>
+                        <p className="text-2xs text-on-surface-variant/50 capitalize">{r.actor?.type || 'self'}</p>
                       </td>
                       <td className="py-2 px-3 border-b border-outline-variant/5 align-top">
-                        <p className="text-[11px] font-mono text-on-surface-variant/80 truncate max-w-[120px]">{r.ip || '—'}</p>
-                        <p className="text-[10px] text-on-surface-variant/40 truncate max-w-[140px]">{r.userAgent ? r.userAgent.split(' ')[0] : '—'}</p>
+                        <p className="text-2xs font-mono text-on-surface-variant/80 truncate max-w-[120px]">{r.ip || '—'}</p>
+                        <p className="text-2xs text-on-surface-variant/40 truncate max-w-[140px]">{r.userAgent ? r.userAgent.split(' ')[0] : '—'}</p>
                       </td>
                       <td className="py-2 px-3 border-b border-outline-variant/5 text-right align-middle">
-                        <span className="material-symbols-outlined text-on-surface-variant/30 text-[18px]">chevron_right</span>
+                        <span className="material-symbols-outlined text-on-surface-variant/30 text-lg">chevron_right</span>
                       </td>
                     </tr>
                   );
@@ -356,7 +356,7 @@ export default function AuditLog() {
             </table>
           </div>
           <TablePagination page={page} pageSize={PAGE_SIZE} total={total} onPage={setPage} />
-          <div className="px-4 py-2 bg-surface text-[11px] text-on-surface-variant/50 font-body border-t border-outline-variant/10">
+          <div className="px-4 py-2 bg-surface text-2xs text-on-surface-variant/50 font-body border-t border-outline-variant/10">
             Showing {rows.length} of {total} events
           </div>
         </div>
@@ -369,7 +369,7 @@ export default function AuditLog() {
 
 // ── Bits ────────────────────────────────────────────────────────────────
 const Th = ({ children, className = '' }) => (
-  <th className={`py-3 px-3 border-b border-outline-variant/10 text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/40 ${className}`}>
+  <th className={`py-3 px-3 border-b border-outline-variant/10 text-2xs font-bold uppercase tracking-widest text-on-surface-variant/40 ${className}`}>
     {children}
   </th>
 );
@@ -387,10 +387,10 @@ const KpiCard = ({ label, value, tone = 'primary', icon = null }) => {
   return (
     <div className={`p-3 rounded-xl border border-outline-variant/20 ${t.bg}`}>
       <div className="flex items-center gap-1">
-        {icon && <span className={`material-symbols-outlined text-[14px] ${t.text}`}>{icon}</span>}
-        <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60">{label}</p>
+        {icon && <span className={`material-symbols-outlined text-sm ${t.text}`}>{icon}</span>}
+        <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60">{label}</p>
       </div>
-      <p className={`text-[22px] font-bold tabular-nums tracking-tight mt-0.5 ${t.text}`}>
+      <p className={`text-2xl font-bold tabular-nums tracking-tight mt-0.5 ${t.text}`}>
         {value == null ? '—' : value}
       </p>
     </div>
@@ -401,7 +401,7 @@ const FilterSelect = ({ value, onChange, options }) => (
   <select
     value={value}
     onChange={(e) => onChange(e.target.value)}
-    className="text-[12px] font-semibold bg-surface-container-low border border-outline-variant/20 rounded-lg px-3 py-2 text-on-surface focus:border-primary focus:ring-0"
+    className="text-xs font-semibold bg-surface-container-low border border-outline-variant/20 rounded-lg px-3 py-2 text-on-surface focus:border-primary focus:ring-0"
   >
     {options.map((o) => (
       <option key={o.v} value={o.v}>{o.l}</option>
@@ -420,9 +420,9 @@ const EntryDrawer = ({ entry, onClose }) => {
       >
         <div className="px-6 py-5 border-b border-outline-variant/10 sticky top-0 bg-white flex items-start justify-between">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40">Audit entry</p>
-            <h3 className="text-[18px] font-bold text-on-surface tracking-tight">{meta.label}</h3>
-            <p className="text-[12px] text-on-surface-variant/60 mt-1">{absTime(entry.createdAt)}</p>
+            <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/40">Audit entry</p>
+            <h3 className="text-lg font-bold text-on-surface tracking-tight">{meta.label}</h3>
+            <p className="text-xs text-on-surface-variant/60 mt-1">{absTime(entry.createdAt)}</p>
           </div>
           <button onClick={onClose} className="p-1 hover:bg-surface-container-low rounded-lg text-on-surface-variant/60">
             <span className="material-symbols-outlined">close</span>
@@ -432,8 +432,8 @@ const EntryDrawer = ({ entry, onClose }) => {
         <div className="px-6 py-5 space-y-5">
           {entry.message && (
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1">Summary</p>
-              <p className="text-[14px] text-on-surface leading-relaxed">{entry.message}</p>
+              <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1">Summary</p>
+              <p className="text-sm text-on-surface leading-relaxed">{entry.message}</p>
             </div>
           )}
 
@@ -447,24 +447,24 @@ const EntryDrawer = ({ entry, onClose }) => {
 
           {entry.merchantEmail && (
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1">Merchant</p>
-              <p className="text-[13px] font-semibold text-on-surface">{entry.merchantName || '—'}</p>
-              <p className="text-[12px] text-on-surface-variant/60 break-all">{entry.merchantEmail}</p>
+              <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1">Merchant</p>
+              <p className="text-xs font-semibold text-on-surface">{entry.merchantName || '—'}</p>
+              <p className="text-xs text-on-surface-variant/60 break-all">{entry.merchantEmail}</p>
             </div>
           )}
 
           {(entry.ip || entry.userAgent) && (
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1">Network</p>
-              {entry.ip && <p className="text-[12px] font-mono text-on-surface break-all">{entry.ip}</p>}
-              {entry.userAgent && <p className="text-[11px] text-on-surface-variant/60 break-all mt-1">{entry.userAgent}</p>}
+              <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1">Network</p>
+              {entry.ip && <p className="text-xs font-mono text-on-surface break-all">{entry.ip}</p>}
+              {entry.userAgent && <p className="text-2xs text-on-surface-variant/60 break-all mt-1">{entry.userAgent}</p>}
             </div>
           )}
 
           {entry.metadata && Object.keys(entry.metadata).length > 0 && (
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1">Metadata</p>
-              <pre className="text-[11px] font-mono bg-surface-container-low p-3 rounded-lg overflow-auto max-h-60">
+              <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1">Metadata</p>
+              <pre className="text-2xs font-mono bg-surface-container-low p-3 rounded-lg overflow-auto max-h-60">
                 {JSON.stringify(entry.metadata, null, 2)}
               </pre>
             </div>
@@ -477,7 +477,7 @@ const EntryDrawer = ({ entry, onClose }) => {
 
 const DrawerField = ({ label, value, mono }) => (
   <div>
-    <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1">{label}</p>
-    <p className={`text-[12px] text-on-surface ${mono ? 'font-mono' : 'font-semibold'} break-all`}>{value || '—'}</p>
+    <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1">{label}</p>
+    <p className={`text-xs text-on-surface ${mono ? 'font-mono' : 'font-semibold'} break-all`}>{value || '—'}</p>
   </div>
 );

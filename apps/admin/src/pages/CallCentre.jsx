@@ -173,16 +173,16 @@ const CallCentre = () => {
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-emerald-300">Communications Hub · Live</p>
+                <p className="text-2xs font-bold uppercase tracking-[0.3em] text-emerald-300">Communications Hub · Live</p>
               </div>
-              <h1 className="text-[24px] md:text-[40px] font-bold text-white tracking-tighter font-headline leading-none">
+              <h1 className="text-2xl md:text-5xl font-bold text-white tracking-tighter font-headline leading-none">
                 Call Centre
               </h1>
-              <p className="text-emerald-100/60 mt-2 max-w-xl text-[13px] md:text-[14px]">
+              <p className="text-emerald-100/60 mt-2 max-w-xl text-xs md:text-sm">
                 Every call, SMS, WhatsApp and voicemail received on the PayChain hotline — triaged, attributed to merchants, and resolved in one console.
               </p>
               {refreshedAt && (
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-300/60 mt-3">
+                <p className="text-2xs font-bold uppercase tracking-[0.2em] text-emerald-300/60 mt-3">
                   Last refresh · {refreshedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                 </p>
               )}
@@ -193,7 +193,7 @@ const CallCentre = () => {
                   <button
                     key={r.v}
                     onClick={() => { setRange(r.v); setPage(1); }}
-                    className={`px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest rounded-lg transition-all ${
+                    className={`px-3 py-1.5 text-2xs font-bold uppercase tracking-widest rounded-lg transition-all ${
                       range === r.v ? 'bg-emerald-500 text-white shadow-lg' : 'text-emerald-200/60 hover:text-white'
                     }`}
                   >
@@ -204,9 +204,9 @@ const CallCentre = () => {
               <button
                 onClick={fetchData}
                 disabled={loading}
-                className="flex items-center gap-2 px-3.5 py-2 bg-white/10 hover:bg-white/15 backdrop-blur-sm border border-white/10 text-white text-[11px] font-bold rounded-xl uppercase tracking-widest transition-all disabled:opacity-60"
+                className="flex items-center gap-2 px-3.5 py-2 bg-white/10 hover:bg-white/15 backdrop-blur-sm border border-white/10 text-white text-2xs font-bold rounded-xl uppercase tracking-widest transition-all disabled:opacity-60"
               >
-                <span className={`material-symbols-outlined text-[16px] ${loading ? 'animate-spin' : ''}`}>refresh</span>
+                <span className={`material-symbols-outlined text-base ${loading ? 'animate-spin' : ''}`}>refresh</span>
                 Refresh
               </button>
             </div>
@@ -233,16 +233,16 @@ const CallCentre = () => {
                 <button
                   key={ch.id}
                   onClick={() => { setChannel(ch.id); setPage(1); }}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-widest border transition-all ${
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-2xs font-bold uppercase tracking-widest border transition-all ${
                     channel === ch.id
                       ? 'bg-primary text-white border-primary shadow'
                       : 'bg-white text-on-surface-variant/70 border-outline-variant/30 hover:border-primary hover:text-primary'
                   }`}
                 >
-                  <span className="material-symbols-outlined text-[14px]">{ch.icon}</span>
+                  <span className="material-symbols-outlined text-sm">{ch.icon}</span>
                   {ch.label}
                   {ch.id !== 'all' && (
-                    <span className={`tabular-nums text-[10px] px-1.5 py-0.5 rounded ${channel === ch.id ? 'bg-white/20' : 'bg-surface-container'}`}>
+                    <span className={`tabular-nums text-2xs px-1.5 py-0.5 rounded ${channel === ch.id ? 'bg-white/20' : 'bg-surface-container'}`}>
                       {channelCount(ch.id)}
                     </span>
                   )}
@@ -251,21 +251,21 @@ const CallCentre = () => {
             </div>
             <div className="flex flex-col sm:flex-row gap-2">
               <div className="relative flex-1">
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/40 text-[18px]">search</span>
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/40 text-lg">search</span>
                 <input
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
                   placeholder="Search by phone, caller, or message body…"
-                  className="w-full pl-9 pr-3 py-2 bg-surface-container-low border-transparent focus:border-primary focus:ring-0 rounded-lg text-[13px]"
+                  className="w-full pl-9 pr-3 py-2 bg-surface-container-low border-transparent focus:border-primary focus:ring-0 rounded-lg text-xs"
                 />
               </div>
-              <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className="px-3 py-2 border border-outline-variant/40 rounded-lg text-[12px] font-bold uppercase tracking-widest bg-white">
+              <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className="px-3 py-2 border border-outline-variant/40 rounded-lg text-xs font-bold uppercase tracking-widest bg-white">
                 <option value="all">All status</option>
                 {Object.entries(STATUS_META).map(([v, m]) => <option key={v} value={v}>{m.label}</option>)}
               </select>
               {filtersActive && (
-                <button onClick={() => { setChannel('all'); setStatus('all'); setSearchInput(''); setSearch(''); setPage(1); }} className="px-3 py-2 rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 text-[11px] font-bold uppercase tracking-widest flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[14px]">close</span>
+                <button onClick={() => { setChannel('all'); setStatus('all'); setSearchInput(''); setSearch(''); setPage(1); }} className="px-3 py-2 rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 text-2xs font-bold uppercase tracking-widest flex items-center gap-1">
+                  <span className="material-symbols-outlined text-sm">close</span>
                   Clear
                 </button>
               )}
@@ -285,12 +285,12 @@ const CallCentre = () => {
             <div className={`${selected ? 'lg:col-span-5' : 'lg:col-span-12'} bg-surface-container-lowest rounded-2xl border border-outline-variant/20 shadow-editorial overflow-hidden`}>
               <div className="px-5 py-3 border-b border-outline-variant/10 bg-white flex items-center justify-between">
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-0.5">Inbox</p>
+                  <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-0.5">Inbox</p>
                   <h3 className="text-base font-bold text-on-surface tracking-tight">
                     {data.pagination.total.toLocaleString()} record{data.pagination.total === 1 ? '' : 's'}
                   </h3>
                 </div>
-                <div className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40">
+                <div className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/40">
                   Page {data.pagination.page}/{data.pagination.totalPages}
                 </div>
               </div>
@@ -306,13 +306,13 @@ const CallCentre = () => {
               </div>
               {data.pagination.totalPages > 1 && (
                 <div className="px-5 py-3 bg-surface flex items-center justify-between border-t border-outline-variant/10">
-                  <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1.5 rounded-lg hover:bg-surface-container-low text-[11px] font-bold uppercase tracking-widest disabled:opacity-30">
+                  <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1.5 rounded-lg hover:bg-surface-container-low text-2xs font-bold uppercase tracking-widest disabled:opacity-30">
                     ← Prev
                   </button>
-                  <span className="text-[12px] text-on-surface-variant/60">
+                  <span className="text-xs text-on-surface-variant/60">
                     {data.pagination.page} of {data.pagination.totalPages}
                   </span>
-                  <button onClick={() => setPage((p) => Math.min(data.pagination.totalPages, p + 1))} disabled={page === data.pagination.totalPages} className="px-3 py-1.5 rounded-lg hover:bg-surface-container-low text-[11px] font-bold uppercase tracking-widest disabled:opacity-30">
+                  <button onClick={() => setPage((p) => Math.min(data.pagination.totalPages, p + 1))} disabled={page === data.pagination.totalPages} className="px-3 py-1.5 rounded-lg hover:bg-surface-container-low text-2xs font-bold uppercase tracking-widest disabled:opacity-30">
                     Next →
                   </button>
                 </div>
@@ -356,36 +356,36 @@ const InboxRow = ({ item, selected, onClick }) => {
     >
       <div className="relative flex-shrink-0">
         <div className="w-10 h-10 rounded-full flex items-center justify-center text-white" style={{ backgroundColor: cm.hue }}>
-          <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>{cm.icon}</span>
+          <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>{cm.icon}</span>
         </div>
         {item.status === 'new' && <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-red-500 rounded-full border-2 border-white"></span>}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2">
-          <p className="font-bold text-on-surface text-[13px] tracking-tight truncate">
+          <p className="font-bold text-on-surface text-xs tracking-tight truncate">
             {item.callerName || item.merchant?.businessName || fmtPhone(item.fromNumber)}
           </p>
-          <span className="text-[10px] text-on-surface-variant/50 flex-shrink-0">{fmtTime(item.occurredAt)}</span>
+          <span className="text-2xs text-on-surface-variant/50 flex-shrink-0">{fmtTime(item.occurredAt)}</span>
         </div>
-        <p className="text-[11px] text-on-surface-variant/60 font-mono truncate">{fmtPhone(item.fromNumber)}</p>
-        {item.body && <p className="text-[12px] text-on-surface-variant/80 line-clamp-2 mt-1">{item.body}</p>}
+        <p className="text-2xs text-on-surface-variant/60 font-mono truncate">{fmtPhone(item.fromNumber)}</p>
+        {item.body && <p className="text-xs text-on-surface-variant/80 line-clamp-2 mt-1">{item.body}</p>}
         <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest border ${sm.pill}`}>
+          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-2xs font-bold uppercase tracking-widest border ${sm.pill}`}>
             <span className={`w-1 h-1 rounded-full ${sm.dot}`}></span>
             {sm.label}
           </span>
           {item.channel === 'call' && item.durationSec > 0 && (
-            <span className="text-[10px] text-on-surface-variant/50 font-bold">{fmtDuration(item.durationSec)}</span>
+            <span className="text-2xs text-on-surface-variant/50 font-bold">{fmtDuration(item.durationSec)}</span>
           )}
           {item.priority && (
-            <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-amber-700">
-              <span className="material-symbols-outlined text-[12px]" style={{ fontVariationSettings: "'FILL' 1" }}>flag</span>
+            <span className="inline-flex items-center gap-0.5 text-2xs font-bold text-amber-700">
+              <span className="material-symbols-outlined text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>flag</span>
               Priority
             </span>
           )}
           {item.merchant && (
-            <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-700">
-              <span className="material-symbols-outlined text-[12px]">storefront</span>
+            <span className="inline-flex items-center gap-0.5 text-2xs font-bold text-emerald-700">
+              <span className="material-symbols-outlined text-xs">storefront</span>
               {item.merchant.businessName}
             </span>
           )}
@@ -406,14 +406,14 @@ const DetailPanel = ({ item, onClose, onStatus, onPriority, onDelete, noteText, 
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl flex items-center justify-center text-white" style={{ backgroundColor: cm.hue }}>
-              <span className="material-symbols-outlined text-[22px]" style={{ fontVariationSettings: "'FILL' 1" }}>{cm.icon}</span>
+              <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>{cm.icon}</span>
             </div>
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40">{item.channel.toUpperCase()} · {item.direction === 'inbound' ? 'Incoming' : 'Outgoing'}</p>
+              <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/40">{item.channel.toUpperCase()} · {item.direction === 'inbound' ? 'Incoming' : 'Outgoing'}</p>
               <h3 className="text-lg font-bold text-on-surface tracking-tight">
                 {item.callerName || item.merchant?.businessName || fmtPhone(item.fromNumber)}
               </h3>
-              <p className="text-[11px] text-on-surface-variant/60 font-mono">{fmtPhone(item.fromNumber)}</p>
+              <p className="text-2xs text-on-surface-variant/60 font-mono">{fmtPhone(item.fromNumber)}</p>
             </div>
           </div>
           <button onClick={onClose} className="text-on-surface-variant/40 hover:text-on-surface p-1">
@@ -421,17 +421,17 @@ const DetailPanel = ({ item, onClose, onStatus, onPriority, onDelete, noteText, 
           </button>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest border ${sm.pill}`}>
+          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-2xs font-bold uppercase tracking-widest border ${sm.pill}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${sm.dot}`}></span>
             {sm.label}
           </span>
-          <button onClick={onPriority} disabled={busy} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest border transition-all ${
+          <button onClick={onPriority} disabled={busy} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-bold uppercase tracking-widest border transition-all ${
             item.priority ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-white text-on-surface-variant/60 border-outline-variant/30 hover:border-amber-300'
           }`}>
-            <span className="material-symbols-outlined text-[12px]" style={{ fontVariationSettings: item.priority ? "'FILL' 1" : "'FILL' 0" }}>flag</span>
+            <span className="material-symbols-outlined text-xs" style={{ fontVariationSettings: item.priority ? "'FILL' 1" : "'FILL' 0" }}>flag</span>
             {item.priority ? 'Priority' : 'Mark priority'}
           </button>
-          <span className="ml-auto text-[10px] text-on-surface-variant/50">{fmtFullTime(item.occurredAt)}</span>
+          <span className="ml-auto text-2xs text-on-surface-variant/50">{fmtFullTime(item.occurredAt)}</span>
         </div>
       </div>
 
@@ -440,16 +440,16 @@ const DetailPanel = ({ item, onClose, onStatus, onPriority, onDelete, noteText, 
         {item.merchant && (
           <div className="bg-emerald-50/40 border border-emerald-200/40 rounded-xl p-4 flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center">
-              <span className="material-symbols-outlined text-[20px]">storefront</span>
+              <span className="material-symbols-outlined text-xl">storefront</span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[9px] font-bold uppercase tracking-widest text-emerald-700 mb-0.5">Matched Merchant</p>
-              <p className="font-bold text-on-surface text-[14px] truncate">{item.merchant.businessName}</p>
-              {item.merchant.paybillAccount && <p className="text-[11px] text-on-surface-variant/60 font-mono">Paybill #{item.merchant.paybillAccount}</p>}
+              <p className="text-2xs font-bold uppercase tracking-widest text-emerald-700 mb-0.5">Matched Merchant</p>
+              <p className="font-bold text-on-surface text-sm truncate">{item.merchant.businessName}</p>
+              {item.merchant.paybillAccount && <p className="text-2xs text-on-surface-variant/60 font-mono">Paybill #{item.merchant.paybillAccount}</p>}
             </div>
             {item.merchant.flagged && (
-              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-red-50 text-red-700 border border-red-200 text-[10px] font-bold uppercase tracking-widest">
-                <span className="material-symbols-outlined text-[12px]">flag</span>
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-red-50 text-red-700 border border-red-200 text-2xs font-bold uppercase tracking-widest">
+                <span className="material-symbols-outlined text-xs">flag</span>
                 Flagged
               </span>
             )}
@@ -467,7 +467,7 @@ const DetailPanel = ({ item, onClose, onStatus, onPriority, onDelete, noteText, 
             </div>
             {item.recordingUrl && (
               <div className="mt-3 p-3 bg-surface-container-low rounded-lg">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/50 mb-2">Recording</p>
+                <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 mb-2">Recording</p>
                 <audio controls src={item.recordingUrl} className="w-full h-9"></audio>
               </div>
             )}
@@ -477,14 +477,14 @@ const DetailPanel = ({ item, onClose, onStatus, onPriority, onDelete, noteText, 
         {/* Message body for SMS/WhatsApp/voicemail transcript */}
         {item.body && (
           <Section title={item.channel === 'voicemail' ? 'Voicemail transcript' : 'Message'}>
-            <div className="p-4 bg-white border border-outline-variant/20 rounded-xl text-[13px] text-on-surface whitespace-pre-wrap leading-relaxed">
+            <div className="p-4 bg-white border border-outline-variant/20 rounded-xl text-xs text-on-surface whitespace-pre-wrap leading-relaxed">
               {item.body}
             </div>
             {item.attachments && item.attachments.length > 0 && (
               <div className="mt-2 flex gap-2 flex-wrap">
                 {item.attachments.map((a, i) => (
-                  <a key={i} href={a} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-2 py-1 bg-surface-container-low rounded-lg text-[11px] font-bold text-primary hover:underline">
-                    <span className="material-symbols-outlined text-[14px]">attach_file</span>
+                  <a key={i} href={a} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-2 py-1 bg-surface-container-low rounded-lg text-2xs font-bold text-primary hover:underline">
+                    <span className="material-symbols-outlined text-sm">attach_file</span>
                     Attachment {i + 1}
                   </a>
                 ))}
@@ -501,7 +501,7 @@ const DetailPanel = ({ item, onClose, onStatus, onPriority, onDelete, noteText, 
                 key={v}
                 onClick={() => onStatus(v)}
                 disabled={busy || item.status === v}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest border transition-all ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-2xs font-bold uppercase tracking-widest border transition-all ${
                   item.status === v
                     ? `${m.pill} ring-2 ring-offset-1 ring-emerald-300`
                     : 'bg-white text-on-surface-variant/70 border-outline-variant/30 hover:border-primary hover:text-primary'
@@ -520,14 +520,14 @@ const DetailPanel = ({ item, onClose, onStatus, onPriority, onDelete, noteText, 
             {(item.notes || []).map((n, i) => (
               <div key={i} className="p-3 bg-surface-container-low rounded-lg">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60">{n.authorEmail || 'admin'}</span>
-                  <span className="text-[10px] text-on-surface-variant/40">{fmtFullTime(n.createdAt)}</span>
+                  <span className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60">{n.authorEmail || 'admin'}</span>
+                  <span className="text-2xs text-on-surface-variant/40">{fmtFullTime(n.createdAt)}</span>
                 </div>
-                <p className="text-[12px] text-on-surface whitespace-pre-wrap">{n.body}</p>
+                <p className="text-xs text-on-surface whitespace-pre-wrap">{n.body}</p>
               </div>
             ))}
             {(!item.notes || item.notes.length === 0) && (
-              <p className="text-[11px] text-on-surface-variant/40 italic">No internal notes yet.</p>
+              <p className="text-2xs text-on-surface-variant/40 italic">No internal notes yet.</p>
             )}
           </div>
           <div className="flex gap-2">
@@ -537,9 +537,9 @@ const DetailPanel = ({ item, onClose, onStatus, onPriority, onDelete, noteText, 
               placeholder="Add an internal note (visible to team only)…"
               rows={2}
               maxLength={2000}
-              className="flex-1 px-3 py-2 border border-outline-variant/30 rounded-lg text-[13px] focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none resize-none"
+              className="flex-1 px-3 py-2 border border-outline-variant/30 rounded-lg text-xs focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none resize-none"
             />
-            <button onClick={onAddNote} disabled={busy || !noteText.trim()} className="px-4 py-2 rounded-lg bg-primary text-white text-[11px] font-bold uppercase tracking-widest disabled:opacity-50 transition-all">
+            <button onClick={onAddNote} disabled={busy || !noteText.trim()} className="px-4 py-2 rounded-lg bg-primary text-white text-2xs font-bold uppercase tracking-widest disabled:opacity-50 transition-all">
               Add
             </button>
           </div>
@@ -547,8 +547,8 @@ const DetailPanel = ({ item, onClose, onStatus, onPriority, onDelete, noteText, 
 
         {/* Danger zone */}
         <div className="pt-4 border-t border-outline-variant/10">
-          <button onClick={onDelete} disabled={busy} className="text-[11px] font-bold uppercase tracking-widest text-red-600 hover:text-red-700 flex items-center gap-1 disabled:opacity-50">
-            <span className="material-symbols-outlined text-[14px]">delete</span>
+          <button onClick={onDelete} disabled={busy} className="text-2xs font-bold uppercase tracking-widest text-red-600 hover:text-red-700 flex items-center gap-1 disabled:opacity-50">
+            <span className="material-symbols-outlined text-sm">delete</span>
             Delete record
           </button>
         </div>
@@ -559,15 +559,15 @@ const DetailPanel = ({ item, onClose, onStatus, onPriority, onDelete, noteText, 
 
 const Section = ({ title, children }) => (
   <div>
-    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/50 mb-2">{title}</p>
+    <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/50 mb-2">{title}</p>
     {children}
   </div>
 );
 
 const DetailPill = ({ label, value, mono }) => (
   <div className="bg-surface-container-low rounded-lg px-3 py-2">
-    <p className="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant/50 mb-0.5">{label}</p>
-    <p className={`text-[13px] font-bold text-on-surface tracking-tight ${mono ? 'font-mono' : ''}`}>{value}</p>
+    <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 mb-0.5">{label}</p>
+    <p className={`text-xs font-bold text-on-surface tracking-tight ${mono ? 'font-mono' : ''}`}>{value}</p>
   </div>
 );
 
@@ -582,9 +582,9 @@ const Kpi = ({ icon, label, value, tone, pulse }) => {
   return (
     <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
       <div className="flex items-center justify-between mb-2">
-        <p className="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant/50">{label}</p>
+        <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50">{label}</p>
         <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${toneMap[tone] || 'bg-surface-container text-on-surface-variant/70'}`}>
-          <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>{icon}</span>
+          <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>{icon}</span>
         </div>
       </div>
       <div className="flex items-baseline gap-2">
@@ -604,13 +604,13 @@ const EmptyState = ({ filtersActive, onClear }) => (
     <h3 className="text-lg font-bold text-on-surface mb-1">
       {filtersActive ? 'No records match this view' : 'Inbox is clear'}
     </h3>
-    <p className="text-[13px] text-on-surface-variant/60 max-w-md mx-auto mb-4">
+    <p className="text-xs text-on-surface-variant/60 max-w-md mx-auto mb-4">
       {filtersActive
         ? 'Try widening the date range, switching channel, or clearing your filters.'
         : 'When merchants call, SMS or WhatsApp the PayChain hotline, every interaction will be logged here for triage.'}
     </p>
     {filtersActive && (
-      <button onClick={onClear} className="px-4 py-2 bg-primary text-white text-[11px] font-bold uppercase tracking-widest rounded-lg">
+      <button onClick={onClear} className="px-4 py-2 bg-primary text-white text-2xs font-bold uppercase tracking-widest rounded-lg">
         Clear filters
       </button>
     )}
@@ -625,21 +625,21 @@ const IntegrationBanner = () => (
         <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>hub</span>
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/50 mb-0.5">Channel integration</p>
+        <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 mb-0.5">Channel integration</p>
         <h3 className="text-base font-bold text-on-surface tracking-tight mb-1">Connect your telephony provider</h3>
-        <p className="text-[13px] text-on-surface-variant/70 mb-3 max-w-2xl">
-          Records show up here automatically once a provider webhook is wired. PayChain supports Africa's Talking, Twilio, and Safaricom Daraja by posting to <code className="font-mono text-[12px] bg-surface-container-low px-1.5 py-0.5 rounded">/api/webhooks/communications</code>.
+        <p className="text-xs text-on-surface-variant/70 mb-3 max-w-2xl">
+          Records show up here automatically once a provider webhook is wired. PayChain supports Africa's Talking, Twilio, and Safaricom Daraja by posting to <code className="font-mono text-xs bg-surface-container-low px-1.5 py-0.5 rounded">/api/webhooks/communications</code>.
         </p>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-outline-variant/30 text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/70">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-outline-variant/30 text-2xs font-bold uppercase tracking-widest text-on-surface-variant/70">
             <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
             Africa's Talking · Not connected
           </span>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-outline-variant/30 text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/70">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-outline-variant/30 text-2xs font-bold uppercase tracking-widest text-on-surface-variant/70">
             <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
             Twilio · Not connected
           </span>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-outline-variant/30 text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/70">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-outline-variant/30 text-2xs font-bold uppercase tracking-widest text-on-surface-variant/70">
             <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
             Safaricom Daraja · Not connected
           </span>
@@ -662,7 +662,7 @@ const ErrorState = ({ error, onRetry }) => (
     </div>
     <h3 className="text-lg font-bold text-red-900 mb-1">Call centre unavailable</h3>
     <p className="text-sm text-red-700 max-w-md mx-auto mb-4">{error}</p>
-    <button onClick={onRetry} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold uppercase tracking-widest rounded-lg">
+    <button onClick={onRetry} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-2xs font-bold uppercase tracking-widest rounded-lg">
       Retry
     </button>
   </div>
