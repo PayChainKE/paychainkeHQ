@@ -8,7 +8,7 @@ export default function SetPassword({ navigation }: any) {
   const [confirmPassword, setConfirmPassword] = useState('••••••••••••••');
 
   return (
-    <SafeAreaView className="flex-1 bg-[#faf9f6]" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top']}>
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         className="flex-1"
@@ -19,7 +19,7 @@ export default function SetPassword({ navigation }: any) {
               <View className="w-14 h-14 rounded-full bg-[#e7f8ef] items-center justify-center mb-6">
                 <MaterialIcons name="lock-reset" size={28} color="#006c4e" />
               </View>
-              <Text className="text-[26px] font-jakarta-bold text-[#1b1c1a] tracking-tight mb-3 text-center">Set your password</Text>
+              <Text className="text-[26px] font-jakarta-bold text-[#0c2010] tracking-tight mb-3 text-center">Set your password</Text>
               <Text className="text-[15px] text-[#404942] text-center font-jakarta-medium px-2 leading-relaxed">
                 Welcome, James. Set a permanent password before accessing your dashboard.
               </Text>
@@ -31,7 +31,7 @@ export default function SetPassword({ navigation }: any) {
                   <Text className="text-white font-jakarta-bold text-[15px]">JK</Text>
                 </View>
                 <View className="flex-col">
-                  <Text className="text-[16px] font-jakarta-bold text-[#1b1c1a] leading-tight">James Kamau</Text>
+                  <Text className="text-[16px] font-jakarta-bold text-[#0c2010] leading-tight">James Kamau</Text>
                   <Text className="text-[13px] text-[#006c4e] mt-1 font-jakarta-medium">Kamau General Store</Text>
                 </View>
               </View>
@@ -40,11 +40,11 @@ export default function SetPassword({ navigation }: any) {
             <View className="mt-10 px-8 flex-1">
               <View className="mb-8">
                 <Text className="text-[11px] font-jakarta-bold uppercase tracking-[0.1em] text-[#404942] mb-2">New Password</Text>
-                <View className="w-full border border-[#c0c9c0]/60 bg-white rounded-md h-[52px] justify-center px-4">
+                <View className="w-full border border-[#bfc9bf]/60 bg-white rounded-md h-[52px] justify-center px-4">
                   <TextInput 
-                    className="text-[#1b1c1a] font-jakarta-bold text-[22px] tracking-[0.2em] pt-2"
+                    className="text-[#0c2010] font-jakarta-bold text-[22px] tracking-[0.2em] pt-2"
                     placeholder="••••••••"
-                    placeholderTextColor="#c0c9c0"
+                    placeholderTextColor="#bfc9bf"
                     secureTextEntry
                     value={password}
                     onChangeText={setPassword}
@@ -83,11 +83,11 @@ export default function SetPassword({ navigation }: any) {
 
               <View className="mb-10">
                 <Text className="text-[11px] font-jakarta-bold uppercase tracking-[0.1em] text-[#404942] mb-2">Confirm Password</Text>
-                <View className="w-full border border-[#c0c9c0]/60 bg-white rounded-md h-[52px] justify-center px-4">
+                <View className="w-full border border-[#bfc9bf]/60 bg-white rounded-md h-[52px] justify-center px-4">
                   <TextInput 
-                    className="text-[#1b1c1a] font-jakarta-bold text-[22px] tracking-[0.2em] pt-2"
+                    className="text-[#0c2010] font-jakarta-bold text-[22px] tracking-[0.2em] pt-2"
                     placeholder="••••••••"
-                    placeholderTextColor="#c0c9c0"
+                    placeholderTextColor="#bfc9bf"
                     secureTextEntry
                     value={confirmPassword}
                     onChangeText={setConfirmPassword}

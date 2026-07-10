@@ -283,7 +283,7 @@ export default function Login({ route }: any) {
 
   const SecurityRequirement = ({ met, label }: { met: boolean, label: string }) => (
     <View className="flex-row items-center mb-1">
-      <Feather name={met ? "check-circle" : "circle"} size={12} color={met ? "#10b981" : "#c0c9c0"} />
+      <Feather name={met ? "check-circle" : "circle"} size={12} color={met ? "#10b981" : "#bfc9bf"} />
       <Text className={`ml-2 text-[10px] font-jakarta-bold uppercase tracking-widest ${met ? 'text-[#10b981]' : 'text-[#707971]'}`}>
         {label}
       </Text>
@@ -314,7 +314,7 @@ export default function Login({ route }: any) {
 
             {activeTab === 'login' && !isOTPMode && !isResetMode && (
               <View>
-                <Text className="text-[#1b1c1a] text-[24px] font-jakarta-bold mb-2">Sign in</Text>
+                <Text className="text-[#0c2010] text-[24px] font-jakarta-bold mb-2">Sign in</Text>
                 <Text className="text-[#707971] text-[14px] font-jakarta-medium mb-6">Enter credentials provided during onboarding.</Text>
 
                 {showBiometricButton && (
@@ -327,7 +327,7 @@ export default function Login({ route }: any) {
                 <View className="mb-6">
                   <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Email or Phone Number</Text>
                   <TextInput 
-                    className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-4 px-5 text-[16px] font-jakarta-medium text-[#1b1c1a]"
+                    className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-4 px-5 text-[16px] font-jakarta-medium text-[#0c2010]"
                     placeholder="john@example.com or 0712..."
                     placeholderTextColor="#9ca3af"
                     value={phone}
@@ -343,7 +343,7 @@ export default function Login({ route }: any) {
                   </View>
                   <View className="flex-row items-center w-full bg-white border border-[#e5e7eb] rounded-2xl pr-4">
                     <TextInput 
-                      className="flex-1 py-4 px-5 text-[16px] font-jakarta-medium text-[#1b1c1a]"
+                      className="flex-1 py-4 px-5 text-[16px] font-jakarta-medium text-[#0c2010]"
                       placeholder="••••••••"
                       placeholderTextColor="#9ca3af"
                       secureTextEntry={!showPassword}
@@ -374,13 +374,13 @@ export default function Login({ route }: any) {
 
             {activeTab === 'reset' && !isOTPMode && !isResetMode && (
               <View>
-                <Text className="text-[#1b1c1a] text-[24px] font-jakarta-bold mb-2">Reset Password</Text>
+                <Text className="text-[#0c2010] text-[24px] font-jakarta-bold mb-2">Reset Password</Text>
                 <Text className="text-[#707971] text-[14px] font-jakarta-medium mb-6">Enter your registered phone number or email address to receive a recovery code.</Text>
 
                 <View className="mb-6">
                   <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Email or Phone Number</Text>
                   <TextInput 
-                    className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-4 px-5 text-[16px] font-jakarta-medium text-[#1b1c1a]"
+                    className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-4 px-5 text-[16px] font-jakarta-medium text-[#0c2010]"
                     placeholder="john@example.com or 0712..."
                     placeholderTextColor="#9ca3af"
                     value={phone}
@@ -400,14 +400,14 @@ export default function Login({ route }: any) {
 
             {isOTPMode && (
               <View>
-                <Text className="text-[#1b1c1a] text-[24px] font-jakarta-bold mb-2">Enter OTP</Text>
+                <Text className="text-[#0c2010] text-[24px] font-jakarta-bold mb-2">Enter OTP</Text>
                 <Text className="text-[#707971] text-[14px] font-jakarta-medium mb-6">Enter the code sent to {authEmail}</Text>
                 
                 <View className="flex-row justify-between mb-8">
                   {otp.map((digit, index) => (
                     <TextInput 
                       key={index}
-                      className="w-[45px] h-[55px] bg-[#f9fafb] border border-[#e5e7eb] rounded-xl text-center text-[20px] font-jakarta-bold text-[#1b1c1a]"
+                      className="w-[45px] h-[55px] bg-[#f9fafb] border border-[#e5e7eb] rounded-xl text-center text-[20px] font-jakarta-bold text-[#0c2010]"
                       keyboardType="number-pad"
                       maxLength={1}
                       value={digit}
@@ -428,18 +428,18 @@ export default function Login({ route }: any) {
 
             {isResetMode && (
               <View>
-                 <Text className="text-[#1b1c1a] text-[24px] font-jakarta-bold mb-6">Create New Password</Text>
+                 <Text className="text-[#0c2010] text-[24px] font-jakarta-bold mb-6">Create New Password</Text>
                  <View className="mb-6">
                     <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">New Password</Text>
                     <View className="flex-row items-center w-full bg-white border border-[#e5e7eb] rounded-2xl pr-4">
-                      <TextInput className="flex-1 py-4 px-5 text-[16px] font-jakarta-medium text-[#1b1c1a]" placeholder="••••••••" secureTextEntry={!showPassword} value={newPassword} onChangeText={setNewPasswordInput} />
+                      <TextInput className="flex-1 py-4 px-5 text-[16px] font-jakarta-medium text-[#0c2010]" placeholder="••••••••" secureTextEntry={!showPassword} value={newPassword} onChangeText={setNewPasswordInput} />
                       <TouchableOpacity onPress={() => setShowPassword(!showPassword)} className="p-2"><Feather name={showPassword ? "eye-off" : "eye"} size={20} color="#9ca3af" /></TouchableOpacity>
                     </View>
                  </View>
                  <View className="mb-8">
                     <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Confirm Password</Text>
                     <View className="flex-row items-center w-full bg-white border border-[#e5e7eb] rounded-2xl pr-4">
-                      <TextInput className="flex-1 py-4 px-5 text-[16px] font-jakarta-medium text-[#1b1c1a]" placeholder="••••••••" secureTextEntry={!showConfirmPassword} value={confirmPassword} onChangeText={setConfirmPassword} />
+                      <TextInput className="flex-1 py-4 px-5 text-[16px] font-jakarta-medium text-[#0c2010]" placeholder="••••••••" secureTextEntry={!showConfirmPassword} value={confirmPassword} onChangeText={setConfirmPassword} />
                       <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} className="p-2"><Feather name={showConfirmPassword ? "eye-off" : "eye"} size={20} color="#9ca3af" /></TouchableOpacity>
                     </View>
                  </View>
@@ -451,53 +451,53 @@ export default function Login({ route }: any) {
 
             {activeTab === 'signup' && !isSignupPasswordStep && !isSignupBiometricStep && !isSignupSuccess && (
               <View>
-                <Text className="text-[#1b1c1a] text-[24px] font-jakarta-bold mb-2">Get started with us</Text>
+                <Text className="text-[#0c2010] text-[24px] font-jakarta-bold mb-2">Get started with us</Text>
                 <Text className="text-[#707971] text-[14px] font-jakarta-medium mb-6">Fill out the form below and we will connect you with the right person.</Text>
 
                 <View className="space-y-4">
                   <View>
                     <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Your Name *</Text>
                     <ValidatedTextInput kind="personName" value={signupName} onChangeText={setSignupName} placeholder="John Doe"
-                      className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-medium text-[#1b1c1a]" />
+                      className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-medium text-[#0c2010]" />
                   </View>
                   <View>
                     <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Your Email *</Text>
                     <ValidatedTextInput kind="email" value={signupEmail} onChangeText={setSignupEmail} placeholder="john@example.com"
-                      className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-medium text-[#1b1c1a]" />
+                      className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-medium text-[#0c2010]" />
                   </View>
                   <View>
                     <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Your Phone *</Text>
                     <ValidatedTextInput kind="phoneKE" value={signupPhone} onChangeText={setSignupPhone} placeholder="0712 345 678"
-                      className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-medium text-[#1b1c1a]" />
+                      className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-medium text-[#0c2010]" />
                   </View>
                   <View>
                     <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Business Name *</Text>
                     <ValidatedTextInput kind="businessName" value={signupBusinessName} onChangeText={setSignupBusinessName} placeholder="Acme Corp"
-                      className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-medium text-[#1b1c1a]" />
+                      className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-medium text-[#0c2010]" />
                   </View>
                   <View>
                     <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Business Type *</Text>
                     <TouchableOpacity onPress={() => setShowBusinessModal(true)} className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 flex-row justify-between items-center">
-                      <Text className={`text-[14px] font-jakarta-medium ${businessType ? 'text-[#1b1c1a]' : 'text-[#9ca3af]'}`}>{businessType || '—Please choose an option—'}</Text>
+                      <Text className={`text-[14px] font-jakarta-medium ${businessType ? 'text-[#0c2010]' : 'text-[#9ca3af]'}`}>{businessType || '—Please choose an option—'}</Text>
                       <Feather name="chevron-down" size={16} color="#9ca3af" />
                     </TouchableOpacity>
                   </View>
                   <View>
                     <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">County *</Text>
                     <TouchableOpacity onPress={() => setShowCountyModal(true)} className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 flex-row justify-between items-center">
-                      <Text className={`text-[14px] font-jakarta-medium ${signupCounty ? 'text-[#1b1c1a]' : 'text-[#9ca3af]'}`}>{signupCounty || 'Search your county...'}</Text>
+                      <Text className={`text-[14px] font-jakarta-medium ${signupCounty ? 'text-[#0c2010]' : 'text-[#9ca3af]'}`}>{signupCounty || 'Search your county...'}</Text>
                       <Feather name="search" size={16} color="#9ca3af" />
                     </TouchableOpacity>
                   </View>
                   <View>
                     <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Area/Location *</Text>
                     <ValidatedTextInput kind="personName" value={area} onChangeText={setArea} placeholder="Westlands"
-                      className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-medium text-[#1b1c1a]" />
+                      className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-medium text-[#0c2010]" />
                   </View>
                   <View>
                     <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Employees *</Text>
                     <TouchableOpacity onPress={() => setShowEmployeesModal(true)} className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 flex-row justify-between items-center">
-                      <Text className={`text-[14px] font-jakarta-medium ${employees ? 'text-[#1b1c1a]' : 'text-[#9ca3af]'}`}>{employees || '—Please choose an option—'}</Text>
+                      <Text className={`text-[14px] font-jakarta-medium ${employees ? 'text-[#0c2010]' : 'text-[#9ca3af]'}`}>{employees || '—Please choose an option—'}</Text>
                       <Feather name="chevron-down" size={16} color="#9ca3af" />
                     </TouchableOpacity>
                   </View>
@@ -505,10 +505,10 @@ export default function Login({ route }: any) {
                     <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Is this an eCommerce business?</Text>
                     <View className="flex-row space-x-4">
                       <TouchableOpacity onPress={() => setSignupEcommerce('yes')} className={`flex-1 py-3 rounded-xl border flex-row items-center justify-center ${signupEcommerce === 'yes' ? 'bg-[#06201b] border-[#06201b]' : 'bg-white border-[#e5e7eb]'}`}>
-                        <Text className={`font-jakarta-bold text-[14px] ${signupEcommerce === 'yes' ? 'text-white' : 'text-[#1b1c1a]'}`}>Yes</Text>
+                        <Text className={`font-jakarta-bold text-[14px] ${signupEcommerce === 'yes' ? 'text-white' : 'text-[#0c2010]'}`}>Yes</Text>
                       </TouchableOpacity>
                       <TouchableOpacity onPress={() => setSignupEcommerce('no')} className={`flex-1 py-3 rounded-xl border flex-row items-center justify-center ${signupEcommerce === 'no' ? 'bg-[#06201b] border-[#06201b]' : 'bg-white border-[#e5e7eb]'}`}>
-                        <Text className={`font-jakarta-bold text-[14px] ${signupEcommerce === 'no' ? 'text-white' : 'text-[#1b1c1a]'}`}>No</Text>
+                        <Text className={`font-jakarta-bold text-[14px] ${signupEcommerce === 'no' ? 'text-white' : 'text-[#0c2010]'}`}>No</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -521,11 +521,11 @@ export default function Login({ route }: any) {
 
             {isSignupPasswordStep && (
               <View>
-                <Text className="text-[#1b1c1a] text-[24px] font-jakarta-bold mb-6">Set Custom Access</Text>
+                <Text className="text-[#0c2010] text-[24px] font-jakarta-bold mb-6">Set Custom Access</Text>
                  <View className="mb-4">
                     <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">New Password</Text>
                     <View className="flex-row items-center w-full bg-white border border-[#e5e7eb] rounded-2xl pr-4">
-                      <TextInput className="flex-1 py-4 px-5 text-[16px] font-jakarta-medium text-[#1b1c1a]" placeholder="••••••••" secureTextEntry={!showPassword} value={newPassword} onChangeText={setNewPasswordInput} />
+                      <TextInput className="flex-1 py-4 px-5 text-[16px] font-jakarta-medium text-[#0c2010]" placeholder="••••••••" secureTextEntry={!showPassword} value={newPassword} onChangeText={setNewPasswordInput} />
                       <TouchableOpacity onPress={() => setShowPassword(!showPassword)} className="p-2"><Feather name={showPassword ? "eye-off" : "eye"} size={20} color="#9ca3af" /></TouchableOpacity>
                     </View>
                  </View>
@@ -540,7 +540,7 @@ export default function Login({ route }: any) {
                  <View className="mb-8">
                     <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Confirm Password</Text>
                     <View className="flex-row items-center w-full bg-white border border-[#e5e7eb] rounded-2xl pr-4">
-                      <TextInput className="flex-1 py-4 px-5 text-[16px] font-jakarta-medium text-[#1b1c1a]" placeholder="••••••••" secureTextEntry={!showConfirmPassword} value={confirmPassword} onChangeText={setConfirmPassword} />
+                      <TextInput className="flex-1 py-4 px-5 text-[16px] font-jakarta-medium text-[#0c2010]" placeholder="••••••••" secureTextEntry={!showConfirmPassword} value={confirmPassword} onChangeText={setConfirmPassword} />
                       <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} className="p-2"><Feather name={showConfirmPassword ? "eye-off" : "eye"} size={20} color="#9ca3af" /></TouchableOpacity>
                     </View>
                  </View>
@@ -555,7 +555,7 @@ export default function Login({ route }: any) {
                 <View className="w-20 h-20 bg-[#ecfdf5] rounded-full justify-center items-center mb-6">
                   <MaterialIcons name="fingerprint" size={32} color="#047857" />
                 </View>
-                <Text className="text-[#1b1c1a] text-[24px] font-jakarta-bold mb-4">Enable Biometrics</Text>
+                <Text className="text-[#0c2010] text-[24px] font-jakarta-bold mb-4">Enable Biometrics</Text>
                 <Text className="text-[#707971] text-[14px] font-jakarta-medium text-center mb-8">Set up Face ID or Touch ID for instant, secure access to your merchant dashboard.</Text>
                 
                 <TouchableOpacity onPress={handleSetupBiometric} disabled={loading} className="w-full bg-[#06201b] py-4 rounded-2xl flex-row justify-center items-center mb-4">
@@ -572,7 +572,7 @@ export default function Login({ route }: any) {
                 <View className="w-20 h-20 bg-[#ecfdf5] rounded-full justify-center items-center mb-6">
                   <Feather name="check-circle" size={32} color="#047857" />
                 </View>
-                <Text className="text-[#1b1c1a] text-[24px] font-jakarta-bold mb-4">Application Received</Text>
+                <Text className="text-[#0c2010] text-[24px] font-jakarta-bold mb-4">Application Received</Text>
                 <Text className="text-[#707971] text-[14px] font-jakarta-medium text-center mb-8">Thank you for applying to join PayChain! Our team will review your details shortly.</Text>
                 
                 <TouchableOpacity onPress={() => { setIsSignupSuccess(false); setActiveTab('login'); }} className="w-full bg-[#06201b] py-4 rounded-2xl flex-row justify-center items-center">
@@ -590,8 +590,8 @@ export default function Login({ route }: any) {
         <View className="flex-1 justify-end bg-black/50">
           <View className="bg-white rounded-t-3xl h-[70%] p-6">
             <View className="flex-row justify-between items-center mb-4">
-              <Text className="text-[#1b1c1a] text-[18px] font-jakarta-bold">Select County</Text>
-              <TouchableOpacity onPress={() => setShowCountyModal(false)}><Feather name="x" size={24} color="#1b1c1a" /></TouchableOpacity>
+              <Text className="text-[#0c2010] text-[18px] font-jakarta-bold">Select County</Text>
+              <TouchableOpacity onPress={() => setShowCountyModal(false)}><Feather name="x" size={24} color="#0c2010" /></TouchableOpacity>
             </View>
             <TextInput 
               className="w-full bg-[#f9fafb] border border-[#e5e7eb] rounded-xl py-3 px-4 mb-4 text-[14px] font-jakarta-medium"
@@ -604,7 +604,7 @@ export default function Login({ route }: any) {
               keyExtractor={item => item}
               renderItem={({item}) => (
                 <TouchableOpacity className="py-4 border-b border-[#e5e7eb]" onPress={() => { setSignupCounty(item); setShowCountyModal(false); }}>
-                  <Text className="text-[16px] font-jakarta-medium text-[#1b1c1a]">{item}</Text>
+                  <Text className="text-[16px] font-jakarta-medium text-[#0c2010]">{item}</Text>
                 </TouchableOpacity>
               )}
             />
@@ -616,12 +616,12 @@ export default function Login({ route }: any) {
         <View className="flex-1 justify-end bg-black/50">
           <View className="bg-white rounded-t-3xl p-6">
             <View className="flex-row justify-between items-center mb-6">
-              <Text className="text-[#1b1c1a] text-[18px] font-jakarta-bold">Business Type</Text>
-              <TouchableOpacity onPress={() => setShowBusinessModal(false)}><Feather name="x" size={24} color="#1b1c1a" /></TouchableOpacity>
+              <Text className="text-[#0c2010] text-[18px] font-jakarta-bold">Business Type</Text>
+              <TouchableOpacity onPress={() => setShowBusinessModal(false)}><Feather name="x" size={24} color="#0c2010" /></TouchableOpacity>
             </View>
             {['Sole Proprietorship', 'Partnership', 'Limited Liability Company (LLC)', 'Public Limited Company (PLC)', 'NGO/Non-Profit'].map(type => (
               <TouchableOpacity key={type} className="py-4 border-b border-[#e5e7eb]" onPress={() => { setBusinessType(type); setShowBusinessModal(false); }}>
-                <Text className="text-[16px] font-jakarta-medium text-[#1b1c1a]">{type}</Text>
+                <Text className="text-[16px] font-jakarta-medium text-[#0c2010]">{type}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -632,12 +632,12 @@ export default function Login({ route }: any) {
         <View className="flex-1 justify-end bg-black/50">
           <View className="bg-white rounded-t-3xl p-6">
             <View className="flex-row justify-between items-center mb-6">
-              <Text className="text-[#1b1c1a] text-[18px] font-jakarta-bold">Number of Employees</Text>
-              <TouchableOpacity onPress={() => setShowEmployeesModal(false)}><Feather name="x" size={24} color="#1b1c1a" /></TouchableOpacity>
+              <Text className="text-[#0c2010] text-[18px] font-jakarta-bold">Number of Employees</Text>
+              <TouchableOpacity onPress={() => setShowEmployeesModal(false)}><Feather name="x" size={24} color="#0c2010" /></TouchableOpacity>
             </View>
             {['1-10', '11-50', '51-200', '201-500', '501+'].map(type => (
               <TouchableOpacity key={type} className="py-4 border-b border-[#e5e7eb]" onPress={() => { setEmployees(type); setShowEmployeesModal(false); }}>
-                <Text className="text-[16px] font-jakarta-medium text-[#1b1c1a]">{type}</Text>
+                <Text className="text-[16px] font-jakarta-medium text-[#0c2010]">{type}</Text>
               </TouchableOpacity>
             ))}
           </View>

@@ -7,6 +7,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useAuth } from '../context/AuthContext';
 import { ValidatedTextInput } from '../components/ValidatedTextInput';
 import api from '../api/config';
+import TopBar from '../components/layout/TopBar';
 
 import MyTillsTab from '../components/tabs/MyTillsTab';
 import SupportTab from '../components/tabs/SupportTab';
@@ -42,7 +43,7 @@ function MenuButton({
 }) {
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.8} className="mb-1.5 items-center">
-      <View className={`w-10 h-10 rounded-xl items-center justify-center ${active ? 'bg-[#00351d] shadow-md shadow-[#00351d]/25' : 'bg-[#faf9f6]'}`}>
+      <View className={`w-10 h-10 rounded-xl items-center justify-center ${active ? 'bg-[#00351d] shadow-md shadow-[#00351d]/25' : 'bg-[#f0fdf4]'}`}>
         <MaterialIcons name={icon} size={18} color={active ? '#ffffff' : '#00351d'} />
       </View>
     </TouchableOpacity>
@@ -131,7 +132,7 @@ function PaymentLinkPanel() {
   const statusMeta: Record<string, { label: string; color: string; bg: string }> = {
     active: { label: 'Active', color: '#006c4e', bg: '#e7f8ef' },
     paid: { label: 'Paid', color: '#1d4ed8', bg: '#eef2ff' },
-    expired: { label: 'Expired', color: '#707971', bg: '#f4f3f0' },
+    expired: { label: 'Expired', color: '#707971', bg: '#f7faf7' },
   };
 
   return (
@@ -142,9 +143,9 @@ function PaymentLinkPanel() {
           <Text className="text-[#707971] text-[14px] font-jakarta-medium leading-relaxed opacity-80">Generate a secure, one-time link for a specific amount and share it with your customer.</Text>
         </View>
 
-        <View className="bg-white rounded-[32px] border border-[#efeeeb] shadow-sm shadow-[#00351d]/5 p-6 mb-6">
+        <View className="bg-white rounded-[32px] border border-[#eff4ef] shadow-sm shadow-[#00351d]/5 p-6 mb-6">
           <Text className="text-[10px] text-[#707971] font-jakarta-bold uppercase tracking-[0.2em] mb-3">Amount to request</Text>
-          <View className="flex-row items-center bg-[#faf9f6] rounded-2xl border border-[#efeeeb] px-4">
+          <View className="flex-row items-center bg-[#f0fdf4] rounded-2xl border border-[#eff4ef] px-4">
             <Text className="text-[#707971] text-[13px] font-jakarta-bold mr-2">KES</Text>
             <ValidatedTextInput
               kind="amount"
@@ -165,7 +166,7 @@ function PaymentLinkPanel() {
             onPress={generateLink}
             disabled={isGenerating || !amount}
             activeOpacity={0.85}
-            className={`mt-4 py-4 rounded-2xl items-center justify-center shadow-lg shadow-[#00351d]/20 ${isGenerating || !amount ? 'bg-[#c0c9c0]' : 'bg-[#00351d]'}`}
+            className={`mt-4 py-4 rounded-2xl items-center justify-center shadow-lg shadow-[#00351d]/20 ${isGenerating || !amount ? 'bg-[#bfc9bf]' : 'bg-[#00351d]'}`}
           >
             {isGenerating ? (
               <ActivityIndicator color="#ffffff" size="small" />
@@ -176,7 +177,7 @@ function PaymentLinkPanel() {
         </View>
 
         {generatedLink && (
-          <View className="bg-white rounded-[32px] border border-[#efeeeb] shadow-sm shadow-[#00351d]/5 p-6 mb-6">
+          <View className="bg-white rounded-[32px] border border-[#eff4ef] shadow-sm shadow-[#00351d]/5 p-6 mb-6">
             <View className="flex-row items-center gap-2 mb-3">
               <MaterialIcons name="check-circle" size={16} color="#006c4e" />
               <Text className="text-[10px] text-[#006c4e] font-jakarta-bold uppercase tracking-[0.2em]">Link ready · expires in 24h</Text>
@@ -189,7 +190,7 @@ function PaymentLinkPanel() {
               <TouchableOpacity
                 onPress={copyLink}
                 activeOpacity={0.85}
-                className="flex-1 bg-[#faf9f6] py-4 rounded-2xl items-center justify-center border border-[#efeeeb] flex-row gap-2"
+                className="flex-1 bg-[#f0fdf4] py-4 rounded-2xl items-center justify-center border border-[#eff4ef] flex-row gap-2"
               >
                 <Feather name={copied ? 'check' : 'copy'} size={15} color="#00351d" />
                 <Text className="text-[#00351d] font-jakarta-extrabold text-[12px] uppercase tracking-widest">{copied ? 'Copied' : 'Copy'}</Text>
@@ -210,22 +211,22 @@ function PaymentLinkPanel() {
           <Text className="text-[10px] text-[#707971] font-jakarta-bold uppercase tracking-[0.2em] mb-3">Link History</Text>
 
           {isLoadingHistory ? (
-            <View className="bg-white rounded-[32px] border border-[#efeeeb] py-10 items-center justify-center">
+            <View className="bg-white rounded-[32px] border border-[#eff4ef] py-10 items-center justify-center">
               <ActivityIndicator color="#00351d" />
             </View>
           ) : history.length === 0 ? (
-            <View className="bg-white rounded-[32px] border border-[#efeeeb] p-6 items-center">
+            <View className="bg-white rounded-[32px] border border-[#eff4ef] p-6 items-center">
               <Text className="text-[13px] text-[#707971] font-jakarta-medium text-center">No payment links yet. Generate one above to see it here.</Text>
             </View>
           ) : (
-            <View className="bg-white rounded-[32px] border border-[#efeeeb] shadow-sm shadow-[#00351d]/5 overflow-hidden">
+            <View className="bg-white rounded-[32px] border border-[#eff4ef] shadow-sm shadow-[#00351d]/5 overflow-hidden">
               {history.map((item, index) => {
                 const meta = statusMeta[item.status] || statusMeta.active;
                 const created = new Date(item.createdAt);
                 return (
                   <View
                     key={item.linkId}
-                    className={`p-5 ${index !== history.length - 1 ? 'border-b border-[#efeeeb]' : ''}`}
+                    className={`p-5 ${index !== history.length - 1 ? 'border-b border-[#eff4ef]' : ''}`}
                   >
                     <View className="flex-row items-center justify-between mb-1">
                       <Text className="text-[17px] font-jakarta-extrabold text-[#00351d] tracking-tight">
@@ -242,7 +243,7 @@ function PaymentLinkPanel() {
                       <TouchableOpacity
                         onPress={() => copyHistoryLink(item)}
                         activeOpacity={0.85}
-                        className="flex-1 bg-[#faf9f6] py-2.5 rounded-xl items-center justify-center border border-[#efeeeb] flex-row gap-1.5"
+                        className="flex-1 bg-[#f0fdf4] py-2.5 rounded-xl items-center justify-center border border-[#eff4ef] flex-row gap-1.5"
                       >
                         <Feather name={copiedLinkId === item.linkId ? 'check' : 'copy'} size={13} color="#00351d" />
                         <Text className="text-[#00351d] font-jakarta-bold text-[11px] uppercase tracking-wider">{copiedLinkId === item.linkId ? 'Copied' : 'Copy'}</Text>
@@ -250,7 +251,7 @@ function PaymentLinkPanel() {
                       <TouchableOpacity
                         onPress={() => shareHistoryLink(item)}
                         activeOpacity={0.85}
-                        className="flex-1 bg-[#faf9f6] py-2.5 rounded-xl items-center justify-center border border-[#efeeeb] flex-row gap-1.5"
+                        className="flex-1 bg-[#f0fdf4] py-2.5 rounded-xl items-center justify-center border border-[#eff4ef] flex-row gap-1.5"
                       >
                         <Feather name="share-2" size={13} color="#00351d" />
                         <Text className="text-[#00351d] font-jakarta-bold text-[11px] uppercase tracking-wider">Share</Text>
@@ -263,7 +264,7 @@ function PaymentLinkPanel() {
           )}
         </View>
 
-        <View className="bg-[#f4f3f0] rounded-[28px] border border-[#c0c9c0]/20 p-5 flex-row items-start gap-3">
+        <View className="bg-[#f7faf7] rounded-[28px] border border-[#bfc9bf]/20 p-5 flex-row items-start gap-3">
           <MaterialIcons name="info-outline" size={18} color="#707971" />
           <Text className="flex-1 text-[12px] text-[#707971] font-jakarta-medium leading-relaxed">
             Each link is tied to the amount you enter and can only be paid once. Share it in invoices, WhatsApp, or on your website.
@@ -333,7 +334,7 @@ function ActionCard({
   onPress: () => void;
 }) {
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.85} className="rounded-[30px] overflow-hidden bg-white border border-[#efeeeb] shadow-sm shadow-[#00351d]/5">
+    <TouchableOpacity onPress={onPress} activeOpacity={0.85} className="rounded-[30px] overflow-hidden bg-white border border-[#eff4ef] shadow-sm shadow-[#00351d]/5">
       <View className="p-5 flex-row items-center gap-4">
         <View style={{ backgroundColor: accent + '18' }} className="w-14 h-14 rounded-[22px] items-center justify-center">
           <MaterialIcons name={icon} size={26} color={accent} />
@@ -357,7 +358,7 @@ function AccountStatementPanel({ navigation, merchant }: { navigation: any; merc
           <Text className="text-[#707971] text-[14px] font-jakarta-medium leading-relaxed opacity-80">Review recent activity and open the statement export screen.</Text>
         </View>
 
-        <View className="bg-white rounded-[32px] border border-[#efeeeb] shadow-sm shadow-[#00351d]/5 p-6 mb-6">
+        <View className="bg-white rounded-[32px] border border-[#eff4ef] shadow-sm shadow-[#00351d]/5 p-6 mb-6">
           <Text className="text-[10px] text-[#707971] font-jakarta-bold uppercase tracking-[0.2em] mb-2">Statement summary</Text>
           <Text className="text-[18px] font-jakarta-extrabold text-[#00351d] tracking-tight mb-2">{merchant?.businessName || 'Merchant'} account</Text>
           <Text className="text-[13px] text-[#707971] font-jakarta-medium leading-relaxed">Open Collections to download a PDF statement for today, the last 7 days, this month, or any custom range.</Text>
@@ -367,7 +368,7 @@ function AccountStatementPanel({ navigation, merchant }: { navigation: any; merc
           <TouchableOpacity onPress={() => navigation?.navigate('Collections')} className="bg-[#00351d] py-4 rounded-2xl items-center justify-center shadow-lg shadow-[#00351d]/25">
             <Text className="text-white font-jakarta-extrabold text-[12px] uppercase tracking-widest">Open Collections</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation?.navigate('Transactions')} className="bg-white py-4 rounded-2xl items-center justify-center border border-[#efeeeb] shadow-sm">
+          <TouchableOpacity onPress={() => navigation?.navigate('Transactions')} className="bg-white py-4 rounded-2xl items-center justify-center border border-[#eff4ef] shadow-sm">
             <Text className="text-[#00351d] font-jakarta-extrabold text-[12px] uppercase tracking-widest">View Transactions</Text>
           </TouchableOpacity>
         </View>
@@ -385,7 +386,7 @@ function BusinessProfilePanel({ merchant }: { merchant: any }) {
           <Text className="text-[#707971] text-[14px] font-jakarta-medium leading-relaxed opacity-80">Your registered business identity and key merchant details.</Text>
         </View>
 
-        <View className="bg-white rounded-[32px] border border-[#efeeeb] shadow-sm shadow-[#00351d]/5 p-6 gap-5">
+        <View className="bg-white rounded-[32px] border border-[#eff4ef] shadow-sm shadow-[#00351d]/5 p-6 gap-5">
           <ProfileRow label="Business Name" value={merchant?.businessName || 'N/A'} />
           <ProfileRow label="Email" value={merchant?.email || 'N/A'} />
           <ProfileRow label="Phone" value={merchant?.phone || 'N/A'} />
@@ -448,10 +449,11 @@ export default function Profile({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#faf9f6]" edges={['top', 'left', 'right']}>
-      <View className="flex-1 flex-row bg-[#faf9f6]">
-        <View className="w-[80px] bg-white border-r border-[#efeeeb] shadow-sm shadow-[#00351d]/5">
-          <View className="items-center pt-6 pb-5 border-b border-[#efeeeb]">
+    <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
+      <TopBar title="Profile" showBack={false} />
+      <View className="flex-1 flex-row bg-[#f0fdf4]">
+        <View className="w-[80px] bg-white border-r border-[#eff4ef] shadow-sm shadow-[#00351d]/5">
+          <View className="items-center pt-6 pb-5 border-b border-[#eff4ef]">
             <LinearGradient colors={['#006c4e', '#00351d']} className="w-10 h-10 rounded-2xl items-center justify-center shadow-lg shadow-[#006c4e]/20">
               <Text className="text-white font-jakarta-bold text-[11px]">
                 {merchant?.businessName ? merchant.businessName.substring(0, 2).toUpperCase() : 'PC'}
@@ -470,7 +472,7 @@ export default function Profile({ navigation }: any) {
               />
             ))}
 
-            <View className="h-px bg-[#efeeeb] my-2" />
+            <View className="h-px bg-[#eff4ef] my-2" />
 
             <TouchableOpacity onPress={logout} activeOpacity={0.8} className="items-center">
               <View className="w-10 h-10 rounded-xl items-center justify-center bg-[#fff5f5]">
@@ -481,7 +483,7 @@ export default function Profile({ navigation }: any) {
         </View>
 
         <View className="flex-1">
-          <View className="px-5 pt-5 pb-3 border-b border-[#efeeeb] bg-[#faf9f6]">
+          <View className="px-5 pt-5 pb-3 border-b border-[#eff4ef] bg-[#f0fdf4]">
             <Text className="text-[#707971] text-[10px] font-jakarta-bold uppercase tracking-[0.2em] mb-1">Selected</Text>
             <Text className="font-jakarta-extrabold text-[22px] text-[#00351d] tracking-tight">{activeItem.label}</Text>
           </View>

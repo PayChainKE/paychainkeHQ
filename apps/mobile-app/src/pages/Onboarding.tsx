@@ -54,7 +54,7 @@ export default function Onboarding({ navigation }: any) {
   const currentSlide = ONBOARDING_DATA[currentIndex];
 
   return (
-    <SafeAreaView className="flex-1 bg-[#faf9f6]">
+    <SafeAreaView className="flex-1 bg-[#f0fdf4]">
       <View className="flex-row justify-between items-center px-6 pt-4">
         <View className="flex-row space-x-1">
           {ONBOARDING_DATA.map((_, index) => (
@@ -72,7 +72,7 @@ export default function Onboarding({ navigation }: any) {
 
       <View className="flex-1 px-8 pt-10 pb-4">
         <View className="items-center w-full mb-10">
-          <Text className="text-[#1b1c1a] text-[32px] font-jakarta-bold text-center mb-4 tracking-tight">
+          <Text className="text-[#0c2010] text-[32px] font-jakarta-bold text-center mb-4 tracking-tight">
             {currentSlide.title}
           </Text>
           <Text className="text-[#707971] text-[16px] font-jakarta-medium text-center leading-relaxed px-4">

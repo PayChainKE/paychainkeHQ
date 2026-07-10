@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import api from '../api/config';
+import TopBar from '../components/layout/TopBar';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -20,11 +21,11 @@ const STAT_CARD_STYLES = [
   {
     // Today – dark anchor card
     containerStyle: { backgroundColor: '#00351d' },
-    labelColor: '#b1f1c6',
+    labelColor: '#5efeb3',
     valueColor: '#ffffff',
     subLabelColor: 'rgba(177,241,198,0.6)',
     icon: 'today',
-    iconColor: '#b1f1c6',
+    iconColor: '#5efeb3',
     accent: '#05c46b',
   },
   {
@@ -35,7 +36,7 @@ const STAT_CARD_STYLES = [
     subLabelColor: '#6b7280',
     icon: 'calendar_view_week',
     iconColor: '#006c4e',
-    accent: '#b1f1c6',
+    accent: '#5efeb3',
   },
   {
     // This Month – cream
@@ -45,16 +46,16 @@ const STAT_CARD_STYLES = [
     subLabelColor: '#6b7280',
     icon: 'calendar_month',
     iconColor: '#006c4e',
-    accent: '#b1f1c6',
+    accent: '#5efeb3',
   },
   {
     // All Time – deep forest
     containerStyle: { backgroundColor: '#002110' },
-    labelColor: '#b1f1c6',
+    labelColor: '#5efeb3',
     valueColor: '#ffffff',
     subLabelColor: 'rgba(177,241,198,0.5)',
     icon: 'all_inclusive',
-    iconColor: '#b1f1c6',
+    iconColor: '#5efeb3',
     accent: '#05c46b',
   },
 ];
@@ -117,24 +118,9 @@ export default function Transactions({ navigation }: any) {
 
   // ─── Render ────────────────────────────────────────────────────────────────
   return (
-    <SafeAreaView className="flex-1 bg-[#faf9f6]" edges={['top', 'left', 'right']}>
+    <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
 
-      {/* Header */}
-      <View className="px-6 pt-5 pb-4 flex-row items-center justify-between border-b border-[#efeeeb]">
-        <View className="flex-row items-center gap-3">
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            className="w-10 h-10 bg-white rounded-full items-center justify-center border border-[#efeeeb] shadow-sm"
-          >
-            <Feather name="arrow-left" size={20} color="#00351d" />
-          </TouchableOpacity>
-          <View>
-            <Text className="text-xl font-jakarta-bold text-[#1b1c1a]">Transactions</Text>
-            <Text className="text-[11px] font-jakarta-medium text-[#707971]">Inbound payment history</Text>
-          </View>
-        </View>
-        <MaterialIcons name="receipt-long" size={22} color="#00351d" />
-      </View>
+      <TopBar title="Transactions" subtitle="Inbound payment history" />
 
       <ScrollView
         className="flex-1"
@@ -188,7 +174,7 @@ export default function Transactions({ navigation }: any) {
               {statCards.slice(1).map((card, idx) => (
                 <View
                   key={card.label}
-                  className="flex-1 rounded-[24px] p-5 shadow-sm border border-[#c0c9c0]/10 overflow-hidden"
+                  className="flex-1 rounded-[24px] p-5 shadow-sm border border-[#bfc9bf]/10 overflow-hidden"
                   style={card.style.containerStyle}
                 >
                   <View className="w-8 h-8 rounded-full items-center justify-center mb-3" style={{ backgroundColor: idx === 2 ? '#002110' : '#e7f8ef' }}>
@@ -219,7 +205,7 @@ export default function Transactions({ navigation }: any) {
             All Transactions
           </Text>
 
-          <View className="bg-white rounded-[28px] shadow-sm border border-[#c0c9c0]/10 mb-6 overflow-hidden">
+          <View className="bg-white rounded-[28px] shadow-sm border border-[#bfc9bf]/10 mb-6 overflow-hidden">
             {isLoading ? (
               <View className="py-20 items-center justify-center">
                 <ActivityIndicator color="#00351d" size="large" />
@@ -227,10 +213,10 @@ export default function Transactions({ navigation }: any) {
               </View>
             ) : currentTransactions.length === 0 ? (
               <View className="py-20 items-center justify-center px-8">
-                <View className="w-16 h-16 rounded-full bg-[#efeeeb] items-center justify-center mb-4">
+                <View className="w-16 h-16 rounded-full bg-[#eff4ef] items-center justify-center mb-4">
                   <MaterialIcons name="receipt-long" size={28} color="#707971" />
                 </View>
-                <Text className="text-[#1b1c1a] font-jakarta-bold text-[16px] mb-1">No transactions yet</Text>
+                <Text className="text-[#0c2010] font-jakarta-bold text-[16px] mb-1">No transactions yet</Text>
                 <Text className="text-[#707971] font-jakarta-medium text-[13px] text-center leading-relaxed">
                   Inbound payments to your account will appear here.
                 </Text>
@@ -251,17 +237,17 @@ export default function Transactions({ navigation }: any) {
                   <View
                     key={tx._id || index}
                     className={`flex-row items-center py-4 px-5 ${
-                      index !== currentTransactions.length - 1 ? 'border-b border-[#efeeeb]/60' : ''
+                      index !== currentTransactions.length - 1 ? 'border-b border-[#eff4ef]/60' : ''
                     }`}
                   >
-                    <View className="w-11 h-11 rounded-full bg-[#efeeeb] items-center justify-center mr-3">
+                    <View className="w-11 h-11 rounded-full bg-[#eff4ef] items-center justify-center mr-3">
                       <Text className="text-[#404942] font-jakarta-bold text-[12px]">
                         {name ? name.substring(0, 2).toUpperCase() : 'TX'}
                       </Text>
                     </View>
                     <View className="flex-1 min-w-0 mr-2">
                       <View className="flex-row items-center">
-                        <Text className="font-jakarta-bold text-[14px] text-[#1b1c1a] flex-shrink" numberOfLines={1} ellipsizeMode="tail">{name}</Text>
+                        <Text className="font-jakarta-bold text-[14px] text-[#0c2010] flex-shrink" numberOfLines={1} ellipsizeMode="tail">{name}</Text>
                         {verified && <MaterialIcons name="verified" size={12} color="#006c4e" style={{ marginLeft: 4 }} />}
                       </View>
                       <Text className="text-[#707971] text-[11px] font-jakarta-medium mt-0.5" numberOfLines={1} ellipsizeMode="tail">
@@ -270,7 +256,7 @@ export default function Transactions({ navigation }: any) {
                     </View>
                     <Text
                       className={`font-jakarta-bold text-[14px] ${
-                        isSwap ? 'text-[#1D4ED8]' : isInbound ? 'text-[#006c4e]' : 'text-[#1b1c1a]'
+                        isSwap ? 'text-[#1D4ED8]' : isInbound ? 'text-[#006c4e]' : 'text-[#0c2010]'
                       }`}
                       numberOfLines={1}
                       style={{ flexShrink: 0 }}
@@ -287,7 +273,7 @@ export default function Transactions({ navigation }: any) {
 
           {/* ── Pagination ─────────────────────────────────────────────────── */}
           {!isLoading && transactions.length > ITEMS_PER_PAGE && (
-            <View className="flex-row items-center justify-between bg-white p-4 rounded-[24px] shadow-sm border border-[#c0c9c0]/10">
+            <View className="flex-row items-center justify-between bg-white p-4 rounded-[24px] shadow-sm border border-[#bfc9bf]/10">
               <TouchableOpacity
                 onPress={handlePrev}
                 disabled={currentPage === 1}
