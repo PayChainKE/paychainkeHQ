@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AxiosError } from 'axios';
-import { motion } from 'framer-motion';
+import { motion, type Variants } from 'framer-motion';
 import api from '@/lib/api';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -24,7 +24,7 @@ function phoneSanitize(raw: string) {
   return digits;
 }
 
-const containerVariants = {
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
@@ -35,7 +35,7 @@ const containerVariants = {
   }
 };
 
-const itemVariants = {
+const itemVariants: Variants = {
   hidden: { opacity: 0, y: 20 },
   visible: { 
     opacity: 1, 
