@@ -148,7 +148,6 @@ const CallCentre = () => {
     } catch { /* noop */ } finally { setUpdating(false); }
   }
   async function removeRecord(id) {
-    if (!window.confirm('Delete this record? This cannot be undone.')) return;
     setUpdating(true);
     try {
       const res = await api.delete(`/api/admin/communications/${id}`);
@@ -399,6 +398,7 @@ const InboxRow = ({ item, selected, onClick }) => {
 const DetailPanel = ({ item, onClose, onStatus, onPriority, onDelete, noteText, onNoteText, onAddNote, busy }) => {
   const cm = CHANNEL_META[item.channel];
   const sm = STATUS_META[item.status] || STATUS_META.new;
+  const [confirmingDelete, setConfirmingDelete] = React.useState(false);
   return (
     <div className="lg:col-span-7 bg-surface-container-lowest rounded-2xl border border-outline-variant/20 shadow-editorial overflow-hidden flex flex-col max-h-[calc(100vh-200px)]">
       {/* Header */}
@@ -547,10 +547,25 @@ const DetailPanel = ({ item, onClose, onStatus, onPriority, onDelete, noteText, 
 
         {/* Danger zone */}
         <div className="pt-4 border-t border-outline-variant/10">
-          <button onClick={onDelete} disabled={busy} className="text-2xs font-bold uppercase tracking-widest text-red-600 hover:text-red-700 flex items-center gap-1 disabled:opacity-50">
-            <span className="material-symbols-outlined text-sm">delete</span>
-            Delete record
-          </button>
+          {confirmingDelete ? (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+              <p className="text-xs font-bold text-red-900">Delete this record? This cannot be undone.</p>
+              <div className="mt-2.5 flex items-center gap-2">
+                <button onClick={() => setConfirmingDelete(false)} disabled={busy} className="px-3 py-1.5 rounded-lg border border-outline-variant/40 text-on-surface-variant text-2xs font-bold uppercase tracking-widest hover:bg-white transition-all disabled:opacity-50">
+                  Cancel
+                </button>
+                <button onClick={onDelete} disabled={busy} className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-2xs font-bold uppercase tracking-widest transition-all disabled:opacity-50 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-sm">delete</span>
+                  {busy ? 'Deleting…' : 'Yes, delete'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={() => setConfirmingDelete(true)} disabled={busy} className="text-2xs font-bold uppercase tracking-widest text-red-600 hover:text-red-700 flex items-center gap-1 disabled:opacity-50">
+              <span className="material-symbols-outlined text-sm">delete</span>
+              Delete record
+            </button>
+          )}
         </div>
       </div>
     </div>

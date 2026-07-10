@@ -75,6 +75,9 @@ const Messages = () => {
   const [deleteState, setDeleteState] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [bulkDeleteBusy, setBulkDeleteBusy] = useState(false);
+  const [confirmingBulkDelete, setConfirmingBulkDelete] = useState(false);
+  const [toast, setToast] = useState('');
+  const showToast = useCallback((msg) => { setToast(msg); setTimeout(() => setToast(''), 2500); }, []);
 
   const fetchMessages = useCallback(async () => {
     setLoading(true);
@@ -176,7 +179,7 @@ const Messages = () => {
       const res = await api.patch(`/api/contact/${selected._id}/status`, { status });
       setMessages((arr) => arr.map((m) => (m._id === selected._id ? { ...m, ...res.data.data } : m)));
     } catch (e) {
-      alert(e?.response?.data?.error || 'Could not update status.');
+      showToast(e?.response?.data?.error || 'Could not update status.');
     }
   }
 
@@ -209,7 +212,7 @@ const Messages = () => {
   }
   async function confirmDelete() {
     if (!deleteState) return;
-    setDeleteState((s) => ({ ...s, busy: true }));
+    setDeleteState((s) => ({ ...s, busy: true, error: '' }));
     try {
       await api.delete(`/api/contact/${deleteState.message._id}`);
       setMessages((arr) => arr.filter((m) => m._id !== deleteState.message._id));
@@ -217,14 +220,14 @@ const Messages = () => {
       setDeleteState(null);
       setIsMobileDetailOpen(false);
     } catch (e) {
-      alert(e?.response?.data?.error || 'Delete failed.');
-      setDeleteState(null);
+      setDeleteState((s) => ({ ...s, busy: false, error: e?.response?.data?.error || 'Delete failed.' }));
     }
   }
 
   async function bulkDelete() {
     if (selectedIds.size === 0) return;
-    if (!window.confirm(`Delete ${selectedIds.size} selected messages?`)) return;
+    if (!confirmingBulkDelete) { setConfirmingBulkDelete(true); return; }
+    setConfirmingBulkDelete(false);
     setBulkDeleteBusy(true);
     try {
       await api.post('/api/contact/bulk-delete', { ids: Array.from(selectedIds) });
@@ -235,7 +238,7 @@ const Messages = () => {
       }
       setSelectedIds(new Set());
     } catch (e) {
-      alert(e?.response?.data?.error || 'Bulk delete failed.');
+      showToast(e?.response?.data?.error || 'Bulk delete failed.');
     } finally {
       setBulkDeleteBusy(false);
     }
@@ -246,6 +249,7 @@ const Messages = () => {
     if (newSet.has(id)) newSet.delete(id);
     else newSet.add(id);
     setSelectedIds(newSet);
+    setConfirmingBulkDelete(false);
   }
 
   return (
@@ -298,10 +302,19 @@ const Messages = () => {
             </div>
             {selectedIds.size > 0 && (
               <div className="flex items-center justify-between bg-surface-container-low px-3 py-2 rounded-lg border border-outline-variant/20 mb-2">
-                <span className="text-2xs font-bold text-on-surface-variant uppercase tracking-widest">{selectedIds.size} selected</span>
-                <button onClick={bulkDelete} disabled={bulkDeleteBusy} className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-2xs font-bold uppercase tracking-widest rounded transition-colors disabled:opacity-50">
-                  {bulkDeleteBusy ? 'Deleting...' : 'Delete'}
-                </button>
+                <span className="text-2xs font-bold text-on-surface-variant uppercase tracking-widest">
+                  {confirmingBulkDelete ? `Delete ${selectedIds.size}?` : `${selectedIds.size} selected`}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  {confirmingBulkDelete && (
+                    <button onClick={() => setConfirmingBulkDelete(false)} className="px-3 py-1 border border-outline-variant/40 text-on-surface-variant text-2xs font-bold uppercase tracking-widest rounded transition-colors hover:bg-white">
+                      Cancel
+                    </button>
+                  )}
+                  <button onClick={bulkDelete} disabled={bulkDeleteBusy} className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-2xs font-bold uppercase tracking-widest rounded transition-colors disabled:opacity-50">
+                    {bulkDeleteBusy ? 'Deleting...' : confirmingBulkDelete ? 'Confirm' : 'Delete'}
+                  </button>
+                </div>
               </div>
             )}
             <div className="relative">
@@ -416,6 +429,7 @@ const Messages = () => {
               onTogglePriority={togglePriority}
               onChangeStatus={changeStatus}
               onDelete={startDelete}
+              showToast={showToast}
               replyRef={replyRef}
             />
           ) : (
@@ -428,12 +442,16 @@ const Messages = () => {
       {deleteState && (
         <DeleteModal state={deleteState} onClose={() => !deleteState.busy && setDeleteState(null)} onConfirm={confirmDelete} />
       )}
+
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 bg-on-surface text-on-inverse-surface px-4 py-2.5 rounded-xl shadow-lg text-xs font-bold animate-fadeIn">{toast}</div>
+      )}
     </Layout>
   );
 };
 
 // ── Conversation Panel ────────────────────────────────────────────────
-const Conversation = ({ m, draft, onDraft, replySubject, onSubject, attachments, setAttachments, uploading, setUploading, busy, error, onSend, onBack, onToggleUnread, onTogglePriority, onChangeStatus, onDelete, replyRef }) => {
+const Conversation = ({ m, draft, onDraft, replySubject, onSubject, attachments, setAttachments, uploading, setUploading, busy, error, onSend, onBack, onToggleUnread, onTogglePriority, onChangeStatus, onDelete, replyRef, showToast }) => {
   const st = STATUS_META[m.status || 'open'];
   const typeMeta = TYPE_META[m.contactType] || TYPE_META.other;
   return (
@@ -579,7 +597,7 @@ const Conversation = ({ m, draft, onDraft, replySubject, onSubject, attachments,
                         });
                         if (res.data?.url) setAttachments([...attachments, res.data.url]);
                       } catch (err) {
-                        alert('Upload failed');
+                        showToast('Upload failed');
                       } finally {
                         setUploading(false);
                       }
@@ -691,6 +709,7 @@ const DeleteModal = ({ state, onClose, onConfirm }) => (
       <p className="text-sm text-on-surface-variant mb-5">
         Permanently remove the inquiry from <strong>{state.message.name}</strong> ({state.message.email})? Any reply history is lost.
       </p>
+      {state.error && <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium mb-4">{state.error}</div>}
       <div className="flex gap-3">
         <button onClick={onClose} disabled={state.busy} className="flex-1 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40">Cancel</button>
         <button onClick={onConfirm} disabled={state.busy} className="flex-1 py-2.5 rounded-lg bg-red-600 text-white text-sm font-semibold uppercase tracking-widest hover:bg-red-700 disabled:opacity-50">

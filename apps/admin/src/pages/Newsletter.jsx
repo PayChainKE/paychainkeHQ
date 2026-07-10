@@ -49,6 +49,12 @@ export default function Newsletter() {
   // Delete confirmation
   const [deleteState, setDeleteState] = useState(null);
 
+  // Send-campaign confirmation (replaces window.confirm)
+  const [pendingSend, setPendingSend] = useState(null); // { htmlBody } | null
+
+  const [toast, setToast] = useState('');
+  const showToast = useCallback((msg) => { setToast(msg); setTimeout(() => setToast(''), 2500); }, []);
+
   const fetchAll = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -124,21 +130,20 @@ export default function Newsletter() {
       const res = await api.patch(`/api/newsletter/${sub._id}/toggle`);
       setSubscribers((arr) => arr.map((s) => (s._id === sub._id ? { ...s, active: res.data.data.active } : s)));
     } catch (e) {
-      alert(e?.response?.data?.error || 'Could not toggle subscriber.');
+      showToast(e?.response?.data?.error || 'Could not toggle subscriber.');
     }
   }
 
   function startDelete(sub) { setDeleteState({ sub, busy: false }); }
   async function confirmDelete() {
     if (!deleteState) return;
-    setDeleteState((s) => ({ ...s, busy: true }));
+    setDeleteState((s) => ({ ...s, busy: true, error: '' }));
     try {
       await api.delete(`/api/newsletter/${deleteState.sub._id}`);
       setSubscribers((arr) => arr.filter((s) => s._id !== deleteState.sub._id));
       setDeleteState(null);
     } catch (e) {
-      alert(e?.response?.data?.error || 'Delete failed.');
-      setDeleteState(null);
+      setDeleteState((s) => ({ ...s, busy: false, error: e?.response?.data?.error || 'Delete failed.' }));
     }
   }
 
@@ -150,15 +155,19 @@ export default function Newsletter() {
     setShowPreview(false);
     setComposeOpen(true);
   }
-  async function sendCampaign(htmlBody) {
+  function sendCampaign(htmlBody) {
     setComposeError('');
     if (composeSubject.trim().length < 3) { setComposeError('Subject must be at least 3 characters.'); return; }
-    if (!confirm(`Send "${composeSubject.trim()}" to ${stats.active} active subscriber${stats.active === 1 ? '' : 's'}?`)) return;
+    setPendingSend({ htmlBody });
+  }
+
+  async function confirmSendCampaign() {
+    if (!pendingSend) return;
     setComposeBusy(true);
     try {
       const res = await api.post('/api/newsletter/send', {
         subject: composeSubject.trim(),
-        body: htmlBody,
+        body: pendingSend.htmlBody,
         htmlMode: true,   // rich HTML from the editor is passed through to Resend as-is
       });
       if (res.data?.success) {
@@ -171,6 +180,7 @@ export default function Newsletter() {
       setComposeError(e?.response?.data?.error || 'Send failed.');
     } finally {
       setComposeBusy(false);
+      setPendingSend(null);
     }
   }
 
@@ -416,6 +426,31 @@ export default function Newsletter() {
       {deleteState && (
         <DeleteModal state={deleteState} onClose={() => !deleteState.busy && setDeleteState(null)} onConfirm={confirmDelete} />
       )}
+
+      {/* Send-campaign confirmation */}
+      {pendingSend && (
+        <Modal onClose={() => !composeBusy && setPendingSend(null)} maxWidth="max-w-md">
+          <div className="p-7">
+            <div className="w-14 h-14 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-4">
+              <span className="material-symbols-outlined text-3xl">send</span>
+            </div>
+            <h3 className="text-xl font-bold text-on-surface mb-1">Send campaign?</h3>
+            <p className="text-sm text-on-surface-variant mb-5">
+              Send "<strong>{composeSubject.trim()}</strong>" to <strong>{stats.active}</strong> active subscriber{stats.active === 1 ? '' : 's'}? This cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setPendingSend(null)} disabled={composeBusy} className="flex-1 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40">Cancel</button>
+              <button onClick={confirmSendCampaign} disabled={composeBusy} className="flex-1 py-2.5 rounded-lg bg-primary text-white text-sm font-semibold uppercase tracking-widest hover:shadow-lg disabled:opacity-50">
+                {composeBusy ? 'Sending…' : 'Send Now'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 bg-on-surface text-on-inverse-surface px-4 py-2.5 rounded-xl shadow-lg text-xs font-bold animate-fadeIn">{toast}</div>
+      )}
     </Layout>
   );
 }
@@ -562,6 +597,7 @@ const DeleteModal = ({ state, onClose, onConfirm }) => (
       <p className="text-sm text-on-surface-variant mb-5">
         Permanently remove <strong>{state.sub.email}</strong> from the newsletter? They'll need to re-subscribe to receive future emails.
       </p>
+      {state.error && <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium mb-4">{state.error}</div>}
       <div className="flex gap-3">
         <button onClick={onClose} disabled={state.busy} className="flex-1 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40">Cancel</button>
         <button onClick={onConfirm} disabled={state.busy} className="flex-1 py-2.5 rounded-lg bg-red-600 text-white text-sm font-semibold uppercase tracking-widest hover:bg-red-700 disabled:opacity-50">

@@ -74,6 +74,13 @@ const Waitlist = () => {
   // Delete confirmation
   const [deleteState, setDeleteState] = useState(null); // { entry, busy }
 
+  // Bulk-action confirmation (replaces window.confirm)
+  const [bulkConfirm, setBulkConfirm] = useState(null); // { type: 'status', status } | { type: 'delete' }
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  const [toast, setToast] = useState('');
+  const showToast = useCallback((msg) => { setToast(msg); setTimeout(() => setToast(''), 2500); }, []);
+
   const fetchAll = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -183,7 +190,7 @@ const Waitlist = () => {
       await api.put(`/api/waitlist/${entry._id}/status`, { status });
       fetchAll();
     } catch (e) {
-      alert(e?.response?.data?.error || 'Failed to update status.');
+      showToast(e?.response?.data?.error || 'Failed to update status.');
     }
   }
 
@@ -193,7 +200,7 @@ const Waitlist = () => {
       await api.put(`/api/waitlist/${entry._id}/priority`, { priority: !entry.priority });
       fetchAll();
     } catch (e) {
-      alert(e?.response?.data?.error || 'Failed to toggle priority.');
+      showToast(e?.response?.data?.error || 'Failed to toggle priority.');
     }
   }
 
@@ -213,7 +220,7 @@ const Waitlist = () => {
       setTimeout(() => setNotesSaved(false), 2200);
       fetchAll();
     } catch (e) {
-      alert(e?.response?.data?.error || 'Failed to save notes.');
+      showToast(e?.response?.data?.error || 'Failed to save notes.');
     } finally {
       setNotesSaving(false);
     }
@@ -245,14 +252,13 @@ const Waitlist = () => {
   }
   async function confirmDelete() {
     if (!deleteState) return;
-    setDeleteState((s) => ({ ...s, busy: true }));
+    setDeleteState((s) => ({ ...s, busy: true, error: '' }));
     try {
       await api.delete(`/api/waitlist/${deleteState.entry._id}`);
       setDeleteState(null);
       fetchAll();
     } catch (e) {
-      alert(e?.response?.data?.error || 'Delete failed.');
-      setDeleteState(null);
+      setDeleteState((s) => ({ ...s, busy: false, error: e?.response?.data?.error || 'Delete failed.' }));
     }
   }
 
@@ -266,38 +272,37 @@ const Waitlist = () => {
       pagedEntries.forEach((e) => next.add(e._id));
     }
     setSelected(next);
+    setBulkConfirm(null);
   }
   function toggleSelect(id) {
     const next = new Set(selected);
     if (next.has(id)) next.delete(id); else next.add(id);
     setSelected(next);
+    setBulkConfirm(null);
   }
 
-  async function bulkSetStatus(status) {
+  function requestBulk(action) { setBulkConfirm(action); }
+  function cancelBulk() { setBulkConfirm(null); }
+
+  async function confirmBulk() {
+    if (!bulkConfirm) return;
     const ids = Array.from(selected);
-    if (ids.length === 0) return;
-    if (!confirm(`Mark ${ids.length} entr${ids.length === 1 ? 'y' : 'ies'} as ${status}?`)) return;
+    if (ids.length === 0) { setBulkConfirm(null); return; }
+    setBulkBusy(true);
     try {
-      await Promise.all(ids.map((id) => api.put(`/api/waitlist/${id}/status`, { status })));
+      if (bulkConfirm.type === 'delete') {
+        await Promise.all(ids.map((id) => api.delete(`/api/waitlist/${id}`)));
+      } else {
+        await Promise.all(ids.map((id) => api.put(`/api/waitlist/${id}/status`, { status: bulkConfirm.status })));
+      }
       setSelected(new Set());
       fetchAll();
     } catch (e) {
-      alert('Some updates failed. Refreshing list.');
+      showToast(bulkConfirm.type === 'delete' ? 'Some deletes failed. Refreshing list.' : 'Some updates failed. Refreshing list.');
       fetchAll();
-    }
-  }
-
-  async function bulkDelete() {
-    const ids = Array.from(selected);
-    if (ids.length === 0) return;
-    if (!confirm(`Permanently delete ${ids.length} entr${ids.length === 1 ? 'y' : 'ies'}?`)) return;
-    try {
-      await Promise.all(ids.map((id) => api.delete(`/api/waitlist/${id}`)));
-      setSelected(new Set());
-      fetchAll();
-    } catch (e) {
-      alert('Some deletes failed. Refreshing list.');
-      fetchAll();
+    } finally {
+      setBulkBusy(false);
+      setBulkConfirm(null);
     }
   }
 
@@ -316,7 +321,7 @@ const Waitlist = () => {
       'Contacted': e.contactedAt ? new Date(e.contactedAt).toISOString() : '',
       'Converted': e.convertedAt ? new Date(e.convertedAt).toISOString() : '',
     }));
-    if (rows.length === 0) { alert('Nothing to export.'); return; }
+    if (rows.length === 0) { showToast('Nothing to export.'); return; }
     const headers = Object.keys(rows[0]);
     const escape = (v) => {
       const s = String(v ?? '');
@@ -432,14 +437,34 @@ const Waitlist = () => {
           {/* Bulk-action bar (only when something is selected) */}
           {selected.size > 0 && (
             <div className="px-4 md:px-6 py-3 bg-primary/5 border-b border-outline-variant/10 flex flex-wrap items-center gap-3">
-              <p className="text-xs font-bold text-primary">{selected.size} selected</p>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <BulkBtn onClick={() => bulkSetStatus('contacted')} icon="call">Mark Contacted</BulkBtn>
-                <BulkBtn onClick={() => bulkSetStatus('approved')} icon="check_circle">Mark Approved</BulkBtn>
-                <BulkBtn onClick={() => bulkSetStatus('rejected')} icon="cancel">Reject</BulkBtn>
-                <BulkBtn onClick={bulkDelete} icon="delete" tone="red">Delete</BulkBtn>
-              </div>
-              <button onClick={() => setSelected(new Set())} className="ml-auto text-2xs font-bold text-on-surface-variant/60 hover:text-on-surface uppercase tracking-widest">Clear selection</button>
+              {bulkConfirm ? (
+                <>
+                  <p className="text-xs font-bold text-primary">
+                    {bulkConfirm.type === 'delete'
+                      ? `Permanently delete ${selected.size} entr${selected.size === 1 ? 'y' : 'ies'}?`
+                      : `Mark ${selected.size} entr${selected.size === 1 ? 'y' : 'ies'} as ${bulkConfirm.status}?`}
+                  </p>
+                  <div className="flex items-center gap-1.5 ml-auto">
+                    <button onClick={cancelBulk} disabled={bulkBusy} className="px-3 py-1.5 rounded-lg border border-outline-variant/40 text-on-surface-variant text-2xs font-bold uppercase tracking-widest hover:bg-white transition-colors disabled:opacity-50">
+                      Cancel
+                    </button>
+                    <button onClick={confirmBulk} disabled={bulkBusy} className={`px-3 py-1.5 rounded-lg text-white text-2xs font-bold uppercase tracking-widest transition-colors disabled:opacity-50 ${bulkConfirm.type === 'delete' ? 'bg-red-600 hover:bg-red-700' : 'bg-primary hover:bg-primary/90'}`}>
+                      {bulkBusy ? 'Working…' : 'Confirm'}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-xs font-bold text-primary">{selected.size} selected</p>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <BulkBtn onClick={() => requestBulk({ type: 'status', status: 'contacted' })} icon="call">Mark Contacted</BulkBtn>
+                    <BulkBtn onClick={() => requestBulk({ type: 'status', status: 'approved' })} icon="check_circle">Mark Approved</BulkBtn>
+                    <BulkBtn onClick={() => requestBulk({ type: 'status', status: 'rejected' })} icon="cancel">Reject</BulkBtn>
+                    <BulkBtn onClick={() => requestBulk({ type: 'delete' })} icon="delete" tone="red">Delete</BulkBtn>
+                  </div>
+                  <button onClick={() => setSelected(new Set())} className="ml-auto text-2xs font-bold text-on-surface-variant/60 hover:text-on-surface uppercase tracking-widest">Clear selection</button>
+                </>
+              )}
             </div>
           )}
 
@@ -665,6 +690,10 @@ const Waitlist = () => {
           onClose={() => { if (!deleteState.busy) setDeleteState(null); }}
           onConfirm={confirmDelete}
         />
+      )}
+
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 bg-on-surface text-on-inverse-surface px-4 py-2.5 rounded-xl shadow-lg text-xs font-bold animate-fadeIn">{toast}</div>
       )}
     </Layout>
   );
@@ -1006,6 +1035,7 @@ const DeleteModal = ({ state, onClose, onConfirm }) => (
       <p className="text-sm text-on-surface-variant mb-5">
         Permanently remove <strong>{state.entry.fullName}</strong> ({state.entry.businessName}) from the waitlist? This cannot be undone.
       </p>
+      {state.error && <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium mb-4">{state.error}</div>}
       <div className="flex gap-3">
         <button onClick={onClose} disabled={state.busy} className="flex-1 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40">Cancel</button>
         <button onClick={onConfirm} disabled={state.busy} className="flex-1 py-2.5 rounded-lg bg-red-600 text-white text-sm font-semibold uppercase tracking-widest hover:bg-red-700 disabled:opacity-50">

@@ -86,6 +86,37 @@ const Team = () => {
 
   const showToast = useCallback((msg) => { setToast(msg); setTimeout(() => setToast(''), 2200); }, []);
 
+  function exportCsv() {
+    if (filtered.length === 0) { showToast('Nothing to export.'); return; }
+    const rows = filtered.map((m) => ({
+      Name: m.name || '',
+      Email: m.email,
+      Role: m.role,
+      Status: m.status,
+      'Merchants Onboarded': m.stats?.merchantsOnboarded ?? 0,
+      'Tickets Resolved': m.stats?.ticketsResolved ?? 0,
+      'Calls Handled': m.stats?.callsHandled ?? 0,
+      'Login Count': m.loginCount ?? 0,
+      'Last Login': m.lastLogin ? new Date(m.lastLogin).toISOString() : '',
+      Joined: m.createdAt ? new Date(m.createdAt).toISOString() : '',
+    }));
+    const headers = Object.keys(rows[0]);
+    const escape = (v) => {
+      const s = String(v ?? '');
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const csv = [headers.join(','), ...rows.map((r) => headers.map((h) => escape(r[h])).join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `paychain-team-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   const filtered = useMemo(() => members.filter((m) => {
     if (tier !== 'all' && m.role !== tier) return false;
     if (status !== 'all' && m.status !== status) return false;
@@ -117,7 +148,6 @@ const Team = () => {
     }
   }
   async function handleRemove(member) {
-    if (!window.confirm(`Remove ${member.email}? This cannot be undone.`)) return;
     try {
       const res = await api.delete(`/api/admin/team/${member._id}`);
       if (res.data?.success) {
@@ -159,12 +189,18 @@ const Team = () => {
                 Operators, analysts and owners running PayChain. Only the workspace owner can invite, edit, or remove members.
               </p>
             </div>
-            {isOwner && (
-              <button onClick={() => setInviteOpen(true)} className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-white text-2xs font-bold rounded-xl uppercase tracking-widest transition-all shadow-lg">
-                <span className="material-symbols-outlined text-base">person_add</span>
-                Invite Member
+            <div className="flex items-center gap-2">
+              <button onClick={exportCsv} className="flex items-center gap-2 px-3.5 py-2 bg-white/10 hover:bg-white/15 backdrop-blur-sm border border-white/10 text-white text-2xs font-bold rounded-xl uppercase tracking-widest transition-all">
+                <span className="material-symbols-outlined text-base">file_download</span>
+                Export CSV
               </button>
-            )}
+              {isOwner && (
+                <button onClick={() => setInviteOpen(true)} className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-white text-2xs font-bold rounded-xl uppercase tracking-widest transition-all shadow-lg">
+                  <span className="material-symbols-outlined text-base">person_add</span>
+                  Invite Member
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -380,6 +416,7 @@ const EditDrawer = ({ member, isSelf, isOwner, onClose, onSave, onRemove, onRese
   const [name, setName] = useState(member.name || '');
   const [role, setRole] = useState(member.role);
   const [status, setStatus] = useState(member.status);
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
 
   const dirty = name !== (member.name || '') || role !== member.role || status !== member.status;
 
@@ -444,9 +481,24 @@ const EditDrawer = ({ member, isSelf, isOwner, onClose, onSave, onRemove, onRese
             </select>
           </Field>
 
+          {isOwner && confirmingRemove && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+              <p className="text-xs font-bold text-red-900">Remove {member.email}? This cannot be undone.</p>
+              <div className="mt-2.5 flex items-center gap-2">
+                <button onClick={() => setConfirmingRemove(false)} className="px-3 py-1.5 rounded-lg border border-outline-variant/40 text-on-surface-variant text-2xs font-bold uppercase tracking-widest hover:bg-white transition-all">
+                  Cancel
+                </button>
+                <button onClick={onRemove} className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-2xs font-bold uppercase tracking-widest transition-all flex items-center gap-1">
+                  <span className="material-symbols-outlined text-sm">delete</span>
+                  Yes, remove
+                </button>
+              </div>
+            </div>
+          )}
+
           {isOwner && (
             <div className="flex items-center justify-between pt-4 border-t border-outline-variant/10">
-              <button onClick={onRemove} disabled={isSelf} className="text-2xs font-bold uppercase tracking-widest text-red-600 hover:text-red-700 flex items-center gap-1 disabled:opacity-30 disabled:cursor-not-allowed">
+              <button onClick={() => setConfirmingRemove(true)} disabled={isSelf || confirmingRemove} className="text-2xs font-bold uppercase tracking-widest text-red-600 hover:text-red-700 flex items-center gap-1 disabled:opacity-30 disabled:cursor-not-allowed">
                 <span className="material-symbols-outlined text-sm">delete</span>
                 Remove member
               </button>
