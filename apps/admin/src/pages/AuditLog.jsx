@@ -25,12 +25,23 @@ const ACTION_META = {
   'merchant.profile.updated':                 { label: 'Profile updated',          icon: 'edit' },
   'merchant.biometrics.enabled':              { label: 'Biometrics enabled',       icon: 'fingerprint' },
   'merchant.biometrics.disabled':             { label: 'Biometrics disabled',     icon: 'fingerprint_off' },
+  'merchant.login.passkey':                   { label: 'Signed in (passkey)',      icon: 'key' },
+  'merchant.passkey.registered':               { label: 'Passkey added',            icon: 'add_moderator' },
+  'merchant.passkey.deleted':                  { label: 'Passkey removed',          icon: 'key_off' },
+  'merchant.payment_pin.verified':            { label: 'Payment PIN verified',     icon: 'verified_user' },
+  'merchant.payment_pin.failed':              { label: 'Payment PIN failed',       icon: 'warning' },
+  'merchant.security_questions.updated':      { label: 'Security questions updated', icon: 'quiz' },
+  'merchant.security_questions.update_failed':{ label: 'Security questions update failed', icon: 'warning' },
+  'merchant.sessions.revoked_all':            { label: 'Signed out all devices',   icon: 'devices_off' },
+  'merchant.cash_advance.applied':            { label: 'Applied for cash advance', icon: 'savings' },
   'admin.merchant.created':                   { label: 'Admin · onboarded',        icon: 'add_business' },
   'admin.merchant.flagged':                   { label: 'Admin · flagged',          icon: 'flag' },
   'admin.merchant.unflagged':                 { label: 'Admin · cleared flag',     icon: 'outlined_flag' },
   'admin.merchant.locked':                    { label: 'Admin · locked',           icon: 'lock' },
   'admin.merchant.unlocked':                  { label: 'Admin · unlocked',         icon: 'lock_open' },
   'admin.merchant.deleted':                   { label: 'Admin · deleted',          icon: 'delete_forever' },
+  'admin.merchant.features_updated':          { label: 'Admin · feature access updated', icon: 'toggle_on' },
+  'admin.cash_advance.status_updated':        { label: 'Admin · cash advance decision', icon: 'fact_check' },
 };
 
 const SEVERITY_TONE = {
@@ -94,11 +105,14 @@ const PLATFORM_META = {
 };
 
 const RANGE_OPTIONS = [
-  { v: '24h', l: 'Last 24h', hours: 24 },
-  { v: '7d',  l: 'Last 7d',  hours: 24 * 7 },
-  { v: '30d', l: 'Last 30d', hours: 24 * 30 },
-  { v: 'all', l: 'All time', hours: null },
+  { v: '24h',    l: 'Last 24h',     hours: 24 },
+  { v: '7d',     l: 'Last 7d',      hours: 24 * 7 },
+  { v: '30d',    l: 'Last 30d',     hours: 24 * 30 },
+  { v: 'all',    l: 'All time',     hours: null },
+  { v: 'custom', l: 'Custom range', hours: null },
 ];
+
+const EXPORT_LIMIT = 5000;
 
 function relTime(iso) {
   if (!iso) return '—';
@@ -119,6 +133,26 @@ function absTime(iso) {
   });
 }
 
+// Shared by the live query and the CSV export so both respect the same range.
+function dateRangeParams(range, customFrom, customTo) {
+  if (range === 'custom') {
+    const p = {};
+    if (customFrom) p.from = new Date(`${customFrom}T00:00:00`).toISOString();
+    if (customTo)   p.to   = new Date(`${customTo}T23:59:59.999`).toISOString();
+    return p;
+  }
+  const rangeMeta = RANGE_OPTIONS.find((r) => r.v === range);
+  if (rangeMeta?.hours) {
+    return { from: new Date(Date.now() - rangeMeta.hours * 60 * 60 * 1000).toISOString() };
+  }
+  return {};
+}
+
+function escapeCsv(v) {
+  const s = String(v ?? '');
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
 export default function AuditLog() {
   const [rows, setRows] = useState([]);
   const [kpis, setKpis] = useState(null);
@@ -133,7 +167,10 @@ export default function AuditLog() {
   const [actor, setActor] = useState('all');
   const [platform, setPlatform] = useState('all');
   const [range, setRange] = useState('7d');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
   const [drawerEntry, setDrawerEntry] = useState(null);
+  const [exporting, setExporting] = useState(false);
 
   const params = useMemo(() => {
     const p = { page, limit: PAGE_SIZE };
@@ -142,12 +179,8 @@ export default function AuditLog() {
     if (severity !== 'all') p.severity = severity;
     if (actor    !== 'all') p.actor    = actor;
     if (platform !== 'all') p.platform = platform;
-    const rangeMeta = RANGE_OPTIONS.find((r) => r.v === range);
-    if (rangeMeta?.hours) {
-      p.from = new Date(Date.now() - rangeMeta.hours * 60 * 60 * 1000).toISOString();
-    }
-    return p;
-  }, [page, search, category, severity, actor, platform, range]);
+    return { ...p, ...dateRangeParams(range, customFrom, customTo) };
+  }, [page, search, category, severity, actor, platform, range, customFrom, customTo]);
 
   const fetchLog = useCallback(async () => {
     setLoading(true);
@@ -171,10 +204,66 @@ export default function AuditLog() {
   useEffect(() => { fetchLog(); }, [fetchLog]);
 
   // Reset to page 1 whenever a filter changes (but not when the page itself changes).
-  useEffect(() => { setPage(1); }, [search, category, severity, actor, platform, range]);
+  useEffect(() => { setPage(1); }, [search, category, severity, actor, platform, range, customFrom, customTo]);
 
   function clearFilters() {
     setSearch(''); setCategory('all'); setSeverity('all'); setActor('all'); setPlatform('all'); setRange('7d');
+    setCustomFrom(''); setCustomTo('');
+  }
+
+  // Exports every row matching the current filter (not just the visible
+  // page), capped at EXPORT_LIMIT so a full-history export can't hang the
+  // tab. Reuses the exact same filter params as the live query.
+  async function exportCsv() {
+    setExporting(true);
+    try {
+      const exportParams = {
+        page: 1, limit: EXPORT_LIMIT,
+        ...(search.trim() ? { q: search.trim() } : {}),
+        ...(category !== 'all' ? { category } : {}),
+        ...(severity !== 'all' ? { severity } : {}),
+        ...(actor    !== 'all' ? { actor } : {}),
+        ...(platform !== 'all' ? { platform } : {}),
+        ...dateRangeParams(range, customFrom, customTo),
+      };
+      const res = await api.get('/api/admin/audit-log', { params: exportParams });
+      const data = res.data?.data || [];
+      if (data.length === 0) { alert('Nothing to export for the current filters.'); return; }
+
+      const csvRows = data.map((r) => ({
+        'Timestamp': r.createdAt ? new Date(r.createdAt).toISOString() : '',
+        'Action': r.action || '',
+        'Message': r.message || '',
+        'Category': r.category || '',
+        'Severity': r.severity || '',
+        'Platform': r.platform || '',
+        'Actor Type': r.actor?.type || 'self',
+        'Actor': r.actor?.type === 'admin' ? (r.actor?.name || r.actor?.email || 'admin') : '',
+        'Merchant Name': r.merchantName || '',
+        'Merchant Email': r.merchantEmail || '',
+        'IP': r.ip || '',
+        'User Agent': r.userAgent || '',
+      }));
+      const headers = Object.keys(csvRows[0]);
+      const csv = [headers.join(','), ...csvRows.map((r) => headers.map((h) => escapeCsv(r[h])).join(','))].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `paychain-audit-log-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      if (res.data?.total > EXPORT_LIMIT) {
+        alert(`This filter matches ${res.data.total} events — only the most recent ${EXPORT_LIMIT} were exported. Narrow the date range for a complete export.`);
+      }
+    } catch (e) {
+      alert(e?.response?.data?.error || 'Export failed.');
+    } finally {
+      setExporting(false);
+    }
   }
 
   return (
@@ -184,23 +273,33 @@ export default function AuditLog() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="material-symbols-outlined text-primary text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>fact_check</span>
-              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary">Audit Log</p>
+              <span className="material-symbols-outlined text-primary text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>fact_check</span>
+              <p className="text-2xs font-bold uppercase tracking-[0.2em] text-primary">Audit Log</p>
             </div>
-            <h2 className="text-[22px] md:text-[32px] font-bold text-on-surface tracking-tighter font-headline">
+            <h2 className="text-2xl md:text-4xl font-bold text-on-surface tracking-tighter font-headline">
               Every action across PayChain
             </h2>
-            <p className="text-[13px] md:text-[14px] text-on-surface-variant mt-1">
+            <p className="text-xs md:text-sm text-on-surface-variant mt-1">
               Sign-ins, password resets, profile changes, and every admin action — with timestamps, IPs and devices.
             </p>
           </div>
-          <button
-            onClick={fetchLog}
-            className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant hover:text-on-surface flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-container-low border border-outline-variant/20"
-          >
-            <span className={`material-symbols-outlined text-[16px] ${loading ? 'animate-spin' : ''}`}>refresh</span>
-            Refresh
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={exportCsv}
+              disabled={exporting}
+              className="text-2xs font-bold uppercase tracking-widest text-white flex items-center gap-2 px-3 py-2 rounded-lg bg-primary hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            >
+              <span className={`material-symbols-outlined text-base ${exporting ? 'animate-spin' : ''}`}>{exporting ? 'progress_activity' : 'download'}</span>
+              {exporting ? 'Exporting…' : 'Export CSV'}
+            </button>
+            <button
+              onClick={fetchLog}
+              className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant hover:text-on-surface flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-container-low border border-outline-variant/20"
+            >
+              <span className={`material-symbols-outlined text-base ${loading ? 'animate-spin' : ''}`}>refresh</span>
+              Refresh
+            </button>
+          </div>
         </div>
 
         {/* KPIs — last 24h, independent of the current filter */}
@@ -219,7 +318,7 @@ export default function AuditLog() {
         {/* Filters */}
         <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/20 p-3 md:p-4 flex flex-col lg:flex-row gap-3 items-stretch lg:items-center">
           <div className="relative flex-1 min-w-0">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant/40 text-[18px]">search</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant/40 text-lg">search</span>
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -228,14 +327,33 @@ export default function AuditLog() {
             />
           </div>
           <FilterSelect value={range}    onChange={setRange}    options={RANGE_OPTIONS} />
+          {range === 'custom' && (
+            <div className="flex items-center gap-1.5">
+              <input
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                max={customTo || undefined}
+                className="text-xs font-semibold bg-surface-container-low border border-outline-variant/20 rounded-lg px-2.5 py-2 text-on-surface focus:border-primary focus:ring-0"
+              />
+              <span className="text-2xs text-on-surface-variant/40 font-bold">to</span>
+              <input
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                min={customFrom || undefined}
+                className="text-xs font-semibold bg-surface-container-low border border-outline-variant/20 rounded-lg px-2.5 py-2 text-on-surface focus:border-primary focus:ring-0"
+              />
+            </div>
+          )}
           <FilterSelect value={category} onChange={setCategory} options={CATEGORY_OPTIONS} />
           <FilterSelect value={severity} onChange={setSeverity} options={SEVERITY_OPTIONS} />
           <FilterSelect value={actor}    onChange={setActor}    options={ACTOR_OPTIONS} />
           <FilterSelect value={platform} onChange={setPlatform} options={PLATFORM_OPTIONS} />
-          {(search || category !== 'all' || severity !== 'all' || actor !== 'all' || platform !== 'all' || range !== '7d') && (
+          {(search || category !== 'all' || severity !== 'all' || actor !== 'all' || platform !== 'all' || range !== '7d' || customFrom || customTo) && (
             <button
               onClick={clearFilters}
-              className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/70 hover:text-error px-2"
+              className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/70 hover:text-error px-2"
             >
               Clear
             </button>
@@ -258,7 +376,7 @@ export default function AuditLog() {
                   <Th className="text-right"></Th>
                 </tr>
               </thead>
-              <tbody className="text-[13px]">
+              <tbody className="text-xs">
                 {loading ? (
                   [...Array(6)].map((_, i) => (
                     <tr key={i}>
@@ -292,62 +410,62 @@ export default function AuditLog() {
                       className="hover:bg-secondary-container/5 transition-colors cursor-pointer"
                     >
                       <td className="py-2 px-3 border-b border-outline-variant/5 align-top">
-                        <p className="text-[12px] font-bold text-on-surface tracking-tight">{relTime(r.createdAt)}</p>
-                        <p className="text-[10px] text-on-surface-variant/50 mt-0.5">{absTime(r.createdAt)}</p>
+                        <p className="text-xs font-bold text-on-surface tracking-tight">{relTime(r.createdAt)}</p>
+                        <p className="text-2xs text-on-surface-variant/50 mt-0.5">{absTime(r.createdAt)}</p>
                       </td>
                       <td className="py-2 px-3 border-b border-outline-variant/5 align-top">
                         {r.merchantEmail ? (
                           <>
-                            <p className="text-[12px] font-bold text-on-surface tracking-tight truncate max-w-[180px]">{r.merchantName || r.merchantEmail}</p>
-                            <p className="text-[10px] text-on-surface-variant/60 truncate max-w-[180px]">{r.merchantEmail}</p>
+                            <p className="text-xs font-bold text-on-surface tracking-tight truncate max-w-[180px]">{r.merchantName || r.merchantEmail}</p>
+                            <p className="text-2xs text-on-surface-variant/60 truncate max-w-[180px]">{r.merchantEmail}</p>
                           </>
                         ) : (
-                          <span className="text-[11px] text-on-surface-variant/40 italic">— platform —</span>
+                          <span className="text-2xs text-on-surface-variant/40 italic">— platform —</span>
                         )}
                       </td>
                       <td className="py-2 px-3 border-b border-outline-variant/5 align-top">
                         <div className="flex items-start gap-2">
-                          <span className={`material-symbols-outlined text-[16px] flex-shrink-0 mt-0.5 ${
+                          <span className={`material-symbols-outlined text-base flex-shrink-0 mt-0.5 ${
                             r.severity === 'critical' ? 'text-red-600' :
                             r.severity === 'warning'  ? 'text-amber-600' :
                             r.severity === 'success'  ? 'text-emerald-600' : 'text-blue-600'
                           }`}>{meta.icon}</span>
                           <div className="min-w-0">
-                            <p className="text-[12px] font-bold text-on-surface tracking-tight">{meta.label}</p>
+                            <p className="text-xs font-bold text-on-surface tracking-tight">{meta.label}</p>
                             {r.message && (
-                              <p className="text-[10px] text-on-surface-variant/60 mt-0.5 truncate max-w-[260px]">{r.message}</p>
+                              <p className="text-2xs text-on-surface-variant/60 mt-0.5 truncate max-w-[260px]">{r.message}</p>
                             )}
-                            <span className={`inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest border ${sevCls}`}>
+                            <span className={`inline-block mt-1 px-1.5 py-0.5 rounded text-2xs font-bold uppercase tracking-widest border ${sevCls}`}>
                               {r.severity}
                             </span>
                           </div>
                         </div>
                       </td>
                       <td className="py-2 px-3 border-b border-outline-variant/5 align-top">
-                        <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest ${catCls}`}>
+                        <span className={`inline-block px-2 py-0.5 rounded-full text-2xs font-bold uppercase tracking-widest ${catCls}`}>
                           {r.category}
                         </span>
                       </td>
                       <td className="py-2 px-3 border-b border-outline-variant/5 align-top">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${platMeta.tone}`}>
-                          <span className="material-symbols-outlined text-[12px]">{platMeta.icon}</span>
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-bold border ${platMeta.tone}`}>
+                          <span className="material-symbols-outlined text-xs">{platMeta.icon}</span>
                           {platMeta.label}
                         </span>
                       </td>
                       <td className="py-2 px-3 border-b border-outline-variant/5 align-top">
-                        <p className={`text-[11px] font-bold ${actCls}`}>
+                        <p className={`text-2xs font-bold ${actCls}`}>
                           {r.actor?.type === 'admin' ? r.actor?.name || r.actor?.email || 'admin'
                             : r.actor?.type === 'system' ? 'System'
                             : 'Merchant'}
                         </p>
-                        <p className="text-[10px] text-on-surface-variant/50 capitalize">{r.actor?.type || 'self'}</p>
+                        <p className="text-2xs text-on-surface-variant/50 capitalize">{r.actor?.type || 'self'}</p>
                       </td>
                       <td className="py-2 px-3 border-b border-outline-variant/5 align-top">
-                        <p className="text-[11px] font-mono text-on-surface-variant/80 truncate max-w-[120px]">{r.ip || '—'}</p>
-                        <p className="text-[10px] text-on-surface-variant/40 truncate max-w-[140px]">{r.userAgent ? r.userAgent.split(' ')[0] : '—'}</p>
+                        <p className="text-2xs font-mono text-on-surface-variant/80 truncate max-w-[120px]">{r.ip || '—'}</p>
+                        <p className="text-2xs text-on-surface-variant/40 truncate max-w-[140px]">{r.userAgent ? r.userAgent.split(' ')[0] : '—'}</p>
                       </td>
                       <td className="py-2 px-3 border-b border-outline-variant/5 text-right align-middle">
-                        <span className="material-symbols-outlined text-on-surface-variant/30 text-[18px]">chevron_right</span>
+                        <span className="material-symbols-outlined text-on-surface-variant/30 text-lg">chevron_right</span>
                       </td>
                     </tr>
                   );
@@ -356,7 +474,7 @@ export default function AuditLog() {
             </table>
           </div>
           <TablePagination page={page} pageSize={PAGE_SIZE} total={total} onPage={setPage} />
-          <div className="px-4 py-2 bg-surface text-[11px] text-on-surface-variant/50 font-body border-t border-outline-variant/10">
+          <div className="px-4 py-2 bg-surface text-2xs text-on-surface-variant/50 font-body border-t border-outline-variant/10">
             Showing {rows.length} of {total} events
           </div>
         </div>
@@ -369,7 +487,7 @@ export default function AuditLog() {
 
 // ── Bits ────────────────────────────────────────────────────────────────
 const Th = ({ children, className = '' }) => (
-  <th className={`py-3 px-3 border-b border-outline-variant/10 text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/40 ${className}`}>
+  <th className={`py-3 px-3 border-b border-outline-variant/10 text-2xs font-bold uppercase tracking-widest text-on-surface-variant/40 ${className}`}>
     {children}
   </th>
 );
@@ -387,10 +505,10 @@ const KpiCard = ({ label, value, tone = 'primary', icon = null }) => {
   return (
     <div className={`p-3 rounded-xl border border-outline-variant/20 ${t.bg}`}>
       <div className="flex items-center gap-1">
-        {icon && <span className={`material-symbols-outlined text-[14px] ${t.text}`}>{icon}</span>}
-        <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60">{label}</p>
+        {icon && <span className={`material-symbols-outlined text-sm ${t.text}`}>{icon}</span>}
+        <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60">{label}</p>
       </div>
-      <p className={`text-[22px] font-bold tabular-nums tracking-tight mt-0.5 ${t.text}`}>
+      <p className={`text-2xl font-bold tabular-nums tracking-tight mt-0.5 ${t.text}`}>
         {value == null ? '—' : value}
       </p>
     </div>
@@ -401,7 +519,7 @@ const FilterSelect = ({ value, onChange, options }) => (
   <select
     value={value}
     onChange={(e) => onChange(e.target.value)}
-    className="text-[12px] font-semibold bg-surface-container-low border border-outline-variant/20 rounded-lg px-3 py-2 text-on-surface focus:border-primary focus:ring-0"
+    className="text-xs font-semibold bg-surface-container-low border border-outline-variant/20 rounded-lg px-3 py-2 text-on-surface focus:border-primary focus:ring-0"
   >
     {options.map((o) => (
       <option key={o.v} value={o.v}>{o.l}</option>
@@ -420,9 +538,9 @@ const EntryDrawer = ({ entry, onClose }) => {
       >
         <div className="px-6 py-5 border-b border-outline-variant/10 sticky top-0 bg-white flex items-start justify-between">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40">Audit entry</p>
-            <h3 className="text-[18px] font-bold text-on-surface tracking-tight">{meta.label}</h3>
-            <p className="text-[12px] text-on-surface-variant/60 mt-1">{absTime(entry.createdAt)}</p>
+            <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/40">Audit entry</p>
+            <h3 className="text-lg font-bold text-on-surface tracking-tight">{meta.label}</h3>
+            <p className="text-xs text-on-surface-variant/60 mt-1">{absTime(entry.createdAt)}</p>
           </div>
           <button onClick={onClose} className="p-1 hover:bg-surface-container-low rounded-lg text-on-surface-variant/60">
             <span className="material-symbols-outlined">close</span>
@@ -432,8 +550,8 @@ const EntryDrawer = ({ entry, onClose }) => {
         <div className="px-6 py-5 space-y-5">
           {entry.message && (
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1">Summary</p>
-              <p className="text-[14px] text-on-surface leading-relaxed">{entry.message}</p>
+              <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1">Summary</p>
+              <p className="text-sm text-on-surface leading-relaxed">{entry.message}</p>
             </div>
           )}
 
@@ -447,24 +565,24 @@ const EntryDrawer = ({ entry, onClose }) => {
 
           {entry.merchantEmail && (
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1">Merchant</p>
-              <p className="text-[13px] font-semibold text-on-surface">{entry.merchantName || '—'}</p>
-              <p className="text-[12px] text-on-surface-variant/60 break-all">{entry.merchantEmail}</p>
+              <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1">Merchant</p>
+              <p className="text-xs font-semibold text-on-surface">{entry.merchantName || '—'}</p>
+              <p className="text-xs text-on-surface-variant/60 break-all">{entry.merchantEmail}</p>
             </div>
           )}
 
           {(entry.ip || entry.userAgent) && (
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1">Network</p>
-              {entry.ip && <p className="text-[12px] font-mono text-on-surface break-all">{entry.ip}</p>}
-              {entry.userAgent && <p className="text-[11px] text-on-surface-variant/60 break-all mt-1">{entry.userAgent}</p>}
+              <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1">Network</p>
+              {entry.ip && <p className="text-xs font-mono text-on-surface break-all">{entry.ip}</p>}
+              {entry.userAgent && <p className="text-2xs text-on-surface-variant/60 break-all mt-1">{entry.userAgent}</p>}
             </div>
           )}
 
           {entry.metadata && Object.keys(entry.metadata).length > 0 && (
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1">Metadata</p>
-              <pre className="text-[11px] font-mono bg-surface-container-low p-3 rounded-lg overflow-auto max-h-60">
+              <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1">Metadata</p>
+              <pre className="text-2xs font-mono bg-surface-container-low p-3 rounded-lg overflow-auto max-h-60">
                 {JSON.stringify(entry.metadata, null, 2)}
               </pre>
             </div>
@@ -477,7 +595,7 @@ const EntryDrawer = ({ entry, onClose }) => {
 
 const DrawerField = ({ label, value, mono }) => (
   <div>
-    <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1">{label}</p>
-    <p className={`text-[12px] text-on-surface ${mono ? 'font-mono' : 'font-semibold'} break-all`}>{value || '—'}</p>
+    <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1">{label}</p>
+    <p className={`text-xs text-on-surface ${mono ? 'font-mono' : 'font-semibold'} break-all`}>{value || '—'}</p>
   </div>
 );

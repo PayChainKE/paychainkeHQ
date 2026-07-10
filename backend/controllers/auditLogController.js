@@ -48,7 +48,10 @@ export const getAuditLog = async (req, res) => {
     }
 
     const pageNum  = Math.max(1, parseInt(page, 10) || 1);
-    const pageSize = Math.min(100, Math.max(1, parseInt(limit, 10) || 25));
+    // Capped at 5000 (not the usual ~100) so the admin CSV export can pull a
+    // full filtered range in one request. Still bounded, and this route is
+    // admin-only, so there's no public abuse vector.
+    const pageSize = Math.min(5000, Math.max(1, parseInt(limit, 10) || 25));
     const skip     = (pageNum - 1) * pageSize;
 
     // Run the data fetch and the KPI rollup in parallel.

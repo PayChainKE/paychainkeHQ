@@ -98,6 +98,11 @@ export const registerMerchant = async (req, res) => {
       console.error(`📧 Resend Error: Failed to send Welcome Email to ${merchant.email}:`, err);
     });
 
+    // Wallet provisioning is intentionally NOT done here. The Digital Wallet
+    // is opt-in: a merchant activates it whenever they want via
+    // POST /api/transactions/activate-wallet (one-time — that endpoint
+    // rejects a second call once stellarPublicKey is already set).
+
     logAudit({
       action: 'merchant.signup', category: 'auth', severity: 'success',
       message: `Merchant signed up — ${merchant.businessName || merchant.email}`,

@@ -343,8 +343,8 @@ const Waitlist = () => {
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
           <div>
-            <h2 className="text-[22px] md:text-[32px] font-bold text-on-surface tracking-tighter font-headline">Waitlist Pipeline</h2>
-            <p className="text-on-surface-variant/60 mt-1 text-[13px] md:text-[14px] font-body">Track prospective merchants from interest through to onboarded business.</p>
+            <h2 className="text-2xl md:text-4xl font-bold text-on-surface tracking-tighter font-headline">Waitlist Pipeline</h2>
+            <p className="text-on-surface-variant/60 mt-1 text-xs md:text-sm font-body">Track prospective merchants from interest through to onboarded business.</p>
           </div>
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <button onClick={exportCsv} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs font-bold rounded-lg hover:bg-surface-container-low transition-colors shadow-sm uppercase tracking-widest font-label">
@@ -383,7 +383,7 @@ const Waitlist = () => {
           <div className="px-4 md:px-6 py-4 border-b border-outline-variant/10 flex flex-col md:flex-row md:items-center md:justify-between gap-3 bg-white">
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full">
               <div className="relative flex-1 max-w-md">
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/40 text-[20px]">search</span>
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/40 text-xl">search</span>
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -392,7 +392,7 @@ const Waitlist = () => {
                 />
                 {search && (
                   <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md text-on-surface-variant/40 hover:bg-surface-container-high hover:text-on-surface">
-                    <span className="material-symbols-outlined text-[16px]">close</span>
+                    <span className="material-symbols-outlined text-base">close</span>
                   </button>
                 )}
               </div>
@@ -403,9 +403,9 @@ const Waitlist = () => {
                     activeFilterCount > 0 ? 'bg-primary text-white hover:bg-primary/90' : 'text-on-surface-variant bg-surface-container-low hover:bg-surface-container-high'
                   }`}
                 >
-                  <span className="material-symbols-outlined text-[18px]">filter_list</span>
+                  <span className="material-symbols-outlined text-lg">filter_list</span>
                   Filters
-                  {activeFilterCount > 0 && <span className="ml-1 px-1.5 py-0.5 rounded-full bg-white/25 text-[10px] font-bold">{activeFilterCount}</span>}
+                  {activeFilterCount > 0 && <span className="ml-1 px-1.5 py-0.5 rounded-full bg-white/25 text-2xs font-bold">{activeFilterCount}</span>}
                 </button>
                 {showFilters && (
                   <FilterPopover
@@ -419,12 +419,12 @@ const Waitlist = () => {
               </div>
               {(search || activeFilterCount > 0 || activeTab !== 'all') && (
                 <button onClick={clearAll} className="flex items-center gap-1 px-3 py-2 text-xs font-bold uppercase tracking-widest text-on-surface-variant/70 hover:text-error transition-colors">
-                  <span className="material-symbols-outlined text-[16px]">refresh</span>
+                  <span className="material-symbols-outlined text-base">refresh</span>
                   Clear
                 </button>
               )}
             </div>
-            <p className="text-[12px] text-on-surface-variant/60 font-body whitespace-nowrap">
+            <p className="text-xs text-on-surface-variant/60 font-body whitespace-nowrap">
               {filteredEntries.length} of {entries.length}
             </p>
           </div>
@@ -432,14 +432,14 @@ const Waitlist = () => {
           {/* Bulk-action bar (only when something is selected) */}
           {selected.size > 0 && (
             <div className="px-4 md:px-6 py-3 bg-primary/5 border-b border-outline-variant/10 flex flex-wrap items-center gap-3">
-              <p className="text-[12px] font-bold text-primary">{selected.size} selected</p>
+              <p className="text-xs font-bold text-primary">{selected.size} selected</p>
               <div className="flex items-center gap-1.5 flex-wrap">
                 <BulkBtn onClick={() => bulkSetStatus('contacted')} icon="call">Mark Contacted</BulkBtn>
                 <BulkBtn onClick={() => bulkSetStatus('approved')} icon="check_circle">Mark Approved</BulkBtn>
                 <BulkBtn onClick={() => bulkSetStatus('rejected')} icon="cancel">Reject</BulkBtn>
                 <BulkBtn onClick={bulkDelete} icon="delete" tone="red">Delete</BulkBtn>
               </div>
-              <button onClick={() => setSelected(new Set())} className="ml-auto text-[11px] font-bold text-on-surface-variant/60 hover:text-on-surface uppercase tracking-widest">Clear selection</button>
+              <button onClick={() => setSelected(new Set())} className="ml-auto text-2xs font-bold text-on-surface-variant/60 hover:text-on-surface uppercase tracking-widest">Clear selection</button>
             </div>
           )}
 
@@ -447,7 +447,7 @@ const Waitlist = () => {
           {loading ? (
             <div className="flex flex-col items-center justify-center py-20 gap-4">
               <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-              <p className="text-[14px] text-on-surface-variant/60 font-medium">Loading waitlist…</p>
+              <p className="text-sm text-on-surface-variant/60 font-medium">Loading waitlist…</p>
             </div>
           ) : error ? (
             <div className="p-10 text-center">
@@ -474,7 +474,7 @@ const Waitlist = () => {
                     <th className="px-3 py-2 text-right"></th>
                   </tr>
                 </thead>
-                <tbody className="text-[13px]">
+                <tbody className="text-xs">
                   {pagedEntries.map((e, i) => {
                     const st = STATUS_META[e.status || 'pending'];
                     const isSelected = selected.has(e._id);
@@ -495,19 +495,19 @@ const Waitlist = () => {
                             </div>
                             <div>
                               <p className="font-bold text-on-surface tracking-tight">{e.fullName || '—'}</p>
-                              <p className="text-[11px] text-on-surface-variant/60">{e.businessName || '—'}</p>
+                              <p className="text-2xs text-on-surface-variant/60">{e.businessName || '—'}</p>
                             </div>
                           </div>
                         </td>
                         <td className="px-3 py-2 border-b border-outline-variant/5">
                           <p className="text-on-surface-variant/80 font-medium">{e.phone || '—'}</p>
-                          <p className="text-[11px] text-on-surface-variant/60">{e.email || 'No email'}</p>
+                          <p className="text-2xs text-on-surface-variant/60">{e.email || 'No email'}</p>
                         </td>
                         <td className="px-3 py-2 border-b border-outline-variant/5">
-                          <span className="px-2 py-0.5 rounded bg-surface-container text-on-surface-variant text-[11px] font-bold uppercase tracking-tight">{e.businessType || '—'}</span>
+                          <span className="px-2 py-0.5 rounded bg-surface-container text-on-surface-variant text-2xs font-bold uppercase tracking-tight">{e.businessType || '—'}</span>
                         </td>
                         <td className="px-3 py-2 border-b border-outline-variant/5">
-                          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold border tracking-wide uppercase ${st.pill}`}>
+                          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-2xs font-bold border tracking-wide uppercase ${st.pill}`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`}></span>
                             {st.label}
                           </span>
@@ -521,7 +521,7 @@ const Waitlist = () => {
                             className="p-1 rounded hover:bg-amber-50 transition-colors"
                             title={e.priority ? 'Remove priority' : 'Mark as priority'}
                           >
-                            <span className={`material-symbols-outlined text-[20px] ${e.priority ? 'text-amber-500' : 'text-on-surface-variant/20'}`} style={{ fontVariationSettings: e.priority ? "'FILL' 1" : '' }}>star</span>
+                            <span className={`material-symbols-outlined text-xl ${e.priority ? 'text-amber-500' : 'text-on-surface-variant/20'}`} style={{ fontVariationSettings: e.priority ? "'FILL' 1" : '' }}>star</span>
                           </button>
                         </td>
                         <td className="px-4 py-3 text-right border-b border-outline-variant/5 relative" onClick={(ev) => ev.stopPropagation()}>
@@ -529,7 +529,7 @@ const Waitlist = () => {
                             onClick={(ev) => { ev.stopPropagation(); setOpenMenuId(openMenuId === e._id ? null : e._id); }}
                             className="p-1 hover:bg-surface-container-high rounded-lg text-on-surface-variant/30 hover:text-primary transition-colors"
                           >
-                            <span className="material-symbols-outlined text-[20px]">more_vert</span>
+                            <span className="material-symbols-outlined text-xl">more_vert</span>
                           </button>
                           {openMenuId === e._id && (
                             <div ref={menuRef} className="absolute right-3 top-10 z-20 w-56 bg-white rounded-xl shadow-xl border border-outline-variant/20 overflow-hidden">
@@ -561,7 +561,7 @@ const Waitlist = () => {
                           : (
                             <div className="space-y-2">
                               <p>No entries match the current filters.</p>
-                              <button onClick={clearAll} className="text-primary font-bold underline text-[12px]">Clear filters</button>
+                              <button onClick={clearAll} className="text-primary font-bold underline text-xs">Clear filters</button>
                             </div>
                           )}
                       </td>
@@ -575,12 +575,12 @@ const Waitlist = () => {
           {/* Pagination */}
           {filteredEntries.length > PAGE_SIZE && (
             <div className="px-6 py-3 bg-surface flex items-center justify-between border-t border-outline-variant/10">
-              <p className="text-[12px] text-on-surface-variant/60 font-body">
+              <p className="text-xs text-on-surface-variant/60 font-body">
                 Page {page} of {totalPages} · Showing {pageStart + 1}–{Math.min(pageStart + PAGE_SIZE, filteredEntries.length)} of {filteredEntries.length}
               </p>
               <div className="flex items-center gap-1">
                 <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="p-1.5 rounded-lg hover:bg-surface-container-low text-on-surface-variant/40 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
-                  <span className="material-symbols-outlined text-[18px]">chevron_left</span>
+                  <span className="material-symbols-outlined text-lg">chevron_left</span>
                 </button>
                 {Array.from({ length: totalPages }, (_, idx) => idx + 1)
                   .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
@@ -597,7 +597,7 @@ const Waitlist = () => {
                       </button>
                     ))}
                 <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="p-1.5 rounded-lg hover:bg-surface-container-low text-on-surface-variant/40 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
-                  <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+                  <span className="material-symbols-outlined text-lg">chevron_right</span>
                 </button>
               </div>
             </div>
@@ -608,8 +608,8 @@ const Waitlist = () => {
         {analytics?.topBusinessTypes && analytics.topBusinessTypes.length > 0 && (
           <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/20 p-5">
             <div className="flex items-center justify-between mb-4">
-              <h4 className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/80">Top business types in pipeline</h4>
-              <span className="material-symbols-outlined text-on-surface-variant/40 text-[20px]">leaderboard</span>
+              <h4 className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/80">Top business types in pipeline</h4>
+              <span className="material-symbols-outlined text-on-surface-variant/40 text-xl">leaderboard</span>
             </div>
             <div className="space-y-2">
               {analytics.topBusinessTypes.map((t, idx) => {
@@ -617,11 +617,11 @@ const Waitlist = () => {
                 const pct = (t.count / max) * 100;
                 return (
                   <div key={idx} className="flex items-center gap-3">
-                    <p className="text-[12px] font-bold text-on-surface w-28 truncate">{t.type}</p>
+                    <p className="text-xs font-bold text-on-surface w-28 truncate">{t.type}</p>
                     <div className="flex-1 h-2 bg-surface-container-low rounded-full overflow-hidden">
                       <div className="h-full bg-primary rounded-full" style={{ width: `${pct}%` }}></div>
                     </div>
-                    <p className="text-[12px] font-bold text-on-surface-variant w-10 text-right">{t.count}</p>
+                    <p className="text-xs font-bold text-on-surface-variant w-10 text-right">{t.count}</p>
                   </div>
                 );
               })}
@@ -672,11 +672,11 @@ const Waitlist = () => {
 
 // ── Bits ─────────────────────────────────────────────────────────────
 const Th = ({ children }) => (
-  <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/60">{children}</th>
+  <th className="px-4 py-3 text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60">{children}</th>
 );
 
 const Count = ({ children }) => (
-  <span className="ml-1 px-1.5 py-0.5 rounded-md bg-surface-container-low text-[10px] font-bold text-on-surface-variant/70">{children}</span>
+  <span className="ml-1 px-1.5 py-0.5 rounded-md bg-surface-container-low text-2xs font-bold text-on-surface-variant/70">{children}</span>
 );
 
 const Tab = ({ v, current, onClick, children }) => (
@@ -703,9 +703,9 @@ const StatCard = ({ label, value, icon, tone, sub }) => {
   return (
     <div className="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/20 flex items-center justify-between shadow-sm transition-all hover:scale-[1.02]">
       <div className="min-w-0">
-        <p className="text-[10px] md:text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/40 mb-1">{label}</p>
+        <p className="text-2xs md:text-2xs font-bold uppercase tracking-widest text-on-surface-variant/40 mb-1">{label}</p>
         <h3 className="text-xl md:text-2xl font-bold text-on-surface tracking-tight">{value}</h3>
-        {sub && <p className="text-[10px] text-on-surface-variant/60 mt-0.5">{sub}</p>}
+        {sub && <p className="text-2xs text-on-surface-variant/60 mt-0.5">{sub}</p>}
       </div>
       <div className={`hidden sm:flex w-10 h-10 rounded-full items-center justify-center ${toneMap[tone] || toneMap.gray}`}>
         <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>{icon}</span>
@@ -724,7 +724,7 @@ const MenuItem = ({ icon, tone, onClick, children }) => {
   };
   return (
     <button onClick={onClick} className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-left transition-colors ${toneMap[tone]}`}>
-      <span className="material-symbols-outlined text-[18px]">{icon}</span>
+      <span className="material-symbols-outlined text-lg">{icon}</span>
       {children}
     </button>
   );
@@ -737,9 +737,9 @@ const BulkBtn = ({ icon, onClick, tone, children }) => {
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-widest transition-colors ${toneMap[tone] || 'bg-white border border-outline-variant/40 text-on-surface hover:bg-surface-container-low'}`}
+      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-2xs font-bold uppercase tracking-widest transition-colors ${toneMap[tone] || 'bg-white border border-outline-variant/40 text-on-surface hover:bg-surface-container-low'}`}
     >
-      <span className="material-symbols-outlined text-[14px]">{icon}</span>
+      <span className="material-symbols-outlined text-sm">{icon}</span>
       {children}
     </button>
   );
@@ -754,13 +754,13 @@ const FilterPopover = ({ filters, businessTypes, onChange, onReset, onClose }) =
   return (
     <div className="absolute right-0 top-12 z-30 w-72 bg-white rounded-xl shadow-2xl border border-outline-variant/20 overflow-hidden">
       <div className="px-4 py-3 border-b border-outline-variant/10 flex items-center justify-between bg-surface-container-low">
-        <h4 className="text-[12px] font-bold uppercase tracking-widest text-on-surface">Filter</h4>
-        <button onClick={onReset} className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/60 hover:text-error">Reset</button>
+        <h4 className="text-xs font-bold uppercase tracking-widest text-on-surface">Filter</h4>
+        <button onClick={onReset} className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 hover:text-error">Reset</button>
       </div>
       <div className="max-h-[440px] overflow-y-auto custom-scrollbar p-4 space-y-4">
         {groups.map((g) => (
           <div key={g.key}>
-            <label className="block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60 mb-2">{g.label}</label>
+            <label className="block text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 mb-2">{g.label}</label>
             <div className="flex flex-wrap gap-1.5">
               {g.opts.map((o) => {
                 const selected = filters[g.key] === o.v;
@@ -768,7 +768,7 @@ const FilterPopover = ({ filters, businessTypes, onChange, onReset, onClose }) =
                   <button
                     key={o.v}
                     onClick={() => onChange({ [g.key]: o.v })}
-                    className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all ${selected ? 'bg-primary text-white border-primary' : 'bg-white text-on-surface-variant border-outline-variant/40 hover:border-primary/40'}`}
+                    className={`px-2.5 py-1 rounded-full text-2xs font-semibold border transition-all ${selected ? 'bg-primary text-white border-primary' : 'bg-white text-on-surface-variant border-outline-variant/40 hover:border-primary/40'}`}
                   >
                     {o.l}
                   </button>
@@ -779,11 +779,11 @@ const FilterPopover = ({ filters, businessTypes, onChange, onReset, onClose }) =
         ))}
         {businessTypes.length > 0 && (
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60 mb-2">Business Type</label>
+            <label className="block text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 mb-2">Business Type</label>
             <select
               value={filters.source}
               onChange={(e) => onChange({ source: e.target.value })}
-              className="w-full px-2 py-1.5 border border-outline-variant/40 rounded-md text-[12px] font-medium bg-white focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none"
+              className="w-full px-2 py-1.5 border border-outline-variant/40 rounded-md text-xs font-medium bg-white focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none"
             >
               <option value="all">All types</option>
               {businessTypes.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -792,7 +792,7 @@ const FilterPopover = ({ filters, businessTypes, onChange, onReset, onClose }) =
         )}
       </div>
       <div className="px-4 py-3 border-t border-outline-variant/10 bg-surface-container-low/50 flex justify-end">
-        <button onClick={onClose} className="px-4 py-1.5 rounded-lg bg-primary text-white text-[11px] font-bold uppercase tracking-widest hover:shadow-md">Done</button>
+        <button onClick={onClose} className="px-4 py-1.5 rounded-lg bg-primary text-white text-2xs font-bold uppercase tracking-widest hover:shadow-md">Done</button>
       </div>
     </div>
   );
@@ -808,9 +808,9 @@ const DetailDrawer = ({ entry, notes, onNotesChange, onSaveNotes, saving, saved,
         {/* Header */}
         <div className="sticky top-0 z-10 bg-white border-b border-outline-variant/20 px-6 py-4 flex items-start justify-between">
           <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40 mb-0.5">Waitlist Entry</p>
+            <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/40 mb-0.5">Waitlist Entry</p>
             <h3 className="text-xl font-bold text-on-surface tracking-tight truncate">{entry.fullName}</h3>
-            <p className="text-[12px] text-on-surface-variant/70 mt-0.5">{entry.businessName}</p>
+            <p className="text-xs text-on-surface-variant/70 mt-0.5">{entry.businessName}</p>
           </div>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-surface-container-low text-on-surface-variant/60">
             <span className="material-symbols-outlined">close</span>
@@ -820,17 +820,17 @@ const DetailDrawer = ({ entry, notes, onNotesChange, onSaveNotes, saving, saved,
         <div className="p-6 space-y-5">
           {/* Status + priority */}
           <div className="flex flex-wrap gap-2 items-center">
-            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border tracking-wide uppercase ${st.pill}`}>
+            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-2xs font-bold border tracking-wide uppercase ${st.pill}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`}></span>
               {st.label}
             </span>
             {entry.priority && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold border bg-amber-50 text-amber-700 border-amber-200">
-                <span className="material-symbols-outlined text-[12px]" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-bold border bg-amber-50 text-amber-700 border-amber-200">
+                <span className="material-symbols-outlined text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
                 Priority
               </span>
             )}
-            <span className="text-[11px] text-on-surface-variant/60 ml-auto">Added {relativeTime(entry.createdAt)}</span>
+            <span className="text-2xs text-on-surface-variant/60 ml-auto">Added {relativeTime(entry.createdAt)}</span>
           </div>
 
           {/* Contact card */}
@@ -844,7 +844,7 @@ const DetailDrawer = ({ entry, notes, onNotesChange, onSaveNotes, saving, saved,
           <Section title="Business Details" icon="storefront">
             <Row label="Business Name" value={entry.businessName} />
             <Row label="Business Type" value={entry.businessType} />
-            {entry.challenge && <Row label="Stated Challenge" value={<span className="text-[13px] leading-relaxed">{entry.challenge}</span>} />}
+            {entry.challenge && <Row label="Stated Challenge" value={<span className="text-xs leading-relaxed">{entry.challenge}</span>} />}
           </Section>
 
           {/* Timeline */}
@@ -854,7 +854,7 @@ const DetailDrawer = ({ entry, notes, onNotesChange, onSaveNotes, saving, saved,
             {entry.convertedAt && <Row label="Converted" value={fmtDate(entry.convertedAt)} />}
             {entry.convertedMerchantId && (
               <Row label="Merchant Record" value={
-                <span className="font-mono text-[12px] bg-violet-50 text-violet-700 px-2 py-0.5 rounded border border-violet-200">
+                <span className="font-mono text-xs bg-violet-50 text-violet-700 px-2 py-0.5 rounded border border-violet-200">
                   {entry.convertedMerchantId.paybillAccount ? `#${entry.convertedMerchantId.paybillAccount}` : 'Linked'}
                 </span>
               } />
@@ -874,13 +874,13 @@ const DetailDrawer = ({ entry, notes, onNotesChange, onSaveNotes, saving, saved,
                 className="w-full px-3 py-2.5 border border-outline-variant/40 rounded-lg text-sm focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none resize-none"
               />
               <div className="flex items-center justify-between">
-                <p className="text-[10px] text-on-surface-variant/50">{notes.length}/2000 · only admins see this</p>
+                <p className="text-2xs text-on-surface-variant/50">{notes.length}/2000 · only admins see this</p>
                 <div className="flex items-center gap-2">
-                  {saved && <span className="text-[11px] text-emerald-600 font-bold">✓ Saved</span>}
+                  {saved && <span className="text-2xs text-emerald-600 font-bold">✓ Saved</span>}
                   <button
                     onClick={onSaveNotes}
                     disabled={saving}
-                    className="px-3 py-1.5 rounded-lg bg-primary text-white text-[11px] font-bold uppercase tracking-widest hover:shadow-md disabled:opacity-50"
+                    className="px-3 py-1.5 rounded-lg bg-primary text-white text-2xs font-bold uppercase tracking-widest hover:shadow-md disabled:opacity-50"
                   >
                     {saving ? 'Saving…' : 'Save notes'}
                   </button>
@@ -919,8 +919,8 @@ const DetailDrawer = ({ entry, notes, onNotesChange, onSaveNotes, saving, saved,
 const Section = ({ title, icon, children }) => (
   <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-xl overflow-hidden">
     <div className="px-4 py-3 border-b border-outline-variant/10 bg-surface-container-low flex items-center gap-2">
-      <span className="material-symbols-outlined text-on-surface-variant/60 text-[18px]">{icon}</span>
-      <h4 className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/80">{title}</h4>
+      <span className="material-symbols-outlined text-on-surface-variant/60 text-lg">{icon}</span>
+      <h4 className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/80">{title}</h4>
     </div>
     <div className="divide-y divide-outline-variant/10">{children}</div>
   </div>
@@ -928,8 +928,8 @@ const Section = ({ title, icon, children }) => (
 
 const Row = ({ label, value, mono }) => (
   <div className="px-4 py-3 grid grid-cols-3 gap-3 items-start">
-    <div className="text-[12px] font-semibold text-on-surface-variant/60 uppercase tracking-wide">{label}</div>
-    <div className={`col-span-2 text-[14px] text-on-surface ${mono ? 'font-mono' : ''}`}>{value ?? '—'}</div>
+    <div className="text-xs font-semibold text-on-surface-variant/60 uppercase tracking-wide">{label}</div>
+    <div className={`col-span-2 text-sm text-on-surface ${mono ? 'font-mono' : ''}`}>{value ?? '—'}</div>
   </div>
 );
 
@@ -942,8 +942,8 @@ const ActionBtn = ({ icon, tone, onClick, children, className = '' }) => {
     violet:  'bg-violet-50 text-violet-700 hover:bg-violet-100 border-violet-200',
   };
   return (
-    <button onClick={onClick} className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-[12px] font-bold uppercase tracking-widest border transition-all ${toneMap[tone]} ${className}`}>
-      <span className="material-symbols-outlined text-[16px]">{icon}</span>
+    <button onClick={onClick} className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest border transition-all ${toneMap[tone]} ${className}`}>
+      <span className="material-symbols-outlined text-base">{icon}</span>
       {children}
     </button>
   );
@@ -961,7 +961,7 @@ const ConvertModal = ({ state, onClose, onConfirm }) => {
           <h3 className="text-xl font-bold text-on-surface mb-2">Merchant created</h3>
           <p className="text-sm text-on-surface-variant mb-4">A secure setup invite has been emailed to <strong>{state.done.email}</strong>.</p>
           <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 mb-5 inline-block">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-700 mb-1">Account Number</p>
+            <p className="text-2xs font-bold uppercase tracking-widest text-emerald-700 mb-1">Account Number</p>
             <p className="font-mono text-xl font-bold text-emerald-900">{state.done.paybillAccount}</p>
           </div>
           <div>
@@ -981,10 +981,10 @@ const ConvertModal = ({ state, onClose, onConfirm }) => {
         <p className="text-sm text-on-surface-variant mb-4">
           <strong>{state.entry.businessName}</strong> ({state.entry.email || state.entry.phone}) will be created as a full merchant account.
         </p>
-        <div className="text-[13px] px-3 py-2.5 rounded-lg mb-5 bg-violet-50 text-violet-800 border border-violet-100">
+        <div className="text-xs px-3 py-2.5 rounded-lg mb-5 bg-violet-50 text-violet-800 border border-violet-100">
           This will: mint a unique 5-digit account number, generate a secure 24-hour password-setup link, and email it to the merchant. The waitlist entry will be marked as converted.
         </div>
-        {state.error && <div className="text-[13px] text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium mb-3">{state.error}</div>}
+        {state.error && <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium mb-3">{state.error}</div>}
         <div className="flex gap-3">
           <button onClick={onClose} disabled={state.busy} className="flex-1 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40">Cancel</button>
           <button onClick={onConfirm} disabled={state.busy} className="flex-1 py-2.5 rounded-lg bg-violet-600 text-white text-sm font-semibold uppercase tracking-widest hover:bg-violet-700 disabled:opacity-50">

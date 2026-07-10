@@ -93,7 +93,7 @@ const Sidebar = ({ isOpen, onClose }) => {
       <div className="flex items-center justify-between mb-6 px-2 lg:justify-center">
         <div className="flex flex-col items-center gap-1.5">
           <img src={logo} alt="PayChain Logo" className="h-8 max-w-full w-auto object-contain" />
-          <span className="text-[9px] font-bold tracking-[0.22em] text-secondary-fixed opacity-60 uppercase">ADMIN PORTAL</span>
+          <span className="text-2xs font-bold tracking-[0.22em] text-secondary-fixed opacity-60 uppercase">ADMIN PORTAL</span>
         </div>
         <button onClick={onClose} className="lg:hidden text-white/40 hover:text-white absolute right-3 top-5">
           <span className="material-symbols-outlined">close</span>
@@ -104,7 +104,7 @@ const Sidebar = ({ isOpen, onClose }) => {
       <nav className="flex-1 overflow-y-auto no-scrollbar pr-1 -mr-1">
         {NAV_SECTIONS.map((section, sIdx) => (
           <div key={section.title} className={sIdx === 0 ? '' : 'mt-4'}>
-            <div className="px-3 mb-1.5 text-[9px] font-bold tracking-[0.18em] text-[#c0c9c0]/40 uppercase font-label">
+            <div className="px-3 mb-1.5 text-2xs font-bold tracking-[0.18em] text-[#c0c9c0]/40 uppercase font-label">
               {section.title}
             </div>
             <div className="space-y-0.5">
@@ -114,14 +114,14 @@ const Sidebar = ({ isOpen, onClose }) => {
                   to={item.path}
                   onClick={handleNavClick}
                   className={({ isActive }) =>
-                    `flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-[12.5px] font-body font-bold leading-tight tracking-tight relative ${
+                    `flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-xs font-body font-bold leading-tight tracking-tight relative ${
                       isActive
                         ? 'bg-[#0E3D2E] text-[#5EFEB3] shadow-[0_0_15px_rgba(94,254,179,0.05)] after:absolute after:left-0 after:top-1 after:bottom-1 after:w-[3px] after:bg-[#5EFEB3] after:rounded-full'
                         : 'text-[#c0c9c0] hover:text-white hover:bg-emerald-900/30'
                     }`
                   }
                 >
-                  <span className="material-symbols-outlined text-[19px]">{item.icon}</span>
+                  <span className="material-symbols-outlined text-xl">{item.icon}</span>
                   <span className="flex-1 truncate">{item.label}</span>
                 </NavLink>
               ))}
@@ -133,14 +133,14 @@ const Sidebar = ({ isOpen, onClose }) => {
       {/* ── System Status + sign-out ─────────────────────────────── */}
       <div className="mt-4 pt-3 border-t border-white/10 space-y-3">
         <div className="space-y-0.5">
-          <div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-[0.18em] text-[#c0c9c0]/40 px-2 font-label">
+          <div className="flex items-center justify-between text-2xs font-bold uppercase tracking-[0.18em] text-[#c0c9c0]/40 px-2 font-label">
             <span>System Status</span>
             <button
               onClick={fetchStatus}
               title="Refresh"
               className="text-[#c0c9c0]/40 hover:text-emerald-300 transition-colors"
             >
-              <span className="material-symbols-outlined text-[13px]">refresh</span>
+              <span className="material-symbols-outlined text-xs">refresh</span>
             </button>
           </div>
           {statRows.map((row) => (
@@ -148,9 +148,9 @@ const Sidebar = ({ isOpen, onClose }) => {
               key={row.label}
               to={row.path}
               onClick={handleNavClick}
-              className="flex items-center gap-2 px-2 py-1 text-slate-400 text-[11px] font-medium font-body rounded-md hover:bg-emerald-900/30 hover:text-white transition-colors"
+              className="flex items-center gap-2 px-2 py-1 text-slate-400 text-2xs font-medium font-body rounded-md hover:bg-emerald-900/30 hover:text-white transition-colors"
             >
-              <span className="material-symbols-outlined text-[14px] opacity-70">{row.icon}</span>
+              <span className="material-symbols-outlined text-sm opacity-70">{row.icon}</span>
               <span className="flex-1">{row.label}</span>
               {loadingStatus ? (
                 <span className="inline-block w-6 h-3 bg-white/10 rounded animate-pulse"></span>
@@ -158,7 +158,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                 <>
                   <span className="tabular-nums font-bold text-white/80">{(row.value ?? 0).toLocaleString()}</span>
                   {row.badge > 0 && (
-                    <span className={`tabular-nums text-[9px] font-bold px-1.5 py-0.5 rounded border ${badgeToneMap[row.badgeTone]}`}>
+                    <span className={`tabular-nums text-2xs font-bold px-1.5 py-0.5 rounded border ${badgeToneMap[row.badgeTone]}`}>
                       {row.badge}
                     </span>
                   )}
@@ -169,9 +169,9 @@ const Sidebar = ({ isOpen, onClose }) => {
         </div>
         <button
           onClick={logout}
-          className="w-full flex items-center justify-center gap-2 py-2 bg-secondary-container/10 text-white rounded-lg text-[12px] font-medium hover:bg-secondary-container/20 transition-all font-label"
+          className="w-full flex items-center justify-center gap-2 py-2 bg-secondary-container/10 text-white rounded-lg text-xs font-medium hover:bg-secondary-container/20 transition-all font-label"
         >
-          <span className="material-symbols-outlined text-[16px]">logout</span>
+          <span className="material-symbols-outlined text-base">logout</span>
           Sign Out
         </button>
       </div>

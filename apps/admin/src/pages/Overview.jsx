@@ -239,59 +239,59 @@ const Overview = () => {
       <div className="space-y-8 md:space-y-10">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 mb-2">
           <div>
-            <h2 className="text-[22px] md:text-[32px] font-bold text-on-surface tracking-tighter font-headline">System Overview</h2>
-            <p className="text-[13px] md:text-[14px] text-on-surface-variant mt-1">
+            <h2 className="text-2xl md:text-4xl font-bold text-on-surface tracking-tighter font-headline">System Overview</h2>
+            <p className="text-xs md:text-sm text-on-surface-variant mt-1">
               Real-time monitoring of PayChain ecosystem performance.
             </p>
           </div>
           <div className="text-left sm:text-right">
-            <p className="text-[10px] md:text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest leading-none mb-1">Last Update</p>
-            <p className="text-[14px] font-semibold text-on-surface tracking-tight">{new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })}</p>
+            <p className="text-2xs md:text-2xs font-bold text-on-surface-variant/40 uppercase tracking-widest leading-none mb-1">Last Update</p>
+            <p className="text-sm font-semibold text-on-surface tracking-tight">{new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })}</p>
           </div>
         </div>
 
         <section>
           <div className="flex items-center gap-3 mb-4 text-slate-400">
-            <span className="text-[11px] font-bold uppercase tracking-widest font-label">Waitlist Pipeline</span>
+            <span className="text-2xs font-bold uppercase tracking-widest font-label">Waitlist Pipeline</span>
             <div className="flex-1 h-[1px] bg-outline-variant/10"></div>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
             <div className="bg-surface-container-lowest p-3 md:p-5 rounded-xl border border-outline-variant/20 flex flex-col gap-1 transition-all hover:scale-[1.01] hover:shadow-premium-glow">
-              <span className="text-[12px] font-medium text-on-surface-variant/60">Total Entries</span>
+              <span className="text-xs font-medium text-on-surface-variant/60">Total Entries</span>
               <div className="flex items-baseline gap-2">
                 {loading
                   ? <Skel className="w-14 h-7" />
-                  : <span className="text-[20px] md:text-[28px] font-semibold text-on-surface tracking-tighter">{stats.total}</span>}
-                <span className="text-[12px] font-bold text-secondary tracking-tight">Live</span>
+                  : <span className="text-xl md:text-3xl font-semibold text-on-surface tracking-tighter">{stats.total}</span>}
+                <span className="text-xs font-bold text-secondary tracking-tight">Live</span>
               </div>
             </div>
             <div className="bg-surface-container-lowest p-3 md:p-5 rounded-xl border border-outline-variant/20 flex flex-col gap-1 relative overflow-hidden transition-all hover:scale-[1.01] hover:shadow-sm">
               {!loading && stats.pending > 0 && <div className="absolute top-0 right-0 w-1 h-full bg-amber-400"></div>}
-              <span className="text-[12px] font-medium text-on-surface-variant/60">Pending Review</span>
+              <span className="text-xs font-medium text-on-surface-variant/60">Pending Review</span>
               <div className="flex items-baseline gap-2">
                 {loading
                   ? <Skel className="w-14 h-7" />
-                  : <span className="text-[20px] md:text-[28px] font-semibold text-on-surface tracking-tighter">{stats.pending}</span>}
+                  : <span className="text-xl md:text-3xl font-semibold text-on-surface tracking-tighter">{stats.pending}</span>}
                 {!loading && stats.pending > 0 && <span className="w-2 h-2 bg-amber-400 rounded-full"></span>}
               </div>
             </div>
             <div className="bg-surface-container-lowest p-3 md:p-5 rounded-xl border border-outline-variant/20 flex flex-col gap-1 transition-all hover:scale-[1.01] hover:shadow-premium-glow">
-              <span className="text-[12px] font-medium text-on-surface-variant/60">Approved</span>
+              <span className="text-xs font-medium text-on-surface-variant/60">Approved</span>
               <div className="flex items-baseline gap-2">
                 {loading
                   ? <Skel className="w-14 h-7" />
-                  : <span className="text-[20px] md:text-[28px] font-semibold text-on-surface tracking-tighter">{stats.approved}</span>}
+                  : <span className="text-xl md:text-3xl font-semibold text-on-surface tracking-tighter">{stats.approved}</span>}
               </div>
             </div>
             <div className="bg-surface-container-lowest p-3 md:p-5 rounded-xl border border-outline-variant/20 flex flex-col gap-1 transition-all hover:scale-[1.01] hover:shadow-sm">
-              <span className="text-[12px] font-medium text-on-surface-variant/60">Conversion Rate</span>
+              <span className="text-xs font-medium text-on-surface-variant/60">Conversion Rate</span>
               <div className="flex items-baseline gap-2">
                 {loading
                   ? <Skel className="w-16 h-7" />
-                  : <span className="text-[20px] md:text-[28px] font-semibold text-on-surface tracking-tighter">
+                  : <span className="text-xl md:text-3xl font-semibold text-on-surface tracking-tighter">
                       {stats.total > 0 ? ((stats.converted / stats.total) * 100).toFixed(1) : 0}%
                     </span>}
-                <span className="text-[12px] font-bold text-secondary tracking-tight">Live</span>
+                <span className="text-xs font-bold text-secondary tracking-tight">Live</span>
               </div>
             </div>
           </div>
@@ -300,50 +300,50 @@ const Overview = () => {
         {/* Digital Wallet Stats Section */}
         <section>
           <div className="flex items-center gap-2 md:gap-3 mb-4 text-slate-400">
-            <span className="text-[10px] md:text-[11px] font-bold uppercase tracking-widest font-label whitespace-nowrap">Digital Wallet</span>
+            <span className="text-2xs md:text-2xs font-bold uppercase tracking-widest font-label whitespace-nowrap">Digital Wallet</span>
             <div className="flex-1 h-[1px] bg-outline-variant/10"></div>
             <div className="flex items-center gap-1.5 bg-[#0F141E] border border-[#1E2532] rounded-full px-2 md:px-3 py-1 flex-shrink-0">
               <div className="w-1.5 h-1.5 rounded-full bg-[#35D07F] shadow-[0_0_6px_rgba(53,208,127,0.6)]"></div>
-              <span className="text-[8px] md:text-[9px] font-black uppercase tracking-widest text-[#35D07F] whitespace-nowrap">Stellar Testnet</span>
+              <span className="text-2xs md:text-2xs font-black uppercase tracking-widest text-[#35D07F] whitespace-nowrap">Stellar Testnet</span>
             </div>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
             {/* Active Wallets */}
             <div className="bg-gradient-to-br from-[#0F141E] to-[#0A0D14] p-3 md:p-5 rounded-xl border border-[#1E2532] flex flex-col gap-1 relative overflow-hidden group hover:border-[#2775CA]/40 transition-all">
               <div className="absolute top-0 right-0 w-24 h-24 bg-[#2775CA]/10 rounded-full -mr-8 -mt-8 blur-2xl group-hover:bg-[#2775CA]/20 transition-all pointer-events-none"></div>
-              <span className="text-[10px] md:text-[11px] font-bold text-[#8B98A9] uppercase tracking-widest">Active Wallets</span>
+              <span className="text-2xs md:text-2xs font-bold text-[#8B98A9] uppercase tracking-widest">Active Wallets</span>
               <div className="flex items-baseline gap-2 mt-1">
                 {loading
                   ? <Skel className="w-16 h-8 bg-white/10" />
-                  : <span className="text-[22px] md:text-[32px] font-bold text-white tracking-tighter">{merchantAnalytics?.activeWallets ?? 0}</span>}
-                <span className="text-[11px] font-bold text-[#2775CA]">Merchants</span>
+                  : <span className="text-2xl md:text-4xl font-bold text-white tracking-tighter">{merchantAnalytics?.activeWallets ?? 0}</span>}
+                <span className="text-2xs font-bold text-[#2775CA]">Merchants</span>
               </div>
-              <p className="text-[10px] text-[#8B98A9]/60 mt-1">Unique Stellar wallets provisioned</p>
+              <p className="text-2xs text-[#8B98A9]/60 mt-1">Unique Stellar wallets provisioned</p>
             </div>
 
             {/* Total USDC Locked */}
             <div className="bg-gradient-to-br from-[#0F141E] to-[#0A0D14] p-3 md:p-5 rounded-xl border border-[#1E2532] flex flex-col gap-1 relative overflow-hidden group hover:border-[#35D07F]/40 transition-all">
               <div className="absolute top-0 right-0 w-24 h-24 bg-[#35D07F]/10 rounded-full -mr-8 -mt-8 blur-2xl group-hover:bg-[#35D07F]/20 transition-all pointer-events-none"></div>
-              <span className="text-[10px] md:text-[11px] font-bold text-[#8B98A9] uppercase tracking-widest">USDC Locked</span>
+              <span className="text-2xs md:text-2xs font-bold text-[#8B98A9] uppercase tracking-widest">USDC Locked</span>
               <div className="flex items-baseline gap-2 mt-1">
                 {loading
                   ? <Skel className="w-24 h-8 bg-white/10" />
-                  : <span className="text-[22px] md:text-[32px] font-bold text-white tracking-tighter tabular-nums">
+                  : <span className="text-2xl md:text-4xl font-bold text-white tracking-tighter tabular-nums">
                       {(merchantAnalytics?.totalUsdcLocked ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>}
-                <span className="text-[11px] font-bold text-[#35D07F]">USDC</span>
+                <span className="text-2xs font-bold text-[#35D07F]">USDC</span>
               </div>
-              <p className="text-[10px] text-[#8B98A9]/60 mt-1">Settled across all wallets</p>
+              <p className="text-2xs text-[#8B98A9]/60 mt-1">Settled across all wallets</p>
             </div>
 
             {/* Wallet Activation Rate */}
             <div className="bg-gradient-to-br from-[#0F141E] to-[#0A0D14] p-3 md:p-5 rounded-xl border border-[#1E2532] flex flex-col gap-1 relative overflow-hidden group hover:border-[#F0B429]/40 transition-all">
               <div className="absolute top-0 right-0 w-24 h-24 bg-[#F0B429]/10 rounded-full -mr-8 -mt-8 blur-2xl group-hover:bg-[#F0B429]/20 transition-all pointer-events-none"></div>
-              <span className="text-[10px] md:text-[11px] font-bold text-[#8B98A9] uppercase tracking-widest">Activation Rate</span>
+              <span className="text-2xs md:text-2xs font-bold text-[#8B98A9] uppercase tracking-widest">Activation Rate</span>
               <div className="flex items-baseline gap-2 mt-1">
                 {loading
                   ? <Skel className="w-20 h-8 bg-white/10" />
-                  : <span className="text-[22px] md:text-[32px] font-bold text-white tracking-tighter">
+                  : <span className="text-2xl md:text-4xl font-bold text-white tracking-tighter">
                       {merchantAnalytics?.totalMerchants > 0
                         ? ((merchantAnalytics.activeWallets / merchantAnalytics.totalMerchants) * 100).toFixed(1)
                         : '0.0'}%
@@ -359,16 +359,16 @@ const Overview = () => {
 
             {/* Wallets Without Activation */}
             <div className="bg-gradient-to-br from-[#0F141E] to-[#0A0D14] p-3 md:p-5 rounded-xl border border-[#1E2532] flex flex-col gap-1 relative overflow-hidden group hover:border-[#8B98A9]/30 transition-all">
-              <span className="text-[10px] md:text-[11px] font-bold text-[#8B98A9] uppercase tracking-widest">Pending</span>
+              <span className="text-2xs md:text-2xs font-bold text-[#8B98A9] uppercase tracking-widest">Pending</span>
               <div className="flex items-baseline gap-2 mt-1">
                 {loading
                   ? <Skel className="w-16 h-8 bg-white/10" />
-                  : <span className="text-[22px] md:text-[32px] font-bold text-white tracking-tighter">
+                  : <span className="text-2xl md:text-4xl font-bold text-white tracking-tighter">
                       {(merchantAnalytics?.totalMerchants ?? 0) - (merchantAnalytics?.activeWallets ?? 0)}
                     </span>}
-                <span className="text-[11px] font-bold text-[#8B98A9]">Merchants</span>
+                <span className="text-2xs font-bold text-[#8B98A9]">Merchants</span>
               </div>
-              <p className="text-[10px] text-[#8B98A9]/60 mt-1">Yet to activate digital wallet</p>
+              <p className="text-2xs text-[#8B98A9]/60 mt-1">Yet to activate digital wallet</p>
             </div>
           </div>
         </section>
@@ -376,20 +376,20 @@ const Overview = () => {
         {/* Live FX rates */}
         <section>
           <div className="flex items-center gap-2 md:gap-3 mb-4 text-slate-400">
-            <span className="text-[10px] md:text-[11px] font-bold uppercase tracking-widest font-label whitespace-nowrap">Live Exchange Rates</span>
+            <span className="text-2xs md:text-2xs font-bold uppercase tracking-widest font-label whitespace-nowrap">Live Exchange Rates</span>
             <div className="flex-1 h-[1px] bg-outline-variant/10"></div>
             <button
               onClick={fetchFx}
               disabled={fxLoading}
-              className="text-[10px] md:text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/60 hover:text-on-surface disabled:opacity-40 flex items-center gap-1"
+              className="text-2xs md:text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 hover:text-on-surface disabled:opacity-40 flex items-center gap-1"
               title="Refresh rates"
             >
-              <span className={`material-symbols-outlined text-[14px] ${fxLoading ? 'animate-spin' : ''}`}>refresh</span>
+              <span className={`material-symbols-outlined text-sm ${fxLoading ? 'animate-spin' : ''}`}>refresh</span>
               {fx?.fetchedAt && !fxLoading ? new Date(fx.fetchedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
             </button>
           </div>
           {fxError && (
-            <div className="mb-3 text-[11px] text-amber-500/80 font-medium">{fxError}</div>
+            <div className="mb-3 text-2xs text-amber-500/80 font-medium">{fxError}</div>
           )}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
             <FxCard
@@ -435,11 +435,11 @@ const Overview = () => {
           <div className="lg:col-span-6 bg-surface-container-lowest p-4 md:p-6 rounded-xl border border-outline-variant/10 shadow-editorial">
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4 md:mb-6">
               <div className="min-w-0">
-                <h3 className="text-[15px] md:text-[16px] font-semibold text-on-surface">Merchant Signups · {activeMeta.label}</h3>
-                <p className="text-[12px] text-slate-500">{activeMeta.subtitle}</p>
+                <h3 className="text-sm md:text-base font-semibold text-on-surface">Merchant Signups · {activeMeta.label}</h3>
+                <p className="text-xs text-slate-500">{activeMeta.subtitle}</p>
               </div>
               <div className="flex items-center gap-3 flex-shrink-0">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40 hidden sm:inline">
+                <span className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/40 hidden sm:inline">
                   {signupSeries.length > 0 ? `${signupTotal} total` : ''}
                 </span>
                 <div className="inline-flex bg-surface-container-low border border-outline-variant/20 rounded-full p-0.5">
@@ -447,7 +447,7 @@ const Overview = () => {
                     <button
                       key={key}
                       onClick={() => setSignupGranularity(key)}
-                      className={`px-2.5 md:px-3 py-1 text-[10px] md:text-[11px] font-bold uppercase tracking-widest rounded-full transition-colors ${
+                      className={`px-2.5 md:px-3 py-1 text-2xs md:text-2xs font-bold uppercase tracking-widest rounded-full transition-colors ${
                         signupGranularity === key
                           ? 'bg-emerald-700 text-white shadow-sm'
                           : 'text-on-surface-variant/70 hover:text-on-surface'
@@ -463,8 +463,8 @@ const Overview = () => {
           </div>
           <div className="lg:col-span-4 bg-surface-container-lowest p-4 md:p-6 rounded-xl border border-outline-variant/10 shadow-editorial flex flex-col">
             <div className="flex items-baseline justify-between mb-4 md:mb-6">
-              <h3 className="text-[15px] md:text-[16px] font-semibold text-on-surface">Merchant Composition</h3>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40">Lifecycle</span>
+              <h3 className="text-sm md:text-base font-semibold text-on-surface">Merchant Composition</h3>
+              <span className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/40">Lifecycle</span>
             </div>
             <CompositionDonut
               total={merchantAnalytics?.totalMerchants ?? 0}
@@ -479,15 +479,15 @@ const Overview = () => {
         {/* Pipeline funnel */}
         <section>
           <div className="flex items-center gap-3 mb-4 text-slate-400">
-            <span className="text-[11px] font-bold uppercase tracking-widest font-label">Pipeline Funnel</span>
+            <span className="text-2xs font-bold uppercase tracking-widest font-label">Pipeline Funnel</span>
             <div className="flex-1 h-[1px] bg-outline-variant/10"></div>
           </div>
           <div className="bg-surface-container-lowest p-4 md:p-6 rounded-xl border border-outline-variant/20">
             <div className="flex w-full gap-2 overflow-x-auto no-scrollbar">
-              <div className="flex-1 min-w-[80px] h-12 bg-primary rounded-lg flex items-center justify-center text-white text-[10px] font-bold tracking-widest uppercase">WAITLIST {loading ? '' : `(${stats.total})`}</div>
-              <div className="flex-[0.85] min-w-[80px] h-12 bg-primary/90 rounded-lg flex items-center justify-center text-white text-[10px] font-bold tracking-widest uppercase">APPROVED {loading ? '' : `(${stats.approved})`}</div>
-              <div className="flex-[0.7] min-w-[80px] h-12 bg-primary/80 rounded-lg flex items-center justify-center text-white text-[10px] font-bold tracking-widest uppercase">KYC {loading ? '' : `(${stats.kyc})`}</div>
-              <div className="flex-[0.55] min-w-[80px] h-12 bg-secondary rounded-lg flex items-center justify-center text-on-secondary text-[10px] font-bold tracking-widest uppercase">CONVERTED {loading ? '' : `(${stats.converted})`}</div>
+              <div className="flex-1 min-w-[80px] h-12 bg-primary rounded-lg flex items-center justify-center text-white text-2xs font-bold tracking-widest uppercase">WAITLIST {loading ? '' : `(${stats.total})`}</div>
+              <div className="flex-[0.85] min-w-[80px] h-12 bg-primary/90 rounded-lg flex items-center justify-center text-white text-2xs font-bold tracking-widest uppercase">APPROVED {loading ? '' : `(${stats.approved})`}</div>
+              <div className="flex-[0.7] min-w-[80px] h-12 bg-primary/80 rounded-lg flex items-center justify-center text-white text-2xs font-bold tracking-widest uppercase">KYC {loading ? '' : `(${stats.kyc})`}</div>
+              <div className="flex-[0.55] min-w-[80px] h-12 bg-secondary rounded-lg flex items-center justify-center text-on-secondary text-2xs font-bold tracking-widest uppercase">CONVERTED {loading ? '' : `(${stats.converted})`}</div>
             </div>
           </div>
         </section>
@@ -496,8 +496,8 @@ const Overview = () => {
         <section className="grid grid-cols-1 xl:grid-cols-2 gap-6 md:gap-8">
           <div>
             <div className="flex items-center justify-between mb-4 px-1">
-              <h3 className="text-[15px] md:text-[16px] font-semibold text-on-surface">Recent Activity</h3>
-              <button onClick={() => navigate('/messages')} className="text-[12px] text-secondary font-bold hover:underline">View All</button>
+              <h3 className="text-sm md:text-base font-semibold text-on-surface">Recent Activity</h3>
+              <button onClick={() => navigate('/messages')} className="text-xs text-secondary font-bold hover:underline">View All</button>
             </div>
             <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/20 overflow-hidden shadow-sm">
               <table className="w-full text-left font-body">
@@ -511,9 +511,9 @@ const Overview = () => {
                   ) : recentActivity.map((act, i) => (
                     <tr key={i} onClick={act.onClick} className="hover:bg-surface-container-low transition-colors cursor-pointer">
                       <td className="px-4 py-3"><div className={`w-2 h-2 rounded-full ${act.dot}`}></div></td>
-                      <td className="px-2 py-3 text-[13px] font-semibold text-on-surface tracking-tight truncate max-w-[200px]">{act.label}</td>
-                      <td className="px-3 py-3 text-[12px] text-on-surface-variant/70 truncate max-w-[120px]">{act.entity}</td>
-                      <td className="px-4 py-3 text-[10px] text-on-surface-variant/50 font-bold uppercase tracking-widest text-right whitespace-nowrap">{fmtTime(act.ts)}</td>
+                      <td className="px-2 py-3 text-xs font-semibold text-on-surface tracking-tight truncate max-w-[200px]">{act.label}</td>
+                      <td className="px-3 py-3 text-xs text-on-surface-variant/70 truncate max-w-[120px]">{act.entity}</td>
+                      <td className="px-4 py-3 text-2xs text-on-surface-variant/50 font-bold uppercase tracking-widest text-right whitespace-nowrap">{fmtTime(act.ts)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -523,12 +523,12 @@ const Overview = () => {
 
           <div>
             <div className="flex items-center justify-between mb-4 px-1">
-              <h3 className="text-[15px] md:text-[16px] font-semibold text-on-surface">Top Merchants · 30d</h3>
-              <button onClick={() => navigate('/merchants')} className="text-[12px] text-secondary font-bold hover:underline">Full Directory</button>
+              <h3 className="text-sm md:text-base font-semibold text-on-surface">Top Merchants · 30d</h3>
+              <button onClick={() => navigate('/merchants')} className="text-xs text-secondary font-bold hover:underline">Full Directory</button>
             </div>
             <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/20 overflow-hidden shadow-sm">
               <table className="w-full text-left font-body">
-                <thead className="bg-surface-container-low text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-widest border-b border-outline-variant/20">
+                <thead className="bg-surface-container-low text-2xs font-bold text-on-surface-variant/40 uppercase tracking-widest border-b border-outline-variant/20">
                   <tr>
                     <th className="px-4 py-2">Business</th>
                     <th className="px-4 py-2 text-right">30d Volume</th>
@@ -547,18 +547,18 @@ const Overview = () => {
                     <tr key={m._id} onClick={() => navigate('/merchants')} className="hover:bg-secondary-container/10 transition-colors cursor-pointer">
                       <td className="px-4 py-2.5">
                         <div className="flex flex-col">
-                          <span className="text-[13px] font-bold text-on-surface tracking-tight truncate max-w-[180px]">{m.businessName}</span>
-                          {m.paybillAccount && <span className="text-[10px] text-on-surface-variant/60 font-mono">#{m.paybillAccount}</span>}
+                          <span className="text-xs font-bold text-on-surface tracking-tight truncate max-w-[180px]">{m.businessName}</span>
+                          {m.paybillAccount && <span className="text-2xs text-on-surface-variant/60 font-mono">#{m.paybillAccount}</span>}
                         </div>
                       </td>
-                      <td className="px-4 py-2.5 text-[13px] font-bold text-on-surface tracking-tight tabular-nums text-right">
+                      <td className="px-4 py-2.5 text-xs font-bold text-on-surface tracking-tight tabular-nums text-right">
                         {fmtKES(m.volume)}
                       </td>
-                      <td className="px-4 py-2.5 text-[12px] font-bold text-on-surface-variant/70 tabular-nums text-right">
+                      <td className="px-4 py-2.5 text-xs font-bold text-on-surface-variant/70 tabular-nums text-right">
                         {m.txnCount.toLocaleString()}
                       </td>
                       <td className="px-2 py-2.5 text-right">
-                        <span className="material-symbols-outlined text-on-surface-variant/30 text-[18px]">chevron_right</span>
+                        <span className="material-symbols-outlined text-on-surface-variant/30 text-lg">chevron_right</span>
                       </td>
                     </tr>
                   ))}
@@ -588,7 +588,7 @@ const SignupsBarChart = ({ series, max, loading }) => {
           return (
             <div key={i} className="flex-1 flex flex-col items-center justify-end h-full group relative">
               {d.count > 0 && (
-                <span className="text-[9px] md:text-[10px] font-bold text-emerald-700 tabular-nums mb-1 absolute -top-0">{d.count}</span>
+                <span className="text-2xs md:text-2xs font-bold text-emerald-700 tabular-nums mb-1 absolute -top-0">{d.count}</span>
               )}
               <div
                 title={`${tip} — ${d.count} signup${d.count === 1 ? '' : 's'}`}
@@ -601,13 +601,13 @@ const SignupsBarChart = ({ series, max, loading }) => {
       </div>
       <div className="flex gap-1 md:gap-1.5 px-1 mt-2">
         {series.map((d, i) => (
-          <div key={i} className="flex-1 text-center text-[9px] md:text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40 truncate">
+          <div key={i} className="flex-1 text-center text-2xs md:text-2xs font-bold uppercase tracking-widest text-on-surface-variant/40 truncate">
             {d.label}
           </div>
         ))}
       </div>
       {totalAcross === 0 && (
-        <p className="mt-2 text-center text-[11px] text-on-surface-variant/50">No signups in this window yet.</p>
+        <p className="mt-2 text-center text-2xs text-on-surface-variant/50">No signups in this window yet.</p>
       )}
     </div>
   );
@@ -686,22 +686,22 @@ const CompositionDonut = ({ total = 0, verified = 0, wallet = 0, recent = 0, loa
             ))}
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center font-body">
-            <span className="text-[28px] md:text-[32px] font-bold tracking-tight leading-none">{total}</span>
-            <span className="text-[10px] uppercase font-bold text-on-surface-variant/40 tracking-widest mt-1">Merchants</span>
+            <span className="text-3xl md:text-4xl font-bold tracking-tight leading-none">{total}</span>
+            <span className="text-2xs uppercase font-bold text-on-surface-variant/40 tracking-widest mt-1">Merchants</span>
           </div>
         </div>
       </div>
 
       <div className="mt-6 space-y-2.5">
         {drawArcs.map((a) => (
-          <div key={a.key} className="flex items-center justify-between text-[12px] font-semibold">
+          <div key={a.key} className="flex items-center justify-between text-xs font-semibold">
             <div className="flex items-center gap-2 min-w-0">
               <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: a.color }} />
               <span className={`${a.labelClass} truncate`}>{a.label}</span>
             </div>
             <div className="flex items-baseline gap-2 flex-shrink-0">
               <span className={`font-bold tabular-nums ${a.valueClass}`}>{a.value}</span>
-              <span className={`text-[10px] font-bold uppercase tracking-widest tabular-nums w-9 text-right ${a.labelClass} opacity-70`}>
+              <span className={`text-2xs font-bold uppercase tracking-widest tabular-nums w-9 text-right ${a.labelClass} opacity-70`}>
                 {pct(a.value).toFixed(0)}%
               </span>
             </div>
@@ -710,8 +710,8 @@ const CompositionDonut = ({ total = 0, verified = 0, wallet = 0, recent = 0, loa
       </div>
 
       <div className="mt-4 pt-4 border-t border-outline-variant/10 flex items-center justify-between">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40">Last 7 Days</span>
-        <span className="text-[12px] font-bold tabular-nums">
+        <span className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/40">Last 7 Days</span>
+        <span className="text-xs font-bold tabular-nums">
           {recent > 0
             ? <span className="text-[#35D07F]">+{recent}</span>
             : <span className="text-on-surface-variant/40">0</span>}
@@ -724,18 +724,18 @@ const CompositionDonut = ({ total = 0, verified = 0, wallet = 0, recent = 0, loa
 
 const FxCard = ({ label, value, digits = 2, prefix = '', hint, loading, accent = 'text-secondary' }) => (
   <div className="bg-surface-container-lowest p-3 md:p-5 rounded-xl border border-outline-variant/20 flex flex-col gap-1 transition-all hover:scale-[1.01] hover:shadow-sm">
-    <span className="text-[10px] md:text-[11px] font-bold text-on-surface-variant/60 uppercase tracking-widest">{label}</span>
+    <span className="text-2xs md:text-2xs font-bold text-on-surface-variant/60 uppercase tracking-widest">{label}</span>
     <div className="flex items-baseline gap-2 mt-1">
       {loading
         ? <Skel className="w-20 h-7" />
         : value == null
-          ? <span className="text-[20px] md:text-[28px] font-semibold text-on-surface-variant/30 tracking-tighter">—</span>
-          : <span className="text-[20px] md:text-[28px] font-semibold text-on-surface tracking-tighter tabular-nums">
+          ? <span className="text-xl md:text-3xl font-semibold text-on-surface-variant/30 tracking-tighter">—</span>
+          : <span className="text-xl md:text-3xl font-semibold text-on-surface tracking-tighter tabular-nums">
               {prefix}{value.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits })}
             </span>}
-      <span className={`text-[10px] font-bold tracking-tight ${accent}`}>LIVE</span>
+      <span className={`text-2xs font-bold tracking-tight ${accent}`}>LIVE</span>
     </div>
-    {hint && <p className="text-[10px] text-on-surface-variant/50 mt-0.5">{hint}</p>}
+    {hint && <p className="text-2xs text-on-surface-variant/50 mt-0.5">{hint}</p>}
   </div>
 );
 

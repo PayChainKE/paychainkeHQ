@@ -1,20 +1,25 @@
 import * as StellarSdk from '@stellar/stellar-sdk';
 import Merchant from '../models/Merchant.js';
-
-// Circle's official USDC issuer on Stellar Testnet
-const USDC_TESTNET_ISSUER = 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5';
-const USDC_ASSET_CODE = 'USDC';
-const HORIZON_URL = process.env.STELLAR_HORIZON_URL || 'https://horizon-testnet.stellar.org';
+import { HORIZON_URL, USDC_ASSET_CODE, USDC_ISSUER_ADDRESS, STELLAR_NETWORK } from '../utils/stellarHelper.js';
 
 const server = new StellarSdk.Horizon.Server(HORIZON_URL);
 
+// Discrepancies smaller than this are floating-point noise, not a real
+// mismatch between MongoDB's recorded balance and the on-chain balance.
+const DISCREPANCY_EPSILON = 0.0001;
+
 /**
- * Audits a single merchant's public key against the live Stellar Horizon ledger.
- * Returns a structured audit record regardless of on-chain status.
+ * Audits a single merchant's public key against the live Stellar Horizon ledger,
+ * and reconciles the on-chain USDC balance against what MongoDB has recorded —
+ * that comparison is the actual point of an "audit" and was previously missing
+ * entirely (the page only ever showed the live chain number, never checked it
+ * against our own records).
  * @param {object} merchant - Mongoose merchant document
  * @returns {object} Structured audit record
  */
 const auditSingleWallet = async (merchant) => {
+  const dbUsdcBalance = merchant.usdcBalance || 0;
+
   const baseRecord = {
     name: merchant.businessName || 'N/A',
     email: merchant.email || 'N/A',
@@ -22,6 +27,9 @@ const auditSingleWallet = async (merchant) => {
     status: 'No Wallet',
     xlmBalance: '0.0000000',
     usdcBalance: '0.0000000',
+    dbUsdcBalance,
+    usdcDiscrepancy: -dbUsdcBalance,
+    hasDiscrepancy: Math.abs(dbUsdcBalance) > DISCREPANCY_EPSILON,
     lastActiveTime: null,
     registeredAt: merchant.createdAt,
   };
@@ -43,10 +51,12 @@ const auditSingleWallet = async (merchant) => {
       b =>
         b.asset_type === 'credit_alphanum4' &&
         b.asset_code === USDC_ASSET_CODE &&
-        b.asset_issuer === USDC_TESTNET_ISSUER
+        b.asset_issuer === USDC_ISSUER_ADDRESS
     );
 
     const usdcBalance = usdcEntry ? usdcEntry.balance : '0.0000000';
+    const chainUsdcBalance = parseFloat(usdcBalance) || 0;
+    const usdcDiscrepancy = chainUsdcBalance - dbUsdcBalance;
 
     // A wallet is "Active" if it has XLM gas AND an open USDC trustline
     const isFullyActive = !!xlmEntry && !!usdcEntry;
@@ -56,6 +66,8 @@ const auditSingleWallet = async (merchant) => {
       status: isFullyActive ? 'Active' : 'Inactive',
       xlmBalance,
       usdcBalance,
+      usdcDiscrepancy,
+      hasDiscrepancy: Math.abs(usdcDiscrepancy) > DISCREPANCY_EPSILON,
       lastActiveTime: account.last_modified_time || null,
     };
   } catch (err) {
@@ -64,7 +76,8 @@ const auditSingleWallet = async (merchant) => {
       return { ...baseRecord, status: 'Unfunded' };
     }
     console.error(`⚠️ Audit error for ${merchant.stellarPublicKey}: ${err.message}`);
-    return { ...baseRecord, status: 'Error' };
+    // Unknown chain state — don't claim a discrepancy we can't actually verify.
+    return { ...baseRecord, status: 'Error', hasDiscrepancy: false };
   }
 };
 
@@ -75,7 +88,7 @@ export const runWalletAudit = async (req, res) => {
   try {
     // 1. Pull all merchants from MongoDB (exclude sensitive fields)
     const merchants = await Merchant.find({})
-      .select('businessName email stellarPublicKey createdAt')
+      .select('businessName email stellarPublicKey createdAt usdcBalance')
       .sort('-createdAt');
 
     console.log(`\n🔍 Starting Stellar Wallet Audit for ${merchants.length} merchants...\n`);
@@ -90,6 +103,8 @@ export const runWalletAudit = async (req, res) => {
     const activeWallets = auditResults.filter(r => r.status === 'Active').length;
     const inactiveWallets = auditResults.filter(r => r.status === 'Inactive').length;
     const noWallet = auditResults.filter(r => r.status === 'No Wallet').length;
+    const errorCount = auditResults.filter(r => r.status === 'Error').length;
+    const discrepancyCount = auditResults.filter(r => r.hasDiscrepancy).length;
     // 4-decimal precision matches the on-chain USDC display convention.
     const totalUsdcFloat = auditResults
       .reduce((sum, r) => sum + parseFloat(r.usdcBalance || 0), 0)
@@ -153,9 +168,13 @@ export const runWalletAudit = async (req, res) => {
         activeWallets,
         inactiveWallets,
         noWallet,
+        errorCount,
+        discrepancyCount,
         totalUsdcFloat,
         totalKesVolume,
         totalUsdcVolume,
+        // 'PUBLIC' -> mainnet explorer path, anything else -> testnet.
+        network: STELLAR_NETWORK === 'PUBLIC' ? 'public' : 'testnet',
         auditedAt: new Date().toISOString(),
       },
       data: enrichedAuditResults,

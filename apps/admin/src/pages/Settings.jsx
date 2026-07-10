@@ -40,9 +40,9 @@ const Settings = () => {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary mb-1">Console</p>
-            <h2 className="text-[22px] md:text-[32px] font-bold text-on-surface tracking-tighter font-headline">Settings</h2>
-            <p className="text-on-surface-variant/60 mt-1 text-[13px] md:text-[14px] font-body">
+            <p className="text-2xs font-bold uppercase tracking-[0.2em] text-primary mb-1">Console</p>
+            <h2 className="text-2xl md:text-4xl font-bold text-on-surface tracking-tighter font-headline">Settings</h2>
+            <p className="text-on-surface-variant/60 mt-1 text-xs md:text-sm font-body">
               Manage your profile, security credentials, and system-level controls.
             </p>
           </div>
@@ -54,11 +54,11 @@ const Settings = () => {
             <button
               key={t.v}
               onClick={() => setTab(t.v)}
-              className={`flex items-center gap-2 px-4 py-3 text-[13px] font-bold transition-colors relative whitespace-nowrap ${
+              className={`flex items-center gap-2 px-4 py-3 text-xs font-bold transition-colors relative whitespace-nowrap ${
                 tab === t.v ? 'text-primary' : 'text-on-surface-variant/60 hover:text-on-surface'
               }`}
             >
-              <span className="material-symbols-outlined text-[18px]">{t.icon}</span>
+              <span className="material-symbols-outlined text-lg">{t.icon}</span>
               {t.label}
               {tab === t.v && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full"></div>}
             </button>
@@ -154,14 +154,14 @@ const ProfileSection = ({ profile, onUpdated }) => {
             {avatarData ? <img src={avatarData} alt={displayName} className="w-full h-full object-cover" /> : initials}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-300 mb-1">Signed in as</p>
+            <p className="text-2xs font-bold uppercase tracking-[0.2em] text-emerald-300 mb-1">Signed in as</p>
             <h3 className="text-xl font-bold text-white tracking-tight truncate">{displayName}</h3>
-            <p className="text-[13px] text-emerald-100/70 truncate">{profile.email}</p>
+            <p className="text-xs text-emerald-100/70 truncate">{profile.email}</p>
             <div className="flex items-center gap-3 mt-2 flex-wrap">
-              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest bg-emerald-500/20 text-emerald-200 border border-emerald-500/30">
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-2xs font-bold uppercase tracking-widest bg-emerald-500/20 text-emerald-200 border border-emerald-500/30">
                 {(profile.role || 'owner').toUpperCase()}
               </span>
-              <span className="text-[11px] text-emerald-100/60 flex items-center gap-1">
+              <span className="text-2xs text-emerald-100/60 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                 Active session
               </span>
@@ -192,20 +192,20 @@ const ProfileSection = ({ profile, onUpdated }) => {
               {avatarData ? <img src={avatarData} alt="" className="w-full h-full object-cover" /> : initials}
             </div>
             <div className="flex-1 flex flex-wrap gap-2">
-              <label className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/15 text-[11px] font-bold uppercase tracking-widest cursor-pointer transition-all">
-                <span className="material-symbols-outlined text-[14px]">upload</span>
+              <label className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/15 text-2xs font-bold uppercase tracking-widest cursor-pointer transition-all">
+                <span className="material-symbols-outlined text-sm">upload</span>
                 Upload photo
                 <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" onChange={onAvatarFile} className="hidden" />
               </label>
               {avatarData && (
-                <button type="button" onClick={clearAvatar} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-outline-variant/30 text-on-surface-variant hover:bg-surface-container-low text-[11px] font-bold uppercase tracking-widest transition-all">
-                  <span className="material-symbols-outlined text-[14px]">delete</span>
+                <button type="button" onClick={clearAvatar} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-outline-variant/30 text-on-surface-variant hover:bg-surface-container-low text-2xs font-bold uppercase tracking-widest transition-all">
+                  <span className="material-symbols-outlined text-sm">delete</span>
                   Remove
                 </button>
               )}
             </div>
           </div>
-          {uploadError && <p className="text-[12px] text-red-600 font-medium mt-2">{uploadError}</p>}
+          {uploadError && <p className="text-xs text-red-600 font-medium mt-2">{uploadError}</p>}
         </Field>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
@@ -214,16 +214,16 @@ const ProfileSection = ({ profile, onUpdated }) => {
           <MetaPill label="Member since" value={fmtDate(profile.createdAt, true)} />
         </div>
 
-        {error && <div className="text-[13px] text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium">{error}</div>}
+        {error && <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium">{error}</div>}
 
         <div className="flex items-center justify-end gap-3 pt-3 border-t border-outline-variant/10">
-          {savedAt && <span className="text-[12px] text-emerald-600 font-bold">✓ Saved</span>}
+          {savedAt && <span className="text-xs text-emerald-600 font-bold">✓ Saved</span>}
           <button
             onClick={save}
             disabled={!dirty || busy}
-            className="px-5 py-2.5 rounded-lg bg-primary text-white text-[11px] font-bold uppercase tracking-widest hover:shadow-md disabled:opacity-50 transition-all flex items-center gap-2"
+            className="px-5 py-2.5 rounded-lg bg-primary text-white text-2xs font-bold uppercase tracking-widest hover:shadow-md disabled:opacity-50 transition-all flex items-center gap-2"
           >
-            <span className="material-symbols-outlined text-[14px]">save</span>
+            <span className="material-symbols-outlined text-sm">save</span>
             {busy ? 'Saving…' : 'Save Profile'}
           </button>
         </div>
@@ -278,8 +278,8 @@ const SecuritySection = ({ profile }) => {
       <Card>
         <div className="px-6 py-4 border-b border-outline-variant/10 bg-surface-container-low/40">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>lock</span>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/60">Change Password</p>
+            <span className="material-symbols-outlined text-primary text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>lock</span>
+            <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/60">Change Password</p>
           </div>
           <h3 className="text-base font-bold text-on-surface mt-0.5">Update your sign-in credentials</h3>
         </div>
@@ -311,7 +311,7 @@ const SecuritySection = ({ profile }) => {
                 autoComplete="new-password"
                 className={inputClass}
               />
-              {confirm.length > 0 && !matches && <p className="text-[11px] text-red-600 font-medium mt-1">Passwords do not match.</p>}
+              {confirm.length > 0 && !matches && <p className="text-2xs text-red-600 font-medium mt-1">Passwords do not match.</p>}
             </Field>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 bg-surface-container-low rounded-lg">
@@ -320,15 +320,15 @@ const SecuritySection = ({ profile }) => {
             <Strength met={strength.number}>Number</Strength>
             <Strength met={strength.symbol}>Symbol</Strength>
           </div>
-          {error && <div className="text-[13px] text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium">{error}</div>}
-          {done && <div className="text-[13px] text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2 font-medium">✓ Password updated successfully.</div>}
+          {error && <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium">{error}</div>}
+          {done && <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2 font-medium">✓ Password updated successfully.</div>}
           <div className="flex justify-end pt-2 border-t border-outline-variant/10">
             <button
               type="submit"
               disabled={busy || !current || !allMet || !matches}
-              className="px-5 py-2.5 rounded-lg bg-primary text-white text-[11px] font-bold uppercase tracking-widest hover:shadow-md disabled:opacity-50 transition-all flex items-center gap-2"
+              className="px-5 py-2.5 rounded-lg bg-primary text-white text-2xs font-bold uppercase tracking-widest hover:shadow-md disabled:opacity-50 transition-all flex items-center gap-2"
             >
-              <span className="material-symbols-outlined text-[14px]">key</span>
+              <span className="material-symbols-outlined text-sm">key</span>
               {busy ? 'Updating…' : 'Update Password'}
             </button>
           </div>
@@ -338,7 +338,7 @@ const SecuritySection = ({ profile }) => {
       {/* Security posture summary */}
       <Card>
         <div className="px-6 py-4 border-b border-outline-variant/10 bg-surface-container-low/40">
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/60">Defenses</p>
+          <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/60">Defenses</p>
           <h3 className="text-base font-bold text-on-surface mt-0.5">Account Security Posture</h3>
         </div>
         <div className="p-6 space-y-3">
@@ -405,7 +405,7 @@ const SystemSection = ({ profile }) => {
       {/* Exports */}
       <Card>
         <div className="px-6 py-4 border-b border-outline-variant/10 bg-surface-container-low/40">
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/60">Audit & Reporting</p>
+          <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/60">Audit & Reporting</p>
           <h3 className="text-base font-bold text-on-surface mt-0.5">Data Exports</h3>
         </div>
         <div className="p-5 space-y-2">
@@ -422,25 +422,25 @@ const SystemSection = ({ profile }) => {
               className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-outline-variant/20 hover:bg-surface-container-low transition-all text-left disabled:opacity-60"
             >
               <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
-                <span className="material-symbols-outlined text-[18px]">{x.icon}</span>
+                <span className="material-symbols-outlined text-lg">{x.icon}</span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-bold text-on-surface tracking-tight">{x.label}</p>
-                <p className="text-[11px] text-on-surface-variant/60 truncate">{x.desc}</p>
+                <p className="text-xs font-bold text-on-surface tracking-tight">{x.label}</p>
+                <p className="text-2xs text-on-surface-variant/60 truncate">{x.desc}</p>
               </div>
-              <span className="material-symbols-outlined text-on-surface-variant/40 text-[18px]">
+              <span className="material-symbols-outlined text-on-surface-variant/40 text-lg">
                 {exporting === x.k ? 'sync' : 'download'}
               </span>
             </button>
           ))}
-          {exportError && <p className="text-[12px] text-red-600 font-medium mt-2">{exportError}</p>}
+          {exportError && <p className="text-xs text-red-600 font-medium mt-2">{exportError}</p>}
         </div>
       </Card>
 
       {/* System info */}
       <Card>
         <div className="px-6 py-4 border-b border-outline-variant/10 bg-surface-container-low/40">
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/60">Infrastructure</p>
+          <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/60">Infrastructure</p>
           <h3 className="text-base font-bold text-on-surface mt-0.5">Platform Status</h3>
         </div>
         <div className="p-5 space-y-3">
@@ -461,7 +461,7 @@ const SystemSection = ({ profile }) => {
       <Card className="lg:col-span-2">
         <div className="px-6 py-4 border-b border-outline-variant/10 bg-surface-container-low/40 flex items-center justify-between">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/60">This Session</p>
+            <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/60">This Session</p>
             <h3 className="text-base font-bold text-on-surface mt-0.5">Your Login Activity</h3>
           </div>
         </div>
@@ -485,24 +485,24 @@ const Card = ({ children, className = '' }) => (
 
 const Field = ({ label, required, hint, children }) => (
   <div>
-    <label className="block text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/60 mb-1.5">
+    <label className="block text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 mb-1.5">
       {label} {required && <span className="text-red-500">*</span>}
     </label>
     {children}
-    {hint && <p className="text-[11px] text-on-surface-variant/50 mt-1">{hint}</p>}
+    {hint && <p className="text-2xs text-on-surface-variant/50 mt-1">{hint}</p>}
   </div>
 );
 
 const MetaPill = ({ label, value }) => (
   <div className="px-3 py-2 bg-surface-container-low rounded-lg">
-    <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/50 mb-0.5">{label}</p>
-    <p className="text-[13px] font-bold text-on-surface tracking-tight truncate">{value}</p>
+    <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 mb-0.5">{label}</p>
+    <p className="text-xs font-bold text-on-surface tracking-tight truncate">{value}</p>
   </div>
 );
 
 const Strength = ({ met, children }) => (
-  <div className={`flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest transition-colors ${met ? 'text-emerald-600' : 'text-on-surface-variant/40'}`}>
-    <span className="material-symbols-outlined text-[14px]">{met ? 'check_circle' : 'circle'}</span>
+  <div className={`flex items-center gap-1.5 text-2xs font-bold uppercase tracking-widest transition-colors ${met ? 'text-emerald-600' : 'text-on-surface-variant/40'}`}>
+    <span className="material-symbols-outlined text-sm">{met ? 'check_circle' : 'circle'}</span>
     {children}
   </div>
 );
@@ -512,11 +512,11 @@ const SecurityRow = ({ icon, tone, title, desc }) => {
   return (
     <div className="flex items-start gap-3 p-3 bg-surface-container-low/30 rounded-lg">
       <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${toneMap[tone]}`}>
-        <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>{icon}</span>
+        <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>{icon}</span>
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-[13px] font-bold text-on-surface tracking-tight">{title}</p>
-        <p className="text-[12px] text-on-surface-variant/60">{desc}</p>
+        <p className="text-xs font-bold text-on-surface tracking-tight">{title}</p>
+        <p className="text-xs text-on-surface-variant/60">{desc}</p>
       </div>
     </div>
   );
@@ -524,8 +524,8 @@ const SecurityRow = ({ icon, tone, title, desc }) => {
 
 const InfoRow = ({ label, value, status }) => (
   <div className="flex items-center justify-between py-2 border-b border-outline-variant/5 last:border-0">
-    <span className="text-[12px] font-bold uppercase tracking-tight text-on-surface-variant/60">{label}</span>
-    <span className="flex items-center gap-1.5 text-[13px] font-bold text-on-surface tracking-tight">
+    <span className="text-xs font-bold uppercase tracking-tight text-on-surface-variant/60">{label}</span>
+    <span className="flex items-center gap-1.5 text-xs font-bold text-on-surface tracking-tight">
       <span className={`w-1.5 h-1.5 rounded-full ${status === 'online' ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'}`}></span>
       {value}
     </span>

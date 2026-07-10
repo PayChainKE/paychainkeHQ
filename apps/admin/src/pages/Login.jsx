@@ -94,7 +94,7 @@ const Login = () => {
         
         <div className="relative z-10 flex flex-col gap-2 items-start">
           <img src={logo} alt="PayChain Logo" className="h-10 w-auto object-contain" />
-          <span className="text-secondary-fixed-dim text-[11px] font-bold tracking-[0.2em] uppercase font-label opacity-80">Admin Portal</span>
+          <span className="text-secondary-fixed-dim text-2xs font-bold tracking-[0.2em] uppercase font-label opacity-80">Admin Portal</span>
         </div>
 
         <div className="relative z-10 max-w-lg mt-12 md:mt-0">
@@ -120,7 +120,7 @@ const Login = () => {
         </div>
 
         <div className="relative z-10 mt-12 md:mt-0">
-          <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-white/40">
+          <p className="text-2xs font-bold tracking-[0.2em] uppercase text-white/40">
             Professional Enterprise Grade
           </p>
         </div>
@@ -164,7 +164,7 @@ const Login = () => {
             {step === 1 ? (
               <>
                 <div className="space-y-2">
-                  <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1" htmlFor="email">Email address</label>
+                  <label className="text-2xs font-black uppercase tracking-widest text-primary/60 pl-1" htmlFor="email">Email address</label>
                   <input
                     id="email"
                     name="admin_login_id"
@@ -186,8 +186,8 @@ const Login = () => {
 
                 <div className="space-y-2">
                   <div className="flex justify-between items-center px-1">
-                    <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1" htmlFor="password">Password</label>
-                    <button type="button" className="text-[9px] font-black uppercase tracking-widest text-emerald-600 hover:text-emerald-700">Forgot?</button>
+                    <label className="text-2xs font-black uppercase tracking-widest text-primary/60 pl-1" htmlFor="password">Password</label>
+                    <button type="button" className="text-2xs font-black uppercase tracking-widest text-emerald-600 hover:text-emerald-700">Forgot?</button>
                   </div>
                   <div className="relative">
                     <input
@@ -222,7 +222,7 @@ const Login = () => {
             ) : (
               <div className="space-y-6">
                 <div className="space-y-2">
-                  <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1" htmlFor="otp">Verification Code</label>
+                  <label className="text-2xs font-black uppercase tracking-widest text-primary/60 pl-1" htmlFor="otp">Verification Code</label>
                   <input
                     id="otp"
                     name="admin_otp_code"
@@ -242,7 +242,7 @@ const Login = () => {
                 <button 
                   type="button" 
                   onClick={() => setStep(1)}
-                  className="text-[10px] font-black uppercase tracking-widest text-primary/40 hover:text-primary flex items-center gap-2"
+                  className="text-2xs font-black uppercase tracking-widest text-primary/40 hover:text-primary flex items-center gap-2"
                 >
                   <span className="material-symbols-outlined text-sm">arrow_back</span>
                   Back to credentials
@@ -266,7 +266,7 @@ const Login = () => {
             </button>
             
             <div className="flex items-center justify-center gap-2 opacity-50 pt-8">
-              <p className="text-[9px] text-primary/60 uppercase font-black tracking-[0.2em]">
+              <p className="text-2xs text-primary/60 uppercase font-black tracking-[0.2em]">
                 {step === 1 ? 'Secure Administrator Portal' : 'Two-Factor Authentication Active'}
               </p>
             </div>

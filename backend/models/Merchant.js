@@ -156,6 +156,10 @@ const merchantSchema = new mongoose.Schema({
     inflationShield: {
       type: Boolean,
       default: true
+    },
+    cashAdvanceForm: {
+      type: Boolean,
+      default: true
     }
   },
   stellarPublicKey: {

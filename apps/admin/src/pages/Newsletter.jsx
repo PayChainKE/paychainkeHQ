@@ -192,11 +192,11 @@ export default function Newsletter() {
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="material-symbols-outlined text-primary text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>campaign</span>
-              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary">Audience & Campaigns</p>
+              <span className="material-symbols-outlined text-primary text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>campaign</span>
+              <p className="text-2xs font-bold uppercase tracking-[0.2em] text-primary">Audience & Campaigns</p>
             </div>
-            <h2 className="text-[28px] md:text-[32px] font-bold text-on-surface tracking-tighter font-headline">Newsletter</h2>
-            <p className="text-on-surface-variant/60 mt-1 text-[13px] md:text-[14px] font-body">Grow your audience, send updates, and track delivery.</p>
+            <h2 className="text-3xl md:text-4xl font-bold text-on-surface tracking-tighter font-headline">Newsletter</h2>
+            <p className="text-on-surface-variant/60 mt-1 text-xs md:text-sm font-body">Grow your audience, send updates, and track delivery.</p>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={downloadCsv} className="flex items-center gap-2 px-4 py-2.5 bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs font-bold rounded-lg hover:bg-surface-container-low transition-colors shadow-sm uppercase tracking-widest font-label">
@@ -224,7 +224,7 @@ export default function Newsletter() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {/* Add subscriber */}
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/60 mb-2">Add subscriber manually</p>
+              <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/60 mb-2">Add subscriber manually</p>
               <form onSubmit={handleAdd} className="flex gap-2">
                 <input
                   type="email"
@@ -237,24 +237,24 @@ export default function Newsletter() {
                 <button
                   type="submit"
                   disabled={addBusy || !addEmail.trim()}
-                  className="px-4 py-2.5 rounded-lg bg-primary text-white text-[11px] font-bold uppercase tracking-widest hover:shadow-md disabled:opacity-50 transition-all flex items-center gap-1.5"
+                  className="px-4 py-2.5 rounded-lg bg-primary text-white text-2xs font-bold uppercase tracking-widest hover:shadow-md disabled:opacity-50 transition-all flex items-center gap-1.5"
                 >
-                  <span className="material-symbols-outlined text-[16px]">add</span>
+                  <span className="material-symbols-outlined text-base">add</span>
                   Add
                 </button>
               </form>
               <div className="h-5 mt-1.5">
-                {addError && <p className="text-[12px] text-red-600 font-medium">{addError}</p>}
-                {addOk && <p className="text-[12px] text-emerald-600 font-medium">✓ Subscriber added.</p>}
-                {!addError && !addOk && <p className="text-[11px] text-on-surface-variant/50">Duplicates are automatically rejected.</p>}
+                {addError && <p className="text-xs text-red-600 font-medium">{addError}</p>}
+                {addOk && <p className="text-xs text-emerald-600 font-medium">✓ Subscriber added.</p>}
+                {!addError && !addOk && <p className="text-2xs text-on-surface-variant/50">Duplicates are automatically rejected.</p>}
               </div>
             </div>
             {/* Search */}
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/60 mb-2">Search subscribers</p>
+              <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/60 mb-2">Search subscribers</p>
               <div className="flex gap-2">
                 <div className="relative flex-1">
-                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/40 text-[18px]">search</span>
+                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/40 text-lg">search</span>
                   <input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
@@ -265,14 +265,14 @@ export default function Newsletter() {
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-3 py-2.5 border border-outline-variant/40 rounded-lg text-[12px] font-bold uppercase tracking-widest bg-white outline-none focus:border-primary"
+                  className="px-3 py-2.5 border border-outline-variant/40 rounded-lg text-xs font-bold uppercase tracking-widest bg-white outline-none focus:border-primary"
                 >
                   <option value="all">All</option>
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
                 </select>
               </div>
-              <p className="text-[11px] text-on-surface-variant/50 mt-1.5">Showing {filtered.length} of {stats.total} subscribers</p>
+              <p className="text-2xs text-on-surface-variant/50 mt-1.5">Showing {filtered.length} of {stats.total} subscribers</p>
             </div>
           </div>
         </div>
@@ -281,7 +281,7 @@ export default function Newsletter() {
         <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 overflow-hidden shadow-editorial">
           <div className="px-6 py-4 border-b border-outline-variant/10 flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">Audience</p>
+              <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">Audience</p>
               <h3 className="text-base font-bold text-on-surface tracking-tight">Subscribers</h3>
             </div>
           </div>
@@ -302,16 +302,16 @@ export default function Newsletter() {
                     <th className="px-4 py-3 text-right"></th>
                   </tr>
                 </thead>
-                <tbody className="text-[13px]">
+                <tbody className="text-xs">
                   {paged.map((s, i) => (
                     <tr key={s._id} className="hover:bg-secondary-container/5 transition-colors group">
-                      <td className="px-3 py-2 text-on-surface-variant/40 border-b border-outline-variant/5 text-[11px] tabular-nums">{String((page - 1) * PAGE_SIZE + i + 1).padStart(3, '0')}</td>
+                      <td className="px-3 py-2 text-on-surface-variant/40 border-b border-outline-variant/5 text-2xs tabular-nums">{String((page - 1) * PAGE_SIZE + i + 1).padStart(3, '0')}</td>
                       <td className="px-3 py-2 border-b border-outline-variant/5">
                         <p className="font-bold text-on-surface tracking-tight">{s.email}</p>
-                        {s.addedBy?.email && <p className="text-[10px] text-on-surface-variant/50">added by {s.addedBy.email}</p>}
+                        {s.addedBy?.email && <p className="text-2xs text-on-surface-variant/50">added by {s.addedBy.email}</p>}
                       </td>
                       <td className="px-3 py-2 border-b border-outline-variant/5">
-                        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-widest ${
+                        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-2xs font-bold border uppercase tracking-widest ${
                           s.active ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-100 text-gray-600 border-gray-200'
                         }`}>
                           <span className={`w-1.5 h-1.5 rounded-full ${s.active ? 'bg-emerald-500' : 'bg-gray-400'}`}></span>
@@ -319,13 +319,13 @@ export default function Newsletter() {
                         </span>
                       </td>
                       <td className="px-3 py-2 border-b border-outline-variant/5">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest border ${
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-2xs font-bold uppercase tracking-widest border ${
                           s.source === 'admin' ? 'bg-violet-50 text-violet-700 border-violet-200' : 'bg-blue-50 text-blue-700 border-blue-200'
                         }`}>
                           {s.source === 'admin' ? 'Manual' : 'Public'}
                         </span>
                       </td>
-                      <td className="px-3 py-2 border-b border-outline-variant/5 text-on-surface-variant/60 text-[11px]">
+                      <td className="px-3 py-2 border-b border-outline-variant/5 text-on-surface-variant/60 text-2xs">
                         {relativeTime(s.createdAt)}
                       </td>
                       <td className="px-3 py-2 text-right border-b border-outline-variant/5">
@@ -335,14 +335,14 @@ export default function Newsletter() {
                             className="p-1.5 rounded-lg hover:bg-surface-container-high text-on-surface-variant/60 transition-colors"
                             title={s.active ? 'Pause' : 'Reactivate'}
                           >
-                            <span className="material-symbols-outlined text-[16px]">{s.active ? 'pause_circle' : 'play_circle'}</span>
+                            <span className="material-symbols-outlined text-base">{s.active ? 'pause_circle' : 'play_circle'}</span>
                           </button>
                           <button
                             onClick={() => startDelete(s)}
                             className="p-1.5 rounded-lg hover:bg-red-50 text-on-surface-variant/60 hover:text-red-600 transition-colors"
                             title="Delete"
                           >
-                            <span className="material-symbols-outlined text-[16px]">delete</span>
+                            <span className="material-symbols-outlined text-base">delete</span>
                           </button>
                         </div>
                       </td>
@@ -366,17 +366,17 @@ export default function Newsletter() {
         <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 overflow-hidden shadow-editorial">
           <div className="px-6 py-4 border-b border-outline-variant/10 flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">History</p>
+              <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">History</p>
               <h3 className="text-base font-bold text-on-surface tracking-tight">Campaign Delivery Status</h3>
             </div>
             <div className="flex items-center gap-3">
               {campaigns.length > 0 && (
-                <div className="hidden sm:flex items-center gap-4 text-[11px] font-bold text-on-surface-variant/50">
+                <div className="hidden sm:flex items-center gap-4 text-2xs font-bold text-on-surface-variant/50">
                   <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>Delivered</span>
                   <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-400 inline-block"></span>Failed</span>
                 </div>
               )}
-              <span className="text-[11px] font-bold text-on-surface-variant/40 bg-surface-container px-2.5 py-1 rounded-full">{campaigns.length} sent</span>
+              <span className="text-2xs font-bold text-on-surface-variant/40 bg-surface-container px-2.5 py-1 rounded-full">{campaigns.length} sent</span>
             </div>
           </div>
 
@@ -386,7 +386,7 @@ export default function Newsletter() {
                 <span className="material-symbols-outlined text-on-surface-variant/30 text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>campaign</span>
               </div>
               <p className="text-sm font-medium text-on-surface-variant/40">No campaigns sent yet</p>
-              <p className="text-[12px] text-on-surface-variant/30">Click "Compose Newsletter" to reach your subscribers.</p>
+              <p className="text-xs text-on-surface-variant/30">Click "Compose Newsletter" to reach your subscribers.</p>
             </div>
           ) : (
             <div className="divide-y divide-outline-variant/8">
@@ -453,27 +453,27 @@ const CampaignRow = ({ campaign: c, index }) => {
         {/* Left: index + subject */}
         <div className="flex items-start gap-3 flex-1 min-w-0">
           <div className="shrink-0 w-7 h-7 rounded-lg bg-surface-container flex items-center justify-center mt-0.5">
-            <span className="text-[10px] font-black text-on-surface-variant/40 tabular-nums">
+            <span className="text-2xs font-black text-on-surface-variant/40 tabular-nums">
               {String(index + 1).padStart(2, '0')}
             </span>
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap mb-0.5">
-              <h4 className="font-bold text-on-surface tracking-tight truncate text-[14px]">{c.subject}</h4>
+              <h4 className="font-bold text-on-surface tracking-tight truncate text-sm">{c.subject}</h4>
               {/* Status badge */}
-              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${styles.badge}`}>
-                <span className="material-symbols-outlined text-[11px]" style={{ fontVariationSettings: "'FILL' 1" }}>{icon}</span>
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-black uppercase tracking-widest border ${styles.badge}`}>
+                <span className="material-symbols-outlined text-2xs" style={{ fontVariationSettings: "'FILL' 1" }}>{icon}</span>
                 {label}
               </span>
             </div>
-            <p className="text-[11px] text-on-surface-variant/50 mb-3">
+            <p className="text-2xs text-on-surface-variant/50 mb-3">
               Sent {fmtDate(c.sentAt)}
               {c.sentByEmail && <> · <span className="font-medium">{c.sentByEmail}</span></>}
             </p>
 
             {/* Delivery bar */}
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest">
+              <div className="flex items-center justify-between text-2xs font-bold text-on-surface-variant/50 uppercase tracking-widest">
                 <span>Delivery rate</span>
                 <span className={color === 'emerald' ? 'text-emerald-600' : color === 'amber' ? 'text-amber-600' : color === 'red' ? 'text-red-600' : 'text-orange-600'}>
                   {deliveredPct}%
@@ -500,16 +500,16 @@ const CampaignRow = ({ campaign: c, index }) => {
         <div className="flex items-center gap-2 sm:flex-col sm:items-end sm:gap-1.5 flex-shrink-0 pl-10 sm:pl-0">
           {/* Delivered */}
           <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-1.5">
-            <span className="material-symbols-outlined text-emerald-600 text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>mark_email_read</span>
-            <span className="text-emerald-800 font-black text-[13px] tabular-nums">{successCount.toLocaleString()}</span>
-            <span className="text-emerald-600/60 text-[10px] font-bold">/ {recipientCount.toLocaleString()}</span>
+            <span className="material-symbols-outlined text-emerald-600 text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>mark_email_read</span>
+            <span className="text-emerald-800 font-black text-xs tabular-nums">{successCount.toLocaleString()}</span>
+            <span className="text-emerald-600/60 text-2xs font-bold">/ {recipientCount.toLocaleString()}</span>
           </div>
           {/* Failed — only shown when > 0 */}
           {failureCount > 0 && (
             <div className="flex items-center gap-1.5 bg-red-50 border border-red-100 rounded-xl px-3 py-1.5">
-              <span className="material-symbols-outlined text-red-500 text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>unsubscribe</span>
-              <span className="text-red-700 font-black text-[13px] tabular-nums">{failureCount.toLocaleString()}</span>
-              <span className="text-red-500/60 text-[10px] font-bold">failed</span>
+              <span className="material-symbols-outlined text-red-500 text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>unsubscribe</span>
+              <span className="text-red-700 font-black text-xs tabular-nums">{failureCount.toLocaleString()}</span>
+              <span className="text-red-500/60 text-2xs font-bold">failed</span>
             </div>
           )}
         </div>
@@ -520,7 +520,7 @@ const CampaignRow = ({ campaign: c, index }) => {
 
 // ── Bits ──────────────────────────────────────────────────────────────
 const Th = ({ children }) => (
-  <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/60">{children}</th>
+  <th className="px-4 py-3 text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60">{children}</th>
 );
 
 const StatCard = ({ label, value, icon, tone, isText }) => {
@@ -534,7 +534,7 @@ const StatCard = ({ label, value, icon, tone, isText }) => {
   return (
     <div className="bg-surface-container-lowest p-4 rounded-2xl border border-outline-variant/20 flex items-center justify-between shadow-sm transition-all hover:scale-[1.02]">
       <div className="min-w-0">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40 mb-1">{label}</p>
+        <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/40 mb-1">{label}</p>
         <h3 className={`${isText ? 'text-sm' : 'text-xl md:text-2xl'} font-bold text-on-surface tracking-tight truncate`}>{value}</h3>
       </div>
       <div className={`hidden sm:flex w-10 h-10 rounded-full items-center justify-center flex-shrink-0 ${toneMap[tone] || toneMap.primary}`}>
@@ -592,7 +592,7 @@ const ComposeModal = ({ subject, body, onSubject, onBody, busy, error, done, act
     <Modal onClose={onClose} maxWidth="max-w-2xl">
       <div className="px-6 py-4 border-b border-outline-variant/10 flex items-center justify-between bg-surface-container-low">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary mb-0.5">Compose newsletter</p>
+          <p className="text-2xs font-bold uppercase tracking-[0.2em] text-primary mb-0.5">Compose newsletter</p>
           <h3 className="text-base font-bold text-on-surface">Reach {activeCount} active subscriber{activeCount === 1 ? '' : 's'}</h3>
         </div>
         <button onClick={onClose} disabled={busy} className="p-1 rounded-lg hover:bg-surface-container-high text-on-surface-variant/60 disabled:opacity-40">
@@ -601,7 +601,7 @@ const ComposeModal = ({ subject, body, onSubject, onBody, busy, error, done, act
       </div>
       <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
         <div>
-          <label className="block text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/60 mb-1.5">Subject</label>
+          <label className="block text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 mb-1.5">Subject</label>
           <input
             type="text"
             value={subject}
@@ -611,16 +611,16 @@ const ComposeModal = ({ subject, body, onSubject, onBody, busy, error, done, act
             placeholder="What's new at PayChain this month?"
             className="w-full px-3 py-2.5 border border-outline-variant/40 rounded-lg text-sm focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none disabled:opacity-50"
           />
-          <p className="text-[10px] text-on-surface-variant/40 mt-1 text-right">{subject.length}/200</p>
+          <p className="text-2xs text-on-surface-variant/40 mt-1 text-right">{subject.length}/200</p>
         </div>
 
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <label className="block text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/60">Body</label>
+            <label className="block text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60">Body</label>
             <button
               onClick={onTogglePreview}
               type="button"
-              className="text-[11px] font-bold uppercase tracking-widest text-primary hover:underline"
+              className="text-2xs font-bold uppercase tracking-widest text-primary hover:underline"
             >
               {preview ? 'Edit' : 'Preview'}
             </button>
@@ -628,10 +628,10 @@ const ComposeModal = ({ subject, body, onSubject, onBody, busy, error, done, act
           {preview ? (
             <div className="border border-outline-variant/40 rounded-lg bg-white max-h-[300px] overflow-y-auto">
               <div className="bg-[#06201B] px-5 py-4 text-center">
-                <p className="text-[10px] font-bold tracking-[0.3em] text-emerald-300 uppercase">PayChain Updates</p>
+                <p className="text-2xs font-bold tracking-[0.3em] text-emerald-300 uppercase">PayChain Updates</p>
                 <h2 className="text-base font-bold text-white mt-1">{subject || '(no subject)'}</h2>
               </div>
-              <div className="p-5 text-[14px] leading-[1.7] text-on-surface whitespace-pre-wrap">{body || '(empty body)'}</div>
+              <div className="p-5 text-sm leading-[1.7] text-on-surface whitespace-pre-wrap">{body || '(empty body)'}</div>
             </div>
           ) : (
             <textarea
@@ -644,23 +644,23 @@ const ComposeModal = ({ subject, body, onSubject, onBody, busy, error, done, act
               className="w-full px-3 py-2.5 border border-outline-variant/40 rounded-lg text-sm focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none resize-none font-mono disabled:opacity-50"
             />
           )}
-          <p className="text-[10px] text-on-surface-variant/40 mt-1">{body.length}/50000 · Plain text with blank-line paragraphs</p>
+          <p className="text-2xs text-on-surface-variant/40 mt-1">{body.length}/50000 · Plain text with blank-line paragraphs</p>
         </div>
 
-        {error && <div className="text-[13px] text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium">{error}</div>}
+        {error && <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium">{error}</div>}
 
-        <div className="bg-amber-50 border border-amber-100 rounded-lg p-3 text-[12px] text-amber-800">
+        <div className="bg-amber-50 border border-amber-100 rounded-lg p-3 text-xs text-amber-800">
           <strong>Heads up:</strong> This will send <strong>{activeCount}</strong> emails through Resend. You'll be charged accordingly. Inactive subscribers and unsubscribed addresses are skipped.
         </div>
       </div>
       <div className="px-6 py-4 border-t border-outline-variant/10 flex items-center justify-end gap-3 bg-surface-container-low/30">
-        <button onClick={onClose} disabled={busy} className="px-4 py-2 rounded-lg border border-outline-variant/40 text-on-surface text-[11px] font-bold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40">Cancel</button>
+        <button onClick={onClose} disabled={busy} className="px-4 py-2 rounded-lg border border-outline-variant/40 text-on-surface text-2xs font-bold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40">Cancel</button>
         <button
           onClick={onSend}
           disabled={busy || subject.trim().length < 3 || body.trim().length < 10 || activeCount === 0}
-          className="px-5 py-2 rounded-lg bg-primary text-white text-[11px] font-bold uppercase tracking-widest hover:shadow-md disabled:opacity-50 flex items-center gap-2"
+          className="px-5 py-2 rounded-lg bg-primary text-white text-2xs font-bold uppercase tracking-widest hover:shadow-md disabled:opacity-50 flex items-center gap-2"
         >
-          <span className="material-symbols-outlined text-[14px]">send</span>
+          <span className="material-symbols-outlined text-sm">send</span>
           {busy ? 'Sending…' : `Send to ${activeCount}`}
         </button>
       </div>
