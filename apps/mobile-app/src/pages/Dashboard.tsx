@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,13 +7,91 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/config';
 
+type Timeframe = '7D' | '30D' | '6M';
+const OUTBOUND_TYPES = ['bulk_pay', 'settlement', 'outbound'];
+const DAY_NAMES = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+const MONTH_NAMES = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+
+// Same bucketing convention as the merchant dashboard's Overview chart
+// (apps/merchant-dashboard/src/pages/Overview.jsx generateChartData), ported to RN.
+function computeChartData(transactions: any[]) {
+  const inboundTxs = transactions.filter((t) => t.type === 'inbound');
+  const outboundTxs = transactions.filter((t) => OUTBOUND_TYPES.includes(t.type));
+  const now = new Date();
+  const sumFor = (txs: any[], matches: (t: any) => boolean) =>
+    txs.filter(matches).reduce((sum, t) => sum + (t.kesAmount || t.amount || 0), 0);
+
+  const labels7D: string[] = [];
+  const inbound7D: number[] = [];
+  const outbound7D: number[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    labels7D.push(DAY_NAMES[d.getDay()]);
+    const sameDay = (t: any) => new Date(t.createdAt).toDateString() === d.toDateString();
+    inbound7D.push(sumFor(inboundTxs, sameDay));
+    outbound7D.push(sumFor(outboundTxs, sameDay));
+  }
+
+  const labels30D = ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
+  const inbound30D = [0, 0, 0, 0];
+  const outbound30D = [0, 0, 0, 0];
+  const thirtyDaysAgo = new Date(now);
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 28);
+  const bucketByWeek = (txs: any[], bucket: number[]) => {
+    txs.forEach((t) => {
+      const txDate = new Date(t.createdAt);
+      if (txDate >= thirtyDaysAgo) {
+        const diffDays = Math.floor(Math.abs(now.getTime() - txDate.getTime()) / (1000 * 60 * 60 * 24));
+        const weekIndex = 3 - Math.floor(diffDays / 7);
+        if (weekIndex >= 0 && weekIndex < 4) bucket[weekIndex] += t.kesAmount || t.amount || 0;
+      }
+    });
+  };
+  bucketByWeek(inboundTxs, inbound30D);
+  bucketByWeek(outboundTxs, outbound30D);
+
+  const labels6M: string[] = [];
+  const inbound6M: number[] = [];
+  const outbound6M: number[] = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now);
+    d.setMonth(d.getMonth() - i);
+    labels6M.push(MONTH_NAMES[d.getMonth()]);
+    const sameMonth = (t: any) => {
+      const txDate = new Date(t.createdAt);
+      return txDate.getMonth() === d.getMonth() && txDate.getFullYear() === d.getFullYear();
+    };
+    inbound6M.push(sumFor(inboundTxs, sameMonth));
+    outbound6M.push(sumFor(outboundTxs, sameMonth));
+  }
+
+  return {
+    '7D': { labels: labels7D, inbound: inbound7D, outbound: outbound7D },
+    '30D': { labels: labels30D, inbound: inbound30D, outbound: outbound30D },
+    '6M': { labels: labels6M, inbound: inbound6M, outbound: outbound6M },
+  };
+}
+
+function estateTier(score: number): string {
+  if (score >= 85) return 'Elite';
+  if (score >= 70) return 'Trusted';
+  if (score >= 40) return 'Established';
+  return 'Growing';
+}
+
 export default function Dashboard({ navigation }: any) {
   const { merchant } = useAuth();
   const [transactions, setTransactions] = useState<any[]>([]);
   const [trustScore, setTrustScore] = useState<any>({ current: 0, eligibleForAdvance: false });
+  const [approvedLimit, setApprovedLimit] = useState<number | null>(null);
+  const [liveRate, setLiveRate] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [now, setNow] = useState(new Date());
   const [unreadCount, setUnreadCount] = useState(0);
+  const [showAmounts, setShowAmounts] = useState(true);
+  const [activeTimeframe, setActiveTimeframe] = useState<Timeframe>('7D');
 
   useFocusEffect(
     useCallback(() => {
@@ -30,34 +108,63 @@ export default function Dashboard({ navigation }: any) {
     return () => clearInterval(timer);
   }, []);
 
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        const [txRes, scoreRes] = await Promise.all([
-          api.get('/api/transactions'),
-          api.get('/api/trust-score').catch(() => ({ data: { current: 0, eligibleForAdvance: false } }))
-        ]);
-        
-        const txList = Array.isArray(txRes.data)
-          ? txRes.data
-          : Array.isArray(txRes.data?.transactions)
-          ? txRes.data.transactions
-          : [];
-        setTransactions(txList);
-        if (scoreRes.data) {
-          setTrustScore(scoreRes.data);
-        }
-      } catch (error) {
-        console.error("Error fetching dashboard data", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    if (merchant) {
-      fetchDashboardData();
+  const fetchDashboardData = useCallback(async () => {
+    if (!merchant) return;
+    try {
+      const [txRes, scoreRes, rateRes, cashAdvRes] = await Promise.all([
+        api.get('/api/transactions'),
+        api.get('/api/trust-score').catch(() => ({ data: { current: 0, eligibleForAdvance: false } })),
+        api.get('/api/transactions/live-rate').catch(() => null),
+        api.get('/api/cash-advance/my-applications').catch(() => null),
+      ]);
+
+      const txList = Array.isArray(txRes.data)
+        ? txRes.data
+        : Array.isArray(txRes.data?.transactions)
+        ? txRes.data.transactions
+        : [];
+      setTransactions(txList);
+      if (scoreRes.data) setTrustScore(scoreRes.data);
+      if (rateRes?.data?.success) setLiveRate(rateRes.data.rate);
+
+      const applications = cashAdvRes?.data?.applications || [];
+      const latestApproved = applications.find((a: any) => a.status === 'approved' && a.approvedLimit);
+      setApprovedLimit(latestApproved ? latestApproved.approvedLimit : null);
+    } catch (error) {
+      console.error('Error fetching dashboard data', error);
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
     }
   }, [merchant]);
+
+  useEffect(() => {
+    if (merchant) {
+      setIsLoading(true);
+      fetchDashboardData();
+    } else {
+      setIsLoading(false);
+    }
+  }, [merchant, fetchDashboardData]);
+
+  // Keep the balance/chart/transaction data live, matching the merchant
+  // dashboard Overview's 30s poll + refetch-on-focus behavior.
+  useEffect(() => {
+    if (!merchant) return;
+    const interval = setInterval(fetchDashboardData, 30000);
+    return () => clearInterval(interval);
+  }, [merchant, fetchDashboardData]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (merchant) fetchDashboardData();
+    }, [merchant, fetchDashboardData])
+  );
+
+  const onRefresh = () => {
+    setIsRefreshing(true);
+    fetchDashboardData();
+  };
 
   const initials = merchant?.businessName
     ? merchant.businessName.substring(0, 2).toUpperCase()
@@ -66,6 +173,8 @@ export default function Dashboard({ navigation }: any) {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(amount);
   };
+
+  const mask = (formatted: string) => (showAmounts ? formatted : '••••••');
 
   const hour = now.getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
@@ -80,13 +189,30 @@ export default function Dashboard({ navigation }: any) {
   const todayTotal = todayInbound.reduce((sum, tx) => sum + (tx.kesAmount || tx.amount || 0), 0);
   const monthTotal = monthInbound.reduce((sum, tx) => sum + (tx.kesAmount || tx.amount || 0), 0);
 
+  const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastMonthInbound = inboundTransactions.filter((tx) => isSameMonth(new Date(tx.createdAt), lastMonthDate));
+  const lastMonthTotal = lastMonthInbound.reduce((sum, tx) => sum + (tx.kesAmount || tx.amount || 0), 0);
+  const monthOverMonthPct = lastMonthTotal > 0 ? ((monthTotal - lastMonthTotal) / lastMonthTotal) * 100 : null;
+
+  const walletActivated = !!merchant?.stellarPublicKey;
+  const usdcBalance = merchant?.usdcBalance || 0;
+  const usdcInKes = liveRate != null ? usdcBalance * liveRate : null;
+
+  const chartData = computeChartData(transactions);
+  const activeChart = chartData[activeTimeframe];
+  const chartMax = Math.max(1, ...activeChart.inbound, ...activeChart.outbound);
+  const periodInboundTotal = activeChart.inbound.reduce((s, v) => s + v, 0);
+  const periodOutboundTotal = activeChart.outbound.reduce((s, v) => s + v, 0);
 
   return (
     <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
-      <ScrollView 
-        className="flex-1" 
+      <ScrollView
+        className="flex-1"
         contentContainerStyle={{ paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#0b4d2e" colors={['#0b4d2e']} />
+        }
       >
         <View className="w-full max-w-lg mx-auto flex-1">
           {/* Header Area */}
@@ -98,7 +224,7 @@ export default function Dashboard({ navigation }: any) {
           >
             <View className="flex-row justify-between items-center mb-10 mt-4">
               <View className="flex-row items-center gap-3 pl-3">
-                <TouchableOpacity 
+                <TouchableOpacity
                   onPress={() => navigation?.navigate('More')}
                   className="w-10 h-10 rounded-full bg-white/20 items-center justify-center border border-white/30"
                 >
@@ -109,27 +235,35 @@ export default function Dashboard({ navigation }: any) {
                   <Text className="text-white text-base font-jakarta-bold tracking-tight">{merchant?.businessName || 'Merchant'}</Text>
                 </View>
               </View>
-              <TouchableOpacity
-                onPress={() => navigation?.navigate('Notifications')}
-                className="w-10 h-10 rounded-full bg-white/10 items-center justify-center border border-white/10 mr-3"
-              >
-                <MaterialIcons name="notifications" size={20} color="white" />
-                {unreadCount > 0 && (
-                  <View className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#ff5a5f] border border-[#0b4d2e]" />
-                )}
-              </TouchableOpacity>
+              <View className="flex-row items-center gap-2 mr-3">
+                <TouchableOpacity
+                  onPress={() => setShowAmounts((v) => !v)}
+                  className="w-10 h-10 rounded-full bg-white/10 items-center justify-center border border-white/10"
+                >
+                  <Feather name={showAmounts ? 'eye' : 'eye-off'} size={17} color="white" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => navigation?.navigate('Notifications')}
+                  className="w-10 h-10 rounded-full bg-white/10 items-center justify-center border border-white/10"
+                >
+                  <MaterialIcons name="notifications" size={20} color="white" />
+                  {unreadCount > 0 && (
+                    <View className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#ff5a5f] border border-[#0b4d2e]" />
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
 
             <View className="mb-2 pl-3">
               <Text className="text-white/80 text-[11px] font-jakarta-bold uppercase tracking-widest mb-1">Total Balance</Text>
               <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', letterSpacing: -1 }} className="text-4xl text-white leading-none">
-                {formatCurrency(merchant?.kesBalance || 0)}
+                {mask(formatCurrency(merchant?.kesBalance || 0))}
               </Text>
               <View className="flex-row items-center justify-between mt-4">
                 {todayTotal > 0 ? (
                   <View className="flex-row items-center gap-1.5 bg-[#83f5c6]/20 px-3 py-1.5 rounded-full border border-[#83f5c6]/20">
                     <Feather name="trending-up" size={14} color="#83f5c6" />
-                    <Text className="text-[#83f5c6] font-jakarta-bold text-sm">+{formatCurrency(todayTotal)} today</Text>
+                    <Text className="text-[#83f5c6] font-jakarta-bold text-sm">+{mask(formatCurrency(todayTotal))} today</Text>
                   </View>
                 ) : <View />}
                 <View className="bg-white/10 px-3 py-1.5 rounded-full border border-white/20 mb-1">
@@ -186,7 +320,7 @@ export default function Dashboard({ navigation }: any) {
                   Collect. Pay. Protect. Grow.
                 </Text>
                 <Text className="text-[#006c4e] text-[10px] font-jakarta-bold uppercase tracking-widest">
-                  Merchant Estate Status: Elite
+                  Merchant Estate Status: {estateTier(trustScore.current || 0)}
                 </Text>
               </View>
               <View className="w-8 h-8 rounded-full bg-[#83f5c6] items-center justify-center">
@@ -199,7 +333,7 @@ export default function Dashboard({ navigation }: any) {
           <View className="mb-8">
               <View className="px-6 flex-row items-center justify-between mb-4">
                 <Text className="text-lg font-jakarta-bold text-[#0c2010]">Digital Ledgers</Text>
-                <TouchableOpacity>
+                <TouchableOpacity onPress={() => navigation?.navigate('InflationShield')}>
                   <Text className="text-[#006c4e] text-[11px] font-jakarta-bold uppercase tracking-widest">View All</Text>
                 </TouchableOpacity>
               </View>
@@ -220,24 +354,54 @@ export default function Dashboard({ navigation }: any) {
                     <MaterialIcons name="account-balance-wallet" size={140} color="white" />
                   </View>
                   <Text className="text-[#96d4ab] text-[11px] font-jakarta-bold uppercase tracking-[0.15em] mb-2">Operating Balance</Text>
-                  <Text className="text-white text-3xl font-jakarta-extrabold tracking-tight mb-auto">{formatCurrency(merchant?.kesBalance || 0)}</Text>
+                  <Text className="text-white text-3xl font-jakarta-extrabold tracking-tight mb-auto">{mask(formatCurrency(merchant?.kesBalance || 0))}</Text>
                   <View className="flex-row items-center gap-1.5 mt-4">
-                    <Feather name="arrow-up" size={14} color="#96d4ab" />
-                    <Text className="text-[#96d4ab] text-[13px] font-jakarta-medium">12.4% vs last month</Text>
+                    {monthOverMonthPct != null ? (
+                      <>
+                        <Feather name={monthOverMonthPct >= 0 ? 'arrow-up' : 'arrow-down'} size={14} color="#96d4ab" />
+                        <Text className="text-[#96d4ab] text-[13px] font-jakarta-medium">
+                          {monthOverMonthPct >= 0 ? '+' : ''}{monthOverMonthPct.toFixed(1)}% vs last month
+                        </Text>
+                      </>
+                    ) : (
+                      <Text className="text-[#96d4ab] text-[13px] font-jakarta-medium">{formatCurrency(monthTotal)} collected this month</Text>
+                    )}
                   </View>
                 </View>
 
-                <View className="bg-[#1e293b] w-[280px] h-[160px] rounded-[32px] p-6 mr-4 relative overflow-hidden shadow-md shadow-[#1e293b]/30">
-                  <View className="absolute -right-4 -top-4 opacity-10">
-                    <MaterialIcons name="shield" size={100} color="white" />
+                {walletActivated ? (
+                  <View className="bg-[#1e293b] w-[280px] h-[160px] rounded-[32px] p-6 mr-4 relative overflow-hidden shadow-md shadow-[#1e293b]/30">
+                    <View className="absolute -right-4 -top-4 opacity-10">
+                      <MaterialIcons name="shield" size={100} color="white" />
+                    </View>
+                    <Text className="text-[#94a3b8] text-[11px] font-jakarta-bold uppercase tracking-[0.15em] mb-2">USDC Vault</Text>
+                    <Text className="text-white text-3xl font-jakarta-extrabold tracking-tight mb-auto">{mask(usdcBalance.toFixed(2))}</Text>
+                    <View className="flex-row items-center gap-1.5 mt-4">
+                      <Feather name="refresh-cw" size={14} color="#94a3b8" />
+                      <Text className="text-[#94a3b8] text-[13px] font-jakarta-medium">
+                        {usdcInKes != null ? `≈ ${mask(formatCurrency(usdcInKes))}` : 'Fetching rate…'}
+                      </Text>
+                    </View>
                   </View>
-                  <Text className="text-[#94a3b8] text-[11px] font-jakarta-bold uppercase tracking-[0.15em] mb-2">USDC Vault</Text>
-                  <Text className="text-white text-3xl font-jakarta-extrabold tracking-tight mb-auto">{(merchant?.usdcBalance || 0).toFixed(2)}</Text>
-                  <View className="flex-row items-center gap-1.5 mt-4">
-                    <Feather name="refresh-cw" size={14} color="#94a3b8" />
-                    <Text className="text-[#94a3b8] text-[13px] font-jakarta-medium">≈ KES 40,625</Text>
-                  </View>
-                </View>
+                ) : (
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => navigation?.navigate('InflationShield')}
+                    className="bg-[#0A2540] w-[280px] h-[160px] rounded-[32px] p-6 mr-4 relative overflow-hidden shadow-md shadow-[#0A2540]/30"
+                  >
+                    <View className="absolute -right-4 -top-4 opacity-10">
+                      <MaterialIcons name="shield" size={100} color="white" />
+                    </View>
+                    <Text className="text-[#93c5fd] text-[11px] font-jakarta-bold uppercase tracking-[0.15em] mb-2">USDC Vault</Text>
+                    <Text className="text-white text-[16px] font-jakarta-extrabold tracking-tight mb-auto leading-relaxed">
+                      Activate your Digital Wallet to shield revenue in USDC
+                    </Text>
+                    <View className="flex-row items-center gap-1.5 mt-4">
+                      <Text className="text-[#93c5fd] text-[13px] font-jakarta-bold uppercase tracking-widest">Activate now</Text>
+                      <Feather name="arrow-right" size={14} color="#93c5fd" />
+                    </View>
+                  </TouchableOpacity>
+                )}
               </ScrollView>
           </View>
 
@@ -248,7 +412,7 @@ export default function Dashboard({ navigation }: any) {
               <View className="flex-row justify-between">
                 <View>
                   <Text className="text-[#0c2010] text-[10px] font-jakarta-bold uppercase tracking-wider mb-1">Revenue</Text>
-                  <Text className="text-[#006c4e] text-[16px] font-jakarta-extrabold">{formatCurrency(monthTotal)}</Text>
+                  <Text className="text-[#006c4e] text-[16px] font-jakarta-extrabold">{mask(formatCurrency(monthTotal))}</Text>
                 </View>
                 <View className="w-[1px] h-full bg-[#eff4ef]" />
                 <View>
@@ -266,10 +430,80 @@ export default function Dashboard({ navigation }: any) {
             </View>
           </View>
 
+          {/* Revenue Overview Chart */}
+          <View className="px-6 mb-8">
+            <View className="bg-white rounded-[32px] p-6 shadow-sm border border-[#bfc9bf]/10">
+              <View className="flex-row items-center justify-between mb-1">
+                <View>
+                  <Text className="text-lg font-jakarta-bold text-[#0c2010]">Revenue Overview</Text>
+                  <Text className="text-[#707971] text-[11px] font-jakarta-medium mt-0.5">Money moving in and out</Text>
+                </View>
+                <View className="flex-row bg-[#f0fdf4] p-0.5 rounded-lg border border-[#e7ece7]">
+                  {(['7D', '30D', '6M'] as Timeframe[]).map((period) => (
+                    <TouchableOpacity
+                      key={period}
+                      onPress={() => setActiveTimeframe(period)}
+                      className={`px-2.5 py-1.5 rounded-md ${activeTimeframe === period ? 'bg-white shadow-sm' : ''}`}
+                    >
+                      <Text className={`text-[9px] font-jakarta-extrabold uppercase tracking-wider ${activeTimeframe === period ? 'text-[#006c4e]' : 'text-[#006c4e]/40'}`}>
+                        {period}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View className="flex-row items-center gap-5 mt-5 mb-5">
+                <View className="flex-row items-center gap-1.5">
+                  <View className="w-2.5 h-2.5 rounded-full bg-[#00855D]" />
+                  <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider">In</Text>
+                  <Text className="text-[12px] font-jakarta-extrabold text-[#0c2010]">{mask(formatCurrency(periodInboundTotal))}</Text>
+                </View>
+                <View className="flex-row items-center gap-1.5">
+                  <View className="w-2.5 h-2.5 rounded-full bg-[#D97706]" />
+                  <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider">Out</Text>
+                  <Text className="text-[12px] font-jakarta-extrabold text-[#0c2010]">{mask(formatCurrency(periodOutboundTotal))}</Text>
+                </View>
+              </View>
+
+              {periodInboundTotal === 0 && periodOutboundTotal === 0 ? (
+                <View className="h-[120px] items-center justify-center">
+                  <Text className="text-[#707971] font-jakarta-medium text-[12px]">No activity in this period</Text>
+                </View>
+              ) : (
+                <View className="flex-row items-end justify-between h-[120px]">
+                  {activeChart.labels.map((label, i) => {
+                    const inH = Math.max(4, (activeChart.inbound[i] / chartMax) * 100);
+                    const outH = Math.max(4, (activeChart.outbound[i] / chartMax) * 100);
+                    return (
+                      <View key={`${label}-${i}`} className="items-center flex-1">
+                        <View className="flex-row items-end gap-[3px]" style={{ height: 100 }}>
+                          <View style={{ width: 6, height: inH, backgroundColor: '#00855D', borderRadius: 3 }} />
+                          <View style={{ width: 6, height: outH, backgroundColor: '#D97706', borderRadius: 3 }} />
+                        </View>
+                        <Text className="text-[7px] font-jakarta-bold text-[#707971] uppercase tracking-wider mt-2" numberOfLines={1}>
+                          {label}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
+          </View>
+
           {/* Recent Activity */}
           <View className="px-6 mb-8">
             <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-lg font-jakarta-bold text-[#0c2010]">Recent Activity</Text>
+              <View className="flex-row items-center gap-2">
+                <Text className="text-lg font-jakarta-bold text-[#0c2010]">Recent Activity</Text>
+                <TouchableOpacity
+                  onPress={onRefresh}
+                  className="w-7 h-7 rounded-full bg-[#eff4ef] items-center justify-center"
+                >
+                  <Feather name="refresh-cw" size={12} color="#006c4e" />
+                </TouchableOpacity>
+              </View>
               <TouchableOpacity onPress={() => navigation?.navigate('Transactions')} className="bg-[#e7f8ef] px-3 py-1.5 rounded-full">
                 <Text className="text-[#006c4e] text-[10px] font-jakarta-bold uppercase tracking-widest">View All</Text>
               </TouchableOpacity>
@@ -314,7 +548,7 @@ export default function Dashboard({ navigation }: any) {
                         numberOfLines={1}
                         style={{ flexShrink: 0 }}
                       >
-                        {isSwap ? `${(tx.usdcAmount || 0).toLocaleString()} USDC` : `${isInbound ? '+' : '-'} ${formatCurrency(kes)}`}
+                        {mask(isSwap ? `${(tx.usdcAmount || 0).toLocaleString()} USDC` : `${isInbound ? '+' : '-'} ${formatCurrency(kes)}`)}
                       </Text>
                     </View>
                   );
@@ -329,9 +563,13 @@ export default function Dashboard({ navigation }: any) {
               <View className="flex-row justify-between items-start mb-6">
                 <View>
                   <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-[0.1em] mb-1">Available Cash Advance</Text>
-                  <Text className={`text-3xl font-jakarta-bold tracking-tight ${trustScore.eligibleForAdvance ? 'text-[#0c2010]' : 'text-[#707971]'}`}>
-                    {trustScore.eligibleForAdvance ? 'KES 150,000' : 'KES 0'}
-                  </Text>
+                  {trustScore.eligibleForAdvance ? (
+                    <Text className="text-3xl font-jakarta-bold tracking-tight text-[#0c2010]">
+                      {approvedLimit ? mask(formatCurrency(approvedLimit)) : 'Apply to see your limit'}
+                    </Text>
+                  ) : (
+                    <Text className="text-3xl font-jakarta-bold tracking-tight text-[#707971]">KES 0</Text>
+                  )}
                 </View>
                 <View className="w-14 h-14 rounded-full border-4 border-[#006c4e] items-center justify-center border-r-[#eff4ef] rotate-45">
                   <View className="-rotate-45 items-center justify-center">
@@ -355,12 +593,13 @@ export default function Dashboard({ navigation }: any) {
                     {trustScore.eligibleForAdvance ? 'Cash Advance Eligible' : 'Keep Processing to Unlock'}
                   </Text>
                 </View>
-                <TouchableOpacity 
+                <TouchableOpacity
                   disabled={!trustScore.eligibleForAdvance}
+                  onPress={() => navigation?.navigate('Advance')}
                   className={`px-5 py-2.5 rounded-full ${trustScore.eligibleForAdvance ? 'bg-[#002110]' : 'bg-[#eff4ef]'}`}
                 >
                   <Text className={`text-[11px] font-jakarta-bold uppercase tracking-wider ${trustScore.eligibleForAdvance ? 'text-white' : 'text-[#707971]'}`}>
-                    Unlock Funds
+                    {approvedLimit ? 'Unlock Funds' : 'Apply Now'}
                   </Text>
                 </TouchableOpacity>
               </View>
