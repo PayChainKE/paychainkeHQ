@@ -15,6 +15,7 @@ import mpesaRoutes from './routes/mpesaRoutes.js';
 import trustScoreRoutes from './routes/trustScoreRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import invoiceRoutes from './routes/invoiceRoutes.js';
+import cashAdvanceRoutes from './routes/cashAdvanceRoutes.js';
 import { ensurePrimaryOwner } from './migrations/ensurePrimaryOwner.js';
 import { backfillTransactionFees } from './migrations/backfillTransactionFees.js';
 
@@ -105,6 +106,7 @@ app.use('/api/callbacks', mpesaRoutes);
 app.use('/api/trust-score', trustScoreRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/invoices', invoiceRoutes);
+app.use('/api/cash-advance', cashAdvanceRoutes);
 
 app.use((err, req, res, next) => {
   console.error('Unhandled Error:', err);

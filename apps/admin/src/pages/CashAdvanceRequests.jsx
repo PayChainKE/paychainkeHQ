@@ -19,84 +19,20 @@ const PRIMARY_ACTIONS = [
   { v: 'declined', l: 'Declined' },
 ];
 
-const seedRequests = [
-  {
-    id: 'car-1041',
-    merchantName: 'Kijani Fresh Market Ltd',
-    merchantEmail: 'finance@kijani.co.ke',
-    paybillAccount: '542900',
-    requestedAmount: 850000,
-    approvedLimit: 1200000,
-    tenorDays: 21,
-    trustScore: 86,
-    collections30d: 2860000,
-    settlementRate: 98,
-    purpose: 'Stock expansion before the weekend retail cycle',
-    requestedAt: '2026-07-02T08:12:00.000Z',
-    updatedAt: '2026-07-02T09:04:00.000Z',
-    status: 'pending',
-    priority: 'high',
-    manager: 'A. Njoroge',
-    notes: 'Healthy settlement pattern; requested for perishable inventory restock.',
-  },
-  {
-    id: 'car-1042',
-    merchantName: 'Mtaa Pharmacy Network',
-    merchantEmail: 'ops@mtaapharma.co.ke',
-    paybillAccount: '773110',
-    requestedAmount: 420000,
-    approvedLimit: 700000,
-    tenorDays: 14,
-    trustScore: 91,
-    collections30d: 1684000,
-    settlementRate: 99,
-    purpose: 'Supplier prepayment for medical consumables',
-    requestedAt: '2026-07-01T16:45:00.000Z',
-    updatedAt: '2026-07-02T07:25:00.000Z',
-    status: 'reviewing',
-    priority: 'medium',
-    manager: 'J. Mwangi',
-    notes: 'Strong trust score and recurring collections across 3 locations.',
-  },
-  {
-    id: 'car-1043',
-    merchantName: 'Northstar Hardware',
-    merchantEmail: 'accounts@northstarhardware.co.ke',
-    paybillAccount: '610452',
-    requestedAmount: 1350000,
-    approvedLimit: 1400000,
-    tenorDays: 30,
-    trustScore: 78,
-    collections30d: 4125000,
-    settlementRate: 96,
-    purpose: 'Import deposit for seasonal inventory',
-    requestedAt: '2026-07-01T11:18:00.000Z',
-    updatedAt: '2026-07-01T15:51:00.000Z',
-    status: 'approved',
-    priority: 'high',
-    manager: 'K. Chebet',
-    notes: 'Approved with standard fee after liquidity check passed.',
-  },
-  {
-    id: 'car-1044',
-    merchantName: 'Soko Digital Studio',
-    merchantEmail: 'hello@sokodigital.co.ke',
-    paybillAccount: '900118',
-    requestedAmount: 260000,
-    approvedLimit: 300000,
-    tenorDays: 10,
-    trustScore: 63,
-    collections30d: 740000,
-    settlementRate: 88,
-    purpose: 'Cash buffer for campaign media spend',
-    requestedAt: '2026-06-30T13:32:00.000Z',
-    updatedAt: '2026-07-01T10:08:00.000Z',
-    status: 'declined',
-    priority: 'low',
-    manager: 'M. Wanjiku',
-    notes: 'Declined pending stronger repayment history and lower concentration risk.',
-  },
+// Underwriting risk bands derived from the merchant's Trust Score at the time
+// they applied. Mirrors conventional micro-lending grade nomenclature (A–D)
+// so the queue reads like a real credit console, not a raw percentage.
+const RISK_BANDS = [
+  { min: 85, grade: 'A', label: 'Prime', tone: 'text-emerald-700 bg-emerald-50 border-emerald-200', stroke: '#059669' },
+  { min: 70, grade: 'B', label: 'Standard', tone: 'text-sky-700 bg-sky-50 border-sky-200', stroke: '#0284c7' },
+  { min: 55, grade: 'C', label: 'Watch', tone: 'text-amber-700 bg-amber-50 border-amber-200', stroke: '#d97706' },
+  { min: 0, grade: 'D', label: 'Elevated Risk', tone: 'text-rose-700 bg-rose-50 border-rose-200', stroke: '#e11d48' },
 ];
+
+function riskGradeFor(trustScore) {
+  const score = Number(trustScore) || 0;
+  return RISK_BANDS.find((band) => score >= band.min) || RISK_BANDS[RISK_BANDS.length - 1];
+}
 
 const fmtNum = (value) => Number(value || 0).toLocaleString();
 
@@ -113,31 +49,23 @@ function relativeTime(iso) {
 }
 
 export default function CashAdvanceRequests() {
-  const [requests, setRequests] = useState(seedRequests);
-  const [selectedId, setSelectedId] = useState(seedRequests[0]?.id || null);
+  const [requests, setRequests] = useState([]);
+  const [selectedId, setSelectedId] = useState(null);
   const [statusFilter, setStatusFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [source, setSource] = useState('preview');
 
   const fetchRequests = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
       const res = await api.get('/api/admin/cash-advance/requests');
-      const data = Array.isArray(res.data?.data) ? res.data.data : Array.isArray(res.data) ? res.data : [];
-      if (data.length) {
-        setRequests(data);
-        setSource('live');
-        setSelectedId(data[0]?._id || data[0]?.id || null);
-        return;
-      }
-      setSource('preview');
-      setError('No cash advance requests returned yet. Showing preview data.');
+      const data = Array.isArray(res.data?.data) ? res.data.data : [];
+      setRequests(data);
+      setSelectedId((prev) => (prev && data.some((r) => r._id === prev) ? prev : data[0]?._id || null));
     } catch (err) {
-      setSource('preview');
-      setError(err?.response?.status === 404 ? 'Cash advance API is not connected yet. Showing preview data.' : 'Unable to load live requests right now. Showing preview data.');
+      setError(err?.response?.data?.error || 'Unable to load the underwriting queue right now.');
     } finally {
       setLoading(false);
     }
@@ -171,8 +99,8 @@ export default function CashAdvanceRequests() {
   }, [requests, search, statusFilter]);
 
   const selectedRequest = useMemo(
-    () => visibleRequests.find((request) => (request._id || request.id) === selectedId) || visibleRequests[0] || requests[0] || null,
-    [visibleRequests, selectedId, requests]
+    () => visibleRequests.find((request) => request._id === selectedId) || visibleRequests[0] || null,
+    [visibleRequests, selectedId]
   );
 
   const metrics = useMemo(() => {
@@ -182,7 +110,7 @@ export default function CashAdvanceRequests() {
       acc.amount += Number(request.requestedAmount || 0);
       acc[status] = (acc[status] || 0) + 1;
       acc.trust += Number(request.trustScore || 0);
-      acc.approved += status === 'approved' ? Number(request.requestedAmount || 0) : 0;
+      acc.approved += status === 'approved' ? Number(request.approvedLimit || request.requestedAmount || 0) : 0;
       return acc;
     }, { total: 0, amount: 0, approved: 0, trust: 0, pending: 0, reviewing: 0, declined: 0 });
 
@@ -197,39 +125,95 @@ export default function CashAdvanceRequests() {
     };
   }, [requests]);
 
-  const updateStatus = (nextStatus) => {
-    const id = selectedRequest?._id || selectedRequest?.id;
-    if (!id) return;
-    setRequests((current) => current.map((request) => {
-      const requestId = request._id || request.id;
-      return requestId === id ? { ...request, status: nextStatus, updatedAt: new Date().toISOString() } : request;
-    }));
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [pendingDecision, setPendingDecision] = useState(null); // 'approved' | 'declined' | null
+  const [decisionLimit, setDecisionLimit] = useState('');
+  const [decisionNotes, setDecisionNotes] = useState('');
+  const [decisionError, setDecisionError] = useState('');
+
+  useEffect(() => {
+    setPendingDecision(null);
+    setDecisionNotes('');
+    setDecisionLimit('');
+    setDecisionError('');
+  }, [selectedId]);
+
+  const applyDecision = async (id, payload) => {
+    setUpdatingStatus(true);
+    setDecisionError('');
+    try {
+      const res = await api.patch(`/api/admin/cash-advance/requests/${id}`, payload);
+      const updated = res.data?.data;
+      if (updated) {
+        setRequests((current) => current.map((r) => (r._id === id ? updated : r)));
+      }
+      return true;
+    } catch (err) {
+      setDecisionError(err?.response?.data?.error || 'Failed to update this request.');
+      return false;
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  const openDecision = (status) => {
+    setDecisionError('');
+    setPendingDecision(status);
+    setDecisionNotes(status === 'declined' ? (selectedRequest?.notes || '') : '');
+    setDecisionLimit(status === 'approved' ? String(selectedRequest?.approvedLimit || selectedRequest?.requestedAmount || '') : '');
+  };
+
+  const cancelDecision = () => {
+    setPendingDecision(null);
+    setDecisionError('');
+  };
+
+  const confirmDecision = async () => {
+    if (!selectedRequest?._id) return;
+    const payload = { status: pendingDecision };
+
+    if (pendingDecision === 'approved') {
+      const limit = Number(decisionLimit);
+      if (!Number.isFinite(limit) || limit < 0) {
+        setDecisionError('Enter a valid credit limit amount.');
+        return;
+      }
+      payload.approvedLimit = limit;
+    }
+    if (decisionNotes.trim()) payload.reviewNotes = decisionNotes.trim();
+
+    const ok = await applyDecision(selectedRequest._id, payload);
+    if (ok) setPendingDecision(null);
+  };
+
+  const markUnderReview = () => {
+    if (selectedRequest?._id) applyDecision(selectedRequest._id, { status: 'reviewing' });
   };
 
   return (
     <Layout>
       <div className="space-y-8 pb-12">
-        <section className="relative overflow-hidden rounded-[28px] border border-outline-variant/30 bg-[linear-gradient(135deg,rgba(15,23,42,0.98),rgba(7,47,41,0.92),rgba(3,105,82,0.78))] text-white shadow-[0_24px_80px_rgba(15,23,42,0.28)]">
-          <div className="absolute inset-0 opacity-25 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.42),transparent_34%),radial-gradient(circle_at_20%_20%,rgba(94,254,179,0.2),transparent_26%)]" />
+        <section className="relative overflow-hidden rounded-[28px] border border-outline-variant/30 bg-[linear-gradient(135deg,rgba(9,14,23,0.98),rgba(6,38,33,0.94),rgba(0,53,29,0.9))] text-white shadow-[0_24px_80px_rgba(6,15,12,0.32)]">
+          <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.35),transparent_34%),radial-gradient(circle_at_20%_20%,rgba(134,248,201,0.16),transparent_28%)]" />
           <div className="relative p-6 md:p-8 lg:p-10">
             <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
               <div className="max-w-3xl">
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.22em] text-white/85">
-                  <span className="material-symbols-outlined text-[15px]">savings</span>
-                  Credit operations
+                  <span className="material-symbols-outlined text-[15px]">account_balance</span>
+                  Loan Origination · Credit Operations
                 </div>
                 <h2 className="mt-4 text-[28px] md:text-[42px] font-black tracking-tighter leading-[0.95] font-headline">
-                  Cash advance requests for merchant review
+                  Cash advance underwriting queue
                 </h2>
-                <p className="mt-3 max-w-2xl text-[13px] md:text-[15px] text-white/72">
-                  A focused queue for admin teams to inspect every merchant asking for cash advance, compare risk signals, and move requests from pending to approved in one place.
+                <p className="mt-3 max-w-2xl text-[13px] md:text-[15px] text-white/70">
+                  Review each merchant's application, risk-grade it against Trust Score and settlement history, and issue a decision — approve with a credit limit, hold for review, or decline with a reason.
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:min-w-[430px]">
-                <MiniMetric label="Requests" value={fmtNum(metrics.total)} icon="receipt_long" />
+                <MiniMetric label="Applications" value={fmtNum(metrics.total)} icon="receipt_long" />
                 <MiniMetric label="Pending" value={fmtNum(metrics.pending)} icon="schedule" />
-                <MiniMetric label="Avg trust" value={`${metrics.avgTrust}%`} icon="verified" />
-                <MiniMetric label="Approved" value={formatKES(metrics.approvedAmount)} icon="done_all" />
+                <MiniMetric label="Avg Trust Score" value={`${metrics.avgTrust}%`} icon="verified" />
+                <MiniMetric label="Approved Exposure" value={formatKES(metrics.approvedAmount)} icon="done_all" />
               </div>
             </div>
           </div>
@@ -237,18 +221,18 @@ export default function CashAdvanceRequests() {
 
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <StatCard label="Total requested" value={formatKES(metrics.amount)} subtitle="Across the current queue" icon="account_balance_wallet" tone="emerald" />
-          <StatCard label="Pending review" value={fmtNum(metrics.pending)} subtitle="Requires an admin decision" icon="pending_actions" tone="amber" />
-          <StatCard label="Under review" value={fmtNum(metrics.reviewing)} subtitle="Currently assigned" icon="manage_search" tone="sky" />
+          <StatCard label="Pending decision" value={fmtNum(metrics.pending)} subtitle="Awaiting an underwriting call" icon="pending_actions" tone="amber" />
+          <StatCard label="Under review" value={fmtNum(metrics.reviewing)} subtitle="Currently assigned to an analyst" icon="manage_search" tone="sky" />
           <StatCard label="Declined" value={fmtNum(metrics.declined)} subtitle="Risk or policy mismatch" icon="block" tone="rose" />
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[1.5fr_0.9fr]">
-          <div className="rounded-[24px] border border-outline-variant/40 bg-surface-container-low shadow-[0_18px_45px_rgba(15,23,42,0.08)] overflow-hidden">
+          <div className="rounded-[24px] border border-outline-variant/40 bg-surface-container-low shadow-editorial overflow-hidden">
             <div className="border-b border-outline-variant/20 px-5 md:px-6 py-4 md:py-5 bg-white/60 backdrop-blur-sm">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  <h3 className="text-[18px] md:text-[20px] font-black tracking-tight text-on-surface">Request queue</h3>
-                  <p className="text-[12px] text-on-surface-variant/60 mt-1">Review each merchant’s request, trust profile, and repayment outlook.</p>
+                  <h3 className="text-[18px] md:text-[20px] font-black tracking-tight text-on-surface">Application queue</h3>
+                  <p className="text-[12px] text-on-surface-variant/60 mt-1">Sorted by most recent submission. Click a row to open the underwriting file.</p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
                   <div className="inline-flex rounded-2xl border border-outline-variant/25 bg-surface-container-high p-1 shadow-sm">
@@ -276,7 +260,7 @@ export default function CashAdvanceRequests() {
             </div>
 
             <div className="px-5 md:px-6 py-3 text-[11px] font-bold uppercase tracking-[0.18em] text-on-surface-variant/45 flex items-center justify-between">
-              <span>{source === 'live' ? 'Live queue' : 'Preview queue'}</span>
+              <span>Underwriting queue</span>
               <span>{loading ? 'Syncing…' : `${visibleRequests.length} visible`}</span>
             </div>
 
@@ -286,18 +270,19 @@ export default function CashAdvanceRequests() {
                   <tr>
                     <Th className="pl-6">Merchant</Th>
                     <Th>Requested</Th>
-                    <Th>Trust</Th>
+                    <Th>Risk grade</Th>
                     <Th>Tenor</Th>
                     <Th>Status</Th>
-                    <Th className="pr-6 text-right">Updated</Th>
+                    <Th className="pr-6 text-right">Submitted</Th>
                   </tr>
                 </thead>
                 <tbody>
                   {visibleRequests.map((request) => {
-                    const id = request._id || request.id;
-                    const active = selectedRequest && id === (selectedRequest._id || selectedRequest.id);
+                    const id = request._id;
+                    const active = selectedRequest && id === selectedRequest._id;
                     const status = request.status || 'pending';
                     const meta = STATUS_META[status] || STATUS_META.pending;
+                    const risk = riskGradeFor(request.trustScore);
                     return (
                       <tr
                         key={id}
@@ -316,13 +301,15 @@ export default function CashAdvanceRequests() {
                         <Td>
                           <div className="py-4">
                             <p className="font-black text-[13px] text-on-surface">{formatKES(request.requestedAmount)}</p>
-                            <p className="text-[11px] text-on-surface-variant/55">Limit {formatKES(request.approvedLimit)}</p>
+                            <p className="text-[11px] text-on-surface-variant/55">{request.approvedLimit ? `Limit ${formatKES(request.approvedLimit)}` : 'No limit set'}</p>
                           </div>
                         </Td>
                         <Td>
                           <div className="py-4">
-                            <p className="font-black text-[13px] text-on-surface">{request.trustScore}%</p>
-                            <p className="text-[11px] text-on-surface-variant/55">{fmtNum(request.collections30d)} collected</p>
+                            <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${risk.tone}`}>
+                              {risk.grade} · {risk.label}
+                            </span>
+                            <p className="mt-1 text-[11px] text-on-surface-variant/55">{request.trustScore}% trust score</p>
                           </div>
                         </Td>
                         <Td>
@@ -337,7 +324,6 @@ export default function CashAdvanceRequests() {
                               <span className="material-symbols-outlined text-[12px]">{meta.icon}</span>
                               {meta.label}
                             </span>
-                            <p className="mt-1 text-[11px] text-on-surface-variant/55 capitalize">{request.priority} priority</p>
                           </div>
                         </Td>
                         <Td className="pr-6 text-right">
@@ -353,23 +339,24 @@ export default function CashAdvanceRequests() {
               </table>
             </div>
 
-            {!visibleRequests.length && (
+            {!loading && !visibleRequests.length && !error && (
               <div className="px-6 py-16 text-center">
-                <span className="material-symbols-outlined text-[40px] text-on-surface-variant/25">search_off</span>
-                <p className="mt-3 text-[14px] font-bold text-on-surface">No requests match this filter.</p>
-                <p className="text-[12px] text-on-surface-variant/60 mt-1">Try clearing the search or switching the queue status.</p>
+                <span className="material-symbols-outlined text-[40px] text-on-surface-variant/25">{requests.length ? 'search_off' : 'inbox'}</span>
+                <p className="mt-3 text-[14px] font-bold text-on-surface">{requests.length ? 'No requests match this filter.' : 'No cash advance applications yet.'}</p>
+                <p className="text-[12px] text-on-surface-variant/60 mt-1">{requests.length ? 'Try clearing the search or switching the queue status.' : 'Applications will appear here as merchants apply from their dashboard.'}</p>
               </div>
             )}
 
             {error && (
-              <div className="mx-5 md:mx-6 mb-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-800">
-                {error}
+              <div className="mx-5 md:mx-6 mb-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-[12px] text-rose-800 flex items-center justify-between gap-3">
+                <span>{error}</span>
+                <button onClick={fetchRequests} className="shrink-0 text-[11px] font-black uppercase tracking-widest text-rose-700 hover:text-rose-900">Retry</button>
               </div>
             )}
           </div>
 
           <aside className="space-y-6">
-            <div className="rounded-[24px] border border-outline-variant/40 bg-surface-container-low shadow-[0_18px_45px_rgba(15,23,42,0.08)] p-5 md:p-6">
+            <div className="rounded-[24px] border border-outline-variant/40 bg-surface-container-low shadow-editorial p-5 md:p-6">
               {selectedRequest ? (
                 <>
                   <div className="flex items-start justify-between gap-4">
@@ -386,42 +373,120 @@ export default function CashAdvanceRequests() {
                     </span>
                   </div>
 
-                  <div className="mt-5 grid grid-cols-2 gap-3">
-                    <DetailBox label="Requested" value={formatKES(selectedRequest.requestedAmount)} />
-                    <DetailBox label="Tenor" value={`${selectedRequest.tenorDays} days`} />
-                    <DetailBox label="Trust score" value={`${selectedRequest.trustScore}%`} />
-                    <DetailBox label="Collections 30d" value={formatKES(selectedRequest.collections30d)} />
+                  {/* Credit assessment: Trust Score gauge + risk grade */}
+                  <div className="mt-5 flex items-center gap-4 rounded-2xl border border-outline-variant/20 bg-white p-4">
+                    <TrustGauge score={selectedRequest.trustScore} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-on-surface-variant/45 mb-1.5">Credit Assessment</p>
+                      <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${riskGradeFor(selectedRequest.trustScore).tone}`}>
+                        Grade {riskGradeFor(selectedRequest.trustScore).grade} · {riskGradeFor(selectedRequest.trustScore).label}
+                      </span>
+                      <p className="mt-2 text-[11px] text-on-surface-variant/60 leading-relaxed">
+                        {selectedRequest.settlementRate}% settlement rate on {fmtNum(selectedRequest.collections30d)} KES collected in the last 30 days.
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="mt-5 rounded-2xl bg-surface-container-high/60 border border-outline-variant/20 p-4">
-                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-on-surface-variant/45">Request purpose</p>
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    <DetailBox label="Requested" value={formatKES(selectedRequest.requestedAmount)} />
+                    <DetailBox label="Tenor" value={`${selectedRequest.tenorDays} days`} />
+                  </div>
+
+                  <div className="mt-4 rounded-2xl bg-surface-container-high/60 border border-outline-variant/20 p-4">
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-on-surface-variant/45">Stated purpose</p>
                     <p className="mt-2 text-[13px] text-on-surface leading-6">{selectedRequest.purpose}</p>
                   </div>
 
-                  <div className="mt-4 space-y-3 text-[12px] text-on-surface-variant/70">
+                  {/* Applicant / business profile captured on the application */}
+                  {(selectedRequest.monthlyRevenueEstimate || selectedRequest.yearsInOperation || selectedRequest.businessAddress || selectedRequest.contactPhone) && (
+                    <div className="mt-4 rounded-2xl bg-surface-container-high/60 border border-outline-variant/20 p-4">
+                      <p className="text-[11px] font-black uppercase tracking-[0.18em] text-on-surface-variant/45 mb-3">Applicant Profile</p>
+                      {(selectedRequest.monthlyRevenueEstimate || selectedRequest.yearsInOperation) && (
+                        <div className="grid grid-cols-2 gap-3 mb-3">
+                          <DetailBox label="Monthly revenue" value={selectedRequest.monthlyRevenueEstimate ? formatKES(selectedRequest.monthlyRevenueEstimate) : '—'} />
+                          <DetailBox label="Years operating" value={selectedRequest.yearsInOperation ?? '—'} />
+                        </div>
+                      )}
+                      <div className="space-y-2.5 text-[12px] text-on-surface-variant/70">
+                        <Row label="Business address" value={selectedRequest.businessAddress} />
+                        <Row label="Contact phone" value={selectedRequest.contactPhone} />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="mt-4 space-y-2.5 text-[12px] text-on-surface-variant/70">
                     <Row label="Paybill" value={`#${selectedRequest.paybillAccount}`} />
                     <Row label="Assigned analyst" value={selectedRequest.manager} />
-                    <Row label="Reviewed" value={formatDateISO(selectedRequest.updatedAt)} />
-                    <Row label="Notes" value={selectedRequest.notes} />
+                    <Row label="Last decision" value={formatDateISO(selectedRequest.updatedAt)} />
+                    <Row label="Admin notes" value={selectedRequest.notes} />
                   </div>
 
-                  <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                    <ActionButton tone="emerald" icon="check_circle" label="Approve" onClick={() => updateStatus('approved')} />
-                    <ActionButton tone="sky" icon="visibility" label="Review" onClick={() => updateStatus('reviewing')} />
-                    <ActionButton tone="rose" icon="cancel" label="Decline" onClick={() => updateStatus('declined')} />
-                  </div>
+                  {pendingDecision ? (
+                    <div className="mt-5 rounded-2xl border border-outline-variant/30 bg-white p-4 space-y-3">
+                      <p className="text-[11px] font-black uppercase tracking-[0.18em] text-on-surface-variant/50">
+                        {pendingDecision === 'approved' ? 'Approval details' : 'Decline reason'}
+                      </p>
+                      {pendingDecision === 'approved' && (
+                        <div>
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/45">Approved credit limit (KES)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={decisionLimit}
+                            onChange={(e) => setDecisionLimit(e.target.value)}
+                            className="mt-1 w-full rounded-xl border border-outline-variant/30 bg-surface-container-low px-3 py-2.5 text-sm font-bold text-on-surface outline-none focus:border-primary/50"
+                          />
+                        </div>
+                      )}
+                      <div>
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/45">
+                          {pendingDecision === 'approved' ? 'Underwriting notes (optional)' : 'Reason for the merchant'}
+                        </label>
+                        <textarea
+                          rows={3}
+                          value={decisionNotes}
+                          onChange={(e) => setDecisionNotes(e.target.value)}
+                          placeholder={pendingDecision === 'approved' ? 'Any conditions or notes for the file…' : 'Explain why this application was declined…'}
+                          className="mt-1 w-full rounded-xl border border-outline-variant/30 bg-surface-container-low px-3 py-2.5 text-[13px] text-on-surface outline-none focus:border-primary/50 resize-none"
+                        />
+                      </div>
+                      {decisionError && <p className="text-[11px] font-bold text-rose-600">{decisionError}</p>}
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          onClick={cancelDecision}
+                          disabled={updatingStatus}
+                          className="flex-1 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest text-on-surface-variant/60 bg-surface-container-low hover:bg-surface-container-high transition-colors disabled:opacity-50"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={confirmDecision}
+                          disabled={updatingStatus}
+                          className={`flex-1 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest text-white transition-colors disabled:opacity-50 ${pendingDecision === 'approved' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'}`}
+                        >
+                          {updatingStatus ? 'Saving…' : pendingDecision === 'approved' ? 'Confirm Approval' : 'Confirm Decline'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                      <ActionButton tone="emerald" icon="check_circle" label="Approve" onClick={() => openDecision('approved')} disabled={updatingStatus} />
+                      <ActionButton tone="sky" icon="visibility" label="Review" onClick={markUnderReview} disabled={updatingStatus} />
+                      <ActionButton tone="rose" icon="cancel" label="Decline" onClick={() => openDecision('declined')} disabled={updatingStatus} />
+                    </div>
+                  )}
                 </>
               ) : (
                 <EmptyDetail />
               )}
             </div>
 
-            <div className="rounded-[24px] border border-outline-variant/40 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(243,247,245,0.92))] shadow-[0_18px_45px_rgba(15,23,42,0.08)] p-5 md:p-6">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-on-surface-variant/45">Queue notes</p>
+            <div className="rounded-[24px] border border-outline-variant/40 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(243,247,245,0.92))] shadow-editorial p-5 md:p-6">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-on-surface-variant/45">Underwriting guidelines</p>
               <ul className="mt-4 space-y-3 text-[13px] text-on-surface-variant/75 leading-6">
-                <li>Review requests against trust score, payment velocity, and recent collections.</li>
-                <li>Use the detail drawer to move a merchant between pending, review, approved, or declined.</li>
-                <li>Replace the preview endpoint with your live backend path when the credit workflow ships.</li>
+                <li><span className="font-black text-emerald-700">Grade A/B</span> — Trust Score 70+. Fast-track approval; set a limit at or above the requested amount when collections support it.</li>
+                <li><span className="font-black text-amber-700">Grade C</span> — Trust Score 55–69. Approve at a reduced limit or hold for review pending stronger settlement history.</li>
+                <li><span className="font-black text-rose-700">Grade D</span> — Trust Score below 55. Decline with a clear reason so the merchant knows what to improve.</li>
               </ul>
             </div>
           </aside>
@@ -445,23 +510,50 @@ function MiniMetric({ label, value, icon }) {
 
 function StatCard({ label, value, subtitle, icon, tone }) {
   const toneMap = {
-    emerald: 'from-emerald-500/15 to-emerald-50',
-    amber: 'from-amber-500/15 to-amber-50',
-    sky: 'from-sky-500/15 to-sky-50',
-    rose: 'from-rose-500/15 to-rose-50',
+    emerald: 'bg-emerald-50 text-emerald-600',
+    amber: 'bg-amber-50 text-amber-600',
+    sky: 'bg-sky-50 text-sky-600',
+    rose: 'bg-rose-50 text-rose-600',
   };
 
   return (
-    <div className={`rounded-[22px] border border-outline-variant/35 bg-gradient-to-br ${toneMap[tone] || toneMap.emerald} p-5 shadow-[0_16px_40px_rgba(15,23,42,0.07)]`}>
+    <div className="rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-5 shadow-sm hover:shadow-md transition-shadow">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-on-surface-variant/50">{label}</p>
-          <p className="mt-2 text-[26px] md:text-[30px] font-black tracking-tighter text-on-surface">{value}</p>
+          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-on-surface-variant/45">{label}</p>
+          <p className="mt-2 text-[24px] md:text-[28px] font-black tracking-tighter text-on-surface">{value}</p>
           <p className="mt-1 text-[12px] text-on-surface-variant/60">{subtitle}</p>
         </div>
-        <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white/70 text-on-surface shadow-sm">
-          <span className="material-symbols-outlined text-[24px]">{icon}</span>
+        <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-full ${toneMap[tone] || toneMap.emerald}`}>
+          <span className="material-symbols-outlined text-[22px]">{icon}</span>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// Trust Score gauge — same stroke-dasharray donut recipe used elsewhere in the
+// admin app (Overview/Analytics/Ledger "type mix" charts): viewBox 0 0 36 36,
+// radius 15.5, rotated -90deg so the arc starts at 12 o'clock.
+function TrustGauge({ score }) {
+  const value = Math.max(0, Math.min(100, Number(score) || 0));
+  const radius = 15.5;
+  const circumference = 2 * Math.PI * radius;
+  const dash = (value / 100) * circumference;
+  const stroke = riskGradeFor(value).stroke;
+
+  return (
+    <div className="relative w-[72px] h-[72px] shrink-0">
+      <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+        <circle cx="18" cy="18" r={radius} fill="none" stroke="rgba(0,0,0,0.06)" strokeWidth="3" />
+        <circle
+          cx="18" cy="18" r={radius} fill="none" stroke={stroke} strokeWidth="3" strokeLinecap="round"
+          strokeDasharray={`${dash} ${circumference - dash}`}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-[15px] font-black text-on-surface tracking-tight leading-none">{value}</span>
+        <span className="text-[7px] font-bold uppercase tracking-widest text-on-surface-variant/45 mt-0.5">Score</span>
       </div>
     </div>
   );
@@ -495,7 +587,7 @@ function Row({ label, value }) {
   );
 }
 
-function ActionButton({ tone, icon, label, onClick }) {
+function ActionButton({ tone, icon, label, onClick, disabled }) {
   const toneMap = {
     emerald: 'bg-emerald-600 text-white hover:bg-emerald-700',
     sky: 'bg-sky-600 text-white hover:bg-sky-700',
@@ -503,7 +595,7 @@ function ActionButton({ tone, icon, label, onClick }) {
   };
 
   return (
-    <button onClick={onClick} className={`inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-[12px] font-black uppercase tracking-[0.16em] transition-colors ${toneMap[tone] || toneMap.emerald}`}>
+    <button onClick={onClick} disabled={disabled} className={`inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-[12px] font-black uppercase tracking-[0.16em] transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${toneMap[tone] || toneMap.emerald}`}>
       <span className="material-symbols-outlined text-[16px]">{icon}</span>
       {label}
     </button>
@@ -515,7 +607,7 @@ function EmptyDetail() {
     <div className="rounded-[22px] border border-dashed border-outline-variant/30 bg-surface-container-low/50 px-6 py-14 text-center">
       <span className="material-symbols-outlined text-[42px] text-on-surface-variant/20">savings</span>
       <p className="mt-3 text-[15px] font-black text-on-surface">Select a request</p>
-      <p className="mt-1 text-[12px] text-on-surface-variant/60">Open any merchant request to inspect its risk profile and next action.</p>
+      <p className="mt-1 text-[12px] text-on-surface-variant/60">Open any merchant request to inspect its risk profile and issue a decision.</p>
     </div>
   );
 }

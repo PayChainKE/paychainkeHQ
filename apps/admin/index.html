@@ -14,16 +14,5 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').then(registration => {
-            console.log('Admin SW registered: ', registration);
-          }).catch(registrationError => {
-            console.log('Admin SW registration failed: ', registrationError);
-          });
-        });
-      }
-    </script>
   </body>
 </html>

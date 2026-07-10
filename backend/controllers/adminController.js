@@ -15,7 +15,7 @@ import { logAudit } from '../utils/auditLog.js';
 
 // Build an `actor` shape from req.admin so audit rows attribute admin-initiated
 // actions to the right operator even when the merchant is the subject.
-const adminActor = (admin) => admin ? ({
+export const adminActor = (admin) => admin ? ({
   type: 'admin',
   id:    admin._id || null,
   email: admin.email || null,
@@ -468,34 +468,37 @@ export const unflagMerchant = async (req, res) => {
 export const updateMerchantFeatures = async (req, res) => {
   try {
     const { id } = req.params;
-    const { digitalWallet, inflationShield } = req.body;
-    
+    const { digitalWallet, inflationShield, cashAdvanceForm } = req.body;
+
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ error: 'Invalid merchant id.' });
     }
-    
+
     const merchant = await Merchant.findById(id);
     if (!merchant) {
       return res.status(404).json({ error: 'Merchant not found' });
     }
-    
+
     // Initialize if it doesn't exist
     if (!merchant.features) {
-      merchant.features = { digitalWallet: true, inflationShield: true };
+      merchant.features = { digitalWallet: true, inflationShield: true, cashAdvanceForm: true };
     }
-    
+
     if (digitalWallet !== undefined) {
       merchant.features.digitalWallet = digitalWallet;
     }
     if (inflationShield !== undefined) {
       merchant.features.inflationShield = inflationShield;
     }
-    
+    if (cashAdvanceForm !== undefined) {
+      merchant.features.cashAdvanceForm = cashAdvanceForm;
+    }
+
     await merchant.save();
-    
+
     logAudit({
       action: 'admin.merchant.features_updated', category: 'admin', severity: 'info',
-      message: `Updated feature access (Wallet: ${merchant.features.digitalWallet}, Shield: ${merchant.features.inflationShield})`,
+      message: `Updated feature access (Wallet: ${merchant.features.digitalWallet}, Shield: ${merchant.features.inflationShield}, Cash Advance Form: ${merchant.features.cashAdvanceForm})`,
       merchant, actor: adminActor(req.admin), req,
     });
     
@@ -593,6 +596,8 @@ export const getMerchantDetail = async (req, res) => {
         flaggedAt: merchant.flaggedAt,
         flaggedBy: merchant.flaggedBy ? { email: merchant.flaggedBy.email } : null,
         riskSignals,
+        // Feature access toggles (falls back to all-enabled for older docs)
+        features: merchant.features || { digitalWallet: true, inflationShield: true, cashAdvanceForm: true },
         // Settlement
         settlementMobile: merchant.settlementMobile,
         settlementBankName: merchant.settlementBankName,

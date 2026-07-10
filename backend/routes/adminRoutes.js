@@ -35,6 +35,7 @@ import {
 import { runWalletAudit } from '../controllers/walletAuditController.js';
 import { adminListInvoices } from '../controllers/invoiceController.js';
 import { getRevenue } from '../controllers/revenueController.js';
+import { adminListCashAdvanceRequests, adminUpdateCashAdvanceRequest } from '../controllers/cashAdvanceController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -89,6 +90,11 @@ router.get('/wallet-audit', protect, runWalletAudit);
 
 // Platform-wide invoice oversight — every merchant's invoices, paginated/searchable.
 router.get('/invoices', protect, adminListInvoices);
+
+// Cash advance review queue — list every merchant's application, move a
+// request between pending/reviewing/approved/declined.
+router.get('/cash-advance/requests', protect, adminListCashAdvanceRequests);
+router.patch('/cash-advance/requests/:id', protect, sensitiveActionLimiter, adminUpdateCashAdvanceRequest);
 
 // Compact health pulse for the sidebar widget.
 router.get('/system-status', protect, getSystemStatus);

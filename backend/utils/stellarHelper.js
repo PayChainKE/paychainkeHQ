@@ -8,7 +8,10 @@ dotenv.config();
 const NETWORK = process.env.STELLAR_NETWORK || 'TESTNET';
 const HORIZON_URL = process.env.STELLAR_HORIZON_URL || 'https://horizon-testnet.stellar.org';
 const USDC_ASSET_CODE = process.env.USDC_ASSET_CODE || 'USDC';
-const USDC_ISSUER_ADDRESS = process.env.USDC_ISSUER_ADDRESS || 'GBBD47IF6LWK7P7MDEVSCWT73IQIGCEYEEXIUUABHNYL5NCTHDBWFFXU';
+// Placeholder only — this fallback fails checksum validation unless
+// USDC_ISSUER_ADDRESS is set, which crashes the process at import time.
+// Set the real issuer via env for any environment that touches Stellar/USDC.
+const USDC_ISSUER_ADDRESS = process.env.USDC_ISSUER_ADDRESS || 'GCCS5HLSMPIHCFIJIEKBHAS6WXCBUATQ4APAV5LWJ7E2U2HPYPWZ6TAE';
 const MASTER_SECRET_KEY = process.env.PAYCHAIN_MASTER_SECRET_KEY;
 
 const server = new StellarSdk.Horizon.Server(HORIZON_URL);
