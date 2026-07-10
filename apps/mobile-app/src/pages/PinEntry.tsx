@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { useBiometrics } from '../hooks/useBiometrics';
@@ -41,7 +42,7 @@ export default function PinEntry() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#0b2114]">
+    <SafeAreaView className="flex-1 bg-[#0b2114]" edges={['top', 'left', 'right', 'bottom']}>
       <View className="flex-1 px-8 pt-12 items-center justify-center">
         <View className="w-16 h-16 bg-[#006c4e] rounded-full justify-center items-center mb-6">
           <Feather name="shield" size={28} color="white" />
