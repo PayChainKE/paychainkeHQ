@@ -10,6 +10,7 @@ import BulkPay from '../pages/BulkPay';
 import CashAdvance from '../pages/CashAdvance';
 import Profile from '../pages/Profile';
 import InflationShield from '../pages/InflationShield';
+import DigitalWallet from '../pages/DigitalWallet';
 import SupportPage from '../pages/SupportPage';
 import Notifications from '../pages/Notifications';
 import Login from '../pages/Login';
@@ -97,6 +98,11 @@ function MainTabs() {
       <Tab.Screen
         name="InflationShield"
         component={InflationShield}
+        options={{ tabBarButton: () => null, tabBarItemStyle: { flex: 0, width: 0, padding: 0 } }}
+      />
+      <Tab.Screen
+        name="DigitalWallet"
+        component={DigitalWallet}
         options={{ tabBarButton: () => null, tabBarItemStyle: { flex: 0, width: 0, padding: 0 } }}
       />
       <Tab.Screen

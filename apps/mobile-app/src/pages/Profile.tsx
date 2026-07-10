@@ -14,18 +14,19 @@ import SupportTab from '../components/tabs/SupportTab';
 import SettingsTab from '../components/tabs/SettingsTab';
 import SecurityTab from '../components/tabs/SecurityTab';
 
-type SectionKey = 'my-tills' | 'support' | 'settings' | 'security' | 'swap' | 'payment-link' | 'statement' | 'business-profile';
+type SectionKey = 'my-tills' | 'support' | 'settings' | 'security' | 'wallet' | 'payment-link' | 'statement' | 'business-profile';
 
 const MENU_ITEMS: Array<{
   key: SectionKey;
   label: string;
   icon: keyof typeof MaterialIcons.glyphMap;
+  external?: boolean;
 }> = [
   { key: 'my-tills', label: 'My Tills', icon: 'point-of-sale' },
   { key: 'support', label: 'Help & Support', icon: 'help-outline' },
   { key: 'settings', label: 'Settings', icon: 'tune' },
   { key: 'security', label: 'Security', icon: 'security' },
-  { key: 'swap', label: 'Swap', icon: 'swap-horiz' },
+  { key: 'wallet', label: 'Digital Wallet', icon: 'account-balance-wallet', external: true },
   { key: 'payment-link', label: 'Payment Link', icon: 'link' },
   { key: 'statement', label: 'Account Statement', icon: 'description' },
   { key: 'business-profile', label: 'Business Profile', icon: 'business' },
@@ -275,80 +276,6 @@ function PaymentLinkPanel() {
   );
 }
 
-function SwapPanel({ navigation }: { navigation: any }) {
-  return (
-    <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
-      <View className="w-full max-w-lg mx-auto px-6 pt-2 pb-12">
-        <View className="mb-6">
-          <Text className="font-jakarta-extrabold text-[28px] text-[#00351d] tracking-tight leading-tight mb-2">Move Money</Text>
-          <Text className="text-[#707971] text-[14px] font-jakarta-medium leading-relaxed opacity-80">Send, add, or request funds from a premium money hub.</Text>
-        </View>
-
-        <View className="rounded-[36px] overflow-hidden bg-[#00351d] shadow-xl shadow-[#00351d]/20 mb-6">
-          <LinearGradient colors={['#0b4d2e', '#00351d']} className="p-7">
-            <Text className="text-white/70 text-[10px] font-jakarta-bold uppercase tracking-[0.2em] mb-2">Premium transfer center</Text>
-            <Text className="text-white text-[28px] font-jakarta-extrabold tracking-tight leading-tight mb-3">One place to move value</Text>
-            <Text className="text-white/70 text-[13px] font-jakarta-medium leading-relaxed">Choose how you want to move money. Each path is designed for a faster merchant workflow.</Text>
-          </LinearGradient>
-        </View>
-
-        <View className="gap-4">
-          <ActionCard
-            title="Send Money"
-            subtitle="Pay suppliers, staff, or wallet recipients."
-            icon="north-east"
-            accent="#006c4e"
-            onPress={() => navigation?.navigate('Pay')}
-          />
-          <ActionCard
-            title="Add Money"
-            subtitle="Top up your balance and keep funds ready."
-            icon="add-circle-outline"
-            accent="#1d4ed8"
-            onPress={() => navigation?.navigate('Collections')}
-          />
-          <ActionCard
-            title="Request Money"
-            subtitle="Ask a customer or partner to pay you now."
-            icon="request-page"
-            accent="#b45309"
-            onPress={() => navigation?.navigate('Collections')}
-          />
-        </View>
-      </View>
-    </ScrollView>
-  );
-}
-
-function ActionCard({
-  title,
-  subtitle,
-  icon,
-  accent,
-  onPress,
-}: {
-  title: string;
-  subtitle: string;
-  icon: keyof typeof MaterialIcons.glyphMap;
-  accent: string;
-  onPress: () => void;
-}) {
-  return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.85} className="rounded-[30px] overflow-hidden bg-white border border-[#eff4ef] shadow-sm shadow-[#00351d]/5">
-      <View className="p-5 flex-row items-center gap-4">
-        <View style={{ backgroundColor: accent + '18' }} className="w-14 h-14 rounded-[22px] items-center justify-center">
-          <MaterialIcons name={icon} size={26} color={accent} />
-        </View>
-        <View className="flex-1 pr-2">
-          <Text className="text-[17px] font-jakarta-extrabold text-[#00351d] tracking-tight mb-1">{title}</Text>
-          <Text className="text-[12px] font-jakarta-medium text-[#707971] leading-relaxed">{subtitle}</Text>
-        </View>
-        <Feather name="chevron-right" size={20} color="#b3b9b4" />
-      </View>
-    </TouchableOpacity>
-  );
-}
-
 function AccountStatementPanel({ navigation, merchant }: { navigation: any; merchant: any }) {
   return (
     <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
@@ -416,7 +343,7 @@ export default function Profile({ navigation }: any) {
 
   const digitalWalletEnabled = merchant?.features?.digitalWallet !== false;
   const visibleMenuItems = useMemo(
-    () => MENU_ITEMS.filter((item) => digitalWalletEnabled || (item.key !== 'swap' && item.key !== 'payment-link')),
+    () => MENU_ITEMS.filter((item) => digitalWalletEnabled || (item.key !== 'wallet' && item.key !== 'payment-link')),
     [digitalWalletEnabled]
   );
 
@@ -435,8 +362,6 @@ export default function Profile({ navigation }: any) {
         return <SettingsTab />;
       case 'security':
         return <SecurityTab />;
-      case 'swap':
-        return <SwapPanel navigation={navigation} />;
       case 'payment-link':
         return <PaymentLinkPanel />;
       case 'statement':
@@ -468,7 +393,7 @@ export default function Profile({ navigation }: any) {
                 label={item.label}
                 icon={item.icon}
                 active={activeSection === item.key}
-                onPress={() => setActiveSection(item.key)}
+                onPress={() => (item.external ? navigation?.navigate('DigitalWallet') : setActiveSection(item.key))}
               />
             ))}
 

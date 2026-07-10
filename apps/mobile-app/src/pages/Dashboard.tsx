@@ -333,7 +333,7 @@ export default function Dashboard({ navigation }: any) {
           <View className="mb-8">
               <View className="px-6 flex-row items-center justify-between mb-4">
                 <Text className="text-lg font-jakarta-bold text-[#0c2010]">Digital Ledgers</Text>
-                <TouchableOpacity onPress={() => navigation?.navigate('InflationShield')}>
+                <TouchableOpacity onPress={() => navigation?.navigate('DigitalWallet')}>
                   <Text className="text-[#006c4e] text-[11px] font-jakarta-bold uppercase tracking-widest">View All</Text>
                 </TouchableOpacity>
               </View>
@@ -349,7 +349,10 @@ export default function Dashboard({ navigation }: any) {
                 overScrollMode="always"
                 className="w-full"
               >
-                <View className="bg-[#0b4d2e] w-[280px] h-[160px] rounded-[32px] p-6 mr-4 relative overflow-hidden shadow-md shadow-[#0b4d2e]/30">
+                <TouchableOpacity
+                  activeOpacity={0.9}
+                  onPress={() => navigation?.navigate('DigitalWallet')}
+                  className="bg-[#0b4d2e] w-[280px] h-[160px] rounded-[32px] p-6 mr-4 relative overflow-hidden shadow-md shadow-[#0b4d2e]/30">
                   <View className="absolute -right-8 -top-8 opacity-10">
                     <MaterialIcons name="account-balance-wallet" size={140} color="white" />
                   </View>
@@ -367,10 +370,14 @@ export default function Dashboard({ navigation }: any) {
                       <Text className="text-[#96d4ab] text-[13px] font-jakarta-medium">{formatCurrency(monthTotal)} collected this month</Text>
                     )}
                   </View>
-                </View>
+                </TouchableOpacity>
 
                 {walletActivated ? (
-                  <View className="bg-[#1e293b] w-[280px] h-[160px] rounded-[32px] p-6 mr-4 relative overflow-hidden shadow-md shadow-[#1e293b]/30">
+                  <TouchableOpacity
+                    activeOpacity={0.9}
+                    onPress={() => navigation?.navigate('DigitalWallet')}
+                    className="bg-[#1e293b] w-[280px] h-[160px] rounded-[32px] p-6 mr-4 relative overflow-hidden shadow-md shadow-[#1e293b]/30"
+                  >
                     <View className="absolute -right-4 -top-4 opacity-10">
                       <MaterialIcons name="shield" size={100} color="white" />
                     </View>
@@ -382,11 +389,11 @@ export default function Dashboard({ navigation }: any) {
                         {usdcInKes != null ? `≈ ${mask(formatCurrency(usdcInKes))}` : 'Fetching rate…'}
                       </Text>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 ) : (
                   <TouchableOpacity
                     activeOpacity={0.85}
-                    onPress={() => navigation?.navigate('InflationShield')}
+                    onPress={() => navigation?.navigate('DigitalWallet')}
                     className="bg-[#0A2540] w-[280px] h-[160px] rounded-[32px] p-6 mr-4 relative overflow-hidden shadow-md shadow-[#0A2540]/30"
                   >
                     <View className="absolute -right-4 -top-4 opacity-10">
