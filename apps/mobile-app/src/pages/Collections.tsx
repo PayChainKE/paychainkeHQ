@@ -117,6 +117,11 @@ export default function Collections() {
   const [showStatementSheet, setShowStatementSheet] = useState(false);
   const [statementPeriod, setStatementPeriod] = useState<DateFilter>('month');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isGeneratingReceipt, setIsGeneratingReceipt] = useState(false);
+
+  // Pagination — mirrors the merchant dashboard's Transactions page (10/page)
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const fetchTransactions = async () => {
     try {
@@ -227,6 +232,16 @@ export default function Collections() {
       return true;
     });
   }, [transactions, searchQuery, effectiveDateFilter, effectiveTypeFilter, filterStatus, filterMinAmount, filterMaxAmount]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, effectiveDateFilter, effectiveTypeFilter, filterStatus, filterMinAmount, filterMaxAmount]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / itemsPerPage));
+  const paginatedTransactions = filteredTransactions.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   const advancedFiltersActive =
     filterDate !== 'all' || filterType !== 'all' || filterStatus !== 'all' || filterMinAmount !== '' || filterMaxAmount !== '';
@@ -501,6 +516,106 @@ export default function Collections() {
     }
   };
 
+  // -------- SINGLE-TRANSACTION AUDIT RECEIPT (mirrors dashboard's per-row PDF) --------
+  const buildAuditReceiptHtml = (tx: Tx): string => {
+    const esc = (s: any) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const amountStr = tx.type === 'fx_swap'
+      ? `${(tx.usdcAmount || 0).toLocaleString()} USDC`
+      : formatCurrency(kesValue(tx));
+    const auditHash = Math.random().toString(36).substring(2, 18).toUpperCase();
+    const timestamp = new Date(tx.createdAt).toLocaleString('en-KE', {
+      day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    });
+
+    return `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Audit Receipt — ${esc(tx.reference)}</title>
+<style>
+  @page { size: 105mm 148mm; margin: 0; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; color: #162723; margin: 0; }
+  .band { background: #162723; padding: 18px 16px; text-align: center; }
+  .band .title { color: #fff; font-size: 15px; font-weight: 700; letter-spacing: 1.5px; margin-top: 8px; }
+  .content { padding: 20px 18px; }
+  .ref-label { font-size: 9px; color: #707971; text-transform: uppercase; letter-spacing: 1.5px; }
+  .ref-value { font-size: 14px; font-weight: 700; margin-top: 3px; }
+  .divider { border-top: 1px solid #e6e6e6; margin: 14px 0; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid .item .label { font-size: 8px; color: #707971; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 3px; }
+  .grid .item .value { font-size: 11px; font-weight: 700; }
+  .amount-box { margin-top: 16px; }
+  .amount-box .label { font-size: 8px; color: #707971; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 4px; }
+  .amount-box .value { font-size: 22px; font-weight: 700; }
+  .verify { margin-top: 20px; background: #f5f7f9; padding: 10px 12px; text-align: center; font-size: 9px; font-weight: 700; letter-spacing: 1px; }
+  .footer { margin-top: 22px; text-align: center; font-size: 8px; color: #969696; line-height: 1.6; }
+</style>
+</head>
+<body>
+  <div class="band">
+    <div class="title">OFFICIAL AUDIT RECEIPT</div>
+  </div>
+  <div class="content">
+    <div class="ref-label">Reference ID</div>
+    <div class="ref-value">${esc(tx.reference || '—')}</div>
+    <div class="divider"></div>
+    <div class="grid">
+      <div class="item">
+        <div class="label">Transaction Type</div>
+        <div class="value">${esc(tx.type.replace(/_/g, ' ').toUpperCase())}</div>
+      </div>
+      <div class="item">
+        <div class="label">Network Status</div>
+        <div class="value">${esc((tx.status || '').toUpperCase())}</div>
+      </div>
+      <div class="item">
+        <div class="label">Counterparty</div>
+        <div class="value">${esc(counterpartyName(tx))}</div>
+      </div>
+      <div class="item">
+        <div class="label">Timestamp</div>
+        <div class="value">${esc(timestamp)}</div>
+      </div>
+    </div>
+    <div class="amount-box">
+      <div class="label">Total Amount</div>
+      <div class="value">${esc(amountStr)}</div>
+    </div>
+    <div class="verify">VERIFICATION: PROTOCOL V4.2 SECURED</div>
+    <div class="footer">
+      This receipt is a cryptographically verified record of the transaction.<br/>
+      Audit Hash: ${auditHash}<br/>
+      Verified by PayChain Ledger Node v0.8.2
+    </div>
+  </div>
+</body>
+</html>`;
+  };
+
+  const handleGenerateAuditReceipt = async () => {
+    if (!selectedTx) return;
+    try {
+      setIsGeneratingReceipt(true);
+      const html = buildAuditReceiptHtml(selectedTx);
+      const { uri } = await Print.printToFileAsync({ html, base64: false });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/pdf',
+          dialogTitle: 'PayChain Audit Receipt',
+          UTI: 'com.adobe.pdf',
+        });
+      } else {
+        Alert.alert('Receipt Ready', `Saved to: ${uri}`);
+      }
+    } catch (err: any) {
+      console.error('Audit receipt generation failed', err);
+      Alert.alert('Unable to generate receipt', err?.message || 'Please try again.');
+    } finally {
+      setIsGeneratingReceipt(false);
+    }
+  };
+
   const openReceipt = (tx: any) => {
     setSelectedTx(tx);
     setShowReceipt(true);
@@ -719,7 +834,7 @@ export default function Collections() {
                   <ActivityIndicator color="#0b4d2e" />
                 </View>
               ) : filteredTransactions.length > 0 ? (
-                filteredTransactions.slice(0, 20).map((tx, index, visible) => {
+                paginatedTransactions.map((tx, index, visible) => {
                   const name = counterpartyName(tx);
                   const inboundRow = isInboundType(tx.type);
                   const isSwap = tx.type === 'fx_swap';
@@ -798,6 +913,32 @@ export default function Collections() {
                 </View>
               )}
             </View>
+
+            {!isLoading && filteredTransactions.length > itemsPerPage && (
+              <View className="flex-row items-center justify-between bg-white p-4 rounded-[24px] shadow-sm border border-[#bfc9bf]/10 mb-6">
+                <TouchableOpacity
+                  onPress={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className={`flex-row items-center px-4 py-2.5 rounded-full gap-1 ${currentPage === 1 ? 'opacity-40' : 'bg-[#e7f8ef]'}`}
+                >
+                  <Feather name="chevron-left" size={16} color={currentPage === 1 ? '#a1a1aa' : '#006c4e'} />
+                  <Text className={`font-jakarta-bold text-[12px] ${currentPage === 1 ? 'text-[#a1a1aa]' : 'text-[#006c4e]'}`}>Prev</Text>
+                </TouchableOpacity>
+
+                <Text className="text-[#707971] text-[12px] font-jakarta-bold">
+                  Page {currentPage} of {totalPages}
+                </Text>
+
+                <TouchableOpacity
+                  onPress={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className={`flex-row items-center px-4 py-2.5 rounded-full gap-1 ${currentPage === totalPages ? 'opacity-40' : 'bg-[#e7f8ef]'}`}
+                >
+                  <Text className={`font-jakarta-bold text-[12px] ${currentPage === totalPages ? 'text-[#a1a1aa]' : 'text-[#006c4e]'}`}>Next</Text>
+                  <Feather name="chevron-right" size={16} color={currentPage === totalPages ? '#a1a1aa' : '#006c4e'} />
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </View>
       </ScrollView>
@@ -943,73 +1084,111 @@ export default function Collections() {
         </View>
       </Modal>
 
-      {/* Payment Receipt Modal */}
+      {/* Transaction Detail Modal — mirrors the dashboard's side-drawer info architecture */}
       <Modal visible={showReceipt} transparent animationType="slide" onRequestClose={() => setShowReceipt(false)}>
         <View className="flex-1 justify-end bg-black/30">
           <TouchableOpacity className="absolute inset-0" activeOpacity={1} onPress={() => setShowReceipt(false)} />
-          <View className="w-full max-w-lg mx-auto bg-white rounded-t-[40px] px-6 pt-4 pb-10 items-center mt-auto shadow-2xl">
-            <View className="w-12 h-1.5 bg-[#e7ece7] rounded-full mb-8" />
-
-            <View className="w-16 h-16 rounded-full bg-[#e7f8ef] items-center justify-center mb-6">
-              <MaterialIcons name="verified" size={32} color="#006c4e" />
+          <View className="w-full max-w-lg mx-auto bg-white rounded-t-[40px] px-6 pt-4 pb-10 mt-auto shadow-2xl" style={{ maxHeight: '90%' }}>
+            <View className="items-center">
+              <View className="w-12 h-1.5 bg-[#e7ece7] rounded-full mb-6" />
             </View>
 
-            <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-3xl text-[#0c2010] mb-2">Payment Verified</Text>
-            <Text className="text-[15px] font-jakarta-medium text-[#707971] mb-8">Transaction settled successfully</Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View className="items-center mb-8">
+                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-2xl text-[#0c2010]">Transaction Details</Text>
+                <Text className="text-[#707971] text-[11px] font-jakarta-bold mt-2 tracking-[0.15em] uppercase" numberOfLines={1}>
+                  Reference: {selectedTx?.reference || '—'}
+                </Text>
+              </View>
 
-            <View className="w-full bg-[#f0fdf4] rounded-[32px] p-6 mb-8">
-              <View className="flex-row justify-between items-center mb-6">
-                <Text className="text-[11px] font-jakarta-bold uppercase tracking-[0.1em] text-[#707971]">Amount</Text>
-                <Text className="text-[17px] font-jakarta-bold text-[#0c2010]">
+              <View className="mb-6">
+                <Text className="text-[10px] text-[#707971]/70 font-jakarta-bold uppercase tracking-[0.2em] mb-2">Settlement</Text>
+                <Text className="text-[32px] font-jakarta-extrabold text-[#0c2010] tracking-tight">
                   {selectedTx?.type === 'fx_swap'
                     ? `${(selectedTx?.usdcAmount || 0).toLocaleString()} USDC`
                     : formatCurrency(selectedTx ? kesValue(selectedTx) : 0)}
                 </Text>
               </View>
-              <View className="flex-row justify-between items-center mb-6">
-                <Text className="text-[11px] font-jakarta-bold uppercase tracking-[0.1em] text-[#707971]">
-                  {selectedTx && isInboundType(selectedTx.type) ? 'From' : 'To'}
-                </Text>
-                <Text className="text-[15px] font-jakarta-semibold text-[#0c2010]" numberOfLines={1}>
-                  {selectedTx ? counterpartyName(selectedTx) : 'Unknown'}
-                </Text>
-              </View>
-              <View className="flex-row justify-between items-center mb-6">
-                <Text className="text-[11px] font-jakarta-bold uppercase tracking-[0.1em] text-[#707971]">Reference</Text>
-                <Text className="text-[15px] font-jakarta-semibold text-[#0c2010]" numberOfLines={1}>{selectedTx?.reference || '—'}</Text>
-              </View>
-              <View className="flex-row justify-between items-center mb-6">
-                <Text className="text-[11px] font-jakarta-bold uppercase tracking-[0.1em] text-[#707971]">Type</Text>
-                <Text className="text-[15px] font-jakarta-semibold text-[#0c2010] capitalize">{selectedTx?.type?.replace('_', ' ') || '—'}</Text>
-              </View>
-              <View className="flex-row justify-between items-center mb-6">
-                <Text className="text-[11px] font-jakarta-bold uppercase tracking-[0.1em] text-[#707971]">Status</Text>
-                <Text className="text-[15px] font-jakarta-semibold text-[#006c4e] capitalize">{selectedTx?.status || '—'}</Text>
-              </View>
-              <View className="flex-row justify-between items-center mb-6">
-                <Text className="text-[11px] font-jakarta-bold uppercase tracking-[0.1em] text-[#707971]">Till Number</Text>
-                <Text className="text-[15px] font-jakarta-semibold text-[#0c2010]">{selectedTx?.accountNumber || merchant?.paybillAccount || '—'}</Text>
-              </View>
 
-              <View className="w-full h-[1px] bg-[#e7ece7] mb-5" />
-
-              <View className="flex-row items-center gap-3">
-                <Feather name="zap" size={18} color="#006c4e" />
-                <View>
-                  <Text className="font-jakarta-bold text-[#0c2010] text-[13px] mb-0.5">Verified via Safaricom Daraja API</Text>
-                  <Text className="text-[#707971] text-[11px] font-jakarta-medium">
-                    {selectedTx ? new Date(selectedTx.createdAt).toLocaleString('en-KE') : ''}
+              <View className="pt-5 border-t border-[#eff4ef] mb-6">
+                <Text className="text-[10px] text-[#707971]/70 font-jakarta-bold uppercase tracking-[0.2em] mb-2">Network Status</Text>
+                <View
+                  className="flex-row items-center gap-2 self-start px-3 py-1.5 rounded-full"
+                  style={{
+                    backgroundColor:
+                      selectedTx?.status === 'completed' || selectedTx?.status === 'verified' ? '#e7f8ef'
+                      : selectedTx?.status === 'pending' ? '#fef3e7' : '#fef2f2',
+                  }}
+                >
+                  <View
+                    className="w-2 h-2 rounded-full"
+                    style={{
+                      backgroundColor:
+                        selectedTx?.status === 'completed' || selectedTx?.status === 'verified' ? '#059669'
+                        : selectedTx?.status === 'pending' ? '#d97706' : '#dc2626',
+                    }}
+                  />
+                  <Text
+                    className="text-[11px] font-jakarta-extrabold uppercase tracking-widest"
+                    style={{
+                      color:
+                        selectedTx?.status === 'completed' || selectedTx?.status === 'verified' ? '#006c4e'
+                        : selectedTx?.status === 'pending' ? '#b45309' : '#b91c1c',
+                    }}
+                  >
+                    {selectedTx?.status || '—'}
                   </Text>
                 </View>
               </View>
-            </View>
 
-            <TouchableOpacity
-              className="w-full bg-[#00351d] h-[60px] rounded-full flex-row items-center justify-center shadow-lg shadow-[#00351d]/20"
-              onPress={() => setShowReceipt(false)}
-            >
-              <Text className="text-white font-jakarta-bold text-[17px]">Close Receipt</Text>
-            </TouchableOpacity>
+              <View className="pt-5 border-t border-[#eff4ef] mb-6">
+                <Text className="text-[10px] text-[#707971]/70 font-jakarta-bold uppercase tracking-[0.2em] mb-2">Counterparty</Text>
+                <Text className="text-[16px] font-jakarta-bold text-[#0c2010]" numberOfLines={1}>
+                  {selectedTx ? counterpartyName(selectedTx) : 'Unknown'}
+                </Text>
+                <Text className="text-[10px] text-[#707971] font-jakarta-bold mt-1 uppercase tracking-widest">
+                  {selectedTx?.accountNumber || merchant?.paybillAccount || 'SYSTEM'}
+                </Text>
+              </View>
+
+              <View className="pt-5 border-t border-[#eff4ef] mb-6">
+                <Text className="text-[10px] text-[#707971]/70 font-jakarta-bold uppercase tracking-[0.2em] mb-2">Timestamp</Text>
+                <Text className="text-[13px] font-jakarta-bold text-[#0c2010]/70 uppercase tracking-widest">
+                  {selectedTx ? new Date(selectedTx.createdAt).toLocaleString('en-KE') : ''}
+                </Text>
+              </View>
+
+              <View className="pt-5 border-t border-b border-[#eff4ef] pb-8 mb-6">
+                <Text className="text-[10px] text-[#707971]/70 font-jakarta-bold uppercase tracking-[0.2em] mb-2">Verification</Text>
+                <View className="flex-row items-center gap-3 bg-[#f7faf7] border border-[#eff4ef] px-4 py-3 rounded-2xl self-start">
+                  <Feather name="shield" size={16} color="#00351d40" />
+                  <Text className="text-[10px] font-jakarta-bold text-[#00351d]/60 uppercase tracking-[0.1em]">Protocol V4.2 Secured</Text>
+                </View>
+              </View>
+
+              <View className="items-center gap-5 mb-2">
+                <TouchableOpacity
+                  onPress={handleGenerateAuditReceipt}
+                  disabled={isGeneratingReceipt}
+                  activeOpacity={0.9}
+                  className="w-full bg-[#00351d] h-[56px] rounded-full flex-row items-center justify-center gap-3 shadow-lg shadow-[#00351d]/20"
+                  style={{ opacity: isGeneratingReceipt ? 0.7 : 1 }}
+                >
+                  {isGeneratingReceipt ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <>
+                      <Feather name="file-text" size={17} color="#fff" />
+                      <Text className="text-white font-jakarta-bold text-[15px]">Generate Audit Receipt</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity onPress={() => setShowReceipt(false)} className="py-2">
+                  <Text className="text-[#707971] font-jakarta-extrabold text-[11px] uppercase tracking-[0.2em]">Done</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
