@@ -165,7 +165,7 @@ export default function Dashboard({ navigation }: any) {
                   <MaterialIcons name="swap-horiz" size={24} color="#00351d" />
                 </View>
               </View>
-              <Text className="text-[11px] font-jakarta-bold text-[#1b1c1a] uppercase tracking-widest">Move Money</Text>
+              <Text className="text-[11px] font-jakarta-bold text-[#1b1c1a] uppercase tracking-widest">Swap</Text>
             </TouchableOpacity>
 
             <TouchableOpacity className="items-center" activeOpacity={0.8} onPress={() => navigation?.navigate('Advance')}>
