@@ -213,7 +213,7 @@ const Login = () => {
                       className="absolute right-4 top-1/2 -translate-y-1/2 text-primary/40 hover:text-primary transition-colors p-1"
                     >
                       <span className="material-symbols-outlined text-xl">
-                        {showPassword ? 'visibility' : 'visibility_off'}
+                        {showPassword ? 'visibility_off' : 'visibility'}
                       </span>
                     </button>
                   </div>

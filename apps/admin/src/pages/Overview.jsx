@@ -185,12 +185,16 @@ const Overview = () => {
     return () => clearInterval(id);
   }, [fetchFx]);
 
+  // Mirrors the real Waitlist status enum: pending | contacted | approved |
+  // rejected | converted (backend/models/Waitlist.js). There is no 'kyc'
+  // status in the schema — an earlier version of this funnel filtered on one
+  // and always showed zero as a result.
   const stats = useMemo(() => ({
     total: waitlist.length,
     pending: waitlist.filter((w) => w.status?.toLowerCase() === 'pending').length,
+    contacted: waitlist.filter((w) => w.status?.toLowerCase() === 'contacted').length,
     approved: waitlist.filter((w) => w.status?.toLowerCase() === 'approved').length,
     converted: waitlist.filter((w) => ['converted', 'active'].includes((w.status || '').toLowerCase())).length,
-    kyc: waitlist.filter((w) => w.status?.toLowerCase() === 'kyc').length,
   }), [waitlist]);
 
   // Recent activity merges messages + recent merchants for a real cross-system pulse.
@@ -485,8 +489,8 @@ const Overview = () => {
           <div className="bg-surface-container-lowest p-4 md:p-6 rounded-xl border border-outline-variant/20">
             <div className="flex w-full gap-2 overflow-x-auto no-scrollbar">
               <div className="flex-1 min-w-[80px] h-12 bg-primary rounded-lg flex items-center justify-center text-white text-2xs font-bold tracking-widest uppercase">WAITLIST {loading ? '' : `(${stats.total})`}</div>
-              <div className="flex-[0.85] min-w-[80px] h-12 bg-primary/90 rounded-lg flex items-center justify-center text-white text-2xs font-bold tracking-widest uppercase">APPROVED {loading ? '' : `(${stats.approved})`}</div>
-              <div className="flex-[0.7] min-w-[80px] h-12 bg-primary/80 rounded-lg flex items-center justify-center text-white text-2xs font-bold tracking-widest uppercase">KYC {loading ? '' : `(${stats.kyc})`}</div>
+              <div className="flex-[0.85] min-w-[80px] h-12 bg-primary/90 rounded-lg flex items-center justify-center text-white text-2xs font-bold tracking-widest uppercase">CONTACTED {loading ? '' : `(${stats.contacted})`}</div>
+              <div className="flex-[0.7] min-w-[80px] h-12 bg-primary/80 rounded-lg flex items-center justify-center text-white text-2xs font-bold tracking-widest uppercase">APPROVED {loading ? '' : `(${stats.approved})`}</div>
               <div className="flex-[0.55] min-w-[80px] h-12 bg-secondary rounded-lg flex items-center justify-center text-on-secondary text-2xs font-bold tracking-widest uppercase">CONVERTED {loading ? '' : `(${stats.converted})`}</div>
             </div>
           </div>
