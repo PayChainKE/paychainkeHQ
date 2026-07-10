@@ -748,7 +748,9 @@ export const getLedger = async (req, res) => {
   try {
     const range = ['24h', '7d', '30d', 'all'].includes(req.query.range) ? req.query.range : '7d';
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const limit = Math.min(100, Math.max(5, parseInt(req.query.limit, 10) || 25));
+    // Capped at 5000 (not the usual ~100) so the admin CSV export can pull a
+    // full filtered range in one request. Admin-only route, no public abuse vector.
+    const limit = Math.min(5000, Math.max(5, parseInt(req.query.limit, 10) || 25));
     const type = req.query.type && req.query.type !== 'all' ? req.query.type : null;
     const status = req.query.status && req.query.status !== 'all' ? req.query.status : null;
     const q = (req.query.q || '').trim();
@@ -882,7 +884,7 @@ export const getLedger = async (req, res) => {
     });
   } catch (error) {
     console.error('Get Ledger Error:', error);
-    res.status(500).json({ error: error.message, stack: error.stack });
+    res.status(500).json({ error: 'Server Error' });
   }
 };
 

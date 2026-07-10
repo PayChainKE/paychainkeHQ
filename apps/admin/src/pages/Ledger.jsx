@@ -86,6 +86,7 @@ const Ledger = () => {
   const [activeTxn, setActiveTxn] = useState(null);
   const [refreshedAt, setRefreshedAt] = useState(null);
   const [copiedRef, setCopiedRef] = useState('');
+  const [exporting, setExporting] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -133,9 +134,30 @@ const Ledger = () => {
     return () => window.removeEventListener('keydown', h);
   }, []);
 
-  function exportCsv() {
-    if (!data?.transactions || data.transactions.length === 0) { alert('Nothing to export.'); return; }
-    const rows = data.transactions.map((t) => ({
+  const EXPORT_LIMIT = 5000;
+
+  async function exportCsv() {
+    setExporting(true);
+    try {
+      const res = await api.get('/api/admin/ledger', {
+        params: { range, page: 1, limit: EXPORT_LIMIT, type, status, q: search },
+      });
+      if (!res.data?.success) { alert(res.data?.error || 'Export failed.'); return; }
+      const txns = res.data.data?.transactions || [];
+      if (txns.length === 0) { alert('Nothing to export for the current filters.'); return; }
+      buildAndDownloadCsv(txns);
+      if (res.data.data?.pagination?.total > EXPORT_LIMIT) {
+        alert(`This filter matches ${res.data.data.pagination.total} transactions — only the most recent ${EXPORT_LIMIT} were exported. Narrow the range for a complete export.`);
+      }
+    } catch (e) {
+      alert(e?.response?.data?.error || 'Export failed.');
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  function buildAndDownloadCsv(transactions) {
+    const rows = transactions.map((t) => ({
       Reference: t.reference,
       Timestamp: new Date(t.createdAt).toISOString(),
       Type: t.type,
@@ -233,9 +255,9 @@ const Ledger = () => {
                 <span className={`material-symbols-outlined text-base ${loading ? 'animate-spin' : ''}`}>refresh</span>
                 Refresh
               </button>
-              <button onClick={exportCsv} className="flex items-center gap-2 px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-white text-2xs font-bold rounded-xl uppercase tracking-widest transition-all shadow-lg">
-                <span className="material-symbols-outlined text-base">file_download</span>
-                Export CSV
+              <button onClick={exportCsv} disabled={exporting} className="flex items-center gap-2 px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-white text-2xs font-bold rounded-xl uppercase tracking-widest transition-all shadow-lg disabled:opacity-50">
+                <span className={`material-symbols-outlined text-base ${exporting ? 'animate-spin' : ''}`}>{exporting ? 'progress_activity' : 'file_download'}</span>
+                {exporting ? 'Exporting…' : 'Export CSV'}
               </button>
             </div>
           </div>
