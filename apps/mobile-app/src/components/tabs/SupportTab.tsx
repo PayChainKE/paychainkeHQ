@@ -39,7 +39,7 @@ export default function SupportTab() {
           <View className="relative w-full shadow-lg shadow-[#00351d]/5">
             <Feather name="search" size={22} color="#b3b9b4" style={{ position: 'absolute', left: 20, top: 18, zIndex: 1 }} />
             <TextInput 
-              className="w-full bg-white border border-[#efeeeb] rounded-3xl py-4 pl-[56px] pr-6 text-[16px] font-jakarta-medium text-[#00351d]"
+              className="w-full bg-white border border-[#eff4ef] rounded-3xl py-4 pl-[56px] pr-6 text-[16px] font-jakarta-medium text-[#00351d]"
               placeholder="Describe your issue..."
               value={search}
               onChangeText={setSearch}
@@ -77,13 +77,13 @@ export default function SupportTab() {
             {faqs.map((f, i) => (
               <TouchableOpacity 
                 key={i} 
-                className={`bg-white rounded-[24px] border ${expandedFaq === i ? 'border-[#006c4e]/30 shadow-md shadow-[#006c4e]/10' : 'border-[#efeeeb] shadow-sm shadow-[#00351d]/5'} overflow-hidden transition-all`}
+                className={`bg-white rounded-[24px] border ${expandedFaq === i ? 'border-[#006c4e]/30 shadow-md shadow-[#006c4e]/10' : 'border-[#eff4ef] shadow-sm shadow-[#00351d]/5'} overflow-hidden transition-all`}
                 onPress={() => setExpandedFaq(expandedFaq === i ? null : i)}
                 activeOpacity={0.7}
               >
                 <View className="p-5 flex-row items-center justify-between">
                   <Text className={`text-[14px] font-jakarta-bold flex-1 pr-4 ${expandedFaq === i ? 'text-[#006c4e]' : 'text-[#00351d]'}`}>{f.q}</Text>
-                  <View className={`w-8 h-8 rounded-full items-center justify-center ${expandedFaq === i ? 'bg-[#006c4e]/10' : 'bg-[#faf9f6]'}`}>
+                  <View className={`w-8 h-8 rounded-full items-center justify-center ${expandedFaq === i ? 'bg-[#006c4e]/10' : 'bg-[#f0fdf4]'}`}>
                     <Feather name={expandedFaq === i ? "minus" : "plus"} size={16} color={expandedFaq === i ? "#006c4e" : "#00351d"} />
                   </View>
                 </View>
@@ -112,7 +112,7 @@ export default function SupportTab() {
                   </View>
                   <View>
                     <Text className="text-[15px] font-jakarta-extrabold text-white tracking-tight mb-0.5">WhatsApp Support</Text>
-                    <Text className="text-[11px] text-[#b1f1c6] font-jakarta-medium">Instant response (2 mins)</Text>
+                    <Text className="text-[11px] text-[#5efeb3] font-jakarta-medium">Instant response (2 mins)</Text>
                   </View>
                 </View>
                 <Feather name="arrow-right" size={20} color="rgba(255,255,255,0.3)" />

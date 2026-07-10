@@ -25,7 +25,7 @@ export default function SettingsTab() {
         </View>
 
         {/* Administrator Profile Card */}
-        <View className="bg-white rounded-[32px] border border-[#efeeeb] shadow-md shadow-[#00351d]/5 mb-6 overflow-hidden">
+        <View className="bg-white rounded-[32px] border border-[#eff4ef] shadow-md shadow-[#00351d]/5 mb-6 overflow-hidden">
           <LinearGradient colors={['rgba(0,108,78,0.03)', 'rgba(0,108,78,0)']} className="absolute inset-0 h-32" />
           
           <View className="p-7">
@@ -43,7 +43,7 @@ export default function SettingsTab() {
             <View className="gap-6">
               <View>
                 <Text className="text-[10px] text-[#707971] font-jakarta-bold uppercase tracking-[0.2em] mb-2.5 pl-1 opacity-80">Primary Contact</Text>
-                <View className="w-full bg-[#faf9f6] border border-[#efeeeb] rounded-2xl py-4 px-5 flex-row items-center justify-between">
+                <View className="w-full bg-[#f0fdf4] border border-[#eff4ef] rounded-2xl py-4 px-5 flex-row items-center justify-between">
                   <Text className="text-[15px] font-jakarta-extrabold text-[#00351d] tracking-tight">{merchant?.businessName || "N/A"}</Text>
                   <MaterialIcons name="lock-outline" size={16} color="#b3b9b4" />
                 </View>
@@ -51,20 +51,20 @@ export default function SettingsTab() {
 
               <View>
                 <Text className="text-[10px] text-[#707971] font-jakarta-bold uppercase tracking-[0.2em] mb-2.5 pl-1 opacity-80">Email Address</Text>
-                <View className="w-full bg-[#faf9f6] border border-[#efeeeb] rounded-2xl py-4 px-5 flex-row items-center justify-between">
+                <View className="w-full bg-[#f0fdf4] border border-[#eff4ef] rounded-2xl py-4 px-5 flex-row items-center justify-between">
                   <Text className="text-[15px] font-jakarta-extrabold text-[#00351d] tracking-tight">{merchant?.email || "N/A"}</Text>
                 </View>
               </View>
 
               <View>
                 <Text className="text-[10px] text-[#707971] font-jakarta-bold uppercase tracking-[0.2em] mb-2.5 pl-1 opacity-80">Phone Number</Text>
-                <View className="w-full bg-[#faf9f6] border border-[#efeeeb] rounded-2xl py-4 px-5 flex-row items-center justify-between">
+                <View className="w-full bg-[#f0fdf4] border border-[#eff4ef] rounded-2xl py-4 px-5 flex-row items-center justify-between">
                   <Text className="text-[15px] font-jakarta-extrabold text-[#00351d] tracking-tight">{merchant?.phone || "N/A"}</Text>
                   <MaterialIcons name="lock-outline" size={16} color="#b3b9b4" />
                 </View>
               </View>
 
-              <View className="h-[1px] bg-[#efeeeb] w-full my-2" />
+              <View className="h-[1px] bg-[#eff4ef] w-full my-2" />
 
               <View>
                 <View className="flex-row justify-between items-center mb-2.5 pr-1">
@@ -79,7 +79,7 @@ export default function SettingsTab() {
                 <View className="relative">
                   <ValidatedTextInput kind="kraPin" value={kraPin} onChangeText={setKraPin}
                     placeholder="e.g. P123456789A" placeholderTextColor="#b3b9b4" editable={!kraPinLocked}
-                    className={`w-full bg-white border border-[#efeeeb] rounded-2xl py-4 px-5 text-[15px] font-jakarta-extrabold text-[#00351d] tracking-tight ${kraPinLocked ? 'bg-[#faf9f6] text-[#707971]' : 'shadow-md shadow-[#006c4e]/10 border-[#006c4e]/30'}`} />
+                    className={`w-full bg-white border border-[#eff4ef] rounded-2xl py-4 px-5 text-[15px] font-jakarta-extrabold text-[#00351d] tracking-tight ${kraPinLocked ? 'bg-[#f0fdf4] text-[#707971]' : 'shadow-md shadow-[#006c4e]/10 border-[#006c4e]/30'}`} />
                   {kraPinLocked && (
                     <MaterialIcons name="lock-outline" size={16} color="#b3b9b4" style={{ position: 'absolute', right: 20, top: 18 }} />
                   )}
@@ -99,7 +99,7 @@ export default function SettingsTab() {
                 <View className="relative">
                   <ValidatedTextInput kind="businessReg" optional value={businessNumber} onChangeText={setBusinessNumber}
                     placeholder="e.g. PVT-XXXXXX" placeholderTextColor="#b3b9b4" editable={!businessNumberLocked}
-                    className={`w-full bg-white border border-[#efeeeb] rounded-2xl py-4 px-5 text-[15px] font-jakarta-extrabold text-[#00351d] tracking-tight ${businessNumberLocked ? 'bg-[#faf9f6] text-[#707971]' : 'shadow-md shadow-[#006c4e]/10 border-[#006c4e]/30'}`} />
+                    className={`w-full bg-white border border-[#eff4ef] rounded-2xl py-4 px-5 text-[15px] font-jakarta-extrabold text-[#00351d] tracking-tight ${businessNumberLocked ? 'bg-[#f0fdf4] text-[#707971]' : 'shadow-md shadow-[#006c4e]/10 border-[#006c4e]/30'}`} />
                   {businessNumberLocked && (
                     <MaterialIcons name="lock-outline" size={16} color="#b3b9b4" style={{ position: 'absolute', right: 20, top: 18 }} />
                   )}

@@ -64,7 +64,7 @@ interface BatchHistory {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const TYPE_META: Record<PayeeType, { bg: string; text: string; badgeBg: string; badgeText: string; icon: keyof typeof MaterialIcons.glyphMap; description: string; label: string }> = {
-  employee:   { bg: '#b1f1c6', text: '#00351d', badgeBg: '#e7f8ef', badgeText: '#006c4e', icon: 'badge',           description: 'Payroll & Salaries',   label: 'Employee' },
+  employee:   { bg: '#5efeb3', text: '#00351d', badgeBg: '#e7f8ef', badgeText: '#006c4e', icon: 'badge',           description: 'Payroll & Salaries',   label: 'Employee' },
   supplier:   { bg: '#e0d4f7', text: '#3730a3', badgeBg: '#eef2ff', badgeText: '#3730a3', icon: 'inventory-2',     description: 'Logistics & Stock',    label: 'Supplier' },
   utility:    { bg: '#fef3e7', text: '#b87333', badgeBg: '#fef9e7', badgeText: '#b87333', icon: 'account-balance', description: 'Rent, Power, Water',   label: 'Utility' },
   contractor: { bg: '#dbeafe', text: '#1e40af', badgeBg: '#eff6ff', badgeText: '#1e40af', icon: 'engineering',     description: 'One-off Services',     label: 'Contractor' },
@@ -611,30 +611,30 @@ export default function BulkPay() {
       </tr>`).join('');
     const html = `<!doctype html><html><head><meta charset="utf-8"/><title>Batch Receipts</title><style>
       @page { size: A4; margin: 24mm 16mm; }
-      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; color:#1b1c1a; margin:0; }
-      .header { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #0B4D2E; padding-bottom:16px; margin-bottom:22px; }
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; color:#0c2010; margin:0; }
+      .header { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #0b4d2e; padding-bottom:16px; margin-bottom:22px; }
       .brand { display:flex; align-items:center; gap:12px; }
       .logo { width:40px; height:40px; border-radius:10px; background:linear-gradient(135deg, #00351d, #1D9E75); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:16px; }
-      .brand-name { font-size:18px; font-weight:700; color:#0B4D2E; }
+      .brand-name { font-size:18px; font-weight:700; color:#0b4d2e; }
       .brand-sub { font-size:10px; color:#707971; text-transform:uppercase; letter-spacing:1.5px; margin-top:2px; }
       .doc-title { text-align:right; }
-      .doc-title h1 { margin:0; font-size:20px; color:#1b1c1a; font-weight:600; }
+      .doc-title h1 { margin:0; font-size:20px; color:#0c2010; font-weight:600; }
       .doc-title .meta { font-size:10px; color:#707971; margin-top:4px; }
       .summary { display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; margin-bottom:22px; }
-      .summary .card { padding:14px; border-radius:12px; border:1px solid #e9e8e5; }
-      .summary .card.primary { background:linear-gradient(135deg, #00351d, #0B4D2E); border:none; color:#fff; }
+      .summary .card { padding:14px; border-radius:12px; border:1px solid #e7ece7; }
+      .summary .card.primary { background:linear-gradient(135deg, #00351d, #0b4d2e); border:none; color:#fff; }
       .summary .card .lbl { font-size:9px; text-transform:uppercase; letter-spacing:1.2px; opacity:0.7; margin-bottom:6px; }
       .summary .card .val { font-size:15px; font-weight:700; }
       table { width:100%; border-collapse:collapse; font-size:11px; }
-      thead th { text-align:left; padding:10px 8px; background:#f4f3f0; color:#404942; font-weight:700; font-size:9px; text-transform:uppercase; letter-spacing:1px; border-bottom:1px solid #e9e8e5; }
+      thead th { text-align:left; padding:10px 8px; background:#f7faf7; color:#404942; font-weight:700; font-size:9px; text-transform:uppercase; letter-spacing:1px; border-bottom:1px solid #e7ece7; }
       thead th.amount, thead th.num { text-align:right; }
-      tbody td { padding:10px 8px; border-bottom:1px solid #efeeeb; vertical-align:top; }
+      tbody td { padding:10px 8px; border-bottom:1px solid #eff4ef; vertical-align:top; }
       tbody td.num { text-align:right; color:#a1a1aa; font-size:10px; width:28px; }
       tbody td.amount { text-align:right; font-weight:700; }
       tbody td.ref { font-family: ui-monospace, monospace; font-size:10px; color:#404942; }
-      .primary { font-weight:600; color:#1b1c1a; font-size:11px; }
+      .primary { font-weight:600; color:#0c2010; font-size:11px; }
       .muted { font-size:9px; color:#707971; margin-top:2px; }
-      .footer { margin-top:24px; padding-top:14px; border-top:1px solid #e9e8e5; font-size:9px; color:#707971; line-height:1.6; }
+      .footer { margin-top:24px; padding-top:14px; border-top:1px solid #e7ece7; font-size:9px; color:#707971; line-height:1.6; }
     </style></head><body>
       <div class="header">
         <div class="brand">
@@ -673,7 +673,7 @@ export default function BulkPay() {
   // ─── Render ────────────────────────────────────────────────────────────────
   if (isLoading) {
     return (
-      <SafeAreaView className="flex-1 bg-[#faf9f6]" edges={['top', 'left', 'right']}>
+      <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#00351d" />
           <Text className="text-[#707971] font-jakarta-medium text-[14px] mt-4">Loading payees…</Text>
@@ -685,8 +685,8 @@ export default function BulkPay() {
   // Profile gate
   if (!isProfileComplete) {
     return (
-      <SafeAreaView className="flex-1 bg-[#faf9f6]" edges={['top', 'left', 'right']}>
-        <LinearGradient colors={['#0B4D2E', '#1D9E75']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+      <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
+        <LinearGradient colors={['#0b4d2e', '#1D9E75']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           className="w-full pt-[40px] pb-[16px] px-6 rounded-b-[24px] shadow-sm shadow-[#0b4d2e]/10">
           <View className="w-full max-w-lg mx-auto flex-row items-center gap-3">
             <View className="w-10 h-10 rounded-full bg-white/20 items-center justify-center border border-white/30">
@@ -702,7 +702,7 @@ export default function BulkPay() {
           <View className="w-20 h-20 rounded-full bg-[#fef3e7] items-center justify-center mb-6">
             <Feather name="lock" size={32} color="#b87333" />
           </View>
-          <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[28px] text-[#1b1c1a] text-center mb-3">Profile Incomplete</Text>
+          <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[28px] text-[#0c2010] text-center mb-3">Profile Incomplete</Text>
           <Text className="text-[#707971] font-jakarta-medium text-[14px] text-center leading-relaxed max-w-[320px]">
             To unlock Bulk Payments and stay KRA-compliant, add your KRA PIN and Business Number to your profile.
           </Text>
@@ -712,9 +712,9 @@ export default function BulkPay() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-[#faf9f6]" edges={['top', 'left', 'right']}>
+    <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
       {/* Header */}
-      <LinearGradient colors={['#0B4D2E', '#1D9E75']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+      <LinearGradient colors={['#0b4d2e', '#1D9E75']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
         className="w-full pt-[40px] pb-[16px] px-6 rounded-b-[24px] shadow-sm shadow-[#0b4d2e]/10">
         <View className="w-full max-w-lg mx-auto flex-row items-center justify-between mb-2">
           <View className="flex-row items-center gap-3">
@@ -736,7 +736,7 @@ export default function BulkPay() {
 
       {/* Tabs */}
       <View className="w-full max-w-lg mx-auto px-6 mt-4">
-        <View className="flex-row gap-6 border-b border-[#c0c9c0]/30">
+        <View className="flex-row gap-6 border-b border-[#bfc9bf]/30">
           {(['Payees', 'Batches'] as const).map(tab => (
             <TouchableOpacity
               key={tab}
@@ -759,11 +759,11 @@ export default function BulkPay() {
           <View className="w-full max-w-lg mx-auto pt-5 px-6">
             {/* Stats strip */}
             <View className="flex-row gap-3 mb-5">
-              <View className="flex-1 bg-white rounded-[20px] p-3.5 border border-[#c0c9c0]/20">
+              <View className="flex-1 bg-white rounded-[20px] p-3.5 border border-[#bfc9bf]/20">
                 <Text className="text-[9px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em]">Total Payees</Text>
-                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[22px] text-[#1b1c1a] leading-tight mt-1">{payeesList.length}</Text>
+                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[22px] text-[#0c2010] leading-tight mt-1">{payeesList.length}</Text>
               </View>
-              <View className="flex-1 bg-white rounded-[20px] p-3.5 border border-[#c0c9c0]/20">
+              <View className="flex-1 bg-white rounded-[20px] p-3.5 border border-[#bfc9bf]/20">
                 <Text className="text-[9px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em]">Selected</Text>
                 <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[22px] text-[#006c4e] leading-tight mt-1">{selectedIds.length}</Text>
               </View>
@@ -783,7 +783,7 @@ export default function BulkPay() {
                   <TouchableOpacity
                     key={f}
                     onPress={() => setActiveFilter(f)}
-                    className={`px-5 py-2 rounded-full mr-2 ${active ? 'bg-[#00351d]' : 'bg-[#efeeeb]'}`}
+                    className={`px-5 py-2 rounded-full mr-2 ${active ? 'bg-[#00351d]' : 'bg-[#eff4ef]'}`}
                   >
                     <Text className={`font-jakarta-bold text-[12px] ${active ? 'text-white' : 'text-[#404942]'}`}>{f}</Text>
                   </TouchableOpacity>
@@ -804,10 +804,10 @@ export default function BulkPay() {
             {/* Payee list */}
             {filteredPayees.length === 0 ? (
               <View className="items-center py-16">
-                <View className="w-16 h-16 rounded-full bg-[#e9e8e5] items-center justify-center mb-4">
+                <View className="w-16 h-16 rounded-full bg-[#e7ece7] items-center justify-center mb-4">
                   <Feather name="users" size={26} color="#707971" />
                 </View>
-                <Text className="text-[#1b1c1a] font-jakarta-bold text-[16px] mb-1">No payees yet</Text>
+                <Text className="text-[#0c2010] font-jakarta-bold text-[16px] mb-1">No payees yet</Text>
                 <Text className="text-[#707971] font-jakarta-medium text-[13px] text-center max-w-[260px] leading-relaxed">
                   Tap "Add Payee" above to register your first recipient.
                 </Text>
@@ -824,7 +824,7 @@ export default function BulkPay() {
                     onPress={() => togglePayee(p._id)}
                     onLongPress={() => handleDeletePayee(p)}
                     className={`bg-white rounded-[22px] p-4 flex-row items-center mb-3 border ${
-                      isSelected ? 'border-[#00351d]' : 'border-[#c0c9c0]/15'
+                      isSelected ? 'border-[#00351d]' : 'border-[#bfc9bf]/15'
                     }`}
                   >
                     <View className="w-12 h-12 rounded-full items-center justify-center mr-3" style={{ backgroundColor: meta.bg }}>
@@ -832,7 +832,7 @@ export default function BulkPay() {
                     </View>
                     <View className="flex-1 min-w-0 mr-2">
                       <View className="flex-row items-center">
-                        <Text className="font-jakarta-bold text-[15px] text-[#1b1c1a] flex-shrink" numberOfLines={1} ellipsizeMode="tail">{p.name}</Text>
+                        <Text className="font-jakarta-bold text-[15px] text-[#0c2010] flex-shrink" numberOfLines={1} ellipsizeMode="tail">{p.name}</Text>
                       </View>
                       <View className="flex-row items-center mt-1">
                         <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: meta.badgeBg }}>
@@ -844,14 +844,14 @@ export default function BulkPay() {
                       </View>
                     </View>
                     <View className="items-end" style={{ flexShrink: 0 }}>
-                      <TouchableOpacity onPress={() => openAmountEditor(p)} className="bg-[#faf9f6] border border-[#c0c9c0]/30 rounded-full px-3 py-1.5 mb-1.5">
+                      <TouchableOpacity onPress={() => openAmountEditor(p)} className="bg-[#f0fdf4] border border-[#bfc9bf]/30 rounded-full px-3 py-1.5 mb-1.5">
                         <Text className="font-jakarta-bold text-[11px] text-[#00351d]" numberOfLines={1}>{amt > 0 ? formatKES(amt) : 'Set amount'}</Text>
                       </TouchableOpacity>
                       <View className="flex-row gap-1.5">
-                        <TouchableOpacity onPress={() => openEditPayee(p)} className="w-7 h-7 rounded-full bg-[#faf9f6] items-center justify-center border border-[#c0c9c0]/30">
+                        <TouchableOpacity onPress={() => openEditPayee(p)} className="w-7 h-7 rounded-full bg-[#f0fdf4] items-center justify-center border border-[#bfc9bf]/30">
                           <Feather name="edit-2" size={11} color="#404942" />
                         </TouchableOpacity>
-                        <View className={`w-7 h-7 rounded-full items-center justify-center ${isSelected ? 'bg-[#00351d]' : 'bg-[#faf9f6] border border-[#c0c9c0]/30'}`}>
+                        <View className={`w-7 h-7 rounded-full items-center justify-center ${isSelected ? 'bg-[#00351d]' : 'bg-[#f0fdf4] border border-[#bfc9bf]/30'}`}>
                           {isSelected
                             ? <Feather name="check" size={13} color="white" />
                             : <Feather name="circle" size={13} color="#707971" />}
@@ -884,13 +884,13 @@ export default function BulkPay() {
 
             {/* Last Batch Summary */}
             {receipts.length > 0 && (
-              <View className="bg-white rounded-[24px] p-5 border border-[#c0c9c0]/15 mb-4">
+              <View className="bg-white rounded-[24px] p-5 border border-[#bfc9bf]/15 mb-4">
                 <View className="flex-row items-center gap-3 mb-3">
                   <View className="w-11 h-11 rounded-full bg-[#e7f8ef] items-center justify-center">
                     <Feather name="check-circle" size={18} color="#006c4e" />
                   </View>
                   <View className="flex-1">
-                    <Text className="font-jakarta-bold text-[15px] text-[#1b1c1a]">Last Batch</Text>
+                    <Text className="font-jakarta-bold text-[15px] text-[#0c2010]">Last Batch</Text>
                     <Text className="text-[#707971] font-jakarta-medium text-[11px]" numberOfLines={1}>
                       {receipts.length} recipients · {lastBatchReference}
                     </Text>
@@ -899,7 +899,7 @@ export default function BulkPay() {
                     <Text className="text-white font-jakarta-bold text-[11px]">View</Text>
                   </TouchableOpacity>
                 </View>
-                <TouchableOpacity onPress={downloadBatchReceipts} className="flex-row items-center justify-center gap-2 bg-[#faf9f6] border border-[#c0c9c0]/30 rounded-full py-3 mt-2">
+                <TouchableOpacity onPress={downloadBatchReceipts} className="flex-row items-center justify-center gap-2 bg-[#f0fdf4] border border-[#bfc9bf]/30 rounded-full py-3 mt-2">
                   <Feather name="download" size={14} color="#00351d" />
                   <Text className="text-[#00351d] font-jakarta-bold text-[12px]">Download Report</Text>
                 </TouchableOpacity>
@@ -916,7 +916,7 @@ export default function BulkPay() {
                       <TouchableOpacity
                         key={status}
                         onPress={() => setBatchFilter(status)}
-                        className={`px-3 py-1 rounded-full ${batchFilter === status ? 'bg-[#00351d]' : 'bg-[#faf9f6] border border-[#c0c9c0]/30'}`}
+                        className={`px-3 py-1 rounded-full ${batchFilter === status ? 'bg-[#00351d]' : 'bg-[#f0fdf4] border border-[#bfc9bf]/30'}`}
                       >
                         <Text className={`text-[9px] font-jakarta-bold uppercase tracking-wider ${batchFilter === status ? 'text-white' : 'text-[#707971]'}`}>{status}</Text>
                       </TouchableOpacity>
@@ -926,11 +926,11 @@ export default function BulkPay() {
               </View>
 
               {batchHistory.length === 0 ? (
-                <View className="bg-white rounded-[20px] p-8 items-center border border-[#e9e8e5]">
-                  <View className="w-14 h-14 rounded-full bg-[#f4f3f0] items-center justify-center mb-3">
+                <View className="bg-white rounded-[20px] p-8 items-center border border-[#e7ece7]">
+                  <View className="w-14 h-14 rounded-full bg-[#f7faf7] items-center justify-center mb-3">
                     <Feather name="layers" size={22} color="#707971" />
                   </View>
-                  <Text className="text-[#1b1c1a] font-jakarta-bold text-[14px] mb-1">No batches</Text>
+                  <Text className="text-[#0c2010] font-jakarta-bold text-[14px] mb-1">No batches</Text>
                   <Text className="text-[#707971] font-jakarta-medium text-[12px] text-center">Create your first bulk payment to see history here.</Text>
                 </View>
               ) : (
@@ -941,12 +941,12 @@ export default function BulkPay() {
                       <TouchableOpacity
                         key={batch._id}
                         onPress={() => setShowBatchDetails(batch)}
-                        className="bg-white rounded-[20px] p-4 border border-[#c0c9c0]/15 mr-3 w-[280px]"
+                        className="bg-white rounded-[20px] p-4 border border-[#bfc9bf]/15 mr-3 w-[280px]"
                         style={{ minWidth: 280 }}
                       >
                         <View className="flex-row items-center justify-between mb-3">
                           <View>
-                            <Text className="font-jakarta-bold text-[13px] text-[#1b1c1a]" numberOfLines={1}>{batch.batchReference}</Text>
+                            <Text className="font-jakarta-bold text-[13px] text-[#0c2010]" numberOfLines={1}>{batch.batchReference}</Text>
                             <Text className="text-[#707971] font-jakarta-medium text-[10px] mt-1">
                               {new Date(batch.createdAt).toLocaleDateString('en-KE')}
                             </Text>
@@ -957,7 +957,7 @@ export default function BulkPay() {
                             </Text>
                           </View>
                         </View>
-                        <View className="bg-[#faf9f6] rounded-xl p-3 mb-2">
+                        <View className="bg-[#f0fdf4] rounded-xl p-3 mb-2">
                           <Text className="text-[9px] font-jakarta-medium text-[#707971] uppercase tracking-wider mb-1">Amount</Text>
                           <Text className="text-[#00351d] font-jakarta-bold text-[16px]">{formatKES(batch.totalNetAmount)}</Text>
                         </View>
@@ -977,7 +977,7 @@ export default function BulkPay() {
               )}
             </View>
 
-            <View className="bg-white rounded-[24px] p-5 border border-[#c0c9c0]/15 mb-4">
+            <View className="bg-white rounded-[24px] p-5 border border-[#bfc9bf]/15 mb-4">
               <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-3">Security</Text>
               <TouchableOpacity onPress={() => setShowPinSetup(true)} className="flex-row items-center justify-between py-2">
                 <View className="flex-row items-center gap-3">
@@ -985,7 +985,7 @@ export default function BulkPay() {
                     <Feather name="shield" size={16} color="#b87333" />
                   </View>
                   <View>
-                    <Text className="font-jakarta-bold text-[14px] text-[#1b1c1a]">Bulk Pay PIN</Text>
+                    <Text className="font-jakarta-bold text-[14px] text-[#0c2010]">Bulk Pay PIN</Text>
                     <Text className="text-[#707971] font-jakarta-medium text-[11px]">{merchant?.hasBulkPayPin === false ? 'Not configured' : 'Configured'}</Text>
                   </View>
                 </View>
@@ -993,7 +993,7 @@ export default function BulkPay() {
               </TouchableOpacity>
             </View>
 
-            <View className="bg-[#b1f1c6] rounded-[24px] p-6">
+            <View className="bg-[#5efeb3] rounded-[24px] p-6">
               <Text className="text-[#00351d] font-jakarta-extrabold text-[10px] tracking-[0.2em] uppercase mb-3">Pro Tip</Text>
               <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[#00351d] text-[18px] leading-snug">
                 Upload CSV files for bulk imports, or fund your account to increase payment limits.
@@ -1013,7 +1013,7 @@ export default function BulkPay() {
             style={{ shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 16, shadowOffset: { width: 0, height: 8 } }}
           >
             <View className="flex-1 mr-3">
-              <Text className="text-[#b1f1c6] font-jakarta-bold text-[10px] uppercase tracking-[0.2em] mb-1">
+              <Text className="text-[#5efeb3] font-jakarta-bold text-[10px] uppercase tracking-[0.2em] mb-1">
                 {selectedIds.length} Payee{selectedIds.length === 1 ? '' : 's'}
               </Text>
               <Text className="text-white font-jakarta-bold text-[19px] tracking-tight" numberOfLines={1} adjustsFontSizeToFit>{formatKES(batchTotal)}</Text>
@@ -1032,12 +1032,12 @@ export default function BulkPay() {
           <View className="flex-1 justify-end bg-black/40">
             <TouchableOpacity className="absolute inset-0" activeOpacity={1} onPress={() => setShowPinSetup(false)} />
             <View className="w-full max-w-lg mx-auto bg-white rounded-t-[36px] px-6 pt-4 pb-8 mt-auto shadow-2xl">
-              <View className="items-center mb-4"><View className="w-12 h-1.5 bg-[#e9e8e5] rounded-full" /></View>
+              <View className="items-center mb-4"><View className="w-12 h-1.5 bg-[#e7ece7] rounded-full" /></View>
               <View className="items-center mb-5">
                 <View className="w-14 h-14 rounded-full bg-[#e7f8ef] items-center justify-center mb-3">
                   <Feather name="shield" size={22} color="#006c4e" />
                 </View>
-                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#1b1c1a]">Set Bulk Pay PIN</Text>
+                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#0c2010]">Set Bulk Pay PIN</Text>
                 <Text className="text-[#707971] font-jakarta-medium text-[12px] mt-1 text-center">A 4-digit PIN is required to authorize batches.</Text>
               </View>
               <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-2">New PIN</Text>
@@ -1047,7 +1047,7 @@ export default function BulkPay() {
                 keyboardType="numeric"
                 secureTextEntry
                 maxLength={4}
-                className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-5 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[18px] tracking-[0.5em] text-center mb-4"
+                className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-5 py-3.5 text-[#0c2010] font-jakarta-bold text-[18px] tracking-[0.5em] text-center mb-4"
                 placeholder="••••"
                 placeholderTextColor="#a1a1aa"
               />
@@ -1058,7 +1058,7 @@ export default function BulkPay() {
                 keyboardType="numeric"
                 secureTextEntry
                 maxLength={4}
-                className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-5 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[18px] tracking-[0.5em] text-center mb-6"
+                className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-5 py-3.5 text-[#0c2010] font-jakarta-bold text-[18px] tracking-[0.5em] text-center mb-6"
                 placeholder="••••"
                 placeholderTextColor="#a1a1aa"
               />
@@ -1076,16 +1076,16 @@ export default function BulkPay() {
           <View className="flex-1 justify-end bg-black/40">
             <TouchableOpacity className="absolute inset-0" activeOpacity={1} onPress={() => setShowAmountEditor(null)} />
             <View className="w-full max-w-lg mx-auto bg-white rounded-t-[36px] px-6 pt-4 pb-8 mt-auto">
-              <View className="items-center mb-4"><View className="w-12 h-1.5 bg-[#e9e8e5] rounded-full" /></View>
-              <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[22px] text-[#1b1c1a]">Set Payout</Text>
+              <View className="items-center mb-4"><View className="w-12 h-1.5 bg-[#e7ece7] rounded-full" /></View>
+              <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[22px] text-[#0c2010]">Set Payout</Text>
               <Text className="text-[#707971] font-jakarta-medium text-[12px] mb-5" numberOfLines={1}>For {showAmountEditor?.name}</Text>
-              <View className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-5 py-4 mb-5 flex-row items-center">
+              <View className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-5 py-4 mb-5 flex-row items-center">
                 <Text className="text-[#707971] font-jakarta-bold text-[18px] mr-2">KES</Text>
                 <TextInput
                   value={amountInput}
                   onChangeText={(t) => setAmountInput(t.replace(/[^\d.]/g, ''))}
                   keyboardType="decimal-pad"
-                  className="flex-1 text-[#1b1c1a] font-jakarta-bold text-[20px]"
+                  className="flex-1 text-[#0c2010] font-jakarta-bold text-[20px]"
                   placeholder="0"
                   placeholderTextColor="#a1a1aa"
                   autoFocus
@@ -1105,18 +1105,18 @@ export default function BulkPay() {
           <View className="flex-1 justify-end bg-black/50">
             <TouchableOpacity className="absolute inset-0" activeOpacity={1} onPress={() => !isAuthorizing && setShowAuthorize(false)} />
             <View className="w-full max-w-lg mx-auto bg-white rounded-t-[36px] px-6 pt-4 pb-8 mt-auto">
-              <View className="items-center mb-4"><View className="w-12 h-1.5 bg-[#e9e8e5] rounded-full" /></View>
+              <View className="items-center mb-4"><View className="w-12 h-1.5 bg-[#e7ece7] rounded-full" /></View>
               <View className="items-center mb-5">
                 <View className="w-14 h-14 rounded-full bg-[#fef3e7] items-center justify-center mb-3">
                   <Feather name="lock" size={22} color="#b87333" />
                 </View>
-                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#1b1c1a]">Authorize Batch</Text>
+                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#0c2010]">Authorize Batch</Text>
                 <Text className="text-[#707971] font-jakarta-medium text-[12px] mt-1 text-center">Enter your Bulk Pay PIN to release funds.</Text>
               </View>
-              <View className="bg-[#faf9f6] rounded-2xl p-4 mb-5 border border-[#e9e8e5]">
+              <View className="bg-[#f0fdf4] rounded-2xl p-4 mb-5 border border-[#e7ece7]">
                 <View className="flex-row justify-between items-center mb-2">
                   <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider">Recipients</Text>
-                  <Text className="font-jakarta-bold text-[#1b1c1a] text-[13px]">{selectedIds.length}</Text>
+                  <Text className="font-jakarta-bold text-[#0c2010] text-[13px]">{selectedIds.length}</Text>
                 </View>
                 <View className="flex-row justify-between items-center">
                   <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider">Total Payout</Text>
@@ -1130,7 +1130,7 @@ export default function BulkPay() {
                 secureTextEntry
                 maxLength={4}
                 editable={!isAuthorizing}
-                className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-5 py-4 text-[#1b1c1a] font-jakarta-bold text-[20px] tracking-[0.5em] text-center mb-6"
+                className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-5 py-4 text-[#0c2010] font-jakarta-bold text-[20px] tracking-[0.5em] text-center mb-6"
                 placeholder="••••"
                 placeholderTextColor="#a1a1aa"
                 autoFocus
@@ -1159,19 +1159,19 @@ export default function BulkPay() {
           <View className="flex-1 justify-end bg-black/50">
             <TouchableOpacity className="absolute inset-0" activeOpacity={1} onPress={() => !isAuthorizing && setShowCsvUpload(false)} />
             <View className="w-full max-w-lg mx-auto bg-white rounded-t-[36px] px-6 pt-4 pb-8 mt-auto" style={{ maxHeight: '90%' }}>
-              <View className="items-center mb-4"><View className="w-12 h-1.5 bg-[#e9e8e5] rounded-full" /></View>
+              <View className="items-center mb-4"><View className="w-12 h-1.5 bg-[#e7ece7] rounded-full" /></View>
               <View className="items-center mb-4">
                 <View className="w-14 h-14 rounded-full bg-[#dbeafe] items-center justify-center mb-3">
                   <Feather name="file-text" size={22} color="#1e40af" />
                 </View>
-                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#1b1c1a]">Review CSV Batch</Text>
+                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#0c2010]">Review CSV Batch</Text>
                 <Text className="text-[#707971] font-jakarta-medium text-[12px] mt-1">{csvPreview.length} row{csvPreview.length === 1 ? '' : 's'} detected</Text>
               </View>
 
-              <View className="bg-[#faf9f6] rounded-2xl p-4 mb-4 border border-[#e9e8e5]">
+              <View className="bg-[#f0fdf4] rounded-2xl p-4 mb-4 border border-[#e7ece7]">
                 <View className="flex-row justify-between items-center mb-2">
                   <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider">Gross Total</Text>
-                  <Text className="font-jakarta-bold text-[#1b1c1a] text-[14px]">{formatKES(csvSummary?.totalGross)}</Text>
+                  <Text className="font-jakarta-bold text-[#0c2010] text-[14px]">{formatKES(csvSummary?.totalGross)}</Text>
                 </View>
                 <View className="flex-row justify-between items-center">
                   <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider">Net Payout</Text>
@@ -1181,12 +1181,12 @@ export default function BulkPay() {
 
               <ScrollView className="mb-4" showsVerticalScrollIndicator={false} style={{ maxHeight: 220 }}>
                 {csvPreview.map((row: any, idx: number) => (
-                  <View key={idx} className="bg-white rounded-2xl p-3 mb-2 border border-[#e9e8e5] flex-row items-center">
-                    <View className="w-9 h-9 rounded-full bg-[#faf9f6] items-center justify-center mr-3 border border-[#c0c9c0]/30">
+                  <View key={idx} className="bg-white rounded-2xl p-3 mb-2 border border-[#e7ece7] flex-row items-center">
+                    <View className="w-9 h-9 rounded-full bg-[#f0fdf4] items-center justify-center mr-3 border border-[#bfc9bf]/30">
                       <Text className="font-jakarta-bold text-[10px] text-[#404942]">{initials(row.name)}</Text>
                     </View>
                     <View className="flex-1 min-w-0 mr-2">
-                      <Text className="font-jakarta-bold text-[13px] text-[#1b1c1a]" numberOfLines={1}>{row.name}</Text>
+                      <Text className="font-jakarta-bold text-[13px] text-[#0c2010]" numberOfLines={1}>{row.name}</Text>
                       <Text
                         className={`text-[10px] font-jakarta-medium ${row.status?.startsWith('Warning') ? 'text-[#b87333]' : 'text-[#707971]'}`}
                         numberOfLines={1}
@@ -1194,7 +1194,7 @@ export default function BulkPay() {
                         {row.status || 'Valid'}
                       </Text>
                     </View>
-                    <Text className="font-jakarta-bold text-[13px] text-[#1b1c1a]" style={{ flexShrink: 0 }}>
+                    <Text className="font-jakarta-bold text-[13px] text-[#0c2010]" style={{ flexShrink: 0 }}>
                       {formatKES(row.netAmount ?? row.amount)}
                     </Text>
                   </View>
@@ -1208,7 +1208,7 @@ export default function BulkPay() {
                 secureTextEntry
                 maxLength={4}
                 editable={!isAuthorizing}
-                className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-5 py-4 text-[#1b1c1a] font-jakarta-bold text-[20px] tracking-[0.5em] text-center mb-6"
+                className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-5 py-4 text-[#0c2010] font-jakarta-bold text-[20px] tracking-[0.5em] text-center mb-6"
                 placeholder="••••"
                 placeholderTextColor="#a1a1aa"
               />
@@ -1239,7 +1239,7 @@ export default function BulkPay() {
         <View className="flex-1 justify-end bg-black/40">
           <TouchableOpacity className="absolute inset-0" activeOpacity={1} onPress={() => setShowReceipts(false)} />
           <View className="w-full max-w-lg mx-auto bg-white rounded-t-[36px] px-6 pt-4 pb-8 mt-auto" style={{ maxHeight: '90%' }}>
-            <View className="items-center mb-4"><View className="w-12 h-1.5 bg-[#e9e8e5] rounded-full" /></View>
+            <View className="items-center mb-4"><View className="w-12 h-1.5 bg-[#e7ece7] rounded-full" /></View>
             <View className="items-center mb-4">
               <View
                 style={{ backgroundColor: lastBatchStatus === 'Processed' ? '#e7f8ef' : lastBatchStatus === 'Failed' ? '#fef2f2' : '#fef3e7' }}
@@ -1251,7 +1251,7 @@ export default function BulkPay() {
                   color={lastBatchStatus === 'Processed' ? '#006c4e' : lastBatchStatus === 'Failed' ? '#b91c1c' : '#b87333'}
                 />
               </View>
-              <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#1b1c1a]">
+              <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#0c2010]">
                 {lastBatchStatus === 'Processed' ? 'Batch Settled' : lastBatchStatus === 'Failed' ? 'Batch Failed' : lastBatchStatus === 'Partial' ? 'Batch Partially Settled' : 'Batch Submitted'}
               </Text>
               <Text className="text-[#707971] font-jakarta-medium text-[12px] mt-1 text-center" numberOfLines={2}>
@@ -1270,16 +1270,16 @@ export default function BulkPay() {
                   ? { color: '#b91c1c', label: 'Failed · Refunded' }
                   : { color: '#b87333', label: 'Pending' };
                 return (
-                  <View key={r.id} className="bg-[#faf9f6] rounded-2xl p-3 mb-2 border border-[#e9e8e5] flex-row items-center">
-                    <View className="w-9 h-9 rounded-full bg-white items-center justify-center mr-3 border border-[#c0c9c0]/30">
+                  <View key={r.id} className="bg-[#f0fdf4] rounded-2xl p-3 mb-2 border border-[#e7ece7] flex-row items-center">
+                    <View className="w-9 h-9 rounded-full bg-white items-center justify-center mr-3 border border-[#bfc9bf]/30">
                       <Text className="font-jakarta-bold text-[10px] text-[#404942]">{initials(r.name)}</Text>
                     </View>
                     <View className="flex-1 min-w-0 mr-2">
-                      <Text className="font-jakarta-bold text-[13px] text-[#1b1c1a]" numberOfLines={1}>{r.name}</Text>
+                      <Text className="font-jakarta-bold text-[13px] text-[#0c2010]" numberOfLines={1}>{r.name}</Text>
                       <Text className="text-[#707971] font-jakarta-medium text-[10px]" numberOfLines={1}>{r.id}</Text>
                     </View>
                     <View className="items-end" style={{ flexShrink: 0 }}>
-                      <Text className="font-jakarta-bold text-[13px] text-[#1b1c1a]">{formatKES(r.amount)}</Text>
+                      <Text className="font-jakarta-bold text-[13px] text-[#0c2010]">{formatKES(r.amount)}</Text>
                       <Text style={{ color: rowMeta.color }} className="text-[9px] font-jakarta-bold uppercase tracking-wider mt-0.5">{rowMeta.label}</Text>
                     </View>
                   </View>
@@ -1302,12 +1302,12 @@ export default function BulkPay() {
         <View className="flex-1 justify-end bg-black/40">
           <TouchableOpacity className="absolute inset-0" activeOpacity={1} onPress={() => setShowBatchDetails(null)} />
           <View className="w-full max-w-lg mx-auto bg-white rounded-t-[36px] px-6 pt-4 pb-8 mt-auto" style={{ maxHeight: '85%' }}>
-            <View className="items-center mb-4"><View className="w-12 h-1.5 bg-[#e9e8e5] rounded-full" /></View>
+            <View className="items-center mb-4"><View className="w-12 h-1.5 bg-[#e7ece7] rounded-full" /></View>
             {showBatchDetails && (
               <>
                 <View className="flex-row items-center justify-between mb-4">
                   <View>
-                    <Text className="font-jakarta-bold text-[16px] text-[#1b1c1a]">{showBatchDetails.batchReference}</Text>
+                    <Text className="font-jakarta-bold text-[16px] text-[#0c2010]">{showBatchDetails.batchReference}</Text>
                     <Text className="text-[#707971] font-jakarta-medium text-[11px] mt-0.5">
                       {new Date(showBatchDetails.createdAt).toLocaleString('en-KE')}
                     </Text>
@@ -1320,15 +1320,15 @@ export default function BulkPay() {
                 </View>
 
                 <View className="flex-row gap-2 mb-4">
-                  <View className="flex-1 bg-[#faf9f6] rounded-2xl p-3">
+                  <View className="flex-1 bg-[#f0fdf4] rounded-2xl p-3">
                     <Text className="text-[9px] font-jakarta-medium text-[#707971] uppercase tracking-wider mb-1">Net Paid</Text>
                     <Text className="text-[#00351d] font-jakarta-bold text-[15px]">{formatKES(showBatchDetails.totalNetAmount)}</Text>
                   </View>
-                  <View className="flex-1 bg-[#faf9f6] rounded-2xl p-3">
+                  <View className="flex-1 bg-[#f0fdf4] rounded-2xl p-3">
                     <Text className="text-[9px] font-jakarta-medium text-[#707971] uppercase tracking-wider mb-1">Tax Withheld</Text>
                     <Text className="text-[#00351d] font-jakarta-bold text-[15px]">{formatKES(showBatchDetails.totalTaxDeductions)}</Text>
                   </View>
-                  <View className="flex-1 bg-[#faf9f6] rounded-2xl p-3">
+                  <View className="flex-1 bg-[#f0fdf4] rounded-2xl p-3">
                     <Text className="text-[9px] font-jakarta-medium text-[#707971] uppercase tracking-wider mb-1">Payees</Text>
                     <Text className="text-[#00351d] font-jakarta-bold text-[15px]">{showBatchDetails.payeeCount}</Text>
                   </View>
@@ -1340,16 +1340,16 @@ export default function BulkPay() {
                     const rowStatus = tx.status || 'pending';
                     const meta = BATCH_STATUS_META[rowStatus === 'completed' ? 'Processed' : rowStatus === 'failed' ? 'Failed' : 'Pending'];
                     return (
-                      <View key={tx.receiptNumber || idx} className="bg-[#faf9f6] rounded-2xl p-3 mb-2 border border-[#e9e8e5] flex-row items-center">
-                        <View className="w-9 h-9 rounded-full bg-white items-center justify-center mr-3 border border-[#c0c9c0]/30">
+                      <View key={tx.receiptNumber || idx} className="bg-[#f0fdf4] rounded-2xl p-3 mb-2 border border-[#e7ece7] flex-row items-center">
+                        <View className="w-9 h-9 rounded-full bg-white items-center justify-center mr-3 border border-[#bfc9bf]/30">
                           <Text className="font-jakarta-bold text-[10px] text-[#404942]">{initials(tx.name)}</Text>
                         </View>
                         <View className="flex-1 min-w-0 mr-2">
-                          <Text className="font-jakarta-bold text-[13px] text-[#1b1c1a]" numberOfLines={1}>{tx.name}</Text>
+                          <Text className="font-jakarta-bold text-[13px] text-[#0c2010]" numberOfLines={1}>{tx.name}</Text>
                           <Text className="text-[#707971] font-jakarta-medium text-[10px]" numberOfLines={1}>{tx.accountReference}</Text>
                         </View>
                         <View className="items-end" style={{ flexShrink: 0 }}>
-                          <Text className="font-jakarta-bold text-[13px] text-[#1b1c1a]">{formatKES(tx.amount)}</Text>
+                          <Text className="font-jakarta-bold text-[13px] text-[#0c2010]">{formatKES(tx.amount)}</Text>
                           <View style={{ backgroundColor: meta.bg }} className="px-2 py-0.5 rounded-full mt-1">
                             <Text style={{ color: meta.text }} className="text-[8px] font-jakarta-bold uppercase tracking-wider">{rowStatus}</Text>
                           </View>
@@ -1373,15 +1373,15 @@ export default function BulkPay() {
           <View className="flex-1 justify-end bg-black/40">
             <TouchableOpacity className="absolute inset-0" activeOpacity={1} onPress={() => setShowAddPayee(false)} />
             <View className="w-full max-w-lg mx-auto bg-white rounded-t-[36px] px-6 pt-4 pb-6 mt-auto" style={{ maxHeight: '92%' }}>
-              <View className="items-center mb-4"><View className="w-12 h-1.5 bg-[#e9e8e5] rounded-full" /></View>
+              <View className="items-center mb-4"><View className="w-12 h-1.5 bg-[#e7ece7] rounded-full" /></View>
               <View className="flex-row justify-between items-center mb-5">
                 <View>
-                  <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[22px] text-[#1b1c1a]">{editingId ? 'Edit Recipient' : 'New Recipient'}</Text>
+                  <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[22px] text-[#0c2010]">{editingId ? 'Edit Recipient' : 'New Recipient'}</Text>
                   <Text className="text-[10px] font-jakarta-medium text-[#707971] uppercase tracking-wider mt-1">
                     Step {addStep} of 2 · {addStep === 1 ? 'Category' : 'Details'}
                   </Text>
                 </View>
-                <TouchableOpacity onPress={() => setShowAddPayee(false)} className="w-10 h-10 rounded-full bg-[#faf9f6] items-center justify-center border border-[#c0c9c0]/30">
+                <TouchableOpacity onPress={() => setShowAddPayee(false)} className="w-10 h-10 rounded-full bg-[#f0fdf4] items-center justify-center border border-[#bfc9bf]/30">
                   <Feather name="x" size={16} color="#707971" />
                 </TouchableOpacity>
               </View>
@@ -1396,16 +1396,16 @@ export default function BulkPay() {
                         <TouchableOpacity
                           key={key}
                           onPress={() => setNewPayee({ ...newPayee, type: key })}
-                          className={`flex-row items-center p-4 rounded-2xl mb-2.5 border ${isActive ? 'border-[#00351d] bg-[#f0fdf4]' : 'border-[#e9e8e5] bg-white'}`}
+                          className={`flex-row items-center p-4 rounded-2xl mb-2.5 border ${isActive ? 'border-[#00351d] bg-[#f0fdf4]' : 'border-[#e7ece7] bg-white'}`}
                         >
                           <View className="w-11 h-11 rounded-xl items-center justify-center mr-3" style={{ backgroundColor: isActive ? '#00351d' : meta.bg }}>
                             <MaterialIcons name={meta.icon} size={20} color={isActive ? '#fff' : meta.text} />
                           </View>
                           <View className="flex-1">
-                            <Text className="font-jakarta-bold text-[15px] text-[#1b1c1a]">{meta.label}</Text>
+                            <Text className="font-jakarta-bold text-[15px] text-[#0c2010]">{meta.label}</Text>
                             <Text className="text-[#707971] font-jakarta-medium text-[11px] mt-0.5">{meta.description}</Text>
                           </View>
-                          <View className={`w-5 h-5 rounded-full items-center justify-center ${isActive ? 'bg-[#00351d]' : 'border border-[#c0c9c0]'}`}>
+                          <View className={`w-5 h-5 rounded-full items-center justify-center ${isActive ? 'bg-[#00351d]' : 'border border-[#bfc9bf]'}`}>
                             {isActive && <Feather name="check" size={11} color="#fff" />}
                           </View>
                         </TouchableOpacity>
@@ -1423,7 +1423,7 @@ export default function BulkPay() {
                       onChangeText={(t) => setNewPayee({ ...newPayee, name: t })}
                       placeholder={newPayee.type === 'utility' ? 'e.g. Kenya Power' : 'e.g. John Kamau'}
                       placeholderTextColor="#a1a1aa"
-                      className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-semibold text-[14px] mb-4"
+                      className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-4 py-3.5 text-[#0c2010] font-jakarta-semibold text-[14px] mb-4"
                     />
 
                     {/* KRA Employee fields */}
@@ -1437,7 +1437,7 @@ export default function BulkPay() {
                           autoCapitalize="characters"
                           placeholder="A000000000A"
                           placeholderTextColor="#a1a1aa"
-                          className="bg-white border border-[#e9e8e5] rounded-xl px-4 py-3 text-[#1b1c1a] font-jakarta-bold text-[14px] mb-3"
+                          className="bg-white border border-[#e7ece7] rounded-xl px-4 py-3 text-[#0c2010] font-jakarta-bold text-[14px] mb-3"
                         />
                         <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">ID Number *</Text>
                         <TextInput
@@ -1446,7 +1446,7 @@ export default function BulkPay() {
                           keyboardType="numeric"
                           placeholder="12345678"
                           placeholderTextColor="#a1a1aa"
-                          className="bg-white border border-[#e9e8e5] rounded-xl px-4 py-3 text-[#1b1c1a] font-jakarta-bold text-[14px] mb-3"
+                          className="bg-white border border-[#e7ece7] rounded-xl px-4 py-3 text-[#0c2010] font-jakarta-bold text-[14px] mb-3"
                         />
                         <View className="flex-row gap-2">
                           <View className="flex-1">
@@ -1456,7 +1456,7 @@ export default function BulkPay() {
                               onChangeText={(t) => setNewPayee({ ...newPayee, nssfNumber: t })}
                               placeholder="123456789"
                               placeholderTextColor="#a1a1aa"
-                              className="bg-white border border-[#e9e8e5] rounded-xl px-3 py-3 text-[#1b1c1a] font-jakarta-bold text-[13px]"
+                              className="bg-white border border-[#e7ece7] rounded-xl px-3 py-3 text-[#0c2010] font-jakarta-bold text-[13px]"
                             />
                           </View>
                           <View className="flex-1">
@@ -1466,7 +1466,7 @@ export default function BulkPay() {
                               onChangeText={(t) => setNewPayee({ ...newPayee, shifNumber: t })}
                               placeholder="1234567"
                               placeholderTextColor="#a1a1aa"
-                              className="bg-white border border-[#e9e8e5] rounded-xl px-3 py-3 text-[#1b1c1a] font-jakarta-bold text-[13px]"
+                              className="bg-white border border-[#e7ece7] rounded-xl px-3 py-3 text-[#0c2010] font-jakarta-bold text-[13px]"
                             />
                           </View>
                         </View>
@@ -1484,7 +1484,7 @@ export default function BulkPay() {
                           autoCapitalize="characters"
                           placeholder="P000000000A"
                           placeholderTextColor="#a1a1aa"
-                          className="bg-white border border-[#e9e8e5] rounded-xl px-4 py-3 text-[#1b1c1a] font-jakarta-bold text-[14px] mb-3"
+                          className="bg-white border border-[#e7ece7] rounded-xl px-4 py-3 text-[#0c2010] font-jakarta-bold text-[14px] mb-3"
                         />
                         <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">eTIMS Invoice *</Text>
                         <TextInput
@@ -1492,7 +1492,7 @@ export default function BulkPay() {
                           onChangeText={(t) => setNewPayee({ ...newPayee, etimsInvoiceNumber: t })}
                           placeholder="INV-123"
                           placeholderTextColor="#a1a1aa"
-                          className="bg-white border border-[#e9e8e5] rounded-xl px-4 py-3 text-[#1b1c1a] font-jakarta-bold text-[14px] mb-3"
+                          className="bg-white border border-[#e7ece7] rounded-xl px-4 py-3 text-[#0c2010] font-jakarta-bold text-[14px] mb-3"
                         />
                         <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">Control Unit (CU) *</Text>
                         <TextInput
@@ -1500,7 +1500,7 @@ export default function BulkPay() {
                           onChangeText={(t) => setNewPayee({ ...newPayee, cuNumber: t })}
                           placeholder="123456789"
                           placeholderTextColor="#a1a1aa"
-                          className="bg-white border border-[#e9e8e5] rounded-xl px-4 py-3 text-[#1b1c1a] font-jakarta-bold text-[14px]"
+                          className="bg-white border border-[#e7ece7] rounded-xl px-4 py-3 text-[#0c2010] font-jakarta-bold text-[14px]"
                         />
                       </View>
                     )}
@@ -1513,7 +1513,7 @@ export default function BulkPay() {
                       keyboardType="decimal-pad"
                       placeholder="0"
                       placeholderTextColor="#a1a1aa"
-                      className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[14px] mb-4"
+                      className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-4 py-3.5 text-[#0c2010] font-jakarta-bold text-[14px] mb-4"
                     />
 
                     {/* Payment Method */}
@@ -1523,7 +1523,7 @@ export default function BulkPay() {
                         <TouchableOpacity
                           key={m}
                           onPress={() => setNewPayee({ ...newPayee, paymentMethod: m })}
-                          className={`flex-1 py-3 rounded-xl items-center ${newPayee.paymentMethod === m ? 'bg-[#00351d]' : 'bg-[#faf9f6] border border-[#e9e8e5]'}`}
+                          className={`flex-1 py-3 rounded-xl items-center ${newPayee.paymentMethod === m ? 'bg-[#00351d]' : 'bg-[#f0fdf4] border border-[#e7ece7]'}`}
                         >
                           <Text className={`font-jakarta-bold text-[12px] ${newPayee.paymentMethod === m ? 'text-white' : 'text-[#404942]'}`}>{m}</Text>
                         </TouchableOpacity>
@@ -1538,7 +1538,7 @@ export default function BulkPay() {
                             <TouchableOpacity
                               key={mt}
                               onPress={() => setNewPayee({ ...newPayee, mobileMoneyType: mt })}
-                              className={`flex-1 py-2.5 rounded-lg items-center border ${newPayee.mobileMoneyType === mt ? 'bg-[#00351d] border-[#00351d]' : 'bg-white border-[#e9e8e5]'}`}
+                              className={`flex-1 py-2.5 rounded-lg items-center border ${newPayee.mobileMoneyType === mt ? 'bg-[#00351d] border-[#00351d]' : 'bg-white border-[#e7ece7]'}`}
                             >
                               <Text className={`font-jakarta-bold text-[10px] uppercase tracking-wider ${newPayee.mobileMoneyType === mt ? 'text-white' : 'text-[#707971]'}`}>{mt}</Text>
                             </TouchableOpacity>
@@ -1551,7 +1551,7 @@ export default function BulkPay() {
                             keyboardType="phone-pad"
                             placeholder="07XX XXX XXX"
                             placeholderTextColor="#a1a1aa"
-                            className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[14px] mb-2"
+                            className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-4 py-3.5 text-[#0c2010] font-jakarta-bold text-[14px] mb-2"
                           />
                         )}
                         {newPayee.mobileMoneyType === 'Paybill' && (
@@ -1562,14 +1562,14 @@ export default function BulkPay() {
                               keyboardType="numeric"
                               placeholder="Paybill"
                               placeholderTextColor="#a1a1aa"
-                              className="flex-1 bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[14px]"
+                              className="flex-1 bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-4 py-3.5 text-[#0c2010] font-jakarta-bold text-[14px]"
                             />
                             <TextInput
                               value={newPayee.businessAccount}
                               onChangeText={(t) => setNewPayee({ ...newPayee, businessAccount: t })}
                               placeholder="Account #"
                               placeholderTextColor="#a1a1aa"
-                              className="flex-1 bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[14px]"
+                              className="flex-1 bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-4 py-3.5 text-[#0c2010] font-jakarta-bold text-[14px]"
                             />
                           </View>
                         )}
@@ -1580,7 +1580,7 @@ export default function BulkPay() {
                             keyboardType="numeric"
                             placeholder="Till Number"
                             placeholderTextColor="#a1a1aa"
-                            className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[14px] mb-2"
+                            className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-4 py-3.5 text-[#0c2010] font-jakarta-bold text-[14px] mb-2"
                           />
                         )}
                       </View>
@@ -1593,7 +1593,7 @@ export default function BulkPay() {
                           onChangeText={(t) => setNewPayee({ ...newPayee, bankName: t })}
                           placeholder="Bank Name (e.g. KCB)"
                           placeholderTextColor="#a1a1aa"
-                          className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[14px] mb-2"
+                          className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-4 py-3.5 text-[#0c2010] font-jakarta-bold text-[14px] mb-2"
                         />
                         <TextInput
                           value={newPayee.accountNumber}
@@ -1601,7 +1601,7 @@ export default function BulkPay() {
                           keyboardType="numeric"
                           placeholder="Account Number"
                           placeholderTextColor="#a1a1aa"
-                          className="bg-[#faf9f6] border border-[#e9e8e5] rounded-2xl px-4 py-3.5 text-[#1b1c1a] font-jakarta-bold text-[14px]"
+                          className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-4 py-3.5 text-[#0c2010] font-jakarta-bold text-[14px]"
                         />
                       </View>
                     )}
@@ -1612,7 +1612,7 @@ export default function BulkPay() {
               {/* Footer actions */}
               <View className="flex-row gap-2 mt-5">
                 {addStep === 2 && (
-                  <TouchableOpacity onPress={() => setAddStep(1)} className="px-5 py-3.5 rounded-full bg-[#faf9f6] border border-[#e9e8e5]">
+                  <TouchableOpacity onPress={() => setAddStep(1)} className="px-5 py-3.5 rounded-full bg-[#f0fdf4] border border-[#e7ece7]">
                     <Feather name="arrow-left" size={16} color="#00351d" />
                   </TouchableOpacity>
                 )}

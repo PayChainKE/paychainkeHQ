@@ -30,11 +30,11 @@ function MainTabs() {
         headerShown: false,
         tabBarShowLabel: true,
         tabBarActiveTintColor: '#00351d',
-        tabBarInactiveTintColor: '#1b1c1a80',
+        tabBarInactiveTintColor: '#0c201080',
         tabBarStyle: {
           backgroundColor: '#ffffff',
           borderTopWidth: 1,
-          borderTopColor: '#efeeeb',
+          borderTopColor: '#eff4ef',
           elevation: 10,
           shadowOpacity: 0.05,
           shadowRadius: 10,
@@ -126,8 +126,8 @@ export default function AppNavigator() {
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#faf9f6' }}>
-        <ActivityIndicator size="large" color="#0B4D2E" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0fdf4' }}>
+        <ActivityIndicator size="large" color="#0b4d2e" />
       </View>
     );
   }

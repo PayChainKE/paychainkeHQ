@@ -20,7 +20,7 @@ const KIND_META: Record<NotificationKind, { icon: keyof typeof MaterialIcons.gly
   advance: { icon: 'trending-up', color: '#3f51b5', bg: '#e8eaf6' },
   security: { icon: 'shield', color: '#ba1a1a', bg: '#fff1f1' },
   wallet: { icon: 'account-balance-wallet', color: '#1d4ed8', bg: '#eef2ff' },
-  system: { icon: 'info-outline', color: '#707971', bg: '#f4f3f0' },
+  system: { icon: 'info-outline', color: '#707971', bg: '#f7faf7' },
 };
 
 const isToday = (date: Date) => date.toDateString() === new Date().toDateString();
@@ -86,10 +86,10 @@ export default function Notifications({ navigation }: any) {
   ];
 
   return (
-    <SafeAreaView className="flex-1 bg-[#faf9f6]" edges={['top', 'left', 'right']}>
+    <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
       <View
         className="w-full pt-[16px] pb-[20px] px-6 rounded-b-[24px] shadow-sm shadow-[#0b4d2e]/10"
-        style={{ backgroundColor: '#0B4D2E' }}
+        style={{ backgroundColor: '#0b4d2e' }}
       >
         <View className="w-full max-w-lg mx-auto flex-row items-center justify-between mb-1">
           <View className="flex-row items-center gap-3">
@@ -127,7 +127,7 @@ export default function Notifications({ navigation }: any) {
             </View>
           ) : notifications.length === 0 ? (
             <View className="items-center justify-center py-24">
-              <View className="w-16 h-16 rounded-full bg-white border border-[#efeeeb] items-center justify-center mb-4">
+              <View className="w-16 h-16 rounded-full bg-white border border-[#eff4ef] items-center justify-center mb-4">
                 <Feather name="bell-off" size={24} color="#b3b9b4" />
               </View>
               <Text className="text-[14px] text-[#707971] font-jakarta-medium">No notifications yet</Text>
@@ -138,7 +138,7 @@ export default function Notifications({ navigation }: any) {
               return (
                 <View key={group.label} className="mb-8">
                   <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.2em] mb-3">{group.label}</Text>
-                  <View className="bg-white rounded-[28px] border border-[#efeeeb] shadow-sm shadow-[#00351d]/5 overflow-hidden">
+                  <View className="bg-white rounded-[28px] border border-[#eff4ef] shadow-sm shadow-[#00351d]/5 overflow-hidden">
                     {group.items.map((item, index) => {
                       const meta = KIND_META[item.kind] || KIND_META.system;
                       return (
@@ -146,7 +146,7 @@ export default function Notifications({ navigation }: any) {
                           key={item._id}
                           activeOpacity={0.8}
                           onPress={() => !item.read && markRead(item._id)}
-                          className={`flex-row items-start gap-3 p-5 ${index !== group.items.length - 1 ? 'border-b border-[#efeeeb]' : ''}`}
+                          className={`flex-row items-start gap-3 p-5 ${index !== group.items.length - 1 ? 'border-b border-[#eff4ef]' : ''}`}
                         >
                           <View style={{ backgroundColor: meta.bg }} className="w-11 h-11 rounded-2xl items-center justify-center">
                             <MaterialIcons name={meta.icon} size={20} color={meta.color} />

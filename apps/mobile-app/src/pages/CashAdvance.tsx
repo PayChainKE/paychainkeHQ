@@ -136,7 +136,7 @@ export default function CashAdvance({ navigation }: any) {
 
   if (isLoading) {
     return (
-      <SafeAreaView className="flex-1 bg-[#faf9f6]" edges={['top', 'left', 'right']}>
+      <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#00351d" />
         </View>
@@ -146,7 +146,7 @@ export default function CashAdvance({ navigation }: any) {
 
   const Header = ({ subtitle }: { subtitle: string }) => (
     <LinearGradient
-      colors={['#0B4D2E', '#1D9E75']}
+      colors={['#0b4d2e', '#1D9E75']}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       className="w-full pt-[40px] pb-[16px] px-6 z-40 rounded-b-[24px] shadow-sm shadow-[#0b4d2e]/10"
@@ -185,11 +185,11 @@ export default function CashAdvance({ navigation }: any) {
   // ── Feature disabled by admin ──────────────────────────────────────────
   if (formDisabled) {
     return (
-      <SafeAreaView className="flex-1 bg-[#faf9f6]" edges={['top', 'left', 'right']}>
+      <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
         <Header subtitle="Not available" />
         <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 120 }}>
           <View className="w-full max-w-lg mx-auto px-6 pt-16 items-center text-center">
-            <View className="w-24 h-24 rounded-full bg-white items-center justify-center mb-6 border border-[#efeeeb] shadow-sm">
+            <View className="w-24 h-24 rounded-full bg-white items-center justify-center mb-6 border border-[#eff4ef] shadow-sm">
               <MaterialIcons name="lock" size={36} color="rgba(0,53,29,0.3)" />
             </View>
             <Text className="text-[22px] font-jakarta-extrabold text-[#00351d] tracking-tight mb-3 text-center">Applications Are Currently Paused</Text>
@@ -205,7 +205,7 @@ export default function CashAdvance({ navigation }: any) {
   // ── Application form ───────────────────────────────────────────────────
   if (showForm) {
     return (
-      <SafeAreaView className="flex-1 bg-[#faf9f6]" edges={['top', 'left', 'right']}>
+      <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
         <Header subtitle="New application" />
         <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 140 }}>
           <View className="w-full max-w-lg mx-auto px-6 pt-8">
@@ -213,7 +213,7 @@ export default function CashAdvance({ navigation }: any) {
               Based on your Trust Score of {trustData?.current}, our credit team will review and respond within 1-2 business days.
             </Text>
 
-            <View className="bg-white rounded-[32px] border border-[#c0c9c0]/20 shadow-sm p-6 gap-6">
+            <View className="bg-white rounded-[32px] border border-[#bfc9bf]/20 shadow-sm p-6 gap-6">
               <View>
                 <Text className="text-[10px] font-jakarta-bold uppercase tracking-widest text-[#707971] mb-2">How much do you need? (KES)</Text>
                 <TextInput
@@ -222,7 +222,7 @@ export default function CashAdvance({ navigation }: any) {
                   onChangeText={setRequestedAmount}
                   placeholder="50,000"
                   placeholderTextColor="#a1a1aa"
-                  className="bg-[#faf9f6] border border-[#efeeeb] rounded-2xl px-5 py-4 text-[22px] font-jakarta-extrabold text-[#00351d]"
+                  className="bg-[#f0fdf4] border border-[#eff4ef] rounded-2xl px-5 py-4 text-[22px] font-jakarta-extrabold text-[#00351d]"
                 />
               </View>
 
@@ -233,7 +233,7 @@ export default function CashAdvance({ navigation }: any) {
                     <TouchableOpacity
                       key={days}
                       onPress={() => setTenorDays(days)}
-                      className={`px-4 py-2.5 rounded-xl border ${tenorDays === days ? 'bg-[#00351d] border-[#00351d]' : 'bg-[#faf9f6] border-[#efeeeb]'}`}
+                      className={`px-4 py-2.5 rounded-xl border ${tenorDays === days ? 'bg-[#00351d] border-[#00351d]' : 'bg-[#f0fdf4] border-[#eff4ef]'}`}
                     >
                       <Text className={`text-[12px] font-jakarta-bold ${tenorDays === days ? 'text-white' : 'text-[#404942]'}`}>{days}d</Text>
                     </TouchableOpacity>
@@ -251,7 +251,7 @@ export default function CashAdvance({ navigation }: any) {
                   placeholder="e.g. Restocking inventory ahead of the festive season..."
                   placeholderTextColor="#a1a1aa"
                   textAlignVertical="top"
-                  className="bg-[#faf9f6] border border-[#efeeeb] rounded-2xl px-5 py-4 text-[14px] font-jakarta-medium text-[#00351d] min-h-[100px]"
+                  className="bg-[#f0fdf4] border border-[#eff4ef] rounded-2xl px-5 py-4 text-[14px] font-jakarta-medium text-[#00351d] min-h-[100px]"
                 />
               </View>
 
@@ -264,7 +264,7 @@ export default function CashAdvance({ navigation }: any) {
                     onChangeText={setMonthlyRevenueEstimate}
                     placeholder="Optional"
                     placeholderTextColor="#a1a1aa"
-                    className="bg-[#faf9f6] border border-[#efeeeb] rounded-2xl px-4 py-3.5 text-[15px] font-jakarta-bold text-[#00351d]"
+                    className="bg-[#f0fdf4] border border-[#eff4ef] rounded-2xl px-4 py-3.5 text-[15px] font-jakarta-bold text-[#00351d]"
                   />
                 </View>
                 <View className="flex-1">
@@ -275,7 +275,7 @@ export default function CashAdvance({ navigation }: any) {
                     onChangeText={setYearsInOperation}
                     placeholder="Optional"
                     placeholderTextColor="#a1a1aa"
-                    className="bg-[#faf9f6] border border-[#efeeeb] rounded-2xl px-4 py-3.5 text-[15px] font-jakarta-bold text-[#00351d]"
+                    className="bg-[#f0fdf4] border border-[#eff4ef] rounded-2xl px-4 py-3.5 text-[15px] font-jakarta-bold text-[#00351d]"
                   />
                 </View>
               </View>
@@ -287,7 +287,7 @@ export default function CashAdvance({ navigation }: any) {
                   onChangeText={setBusinessAddress}
                   placeholder="Optional"
                   placeholderTextColor="#a1a1aa"
-                  className="bg-[#faf9f6] border border-[#efeeeb] rounded-2xl px-5 py-3.5 text-[14px] font-jakarta-medium text-[#00351d]"
+                  className="bg-[#f0fdf4] border border-[#eff4ef] rounded-2xl px-5 py-3.5 text-[14px] font-jakarta-medium text-[#00351d]"
                 />
               </View>
 
@@ -300,7 +300,7 @@ export default function CashAdvance({ navigation }: any) {
                   onChangeText={setContactPhone}
                   placeholder="0712 345 678"
                   placeholderTextColor="#a1a1aa"
-                  className="bg-[#faf9f6] border border-[#efeeeb] rounded-2xl px-5 py-3.5 text-[15px] font-jakarta-bold text-[#00351d]"
+                  className="bg-[#f0fdf4] border border-[#eff4ef] rounded-2xl px-5 py-3.5 text-[15px] font-jakarta-bold text-[#00351d]"
                 />
               </View>
 
@@ -314,7 +314,7 @@ export default function CashAdvance({ navigation }: any) {
                 onPress={handleSubmit}
                 disabled={isSubmitting}
                 activeOpacity={0.85}
-                className={`py-4 rounded-2xl items-center flex-row justify-center gap-2 ${isSubmitting ? 'bg-[#b1f1c6]/60' : 'bg-[#00351d]'}`}
+                className={`py-4 rounded-2xl items-center flex-row justify-center gap-2 ${isSubmitting ? 'bg-[#5efeb3]/60' : 'bg-[#00351d]'}`}
               >
                 {isSubmitting ? (
                   <ActivityIndicator color="#ffffff" size="small" />
@@ -334,7 +334,7 @@ export default function CashAdvance({ navigation }: any) {
   if (statusApplication) {
     const meta = STATUS_META[statusApplication.status] || STATUS_META.pending;
     return (
-      <SafeAreaView className="flex-1 bg-[#faf9f6]" edges={['top', 'left', 'right']}>
+      <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
         <Header subtitle={meta.label} />
         <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 120 }}>
           <View className="w-full max-w-lg mx-auto px-6 pt-8">
@@ -342,12 +342,12 @@ export default function CashAdvance({ navigation }: any) {
               <View className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full -mr-40 -mt-40" />
               <View className="relative z-10 items-center">
                 <View className="w-20 h-20 rounded-2xl bg-white/10 items-center justify-center border border-white/10 mb-6">
-                  <MaterialIcons name={meta.icon} size={36} color="#b1f1c6" />
+                  <MaterialIcons name={meta.icon} size={36} color="#5efeb3" />
                 </View>
                 {justSubmitted && (
                   <View className="flex-row items-center gap-1.5 mb-3">
-                    <Feather name="check-circle" size={12} color="#b1f1c6" />
-                    <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#b1f1c6]">Application submitted</Text>
+                    <Feather name="check-circle" size={12} color="#5efeb3" />
+                    <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#5efeb3]">Application submitted</Text>
                   </View>
                 )}
                 <Text className="font-jakarta-extrabold text-[24px] text-white tracking-tight mb-2 text-center">{meta.label}</Text>
@@ -356,7 +356,7 @@ export default function CashAdvance({ navigation }: any) {
                 {statusApplication.status === 'approved' && statusApplication.approvedLimit ? (
                   <View className="bg-white/10 border border-white/10 rounded-2xl p-5 mb-4 items-center w-full">
                     <Text className="text-[9px] font-jakarta-extrabold uppercase tracking-widest text-white/60 mb-1">Approved Credit Limit</Text>
-                    <Text className="font-jakarta-extrabold text-[26px] text-[#b1f1c6]">{formatKES(statusApplication.approvedLimit)}</Text>
+                    <Text className="font-jakarta-extrabold text-[26px] text-[#5efeb3]">{formatKES(statusApplication.approvedLimit)}</Text>
                   </View>
                 ) : null}
 
@@ -392,20 +392,20 @@ export default function CashAdvance({ navigation }: any) {
   // ── Not eligible yet ────────────────────────────────────────────────────
   if (!isEligible) {
     return (
-      <SafeAreaView className="flex-1 bg-[#faf9f6]" edges={['top', 'left', 'right']}>
+      <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
         <Header subtitle="Building eligibility" />
         <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
           <View className="w-full max-w-lg mx-auto px-6 pt-10 pb-12">
             <View className="items-center mb-10">
-              <View className="w-[84px] h-[84px] bg-[#b1f1c6] rounded-full flex items-center justify-center mb-6 shadow-sm">
+              <View className="w-[84px] h-[84px] bg-[#5efeb3] rounded-full flex items-center justify-center mb-6 shadow-sm">
                 <MaterialIcons name="payments" size={40} color="#00351d" />
               </View>
               <Text className="font-jakarta-extrabold text-[36px] tracking-tight text-[#00351d] mb-3">Cash Advance</Text>
               <Text style={{ fontFamily: 'DMSerifDisplay_400Regular_Italic' }} className="text-[24px] text-[#00351d] text-center max-w-[280px] leading-tight">Grow your business with PayChain Capital</Text>
             </View>
 
-            <View className="bg-white rounded-[40px] p-8 mb-6 border border-[#c0c9c0]/20 shadow-sm items-center text-center">
-              <View className="w-16 h-16 bg-[#faf9f6] rounded-full flex items-center justify-center mb-6 border border-[#efeeeb]">
+            <View className="bg-white rounded-[40px] p-8 mb-6 border border-[#bfc9bf]/20 shadow-sm items-center text-center">
+              <View className="w-16 h-16 bg-[#f0fdf4] rounded-full flex items-center justify-center mb-6 border border-[#eff4ef]">
                 <MaterialIcons name="lock" size={28} color="rgba(0,53,29,0.3)" />
               </View>
               <Text className="text-[20px] font-jakarta-extrabold text-[#00351d] tracking-tight mb-2">Keep building your Trust Score</Text>
@@ -414,7 +414,7 @@ export default function CashAdvance({ navigation }: any) {
               </Text>
             </View>
 
-            <View className="bg-[#f4f3f0] rounded-[40px] p-8 border border-[#c0c9c0]/20 mb-8">
+            <View className="bg-[#f7faf7] rounded-[40px] p-8 border border-[#bfc9bf]/20 mb-8">
               <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[28px] text-[#00351d] mb-8 tracking-tight">The Capital Promise</Text>
 
               <View className="space-y-8">
@@ -451,7 +451,7 @@ export default function CashAdvance({ navigation }: any) {
 
   // ── Eligible, no active application — CTA to start one ─────────────────
   return (
-    <SafeAreaView className="flex-1 bg-[#faf9f6]" edges={['top', 'left', 'right']}>
+    <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
       <Header subtitle="Eligible for advance" />
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
         <View className="w-full max-w-lg mx-auto px-6 pt-10 pb-12">
@@ -476,7 +476,7 @@ export default function CashAdvance({ navigation }: any) {
           )}
 
           <View className="flex-row items-start gap-4 mb-10">
-            <View className="w-16 h-16 bg-[#b1f1c6] rounded-[24px] flex items-center justify-center shadow-sm">
+            <View className="w-16 h-16 bg-[#5efeb3] rounded-[24px] flex items-center justify-center shadow-sm">
               <MaterialIcons name="payments" size={32} color="#00351d" />
             </View>
             <View className="flex-1 mt-1">
@@ -489,21 +489,21 @@ export default function CashAdvance({ navigation }: any) {
             <View className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full -mr-40 -mt-40" />
             <View className="relative z-10 items-center">
               <View className="w-20 h-20 rounded-2xl bg-white/10 items-center justify-center border border-white/10 mb-6">
-                <MaterialIcons name="verified" size={40} color="#b1f1c6" />
+                <MaterialIcons name="verified" size={40} color="#5efeb3" />
               </View>
               <Text className="font-jakarta-extrabold text-[28px] text-white tracking-tight mb-2 text-center">You are Eligible!</Text>
               <Text className="text-[14px] text-white/70 font-jakarta-medium text-center max-w-[280px] leading-relaxed mb-8">
                 Based on your Trust Score of {trustData?.current}, you are eligible to apply for a cash advance. Complete a short application and our lending team will review it within 1-2 business days.
               </Text>
-              <TouchableOpacity onPress={startForm} className="w-full bg-[#b1f1c6] py-4 rounded-xl flex-row items-center justify-center shadow-lg shadow-[#b1f1c6]/20 active:opacity-80">
+              <TouchableOpacity onPress={startForm} className="w-full bg-[#5efeb3] py-4 rounded-xl flex-row items-center justify-center shadow-lg shadow-[#5efeb3]/20 active:opacity-80">
                 <Text className="text-[#00351d] font-jakarta-extrabold text-[12px] uppercase tracking-widest">Start Application</Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          <View className="bg-[#b1f1c6] rounded-[32px] p-7 flex-row items-start gap-4 mb-10 shadow-sm">
+          <View className="bg-[#5efeb3] rounded-[32px] p-7 flex-row items-start gap-4 mb-10 shadow-sm">
             <View className="w-6 h-6 rounded-full bg-[#00351d] flex items-center justify-center mt-1">
-              <Text className="text-[#b1f1c6] font-jakarta-bold text-[14px] italic">i</Text>
+              <Text className="text-[#5efeb3] font-jakarta-bold text-[14px] italic">i</Text>
             </View>
             <View className="flex-1">
               <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[22px] text-[#00351d] leading-tight mb-2">Automated Repayment</Text>

@@ -82,7 +82,7 @@ export default function Dashboard({ navigation }: any) {
 
 
   return (
-    <SafeAreaView className="flex-1 bg-[#faf9f6]" edges={['top', 'left', 'right']}>
+    <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
       <ScrollView 
         className="flex-1" 
         contentContainerStyle={{ paddingBottom: 100 }}
@@ -91,7 +91,7 @@ export default function Dashboard({ navigation }: any) {
         <View className="w-full max-w-lg mx-auto flex-1">
           {/* Header Area */}
           <LinearGradient
-            colors={['#1D9E75', '#0B4D2E']}
+            colors={['#1D9E75', '#0b4d2e']}
             start={{ x: 0, y: 0 }}
             end={{ x: 0, y: 1 }}
             className="px-6 pt-[150px] pb-40 rounded-b-[40px] z-0 shadow-lg shadow-[#0b4d2e]/20"
@@ -143,20 +143,20 @@ export default function Dashboard({ navigation }: any) {
           <View className="px-6 flex-row justify-between -mt-6 mb-10 z-10">
             <TouchableOpacity className="items-center" activeOpacity={0.8} onPress={() => navigation?.navigate('Collections')}>
               <View className="w-[72px] h-[72px] rounded-full bg-white shadow-lg shadow-black/10 items-center justify-center mb-2.5">
-                <View className="w-12 h-12 rounded-full bg-[#b1f1c6] items-center justify-center">
+                <View className="w-12 h-12 rounded-full bg-[#5efeb3] items-center justify-center">
                   <Feather name="plus-circle" size={24} color="#00351d" />
                 </View>
               </View>
-              <Text className="text-[11px] font-jakarta-bold text-[#1b1c1a] uppercase tracking-widest">Collect</Text>
+              <Text className="text-[11px] font-jakarta-bold text-[#0c2010] uppercase tracking-widest">Collect</Text>
             </TouchableOpacity>
 
             <TouchableOpacity className="items-center" activeOpacity={0.8} onPress={() => navigation?.navigate('Pay')}>
               <View className="w-[72px] h-[72px] rounded-full bg-white shadow-lg shadow-black/10 items-center justify-center mb-2.5">
-                <View className="w-12 h-12 rounded-full bg-[#efeeeb] items-center justify-center">
+                <View className="w-12 h-12 rounded-full bg-[#eff4ef] items-center justify-center">
                   <MaterialIcons name="payments" size={24} color="#00351d" />
                 </View>
               </View>
-              <Text className="text-[11px] font-jakarta-bold text-[#1b1c1a] uppercase tracking-widest">Pay</Text>
+              <Text className="text-[11px] font-jakarta-bold text-[#0c2010] uppercase tracking-widest">Pay</Text>
             </TouchableOpacity>
 
             <TouchableOpacity className="items-center" activeOpacity={0.8} onPress={() => navigation?.navigate('InflationShield')}>
@@ -165,7 +165,7 @@ export default function Dashboard({ navigation }: any) {
                   <MaterialIcons name="swap-horiz" size={24} color="#00351d" />
                 </View>
               </View>
-              <Text className="text-[11px] font-jakarta-bold text-[#1b1c1a] uppercase tracking-widest">Swap</Text>
+              <Text className="text-[11px] font-jakarta-bold text-[#0c2010] uppercase tracking-widest">Swap</Text>
             </TouchableOpacity>
 
             <TouchableOpacity className="items-center" activeOpacity={0.8} onPress={() => navigation?.navigate('Advance')}>
@@ -174,13 +174,13 @@ export default function Dashboard({ navigation }: any) {
                   <Feather name="trending-up" size={24} color="#3f51b5" />
                 </View>
               </View>
-              <Text className="text-[11px] font-jakarta-bold text-[#1b1c1a] uppercase tracking-widest">Advance</Text>
+              <Text className="text-[11px] font-jakarta-bold text-[#0c2010] uppercase tracking-widest">Advance</Text>
             </TouchableOpacity>
           </View>
 
           {/* Growth Ribbon */}
           <View className="px-6 mb-8">
-            <View className="bg-[#b1f1c6] rounded-[24px] p-5 flex-row items-center justify-between shadow-sm">
+            <View className="bg-[#5efeb3] rounded-[24px] p-5 flex-row items-center justify-between shadow-sm">
               <View>
                 <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[22px] text-[#00351d] mb-1">
                   Collect. Pay. Protect. Grow.
@@ -198,7 +198,7 @@ export default function Dashboard({ navigation }: any) {
           {/* Digital Ledgers */}
           <View className="mb-8">
               <View className="px-6 flex-row items-center justify-between mb-4">
-                <Text className="text-lg font-jakarta-bold text-[#1b1c1a]">Digital Ledgers</Text>
+                <Text className="text-lg font-jakarta-bold text-[#0c2010]">Digital Ledgers</Text>
                 <TouchableOpacity>
                   <Text className="text-[#006c4e] text-[11px] font-jakarta-bold uppercase tracking-widest">View All</Text>
                 </TouchableOpacity>
@@ -243,23 +243,23 @@ export default function Dashboard({ navigation }: any) {
 
           {/* This Month Performance */}
           <View className="px-6 mb-8">
-            <View className="bg-white rounded-[32px] p-6 shadow-sm border border-[#c0c9c0]/10">
+            <View className="bg-white rounded-[32px] p-6 shadow-sm border border-[#bfc9bf]/10">
               <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-[0.15em] mb-6">This Month Performance</Text>
               <View className="flex-row justify-between">
                 <View>
-                  <Text className="text-[#1b1c1a] text-[10px] font-jakarta-bold uppercase tracking-wider mb-1">Revenue</Text>
+                  <Text className="text-[#0c2010] text-[10px] font-jakarta-bold uppercase tracking-wider mb-1">Revenue</Text>
                   <Text className="text-[#006c4e] text-[16px] font-jakarta-extrabold">{formatCurrency(monthTotal)}</Text>
                 </View>
-                <View className="w-[1px] h-full bg-[#efeeeb]" />
+                <View className="w-[1px] h-full bg-[#eff4ef]" />
                 <View>
-                  <Text className="text-[#1b1c1a] text-[10px] font-jakarta-bold uppercase tracking-wider mb-1">Payments</Text>
-                  <Text className="text-[#1b1c1a] text-[16px] font-jakarta-extrabold">{monthInbound.length}</Text>
+                  <Text className="text-[#0c2010] text-[10px] font-jakarta-bold uppercase tracking-wider mb-1">Payments</Text>
+                  <Text className="text-[#0c2010] text-[16px] font-jakarta-extrabold">{monthInbound.length}</Text>
                 </View>
-                <View className="w-[1px] h-full bg-[#efeeeb]" />
+                <View className="w-[1px] h-full bg-[#eff4ef]" />
                 <View>
-                  <Text className="text-[#1b1c1a] text-[10px] font-jakarta-bold uppercase tracking-wider mb-1">Trust Score</Text>
+                  <Text className="text-[#0c2010] text-[10px] font-jakarta-bold uppercase tracking-wider mb-1">Trust Score</Text>
                   <View className="flex-row items-center gap-1.5">
-                    <Text className="text-[#1b1c1a] text-[16px] font-jakarta-extrabold">{trustScore.current || 0}/100</Text>
+                    <Text className="text-[#0c2010] text-[16px] font-jakarta-extrabold">{trustScore.current || 0}/100</Text>
                   </View>
                 </View>
               </View>
@@ -269,16 +269,16 @@ export default function Dashboard({ navigation }: any) {
           {/* Recent Activity */}
           <View className="px-6 mb-8">
             <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-lg font-jakarta-bold text-[#1b1c1a]">Recent Activity</Text>
+              <Text className="text-lg font-jakarta-bold text-[#0c2010]">Recent Activity</Text>
               <TouchableOpacity onPress={() => navigation?.navigate('Transactions')} className="bg-[#e7f8ef] px-3 py-1.5 rounded-full">
                 <Text className="text-[#006c4e] text-[10px] font-jakarta-bold uppercase tracking-widest">View All</Text>
               </TouchableOpacity>
             </View>
 
-            <View className="bg-white rounded-[32px] p-2 shadow-sm border border-[#c0c9c0]/10">
+            <View className="bg-white rounded-[32px] p-2 shadow-sm border border-[#bfc9bf]/10">
               {isLoading ? (
                 <View className="py-10 items-center justify-center">
-                  <ActivityIndicator color="#0B4D2E" />
+                  <ActivityIndicator color="#0b4d2e" />
                 </View>
               ) : transactions.length === 0 ? (
                 <View className="py-10 items-center justify-center">
@@ -294,15 +294,15 @@ export default function Dashboard({ navigation }: any) {
                   const rawRef = tx.reference || tx.type.replace('_', ' ');
                   const refText = rawRef.length > 14 ? `${rawRef.slice(0, 6)}…${rawRef.slice(-4)}` : rawRef;
                   return (
-                    <View key={tx._id || index} className={`flex-row items-center py-3 px-4 ${index !== Math.min(transactions.length - 1, 4) ? 'border-b border-[#efeeeb]/50' : ''}`}>
-                      <View className="w-10 h-10 rounded-full bg-[#efeeeb] items-center justify-center overflow-hidden mr-3">
+                    <View key={tx._id || index} className={`flex-row items-center py-3 px-4 ${index !== Math.min(transactions.length - 1, 4) ? 'border-b border-[#eff4ef]/50' : ''}`}>
+                      <View className="w-10 h-10 rounded-full bg-[#eff4ef] items-center justify-center overflow-hidden mr-3">
                         <Text className="text-[#404942] font-jakarta-bold text-[11px]">
                           {name ? name.substring(0, 2).toUpperCase() : 'TX'}
                         </Text>
                       </View>
                       <View className="flex-1 min-w-0 mr-2">
                         <View className="flex-row items-center">
-                          <Text className="font-jakarta-bold text-[14px] text-[#1b1c1a] flex-shrink" numberOfLines={1} ellipsizeMode="tail">{name}</Text>
+                          <Text className="font-jakarta-bold text-[14px] text-[#0c2010] flex-shrink" numberOfLines={1} ellipsizeMode="tail">{name}</Text>
                           {verified && <MaterialIcons name="verified" size={12} color="#006c4e" style={{ marginLeft: 4 }} />}
                         </View>
                         <Text className="text-[#707971] text-[10px] font-jakarta-medium mt-0.5" numberOfLines={1} ellipsizeMode="tail">
@@ -310,7 +310,7 @@ export default function Dashboard({ navigation }: any) {
                         </Text>
                       </View>
                       <Text
-                        className={`font-jakarta-bold text-[13px] ${isSwap ? 'text-[#1D4ED8]' : isInbound ? 'text-[#006c4e]' : 'text-[#1b1c1a]'}`}
+                        className={`font-jakarta-bold text-[13px] ${isSwap ? 'text-[#1D4ED8]' : isInbound ? 'text-[#006c4e]' : 'text-[#0c2010]'}`}
                         numberOfLines={1}
                         style={{ flexShrink: 0 }}
                       >
@@ -325,23 +325,23 @@ export default function Dashboard({ navigation }: any) {
 
           {/* Available Cash Advance */}
           <View className="px-6 mb-8">
-            <View className={`bg-white rounded-[40px] p-6 shadow-sm border-2 ${trustScore.eligibleForAdvance ? 'border-[#006c4e]' : 'border-[#efeeeb]'}`}>
+            <View className={`bg-white rounded-[40px] p-6 shadow-sm border-2 ${trustScore.eligibleForAdvance ? 'border-[#006c4e]' : 'border-[#eff4ef]'}`}>
               <View className="flex-row justify-between items-start mb-6">
                 <View>
                   <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-[0.1em] mb-1">Available Cash Advance</Text>
-                  <Text className={`text-3xl font-jakarta-bold tracking-tight ${trustScore.eligibleForAdvance ? 'text-[#1b1c1a]' : 'text-[#707971]'}`}>
+                  <Text className={`text-3xl font-jakarta-bold tracking-tight ${trustScore.eligibleForAdvance ? 'text-[#0c2010]' : 'text-[#707971]'}`}>
                     {trustScore.eligibleForAdvance ? 'KES 150,000' : 'KES 0'}
                   </Text>
                 </View>
-                <View className="w-14 h-14 rounded-full border-4 border-[#006c4e] items-center justify-center border-r-[#efeeeb] rotate-45">
+                <View className="w-14 h-14 rounded-full border-4 border-[#006c4e] items-center justify-center border-r-[#eff4ef] rotate-45">
                   <View className="-rotate-45 items-center justify-center">
-                    <Text className="font-jakarta-bold text-[#1b1c1a] text-xs">{trustScore.current || 0}</Text>
+                    <Text className="font-jakarta-bold text-[#0c2010] text-xs">{trustScore.current || 0}</Text>
                     <Text className="text-[7px] text-[#707971] font-jakarta-bold uppercase tracking-wider">Score</Text>
                   </View>
                 </View>
               </View>
 
-              <View className="h-3 w-full bg-[#efeeeb] rounded-full mb-6 overflow-hidden">
+              <View className="h-3 w-full bg-[#eff4ef] rounded-full mb-6 overflow-hidden">
                 <View
                   className="h-full bg-[#006c4e] rounded-full"
                   style={{ width: `${Math.max(0, Math.min(100, trustScore.current || 0))}%` }}
@@ -357,7 +357,7 @@ export default function Dashboard({ navigation }: any) {
                 </View>
                 <TouchableOpacity 
                   disabled={!trustScore.eligibleForAdvance}
-                  className={`px-5 py-2.5 rounded-full ${trustScore.eligibleForAdvance ? 'bg-[#002110]' : 'bg-[#efeeeb]'}`}
+                  className={`px-5 py-2.5 rounded-full ${trustScore.eligibleForAdvance ? 'bg-[#002110]' : 'bg-[#eff4ef]'}`}
                 >
                   <Text className={`text-[11px] font-jakarta-bold uppercase tracking-wider ${trustScore.eligibleForAdvance ? 'text-white' : 'text-[#707971]'}`}>
                     Unlock Funds

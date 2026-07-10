@@ -117,7 +117,7 @@ export default function InflationShield({ navigation }: any) {
   const swapHistory = transactions.filter((tx) => tx.type === 'fx_swap');
 
   const Header = () => (
-    <View className="w-full bg-[#f4f3f0] z-50 pt-2 pb-4 border-b border-[#efeeeb]">
+    <View className="w-full bg-[#f7faf7] z-50 pt-2 pb-4 border-b border-[#eff4ef]">
       <View className="w-full max-w-lg mx-auto px-6 flex-row items-center justify-between">
         <View className="flex-row items-center gap-4">
           <TouchableOpacity onPress={() => navigation.goBack()} className="p-2 -ml-2 rounded-full">
@@ -136,7 +136,7 @@ export default function InflationShield({ navigation }: any) {
   // ── Hard gate: no Stellar wallet yet ────────────────────────────────────
   if (!walletActivated) {
     return (
-      <SafeAreaView className="flex-1 bg-[#faf9f6]" edges={['top', 'left', 'right']}>
+      <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
         <Header />
         <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
           <View className="w-full max-w-lg mx-auto px-6 pt-10 pb-12">
@@ -197,7 +197,7 @@ export default function InflationShield({ navigation }: any) {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-[#faf9f6]" edges={['top', 'left', 'right']}>
+    <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
       <Header />
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
         <View className="w-full max-w-lg mx-auto px-6 pt-10 pb-12">
@@ -243,11 +243,11 @@ export default function InflationShield({ navigation }: any) {
                 </Text>
               </View>
               <View className="flex-row items-center gap-3">
-                <View className="flex-row items-center gap-1.5 bg-[#faf9f6] px-3 py-1.5 rounded-full border border-[#efeeeb]">
+                <View className="flex-row items-center gap-1.5 bg-[#f0fdf4] px-3 py-1.5 rounded-full border border-[#eff4ef]">
                   <View className={`w-5 h-5 rounded-full items-center justify-center ${swapDirection === 'KES_TO_USDC' ? 'bg-[#006c4e]' : 'bg-[#1d4ed8]'}`}>
                     <Text className="text-white text-[9px] font-jakarta-bold">{swapDirection === 'KES_TO_USDC' ? 'K' : 'U'}</Text>
                   </View>
-                  <Text className="text-[13px] font-jakarta-bold text-[#1b1c1a]">{swapDirection === 'KES_TO_USDC' ? 'KES' : 'USDC'}</Text>
+                  <Text className="text-[13px] font-jakarta-bold text-[#0c2010]">{swapDirection === 'KES_TO_USDC' ? 'KES' : 'USDC'}</Text>
                 </View>
                 <TextInput
                   value={inputAmount}
@@ -255,7 +255,7 @@ export default function InflationShield({ navigation }: any) {
                   keyboardType="numeric"
                   placeholder="0"
                   placeholderTextColor="#d4d4d8"
-                  className="flex-1 text-right text-[26px] font-jakarta-extrabold text-[#1b1c1a]"
+                  className="flex-1 text-right text-[26px] font-jakarta-extrabold text-[#0c2010]"
                 />
               </View>
             </View>
@@ -263,7 +263,7 @@ export default function InflationShield({ navigation }: any) {
             <View className="items-center -my-2 z-10">
               <TouchableOpacity
                 onPress={() => setSwapDirection((p) => (p === 'KES_TO_USDC' ? 'USDC_TO_KES' : 'KES_TO_USDC'))}
-                className="w-11 h-11 rounded-full bg-[#0f172a] border-4 border-[#faf9f6] items-center justify-center shadow-lg"
+                className="w-11 h-11 rounded-full bg-[#0f172a] border-4 border-[#f0fdf4] items-center justify-center shadow-lg"
               >
                 <MaterialIcons name="swap-vert" size={20} color="#a7f3d0" />
               </TouchableOpacity>
@@ -275,13 +275,13 @@ export default function InflationShield({ navigation }: any) {
                 <Text className="text-[10px] text-[#707971] font-jakarta-medium">Slippage: 0.1%</Text>
               </View>
               <View className="flex-row items-center gap-3">
-                <View className="flex-row items-center gap-1.5 bg-[#faf9f6] px-3 py-1.5 rounded-full border border-[#efeeeb]">
+                <View className="flex-row items-center gap-1.5 bg-[#f0fdf4] px-3 py-1.5 rounded-full border border-[#eff4ef]">
                   <View className={`w-5 h-5 rounded-full items-center justify-center ${swapDirection === 'USDC_TO_KES' ? 'bg-[#006c4e]' : 'bg-[#1d4ed8]'}`}>
                     <Text className="text-white text-[9px] font-jakarta-bold">{swapDirection === 'USDC_TO_KES' ? 'K' : 'U'}</Text>
                   </View>
-                  <Text className="text-[13px] font-jakarta-bold text-[#1b1c1a]">{swapDirection === 'USDC_TO_KES' ? 'KES' : 'USDC'}</Text>
+                  <Text className="text-[13px] font-jakarta-bold text-[#0c2010]">{swapDirection === 'USDC_TO_KES' ? 'KES' : 'USDC'}</Text>
                 </View>
-                <Text className="flex-1 text-right text-[26px] font-jakarta-extrabold text-[#1b1c1a]">{estimatedOutput}</Text>
+                <Text className="flex-1 text-right text-[26px] font-jakarta-extrabold text-[#0c2010]">{estimatedOutput}</Text>
               </View>
             </View>
 
@@ -313,11 +313,11 @@ export default function InflationShield({ navigation }: any) {
           </View>
 
           {/* Swap History */}
-          <View className="pt-2 border-t border-[#c0c9c0]/30 mb-8">
-            <Text className="font-jakarta-bold text-[#1b1c1a] text-[18px] mb-4">Swap History</Text>
+          <View className="pt-2 border-t border-[#bfc9bf]/30 mb-8">
+            <Text className="font-jakarta-bold text-[#0c2010] text-[18px] mb-4">Swap History</Text>
             {isLoading ? (
               <View className="py-10 items-center justify-center">
-                <ActivityIndicator color="#0B4D2E" />
+                <ActivityIndicator color="#0b4d2e" />
               </View>
             ) : swapHistory.length === 0 ? (
               <View className="py-10 items-center justify-center">
@@ -328,11 +328,11 @@ export default function InflationShield({ navigation }: any) {
                 {swapHistory.slice(0, 10).map((tx) => (
                   <View key={tx._id} className="flex-row items-center justify-between">
                     <View className="flex-row items-center gap-4 flex-1 mr-2">
-                      <View className="w-[46px] h-[46px] rounded-full bg-[#efeeeb] items-center justify-center">
+                      <View className="w-[46px] h-[46px] rounded-full bg-[#eff4ef] items-center justify-center">
                         <MaterialIcons name="sync-alt" size={18} color="#006c4e" />
                       </View>
                       <View className="flex-1">
-                        <Text className="text-[14px] font-jakarta-bold text-[#1b1c1a]" numberOfLines={1}>
+                        <Text className="text-[14px] font-jakarta-bold text-[#0c2010]" numberOfLines={1}>
                           {formatKES(tx.kesAmount || 0)} <Text className="text-[#707971]">→</Text> {(tx.usdcAmount || 0).toFixed(2)} USDC
                         </Text>
                         <Text className="text-[11px] text-[#707971] mt-0.5 font-jakarta-medium">

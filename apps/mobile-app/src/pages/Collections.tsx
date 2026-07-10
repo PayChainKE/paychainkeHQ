@@ -353,40 +353,40 @@ export default function Collections() {
 <style>
   @page { size: A4; margin: 28mm 18mm 24mm 18mm; }
   * { box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; color: #1b1c1a; margin: 0; }
-  .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0B4D2E; padding-bottom: 18px; margin-bottom: 28px; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; color: #0c2010; margin: 0; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0b4d2e; padding-bottom: 18px; margin-bottom: 28px; }
   .brand { display: flex; align-items: center; gap: 12px; }
   .logo { width: 44px; height: 44px; border-radius: 12px; background: linear-gradient(135deg, #00351d, #1D9E75); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px; letter-spacing: 0.5px; }
-  .brand-name { font-size: 20px; font-weight: 700; color: #0B4D2E; letter-spacing: -0.2px; }
+  .brand-name { font-size: 20px; font-weight: 700; color: #0b4d2e; letter-spacing: -0.2px; }
   .brand-sub { font-size: 11px; color: #707971; text-transform: uppercase; letter-spacing: 1.5px; margin-top: 2px; }
   .doc-title { text-align: right; }
-  .doc-title h1 { margin: 0; font-size: 22px; color: #1b1c1a; font-weight: 600; letter-spacing: -0.4px; }
+  .doc-title h1 { margin: 0; font-size: 22px; color: #0c2010; font-weight: 600; letter-spacing: -0.4px; }
   .doc-title .meta { font-size: 11px; color: #707971; margin-top: 4px; }
-  .meta-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding: 16px; background: #faf9f6; border-radius: 12px; margin-bottom: 24px; }
+  .meta-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding: 16px; background: #f0fdf4; border-radius: 12px; margin-bottom: 24px; }
   .meta-grid .item .label { font-size: 9px; color: #707971; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 4px; }
-  .meta-grid .item .value { font-size: 12px; color: #1b1c1a; font-weight: 600; }
+  .meta-grid .item .value { font-size: 12px; color: #0c2010; font-weight: 600; }
   .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 28px; }
-  .summary .card { padding: 14px; border-radius: 12px; border: 1px solid #e9e8e5; }
-  .summary .card.primary { background: linear-gradient(135deg, #00351d, #0B4D2E); border: none; color: #fff; }
+  .summary .card { padding: 14px; border-radius: 12px; border: 1px solid #e7ece7; }
+  .summary .card.primary { background: linear-gradient(135deg, #00351d, #0b4d2e); border: none; color: #fff; }
   .summary .card .lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 1.2px; opacity: 0.7; margin-bottom: 6px; }
   .summary .card .val { font-size: 16px; font-weight: 700; letter-spacing: -0.3px; }
   .summary .card.primary .lbl { opacity: 0.8; color: #c0e5d3; }
   .section-title { font-size: 11px; color: #707971; text-transform: uppercase; letter-spacing: 1.6px; font-weight: 700; margin: 0 0 12px 0; }
   table { width: 100%; border-collapse: collapse; font-size: 11px; }
-  thead th { text-align: left; padding: 10px 8px; background: #f4f3f0; color: #404942; font-weight: 700; font-size: 9px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #e9e8e5; }
+  thead th { text-align: left; padding: 10px 8px; background: #f7faf7; color: #404942; font-weight: 700; font-size: 9px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #e7ece7; }
   thead th.amount, thead th.num { text-align: right; }
-  tbody td { padding: 10px 8px; border-bottom: 1px solid #efeeeb; vertical-align: top; }
+  tbody td { padding: 10px 8px; border-bottom: 1px solid #eff4ef; vertical-align: top; }
   tbody td.num { text-align: right; color: #a1a1aa; font-size: 10px; width: 28px; }
   tbody td.amount { text-align: right; font-weight: 700; font-feature-settings: 'tnum'; }
   tbody td.type { font-size: 10px; color: #404942; }
   tbody td.status { font-size: 10px; color: #006c4e; font-weight: 600; }
-  .primary { font-weight: 600; color: #1b1c1a; font-size: 11px; }
+  .primary { font-weight: 600; color: #0c2010; font-size: 11px; }
   .muted { font-size: 9px; color: #707971; margin-top: 2px; }
   .empty { padding: 40px; text-align: center; color: #707971; font-size: 12px; }
-  .footer { margin-top: 32px; padding-top: 18px; border-top: 1px solid #e9e8e5; font-size: 9px; color: #707971; line-height: 1.6; }
+  .footer { margin-top: 32px; padding-top: 18px; border-top: 1px solid #e7ece7; font-size: 9px; color: #707971; line-height: 1.6; }
   .footer .signature { display: flex; justify-content: space-between; margin-top: 18px; font-size: 10px; }
   .footer .signature .col { width: 45%; }
-  .footer .signature .col .line { border-top: 1px solid #c0c9c0; margin-top: 28px; padding-top: 4px; color: #404942; font-weight: 600; }
+  .footer .signature .col .line { border-top: 1px solid #bfc9bf; margin-top: 28px; padding-top: 4px; color: #404942; font-weight: 600; }
   .badge { display: inline-block; padding: 3px 8px; border-radius: 999px; background: #e7f8ef; color: #006c4e; font-size: 9px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; }
 </style>
 </head>
@@ -510,7 +510,7 @@ export default function Collections() {
     return (
       <TouchableOpacity
         onPress={() => setActiveQuickFilter(value)}
-        className={`px-6 py-2.5 rounded-full mr-2 ${active ? 'bg-[#00351d] shadow-md shadow-[#00351d]/10' : 'bg-[#e9e8e5]'}`}
+        className={`px-6 py-2.5 rounded-full mr-2 ${active ? 'bg-[#00351d] shadow-md shadow-[#00351d]/10' : 'bg-[#e7ece7]'}`}
       >
         <Text className={`text-[13px] ${active ? 'text-white font-jakarta-bold' : 'text-[#404942] font-jakarta-semibold'}`}>{label}</Text>
       </TouchableOpacity>
@@ -532,7 +532,7 @@ export default function Collections() {
       onPress={onPress}
       activeOpacity={0.85}
       className={`flex-row items-center px-4 py-3 rounded-2xl mr-2 mb-2 border ${
-        active ? 'bg-[#00351d] border-[#00351d]' : 'bg-white border-[#e9e8e5]'
+        active ? 'bg-[#00351d] border-[#00351d]' : 'bg-white border-[#e7ece7]'
       }`}
     >
       {icon && <Feather name={icon} size={14} color={active ? '#a7f3d0' : '#707971'} />}
@@ -543,9 +543,9 @@ export default function Collections() {
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-[#faf9f6]" edges={['top', 'left', 'right']}>
+    <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
       <LinearGradient
-        colors={['#0B4D2E', '#1D9E75']}
+        colors={['#0b4d2e', '#1D9E75']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         className="w-full pt-[40px] pb-[16px] px-6 z-40 rounded-b-[24px] shadow-sm shadow-[#0b4d2e]/10"
@@ -587,7 +587,7 @@ export default function Collections() {
           <View className="flex-row flex-wrap pb-6 pt-2 -mx-1.5">
             <View className="w-1/2 px-1.5 mb-3">
               <LinearGradient
-                colors={['#00351d', '#0B4D2E']}
+                colors={['#00351d', '#0b4d2e']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 className="p-5 shadow-lg shadow-[#00351d]/25 border border-white/5"
@@ -609,7 +609,7 @@ export default function Collections() {
             </View>
 
             <View className="w-1/2 px-1.5 mb-3">
-              <View className="bg-white rounded-[26px] p-5 shadow-sm shadow-[#00351d]/5 border border-[#efeeeb]" style={{ minHeight: 132 }}>
+              <View className="bg-white rounded-[26px] p-5 shadow-sm shadow-[#00351d]/5 border border-[#eff4ef]" style={{ minHeight: 132 }}>
                 <View className="flex-row items-center justify-between mb-4">
                   <View className="w-9 h-9 rounded-xl bg-[#eef2ff] items-center justify-center">
                     <Feather name="trending-up" size={15} color="#1d4ed8" />
@@ -624,7 +624,7 @@ export default function Collections() {
             </View>
 
             <View className="w-1/2 px-1.5">
-              <View className="bg-white rounded-[26px] p-5 shadow-sm shadow-[#00351d]/5 border border-[#efeeeb]" style={{ minHeight: 132 }}>
+              <View className="bg-white rounded-[26px] p-5 shadow-sm shadow-[#00351d]/5 border border-[#eff4ef]" style={{ minHeight: 132 }}>
                 <View className="flex-row items-center justify-between mb-4">
                   <View className="w-9 h-9 rounded-xl bg-[#fef3e7] items-center justify-center">
                     <Feather name="calendar" size={15} color="#b87333" />
@@ -658,14 +658,14 @@ export default function Collections() {
           <TouchableOpacity
             onPress={() => setShowStatementSheet(true)}
             activeOpacity={0.85}
-            className="flex-row items-center justify-between bg-white rounded-[22px] p-4 mb-5 border border-[#c0c9c0]/20 shadow-sm"
+            className="flex-row items-center justify-between bg-white rounded-[22px] p-4 mb-5 border border-[#bfc9bf]/20 shadow-sm"
           >
             <View className="flex-row items-center gap-3">
               <View className="w-11 h-11 rounded-full bg-[#e7f8ef] items-center justify-center">
                 <Feather name="file-text" size={18} color="#006c4e" />
               </View>
               <View>
-                <Text className="font-jakarta-bold text-[#1b1c1a] text-[14px]">Download Statement</Text>
+                <Text className="font-jakarta-bold text-[#0c2010] text-[14px]">Download Statement</Text>
                 <Text className="text-[#707971] text-[11px] font-jakarta-medium mt-0.5">Choose a period · PDF export</Text>
               </View>
             </View>
@@ -674,10 +674,10 @@ export default function Collections() {
 
           {/* Search and Filter Row */}
           <View className="flex-row items-center gap-3 mb-6 px-1">
-            <View className="flex-1 flex-row items-center bg-white rounded-full px-4 py-3 shadow-sm border border-[#c0c9c0]/20">
+            <View className="flex-1 flex-row items-center bg-white rounded-full px-4 py-3 shadow-sm border border-[#bfc9bf]/20">
               <Feather name="search" size={18} color="#707971" />
               <TextInput
-                className="flex-1 ml-2 text-[#1b1c1a] font-jakarta-medium text-[14px]"
+                className="flex-1 ml-2 text-[#0c2010] font-jakarta-medium text-[14px]"
                 placeholder="Search transactions..."
                 placeholderTextColor="#a1a1aa"
                 value={searchQuery}
@@ -692,7 +692,7 @@ export default function Collections() {
             <TouchableOpacity
               onPress={() => setShowFilterSheet(true)}
               className={`w-12 h-12 rounded-full items-center justify-center shadow-sm border ${
-                advancedFiltersActive ? 'bg-[#00351d] border-[#00351d]' : 'bg-white border-[#c0c9c0]/20'
+                advancedFiltersActive ? 'bg-[#00351d] border-[#00351d]' : 'bg-white border-[#bfc9bf]/20'
               }`}
             >
               <Feather name="sliders" size={18} color={advancedFiltersActive ? '#ffffff' : '#00351d'} />
@@ -721,10 +721,10 @@ export default function Collections() {
               <Text className="text-[11px] font-jakarta-medium text-[#707971]">{filteredTransactions.length} Results</Text>
             </View>
 
-            <View className="bg-white rounded-[32px] p-2 shadow-sm border border-[#c0c9c0]/10 mb-6">
+            <View className="bg-white rounded-[32px] p-2 shadow-sm border border-[#bfc9bf]/10 mb-6">
               {isLoading ? (
                 <View className="py-10 items-center justify-center">
-                  <ActivityIndicator color="#0B4D2E" />
+                  <ActivityIndicator color="#0b4d2e" />
                 </View>
               ) : filteredTransactions.length > 0 ? (
                 filteredTransactions.slice(0, 20).map((tx, index, visible) => {
@@ -739,7 +739,7 @@ export default function Collections() {
                     ? 'text-[#1D4ED8]'
                     : inboundRow
                     ? 'text-[#006c4e]'
-                    : 'text-[#1b1c1a]';
+                    : 'text-[#0c2010]';
                   const refText = tx.reference ? formatReference(tx.reference) : tx.type.replace('_', ' ');
                   return (
                     <TouchableOpacity
@@ -747,10 +747,10 @@ export default function Collections() {
                       activeOpacity={0.8}
                       onPress={() => openReceipt(tx)}
                       className={`flex-row items-center py-3 px-4 ${
-                        index !== visible.length - 1 ? 'border-b border-[#efeeeb]/50' : ''
+                        index !== visible.length - 1 ? 'border-b border-[#eff4ef]/50' : ''
                       }`}
                     >
-                      <View className="w-10 h-10 rounded-full bg-[#efeeeb] items-center justify-center overflow-hidden mr-3">
+                      <View className="w-10 h-10 rounded-full bg-[#eff4ef] items-center justify-center overflow-hidden mr-3">
                         <Text className="text-[#404942] font-jakarta-bold text-[11px]">
                           {name ? name.substring(0, 2).toUpperCase() : 'TX'}
                         </Text>
@@ -758,7 +758,7 @@ export default function Collections() {
                       <View className="flex-1 min-w-0 mr-2">
                         <View className="flex-row items-center">
                           <Text
-                            className="font-jakarta-bold text-[14px] text-[#1b1c1a] flex-shrink"
+                            className="font-jakarta-bold text-[14px] text-[#0c2010] flex-shrink"
                             numberOfLines={1}
                             ellipsizeMode="tail"
                           >
@@ -786,10 +786,10 @@ export default function Collections() {
                 })
               ) : (
                 <View className="items-center justify-center py-10">
-                  <View className="w-14 h-14 rounded-full bg-[#faf9f6] items-center justify-center mb-3">
+                  <View className="w-14 h-14 rounded-full bg-[#f0fdf4] items-center justify-center mb-3">
                     <Feather name="inbox" size={22} color="#707971" />
                   </View>
-                  <Text className="text-[#1b1c1a] font-jakarta-bold text-[14px]">No transactions found</Text>
+                  <Text className="text-[#0c2010] font-jakarta-bold text-[14px]">No transactions found</Text>
                   <Text className="text-[#707971] font-jakarta-medium text-[12px] mt-1">Try adjusting your filters or search</Text>
                   {(advancedFiltersActive || activeQuickFilter !== 'all' || searchQuery) && (
                     <TouchableOpacity
@@ -816,11 +816,11 @@ export default function Collections() {
           <TouchableOpacity className="absolute inset-0" activeOpacity={1} onPress={() => setShowFilterSheet(false)} />
           <View className="w-full max-w-lg mx-auto bg-white rounded-t-[36px] px-6 pt-4 pb-8 mt-auto shadow-2xl" style={{ maxHeight: '90%' }}>
             <View className="items-center mb-4">
-              <View className="w-12 h-1.5 bg-[#e9e8e5] rounded-full" />
+              <View className="w-12 h-1.5 bg-[#e7ece7] rounded-full" />
             </View>
 
             <View className="flex-row justify-between items-center mb-5">
-              <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#1b1c1a]">Filter Transactions</Text>
+              <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#0c2010]">Filter Transactions</Text>
               <TouchableOpacity onPress={resetFilters}>
                 <Text className="text-[12px] font-jakarta-bold text-[#006c4e] uppercase tracking-wider">Reset</Text>
               </TouchableOpacity>
@@ -857,17 +857,17 @@ export default function Collections() {
 
               <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-3">Amount Range (KES)</Text>
               <View className="flex-row gap-3 mb-6">
-                <View className="flex-1 bg-[#faf9f6] rounded-2xl px-4 py-3 border border-[#e9e8e5]">
+                <View className="flex-1 bg-[#f0fdf4] rounded-2xl px-4 py-3 border border-[#e7ece7]">
                   <Text className="text-[9px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1">Min</Text>
                   <ValidatedTextInput kind="amount" optional placeholder="0" placeholderTextColor="#a1a1aa"
                     value={filterMinAmount} onChangeText={setFilterMinAmount}
-                    className="text-[#1b1c1a] font-jakarta-bold text-[15px]" />
+                    className="text-[#0c2010] font-jakarta-bold text-[15px]" />
                 </View>
-                <View className="flex-1 bg-[#faf9f6] rounded-2xl px-4 py-3 border border-[#e9e8e5]">
+                <View className="flex-1 bg-[#f0fdf4] rounded-2xl px-4 py-3 border border-[#e7ece7]">
                   <Text className="text-[9px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1">Max</Text>
                   <ValidatedTextInput kind="amount" optional placeholder="No limit" placeholderTextColor="#a1a1aa"
                     value={filterMaxAmount} onChangeText={setFilterMaxAmount}
-                    className="text-[#1b1c1a] font-jakarta-bold text-[15px]" />
+                    className="text-[#0c2010] font-jakarta-bold text-[15px]" />
                 </View>
               </View>
             </ScrollView>
@@ -888,14 +888,14 @@ export default function Collections() {
           <TouchableOpacity className="absolute inset-0" activeOpacity={1} onPress={() => setShowStatementSheet(false)} />
           <View className="w-full max-w-lg mx-auto bg-white rounded-t-[36px] px-6 pt-4 pb-8 mt-auto shadow-2xl">
             <View className="items-center mb-4">
-              <View className="w-12 h-1.5 bg-[#e9e8e5] rounded-full" />
+              <View className="w-12 h-1.5 bg-[#e7ece7] rounded-full" />
             </View>
 
             <View className="items-center mb-2">
               <View className="w-14 h-14 rounded-full bg-[#e7f8ef] items-center justify-center mb-3">
                 <Feather name="file-text" size={22} color="#006c4e" />
               </View>
-              <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[26px] text-[#1b1c1a]">Download Statement</Text>
+              <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[26px] text-[#0c2010]">Download Statement</Text>
               <Text className="text-[13px] font-jakarta-medium text-[#707971] mt-1 text-center">
                 Select a period — we'll prepare a premium PDF
               </Text>
@@ -914,18 +914,18 @@ export default function Collections() {
               </View>
             </View>
 
-            <View className="bg-[#faf9f6] rounded-[20px] p-4 mb-6 mt-2 border border-[#e9e8e5]">
+            <View className="bg-[#f0fdf4] rounded-[20px] p-4 mb-6 mt-2 border border-[#e7ece7]">
               <View className="flex-row justify-between items-center mb-2">
                 <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider">Period</Text>
-                <Text className="text-[12px] font-jakarta-bold text-[#1b1c1a]">{getDateRange(statementPeriod).label}</Text>
+                <Text className="text-[12px] font-jakarta-bold text-[#0c2010]">{getDateRange(statementPeriod).label}</Text>
               </View>
               <View className="flex-row justify-between items-center mb-2">
                 <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider">Format</Text>
-                <Text className="text-[12px] font-jakarta-bold text-[#1b1c1a]">PDF · A4</Text>
+                <Text className="text-[12px] font-jakarta-bold text-[#0c2010]">PDF · A4</Text>
               </View>
               <View className="flex-row justify-between items-center">
                 <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider">Account</Text>
-                <Text className="text-[12px] font-jakarta-bold text-[#1b1c1a]" numberOfLines={1}>{merchant?.businessName || '—'}</Text>
+                <Text className="text-[12px] font-jakarta-bold text-[#0c2010]" numberOfLines={1}>{merchant?.businessName || '—'}</Text>
               </View>
             </View>
 
@@ -956,19 +956,19 @@ export default function Collections() {
         <View className="flex-1 justify-end bg-black/30">
           <TouchableOpacity className="absolute inset-0" activeOpacity={1} onPress={() => setShowReceipt(false)} />
           <View className="w-full max-w-lg mx-auto bg-white rounded-t-[40px] px-6 pt-4 pb-10 items-center mt-auto shadow-2xl">
-            <View className="w-12 h-1.5 bg-[#e9e8e5] rounded-full mb-8" />
+            <View className="w-12 h-1.5 bg-[#e7ece7] rounded-full mb-8" />
 
             <View className="w-16 h-16 rounded-full bg-[#e7f8ef] items-center justify-center mb-6">
               <MaterialIcons name="verified" size={32} color="#006c4e" />
             </View>
 
-            <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-3xl text-[#1b1c1a] mb-2">Payment Verified</Text>
+            <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-3xl text-[#0c2010] mb-2">Payment Verified</Text>
             <Text className="text-[15px] font-jakarta-medium text-[#707971] mb-8">Transaction settled successfully</Text>
 
-            <View className="w-full bg-[#faf9f6] rounded-[32px] p-6 mb-8">
+            <View className="w-full bg-[#f0fdf4] rounded-[32px] p-6 mb-8">
               <View className="flex-row justify-between items-center mb-6">
                 <Text className="text-[11px] font-jakarta-bold uppercase tracking-[0.1em] text-[#707971]">Amount</Text>
-                <Text className="text-[17px] font-jakarta-bold text-[#1b1c1a]">
+                <Text className="text-[17px] font-jakarta-bold text-[#0c2010]">
                   {selectedTx?.type === 'fx_swap'
                     ? `${(selectedTx?.usdcAmount || 0).toLocaleString()} USDC`
                     : formatCurrency(selectedTx ? kesValue(selectedTx) : 0)}
@@ -978,17 +978,17 @@ export default function Collections() {
                 <Text className="text-[11px] font-jakarta-bold uppercase tracking-[0.1em] text-[#707971]">
                   {selectedTx && isInboundType(selectedTx.type) ? 'From' : 'To'}
                 </Text>
-                <Text className="text-[15px] font-jakarta-semibold text-[#1b1c1a]" numberOfLines={1}>
+                <Text className="text-[15px] font-jakarta-semibold text-[#0c2010]" numberOfLines={1}>
                   {selectedTx ? counterpartyName(selectedTx) : 'Unknown'}
                 </Text>
               </View>
               <View className="flex-row justify-between items-center mb-6">
                 <Text className="text-[11px] font-jakarta-bold uppercase tracking-[0.1em] text-[#707971]">Reference</Text>
-                <Text className="text-[15px] font-jakarta-semibold text-[#1b1c1a]" numberOfLines={1}>{selectedTx?.reference || '—'}</Text>
+                <Text className="text-[15px] font-jakarta-semibold text-[#0c2010]" numberOfLines={1}>{selectedTx?.reference || '—'}</Text>
               </View>
               <View className="flex-row justify-between items-center mb-6">
                 <Text className="text-[11px] font-jakarta-bold uppercase tracking-[0.1em] text-[#707971]">Type</Text>
-                <Text className="text-[15px] font-jakarta-semibold text-[#1b1c1a] capitalize">{selectedTx?.type?.replace('_', ' ') || '—'}</Text>
+                <Text className="text-[15px] font-jakarta-semibold text-[#0c2010] capitalize">{selectedTx?.type?.replace('_', ' ') || '—'}</Text>
               </View>
               <View className="flex-row justify-between items-center mb-6">
                 <Text className="text-[11px] font-jakarta-bold uppercase tracking-[0.1em] text-[#707971]">Status</Text>
@@ -996,15 +996,15 @@ export default function Collections() {
               </View>
               <View className="flex-row justify-between items-center mb-6">
                 <Text className="text-[11px] font-jakarta-bold uppercase tracking-[0.1em] text-[#707971]">Till Number</Text>
-                <Text className="text-[15px] font-jakarta-semibold text-[#1b1c1a]">{selectedTx?.accountNumber || merchant?.paybillAccount || '—'}</Text>
+                <Text className="text-[15px] font-jakarta-semibold text-[#0c2010]">{selectedTx?.accountNumber || merchant?.paybillAccount || '—'}</Text>
               </View>
 
-              <View className="w-full h-[1px] bg-[#e9e8e5] mb-5" />
+              <View className="w-full h-[1px] bg-[#e7ece7] mb-5" />
 
               <View className="flex-row items-center gap-3">
                 <Feather name="zap" size={18} color="#006c4e" />
                 <View>
-                  <Text className="font-jakarta-bold text-[#1b1c1a] text-[13px] mb-0.5">Verified via Safaricom Daraja API</Text>
+                  <Text className="font-jakarta-bold text-[#0c2010] text-[13px] mb-0.5">Verified via Safaricom Daraja API</Text>
                   <Text className="text-[#707971] text-[11px] font-jakarta-medium">
                     {selectedTx ? new Date(selectedTx.createdAt).toLocaleString('en-KE') : ''}
                   </Text>

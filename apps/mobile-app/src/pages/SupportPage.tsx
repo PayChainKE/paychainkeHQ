@@ -18,13 +18,13 @@ const FAQItem = ({ question, answer }: { question: string, answer: string }) => 
   };
 
   return (
-    <View className={`rounded-[32px] overflow-hidden ${expanded ? 'bg-white border border-[#c0c9c0]/20 shadow-sm shadow-[#00351d]/5' : 'bg-[#f4f3f0] border border-transparent'}`}>
+    <View className={`rounded-[32px] overflow-hidden ${expanded ? 'bg-white border border-[#bfc9bf]/20 shadow-sm shadow-[#00351d]/5' : 'bg-[#f7faf7] border border-transparent'}`}>
       <TouchableOpacity 
         className="flex-row items-center justify-between p-6" 
         onPress={toggleExpand}
         activeOpacity={0.7}
       >
-        <Text className="font-jakarta-bold text-[15px] text-[#1b1c1a] flex-1 pr-4 leading-relaxed">{question}</Text>
+        <Text className="font-jakarta-bold text-[15px] text-[#0c2010] flex-1 pr-4 leading-relaxed">{question}</Text>
         <Feather 
           name="chevron-down" 
           size={20} 
@@ -45,9 +45,9 @@ const FAQItem = ({ question, answer }: { question: string, answer: string }) => 
 
 export default function SupportPage({ navigation }: any) {
   return (
-    <SafeAreaView className="flex-1 bg-[#faf9f6]" edges={['top', 'left', 'right']}>
+    <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
       {/* App Header */}
-      <View className="w-full z-50 bg-[#f4f3f0] pt-2 pb-4">
+      <View className="w-full z-50 bg-[#f7faf7] pt-2 pb-4">
         <View className="w-full max-w-lg mx-auto flex-row justify-between items-center px-6">
           <View className="flex-row items-center gap-3">
             <View className="w-9 h-9 rounded-full bg-[#00351d] flex items-center justify-center shadow-sm">
@@ -92,16 +92,16 @@ export default function SupportPage({ navigation }: any) {
             </TouchableOpacity>
 
             {/* Email Card */}
-            <TouchableOpacity activeOpacity={0.9} className="bg-white p-8 rounded-[40px] shadow-sm shadow-[#00351d]/5 border border-[#c0c9c0]/10">
+            <TouchableOpacity activeOpacity={0.9} className="bg-white p-8 rounded-[40px] shadow-sm shadow-[#00351d]/5 border border-[#bfc9bf]/10">
               <View className="flex-row justify-between items-start mb-8">
-                <View className="w-14 h-14 bg-[#f4f3f0] rounded-full items-center justify-center border border-[#efeeeb]">
+                <View className="w-14 h-14 bg-[#f7faf7] rounded-full items-center justify-center border border-[#eff4ef]">
                   <MaterialIcons name="mail" size={24} color="#00351d" />
                 </View>
               </View>
               <Text className="font-jakarta-extrabold text-[24px] tracking-tight text-[#00351d] mb-2">Email Support</Text>
               <Text className="font-jakarta-medium text-[#404942] text-[15px] mb-8">hello@paychainke.co</Text>
-              <View className="border-[2px] border-[#1b1c1a] py-4 rounded-full items-center justify-center">
-                <Text className="font-jakarta-bold text-[#1b1c1a] text-[16px]">Send Email</Text>
+              <View className="border-[2px] border-[#0c2010] py-4 rounded-full items-center justify-center">
+                <Text className="font-jakarta-bold text-[#0c2010] text-[16px]">Send Email</Text>
               </View>
             </TouchableOpacity>
           </View>
@@ -142,7 +142,7 @@ export default function SupportPage({ navigation }: any) {
           </View>
 
           {/* Growth Ribbon */}
-          <View className="mb-4 p-8 bg-[#b1f1c6] rounded-[40px] overflow-hidden flex-row items-center justify-between shadow-sm">
+          <View className="mb-4 p-8 bg-[#5efeb3] rounded-[40px] overflow-hidden flex-row items-center justify-between shadow-sm">
             <View className="z-10 flex-1 pr-8">
               <Text style={{ fontFamily: 'DMSerifDisplay_400Regular_Italic' }} className="text-[26px] text-[#00351d] mb-2 leading-tight">Expert help, just a tap away.</Text>
               <Text className="font-jakarta-bold text-[10px] uppercase tracking-[0.15em] text-[#006c4e] mt-1">Available 24/7 for urgent issues</Text>

@@ -37,7 +37,7 @@ export default function MyTillsTab() {
           <Feather name="search" size={20} color="#b3b9b4" style={{ position: 'absolute', left: 16, top: 16, zIndex: 1 }} />
           <TextInput 
             placeholder="Search accounts..." 
-            className="w-full bg-white border border-[#efeeeb] rounded-2xl py-4 pl-12 pr-4 text-[15px] font-jakarta-medium text-[#00351d]"
+            className="w-full bg-white border border-[#eff4ef] rounded-2xl py-4 pl-12 pr-4 text-[15px] font-jakarta-medium text-[#00351d]"
             value={searchTerm}
             onChangeText={setSearchTerm}
             placeholderTextColor="#b3b9b4"
@@ -51,7 +51,7 @@ export default function MyTillsTab() {
 
         <View className="gap-5">
           {tillsData.map((till, idx) => (
-            <View key={idx} className="bg-white rounded-[28px] border border-[#efeeeb] shadow-sm shadow-[#00351d]/5 overflow-hidden">
+            <View key={idx} className="bg-white rounded-[28px] border border-[#eff4ef] shadow-sm shadow-[#00351d]/5 overflow-hidden">
               <LinearGradient colors={['rgba(0,108,78,0.05)', 'rgba(0,108,78,0)']} className="absolute inset-0 h-24" />
               
               <View className="p-6">
@@ -73,7 +73,7 @@ export default function MyTillsTab() {
                   </View>
                 </View>
                 
-                <View className="bg-[#faf9f6] rounded-2xl p-5 border border-[#efeeeb] gap-4">
+                <View className="bg-[#f0fdf4] rounded-2xl p-5 border border-[#eff4ef] gap-4">
                   <View className="flex-row justify-between items-center">
                     <Text className="text-[12px] text-[#707971] font-jakarta-bold uppercase tracking-widest">Account No</Text>
                     <Text className="text-[16px] font-jakarta-extrabold text-[#00351d] tracking-tight">{till.accountNumber}</Text>
@@ -84,7 +84,7 @@ export default function MyTillsTab() {
                     <Text className="text-[14px] font-jakarta-bold text-[#00351d]">{till.manager}</Text>
                   </View>
 
-                  <View className="h-[1px] bg-[#efeeeb] w-full" />
+                  <View className="h-[1px] bg-[#eff4ef] w-full" />
                   
                   <View className="flex-row justify-between items-center">
                     <View className="flex-row items-center gap-2">

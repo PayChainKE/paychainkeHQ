@@ -26,16 +26,16 @@ export default function SecurityTab() {
         <View className="flex-row items-center justify-between mb-8">
           <View>
             <Text className="font-jakarta-extrabold text-[28px] text-white tracking-tight leading-tight">Security Vault</Text>
-            <Text className="text-[#b1f1c6] text-[11px] font-jakarta-bold uppercase tracking-[0.2em] mt-1 opacity-80">Encryption & Access Rules</Text>
+            <Text className="text-[#5efeb3] text-[11px] font-jakarta-bold uppercase tracking-[0.2em] mt-1 opacity-80">Encryption & Access Rules</Text>
           </View>
           <View className="w-12 h-12 rounded-[18px] bg-white/5 border border-white/10 flex items-center justify-center shadow-lg">
-            <MaterialIcons name="security" size={24} color="#b1f1c6" />
+            <MaterialIcons name="security" size={24} color="#5efeb3" />
           </View>
         </View>
 
         {/* Change Password */}
         <View className="bg-white/5 rounded-[32px] p-7 border border-white/10 mb-6 shadow-xl relative overflow-hidden">
-          <View className="absolute top-0 right-0 w-32 h-32 bg-[#b1f1c6]/10 rounded-full -mr-16 -mt-16 blur-xl" />
+          <View className="absolute top-0 right-0 w-32 h-32 bg-[#5efeb3]/10 rounded-full -mr-16 -mt-16 blur-xl" />
           
           <View className="flex-row items-center gap-3 mb-6 relative z-10">
             <View className="w-10 h-10 rounded-xl bg-[#006c4e] flex items-center justify-center shadow-md shadow-[#006c4e]/50">
@@ -56,7 +56,7 @@ export default function SecurityTab() {
                 placeholderTextColor="rgba(255,255,255,0.2)"
                 value={currentPassword}
                 onChangeText={setCurrentPassword}
-                className="w-full bg-black/20 border border-white/5 rounded-2xl py-4 px-5 text-[15px] font-jakarta-medium text-white focus:border-[#b1f1c6]/30"
+                className="w-full bg-black/20 border border-white/5 rounded-2xl py-4 px-5 text-[15px] font-jakarta-medium text-white focus:border-[#5efeb3]/30"
               />
             </View>
             <View>
@@ -67,7 +67,7 @@ export default function SecurityTab() {
                 placeholderTextColor="rgba(255,255,255,0.2)"
                 value={newPassword}
                 onChangeText={setNewPassword}
-                className="w-full bg-black/20 border border-white/5 rounded-2xl py-4 px-5 text-[15px] font-jakarta-medium text-white focus:border-[#b1f1c6]/30"
+                className="w-full bg-black/20 border border-white/5 rounded-2xl py-4 px-5 text-[15px] font-jakarta-medium text-white focus:border-[#5efeb3]/30"
               />
             </View>
             <View>
@@ -78,7 +78,7 @@ export default function SecurityTab() {
                 placeholderTextColor="rgba(255,255,255,0.2)"
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
-                className="w-full bg-black/20 border border-white/5 rounded-2xl py-4 px-5 text-[15px] font-jakarta-medium text-white focus:border-[#b1f1c6]/30"
+                className="w-full bg-black/20 border border-white/5 rounded-2xl py-4 px-5 text-[15px] font-jakarta-medium text-white focus:border-[#5efeb3]/30"
               />
             </View>
           </View>
@@ -138,7 +138,7 @@ export default function SecurityTab() {
             <View className="w-full flex-row items-center justify-between p-5 bg-black/20 rounded-2xl border border-white/5">
               <View className="flex-row items-center gap-4">
                 <View className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center">
-                  <MaterialIcons name="fingerprint" size={22} color={merchant?.biometricsEnabled ? "#b1f1c6" : "#9ca3af"} />
+                  <MaterialIcons name="fingerprint" size={22} color={merchant?.biometricsEnabled ? "#5efeb3" : "#9ca3af"} />
                 </View>
                 <View>
                   <Text className="text-[15px] font-jakarta-extrabold text-white">Biometric Login</Text>
@@ -148,8 +148,8 @@ export default function SecurityTab() {
                 </View>
               </View>
               {merchant?.biometricsEnabled ? (
-                <View className="bg-[#b1f1c6]/20 p-2 rounded-full">
-                  <MaterialIcons name="check" size={16} color="#b1f1c6" />
+                <View className="bg-[#5efeb3]/20 p-2 rounded-full">
+                  <MaterialIcons name="check" size={16} color="#5efeb3" />
                 </View>
               ) : (
                 <TouchableOpacity className="bg-white/10 border border-white/20 px-4 py-2 rounded-xl active:bg-white/20">
