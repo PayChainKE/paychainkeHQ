@@ -9,6 +9,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
+import * as Clipboard from 'expo-clipboard';
+import { ValidatedTextInput } from '../components/ValidatedTextInput';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/config';
 
@@ -62,6 +64,28 @@ interface BatchHistory {
   createdAt: string;
 }
 
+interface InvoiceItem {
+  description: string;
+  qty: number;
+  price: number;
+}
+
+interface Invoice {
+  _id?: string;
+  customer: { name: string; email: string; phone: string; address: string };
+  invoiceNumber: number | string | null;
+  issueDate: string;
+  dueDate: string;
+  currency: string;
+  notes: string;
+  recurring: boolean;
+  items: InvoiceItem[];
+  payUrl?: string | null;
+  status: 'draft' | 'sent' | 'paid' | 'void' | string;
+  total?: number;
+  createdAt?: string;
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 const TYPE_META: Record<PayeeType, { bg: string; text: string; badgeBg: string; badgeText: string; icon: keyof typeof MaterialIcons.glyphMap; description: string; label: string }> = {
   employee:   { bg: '#5efeb3', text: '#00351d', badgeBg: '#e7f8ef', badgeText: '#006c4e', icon: 'badge',           description: 'Payroll & Salaries',   label: 'Employee' },
@@ -104,7 +128,7 @@ const BATCH_STATUS_META: Record<string, { bg: string; text: string }> = {
 export default function BulkPay() {
   const { merchant } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<'Payees' | 'Batches'>('Payees');
+  const [activeTab, setActiveTab] = useState<'Payees' | 'Batches' | 'Invoices'>('Payees');
   const [activeFilter, setActiveFilter] = useState<Filter>('All');
   const [payeesList, setPayeesList] = useState<Payee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -122,6 +146,48 @@ export default function BulkPay() {
   const [showCsvUpload, setShowCsvUpload] = useState(false);
   const [showFunding, setShowFunding] = useState(false);
   const [showBatchDetails, setShowBatchDetails] = useState<BatchHistory | null>(null);
+  const [showTillSelect, setShowTillSelect] = useState(false);
+  const [showSecurity, setShowSecurity] = useState(false);
+
+  // Funding source (till) — mirrors the dashboard's single-till selector,
+  // derived from the merchant's own profile (no separate tills backend).
+  const [selectedTill, setSelectedTill] = useState(false);
+
+  // Security verification (OTP-then-PIN), matches the dashboard's two-step
+  // "Verification" modal. The OTP step is not backend-verified on the
+  // dashboard either — the real check is the PIN, enforced server-side in
+  // authorizeBatch. Kept here for exact behavioral parity.
+  const [securityStep, setSecurityStep] = useState<1 | 2>(1);
+  const [securityOtp, setSecurityOtp] = useState('');
+
+  // Which batch is pending authorization — set right before opening the
+  // Till Select -> Security flow, consumed once the PIN is confirmed.
+  const [pendingBatch, setPendingBatch] = useState<{ source: 'manual' | 'csv' } | null>(null);
+
+  // Invoices
+  const blankInvoice = (): Invoice => ({
+    customer: { name: '', email: '', phone: '', address: '' },
+    invoiceNumber: null,
+    issueDate: new Date().toISOString().slice(0, 10),
+    dueDate: '',
+    currency: 'KES',
+    notes: '',
+    recurring: false,
+    items: [{ description: '', qty: 1, price: 0 }],
+    payUrl: null,
+    status: 'draft',
+  });
+  const [invoicesList, setInvoicesList] = useState<Invoice[]>([]);
+  const [invoiceFilter, setInvoiceFilter] = useState<'All' | 'Drafts' | 'Sent' | 'Paid'>('All');
+  const [invoicePage, setInvoicePage] = useState(1);
+  const [showInvoiceEditor, setShowInvoiceEditor] = useState(false);
+  const [activeInvoiceId, setActiveInvoiceId] = useState<string | null>(null);
+  const [invoiceDetails, setInvoiceDetails] = useState<Invoice>(blankInvoice());
+  const [isSavingInvoice, setIsSavingInvoice] = useState(false);
+  const [isSendingInvoice, setIsSendingInvoice] = useState(false);
+  const [confirmDeleteInvoiceId, setConfirmDeleteInvoiceId] = useState<string | null>(null);
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const invoicesPerPage = 5;
 
   // CSV upload
   const [csvPreview, setCsvPreview] = useState<any[]>([]);
@@ -133,9 +199,13 @@ export default function BulkPay() {
   const [batchFilter, setBatchFilter] = useState('All');
   const [batchPage, setBatchPage] = useState(1);
 
-  // Funding
+  // Funding — mirrors the dashboard's Fund Account modal, which is itself
+  // not wired to any real backend endpoint (no funding API exists); this is
+  // a simulated top-up flow for UI parity, same as the dashboard.
+  const [fundStep, setFundStep] = useState<1 | 2 | 3 | 4>(1);
   const [fundingAmount, setFundingAmount] = useState('');
-  const [fundingMethod, setFundingMethod] = useState<'Mobile Money' | 'Bank'>('Mobile Money');
+  const [fundingMethod, setFundingMethod] = useState('Mobile Money');
+  const [fundingPhone, setFundingPhone] = useState('');
 
   // PIN flows
   const [setupPin, setSetupPin] = useState('');
@@ -221,6 +291,243 @@ export default function BulkPay() {
     }
   }, [merchant, activeTab, fetchBatches]);
 
+  // ── Fetch invoices ──
+  const fetchInvoices = useCallback(async () => {
+    try {
+      const res = await api.get('/api/invoices');
+      setInvoicesList(res.data?.invoices || []);
+    } catch (err) {
+      // Non-fatal — the list just shows its empty state.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (merchant && activeTab === 'Invoices') {
+      fetchInvoices();
+    }
+  }, [merchant, activeTab, fetchInvoices]);
+
+  // ── Invoice derived values ──
+  const filteredInvoicesList = useMemo(
+    () => invoicesList.filter(inv => invoiceFilter === 'All' || inv.status === (invoiceFilter === 'Drafts' ? 'draft' : invoiceFilter.toLowerCase())),
+    [invoicesList, invoiceFilter]
+  );
+  const totalInvoicePages = Math.max(1, Math.ceil(filteredInvoicesList.length / invoicesPerPage));
+  const paginatedInvoicesList = filteredInvoicesList.slice((invoicePage - 1) * invoicesPerPage, invoicePage * invoicesPerPage);
+  const invoiceSubtotal = invoiceDetails.items.reduce((sum, item) => sum + (item.qty * item.price), 0);
+  const fmtInvoiceCurrency = (n: number) => `${invoiceDetails.currency} ${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  useEffect(() => {
+    setInvoicePage(prev => Math.min(prev, totalInvoicePages));
+  }, [totalInvoicePages]);
+
+  // ── Invoice item editing ──
+  const handleAddInvoiceItem = () => {
+    setInvoiceDetails(prev => ({ ...prev, items: [...prev.items, { description: '', qty: 1, price: 0 }] }));
+  };
+  const handleUpdateInvoiceItem = (index: number, field: keyof InvoiceItem, value: any) => {
+    setInvoiceDetails(prev => ({
+      ...prev,
+      items: prev.items.map((item, i) => (i === index ? { ...item, [field]: value } : item)),
+    }));
+  };
+  const handleRemoveInvoiceItem = (index: number) => {
+    setInvoiceDetails(prev => ({ ...prev, items: prev.items.filter((_, i) => i !== index) }));
+  };
+
+  const buildInvoicePayload = () => ({
+    customer: invoiceDetails.customer,
+    items: invoiceDetails.items,
+    currency: invoiceDetails.currency,
+    issueDate: invoiceDetails.issueDate,
+    dueDate: invoiceDetails.dueDate || null,
+    notes: invoiceDetails.notes,
+    recurring: invoiceDetails.recurring,
+    invoiceNumber: invoiceDetails.invoiceNumber || undefined,
+  });
+
+  const upsertInvoiceInList = (saved: Invoice) => {
+    setInvoicesList(prev => {
+      const exists = prev.some(inv => inv._id === saved._id);
+      return exists ? prev.map(inv => (inv._id === saved._id ? saved : inv)) : [saved, ...prev];
+    });
+  };
+
+  const handleOpenInvoiceEditor = async () => {
+    setActiveInvoiceId(null);
+    setInvoiceDetails(blankInvoice());
+    setShowInvoiceEditor(true);
+    try {
+      const res = await api.get('/api/invoices/next-number');
+      setInvoiceDetails(prev => ({ ...prev, invoiceNumber: res.data?.invoiceNumber }));
+    } catch (err) {
+      // Non-fatal — invoiceNumber stays null and gets assigned on save.
+    }
+  };
+
+  const openInvoiceForEdit = (inv: Invoice) => {
+    setActiveInvoiceId(inv._id || null);
+    setInvoiceDetails({
+      customer: inv.customer,
+      invoiceNumber: inv.invoiceNumber,
+      issueDate: inv.issueDate ? inv.issueDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
+      dueDate: inv.dueDate ? inv.dueDate.slice(0, 10) : '',
+      currency: inv.currency,
+      notes: inv.notes,
+      recurring: inv.recurring,
+      items: inv.items?.length ? inv.items : [{ description: '', qty: 1, price: 0 }],
+      payUrl: inv.payUrl,
+      status: inv.status,
+    });
+    setShowInvoiceEditor(true);
+  };
+
+  const handleSaveDraft = async () => {
+    if (!invoiceDetails.customer.name.trim()) {
+      Alert.alert('Missing Customer', 'Enter a customer name first.');
+      return;
+    }
+    setIsSavingInvoice(true);
+    try {
+      const payload = buildInvoicePayload();
+      const res = activeInvoiceId
+        ? await api.put(`/api/invoices/${activeInvoiceId}`, payload)
+        : await api.post('/api/invoices', payload);
+      const saved = res.data.invoice;
+      setActiveInvoiceId(saved._id);
+      setInvoiceDetails(prev => ({ ...prev, invoiceNumber: saved.invoiceNumber, payUrl: saved.payUrl, status: saved.status }));
+      upsertInvoiceInList(saved);
+      setShowInvoiceEditor(false);
+      Alert.alert('Draft Saved', `Invoice #${saved.invoiceNumber} safely stored in Invoices → Drafts.`);
+    } catch (err: any) {
+      Alert.alert('Error', err?.response?.data?.error || 'Failed to save invoice draft');
+    } finally {
+      setIsSavingInvoice(false);
+    }
+  };
+
+  const handleSendInvoice = async () => {
+    if (!invoiceDetails.customer.name.trim()) {
+      Alert.alert('Missing Customer', 'Enter a customer name first.');
+      return;
+    }
+    if (!invoiceDetails.customer.email?.trim()) {
+      Alert.alert('Missing Email', "Add the customer's email address to send this invoice.");
+      return;
+    }
+    setIsSendingInvoice(true);
+    try {
+      const payload = buildInvoicePayload();
+      let invoiceId = activeInvoiceId;
+      if (!invoiceId) {
+        const createRes = await api.post('/api/invoices', payload);
+        invoiceId = createRes.data.invoice._id;
+        setActiveInvoiceId(invoiceId);
+      } else {
+        await api.put(`/api/invoices/${invoiceId}`, payload);
+      }
+      const sendRes = await api.post(`/api/invoices/${invoiceId}/send`, {});
+      const sent = sendRes.data.invoice;
+      setInvoiceDetails(prev => ({ ...prev, invoiceNumber: sent.invoiceNumber, payUrl: sent.payUrl, status: sent.status }));
+      upsertInvoiceInList(sent);
+      setShowInvoiceEditor(false);
+      Alert.alert('Invoice Sent', `Invoice #${sent.invoiceNumber} has been emailed to ${invoiceDetails.customer.email}.`);
+    } catch (err: any) {
+      Alert.alert('Error', err?.response?.data?.error || 'Failed to send invoice');
+    } finally {
+      setIsSendingInvoice(false);
+    }
+  };
+
+  const handleDeleteInvoice = async (inv: Invoice) => {
+    setConfirmDeleteInvoiceId(null);
+    try {
+      await api.delete(`/api/invoices/${inv._id}`);
+      setInvoicesList(prev => prev.filter(i => i._id !== inv._id));
+    } catch (err: any) {
+      Alert.alert('Error', err?.response?.data?.error || 'Failed to delete invoice');
+    }
+  };
+
+  const handleGenerateLink = () => {
+    if (!invoiceDetails.payUrl) {
+      Alert.alert('Send First', 'Send this invoice to generate its secure payment link.');
+      return;
+    }
+    setShowLinkModal(true);
+  };
+
+  const handleCopyLink = async () => {
+    if (!invoiceDetails.payUrl) return;
+    await Clipboard.setStringAsync(invoiceDetails.payUrl);
+    setShowLinkModal(false);
+    Alert.alert('Link Copied', `Invoice link ready to share.`);
+  };
+
+  const downloadInvoicePDF = async () => {
+    const esc = (s: any) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const businessName = esc(merchant?.businessName || 'Merchant');
+    const itemRows = invoiceDetails.items.map(item => `
+      <tr>
+        <td>${esc(item.description || '—')}</td>
+        <td class="num">${item.qty}</td>
+        <td class="amount">${fmtInvoiceCurrency(item.price)}</td>
+        <td class="amount">${fmtInvoiceCurrency(item.qty * item.price)}</td>
+      </tr>`).join('');
+    const html = `<!doctype html><html><head><meta charset="utf-8"/><title>Invoice</title><style>
+      @page { size: A4; margin: 24mm 16mm; }
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; color:#0c2010; margin:0; }
+      .header { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #0b4d2e; padding-bottom:16px; margin-bottom:22px; }
+      .brand-name { font-size:18px; font-weight:700; color:#0b4d2e; }
+      .brand-sub { font-size:10px; color:#707971; text-transform:uppercase; letter-spacing:1.5px; margin-top:2px; }
+      .doc-title { text-align:right; }
+      .doc-title h1 { margin:0; font-size:20px; color:#0c2010; font-weight:600; }
+      .doc-title .meta { font-size:10px; color:#707971; margin-top:4px; }
+      .meta-grid { display:grid; grid-template-columns: repeat(2, 1fr); gap:16px; margin-bottom:24px; }
+      .meta-grid .label { font-size:9px; color:#707971; text-transform:uppercase; letter-spacing:1.2px; margin-bottom:4px; }
+      .meta-grid .value { font-size:12px; color:#0c2010; font-weight:600; }
+      table { width:100%; border-collapse:collapse; font-size:11px; margin-bottom: 24px; }
+      thead th { text-align:left; padding:10px 8px; background:#f7faf7; color:#404942; font-weight:700; font-size:9px; text-transform:uppercase; letter-spacing:1px; border-bottom:1px solid #e7ece7; }
+      thead th.num, thead th.amount { text-align:right; }
+      tbody td { padding:10px 8px; border-bottom:1px solid #eff4ef; }
+      tbody td.num, tbody td.amount { text-align:right; }
+      .totals { display:flex; justify-content:flex-end; }
+      .totals .row { display:flex; justify-content:space-between; width:220px; padding:6px 0; font-size:12px; }
+      .totals .row.total { font-weight:700; font-size:16px; border-top:1px solid #e7ece7; margin-top:4px; padding-top:10px; }
+      .notes { margin-top: 24px; font-size: 10px; color: #707971; white-space: pre-wrap; }
+    </style></head><body>
+      <div class="header">
+        <div><div class="brand-name">${businessName}</div><div class="brand-sub">PayChain · Invoice</div></div>
+        <div class="doc-title">
+          <h1>Invoice ${invoiceDetails.invoiceNumber ? `#${invoiceDetails.invoiceNumber}` : ''}</h1>
+          <div class="meta">Issued ${invoiceDetails.issueDate}</div>
+          ${invoiceDetails.dueDate ? `<div class="meta">Due ${invoiceDetails.dueDate}</div>` : ''}
+        </div>
+      </div>
+      <div class="meta-grid">
+        <div><div class="label">Bill To</div><div class="value">${esc(invoiceDetails.customer.name || '—')}</div><div class="value">${esc(invoiceDetails.customer.email || '')}</div><div class="value">${esc(invoiceDetails.customer.address || '')}</div></div>
+      </div>
+      <table>
+        <thead><tr><th>Description</th><th class="num">Qty</th><th class="amount">Price</th><th class="amount">Amount</th></tr></thead>
+        <tbody>${itemRows}</tbody>
+      </table>
+      <div class="totals">
+        <div class="row total"><span>Total</span><span>${fmtInvoiceCurrency(invoiceSubtotal)}</span></div>
+      </div>
+      ${invoiceDetails.notes ? `<div class="notes">${esc(invoiceDetails.notes)}</div>` : ''}
+    </body></html>`;
+    try {
+      const { uri } = await Print.printToFileAsync({ html, base64: false });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: 'Invoice', UTI: 'com.adobe.pdf' });
+      } else {
+        Alert.alert('Saved', uri);
+      }
+    } catch (err: any) {
+      Alert.alert('PDF failed', err?.message || 'Could not generate PDF.');
+    }
+  };
+
   // ── Upload CSV ──
   const handleCsvUpload = async () => {
     try {
@@ -234,24 +541,11 @@ export default function BulkPay() {
       setAuthPin('');
       const file = doc.assets[0];
 
-      // Read file content
-      const response = await fetch(file.uri);
-      const text = await response.text();
-
-      // Parse CSV manually
-      const lines = text.trim().split('\n');
-      const headers = lines[0].toLowerCase().split(',').map((h: string) => h.trim());
-      const rows = lines.slice(1).map((line: string) => {
-        const values = line.split(',').map((v: string) => v.trim());
-        return {
-          name: values[headers.indexOf('name')] || '',
-          type: (values[headers.indexOf('type')] || 'employee').toLowerCase(),
-          phone: values[headers.indexOf('phone')] || '',
-          amount: parseFloat(values[headers.indexOf('amount')] || '0') || 0,
-        };
-      }).filter((r: any) => r.name && r.phone);
-
-      // Send to backend for preview
+      // Send to backend for preview — the server computes real PAYE/NSSF/SHIF
+      // tax withholding for employee rows. There is no safe client-side
+      // fallback: parsing the CSV locally would submit gross-as-net (zero
+      // withholding) for real payouts, so on failure we just surface the
+      // error and let the merchant retry instead of guessing locally.
       const formData = new FormData();
       formData.append('file', {
         uri: file.uri,
@@ -259,81 +553,16 @@ export default function BulkPay() {
         name: file.name,
       } as any);
 
-      try {
-        const previewRes = await api.post('/api/bulkpay/upload-csv', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
-        setCsvPreview(previewRes.data?.rows || []);
-        setCsvSummary(previewRes.data?.summary || {});
-        setShowCsvUpload(true);
-      } catch (err) {
-        // Fallback to manual parsing
-        setCsvPreview(rows);
-        setCsvSummary({
-          totalGross: rows.reduce((s: number, r: any) => s + r.amount, 0),
-          totalNet: rows.reduce((s: number, r: any) => s + r.amount, 0),
-        });
-        setShowCsvUpload(true);
-      }
+      const previewRes = await api.post('/api/bulkpay/upload-csv', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setCsvPreview(previewRes.data?.rows || []);
+      setCsvSummary(previewRes.data?.summary || {});
+      setShowCsvUpload(true);
     } catch (err: any) {
-      Alert.alert('CSV Upload', err?.message || 'Failed to upload CSV');
+      Alert.alert('CSV Upload Failed', err?.response?.data?.message || err?.message || 'Could not process CSV. Please try again.');
     } finally {
       setCsvUploadLoading(false);
-    }
-  };
-
-  // ── Process CSV Batch ──
-  const processCsvBatch = async () => {
-    if (csvPreview.length === 0) return;
-    if (authPin.length !== 4) {
-      Alert.alert('Invalid PIN', 'Enter your 4-digit Bulk Pay PIN.');
-      return;
-    }
-
-    setIsAuthorizing(true);
-    try {
-      const batchRows = csvPreview.map((row: any) => ({
-        name: row.name,
-        type: row.type || 'employee',
-        phone: row.phone,
-        grossAmount: row.grossAmount || row.amount || 0,
-        netAmount: row.netAmount || row.amount || 0,
-        taxDeductions: row.taxDeductions || { paye: 0, nssf: 0, shif: 0 },
-      }));
-
-      const res = await api.post('/api/bulkpay/authorize', {
-        batchRows,
-        fundingSource: 'CSV Bulk Import',
-        pin: authPin,
-      });
-
-      const processedBatch = res.data?.batch;
-      const ref = processedBatch?.batchReference || `B-${Date.now()}`;
-      setLastBatchReference(ref);
-      setLastBatchStatus(processedBatch?.status || 'Pending');
-
-      const newReceipts: Receipt[] = (processedBatch?.transactions || batchRows).map((tx: any, idx: number) => ({
-        id: tx.receiptNumber || `R-${idx + 1}`,
-        name: tx.name,
-        amount: tx.amount || tx.netAmount || 0,
-        method: tx.method,
-        phone: tx.accountReference || tx.phone,
-        reference: ref,
-        timestamp: new Date().toLocaleString('en-KE'),
-        status: tx.status || 'pending',
-      }));
-
-      setReceipts(newReceipts);
-      setShowCsvUpload(false);
-      setAuthPin('');
-      setCsvPreview([]);
-      setCsvSummary(null);
-      setShowReceipts(true);
-      fetchBatches();
-    } catch (e: any) {
-      Alert.alert('Batch Error', e?.response?.data?.message || 'Failed to process CSV batch');
-    } finally {
-      setIsAuthorizing(false);
     }
   };
 
@@ -536,10 +765,40 @@ export default function BulkPay() {
       Alert.alert('Low balance', `Batch total exceeds your KES balance (${formatKES(balance)}).`);
       return;
     }
-    setAuthPin('');
     setShowAuthorize(true);
   };
 
+  // Till label matches the dashboard's single-till card: derived from the
+  // merchant's own profile, since there's no real multi-till backend.
+  const tillLabel = merchant?.businessName || 'Main Business Till';
+  const tillNumber = merchant?.paybillAccount || '—';
+
+  // ── Step 3: confirm funding source, then move to Security (OTP -> PIN) ──
+  const proceedToTillSelect = (source: 'manual' | 'csv') => {
+    setPendingBatch({ source });
+    setShowAuthorize(false);
+    setShowCsvUpload(false);
+    setSelectedTill(false);
+    setShowTillSelect(true);
+  };
+
+  const confirmTillAndVerify = () => {
+    setShowTillSelect(false);
+    setSecurityStep(1);
+    setSecurityOtp('');
+    setAuthPin('');
+    setShowSecurity(true);
+  };
+
+  const cancelSecurity = () => {
+    setShowSecurity(false);
+    setSecurityStep(1);
+    setSecurityOtp('');
+    setAuthPin('');
+    setPendingBatch(null);
+  };
+
+  // ── Final authorize (fires after Security PIN step, for either source) ──
   const handleAuthorize = async () => {
     if (authPin.length !== 4) {
       Alert.alert('Invalid PIN', 'Enter your 4-digit Bulk Pay PIN.');
@@ -547,20 +806,29 @@ export default function BulkPay() {
     }
     setIsAuthorizing(true);
     try {
-      const batchRows = payeesList
-        .filter(p => selectedPayees[p._id])
-        .map(p => ({
-          payeeMatch: p._id,
-          name: p.name,
-          type: p.type,
-          phone: p.phone,
-          grossAmount: payoutAmounts[p._id] || 0,
-          netAmount: payoutAmounts[p._id] || 0,
-        }));
+      const batchRows = pendingBatch?.source === 'csv'
+        ? csvPreview.map((row: any) => ({
+            name: row.name,
+            type: row.type || 'employee',
+            phone: row.phone,
+            grossAmount: row.grossAmount || row.amount || 0,
+            netAmount: row.netAmount || row.amount || 0,
+            taxDeductions: row.taxDeductions || { paye: 0, nssf: 0, shif: 0 },
+          }))
+        : payeesList
+            .filter(p => selectedPayees[p._id])
+            .map(p => ({
+              payeeMatch: p._id,
+              name: p.name,
+              type: p.type,
+              phone: p.phone,
+              grossAmount: payoutAmounts[p._id] || 0,
+              netAmount: payoutAmounts[p._id] || 0,
+            }));
 
       const res = await api.post('/api/bulkpay/authorize', {
         batchRows,
-        fundingSource: 'Main Business Till',
+        fundingSource: tillLabel,
         pin: authPin,
       });
 
@@ -572,7 +840,7 @@ export default function BulkPay() {
       const newReceipts: Receipt[] = (processedBatch?.transactions || batchRows).map((tx: any) => ({
         id: tx.receiptNumber || `R-${Math.random().toString(36).slice(2, 9).toUpperCase()}`,
         name: tx.name,
-        amount: tx.amount || tx.grossAmount || 0,
+        amount: tx.amount || tx.netAmount || tx.grossAmount || 0,
         method: tx.method,
         phone: tx.accountReference || tx.phone,
         reference: ref,
@@ -583,12 +851,24 @@ export default function BulkPay() {
       }));
 
       setReceipts(newReceipts);
-      setShowAuthorize(false);
+      setShowSecurity(false);
       setAuthPin('');
+      setSecurityOtp('');
+      setSecurityStep(1);
       setSelectedPayees({});
+      setCsvPreview([]);
+      setCsvSummary(null);
+      setPendingBatch(null);
       setShowReceipts(true);
+      fetchBatches();
     } catch (e: any) {
       Alert.alert('Authorization failed', e?.response?.data?.message || 'Could not process batch.');
+      // Allow retry for PIN if it fails, matching the dashboard's behavior.
+      if (e?.response?.status === 401) {
+        setAuthPin('');
+      } else {
+        setShowSecurity(false);
+      }
     } finally {
       setIsAuthorizing(false);
     }
@@ -737,7 +1017,7 @@ export default function BulkPay() {
       {/* Tabs */}
       <View className="w-full max-w-lg mx-auto px-6 mt-4">
         <View className="flex-row gap-6 border-b border-[#bfc9bf]/30">
-          {(['Payees', 'Batches'] as const).map(tab => (
+          {(['Payees', 'Batches', 'Invoices'] as const).map(tab => (
             <TouchableOpacity
               key={tab}
               onPress={() => setActiveTab(tab)}
@@ -863,7 +1143,7 @@ export default function BulkPay() {
               })
             )}
           </View>
-        ) : (
+        ) : activeTab === 'Batches' ? (
           // ─── Batches Tab ───
           <View className="w-full max-w-lg mx-auto px-6 pt-5">
             {/* Quick actions */}
@@ -872,7 +1152,10 @@ export default function BulkPay() {
                 <Feather name={csvUploadLoading ? 'loader' : 'upload'} size={16} color="#1e40af" />
                 <Text className="text-[#1e40af] font-jakarta-bold text-[12px]">{csvUploadLoading ? 'Uploading' : 'CSV'}</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => setShowFunding(true)} className="flex-1 bg-[#fef3e7] rounded-2xl p-3.5 flex-row items-center justify-center gap-2 border border-[#fed7aa]">
+              <TouchableOpacity
+                onPress={() => { setFundStep(1); setFundingAmount(''); setFundingPhone(''); setShowFunding(true); }}
+                className="flex-1 bg-[#fef3e7] rounded-2xl p-3.5 flex-row items-center justify-center gap-2 border border-[#fed7aa]"
+              >
                 <Feather name="plus-circle" size={16} color="#b87333" />
                 <Text className="text-[#b87333] font-jakarta-bold text-[12px]">Fund</Text>
               </TouchableOpacity>
@@ -1000,6 +1283,154 @@ export default function BulkPay() {
               </Text>
             </View>
           </View>
+        ) : (
+          // ─── Invoices Tab ───
+          <View className="w-full max-w-lg mx-auto px-6 pt-5">
+            {/* Create Invoice CTA */}
+            <View className="bg-white rounded-[24px] p-5 border border-[#bfc9bf]/15 mb-4">
+              <View className="flex-row items-center gap-3 mb-3">
+                <View className="w-10 h-10 rounded-xl bg-[#e7f8ef] items-center justify-center">
+                  <Feather name="file-text" size={18} color="#006c4e" />
+                </View>
+                <View>
+                  <Text className="font-jakarta-bold text-[15px] text-[#0c2010]">Invoices</Text>
+                  <Text className="text-[#707971] font-jakarta-medium text-[11px]">Billing & Drafts</Text>
+                </View>
+              </View>
+              <Text className="text-[#707971] font-jakarta-medium text-[12px] leading-relaxed mb-4">
+                Generate, send, and manage professional invoices directly to your clients.
+              </Text>
+              <TouchableOpacity onPress={handleOpenInvoiceEditor} className="bg-[#00351d] rounded-2xl py-3.5 flex-row items-center justify-center gap-2">
+                <Feather name="plus" size={15} color="#fff" />
+                <Text className="text-white font-jakarta-bold text-[13px]">Create Invoice</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Invoice Tracking */}
+            <View className="bg-white rounded-[24px] p-5 border border-[#bfc9bf]/15 mb-4">
+              <View className="flex-row items-center justify-between mb-4">
+                <Text className="font-jakarta-bold text-[15px] text-[#0c2010]">Invoice Tracking</Text>
+                <Text className="font-jakarta-extrabold text-[15px] text-[#00351d]">{invoicesList.length}</Text>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-1 mb-4">
+                {(['All', 'Drafts', 'Sent', 'Paid'] as const).map(f => (
+                  <TouchableOpacity
+                    key={f}
+                    onPress={() => { setInvoiceFilter(f); setInvoicePage(1); }}
+                    className={`px-4 py-2 rounded-full mr-2 ${invoiceFilter === f ? 'bg-[#00351d]' : 'bg-[#f0fdf4] border border-[#bfc9bf]/30'}`}
+                  >
+                    <Text className={`text-[10px] font-jakarta-bold uppercase tracking-wider ${invoiceFilter === f ? 'text-white' : 'text-[#707971]'}`}>{f}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              {filteredInvoicesList.length === 0 ? (
+                <View className="items-center py-10">
+                  <View className="w-14 h-14 rounded-full bg-[#f7faf7] items-center justify-center mb-3">
+                    <Feather name="file-text" size={22} color="#707971" />
+                  </View>
+                  <Text className="text-[#0c2010] font-jakarta-bold text-[14px] mb-1">No recent invoices</Text>
+                  <Text className="text-[#707971] font-jakarta-medium text-[12px] text-center">Generate your first professional e-invoice to start getting paid.</Text>
+                </View>
+              ) : (
+                <View className="gap-3">
+                  {paginatedInvoicesList.map(inv => {
+                    const statusMeta: Record<string, { label: string; icon: keyof typeof Feather.glyphMap; tone: string; toneText: string; badgeBg: string; badgeText: string }> = {
+                      draft: { label: 'Draft', icon: 'edit-2', tone: '#fef3e7', toneText: '#b87333', badgeBg: '#fef3e7', badgeText: '#b87333' },
+                      sent: { label: 'Sent', icon: 'send', tone: '#e7f8ef', toneText: '#006c4e', badgeBg: '#e7f8ef', badgeText: '#006c4e' },
+                      paid: { label: 'Paid', icon: 'check-circle', tone: '#dbeafe', toneText: '#1e40af', badgeBg: '#dbeafe', badgeText: '#1e40af' },
+                      void: { label: 'Void', icon: 'slash', tone: '#f1f5f9', toneText: '#64748b', badgeBg: '#f1f5f9', badgeText: '#64748b' },
+                    };
+                    const meta = statusMeta[inv.status] || statusMeta.draft;
+                    const isConfirmingDelete = confirmDeleteInvoiceId === inv._id;
+                    return (
+                      <View key={inv._id} className="bg-[#f7faf7] rounded-[20px] p-4 border border-[#eff4ef]">
+                        <View className="flex-row items-center gap-3 mb-3">
+                          <View style={{ backgroundColor: meta.tone }} className="w-10 h-10 rounded-xl items-center justify-center">
+                            <Feather name={meta.icon} size={16} color={meta.toneText} />
+                          </View>
+                          <View className="flex-1 min-w-0">
+                            <Text className="font-jakarta-bold text-[13px] text-[#0c2010]" numberOfLines={1}>{inv.customer?.name || 'Unnamed Customer'}</Text>
+                            <View className="flex-row items-center gap-2 mt-0.5">
+                              <Text className="text-[10px] text-[#707971] font-jakarta-medium">
+                                #{inv.invoiceNumber} · {inv.createdAt ? new Date(inv.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : ''}
+                              </Text>
+                              <View style={{ backgroundColor: meta.badgeBg }} className="px-1.5 py-0.5 rounded">
+                                <Text style={{ color: meta.badgeText }} className="text-[8px] font-jakarta-bold uppercase tracking-widest">{meta.label}</Text>
+                              </View>
+                            </View>
+                          </View>
+                        </View>
+
+                        {isConfirmingDelete ? (
+                          <View className="flex-row items-center justify-between gap-2">
+                            <Text className="text-[10px] text-[#b91c1c] font-jakarta-bold flex-1 leading-snug">
+                              {inv.status === 'sent' ? "This invoice's payment link will stop working. Delete anyway?" : 'Delete this draft?'}
+                            </Text>
+                            <TouchableOpacity onPress={() => setConfirmDeleteInvoiceId(null)} className="px-3 py-2 rounded-xl">
+                              <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#707971]">Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => handleDeleteInvoice(inv)} className="px-3 py-2 rounded-xl bg-red-600">
+                              <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-white">Delete</Text>
+                            </TouchableOpacity>
+                          </View>
+                        ) : (
+                          <View className="flex-row items-center justify-between">
+                            <View>
+                              <Text className="text-[13px] font-jakarta-bold text-[#00351d]">{inv.currency} {(inv.total || 0).toLocaleString()}</Text>
+                              <Text className="text-[9px] text-[#707971] font-jakarta-medium uppercase tracking-widest">Total value</Text>
+                            </View>
+                            <View className="flex-row gap-2">
+                              {inv.status !== 'paid' && (
+                                <TouchableOpacity onPress={() => setConfirmDeleteInvoiceId(inv._id!)} className="w-9 h-9 rounded-xl bg-red-50 items-center justify-center">
+                                  <Feather name="trash-2" size={15} color="#ef4444" />
+                                </TouchableOpacity>
+                              )}
+                              <TouchableOpacity
+                                onPress={() => openInvoiceForEdit(inv)}
+                                disabled={inv.status === 'paid'}
+                                className="w-9 h-9 rounded-xl bg-[#e7f8ef] items-center justify-center"
+                                style={{ opacity: inv.status === 'paid' ? 0.4 : 1 }}
+                              >
+                                <Feather name={inv.status === 'paid' ? 'eye' : 'edit-2'} size={15} color="#006c4e" />
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+
+              {filteredInvoicesList.length > invoicesPerPage && (
+                <View className="flex-row items-center justify-between mt-5">
+                  <Text className="text-[10px] font-jakarta-bold text-[#707971]">
+                    Showing {paginatedInvoicesList.length} of {filteredInvoicesList.length}
+                  </Text>
+                  <View className="flex-row items-center gap-3">
+                    <TouchableOpacity
+                      onPress={() => setInvoicePage(p => Math.max(1, p - 1))}
+                      disabled={invoicePage === 1}
+                      className="w-8 h-8 rounded-full bg-white border border-[#e7ece7] items-center justify-center"
+                      style={{ opacity: invoicePage === 1 ? 0.3 : 1 }}
+                    >
+                      <Feather name="chevron-left" size={16} color="#00351d" />
+                    </TouchableOpacity>
+                    <Text className="text-[11px] font-jakarta-bold text-[#0c2010]">{invoicePage} / {totalInvoicePages}</Text>
+                    <TouchableOpacity
+                      onPress={() => setInvoicePage(p => Math.min(totalInvoicePages, p + 1))}
+                      disabled={invoicePage >= totalInvoicePages}
+                      className="w-8 h-8 rounded-full bg-white border border-[#e7ece7] items-center justify-center"
+                      style={{ opacity: invoicePage >= totalInvoicePages ? 0.3 : 1 }}
+                    >
+                      <Feather name="chevron-right" size={16} color="#00351d" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+            </View>
+          </View>
         )}
       </ScrollView>
 
@@ -1101,56 +1532,36 @@ export default function BulkPay() {
 
       {/* ── Authorize Modal ── */}
       <Modal visible={showAuthorize} transparent animationType="slide" onRequestClose={() => setShowAuthorize(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
-          <View className="flex-1 justify-end bg-black/50">
-            <TouchableOpacity className="absolute inset-0" activeOpacity={1} onPress={() => !isAuthorizing && setShowAuthorize(false)} />
-            <View className="w-full max-w-lg mx-auto bg-white rounded-t-[36px] px-6 pt-4 pb-8 mt-auto">
-              <View className="items-center mb-4"><View className="w-12 h-1.5 bg-[#e7ece7] rounded-full" /></View>
-              <View className="items-center mb-5">
-                <View className="w-14 h-14 rounded-full bg-[#fef3e7] items-center justify-center mb-3">
-                  <Feather name="lock" size={22} color="#b87333" />
-                </View>
-                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#0c2010]">Authorize Batch</Text>
-                <Text className="text-[#707971] font-jakarta-medium text-[12px] mt-1 text-center">Enter your Bulk Pay PIN to release funds.</Text>
+        <View className="flex-1 justify-end bg-black/50">
+          <TouchableOpacity className="absolute inset-0" activeOpacity={1} onPress={() => setShowAuthorize(false)} />
+          <View className="w-full max-w-lg mx-auto bg-white rounded-t-[36px] px-6 pt-4 pb-8 mt-auto">
+            <View className="items-center mb-4"><View className="w-12 h-1.5 bg-[#e7ece7] rounded-full" /></View>
+            <View className="items-center mb-5">
+              <View className="w-14 h-14 rounded-full bg-[#fef3e7] items-center justify-center mb-3">
+                <Feather name="lock" size={22} color="#b87333" />
               </View>
-              <View className="bg-[#f0fdf4] rounded-2xl p-4 mb-5 border border-[#e7ece7]">
-                <View className="flex-row justify-between items-center mb-2">
-                  <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider">Recipients</Text>
-                  <Text className="font-jakarta-bold text-[#0c2010] text-[13px]">{selectedIds.length}</Text>
-                </View>
-                <View className="flex-row justify-between items-center">
-                  <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider">Total Payout</Text>
-                  <Text className="font-jakarta-bold text-[#00351d] text-[16px]">{formatKES(batchTotal)}</Text>
-                </View>
-              </View>
-              <TextInput
-                value={authPin}
-                onChangeText={(t) => setAuthPin(t.replace(/\D/g, '').slice(0, 4))}
-                keyboardType="numeric"
-                secureTextEntry
-                maxLength={4}
-                editable={!isAuthorizing}
-                className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-5 py-4 text-[#0c2010] font-jakarta-bold text-[20px] tracking-[0.5em] text-center mb-6"
-                placeholder="••••"
-                placeholderTextColor="#a1a1aa"
-                autoFocus
-              />
-              <TouchableOpacity
-                onPress={handleAuthorize}
-                disabled={isAuthorizing}
-                className="w-full bg-[#00351d] h-[56px] rounded-full flex-row items-center justify-center"
-                style={{ opacity: isAuthorizing ? 0.7 : 1 }}
-              >
-                {isAuthorizing ? <ActivityIndicator color="#fff" /> : (
-                  <>
-                    <Feather name="check-circle" size={16} color="#fff" />
-                    <Text className="text-white font-jakarta-bold text-[15px] ml-2">Confirm & Pay</Text>
-                  </>
-                )}
-              </TouchableOpacity>
+              <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#0c2010]">Authorize Batch</Text>
+              <Text className="text-[#707971] font-jakarta-medium text-[12px] mt-1 text-center">Review before selecting a funding source.</Text>
             </View>
+            <View className="bg-[#f0fdf4] rounded-2xl p-4 mb-6 border border-[#e7ece7]">
+              <View className="flex-row justify-between items-center mb-2">
+                <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider">Recipients</Text>
+                <Text className="font-jakarta-bold text-[#0c2010] text-[13px]">{selectedIds.length}</Text>
+              </View>
+              <View className="flex-row justify-between items-center">
+                <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider">Total Payout</Text>
+                <Text className="font-jakarta-bold text-[#00351d] text-[16px]">{formatKES(batchTotal)}</Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              onPress={() => proceedToTillSelect('manual')}
+              className="w-full bg-[#00351d] h-[56px] rounded-full flex-row items-center justify-center"
+            >
+              <Feather name="arrow-right" size={16} color="#fff" />
+              <Text className="text-white font-jakarta-bold text-[15px] ml-2">Continue</Text>
+            </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
 
       {/* ── CSV Upload Preview Modal ── */}
@@ -1201,34 +1612,260 @@ export default function BulkPay() {
                 ))}
               </ScrollView>
 
-              <TextInput
-                value={authPin}
-                onChangeText={(t) => setAuthPin(t.replace(/\D/g, '').slice(0, 4))}
-                keyboardType="numeric"
-                secureTextEntry
-                maxLength={4}
-                editable={!isAuthorizing}
-                className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-5 py-4 text-[#0c2010] font-jakarta-bold text-[20px] tracking-[0.5em] text-center mb-6"
-                placeholder="••••"
-                placeholderTextColor="#a1a1aa"
-              />
-
               <TouchableOpacity
-                onPress={processCsvBatch}
-                disabled={isAuthorizing || csvPreview.length === 0}
+                onPress={() => proceedToTillSelect('csv')}
+                disabled={csvPreview.length === 0}
                 className="w-full bg-[#00351d] h-[56px] rounded-full flex-row items-center justify-center"
-                style={{ opacity: isAuthorizing || csvPreview.length === 0 ? 0.7 : 1 }}
+                style={{ opacity: csvPreview.length === 0 ? 0.7 : 1 }}
               >
-                {isAuthorizing ? <ActivityIndicator color="#fff" /> : (
-                  <>
-                    <Feather name="check-circle" size={16} color="#fff" />
-                    <Text className="text-white font-jakarta-bold text-[15px] ml-2">Confirm & Send</Text>
-                  </>
-                )}
+                <Feather name="arrow-right" size={16} color="#fff" />
+                <Text className="text-white font-jakarta-bold text-[15px] ml-2">Continue</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => !isAuthorizing && setShowCsvUpload(false)} className="items-center py-3 mt-2">
+              <TouchableOpacity onPress={() => setShowCsvUpload(false)} className="items-center py-3 mt-2">
                 <Text className="text-[#707971] font-jakarta-semibold text-[13px]">Cancel</Text>
               </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ── Till Select Modal (Step 3: Funding Source) ── */}
+      <Modal visible={showTillSelect} transparent animationType="slide" onRequestClose={() => setShowTillSelect(false)}>
+        <View className="flex-1 justify-end bg-black/50">
+          <TouchableOpacity className="absolute inset-0" activeOpacity={1} onPress={() => setShowTillSelect(false)} />
+          <View className="w-full max-w-lg mx-auto bg-white rounded-t-[36px] px-6 pt-4 pb-8 mt-auto">
+            <View className="items-center mb-4"><View className="w-12 h-1.5 bg-[#e7ece7] rounded-full" /></View>
+            <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#707971] mb-4 ml-1">Select Funding Source</Text>
+            <TouchableOpacity
+              onPress={() => setSelectedTill(true)}
+              activeOpacity={0.85}
+              className={`p-5 rounded-2xl border-2 mb-6 ${selectedTill ? 'border-[#00351d] bg-[#f0fdf4]' : 'border-[#e7ece7] bg-white'}`}
+            >
+              <View className="flex-row items-start justify-between mb-5">
+                <View className="flex-row items-center gap-3">
+                  <View className={`w-12 h-12 rounded-xl items-center justify-center ${selectedTill ? 'bg-[#00351d]' : 'bg-[#f7faf7]'}`}>
+                    <Feather name={selectedTill ? 'check' : 'home'} size={18} color={selectedTill ? '#fff' : '#00351d'} />
+                  </View>
+                  <View>
+                    <Text className="font-jakarta-bold text-[14px] text-[#0c2010]">{tillLabel}</Text>
+                    <Text className="text-[#707971] font-jakarta-medium text-[11px] mt-0.5">Till No: {tillNumber}</Text>
+                  </View>
+                </View>
+              </View>
+              <View className="flex-row justify-between items-center pt-4 border-t border-[#e7ece7]">
+                <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider">Available Balance</Text>
+                <Text className="font-jakarta-bold text-[#00351d] text-[15px]">{formatKES(balance)}</Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={confirmTillAndVerify}
+              disabled={!selectedTill}
+              className="w-full bg-[#00351d] h-[56px] rounded-full flex-row items-center justify-center"
+              style={{ opacity: selectedTill ? 1 : 0.5 }}
+            >
+              <Text className="text-white font-jakarta-bold text-[15px] mr-2">Continue</Text>
+              <Feather name="arrow-right" size={16} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Security Verification Modal (OTP -> PIN) ── */}
+      <Modal visible={showSecurity} transparent animationType="slide" onRequestClose={cancelSecurity}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
+          <View className="flex-1 justify-end bg-black/50">
+            <TouchableOpacity className="absolute inset-0" activeOpacity={1} onPress={() => !isAuthorizing && cancelSecurity()} />
+            <View className="w-full max-w-lg mx-auto bg-white rounded-t-[36px] px-6 pt-4 pb-8 mt-auto">
+              <View className="items-center mb-4"><View className="w-12 h-1.5 bg-[#e7ece7] rounded-full" /></View>
+              <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[22px] text-[#0c2010] mb-1">Verification</Text>
+              <Text className="text-[#707971] font-jakarta-medium text-[12px] mb-6">Security check required for settlement</Text>
+
+              {securityStep === 1 ? (
+                <>
+                  <View className="items-center mb-6">
+                    <View className="w-16 h-16 rounded-full bg-[#dbeafe] items-center justify-center mb-4">
+                      <Feather name="message-square" size={26} color="#1e40af" />
+                    </View>
+                    <Text className="font-jakarta-bold text-[#0c2010] text-[14px]">Enter OTP Sent to {merchant?.phone || '07XX XXX XXX'}</Text>
+                  </View>
+                  <TextInput
+                    value={securityOtp}
+                    onChangeText={(t) => setSecurityOtp(t.replace(/\D/g, '').slice(0, 6))}
+                    keyboardType="numeric"
+                    maxLength={6}
+                    className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-5 py-4 text-[#0c2010] font-jakarta-bold text-[20px] tracking-[0.5em] text-center mb-6"
+                    placeholder="••••••"
+                    placeholderTextColor="#a1a1aa"
+                    autoFocus
+                  />
+                  <TouchableOpacity
+                    onPress={() => setSecurityStep(2)}
+                    disabled={securityOtp.length < 4}
+                    className="w-full bg-[#e7f8ef] h-[56px] rounded-full items-center justify-center"
+                    style={{ opacity: securityOtp.length < 4 ? 0.5 : 1 }}
+                  >
+                    <Text className="text-[#006c4e] font-jakarta-bold text-[15px]">Verify OTP</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <View className="items-center mb-6">
+                    <View className="w-16 h-16 rounded-full bg-[#00351d] items-center justify-center mb-4">
+                      <Feather name="lock" size={24} color="#5efeb3" />
+                    </View>
+                    <Text className="font-jakarta-bold text-[#0c2010] text-[14px]">Enter Account PIN to Authorize</Text>
+                  </View>
+                  <TextInput
+                    value={authPin}
+                    onChangeText={(t) => setAuthPin(t.replace(/\D/g, '').slice(0, 4))}
+                    keyboardType="numeric"
+                    secureTextEntry
+                    maxLength={4}
+                    editable={!isAuthorizing}
+                    className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-5 py-4 text-[#0c2010] font-jakarta-bold text-[20px] tracking-[0.5em] text-center mb-6"
+                    placeholder="••••"
+                    placeholderTextColor="#a1a1aa"
+                    autoFocus
+                  />
+                  <TouchableOpacity
+                    onPress={handleAuthorize}
+                    disabled={authPin.length !== 4 || isAuthorizing}
+                    className="w-full bg-[#00351d] h-[56px] rounded-full flex-row items-center justify-center"
+                    style={{ opacity: authPin.length !== 4 || isAuthorizing ? 0.7 : 1 }}
+                  >
+                    {isAuthorizing ? <ActivityIndicator color="#fff" /> : (
+                      <Text className="text-white font-jakarta-bold text-[15px]">Confirm & Pay</Text>
+                    )}
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ── Fund Account Modal ── */}
+      <Modal visible={showFunding} transparent animationType="slide" onRequestClose={() => setShowFunding(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
+          <View className="flex-1 justify-end bg-black/50">
+            <TouchableOpacity className="absolute inset-0" activeOpacity={1} onPress={() => setShowFunding(false)} />
+            <View className="w-full max-w-lg mx-auto bg-white rounded-t-[36px] px-6 pt-4 pb-8 mt-auto">
+              <View className="items-center mb-4"><View className="w-12 h-1.5 bg-[#e7ece7] rounded-full" /></View>
+              <View className="flex-row items-center justify-between mb-6">
+                <View>
+                  <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[22px] text-[#0c2010]">Fund Account</Text>
+                  <Text className="text-[#707971] font-jakarta-medium text-[11px] mt-0.5">
+                    {fundStep === 1 ? 'Select Funding Method' : fundStep === 2 ? 'Enter Details' : fundStep === 3 ? 'Confirm Funding' : 'Funding Successful'}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => setShowFunding(false)} className="w-9 h-9 rounded-full bg-[#f7faf7] items-center justify-center">
+                  <Feather name="x" size={16} color="#0c2010" />
+                </TouchableOpacity>
+              </View>
+
+              {fundStep === 1 && (
+                <View className="gap-3">
+                  {[
+                    { id: 'Virtual Account Transfer', icon: 'home' as const, desc: 'Transfer to your dedicated USD/KES account' },
+                    { id: 'Mobile Money', icon: 'smartphone' as const, desc: 'M-Pesa, Airtel Money' },
+                    { id: 'Card Top-up', icon: 'credit-card' as const, desc: 'Visa / Mastercard' },
+                  ].map((method) => (
+                    <TouchableOpacity
+                      key={method.id}
+                      onPress={() => { setFundingMethod(method.id); setFundStep(2); }}
+                      className="flex-row items-center gap-4 p-4 rounded-2xl border border-[#e7ece7]"
+                    >
+                      <View className="w-12 h-12 rounded-xl bg-[#f7faf7] items-center justify-center">
+                        <Feather name={method.icon} size={20} color="#00351d" />
+                      </View>
+                      <View className="flex-1">
+                        <Text className="font-jakarta-bold text-[13px] text-[#0c2010]">{method.id}</Text>
+                        <Text className="text-[#707971] font-jakarta-medium text-[10px] mt-0.5">{method.desc}</Text>
+                      </View>
+                      <Feather name="chevron-right" size={18} color="#bfc9bf" />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              {fundStep === 2 && (
+                <View className="gap-5">
+                  <View>
+                    <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#707971] mb-2 ml-1">Amount (KES)</Text>
+                    <TextInput
+                      value={fundingAmount}
+                      onChangeText={setFundingAmount}
+                      keyboardType="numeric"
+                      placeholder="e.g. 50,000"
+                      placeholderTextColor="#a1a1aa"
+                      className="bg-white border border-[#bfc9bf]/30 rounded-2xl px-5 py-4 text-[15px] font-jakarta-bold text-[#0c2010]"
+                    />
+                  </View>
+                  {fundingMethod === 'Mobile Money' && (
+                    <View>
+                      <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#707971] mb-2 ml-1">Phone Number</Text>
+                      <TextInput
+                        value={fundingPhone}
+                        onChangeText={setFundingPhone}
+                        keyboardType="phone-pad"
+                        placeholder="07XX XXX XXX"
+                        placeholderTextColor="#a1a1aa"
+                        className="bg-white border border-[#bfc9bf]/30 rounded-2xl px-5 py-4 text-[15px] font-jakarta-bold text-[#0c2010]"
+                      />
+                    </View>
+                  )}
+                  <View className="flex-row gap-3 pt-2">
+                    <TouchableOpacity onPress={() => setFundStep(1)} className="flex-1 py-4 rounded-2xl border border-[#e7ece7] items-center">
+                      <Text className="font-jakarta-bold text-[13px] text-[#0c2010]">Back</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setFundStep(3)}
+                      disabled={!fundingAmount}
+                      className="flex-[2] py-4 rounded-2xl bg-[#00351d] items-center"
+                      style={{ opacity: fundingAmount ? 1 : 0.5 }}
+                    >
+                      <Text className="font-jakarta-bold text-[13px] text-white">Next Step</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              {fundStep === 3 && (
+                <View className="items-center py-4">
+                  <View className="w-20 h-20 rounded-full bg-[#e7f8ef] items-center justify-center mb-6">
+                    <Feather name="credit-card" size={30} color="#006c4e" />
+                  </View>
+                  <Text className="font-jakarta-bold text-[18px] text-[#0c2010] mb-1">Confirm Funding</Text>
+                  <Text className="text-[#707971] font-jakarta-medium text-[13px] mb-4">You are about to deposit</Text>
+                  <Text className="font-jakarta-extrabold text-[32px] text-[#0c2010] tracking-tight mb-1">{formatKES(Number(fundingAmount) || 0)}</Text>
+                  <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#707971]">via {fundingMethod}</Text>
+                  <View className="flex-row gap-3 pt-10 w-full">
+                    <TouchableOpacity onPress={() => setFundStep(2)} className="flex-1 py-4 rounded-2xl border border-[#e7ece7] items-center">
+                      <Text className="font-jakarta-bold text-[13px] text-[#0c2010]">Back</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setFundStep(4)} className="flex-[2] py-4 rounded-2xl bg-[#00351d] items-center">
+                      <Text className="font-jakarta-bold text-[13px] text-white">Pay Now</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              {fundStep === 4 && (
+                <View className="items-center py-6">
+                  <View className="w-24 h-24 rounded-full bg-[#e7f8ef] items-center justify-center mb-6">
+                    <Feather name="check" size={40} color="#006c4e" />
+                  </View>
+                  <Text className="font-jakarta-extrabold text-[20px] text-[#0c2010] mb-2">Funds Received!</Text>
+                  <Text className="text-[#707971] font-jakarta-medium text-[13px] text-center mb-6">Your liquidity has been topped up successfully.</Text>
+                  <View className="bg-[#e7f8ef] rounded-2xl px-6 py-4 items-center mb-8">
+                    <Text className="text-[9px] font-jakarta-extrabold uppercase tracking-widest text-[#006c4e] mb-1">New Balance</Text>
+                    <Text className="font-jakarta-extrabold text-[22px] text-[#006c4e]">{formatKES(balance + (Number(fundingAmount) || 0))}</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => setShowFunding(false)} className="w-full py-4 rounded-2xl bg-[#00351d] items-center">
+                    <Text className="font-jakarta-bold text-[13px] text-white">Continue to Bulk Pay</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -1626,6 +2263,235 @@ export default function BulkPay() {
             </View>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ── Invoice Editor Modal ── */}
+      <Modal visible={showInvoiceEditor} transparent animationType="slide" onRequestClose={() => setShowInvoiceEditor(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
+          <View className="flex-1 justify-end bg-black/50">
+            <TouchableOpacity className="absolute inset-0" activeOpacity={1} onPress={() => setShowInvoiceEditor(false)} />
+            <View className="w-full max-w-lg mx-auto bg-white rounded-t-[36px] pt-4 mt-auto" style={{ maxHeight: '92%' }}>
+              <View className="items-center mb-2"><View className="w-12 h-1.5 bg-[#e7ece7] rounded-full" /></View>
+
+              <View className="flex-row items-center justify-between px-6 mb-4">
+                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[22px] text-[#0c2010]">
+                  {invoiceDetails.invoiceNumber ? `Invoice #${invoiceDetails.invoiceNumber}` : 'Create Invoice'}
+                </Text>
+                <TouchableOpacity onPress={() => setShowInvoiceEditor(false)} className="w-9 h-9 rounded-full bg-[#f7faf7] items-center justify-center">
+                  <Feather name="x" size={16} color="#0c2010" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView className="px-6" showsVerticalScrollIndicator={false}>
+                <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#707971] mb-4">Customer</Text>
+                <View className="gap-4 mb-6">
+                  <View>
+                    <Text className="text-[9px] font-jakarta-bold uppercase tracking-widest text-[#707971] mb-1.5 ml-1">Name</Text>
+                    <TextInput
+                      value={invoiceDetails.customer.name}
+                      onChangeText={(t) => setInvoiceDetails(prev => ({ ...prev, customer: { ...prev.customer, name: t } }))}
+                      className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-4 py-3 text-[14px] font-jakarta-bold text-[#0c2010]"
+                    />
+                  </View>
+                  <View>
+                    <Text className="text-[9px] font-jakarta-bold uppercase tracking-widest text-[#707971] mb-1.5 ml-1">Email</Text>
+                    <TextInput
+                      value={invoiceDetails.customer.email}
+                      onChangeText={(t) => setInvoiceDetails(prev => ({ ...prev, customer: { ...prev.customer, email: t } }))}
+                      placeholder="billing@customer.com"
+                      placeholderTextColor="#a1a1aa"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-4 py-3 text-[14px] font-jakarta-bold text-[#0c2010]"
+                    />
+                  </View>
+                  <View>
+                    <Text className="text-[9px] font-jakarta-bold uppercase tracking-widest text-[#707971] mb-1.5 ml-1">Phone</Text>
+                    <ValidatedTextInput
+                      kind="phoneKE"
+                      optional
+                      value={invoiceDetails.customer.phone}
+                      onChangeText={(t) => setInvoiceDetails(prev => ({ ...prev, customer: { ...prev.customer, phone: t } }))}
+                      placeholder="0712 345 678"
+                      placeholderTextColor="#a1a1aa"
+                      className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-4 py-3 text-[14px] font-jakarta-bold text-[#0c2010]"
+                    />
+                  </View>
+                  <View>
+                    <Text className="text-[9px] font-jakarta-bold uppercase tracking-widest text-[#707971] mb-1.5 ml-1">Address</Text>
+                    <TextInput
+                      value={invoiceDetails.customer.address}
+                      onChangeText={(t) => setInvoiceDetails(prev => ({ ...prev, customer: { ...prev.customer, address: t } }))}
+                      placeholder="Nairobi, Kenya"
+                      placeholderTextColor="#a1a1aa"
+                      className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-4 py-3 text-[14px] font-jakarta-bold text-[#0c2010]"
+                    />
+                  </View>
+                </View>
+
+                <View className="flex-row gap-4 mb-6">
+                  <View className="flex-1">
+                    <Text className="text-[9px] font-jakarta-bold uppercase tracking-widest text-[#707971] mb-1.5 ml-1">Issue Date</Text>
+                    <TextInput
+                      value={invoiceDetails.issueDate}
+                      onChangeText={(t) => setInvoiceDetails(prev => ({ ...prev, issueDate: t }))}
+                      placeholder="YYYY-MM-DD"
+                      className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-4 py-3 text-[13px] font-jakarta-bold text-[#0c2010]"
+                    />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-[9px] font-jakarta-bold uppercase tracking-widest text-[#707971] mb-1.5 ml-1">Due Date</Text>
+                    <TextInput
+                      value={invoiceDetails.dueDate}
+                      onChangeText={(t) => setInvoiceDetails(prev => ({ ...prev, dueDate: t }))}
+                      placeholder="Optional"
+                      placeholderTextColor="#a1a1aa"
+                      className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-4 py-3 text-[13px] font-jakarta-bold text-[#0c2010]"
+                    />
+                  </View>
+                </View>
+
+                <View className="flex-row items-center justify-between mb-4">
+                  <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#707971]">Items</Text>
+                </View>
+                <View className="gap-3 mb-3">
+                  {invoiceDetails.items.map((item, index) => (
+                    <View key={index} className="bg-[#f7faf7] rounded-2xl p-3.5 border border-[#eff4ef]">
+                      <TextInput
+                        value={item.description}
+                        onChangeText={(t) => handleUpdateInvoiceItem(index, 'description', t)}
+                        placeholder="Item description"
+                        placeholderTextColor="#a1a1aa"
+                        className="bg-white border border-[#eff4ef] rounded-xl px-3 py-2.5 text-[13px] font-jakarta-medium text-[#0c2010] mb-2.5"
+                      />
+                      <View className="flex-row items-center gap-2.5">
+                        <View className="flex-1">
+                          <Text className="text-[8px] font-jakarta-bold uppercase tracking-widest text-[#707971] mb-1">Qty</Text>
+                          <TextInput
+                            value={String(item.qty)}
+                            onChangeText={(t) => handleUpdateInvoiceItem(index, 'qty', parseInt(t) || 0)}
+                            keyboardType="numeric"
+                            className="bg-white border border-[#eff4ef] rounded-xl px-3 py-2 text-[12px] font-jakarta-bold text-[#0c2010] text-center"
+                          />
+                        </View>
+                        <View className="flex-1">
+                          <Text className="text-[8px] font-jakarta-bold uppercase tracking-widest text-[#707971] mb-1">Price</Text>
+                          <TextInput
+                            value={String(item.price)}
+                            onChangeText={(t) => handleUpdateInvoiceItem(index, 'price', parseFloat(t) || 0)}
+                            keyboardType="numeric"
+                            className="bg-white border border-[#eff4ef] rounded-xl px-3 py-2 text-[12px] font-jakarta-bold text-[#0c2010] text-right"
+                          />
+                        </View>
+                        <View className="flex-1">
+                          <Text className="text-[8px] font-jakarta-bold uppercase tracking-widest text-[#707971] mb-1">Total</Text>
+                          <Text className="text-[12px] font-jakarta-bold text-[#00351d] text-right py-2">{(item.qty * item.price).toLocaleString()}</Text>
+                        </View>
+                        <TouchableOpacity onPress={() => handleRemoveInvoiceItem(index)} className="w-8 h-8 rounded-lg bg-red-50 items-center justify-center mt-4">
+                          <Feather name="trash-2" size={13} color="#ef4444" />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+                <TouchableOpacity onPress={handleAddInvoiceItem} className="py-3 rounded-2xl border-2 border-dashed border-[#e7ece7] items-center mb-6">
+                  <Text className="text-[12px] font-jakarta-bold text-[#00351d]">+ Add Item</Text>
+                </TouchableOpacity>
+
+                <View className="flex-row justify-between items-center border-t border-[#eff4ef] pt-4 mb-6">
+                  <Text className="text-[13px] font-jakarta-extrabold uppercase tracking-widest text-[#707971]">Total</Text>
+                  <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[22px] text-[#0c2010]">{fmtInvoiceCurrency(invoiceSubtotal)}</Text>
+                </View>
+
+                <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#707971] mb-3">Settings</Text>
+                <View className="mb-4">
+                  <Text className="text-[9px] font-jakarta-bold uppercase tracking-widest text-[#707971] mb-1.5 ml-1">Notes / Terms</Text>
+                  <TextInput
+                    value={invoiceDetails.notes}
+                    onChangeText={(t) => setInvoiceDetails(prev => ({ ...prev, notes: t }))}
+                    placeholder="Payment terms, thank you note..."
+                    placeholderTextColor="#a1a1aa"
+                    multiline
+                    numberOfLines={3}
+                    textAlignVertical="top"
+                    className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-4 py-3 text-[13px] font-jakarta-medium text-[#0c2010] min-h-[80px]"
+                  />
+                </View>
+                <TouchableOpacity
+                  onPress={() => setInvoiceDetails(prev => ({ ...prev, recurring: !prev.recurring }))}
+                  className="flex-row items-center gap-3 mb-8"
+                >
+                  <View className={`w-5 h-5 rounded items-center justify-center border ${invoiceDetails.recurring ? 'bg-[#006c4e] border-[#006c4e]' : 'border-[#bfc9bf]'}`}>
+                    {invoiceDetails.recurring && <Feather name="check" size={12} color="#fff" />}
+                  </View>
+                  <Text className="text-[13px] font-jakarta-bold text-[#0c2010]">Recurring Invoice</Text>
+                </TouchableOpacity>
+
+                <View className="flex-row gap-2.5 mb-4">
+                  <TouchableOpacity onPress={downloadInvoicePDF} className="flex-1 flex-row items-center justify-center gap-2 bg-white border border-[#e7ece7] rounded-2xl py-3">
+                    <Feather name="file-text" size={14} color="#00351d" />
+                    <Text className="text-[12px] font-jakarta-bold text-[#00351d]">PDF</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={handleGenerateLink} className="flex-1 flex-row items-center justify-center gap-2 bg-white border border-[#e7ece7] rounded-2xl py-3">
+                    <Feather name="link" size={14} color="#00351d" />
+                    <Text className="text-[12px] font-jakarta-bold text-[#00351d]">Link</Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+
+              <View className="flex-row gap-2.5 px-6 pt-3 pb-8 border-t border-[#eff4ef] bg-white">
+                <TouchableOpacity
+                  onPress={handleSaveDraft}
+                  disabled={isSavingInvoice || isSendingInvoice}
+                  className="flex-1 py-3.5 rounded-2xl border border-[#e7ece7] items-center"
+                  style={{ opacity: isSavingInvoice || isSendingInvoice ? 0.5 : 1 }}
+                >
+                  {isSavingInvoice ? <ActivityIndicator color="#00351d" size="small" /> : (
+                    <Text className="text-[12px] font-jakarta-bold text-[#00351d]">Save Draft</Text>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleSendInvoice}
+                  disabled={isSavingInvoice || isSendingInvoice}
+                  className="flex-[1.4] py-3.5 rounded-2xl bg-[#00351d] items-center flex-row justify-center gap-2"
+                  style={{ opacity: isSavingInvoice || isSendingInvoice ? 0.5 : 1 }}
+                >
+                  {isSendingInvoice ? <ActivityIndicator color="#fff" size="small" /> : (
+                    <>
+                      <Feather name="send" size={14} color="#fff" />
+                      <Text className="text-[12px] font-jakarta-bold text-white">Send Invoice</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ── Invoice Payment Link Modal ── */}
+      <Modal visible={showLinkModal} transparent animationType="slide" onRequestClose={() => setShowLinkModal(false)}>
+        <View className="flex-1 justify-end bg-black/50">
+          <TouchableOpacity className="absolute inset-0" activeOpacity={1} onPress={() => setShowLinkModal(false)} />
+          <View className="w-full max-w-lg mx-auto bg-white rounded-t-[36px] px-6 pt-4 pb-8 mt-auto">
+            <View className="items-center mb-4"><View className="w-12 h-1.5 bg-[#e7ece7] rounded-full" /></View>
+            <View className="flex-row items-center justify-between mb-4">
+              <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[20px] text-[#0c2010]">Invoice Link</Text>
+              <TouchableOpacity onPress={() => setShowLinkModal(false)} className="w-8 h-8 rounded-full bg-[#f7faf7] items-center justify-center">
+                <Feather name="x" size={14} color="#0c2010" />
+              </TouchableOpacity>
+            </View>
+            <Text className="text-[#707971] font-jakarta-medium text-[12px] mb-4 leading-relaxed">
+              Share this link with your customer to allow them to view and pay this invoice online.
+            </Text>
+            <View className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl p-4 mb-5">
+              <Text className="text-[13px] font-jakarta-bold text-[#0c2010]" numberOfLines={1}>{invoiceDetails.payUrl}</Text>
+            </View>
+            <TouchableOpacity onPress={handleCopyLink} className="w-full bg-[#e7f8ef] py-3.5 rounded-2xl items-center">
+              <Text className="text-[#006c4e] font-jakarta-bold text-[13px]">Copy</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
     </SafeAreaView>
   );
