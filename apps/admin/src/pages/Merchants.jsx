@@ -176,6 +176,45 @@ const Merchants = () => {
 
   function clearFilters() { setFilters(defaultFilters); setSearch(''); }
 
+  // Exports whatever the current search/filters resolve to, matching the
+  // "export what I'm looking at" convention used on Waitlist/Ledger/Invoices.
+  function exportCsv() {
+    if (filteredMerchants.length === 0) { alert('Nothing to export.'); return; }
+    const rows = filteredMerchants.map((m) => ({
+      'Business Name': m.businessName || '',
+      'Contact Name': m.name || '',
+      Email: m.email || '',
+      Phone: m.phone || '',
+      'Account #': m.paybillAccount || '',
+      Status: m.status === 'locked' ? 'Locked' : 'Active',
+      Verified: m.isVerified ? 'Yes' : 'No',
+      'KRA Verified': m.isKRAVerified ? 'Yes' : 'No',
+      'KRA PIN': m.kraPin || '',
+      'Registration Source': m.registrationSource || 'web',
+      'Activity Tier': m.activityTier || '',
+      'Transactions (30d)': m.txnCount30d ?? '',
+      Flagged: m.flagged ? 'Yes' : 'No',
+      'Flag Reason': m.flagReason || '',
+      'Registered At': m.createdAt ? new Date(m.createdAt).toISOString() : '',
+      'Last Activity': m.lastActivityAt ? new Date(m.lastActivityAt).toISOString() : '',
+    }));
+    const headers = Object.keys(rows[0]);
+    const escape = (v) => {
+      const s = String(v ?? '');
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const csv = [headers.join(','), ...rows.map((r) => headers.map((h) => escape(r[h])).join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `paychain-merchants-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   const fetchMerchants = useCallback(async () => {
     try {
       const res = await api.get('/api/admin/merchants');
@@ -391,13 +430,22 @@ const Merchants = () => {
             <h2 className="text-2xl md:text-4xl font-bold text-on-surface tracking-tighter font-headline">Merchant Directory</h2>
             <p className="text-xs md:text-sm text-on-surface-variant mt-1">Manage all registered businesses, their activity, and account status.</p>
           </div>
-          <button
-            onClick={openModal}
-            className="w-full sm:w-auto bg-primary text-white px-5 py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:shadow-lg transition-all active:scale-95 font-label uppercase tracking-widest"
-          >
-            <span className="material-symbols-outlined text-lg">add</span>
-            New Merchant
-          </button>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <button
+              onClick={exportCsv}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-sm font-semibold rounded-lg hover:bg-surface-container-low transition-colors shadow-sm uppercase tracking-widest font-label"
+            >
+              <span className="material-symbols-outlined text-lg">file_download</span>
+              Export CSV
+            </button>
+            <button
+              onClick={openModal}
+              className="flex-1 sm:flex-none bg-primary text-white px-5 py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:shadow-lg transition-all active:scale-95 font-label uppercase tracking-widest"
+            >
+              <span className="material-symbols-outlined text-lg">add</span>
+              New Merchant
+            </button>
+          </div>
         </div>
 
         {/* Stats Strip */}
@@ -879,13 +927,13 @@ const ActionModal = ({ state, onClose, onConfirm, onSubmitOtp, onOtpChange }) =>
               <span className="material-symbols-outlined text-3xl">check_circle</span>
             </div>
             <h3 className="text-xl font-bold text-on-surface mb-1">
-              {state.action === 'delete' ? 'Merchant deleted' : state.action === 'freeze' ? 'Account frozen' : 'Account reactivated'}
+              {state.action === 'delete' ? 'Merchant deleted' : state.action === 'lock' ? 'Account locked' : 'Account unlocked'}
             </h3>
             <p className="text-sm text-on-surface-variant mb-5">
               {state.action === 'delete'
                 ? `${state.merchant.businessName} and all related records have been permanently removed.`
-                : state.action === 'freeze'
-                  ? `${state.merchant.businessName} can no longer sign in until reactivated.`
+                : state.action === 'lock'
+                  ? `${state.merchant.businessName} can no longer sign in until unlocked.`
                   : `${state.merchant.businessName} has regained dashboard access.`}
             </p>
             <button onClick={onClose} className="px-5 py-2.5 rounded-lg bg-primary text-white text-sm font-semibold uppercase tracking-widest hover:shadow-lg active:scale-95 transition-all">Done</button>
@@ -1029,6 +1077,7 @@ const Chip = ({ children, onClear }) => (
 // the admin can sight-verify the merchant's KYB submission.
 const KybDrawer = ({ merchant, loading, error, onClose }) => {
   const [updatingFeatures, setUpdatingFeatures] = React.useState(false);
+  const [featureError, setFeatureError] = React.useState('');
   const [features, setFeatures] = React.useState(merchant?.features || { digitalWallet: true, inflationShield: true, cashAdvanceForm: true });
 
   React.useEffect(() => {
@@ -1040,6 +1089,7 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
   const handleToggleFeature = async (featureName, value) => {
     try {
       setUpdatingFeatures(true);
+      setFeatureError('');
       const res = await api.patch(`/api/admin/merchants/${merchant._id}/features`, {
         [featureName]: value
       });
@@ -1048,7 +1098,7 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
       }
     } catch (err) {
       console.error('Failed to update features', err);
-      alert('Failed to update feature access.');
+      setFeatureError(err?.response?.data?.error || 'Failed to update feature access.');
     } finally {
       setUpdatingFeatures(false);
     }
@@ -1277,6 +1327,9 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
                 }
               />
             </Section>
+            {featureError && (
+              <div className="text-xs text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium">{featureError}</div>
+            )}
           </div>
         )}
       </div>
