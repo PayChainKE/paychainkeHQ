@@ -25,12 +25,23 @@ const ACTION_META = {
   'merchant.profile.updated':                 { label: 'Profile updated',          icon: 'edit' },
   'merchant.biometrics.enabled':              { label: 'Biometrics enabled',       icon: 'fingerprint' },
   'merchant.biometrics.disabled':             { label: 'Biometrics disabled',     icon: 'fingerprint_off' },
+  'merchant.login.passkey':                   { label: 'Signed in (passkey)',      icon: 'key' },
+  'merchant.passkey.registered':               { label: 'Passkey added',            icon: 'add_moderator' },
+  'merchant.passkey.deleted':                  { label: 'Passkey removed',          icon: 'key_off' },
+  'merchant.payment_pin.verified':            { label: 'Payment PIN verified',     icon: 'verified_user' },
+  'merchant.payment_pin.failed':              { label: 'Payment PIN failed',       icon: 'warning' },
+  'merchant.security_questions.updated':      { label: 'Security questions updated', icon: 'quiz' },
+  'merchant.security_questions.update_failed':{ label: 'Security questions update failed', icon: 'warning' },
+  'merchant.sessions.revoked_all':            { label: 'Signed out all devices',   icon: 'devices_off' },
+  'merchant.cash_advance.applied':            { label: 'Applied for cash advance', icon: 'savings' },
   'admin.merchant.created':                   { label: 'Admin · onboarded',        icon: 'add_business' },
   'admin.merchant.flagged':                   { label: 'Admin · flagged',          icon: 'flag' },
   'admin.merchant.unflagged':                 { label: 'Admin · cleared flag',     icon: 'outlined_flag' },
   'admin.merchant.locked':                    { label: 'Admin · locked',           icon: 'lock' },
   'admin.merchant.unlocked':                  { label: 'Admin · unlocked',         icon: 'lock_open' },
   'admin.merchant.deleted':                   { label: 'Admin · deleted',          icon: 'delete_forever' },
+  'admin.merchant.features_updated':          { label: 'Admin · feature access updated', icon: 'toggle_on' },
+  'admin.cash_advance.status_updated':        { label: 'Admin · cash advance decision', icon: 'fact_check' },
 };
 
 const SEVERITY_TONE = {
@@ -94,11 +105,14 @@ const PLATFORM_META = {
 };
 
 const RANGE_OPTIONS = [
-  { v: '24h', l: 'Last 24h', hours: 24 },
-  { v: '7d',  l: 'Last 7d',  hours: 24 * 7 },
-  { v: '30d', l: 'Last 30d', hours: 24 * 30 },
-  { v: 'all', l: 'All time', hours: null },
+  { v: '24h',    l: 'Last 24h',     hours: 24 },
+  { v: '7d',     l: 'Last 7d',      hours: 24 * 7 },
+  { v: '30d',    l: 'Last 30d',     hours: 24 * 30 },
+  { v: 'all',    l: 'All time',     hours: null },
+  { v: 'custom', l: 'Custom range', hours: null },
 ];
+
+const EXPORT_LIMIT = 5000;
 
 function relTime(iso) {
   if (!iso) return '—';
@@ -119,6 +133,26 @@ function absTime(iso) {
   });
 }
 
+// Shared by the live query and the CSV export so both respect the same range.
+function dateRangeParams(range, customFrom, customTo) {
+  if (range === 'custom') {
+    const p = {};
+    if (customFrom) p.from = new Date(`${customFrom}T00:00:00`).toISOString();
+    if (customTo)   p.to   = new Date(`${customTo}T23:59:59.999`).toISOString();
+    return p;
+  }
+  const rangeMeta = RANGE_OPTIONS.find((r) => r.v === range);
+  if (rangeMeta?.hours) {
+    return { from: new Date(Date.now() - rangeMeta.hours * 60 * 60 * 1000).toISOString() };
+  }
+  return {};
+}
+
+function escapeCsv(v) {
+  const s = String(v ?? '');
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
 export default function AuditLog() {
   const [rows, setRows] = useState([]);
   const [kpis, setKpis] = useState(null);
@@ -133,7 +167,10 @@ export default function AuditLog() {
   const [actor, setActor] = useState('all');
   const [platform, setPlatform] = useState('all');
   const [range, setRange] = useState('7d');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
   const [drawerEntry, setDrawerEntry] = useState(null);
+  const [exporting, setExporting] = useState(false);
 
   const params = useMemo(() => {
     const p = { page, limit: PAGE_SIZE };
@@ -142,12 +179,8 @@ export default function AuditLog() {
     if (severity !== 'all') p.severity = severity;
     if (actor    !== 'all') p.actor    = actor;
     if (platform !== 'all') p.platform = platform;
-    const rangeMeta = RANGE_OPTIONS.find((r) => r.v === range);
-    if (rangeMeta?.hours) {
-      p.from = new Date(Date.now() - rangeMeta.hours * 60 * 60 * 1000).toISOString();
-    }
-    return p;
-  }, [page, search, category, severity, actor, platform, range]);
+    return { ...p, ...dateRangeParams(range, customFrom, customTo) };
+  }, [page, search, category, severity, actor, platform, range, customFrom, customTo]);
 
   const fetchLog = useCallback(async () => {
     setLoading(true);
@@ -171,10 +204,66 @@ export default function AuditLog() {
   useEffect(() => { fetchLog(); }, [fetchLog]);
 
   // Reset to page 1 whenever a filter changes (but not when the page itself changes).
-  useEffect(() => { setPage(1); }, [search, category, severity, actor, platform, range]);
+  useEffect(() => { setPage(1); }, [search, category, severity, actor, platform, range, customFrom, customTo]);
 
   function clearFilters() {
     setSearch(''); setCategory('all'); setSeverity('all'); setActor('all'); setPlatform('all'); setRange('7d');
+    setCustomFrom(''); setCustomTo('');
+  }
+
+  // Exports every row matching the current filter (not just the visible
+  // page), capped at EXPORT_LIMIT so a full-history export can't hang the
+  // tab. Reuses the exact same filter params as the live query.
+  async function exportCsv() {
+    setExporting(true);
+    try {
+      const exportParams = {
+        page: 1, limit: EXPORT_LIMIT,
+        ...(search.trim() ? { q: search.trim() } : {}),
+        ...(category !== 'all' ? { category } : {}),
+        ...(severity !== 'all' ? { severity } : {}),
+        ...(actor    !== 'all' ? { actor } : {}),
+        ...(platform !== 'all' ? { platform } : {}),
+        ...dateRangeParams(range, customFrom, customTo),
+      };
+      const res = await api.get('/api/admin/audit-log', { params: exportParams });
+      const data = res.data?.data || [];
+      if (data.length === 0) { alert('Nothing to export for the current filters.'); return; }
+
+      const csvRows = data.map((r) => ({
+        'Timestamp': r.createdAt ? new Date(r.createdAt).toISOString() : '',
+        'Action': r.action || '',
+        'Message': r.message || '',
+        'Category': r.category || '',
+        'Severity': r.severity || '',
+        'Platform': r.platform || '',
+        'Actor Type': r.actor?.type || 'self',
+        'Actor': r.actor?.type === 'admin' ? (r.actor?.name || r.actor?.email || 'admin') : '',
+        'Merchant Name': r.merchantName || '',
+        'Merchant Email': r.merchantEmail || '',
+        'IP': r.ip || '',
+        'User Agent': r.userAgent || '',
+      }));
+      const headers = Object.keys(csvRows[0]);
+      const csv = [headers.join(','), ...csvRows.map((r) => headers.map((h) => escapeCsv(r[h])).join(','))].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `paychain-audit-log-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      if (res.data?.total > EXPORT_LIMIT) {
+        alert(`This filter matches ${res.data.total} events — only the most recent ${EXPORT_LIMIT} were exported. Narrow the date range for a complete export.`);
+      }
+    } catch (e) {
+      alert(e?.response?.data?.error || 'Export failed.');
+    } finally {
+      setExporting(false);
+    }
   }
 
   return (
@@ -194,13 +283,23 @@ export default function AuditLog() {
               Sign-ins, password resets, profile changes, and every admin action — with timestamps, IPs and devices.
             </p>
           </div>
-          <button
-            onClick={fetchLog}
-            className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant hover:text-on-surface flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-container-low border border-outline-variant/20"
-          >
-            <span className={`material-symbols-outlined text-base ${loading ? 'animate-spin' : ''}`}>refresh</span>
-            Refresh
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={exportCsv}
+              disabled={exporting}
+              className="text-2xs font-bold uppercase tracking-widest text-white flex items-center gap-2 px-3 py-2 rounded-lg bg-primary hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            >
+              <span className={`material-symbols-outlined text-base ${exporting ? 'animate-spin' : ''}`}>{exporting ? 'progress_activity' : 'download'}</span>
+              {exporting ? 'Exporting…' : 'Export CSV'}
+            </button>
+            <button
+              onClick={fetchLog}
+              className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant hover:text-on-surface flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-container-low border border-outline-variant/20"
+            >
+              <span className={`material-symbols-outlined text-base ${loading ? 'animate-spin' : ''}`}>refresh</span>
+              Refresh
+            </button>
+          </div>
         </div>
 
         {/* KPIs — last 24h, independent of the current filter */}
@@ -228,11 +327,30 @@ export default function AuditLog() {
             />
           </div>
           <FilterSelect value={range}    onChange={setRange}    options={RANGE_OPTIONS} />
+          {range === 'custom' && (
+            <div className="flex items-center gap-1.5">
+              <input
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                max={customTo || undefined}
+                className="text-xs font-semibold bg-surface-container-low border border-outline-variant/20 rounded-lg px-2.5 py-2 text-on-surface focus:border-primary focus:ring-0"
+              />
+              <span className="text-2xs text-on-surface-variant/40 font-bold">to</span>
+              <input
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                min={customFrom || undefined}
+                className="text-xs font-semibold bg-surface-container-low border border-outline-variant/20 rounded-lg px-2.5 py-2 text-on-surface focus:border-primary focus:ring-0"
+              />
+            </div>
+          )}
           <FilterSelect value={category} onChange={setCategory} options={CATEGORY_OPTIONS} />
           <FilterSelect value={severity} onChange={setSeverity} options={SEVERITY_OPTIONS} />
           <FilterSelect value={actor}    onChange={setActor}    options={ACTOR_OPTIONS} />
           <FilterSelect value={platform} onChange={setPlatform} options={PLATFORM_OPTIONS} />
-          {(search || category !== 'all' || severity !== 'all' || actor !== 'all' || platform !== 'all' || range !== '7d') && (
+          {(search || category !== 'all' || severity !== 'all' || actor !== 'all' || platform !== 'all' || range !== '7d' || customFrom || customTo) && (
             <button
               onClick={clearFilters}
               className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/70 hover:text-error px-2"
