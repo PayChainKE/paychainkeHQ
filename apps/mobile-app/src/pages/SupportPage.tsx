@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import TopBar from '../components/layout/TopBar';
 
 if (Platform.OS === 'android') {
   if (UIManager.setLayoutAnimationEnabledExperimental) {
@@ -46,20 +47,7 @@ const FAQItem = ({ question, answer }: { question: string, answer: string }) => 
 export default function SupportPage({ navigation }: any) {
   return (
     <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
-      {/* App Header */}
-      <View className="w-full z-50 bg-[#f7faf7] pt-2 pb-4">
-        <View className="w-full max-w-lg mx-auto flex-row justify-between items-center px-6">
-          <View className="flex-row items-center gap-3">
-            <View className="w-9 h-9 rounded-full bg-[#00351d] flex items-center justify-center shadow-sm">
-              <Text className="text-white text-[12px] font-jakarta-bold tracking-widest">JK</Text>
-            </View>
-            <Text className="font-jakarta-bold tracking-tight text-[#00351d] text-[18px]">Merchant Store</Text>
-          </View>
-          <TouchableOpacity onPress={() => navigation.navigate('Notifications')} className="w-10 h-10 items-center justify-center">
-            <MaterialIcons name="notifications" size={26} color="#00351d" />
-          </TouchableOpacity>
-        </View>
-      </View>
+      <TopBar title="Help & Support" />
 
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
         <View className="w-full max-w-lg mx-auto px-6 pt-10 pb-12">

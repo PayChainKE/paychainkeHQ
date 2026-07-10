@@ -5,7 +5,6 @@ import {
 } from 'react-native';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
@@ -13,6 +12,7 @@ import * as Clipboard from 'expo-clipboard';
 import { ValidatedTextInput } from '../components/ValidatedTextInput';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/config';
+import TopBar from '../components/layout/TopBar';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type PayeeType = 'employee' | 'supplier' | 'utility' | 'contractor';
@@ -591,7 +591,6 @@ export default function BulkPay() {
 
   const balance = merchant?.kesBalance ?? 0;
   const isLiquidityLow = batchTotal > balance && batchTotal > 0;
-  const merchantInitials = merchant?.businessName ? merchant.businessName.substring(0, 2).toUpperCase() : '??';
 
   // ── Selection ──
   const togglePayee = (id: string) => {
@@ -966,18 +965,7 @@ export default function BulkPay() {
   if (!isProfileComplete) {
     return (
       <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
-        <LinearGradient colors={['#0b4d2e', '#1D9E75']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-          className="w-full pt-[40px] pb-[16px] px-6 rounded-b-[24px] shadow-sm shadow-[#0b4d2e]/10">
-          <View className="w-full max-w-lg mx-auto flex-row items-center gap-3">
-            <View className="w-10 h-10 rounded-full bg-white/20 items-center justify-center border border-white/30">
-              <Text className="text-white font-jakarta-bold text-sm">{merchantInitials}</Text>
-            </View>
-            <View>
-              <Text className="text-white text-[20px] font-jakarta-bold tracking-tight leading-tight">Bulk Payments</Text>
-              <Text className="text-white/70 text-[12px] font-jakarta-medium tracking-wide">Profile required to unlock</Text>
-            </View>
-          </View>
-        </LinearGradient>
+        <TopBar title="Bulk Payments" subtitle="Profile required to unlock" showBack={false} />
         <View className="flex-1 items-center justify-center px-8">
           <View className="w-20 h-20 rounded-full bg-[#fef3e7] items-center justify-center mb-6">
             <Feather name="lock" size={32} color="#b87333" />
@@ -993,26 +981,7 @@ export default function BulkPay() {
 
   return (
     <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
-      {/* Header */}
-      <LinearGradient colors={['#0b4d2e', '#1D9E75']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-        className="w-full pt-[40px] pb-[16px] px-6 rounded-b-[24px] shadow-sm shadow-[#0b4d2e]/10">
-        <View className="w-full max-w-lg mx-auto flex-row items-center justify-between mb-2">
-          <View className="flex-row items-center gap-3">
-            <View className="w-10 h-10 rounded-full bg-white/20 items-center justify-center border border-white/30">
-              <Text className="text-white font-jakarta-bold text-sm">{merchantInitials}</Text>
-            </View>
-            <View>
-              <Text className="text-white text-[20px] font-jakarta-bold tracking-tight leading-tight">Bulk Payments</Text>
-              <Text className="text-white/70 text-[12px] font-jakarta-medium tracking-wide">
-                Balance: {formatKES(balance)}
-              </Text>
-            </View>
-          </View>
-          <TouchableOpacity onPress={openAddPayee} className="w-10 h-10 rounded-full bg-white/15 items-center justify-center border border-white/25">
-            <Feather name="plus" size={17} color="#ffffff" />
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
+      <TopBar title="Bulk Payments" subtitle={`Balance: ${formatKES(balance)}`} showBack={false} />
 
       {/* Tabs */}
       <View className="w-full max-w-lg mx-auto px-6 mt-4">
@@ -1037,6 +1006,15 @@ export default function BulkPay() {
       >
         {activeTab === 'Payees' ? (
           <View className="w-full max-w-lg mx-auto pt-5 px-6">
+            <TouchableOpacity
+              onPress={openAddPayee}
+              activeOpacity={0.9}
+              className="flex-row items-center justify-center gap-2 bg-[#00351d] rounded-2xl py-3.5 mb-5"
+            >
+              <Feather name="plus" size={16} color="#ffffff" />
+              <Text className="text-white font-jakarta-bold text-[13px]">Add Payee</Text>
+            </TouchableOpacity>
+
             {/* Stats strip */}
             <View className="flex-row gap-3 mb-5">
               <View className="flex-1 bg-white rounded-[20px] p-3.5 border border-[#bfc9bf]/20">

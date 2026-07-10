@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshCon
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import api from '../api/config';
+import TopBar from '../components/layout/TopBar';
 
 type NotificationKind = 'payment' | 'advance' | 'security' | 'wallet' | 'system';
 
@@ -87,32 +88,17 @@ export default function Notifications({ navigation }: any) {
 
   return (
     <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
-      <View
-        className="w-full pt-[16px] pb-[20px] px-6 rounded-b-[24px] shadow-sm shadow-[#0b4d2e]/10"
-        style={{ backgroundColor: '#0b4d2e' }}
-      >
-        <View className="w-full max-w-lg mx-auto flex-row items-center justify-between mb-1">
-          <View className="flex-row items-center gap-3">
-            <TouchableOpacity
-              onPress={() => navigation.goBack()}
-              className="w-10 h-10 rounded-full bg-white/15 items-center justify-center border border-white/25"
-            >
-              <Feather name="arrow-left" size={18} color="#ffffff" />
-            </TouchableOpacity>
-            <View>
-              <Text className="text-white text-[20px] font-jakarta-bold tracking-tight leading-tight">Notifications</Text>
-              <Text className="text-white/70 text-[12px] font-jakarta-medium tracking-wide">
-                {unreadCount > 0 ? `${unreadCount} unread` : 'You are all caught up'}
-              </Text>
-            </View>
-          </View>
-          {unreadCount > 0 && (
-            <TouchableOpacity onPress={markAllRead} activeOpacity={0.8}>
-              <Text className="text-[#83f5c6] text-[11px] font-jakarta-bold uppercase tracking-widest">Mark all read</Text>
-            </TouchableOpacity>
-          )}
+      <TopBar
+        title="Notifications"
+        subtitle={unreadCount > 0 ? `${unreadCount} unread` : 'You are all caught up'}
+      />
+      {unreadCount > 0 && (
+        <View className="w-full max-w-lg mx-auto px-6 pt-3 items-end">
+          <TouchableOpacity onPress={markAllRead} activeOpacity={0.8}>
+            <Text className="text-[#006c4e] text-[11px] font-jakarta-bold uppercase tracking-widest">Mark all read</Text>
+          </TouchableOpacity>
         </View>
-      </View>
+      )}
 
       <ScrollView
         className="flex-1"

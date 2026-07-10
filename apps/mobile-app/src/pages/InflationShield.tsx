@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
-import { Feather, MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../api/config';
 import { useAuth } from '../context/AuthContext';
+import TopBar from '../components/layout/TopBar';
 
 type SwapDirection = 'KES_TO_USDC' | 'USDC_TO_KES';
 
@@ -116,22 +117,7 @@ export default function InflationShield({ navigation }: any) {
 
   const swapHistory = transactions.filter((tx) => tx.type === 'fx_swap');
 
-  const Header = () => (
-    <View className="w-full bg-[#f7faf7] z-50 pt-2 pb-4 border-b border-[#eff4ef]">
-      <View className="w-full max-w-lg mx-auto px-6 flex-row items-center justify-between">
-        <View className="flex-row items-center gap-4">
-          <TouchableOpacity onPress={() => navigation.goBack()} className="p-2 -ml-2 rounded-full">
-            <Feather name="arrow-left" size={24} color="#00351d" />
-          </TouchableOpacity>
-          <View>
-            <Text className="text-[#707971] text-[10px] font-jakarta-bold uppercase tracking-[0.2em] mb-0.5">Money Hub</Text>
-            <Text className="font-jakarta-bold tracking-tight text-[22px] text-[#00351d]">Inflation Shield</Text>
-          </View>
-        </View>
-        <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[22px] text-[#00351d] tracking-tight">PayChain</Text>
-      </View>
-    </View>
-  );
+  const Header = () => <TopBar title="Inflation Shield" subtitle="Money Hub" />;
 
   // ── Hard gate: no Stellar wallet yet ────────────────────────────────────
   if (!walletActivated) {

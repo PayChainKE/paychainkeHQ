@@ -7,6 +7,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useAuth } from '../context/AuthContext';
 import { ValidatedTextInput } from '../components/ValidatedTextInput';
 import api from '../api/config';
+import TopBar from '../components/layout/TopBar';
 
 import MyTillsTab from '../components/tabs/MyTillsTab';
 import SupportTab from '../components/tabs/SupportTab';
@@ -449,6 +450,7 @@ export default function Profile({ navigation }: any) {
 
   return (
     <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
+      <TopBar title="Profile" showBack={false} />
       <View className="flex-1 flex-row bg-[#f0fdf4]">
         <View className="w-[80px] bg-white border-r border-[#eff4ef] shadow-sm shadow-[#00351d]/5">
           <View className="items-center pt-6 pb-5 border-b border-[#eff4ef]">

@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import api from '../api/config';
+import TopBar from '../components/layout/TopBar';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -119,22 +120,7 @@ export default function Transactions({ navigation }: any) {
   return (
     <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
 
-      {/* Header */}
-      <View className="px-6 pt-5 pb-4 flex-row items-center justify-between border-b border-[#eff4ef]">
-        <View className="flex-row items-center gap-3">
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            className="w-10 h-10 bg-white rounded-full items-center justify-center border border-[#eff4ef] shadow-sm"
-          >
-            <Feather name="arrow-left" size={20} color="#00351d" />
-          </TouchableOpacity>
-          <View>
-            <Text className="text-xl font-jakarta-bold text-[#0c2010]">Transactions</Text>
-            <Text className="text-[11px] font-jakarta-medium text-[#707971]">Inbound payment history</Text>
-          </View>
-        </View>
-        <MaterialIcons name="receipt-long" size={22} color="#00351d" />
-      </View>
+      <TopBar title="Transactions" subtitle="Inbound payment history" />
 
       <ScrollView
         className="flex-1"

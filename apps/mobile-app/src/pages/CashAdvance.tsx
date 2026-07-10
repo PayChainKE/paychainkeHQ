@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import api from '../api/config';
 import { useAuth } from '../context/AuthContext';
 import { ValidatedTextInput } from '../components/ValidatedTextInput';
+import TopBar from '../components/layout/TopBar';
 
 const CASH_ADVANCE_LEARN_MORE_URL = 'https://www.paychain.co.ke/products/cash-advance';
 const TENOR_OPTIONS = [7, 14, 21, 30, 45, 60];
@@ -37,22 +38,6 @@ const STATUS_META: Record<string, { label: string; sub: string; icon: keyof type
 function formatKES(n: number | null | undefined) {
   if (n == null) return 'KES 0.00';
   return `KES ${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-function BackBar({ navigation, visible = true }: { navigation: any; visible?: boolean }) {
-  if (!visible) return null;
-  return (
-    <View className="w-full bg-[#f7faf7] pt-2 pb-3 border-b border-[#eff4ef]">
-      <View className="w-full max-w-lg mx-auto px-6 flex-row items-center justify-between">
-        <TouchableOpacity onPress={() => navigation.goBack()} className="p-2 -ml-2 rounded-full">
-          <Feather name="arrow-left" size={22} color="#00351d" />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.navigate('Notifications')} className="p-2 -mr-2 rounded-full">
-          <Feather name="bell" size={20} color="#00351d" />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
 }
 
 function UnavailableNotice() {
@@ -299,7 +284,7 @@ export default function CashAdvance({ navigation }: any) {
   if (formDisabled) {
     return (
       <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
-        <BackBar navigation={navigation} />
+        <TopBar title="Cash Advance" showBack={false} />
         <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 120 }}>
           <View className="w-full max-w-lg mx-auto px-6 pt-8">
             <PageHeader />
@@ -328,7 +313,7 @@ export default function CashAdvance({ navigation }: any) {
   if (!trustData.eligibleForAdvance) {
     return (
       <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
-        <BackBar navigation={navigation} />
+        <TopBar title="Cash Advance" showBack={false} />
         <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 120 }}>
           <View className="w-full max-w-lg mx-auto px-6 pt-8">
             <UnavailableNotice />
@@ -358,7 +343,7 @@ export default function CashAdvance({ navigation }: any) {
   if (justSubmitted) {
     return (
       <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
-        <BackBar navigation={navigation} />
+        <TopBar title="Cash Advance" showBack={false} />
         <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 120 }}>
           <View className="w-full max-w-lg mx-auto px-6 pt-8">
             <PageHeader />
@@ -373,7 +358,7 @@ export default function CashAdvance({ navigation }: any) {
   if (activeApplication && !showForm) {
     return (
       <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
-        <BackBar navigation={navigation} />
+        <TopBar title="Cash Advance" showBack={false} />
         <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 120 }}>
           <View className="w-full max-w-lg mx-auto px-6 pt-8">
             <PageHeader />
@@ -599,7 +584,7 @@ export default function CashAdvance({ navigation }: any) {
   // ── Eligible, no active application — CTA to start one ─────────────────
   return (
     <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
-      <BackBar navigation={navigation} />
+      <TopBar title="Cash Advance" showBack={false} />
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
         <View className="w-full max-w-lg mx-auto px-6 pt-8">
           <PageHeader />

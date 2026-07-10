@@ -8,6 +8,7 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/config';
+import TopBar from '../components/layout/TopBar';
 
 type DateFilter = 'all' | 'today' | 'yesterday' | 'week' | 'last7' | 'month' | 'last30' | 'year' | 'custom';
 // Backend type enum: 'inbound' | 'outbound' | 'bulk_pay' | 'settlement' | 'fx_swap'
@@ -544,30 +545,7 @@ export default function Collections() {
 
   return (
     <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
-      <LinearGradient
-        colors={['#0b4d2e', '#1D9E75']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        className="w-full pt-[40px] pb-[16px] px-6 z-40 rounded-b-[24px] shadow-sm shadow-[#0b4d2e]/10"
-      >
-        <View className="w-full max-w-lg mx-auto flex-row items-center justify-between mb-2">
-          <View className="flex-row items-center space-x-3 gap-3">
-            <TouchableOpacity className="w-10 h-10 rounded-full bg-white/20 items-center justify-center border border-white/30 ml-3">
-              <Text className="text-white font-jakarta-bold text-sm">{initials}</Text>
-            </TouchableOpacity>
-            <View>
-              <Text className="text-white text-[20px] font-jakarta-bold tracking-tight leading-tight">Collections</Text>
-              <Text className="text-white/70 text-[12px] font-jakarta-medium tracking-wide">Till {merchant?.paybillAccount || 'PENDING'}</Text>
-            </View>
-          </View>
-          <TouchableOpacity
-            onPress={() => setShowStatementSheet(true)}
-            className="w-10 h-10 rounded-full bg-white/15 items-center justify-center border border-white/25 mr-3"
-          >
-            <Feather name="download" size={17} color="#ffffff" />
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
+      <TopBar title="Collections" subtitle={`Till ${merchant?.paybillAccount || 'PENDING'}`} showBack={false} />
 
       <ScrollView
         className="flex-1 z-10 mt-6"
@@ -583,6 +561,20 @@ export default function Collections() {
         }
       >
         <View className="w-full max-w-lg mx-auto px-4">
+          <TouchableOpacity
+            onPress={() => setShowStatementSheet(true)}
+            activeOpacity={0.85}
+            className="flex-row items-center justify-between bg-white rounded-2xl border border-[#eff4ef] px-4 py-3 mt-4 mb-1 shadow-sm shadow-[#00351d]/5"
+          >
+            <View className="flex-row items-center gap-2.5">
+              <View className="w-9 h-9 rounded-xl bg-[#f7faf7] items-center justify-center border border-[#eff4ef]">
+                <Feather name="file-text" size={15} color="#00351d" />
+              </View>
+              <Text className="text-[13px] font-jakarta-bold text-[#0c2010]">Download Statement</Text>
+            </View>
+            <Feather name="chevron-right" size={16} color="#707971" />
+          </TouchableOpacity>
+
           {/* Summary Cards — 2x2 Grid */}
           <View className="flex-row flex-wrap pb-6 pt-2 -mx-1.5">
             <View className="w-1/2 px-1.5 mb-3">
