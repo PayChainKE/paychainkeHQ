@@ -15,7 +15,6 @@ import {
   registerMerchant,
   verifyMerchantOTP,
   loginMerchant,
-  biometricLogin,
   resendMerchantOTP,
   forgotPassword,
   verifyResetOTP,
@@ -91,7 +90,6 @@ router.post('/setup-password', adminOtpLimiter, setupPasswordWithToken);
 router.post('/merchant/register', upload.single('certificate'), registerMerchant);
 router.post('/merchant/verify-otp', merchantOtpLimiter, verifyMerchantOTP);
 router.post('/merchant/login', merchantLoginLimiter, loginMerchant);
-router.post('/merchant/biometric-login', merchantLoginLimiter, biometricLogin);
 router.post('/merchant/resend-otp', merchantOtpLimiter, resendMerchantOTP);
 router.post('/merchant/forgot-password',  merchantLoginLimiter, forgotPassword);
 router.post('/merchant/verify-reset-otp', merchantOtpLimiter,   verifyResetOTP);
