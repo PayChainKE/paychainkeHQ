@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/config';
+import PrivateValue from '../components/PrivateValue';
 
 type Timeframe = '7D' | '30D' | '6M';
 const OUTBOUND_TYPES = ['bulk_pay', 'settlement', 'outbound'];
@@ -174,8 +175,6 @@ export default function Dashboard({ navigation }: any) {
     return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(amount);
   };
 
-  const mask = (formatted: string) => (showAmounts ? formatted : '••••••');
-
   const hour = now.getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
@@ -256,14 +255,25 @@ export default function Dashboard({ navigation }: any) {
 
             <View className="mb-2 pl-3">
               <Text className="text-white/80 text-[11px] font-jakarta-bold uppercase tracking-widest mb-1">Total Balance</Text>
-              <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', letterSpacing: -1 }} className="text-4xl text-white leading-none">
-                {mask(formatCurrency(merchant?.kesBalance || 0))}
-              </Text>
+              <PrivateValue
+                hidden={!showAmounts}
+                tint="dark"
+                style={{ fontFamily: 'PlusJakartaSans_700Bold', letterSpacing: -1 }}
+                className="text-4xl text-white leading-none"
+              >
+                {formatCurrency(merchant?.kesBalance || 0)}
+              </PrivateValue>
               <View className="flex-row items-center justify-between mt-4">
                 {todayTotal > 0 ? (
                   <View className="flex-row items-center gap-1.5 bg-[#83f5c6]/20 px-3 py-1.5 rounded-full border border-[#83f5c6]/20">
                     <Feather name="trending-up" size={14} color="#83f5c6" />
-                    <Text className="text-[#83f5c6] font-jakarta-bold text-sm">+{mask(formatCurrency(todayTotal))} today</Text>
+                    <View className="flex-row items-center">
+                      <Text className="text-[#83f5c6] font-jakarta-bold text-sm">+</Text>
+                      <PrivateValue hidden={!showAmounts} tint="dark" className="text-[#83f5c6] font-jakarta-bold text-sm">
+                        {formatCurrency(todayTotal)}
+                      </PrivateValue>
+                      <Text className="text-[#83f5c6] font-jakarta-bold text-sm"> today</Text>
+                    </View>
                   </View>
                 ) : <View />}
                 <View className="bg-white/10 px-3 py-1.5 rounded-full border border-white/20 mb-1">
@@ -357,7 +367,9 @@ export default function Dashboard({ navigation }: any) {
                     <MaterialIcons name="account-balance-wallet" size={140} color="white" />
                   </View>
                   <Text className="text-[#96d4ab] text-[11px] font-jakarta-bold uppercase tracking-[0.15em] mb-2">Operating Balance</Text>
-                  <Text className="text-white text-3xl font-jakarta-extrabold tracking-tight mb-auto">{mask(formatCurrency(merchant?.kesBalance || 0))}</Text>
+                  <PrivateValue hidden={!showAmounts} tint="dark" className="text-white text-3xl font-jakarta-extrabold tracking-tight mb-auto">
+                    {formatCurrency(merchant?.kesBalance || 0)}
+                  </PrivateValue>
                   <View className="flex-row items-center gap-1.5 mt-4">
                     {monthOverMonthPct != null ? (
                       <>
@@ -382,12 +394,21 @@ export default function Dashboard({ navigation }: any) {
                       <MaterialIcons name="shield" size={100} color="white" />
                     </View>
                     <Text className="text-[#94a3b8] text-[11px] font-jakarta-bold uppercase tracking-[0.15em] mb-2">USDC Vault</Text>
-                    <Text className="text-white text-3xl font-jakarta-extrabold tracking-tight mb-auto">{mask(usdcBalance.toFixed(2))}</Text>
+                    <PrivateValue hidden={!showAmounts} tint="dark" className="text-white text-3xl font-jakarta-extrabold tracking-tight mb-auto">
+                      {usdcBalance.toFixed(2)}
+                    </PrivateValue>
                     <View className="flex-row items-center gap-1.5 mt-4">
                       <Feather name="refresh-cw" size={14} color="#94a3b8" />
-                      <Text className="text-[#94a3b8] text-[13px] font-jakarta-medium">
-                        {usdcInKes != null ? `≈ ${mask(formatCurrency(usdcInKes))}` : 'Fetching rate…'}
-                      </Text>
+                      {usdcInKes != null ? (
+                        <View className="flex-row items-center">
+                          <Text className="text-[#94a3b8] text-[13px] font-jakarta-medium">≈ </Text>
+                          <PrivateValue hidden={!showAmounts} tint="dark" className="text-[#94a3b8] text-[13px] font-jakarta-medium">
+                            {formatCurrency(usdcInKes)}
+                          </PrivateValue>
+                        </View>
+                      ) : (
+                        <Text className="text-[#94a3b8] text-[13px] font-jakarta-medium">Fetching rate…</Text>
+                      )}
                     </View>
                   </TouchableOpacity>
                 ) : (
@@ -419,7 +440,9 @@ export default function Dashboard({ navigation }: any) {
               <View className="flex-row justify-between">
                 <View>
                   <Text className="text-[#0c2010] text-[10px] font-jakarta-bold uppercase tracking-wider mb-1">Revenue</Text>
-                  <Text className="text-[#006c4e] text-[16px] font-jakarta-extrabold">{mask(formatCurrency(monthTotal))}</Text>
+                  <PrivateValue hidden={!showAmounts} tint="light" className="text-[#006c4e] text-[16px] font-jakarta-extrabold">
+                    {formatCurrency(monthTotal)}
+                  </PrivateValue>
                 </View>
                 <View className="w-[1px] h-full bg-[#eff4ef]" />
                 <View>
@@ -464,12 +487,16 @@ export default function Dashboard({ navigation }: any) {
                 <View className="flex-row items-center gap-1.5">
                   <View className="w-2.5 h-2.5 rounded-full bg-[#00855D]" />
                   <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider">In</Text>
-                  <Text className="text-[12px] font-jakarta-extrabold text-[#0c2010]">{mask(formatCurrency(periodInboundTotal))}</Text>
+                  <PrivateValue hidden={!showAmounts} tint="light" className="text-[12px] font-jakarta-extrabold text-[#0c2010]">
+                    {formatCurrency(periodInboundTotal)}
+                  </PrivateValue>
                 </View>
                 <View className="flex-row items-center gap-1.5">
                   <View className="w-2.5 h-2.5 rounded-full bg-[#D97706]" />
                   <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider">Out</Text>
-                  <Text className="text-[12px] font-jakarta-extrabold text-[#0c2010]">{mask(formatCurrency(periodOutboundTotal))}</Text>
+                  <PrivateValue hidden={!showAmounts} tint="light" className="text-[12px] font-jakarta-extrabold text-[#0c2010]">
+                    {formatCurrency(periodOutboundTotal)}
+                  </PrivateValue>
                 </View>
               </View>
 
@@ -550,13 +577,15 @@ export default function Dashboard({ navigation }: any) {
                           {new Date(tx.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} · {refText}
                         </Text>
                       </View>
-                      <Text
+                      <PrivateValue
+                        hidden={!showAmounts}
+                        tint="light"
                         className={`font-jakarta-bold text-[13px] ${isSwap ? 'text-[#1D4ED8]' : isInbound ? 'text-[#006c4e]' : 'text-[#0c2010]'}`}
                         numberOfLines={1}
                         style={{ flexShrink: 0 }}
                       >
-                        {mask(isSwap ? `${(tx.usdcAmount || 0).toLocaleString()} USDC` : `${isInbound ? '+' : '-'} ${formatCurrency(kes)}`)}
-                      </Text>
+                        {isSwap ? `${(tx.usdcAmount || 0).toLocaleString()} USDC` : `${isInbound ? '+' : '-'} ${formatCurrency(kes)}`}
+                      </PrivateValue>
                     </View>
                   );
                 })
@@ -571,9 +600,13 @@ export default function Dashboard({ navigation }: any) {
                 <View>
                   <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-[0.1em] mb-1">Available Cash Advance</Text>
                   {trustScore.eligibleForAdvance ? (
-                    <Text className="text-3xl font-jakarta-bold tracking-tight text-[#0c2010]">
-                      {approvedLimit ? mask(formatCurrency(approvedLimit)) : 'Apply to see your limit'}
-                    </Text>
+                    approvedLimit ? (
+                      <PrivateValue hidden={!showAmounts} tint="light" className="text-3xl font-jakarta-bold tracking-tight text-[#0c2010]">
+                        {formatCurrency(approvedLimit)}
+                      </PrivateValue>
+                    ) : (
+                      <Text className="text-3xl font-jakarta-bold tracking-tight text-[#0c2010]">Apply to see your limit</Text>
+                    )
                   ) : (
                     <Text className="text-3xl font-jakarta-bold tracking-tight text-[#707971]">KES 0</Text>
                   )}
