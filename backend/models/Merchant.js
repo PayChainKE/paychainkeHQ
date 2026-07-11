@@ -1,5 +1,7 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
+import Counter from './Counter.js';
+import { generateMerchantCode } from '../utils/ncbaValidators.js';
 
 const merchantSchema = new mongoose.Schema({
   name: {
@@ -112,6 +114,19 @@ const merchantSchema = new mongoose.Schema({
     unique: true,
     minlength: 5,
     maxlength: 5,
+  },
+  // PayChain's 8-digit half of the NCBA Virtual Account number — NCBA
+  // concatenates its own 4-digit institution prefix with this to form the
+  // full 12-digit virtual account merchants receive M-Pesa/EFT/PesaLink
+  // funds on (e.g. prefix "9868" + this "00000001" -> "986800000001").
+  // Zero-padded, exactly 8 digits, auto-assigned on merchant creation (see
+  // the pre-save hook below) — this is how inbound NCBA reconciliation
+  // pushes are matched back to a merchant. See utils/ncbaValidators.js.
+  ncbaMerchantCode: {
+    type: String,
+    default: null,
+    unique: true,
+    sparse: true,
   },
   settlementMobile: {
     type: String,
@@ -247,6 +262,22 @@ merchantSchema.pre('save', async function() {
   // verify correctly via bcrypt.compare (rounds are embedded in the hash).
   const salt = await bcrypt.genSalt(12);
   this.password = await bcrypt.hash(this.password, salt);
+});
+
+// Auto-assign an NCBA merchant code to every new merchant. Atomic counter
+// increment (see Counter.js) guarantees no two merchants can ever collide,
+// even under concurrent signups — mirrors getNextInvoiceNumber's pattern.
+merchantSchema.pre('save', async function() {
+  if (!this.isNew || this.ncbaMerchantCode) {
+    return;
+  }
+
+  const counter = await Counter.findByIdAndUpdate(
+    'ncbaMerchantCode',
+    { $inc: { seq: 1 } },
+    { new: true, upsert: true }
+  );
+  this.ncbaMerchantCode = generateMerchantCode(counter.seq);
 });
 
 // Match user entered password to hashed password in database

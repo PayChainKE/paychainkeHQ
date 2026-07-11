@@ -16,6 +16,7 @@ import trustScoreRoutes from './routes/trustScoreRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import invoiceRoutes from './routes/invoiceRoutes.js';
 import cashAdvanceRoutes from './routes/cashAdvanceRoutes.js';
+import ncbaRoutes from './routes/ncbaRoutes.js';
 import { ensurePrimaryOwner } from './migrations/ensurePrimaryOwner.js';
 import { backfillTransactionFees } from './migrations/backfillTransactionFees.js';
 
@@ -107,6 +108,14 @@ app.use('/api/trust-score', trustScoreRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/cash-advance', cashAdvanceRoutes);
+app.use('/api/v1', ncbaRoutes);
+
+// Also served prefix-free — api.paychain.co.ke is a dedicated API subdomain
+// (see root vercel.json), so NCBA's webhook and any other /v1 consumer hit
+// this directly without an /api prefix. Same router, same requireDb gate,
+// same handlers — just reachable at a second, shorter mount point.
+app.use('/v1', requireDb);
+app.use('/v1', ncbaRoutes);
 
 app.use((err, req, res, next) => {
   console.error('Unhandled Error:', err);
@@ -115,17 +124,33 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
+// Vercel sets VERCEL=1 in every deployment (production and preview). This
+// file is invoked two different ways: `node server.js` as a traditional
+// long-running process (local dev, Render/Railway/PM2), or imported by
+// Vercel's Node runtime as a serverless function that calls the exported
+// `app` directly per-request and never calls .listen(). Both paths need to
+// come out of this same file — see the `export default app` below.
+const isServerless = process.env.VERCEL === '1';
+
 async function bootstrap() {
   try {
     await connectDB();
     await ensurePrimaryOwner();
     await backfillTransactionFees();
   } catch (error) {
-    if (process.env.NODE_ENV === 'production') {
+    // Hard-exiting on a failed initial connection only makes sense for a
+    // traditional long-running deploy — killing the process is meaningless
+    // (and disruptive to co-located invocations) inside a shared serverless
+    // runtime, so Vercel always falls through to the background-retry path.
+    if (process.env.NODE_ENV === 'production' && !isServerless) {
       process.exit(1);
     }
     console.warn('⚠️ Starting API without Mongo — /api routes return 503 until connected');
     startBackgroundDbRetry();
+  }
+
+  if (isServerless) {
+    return;
   }
 
   app.listen(PORT, '0.0.0.0', () => {
@@ -137,3 +162,8 @@ async function bootstrap() {
 }
 
 bootstrap();
+
+// Vercel's Node.js runtime detects a default-exported Express app and wraps
+// it as the request handler for this serverless function. Local/traditional
+// deploys ignore this export entirely — they already got app.listen() above.
+export default app;

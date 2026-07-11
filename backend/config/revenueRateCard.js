@@ -49,9 +49,11 @@ export function safaricomFeeFor(kesAmount) {
 // Applied to every transaction PayChain processes (inbound, outbound,
 // bulk pay, settlement). On top of the Safaricom tariff for M-Pesa
 // transactions. This is the universal margin line.
-export const PAYCHAIN_TXN_RATE = 0.005;     // 0.50%
-export const FX_SPREAD_RATE    = 0.020;     // 2.00% — Kotani / HoneyCoin standard
-export const CASH_ADVANCE_RATE = 0.025;     // 2.50% — pilot product
+export const PAYCHAIN_TXN_RATE    = 0.005;  // 0.50%
+export const FX_SPREAD_RATE       = 0.020;  // 2.00% — Kotani / HoneyCoin standard
+export const CASH_ADVANCE_RATE    = 0.025;  // 2.50% — pilot product
+// NCBA Virtual Account collections no longer use a flat linear rate — see
+// config/ncbaTariffCard.js for the tiered Safaricom-cost + markup bands.
 
 // ── Revenue streams ───────────────────────────────────────────────────
 // Each stream maps to one or more transaction-type buckets; the aggregator
@@ -107,6 +109,31 @@ export const REVENUE_STREAMS = [
     statuses: ['completed', 'verified'],
     basis: 'kes_volume',
     passthrough: 'safaricom',
+  },
+  {
+    id: 'ncba_collection_fee',
+    label: 'NCBA Collection Fee',
+    description: 'Tiered Safaricom-style tariff on every inbound NCBA Virtual Account collection — PayChain absorbs the underlying Safaricom cost per band and keeps a fixed markup. No single rate; see config/ncbaTariffCard.js.',
+    icon: 'account_balance',
+    accent: 'teal',
+    tiered: true,
+    rate: null,
+    minFee: 0,
+    txTypes: ['ncba_inbound'],
+    statuses: ['completed', 'verified'],
+    basis: 'kes_volume',
+  },
+  {
+    id: 'ncba_disbursement_fee',
+    label: 'NCBA Disbursement Fee',
+    description: 'PayChain margin on outbound NCBA bulk disbursements (supplier payments, KPLC/water utility payouts) routed via NCBA Host-to-Host.',
+    icon: 'account_balance',
+    accent: 'blue',
+    rate: PAYCHAIN_TXN_RATE,
+    minFee: 0,
+    txTypes: ['ncba_outbound'],
+    statuses: ['completed', 'verified'],
+    basis: 'kes_volume',
   },
   {
     id: 'cash_advance',

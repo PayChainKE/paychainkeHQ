@@ -34,6 +34,15 @@ const payeeSchema = new mongoose.Schema(
     bankName: String,
     accountNumber: String,
 
+    // Utility-payee routing (type: 'utility') — which biller NCBA's Bulk
+    // H2H payload should target. accountNumber above doubles as the
+    // KPLC meter number / water account number for these payees.
+    utilityProvider: {
+      type: String,
+      enum: ['KPLC', 'WATER', null],
+      default: null,
+    },
+
     // KRA Employee Details
     kraPin: {
       type: String,
