@@ -46,7 +46,7 @@ export const markAsRead = async (req, res) => {
     const contact = await Contact.findByIdAndUpdate(
       req.params.id,
       { isRead: true },
-      { new: true }
+      { returnDocument: 'after' }
     );
     if (!contact) return res.status(404).json({ error: 'Message not found' });
     res.json({ success: true, data: contact });
@@ -64,7 +64,7 @@ export const markAsUnread = async (req, res) => {
     const contact = await Contact.findByIdAndUpdate(
       req.params.id,
       { isRead: false },
-      { new: true }
+      { returnDocument: 'after' }
     );
     if (!contact) return res.status(404).json({ error: 'Message not found' });
     res.json({ success: true, data: contact });

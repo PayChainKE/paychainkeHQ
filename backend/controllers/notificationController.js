@@ -48,7 +48,7 @@ export const markNotificationRead = async (req, res) => {
     const notification = await Notification.findOneAndUpdate(
       { _id: req.params.id, merchantId: req.merchant._id },
       { read: true },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!notification) {

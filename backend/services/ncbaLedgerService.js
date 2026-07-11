@@ -88,7 +88,7 @@ export async function creditNcbaCollection({ merchant, grossAmount, bankRef, cus
       const updatedMerchant = await Merchant.findByIdAndUpdate(
         merchant._id,
         { $inc: { kesBalance: netAmount } },
-        { new: true, session }
+        { returnDocument: 'after', session }
       );
 
       result = {

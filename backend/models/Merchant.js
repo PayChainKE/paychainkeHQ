@@ -275,7 +275,7 @@ merchantSchema.pre('save', async function() {
   const counter = await Counter.findByIdAndUpdate(
     'ncbaMerchantCode',
     { $inc: { seq: 1 } },
-    { new: true, upsert: true }
+    { returnDocument: 'after', upsert: true }
   );
   this.ncbaMerchantCode = generateMerchantCode(counter.seq);
 });

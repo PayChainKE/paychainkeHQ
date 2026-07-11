@@ -160,7 +160,7 @@ export async function initiateBulkPayment(merchantId, payoutItems) {
   const reservedMerchant = await Merchant.findOneAndUpdate(
     { _id: merchantId, kesBalance: { $gte: totalAmount } },
     { $inc: { kesBalance: -totalAmount } },
-    { new: true }
+    { returnDocument: 'after' }
   );
 
   if (!reservedMerchant) {
