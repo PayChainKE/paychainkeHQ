@@ -434,7 +434,7 @@ export const stkCallback = async (req, res) => {
 
           let paidInvoice = null;
           if (link.invoiceId) {
-            paidInvoice = await Invoice.findByIdAndUpdate(link.invoiceId, { status: 'paid', paidAt: new Date() }, { new: true });
+            paidInvoice = await Invoice.findByIdAndUpdate(link.invoiceId, { status: 'paid', paidAt: new Date() }, { returnDocument: 'after' });
           }
 
           const merchant = link.merchantId;

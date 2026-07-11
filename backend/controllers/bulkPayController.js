@@ -92,7 +92,7 @@ export const updatePayee = async (req, res) => {
         nssfNumber, shifNumber, etimsInvoiceNumber, cuNumber, defaultAmount,
         updatedAt: new Date()
       },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     res.json(updatedPayee);

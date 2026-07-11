@@ -6,6 +6,18 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
     },
+    "@paychain/backend#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"],
+      "env": [
+        "NCBA_API_USERNAME",
+        "NCBA_API_PASSWORD",
+        "NCBA_ACCOUNT_NOTIFICATION_USERNAME",
+        "NCBA_ACCOUNT_NOTIFICATION_PASSWORD",
+        "NCBA_ACCOUNT_NOTIFICATION_SECRET_KEY",
+        "NCBA_INSTITUTION_PREFIX"
+      ]
+    },
     "dev": {
       "cache": false,
       "persistent": true

@@ -26,7 +26,7 @@ const getNextInvoiceNumber = async () => {
   const counter = await Counter.findByIdAndUpdate(
     'invoiceNumber',
     { $inc: { seq: 1 } },
-    { new: true, upsert: true }
+    { returnDocument: 'after', upsert: true }
   );
   return `INV-${String(counter.seq).padStart(6, '0')}`;
 };

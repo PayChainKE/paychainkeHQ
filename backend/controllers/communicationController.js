@@ -148,7 +148,7 @@ export const updateCommunication = async (req, res) => {
     if (Array.isArray(req.body.tags)) update.tags = req.body.tags.slice(0, 12);
     if (req.body.assignedTo === null) update.assignedTo = null;
 
-    const doc = await Communication.findByIdAndUpdate(req.params.id, { $set: update }, { new: true })
+    const doc = await Communication.findByIdAndUpdate(req.params.id, { $set: update }, { returnDocument: 'after' })
       .populate('merchant', 'businessName name phone paybillAccount status flagged')
       .lean();
     if (!doc) return res.status(404).json({ error: 'Not found' });
@@ -179,7 +179,7 @@ export const addCommunicationNote = async (req, res) => {
     const doc = await Communication.findByIdAndUpdate(
       req.params.id,
       { $push: { notes: note } },
-      { new: true }
+      { returnDocument: 'after' }
     ).populate('merchant', 'businessName name phone paybillAccount status flagged').lean();
     if (!doc) return res.status(404).json({ error: 'Not found' });
 
