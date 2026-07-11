@@ -87,6 +87,20 @@ app.get('/', (req, res) => {
   res.send('PayChainKE API is running...');
 });
 
+// Unauthenticated liveness probe for external monitors (uptime pingers,
+// bank infrastructure sweeps) — always 200 as long as the process can
+// respond at all, even mid-Mongo-reconnect, so a transient DB blip doesn't
+// read as "server down". `/api/health` below is the stricter readiness
+// check for our own tooling and returns 503 when Mongo isn't connected.
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'UP',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV,
+    database: isDbReady() ? 'connected' : 'disconnected',
+  });
+});
+
 app.get('/api/health', (req, res) => {
   const dbReady = isDbReady();
   res.status(dbReady ? 200 : 503).json({
