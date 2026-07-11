@@ -1,26 +1,10 @@
-import crypto from 'crypto';
 import express from 'express';
 import { handleNcbaReconciliationWebhook, handleInitiateBulkPayment } from '../controllers/ncbaController.js';
+import { handleNcbaAccountNotification } from '../controllers/ncbaAccountNotificationController.js';
 import { protectMerchant } from '../middleware/authMiddleware.js';
+import { timingSafeStringEqual } from '../utils/timingSafeCompare.js';
 
 const router = express.Router();
-
-// Constant-time string compare — a plain `===` leaks how many leading bytes
-// matched via response timing, which is a real attack surface on a
-// credential check reachable from the public internet. Both buffers must be
-// equal length for timingSafeEqual to run at all, so unequal lengths are
-// handled (and still compared against *something* of the right length) so
-// that a wrong-length guess doesn't short-circuit faster than a right-length
-// wrong guess.
-function timingSafeStringEqual(a, b) {
-  const aBuf = Buffer.from(String(a));
-  const bBuf = Buffer.from(String(b));
-  if (aBuf.length !== bBuf.length) {
-    crypto.timingSafeEqual(aBuf, Buffer.alloc(aBuf.length));
-    return false;
-  }
-  return crypto.timingSafeEqual(aBuf, bBuf);
-}
 
 // Inline HTTP Basic Auth for the NCBA webhook — this is a bank-to-server
 // credential check, deliberately separate from protectMerchant's JWT flow
@@ -76,6 +60,20 @@ function verifyNcbaBasicAuth(req, res, next) {
 // by the app-wide express.json() middleware already applied in server.js.
 // Bank-authenticated via HTTP Basic Auth rather than our merchant JWT flow.
 router.post('/webhooks/ncba-reconciliation', verifyNcbaBasicAuth, handleNcbaReconciliationWebhook);
+
+// Public webhook — NCBA's Account-Level Notification Push (SOAP XML).
+// Separate endpoint from the reconciliation push above: this one fires on
+// every debit/credit on PayChain's NCBA account, not just merchant virtual
+// account collections — see controllers/ncbaAccountNotificationController.js
+// for why that distinction matters. Per NCBA's Account-Level Notification
+// Push Service Guide, auth here is NOT an HTTP header — <User>/<Password>/
+// <HashVal> are embedded in the XML body itself, so verification happens
+// inside the controller (after XML parsing) rather than as route middleware.
+router.post(
+  '/webhooks/ncba-account-notification',
+  express.text({ type: ['text/xml', 'application/xml', 'application/soap+xml'], limit: '64kb' }),
+  handleNcbaAccountNotification
+);
 
 // Merchant-initiated NCBA bulk disbursements (suppliers + utility payouts).
 router.post('/bulk-payments', protectMerchant, handleInitiateBulkPayment);
