@@ -23,6 +23,7 @@
     "dotenv": "^16.6.1",
     "express": "^5.2.1",
     "express-rate-limit": "^8.5.2",
+    "fast-xml-parser": "^5.9.3",
     "helmet": "^8.2.0",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.4.1",

@@ -1,5 +1,6 @@
 import Transaction from '../models/Transaction.js';
 import { REVENUE_STREAMS, SAFARICOM_TARIFF } from '../config/revenueRateCard.js';
+import { ncbaMarkupMongoExpr } from '../config/ncbaTariffCard.js';
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 const RANGES = ['24h', '7d', '30d', '90d', 'ytd', 'all'];
@@ -63,12 +64,20 @@ const KES_BASIS = {
 };
 
 // Compute fee for a single doc inside the aggregation pipeline. Mirrors
-// the JS `computeStreamFee` helper.
-function feeExpr(stream) {
+// the JS `computeStreamFee` helper for linear-rate streams; the NCBA
+// collection stream instead prices off the tiered band table (see
+// config/ncbaTariffCard.js) since it has no single rate to multiply by.
+// `basisExpr` defaults to the raw per-doc KES_BASIS expression, but callers
+// that have already materialised the basis into a field (e.g. `$_kes` via
+// $addFields) pass that alias instead so it isn't recomputed.
+function feeExpr(stream, basisExpr = KES_BASIS) {
+  if (stream.id === 'ncba_collection_fee') {
+    return ncbaMarkupMongoExpr(basisExpr);
+  }
   return {
     $max: [
       stream.minFee || 0,
-      { $multiply: [KES_BASIS, stream.rate] },
+      { $multiply: [basisExpr, stream.rate] },
     ],
   };
 }
@@ -152,15 +161,16 @@ export const getRevenue = async (req, res) => {
         },
       },
       {
-        // Match-and-multiply the per-stream rate by joining the rate as a
+        // Match-and-price by joining the per-stream fee expression as a
         // literal map. We expand each stream into a candidate and pick the
-        // one whose id matches streamId. Cheaper than $lookup.
+        // one whose id matches streamId. Cheaper than $lookup. feeExpr()
+        // handles both linear-rate streams and the tiered NCBA stream.
         $addFields: {
           _fee: {
             $switch: {
               branches: REVENUE_STREAMS.filter((s) => s.txTypes.length).map((s) => ({
                 case: { $eq: ['$streamId', s.id] },
-                then: { $max: [s.minFee || 0, { $multiply: ['$_kes', s.rate] }] },
+                then: feeExpr(s, '$_kes'),
               })),
               default: 0,
             },
@@ -212,7 +222,7 @@ export const getRevenue = async (req, res) => {
             $switch: {
               branches: REVENUE_STREAMS.filter((s) => s.txTypes.length).map((s) => ({
                 case: { $in: ['$type', s.txTypes] },
-                then: { $max: [s.minFee || 0, { $multiply: ['$_kes', s.rate] }] },
+                then: feeExpr(s, '$_kes'),
               })),
               default: 0,
             },
@@ -476,6 +486,7 @@ export const getRevenue = async (req, res) => {
         icon: meta.icon,
         accent: meta.accent,
         rate: meta.rate,
+        tiered: !!meta.tiered,
         minFee: meta.minFee,
         pilot: !!meta.pilot,
         revenue: data.revenue,

@@ -1,11 +1,13 @@
 {
   "functions": {
-    "backend/server.js": {
-      "runtime": "vercel-node@latest"
-    }
+    "backend/server.js": {}
   },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/backend/server.js" },
-    { "source": "/((?!api/|backend/).*)", "destination": "/index.html" }
+    {
+      "source": "/(.*)",
+      "has": [{ "type": "host", "value": "api.paychain.co.ke" }],
+      "destination": "/backend/server.js"
+    },
+    { "source": "/api/(.*)", "destination": "/backend/server.js" }
   ]
 }
