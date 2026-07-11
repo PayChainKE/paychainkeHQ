@@ -19,6 +19,7 @@ import cashAdvanceRoutes from './routes/cashAdvanceRoutes.js';
 import ncbaRoutes from './routes/ncbaRoutes.js';
 import { ensurePrimaryOwner } from './migrations/ensurePrimaryOwner.js';
 import { backfillTransactionFees } from './migrations/backfillTransactionFees.js';
+import { backfillNcbaMerchantCodes } from './migrations/backfillNcbaMerchantCodes.js';
 
 dotenv.config();
 
@@ -137,6 +138,7 @@ async function bootstrap() {
     await connectDB();
     await ensurePrimaryOwner();
     await backfillTransactionFees();
+    await backfillNcbaMerchantCodes();
   } catch (error) {
     // Hard-exiting on a failed initial connection only makes sense for a
     // traditional long-running deploy — killing the process is meaningless
