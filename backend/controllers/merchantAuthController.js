@@ -8,6 +8,7 @@ import { provisionMerchantWallet, getWalletBalance } from '../utils/stellarHelpe
 import { encryptKey } from '../utils/cryptoHelper.js';
 import bcrypt from 'bcryptjs';
 import { createNotification } from './notificationController.js';
+import { getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
 
 // Helper to generate unique 5-digit account number
 const generateUniquePaybillAccount = async () => {
@@ -187,6 +188,12 @@ export const verifyMerchantOTP = async (req, res) => {
         phone: merchant.phone,
         businessName: merchant.businessName,
         paybillAccount: merchant.paybillAccount,
+        // NCBA virtual account — ncbaVirtualAccountNumber is null until
+        // NCBA_INSTITUTION_PREFIX is configured (i.e. until NCBA actually
+        // assigns PayChain's 4-digit code); render that as "pending bank
+        // assignment" rather than an error.
+        ncbaMerchantCode: merchant.ncbaMerchantCode,
+        ncbaVirtualAccountNumber: getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode),
         kesBalance: merchant.kesBalance,
         usdcBalance: merchant.usdcBalance,
         stellarPublicKey: merchant.stellarPublicKey,
@@ -755,6 +762,12 @@ export const getMerchantMe = async (req, res) => {
         phone: merchant.phone,
         businessName: merchant.businessName,
         paybillAccount: merchant.paybillAccount,
+        // NCBA virtual account — ncbaVirtualAccountNumber is null until
+        // NCBA_INSTITUTION_PREFIX is configured (i.e. until NCBA actually
+        // assigns PayChain's 4-digit code); render that as "pending bank
+        // assignment" rather than an error.
+        ncbaMerchantCode: merchant.ncbaMerchantCode,
+        ncbaVirtualAccountNumber: getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode),
         kesBalance: merchant.kesBalance,
         usdcBalance: merchant.usdcBalance,
         stellarPublicKey: merchant.stellarPublicKey,
@@ -844,6 +857,12 @@ export const updateMerchantProfile = async (req, res) => {
         phone: merchant.phone,
         businessName: merchant.businessName,
         paybillAccount: merchant.paybillAccount,
+        // NCBA virtual account — ncbaVirtualAccountNumber is null until
+        // NCBA_INSTITUTION_PREFIX is configured (i.e. until NCBA actually
+        // assigns PayChain's 4-digit code); render that as "pending bank
+        // assignment" rather than an error.
+        ncbaMerchantCode: merchant.ncbaMerchantCode,
+        ncbaVirtualAccountNumber: getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode),
         kesBalance: merchant.kesBalance,
         usdcBalance: merchant.usdcBalance,
         stellarPublicKey: merchant.stellarPublicKey,

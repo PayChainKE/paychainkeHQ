@@ -84,6 +84,32 @@ export function validateMerchantCode(rawMerchantCode) {
   return code;
 }
 
+/**
+ * Builds the full 12-digit NCBA virtual account number for a merchant —
+ * PayChain's bank-assigned 4-digit institution prefix (NCBA_INSTITUTION_PREFIX
+ * env var) concatenated with the merchant's own 8-digit code. This is the
+ * number PayChain must issue to each merchant so their customers have
+ * something to pay into (M-Pesa/EFT/PesaLink/etc. all settle against it).
+ *
+ * Returns null — not an error — if the prefix isn't configured yet. NCBA
+ * assigns this once PayChain's merchant database (i.e. every merchant
+ * having an 8-digit code) is in place, so this is expected to be null until
+ * that value is set, and merchant-facing surfaces should render a "pending
+ * bank assignment" state rather than treating null as a failure.
+ */
+export function getNcbaVirtualAccountNumber(ncbaMerchantCode) {
+  const prefix = process.env.NCBA_INSTITUTION_PREFIX;
+
+  if (!prefix || !/^\d{4}$/.test(prefix)) {
+    return null;
+  }
+  if (!ncbaMerchantCode || !EIGHT_DIGIT_CODE.test(ncbaMerchantCode)) {
+    return null;
+  }
+
+  return `${prefix}${ncbaMerchantCode}`;
+}
+
 export function validateCollectionAmount(amount) {
   const value = Number(amount);
   if (!Number.isFinite(value) || value <= 0) {
