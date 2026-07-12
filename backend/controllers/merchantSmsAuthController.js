@@ -33,14 +33,19 @@ function buildPhoneVariants(rawPhone) {
 // @route   POST /api/auth/merchant/sms/send-otp
 // @access  Public (rate-limited at the route layer — see routes/merchantSmsAuthRoutes.js)
 export const sendMerchantSmsOtp = async (req, res) => {
-  const { phone } = req.body || {};
+  // Accept both `phone` and `phoneNumber` — different callers (curl tests,
+  // future frontend forms) may use either shape; this just widens what's
+  // accepted, it doesn't paper over a missing/wrong Content-Type header
+  // (a request with no `Content-Type: application/json` never reaches this
+  // line with a populated req.body at all, regardless of key name).
+  const phoneInput = req.body?.phone || req.body?.phoneNumber;
 
   try {
-    if (!phone) {
+    if (!phoneInput) {
       return res.status(400).json({ error: 'Phone number is required.' });
     }
 
-    const e164Phone = toE164Kenyan(phone);
+    const e164Phone = toE164Kenyan(phoneInput);
     if (!e164Phone) {
       return res.status(400).json({ error: 'Enter a valid Kenyan mobile number.' });
     }
@@ -48,7 +53,7 @@ export const sendMerchantSmsOtp = async (req, res) => {
     // Only ever text a number that's actually on file for a real merchant —
     // closes the obvious "send SMS to anyone" abuse vector that IP-based
     // rate limiting alone doesn't fully prevent.
-    const merchant = await Merchant.findOne({ phone: { $in: buildPhoneVariants(phone) } });
+    const merchant = await Merchant.findOne({ phone: { $in: buildPhoneVariants(phoneInput) } });
 
     if (merchant) {
       // crypto.randomInt is uniformly distributed and safe for credential
@@ -108,15 +113,17 @@ export const sendMerchantSmsOtp = async (req, res) => {
 // @route   POST /api/auth/merchant/sms/verify-otp
 // @access  Public (rate-limited at the route layer)
 export const verifyMerchantSmsOtp = async (req, res) => {
-  const { phone, otp } = req.body || {};
+  // Same phone / phoneNumber flexibility as sendMerchantSmsOtp above.
+  const phoneInput = req.body?.phone || req.body?.phoneNumber;
+  const { otp } = req.body || {};
   const submittedOtp = String(otp ?? '').trim();
 
   try {
-    if (!phone || !submittedOtp) {
+    if (!phoneInput || !submittedOtp) {
       return res.status(400).json({ error: 'Phone number and verification code are required.' });
     }
 
-    const e164Phone = toE164Kenyan(phone);
+    const e164Phone = toE164Kenyan(phoneInput);
     if (!e164Phone) {
       return res.status(400).json({ error: 'Enter a valid Kenyan mobile number.' });
     }
