@@ -1,5 +1,6 @@
 import Merchant from '../models/Merchant.js';
 import { createNotification } from './notificationController.js';
+import { sendSMS } from '../utils/sms.js';
 import { parseSoapXmlSafely, findFirstTagValue, XmlSecurityError } from '../utils/xmlSecurity.js';
 import {
   extractMerchantCode,
@@ -179,6 +180,21 @@ export const handleNcbaAccountNotification = async (req, res) => {
       title: 'Payment received',
       message: `You received KES ${transAmount.toLocaleString()} via NCBA. Ref: ${transId}.`,
     }).catch((e) => logEvent('error', 'ncba_account_notification_notification_failed', { transId, error: e.message }));
+
+    // Non-blocking SMS alert — sendSMS never throws (see utils/sms.js), but
+    // this is still fired-and-forgotten rather than awaited so a slow or
+    // down SMS provider can never delay the bank's ACK or hold the request
+    // open; a delivery failure here only ever produces a log line.
+    if (merchant.phone) {
+      sendSMS(
+        merchant.phone,
+        `Payment received: KES ${transAmount.toLocaleString()} via NCBA. Ref: ${transId}. New balance: KES ${ledgerResult.merchant.kesBalance.toLocaleString()}.`
+      ).then((result) => {
+        if (!result.success) {
+          logEvent('error', 'ncba_account_notification_sms_failed', { transId, merchantId: merchant._id.toString(), error: result.error });
+        }
+      });
+    }
 
     return respondOk(res);
   } catch (err) {
