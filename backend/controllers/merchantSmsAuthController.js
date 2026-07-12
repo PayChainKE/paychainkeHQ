@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import Merchant from '../models/Merchant.js';
 import VerificationToken from '../models/VerificationToken.js';
-import { sendSMS } from '../utils/sms.js';
+import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { toE164Kenyan } from '../utils/notificationService.js';
 import { timingSafeStringEqual } from '../utils/timingSafeCompare.js';
 import { logAudit } from '../utils/auditLog.js';
@@ -71,7 +71,7 @@ export const sendMerchantSmsOtp = async (req, res) => {
         // sendSMS never throws (see utils/sms.js) — a delivery failure here
         // must never turn into a 500 for the caller or block the OTP record
         // from being written.
-        sendSMS(e164Phone, `Your PayChain verification code is ${otp}. It expires in 5 minutes. Do not share this code.`).then((result) => {
+        safeSendSMS({ to: e164Phone, message: `Your PayChain verification code is ${otp}. It expires in 5 minutes. Do not share this code.` }).then((result) => {
           if (!result.success) {
             console.error(`SMS OTP dispatch failed for merchant ${merchant._id}:`, result.error);
           }

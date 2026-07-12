@@ -1,6 +1,6 @@
 import Merchant from '../models/Merchant.js';
 import { createNotification } from './notificationController.js';
-import { sendSMS } from '../utils/sms.js';
+import { safeSendSMS, buildStrictSms } from '../utils/smsSanitizer.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import {
   validateMerchantCode,
@@ -115,19 +115,28 @@ export const handleNcbaReconciliationWebhook = async (req, res) => {
     const accountRef = getNcbaVirtualAccountNumber(merchantCode) || merchantCode;
 
     if (customerPhone) {
-      sendSMS(
-        customerPhone,
-        `${transactionReference} Confirmed. KES ${grossAmount.toLocaleString()} paid to ${merchant.businessName} for account ${accountRef} on ${date} at ${time}. Thank you for your payment.`
-      ).then((result) => {
+      // businessName is the only unbounded field — reference, amount,
+      // account ref, date and time are always fixed-format.
+      safeSendSMS({
+        to: customerPhone,
+        message: buildStrictSms(
+          ({ ref, amt, name, acct, date, time }) =>
+            `${ref} Confirmed. KES ${amt} paid to ${name} for account ${acct} on ${date} at ${time}. Thank you for your payment.`,
+          {
+            fixed: { ref: transactionReference, amt: grossAmount.toLocaleString(), acct: accountRef, date, time },
+            truncatable: [{ key: 'name', value: merchant.businessName, minLength: 10 }],
+          }
+        ).message,
+      }).then((result) => {
         if (!result.success) logEvent('error', 'ncba_reconciliation_customer_sms_failed', { transactionReference, error: result.error });
       });
     }
 
     if (merchant.phone) {
-      sendSMS(
-        merchant.phone,
-        `${transactionReference} Payment Received. KES ${grossAmount.toLocaleString()} received via NCBA on ${date} at ${time}. New balance: KES ${ledgerResult.merchant.kesBalance.toLocaleString()}.`
-      ).then((result) => {
+      safeSendSMS({
+        to: merchant.phone,
+        message: `${transactionReference} Payment Received. KES ${grossAmount.toLocaleString()} received via NCBA on ${date} at ${time}. New balance: KES ${ledgerResult.merchant.kesBalance.toLocaleString()}.`,
+      }).then((result) => {
         if (!result.success) logEvent('error', 'ncba_reconciliation_sms_failed', { transactionReference, merchantId: merchant._id.toString(), error: result.error });
       });
     }

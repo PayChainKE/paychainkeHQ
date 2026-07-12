@@ -1,7 +1,7 @@
 import axios from 'axios';
 import Transaction from '../models/Transaction.js';
 import Merchant from '../models/Merchant.js';
-import { sendSMS } from '../utils/sms.js';
+import { safeSendSMS, buildStrictSms } from '../utils/smsSanitizer.js';
 import { sendInvoicePaidReceiptEmail } from '../utils/resend.js';
 import { settleInflationShield } from '../utils/stellarHelper.js';
 import { getLiveKesToUsdcRate } from '../utils/rateEngine.js';
@@ -274,10 +274,19 @@ export const confirmationURL = async (req, res) => {
     // the other side of the transaction). Fabricating a number there would
     // be a real customer-facing correctness problem, not a cosmetic one.
     const customerSms = MSISDN
-      ? sendSMS(
-          MSISDN,
-          `${TransID} Confirmed. KES ${amount.toLocaleString()} sent to ${merchant.businessName} for account ${accountNumber} on ${date} at ${time}. Thank you for your payment.`
-        ).then((result) => {
+      ? safeSendSMS({
+          to: MSISDN,
+          // businessName is the only unbounded field here — never the
+          // reference, amount, account number, date or time.
+          message: buildStrictSms(
+            ({ ref, amt, name, acct, date, time }) =>
+              `${ref} Confirmed. KES ${amt} sent to ${name} for account ${acct} on ${date} at ${time}. Thank you for your payment.`,
+            {
+              fixed: { ref: TransID, amt: amount.toLocaleString(), acct: accountNumber, date, time },
+              truncatable: [{ key: 'name', value: merchant.businessName, minLength: 10 }],
+            }
+          ).message,
+        }).then((result) => {
           if (!result.success) console.error(`Customer SMS receipt failed for ${TransID}:`, result.error);
         })
       : Promise.resolve();
@@ -285,10 +294,18 @@ export const confirmationURL = async (req, res) => {
     // Merchant transaction alert SMS — new balance here IS real data we
     // hold (updatedMerchant.kesBalance from the atomic $inc above).
     const merchantSms = merchant.phone
-      ? sendSMS(
-          merchant.phone,
-          `${TransID} Payment Received. KES ${amount.toLocaleString()} received from ${senderName || 'a customer'} (${MSISDN}) on ${date} at ${time}. Your updated PayChain available balance is KES ${(updatedMerchant.kesBalance || 0).toLocaleString()}.`
-        ).then((result) => {
+      ? safeSendSMS({
+          to: merchant.phone,
+          // The payer's own display name is the only unbounded field here.
+          message: buildStrictSms(
+            ({ ref, amt, name, phone, date, time, balance }) =>
+              `${ref} Payment Received. KES ${amt} received from ${name} (${phone}) on ${date} at ${time}. Your updated PayChain available balance is KES ${balance}.`,
+            {
+              fixed: { ref: TransID, amt: amount.toLocaleString(), phone: MSISDN, date, time, balance: (updatedMerchant.kesBalance || 0).toLocaleString() },
+              truncatable: [{ key: 'name', value: senderName || 'a customer', minLength: 10 }],
+            }
+          ).message,
+        }).then((result) => {
           if (!result.success) console.error(`Merchant SMS alert failed for ${merchant._id}:`, result.error);
         })
       : Promise.resolve();
@@ -551,16 +568,25 @@ export const stkCallback = async (req, res) => {
             const payerLabel = link.invoiceId ? 'invoice' : 'payment link';
             const accountRef = paidInvoice?.invoiceNumber || merchant.paybillAccount || stkReq.linkId;
             const customerSms = stkReq.phone
-              ? sendSMS(
-                  stkReq.phone,
-                  `${receipt} Confirmed. KES ${stkReq.amount.toLocaleString()} paid to ${merchant.businessName} for account ${accountRef} on ${date} at ${time}. Thank you for your payment.`
-                ).then((r) => { if (!r.success) console.error(`STK ${payerLabel} customer SMS failed for ${receipt}:`, r.error); })
+              ? safeSendSMS({
+                  to: stkReq.phone,
+                  // businessName is the only unbounded field — receipt,
+                  // amount, account ref, date and time are always fixed.
+                  message: buildStrictSms(
+                    ({ ref, amt, name, acct, date, time }) =>
+                      `${ref} Confirmed. KES ${amt} paid to ${name} for account ${acct} on ${date} at ${time}. Thank you for your payment.`,
+                    {
+                      fixed: { ref: receipt, amt: stkReq.amount.toLocaleString(), acct: accountRef, date, time },
+                      truncatable: [{ key: 'name', value: merchant.businessName, minLength: 10 }],
+                    }
+                  ).message,
+                }).then((r) => { if (!r.success) console.error(`STK ${payerLabel} customer SMS failed for ${receipt}:`, r.error); })
               : Promise.resolve();
             const merchantSms = merchant.phone
-              ? sendSMS(
-                  merchant.phone,
-                  `${receipt} Payment Received. KES ${stkReq.amount.toLocaleString()} received via M-PESA (${link.invoiceId ? 'Invoice' : 'Payment Link'}) on ${date} at ${time}. Your updated PayChain available balance is KES ${(updatedMerchant.kesBalance || 0).toLocaleString()}.`
-                ).then((r) => { if (!r.success) console.error(`STK ${payerLabel} merchant SMS failed for ${receipt}:`, r.error); })
+              ? safeSendSMS({
+                  to: merchant.phone,
+                  message: `${receipt} Payment Received. KES ${stkReq.amount.toLocaleString()} received via M-PESA (${link.invoiceId ? 'Invoice' : 'Payment Link'}) on ${date} at ${time}. Your updated PayChain available balance is KES ${(updatedMerchant.kesBalance || 0).toLocaleString()}.`,
+                }).then((r) => { if (!r.success) console.error(`STK ${payerLabel} merchant SMS failed for ${receipt}:`, r.error); })
               : Promise.resolve();
             await Promise.all([customerSms, merchantSms]);
           }
@@ -599,10 +625,10 @@ export const stkCallback = async (req, res) => {
           // Self-funded top-up — one SMS to the merchant's own registered
           // number is enough (no separate "customer" in this flow).
           if (merchant.phone) {
-            sendSMS(
-              merchant.phone,
-              `${receipt} Confirmed. KES ${stkReq.amount.toLocaleString()} added to your PayChain wallet via M-PESA on ${date} at ${time}. Your updated available balance is KES ${(updatedMerchant.kesBalance || 0).toLocaleString()}.`
-            ).then((r) => { if (!r.success) console.error(`Wallet top-up SMS failed for merchant ${merchant._id}:`, r.error); });
+            safeSendSMS({
+              to: merchant.phone,
+              message: `${receipt} Confirmed. KES ${stkReq.amount.toLocaleString()} added to your PayChain wallet via M-PESA on ${date} at ${time}. Your updated available balance is KES ${(updatedMerchant.kesBalance || 0).toLocaleString()}.`,
+            }).then((r) => { if (!r.success) console.error(`Wallet top-up SMS failed for merchant ${merchant._id}:`, r.error); });
           }
         }
       }
@@ -773,10 +799,19 @@ export const b2cCallback = async (req, res) => {
         // — "now" is accurate here since this fires at the moment the
         // payout actually resolves.
         const { date, time } = formatTransactionDateTime();
-        const message = succeeded
-          ? `${reference} Payout Sent. KES ${transaction.amount.toLocaleString()} paid to ${transaction.recipient?.name || 'the recipient'} on ${date} at ${time}.`
-          : `${reference} Payout Failed. KES ${transaction.amount.toLocaleString()} to ${transaction.recipient?.name || 'the recipient'} could not be completed on ${date} at ${time} and has been refunded. Your updated PayChain available balance is KES ${(merchantForSms.kesBalance || 0).toLocaleString()}.`;
-        sendSMS(merchantForSms.phone, message).then((r) => {
+        const recipientName = transaction.recipient?.name || 'the recipient';
+        // Recipient display name is the only unbounded field — reference,
+        // amount, date, time and balance are always fixed-format.
+        const { message } = succeeded
+          ? buildStrictSms(
+              ({ ref, amt, name, date, time }) => `${ref} Payout Sent. KES ${amt} paid to ${name} on ${date} at ${time}.`,
+              { fixed: { ref: reference, amt: transaction.amount.toLocaleString(), date, time }, truncatable: [{ key: 'name', value: recipientName, minLength: 8 }] }
+            )
+          : buildStrictSms(
+              ({ ref, amt, name, date, time, balance }) => `${ref} Payout Failed. KES ${amt} to ${name} could not be completed on ${date} at ${time} and has been refunded. Your updated PayChain available balance is KES ${balance}.`,
+              { fixed: { ref: reference, amt: transaction.amount.toLocaleString(), date, time, balance: (merchantForSms.kesBalance || 0).toLocaleString() }, truncatable: [{ key: 'name', value: recipientName, minLength: 8 }] }
+            );
+        safeSendSMS({ to: merchantForSms.phone, message }).then((r) => {
           if (!r.success) console.error(`B2C payout SMS failed for merchant ${transaction.merchantId}:`, r.error);
         });
       }
@@ -807,7 +842,7 @@ export const b2cCallback = async (req, res) => {
             const failedCount = statuses.filter((s) => s === 'failed').length;
             const { date, time } = formatTransactionDateTime();
             const message = `${batch.batchReference} Bulk Payout ${batch.status} on ${date} at ${time}. ${succeededCount} of ${batch.transactions.length} payout(s) completed (KES ${batch.totalNetAmount.toLocaleString()} total)${failedCount > 0 ? `; ${failedCount} failed and refunded` : ''}.`;
-            sendSMS(merchant.phone, message).then((r) => {
+            safeSendSMS({ to: merchant.phone, message }).then((r) => {
               if (!r.success) console.error(`Bulk payout batch SMS failed for merchant ${batch.merchantId}:`, r.error);
             });
           }

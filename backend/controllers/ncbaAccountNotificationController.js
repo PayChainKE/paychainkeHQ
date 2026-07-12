@@ -1,6 +1,6 @@
 import Merchant from '../models/Merchant.js';
 import { createNotification } from './notificationController.js';
-import { sendSMS } from '../utils/sms.js';
+import { safeSendSMS, buildStrictSms } from '../utils/smsSanitizer.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { parseSoapXmlSafely, findFirstTagValue, XmlSecurityError } from '../utils/xmlSecurity.js';
 import {
@@ -198,19 +198,27 @@ export const handleNcbaAccountNotification = async (req, res) => {
     // toE164Kenyan fail closed and silently on anything not phone-shaped,
     // so attempting this is safe even when the field is unreliable.
     if (rawPhoneNr) {
-      sendSMS(
-        rawPhoneNr,
-        `${transId} Confirmed. KES ${transAmount.toLocaleString()} paid to ${merchant.businessName} for account ${accountRef} on ${date} at ${time}. Thank you for your payment.`
-      ).then((result) => {
+      // businessName is the only unbounded field here.
+      safeSendSMS({
+        to: rawPhoneNr,
+        message: buildStrictSms(
+          ({ ref, amt, name, acct, date, time }) =>
+            `${ref} Confirmed. KES ${amt} paid to ${name} for account ${acct} on ${date} at ${time}. Thank you for your payment.`,
+          {
+            fixed: { ref: transId, amt: transAmount.toLocaleString(), acct: accountRef, date, time },
+            truncatable: [{ key: 'name', value: merchant.businessName, minLength: 10 }],
+          }
+        ).message,
+      }).then((result) => {
         if (!result.success) logEvent('error', 'ncba_account_notification_customer_sms_failed', { transId, error: result.error });
       });
     }
 
     if (merchant.phone) {
-      sendSMS(
-        merchant.phone,
-        `${transId} Payment Received. KES ${transAmount.toLocaleString()} received via NCBA on ${date} at ${time}. New balance: KES ${ledgerResult.merchant.kesBalance.toLocaleString()}.`
-      ).then((result) => {
+      safeSendSMS({
+        to: merchant.phone,
+        message: `${transId} Payment Received. KES ${transAmount.toLocaleString()} received via NCBA on ${date} at ${time}. New balance: KES ${ledgerResult.merchant.kesBalance.toLocaleString()}.`,
+      }).then((result) => {
         if (!result.success) {
           logEvent('error', 'ncba_account_notification_sms_failed', { transId, merchantId: merchant._id.toString(), error: result.error });
         }
