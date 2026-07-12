@@ -36,6 +36,30 @@ const passkey         = process.env.MPESA_PASSKEY;
 // Must be HTTPS and reachable by Safaricom servers.
 const callbackBase    = (process.env.MPESA_CALLBACK_URL || '').replace(/\/$/, '');
 
+// Safaricom's C2B TransTime arrives as YYYYMMDDhhmmss — this is the
+// authoritative transaction timestamp (matches what M-Pesa's own SMS shows),
+// so SMS receipts format this rather than the server's receive time. Falls
+// back to "now" only if the field is missing/malformed.
+function formatMpesaDateTime(transTime) {
+  const str = String(transTime ?? '').trim();
+  let d;
+  if (/^\d{14}$/.test(str)) {
+    d = new Date(
+      Number(str.slice(0, 4)),
+      Number(str.slice(4, 6)) - 1,
+      Number(str.slice(6, 8)),
+      Number(str.slice(8, 10)),
+      Number(str.slice(10, 12)),
+      Number(str.slice(12, 14))
+    );
+  } else {
+    d = new Date();
+  }
+  const date = `${d.getDate()}/${d.getMonth() + 1}/${String(d.getFullYear()).slice(-2)}`;
+  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  return { date, time };
+}
+
 // Generate OAuth Token for Safaricom Daraja API
 export const generateToken = async (req, res, next) => {
   if (!consumerKey || !consumerSecret) {
@@ -193,6 +217,13 @@ export const confirmationURL = async (req, res) => {
     const liveRate = await getLiveKesToUsdcRate();
     const usdcPayoutValue = (netKESAmount * liveRate).toFixed(7);
 
+    // Atomic $inc rather than a read-modify-write on the in-memory `merchant`
+    // doc — the gap between fetching `merchant` above and saving here spans
+    // several awaits (getLiveKesToUsdcRate, settleInflationShield), during
+    // which a concurrent webhook for the same merchant could read the same
+    // stale balance and silently clobber it on save(). $inc is race-free
+    // regardless of how long this branch takes.
+    let updatedMerchant;
     if (merchant.stellarPublicKey) {
       try {
         console.log(`🛡️ Executing Inflation Shield for Acc ${accountNumber}:`);
@@ -201,7 +232,7 @@ export const confirmationURL = async (req, res) => {
         console.log(`   - Exact On-Chain Payout: ${usdcPayoutValue} USDC`);
 
         const txHash = await settleInflationShield(merchant.stellarPublicKey, usdcPayoutValue);
-        
+
         // Log the blockchain settlement transaction
         await Transaction.create({
           merchantId: merchant._id,
@@ -216,19 +247,29 @@ export const confirmationURL = async (req, res) => {
           recipient: { name: merchant.businessName, id: merchant.stellarPublicKey }
         });
 
-        merchant.usdcBalance = (merchant.usdcBalance || 0) + parseFloat(usdcPayoutValue);
+        updatedMerchant = await Merchant.findByIdAndUpdate(
+          merchant._id,
+          { $inc: { usdcBalance: parseFloat(usdcPayoutValue) } },
+          { returnDocument: 'after' }
+        );
 
       } catch (e) {
         console.error(`❌ Inflation Shield failed for ${accountNumber}:`, e.message);
         // If settlement fails, funds remain as KES balance
-        merchant.kesBalance = (merchant.kesBalance || 0) + netKESAmount;
+        updatedMerchant = await Merchant.findByIdAndUpdate(
+          merchant._id,
+          { $inc: { kesBalance: netKESAmount } },
+          { returnDocument: 'after' }
+        );
       }
     } else {
       // If no Stellar wallet, just add to KES balance
-      merchant.kesBalance = (merchant.kesBalance || 0) + netKESAmount;
+      updatedMerchant = await Merchant.findByIdAndUpdate(
+        merchant._id,
+        { $inc: { kesBalance: netKESAmount } },
+        { returnDocument: 'after' }
+      );
     }
-
-    await merchant.save();
 
     console.log(`✅ Successfully processed M-PESA payment of KES ${amount} for account ${accountNumber}`);
 
@@ -239,11 +280,39 @@ export const confirmationURL = async (req, res) => {
       message: `You received KES ${amount.toLocaleString()} from ${senderName || 'a customer'} via Till ${merchant.paybillAccount}.`,
     });
 
-    // Send SMS notification to the customer
-    if (MSISDN) {
-      const smsMessage = `Confirmed. Ksh${amount.toLocaleString()} paid to ${merchant.businessName} (Acc: ${merchant.paybillAccount}). Ref: ${TransID}. Thank you for your payment.`;
-      await sendSMS(MSISDN, smsMessage);
-    }
+    const { date, time } = formatMpesaDateTime(payload.TransTime);
+
+    // Customer receipt SMS, styled after M-Pesa's own confirmation format.
+    // Deliberately omits a "New M-PESA balance" line — that figure is the
+    // *paying customer's own personal M-Pesa wallet balance*, which
+    // Safaricom's C2B confirmation payload never includes (it belongs to
+    // the other side of the transaction). Fabricating a number there would
+    // be a real customer-facing correctness problem, not a cosmetic one.
+    const customerSms = MSISDN
+      ? sendSMS(
+          MSISDN,
+          `${TransID} Confirmed. KES ${amount.toLocaleString()} sent to ${merchant.businessName} for account ${accountNumber} on ${date} at ${time}. Thank you for your payment.`
+        ).then((result) => {
+          if (!result.success) console.error(`Customer SMS receipt failed for ${TransID}:`, result.error);
+        })
+      : Promise.resolve();
+
+    // Merchant transaction alert SMS — new balance here IS real data we
+    // hold (updatedMerchant.kesBalance from the atomic $inc above).
+    const merchantSms = merchant.phone
+      ? sendSMS(
+          merchant.phone,
+          `${TransID} Payment Received. KES ${amount.toLocaleString()} received from ${senderName || 'a customer'} (${MSISDN}) on ${date} at ${time}. Your updated PayChain available balance is KES ${(updatedMerchant.kesBalance || 0).toLocaleString()}.`
+        ).then((result) => {
+          if (!result.success) console.error(`Merchant SMS alert failed for ${merchant._id}:`, result.error);
+        })
+      : Promise.resolve();
+
+    // Both dispatches never throw (see utils/sms.js) — awaited together
+    // purely so both attempts fire before this handler returns, not because
+    // a delivery failure here could ever affect the response already sent
+    // to Safaricom above.
+    await Promise.all([customerSms, merchantSms]);
 
   } catch (error) {
     console.error('❌ M-PESA Confirmation Webhook Error:', error);
