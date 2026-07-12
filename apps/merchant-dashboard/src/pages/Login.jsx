@@ -69,6 +69,8 @@ export default function Login() {
   const [isSignupPasswordStep, setIsSignupPasswordStep] = useState(false)
   const [otpFlowType, setOtpFlowType] = useState('') // 'login' or 'reset'
   const [authEmail, setAuthEmail] = useState('') // Captured from backend for OTP verification
+  const [otpChannel, setOtpChannel] = useState('email') // 'email' or 'sms' — which channel the current OTP went out on
+  const [otpMaskedPhone, setOtpMaskedPhone] = useState('')
   const [resendTimer, setResendTimer] = useState(59)
   const [hasAccount, setHasAccount] = useState(() => localStorage.getItem('hasAccount') === 'true')
   
@@ -104,6 +106,8 @@ export default function Login() {
         setOtpFlowType('login')
         setIsOTPMode(true)
         setResendTimer(59)
+        setOtpChannel(res.channel || 'email')
+        setOtpMaskedPhone(res.maskedPhone || '')
       } else {
         nav('/overview')
       }
@@ -239,9 +243,11 @@ export default function Login() {
     setLoading(false)
     if (res.success) {
       setResendTimer(59)
+      setOtpChannel(res.channel || otpChannel)
+      setOtpMaskedPhone(res.maskedPhone || otpMaskedPhone)
       addNotification({
         title: 'Code Sent',
-        message: 'A new security code has been dispatched.',
+        message: res.channel === 'sms' ? 'A new security code has been sent to your phone.' : 'A new security code has been dispatched.',
         type: 'success'
       })
     } else {
@@ -405,6 +411,8 @@ export default function Login() {
                   setNewPasswordInput('')
                   setConfirmPassword('')
                   setAgreedToTerms(false)
+                  setOtpChannel('email')
+                  setOtpMaskedPhone('')
                   setErr('')
                 }}
                 className={`flex-1 py-3 px-2 rounded-xl text-[10px] md:text-[11px] font-black uppercase tracking-widest transition-all ${
@@ -842,6 +850,8 @@ export default function Login() {
                 <p className="text-on-surface-variant text-sm mt-2 opacity-60 leading-relaxed max-w-xs mx-auto">
                   {otpFlowType === 'reset' ? (
                     <>6-digit code sent to <span className="text-primary font-bold opacity-100">{maskedResetEmail || 'your inbox'}</span></>
+                  ) : otpChannel === 'sms' ? (
+                    <>6-digit code sent via SMS to <span className="text-primary font-bold opacity-100">{otpMaskedPhone || 'your phone'}</span></>
                   ) : (
                     <>6-digit code sent to your registered email</>
                   )}

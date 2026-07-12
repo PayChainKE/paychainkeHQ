@@ -64,6 +64,8 @@ export default function Login({ route }: any) {
   const [isSignupBiometricStep, setIsSignupBiometricStep] = useState(false);
   const [otpFlowType, setOtpFlowType] = useState('');
   const [authEmail, setAuthEmail] = useState('');
+  const [otpChannel, setOtpChannel] = useState('email'); // 'email' or 'sms' — which channel the current OTP went out on
+  const [otpMaskedPhone, setOtpMaskedPhone] = useState('');
   const [resendTimer, setResendTimer] = useState(59);
 
   const [hasAccount, setHasAccount] = useState(false);
@@ -112,6 +114,8 @@ export default function Login({ route }: any) {
         setOtpFlowType('login');
         setIsOTPMode(true);
         setResendTimer(59);
+        setOtpChannel(res.channel || 'email');
+        setOtpMaskedPhone(res.maskedPhone || '');
       }
     } else {
       setErr(res.error);
@@ -267,6 +271,8 @@ export default function Login({ route }: any) {
             setNewPasswordInput('');
             setConfirmPassword('');
             setAgreedToTerms(false);
+            setOtpChannel('email');
+            setOtpMaskedPhone('');
             setErr('');
           }}
           className={`flex-1 py-3 px-2 rounded-xl items-center justify-center ${
@@ -403,7 +409,11 @@ export default function Login({ route }: any) {
             {isOTPMode && (
               <View>
                 <Text className="text-[#0c2010] text-[24px] font-jakarta-bold mb-2">Enter OTP</Text>
-                <Text className="text-[#707971] text-[14px] font-jakarta-medium mb-6">Enter the code sent to {authEmail}</Text>
+                <Text className="text-[#707971] text-[14px] font-jakarta-medium mb-6">
+                  {otpChannel === 'sms'
+                    ? `Enter the code sent via SMS to ${otpMaskedPhone || 'your phone'}`
+                    : `Enter the code sent to ${authEmail}`}
+                </Text>
                 
                 <View className="flex-row justify-between mb-8">
                   {otp.map((digit, index) => (

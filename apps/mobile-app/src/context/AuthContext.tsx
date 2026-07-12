@@ -141,7 +141,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!res.data.mfaRequired) {
         await persistSession(res.data.merchant, res.data.token);
       }
-      return { success: true, email: res.data.email, mfaRequired: res.data.mfaRequired };
+      return {
+        success: true,
+        email: res.data.email,
+        mfaRequired: res.data.mfaRequired,
+        channel: res.data.channel,
+        maskedPhone: res.data.maskedPhone,
+      };
     } catch (err: any) {
       return { success: false, error: err.response?.data?.error || 'Login failed' };
     }
@@ -202,7 +208,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function resendOTP(email: string) {
     try {
       const res = await api.post('/api/auth/merchant/resend-otp', { email });
-      return { success: true, message: res.data.message };
+      return {
+        success: true,
+        message: res.data.message,
+        channel: res.data.channel,
+        maskedPhone: res.data.maskedPhone,
+      };
     } catch (err: any) {
       return { success: false, error: err.response?.data?.error || 'Failed to resend OTP' };
     }
