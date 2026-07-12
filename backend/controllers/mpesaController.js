@@ -2,6 +2,7 @@ import axios from 'axios';
 import Transaction from '../models/Transaction.js';
 import Merchant from '../models/Merchant.js';
 import { safeSendSMS, buildStrictSms } from '../utils/smsSanitizer.js';
+import { calculateMerchantFee, processSplitTransaction, PricingEngineError } from '../utils/pricingEngine.js';
 import { sendInvoicePaidReceiptEmail } from '../utils/resend.js';
 import { settleInflationShield } from '../utils/stellarHelper.js';
 import { getLiveKesToUsdcRate } from '../utils/rateEngine.js';
@@ -195,10 +196,15 @@ export const confirmationURL = async (req, res) => {
       }
     });
 
-    // Inflation Shield: Automatically convert KES to USDC and settle on-chain
-    const PLATFORM_FEE_PERCENTAGE = 0; // Configurable fee (0% for demo)
-    
-    const netKESAmount = amount - (amount * PLATFORM_FEE_PERCENTAGE);
+    // PayChain's own tiered merchant fee — deducted from the gross receipt
+    // before it ever reaches the merchant's balance or the Inflation Shield
+    // FX conversion below. Same lookup utils/feeCalculator.js's Transaction
+    // pre-save hook uses to stamp paychainFee on the record just created
+    // above, so the ledger and this real deduction can never disagree.
+    const merchantFee = calculateMerchantFee(amount);
+    const netKESAmount = Math.round((amount - merchantFee) * 100) / 100;
+    console.log(`💰 M-PESA C2B fee for ${TransID}: gross KES ${amount}, PayChain fee KES ${merchantFee}, net KES ${netKESAmount}`);
+
     const liveRate = await getLiveKesToUsdcRate();
     const usdcPayoutValue = (netKESAmount * liveRate).toFixed(7);
 
@@ -512,21 +518,65 @@ export const stkCallback = async (req, res) => {
 
           const merchant = link.merchantId;
           if (merchant) {
+            // Dual-sided split: stkReq.amount is the TOTAL Safaricom just
+            // confirmed (base + any customer surcharge, from
+            // getCheckoutTotal at checkout-initiation time); link.amount is
+            // the original base bill. Wrapped defensively — this only
+            // throws on a genuine ledger-integrity failure (see
+            // pricingEngine.js), and by this point Safaricom has already
+            // confirmed real money moved, so a calculation bug must never
+            // silently swallow the merchant's credit. Falls back to
+            // crediting the base amount at zero fee (safest for the
+            // merchant) and flags the discrepancy loudly for manual review.
+            let merchantFee;
+            let merchantNetSettlement;
+            let paychainTotalRevenue;
+            let customerFee;
+            try {
+              ({ merchantFee, merchantNetSettlement, paychainTotalRevenue, customerFee } =
+                processSplitTransaction(stkReq.amount, link.amount));
+            } catch (splitError) {
+              console.error(
+                `🚨 CRITICAL ledger split failure for ${receipt} (STK payment-link ${link.linkId}):`,
+                splitError instanceof PricingEngineError ? splitError.message : splitError,
+                { totalReceived: stkReq.amount, baseAmount: link.amount }
+              );
+              merchantFee = 0;
+              merchantNetSettlement = link.amount;
+              paychainTotalRevenue = 0;
+              customerFee = 0;
+            }
+
+            console.log(
+              `💰 STK checkout split for ${receipt}: total KES ${stkReq.amount} (base KES ${link.amount} + customer fee KES ${customerFee}), ` +
+              `PayChain revenue KES ${paychainTotalRevenue} (merchant fee KES ${merchantFee} + customer fee KES ${customerFee}), merchant net KES ${merchantNetSettlement}`
+            );
+
             // Atomic $inc (not merchant.save()) — also hands back the real
             // post-credit balance for the SMS below, same reasoning as
             // confirmationURL above.
             const updatedMerchant = await Merchant.findByIdAndUpdate(
               merchant._id,
-              { $inc: { kesBalance: stkReq.amount } },
+              { $inc: { kesBalance: merchantNetSettlement } },
               { returnDocument: 'after' }
             );
 
+            // kesAmount is deliberately the BASE bill, not the inflated
+            // total — this is the same basis the automatic Transaction
+            // pre-save hook feeds into calculateMerchantFee (see
+            // utils/feeCalculator.js), so this doc's auto-stamped
+            // paychainFee always equals `merchantFee` above exactly. The
+            // customer-surcharge portion of PayChain's revenue
+            // (paychainTotalRevenue - merchantFee) isn't yet captured on a
+            // per-transaction ledger field — tracked via the structured log
+            // line above until a dedicated revenue stream/field is added
+            // once real surcharge pricing lands.
             await Transaction.create({
               merchantId: merchant._id,
               accountNumber: merchant.paybillAccount || 'WALLET_FUND',
               type: 'inbound',
-              amount: stkReq.amount,
-              kesAmount: stkReq.amount,
+              amount: link.amount,
+              kesAmount: link.amount,
               currency: 'KES',
               status: 'completed',
               reference: receipt,
@@ -582,10 +632,14 @@ export const stkCallback = async (req, res) => {
                   ).message,
                 }).then((r) => { if (!r.success) console.error(`STK ${payerLabel} customer SMS failed for ${receipt}:`, r.error); })
               : Promise.resolve();
+            // Merchant sees their base bill amount, not the customer's
+            // total (which may include a surcharge that was never the
+            // merchant's money) — matches merchantNetSettlement/link.amount
+            // being what actually moves their balance.
             const merchantSms = merchant.phone
               ? safeSendSMS({
                   to: merchant.phone,
-                  message: `${receipt} Payment Received. KES ${stkReq.amount.toLocaleString()} received via M-PESA (${link.invoiceId ? 'Invoice' : 'Payment Link'}) on ${date} at ${time}. Your updated PayChain available balance is KES ${(updatedMerchant.kesBalance || 0).toLocaleString()}.`,
+                  message: `${receipt} Payment Received. KES ${link.amount.toLocaleString()} received via M-PESA (${link.invoiceId ? 'Invoice' : 'Payment Link'}) on ${date} at ${time}. Your updated PayChain available balance is KES ${(updatedMerchant.kesBalance || 0).toLocaleString()}.`,
                 }).then((r) => { if (!r.success) console.error(`STK ${payerLabel} merchant SMS failed for ${receipt}:`, r.error); })
               : Promise.resolve();
             await Promise.all([customerSms, merchantSms]);

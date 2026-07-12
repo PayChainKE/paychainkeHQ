@@ -10,6 +10,7 @@ import { encryptKey } from '../utils/cryptoHelper.js';
 import { getLiveKesToUsdcRate } from '../utils/rateEngine.js';
 import { sendWalletActivationEmail, sendStatementEmail } from '../utils/resend.js';
 import { createNotification } from './notificationController.js';
+import { getCheckoutTotal } from '../utils/pricingEngine.js';
 
 // @desc    Get merchant transactions
 // @route   GET /api/transactions
@@ -516,6 +517,15 @@ export const processPaymentLink = async (req, res) => {
     if (formattedPhone.startsWith('0')) formattedPhone = '254' + formattedPhone.slice(1);
     if (formattedPhone.startsWith('+')) formattedPhone = formattedPhone.slice(1);
 
+    // Checkout initializer: the amount actually prompted on the customer's
+    // handset — base bill + PayChain's customer surcharge (currently 0
+    // until pricing sheets are finalized, see utils/pricingEngine.js).
+    // Computed once, up front, so what the customer sees and approves on
+    // their phone already includes any surcharge — never added silently
+    // after the fact. stkCallback re-derives the split from this same total
+    // plus link.amount (the base) once Safaricom confirms.
+    const checkoutTotal = getCheckoutTotal(link.amount);
+
     // ── SANDBOX MODE: local simulation, no real Safaricom call ──────────────
     // Mirrors mpesaController.js#initiateSTKPush's sandbox branch — no live
     // money at risk, and no dependency on Safaricom's sandbox-specific
@@ -527,13 +537,13 @@ export const processPaymentLink = async (req, res) => {
     // would, rather than a second hand-maintained copy of that logic.
     if (!isLive) {
       const checkoutRequestId = `SANDBOX-LINK-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
-      console.log(`🧪 [SANDBOX] Simulating Payment Link STK Push for ${formattedPhone} KES ${link.amount} | Link: ${linkId}`);
+      console.log(`🧪 [SANDBOX] Simulating Payment Link STK Push for ${formattedPhone} KES ${checkoutTotal} (base KES ${link.amount}) | Link: ${linkId}`);
 
       await STKRequest.create({
         merchantId: link.merchantId._id,
         checkoutRequestId,
         linkId: link.linkId,
-        amount: link.amount,
+        amount: checkoutTotal,
         phone: formattedPhone,
         status: 'pending',
       });
@@ -590,7 +600,7 @@ export const processPaymentLink = async (req, res) => {
       Password: password,
       Timestamp: timestamp,
       TransactionType: 'CustomerPayBillOnline',
-      Amount: link.amount,
+      Amount: checkoutTotal,
       PartyA: formattedPhone,
       PartyB: shortCode,
       PhoneNumber: formattedPhone,
@@ -608,7 +618,7 @@ export const processPaymentLink = async (req, res) => {
       merchantId: link.merchantId._id,
       checkoutRequestId,
       linkId: link.linkId,
-      amount: link.amount,
+      amount: checkoutTotal,
       phone: formattedPhone,
       status: 'pending'
     });
