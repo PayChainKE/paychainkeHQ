@@ -1,11 +1,13 @@
 import Merchant from '../models/Merchant.js';
 import { createNotification } from './notificationController.js';
 import { sendSMS } from '../utils/sms.js';
+import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import {
   validateMerchantCode,
   validateCollectionAmount,
   validatePhoneNumber,
   validateTransactionReference,
+  getNcbaVirtualAccountNumber,
   NcbaValidationError,
 } from '../utils/ncbaValidators.js';
 import { creditNcbaCollection, DuplicateCollectionError } from '../services/ncbaLedgerService.js';
@@ -100,19 +102,33 @@ export const handleNcbaReconciliationWebhook = async (req, res) => {
       message: `You received KES ${grossAmount.toLocaleString()} via NCBA Virtual Account. Ref: ${transactionReference}.`,
     }).catch((e) => logEvent('error', 'ncba_reconciliation_notification_failed', { transactionReference, error: e.message }));
 
-    // Non-blocking merchant SMS — sendSMS never throws (see utils/sms.js),
-    // fired-and-forgotten so a slow/down SMS provider can never delay this
-    // webhook's ack to NCBA. Same phrasing as the sibling Account-Level
-    // Notification webhook (controllers/ncbaAccountNotificationController.js)
-    // for a consistent tone across both NCBA-sourced payment paths.
+    // Non-blocking customer + merchant SMS — sendSMS never throws (see
+    // utils/sms.js), fired-and-forgotten so a slow/down SMS provider can
+    // never delay this webhook's ack to NCBA. This webhook's JSON payload
+    // carries no transaction-time field of its own — "now" is accurate
+    // here since NCBA's push arrives in near-real-time relative to the
+    // actual transaction. Account reference mirrors M-Pesa's own "for
+    // account X" convention: the full 12-digit virtual account number once
+    // NCBA_INSTITUTION_PREFIX is configured, else the bare 8-digit
+    // merchant code as a fallback.
+    const { date, time } = formatTransactionDateTime();
+    const accountRef = getNcbaVirtualAccountNumber(merchantCode) || merchantCode;
+
+    if (customerPhone) {
+      sendSMS(
+        customerPhone,
+        `${transactionReference} Confirmed. KES ${grossAmount.toLocaleString()} paid to ${merchant.businessName} for account ${accountRef} on ${date} at ${time}. Thank you for your payment.`
+      ).then((result) => {
+        if (!result.success) logEvent('error', 'ncba_reconciliation_customer_sms_failed', { transactionReference, error: result.error });
+      });
+    }
+
     if (merchant.phone) {
       sendSMS(
         merchant.phone,
-        `Payment received: KES ${grossAmount.toLocaleString()} via NCBA. Ref: ${transactionReference}. New balance: KES ${ledgerResult.merchant.kesBalance.toLocaleString()}.`
+        `${transactionReference} Payment Received. KES ${grossAmount.toLocaleString()} received via NCBA on ${date} at ${time}. New balance: KES ${ledgerResult.merchant.kesBalance.toLocaleString()}.`
       ).then((result) => {
-        if (!result.success) {
-          logEvent('error', 'ncba_reconciliation_sms_failed', { transactionReference, merchantId: merchant._id.toString(), error: result.error });
-        }
+        if (!result.success) logEvent('error', 'ncba_reconciliation_sms_failed', { transactionReference, merchantId: merchant._id.toString(), error: result.error });
       });
     }
 
