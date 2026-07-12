@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, Modal, FlatList, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, Modal, FlatList, Image, Linking } from 'react-native';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
@@ -40,6 +40,7 @@ export default function Login({ route }: any) {
   const [businessType, setBusinessType] = useState('');
   const [area, setArea] = useState('');
   const [employees, setEmployees] = useState('');
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   
   // Modals for Selection
   const [showCountyModal, setShowCountyModal] = useState(false);
@@ -265,6 +266,7 @@ export default function Login({ route }: any) {
             setIsSignupPasswordStep(false);
             setNewPasswordInput('');
             setConfirmPassword('');
+            setAgreedToTerms(false);
             setErr('');
           }}
           className={`flex-1 py-3 px-2 rounded-xl items-center justify-center ${
@@ -544,7 +546,24 @@ export default function Login({ route }: any) {
                       <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} className="p-2"><Feather name={showConfirmPassword ? "eye-off" : "eye"} size={20} color="#9ca3af" /></TouchableOpacity>
                     </View>
                  </View>
-                 <TouchableOpacity onPress={handleSignupCreateAccount} disabled={loading} className="w-full bg-[#06201b] py-4 rounded-2xl flex-row justify-center items-center">
+
+                 <TouchableOpacity onPress={() => setAgreedToTerms(!agreedToTerms)} activeOpacity={0.7} className="flex-row items-start mb-6">
+                   <View className="mr-3 mt-0.5">
+                     <Feather name={agreedToTerms ? "check-square" : "square"} size={20} color={agreedToTerms ? "#047857" : "#9ca3af"} />
+                   </View>
+                   <Text className="flex-1 text-[12px] font-jakarta-medium text-[#707971] leading-[18px]">
+                     I confirm that I have read and agree to PayChain's{' '}
+                     <Text className="text-[#047857] font-jakarta-bold" onPress={() => Linking.openURL('https://www.paychain.co.ke/privacy-policy')}>
+                       Privacy Policy
+                     </Text>
+                     {' '}and{' '}
+                     <Text className="text-[#047857] font-jakarta-bold" onPress={() => Linking.openURL('https://www.paychain.co.ke/terms-of-service')}>
+                       Terms of Service
+                     </Text>.
+                   </Text>
+                 </TouchableOpacity>
+
+                 <TouchableOpacity onPress={handleSignupCreateAccount} disabled={loading || !agreedToTerms} className="w-full bg-[#06201b] py-4 rounded-2xl flex-row justify-center items-center">
                     {loading ? <ActivityIndicator color="white" /> : <Text className="text-white font-jakarta-bold text-[16px]">Create Account</Text>}
                  </TouchableOpacity>
               </View>
