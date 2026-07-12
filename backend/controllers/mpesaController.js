@@ -508,8 +508,14 @@ export const stkCallback = async (req, res) => {
 
           const merchant = link.merchantId;
           if (merchant) {
-            merchant.kesBalance = (merchant.kesBalance || 0) + stkReq.amount;
-            await merchant.save();
+            // Atomic $inc (not merchant.save()) — also hands back the real
+            // post-credit balance for the SMS below, same reasoning as
+            // confirmationURL above.
+            const updatedMerchant = await Merchant.findByIdAndUpdate(
+              merchant._id,
+              { $inc: { kesBalance: stkReq.amount } },
+              { returnDocument: 'after' }
+            );
 
             await Transaction.create({
               merchantId: merchant._id,
@@ -547,6 +553,23 @@ export const stkCallback = async (req, res) => {
                 payerPhone: stkReq.phone,
               }).catch((e) => console.error('❌ Failed to send invoice-paid receipt email:', e.message));
             }
+
+            // Customer receipt + merchant alert, same pattern as the C2B
+            // confirmationURL above — never blocks, never throws.
+            const payerLabel = link.invoiceId ? 'invoice' : 'payment link';
+            const customerSms = stkReq.phone
+              ? sendSMS(
+                  stkReq.phone,
+                  `Confirmed. KES ${stkReq.amount.toLocaleString()} paid to ${merchant.businessName} via M-PESA. Ref: ${receipt}. Thank you for your payment.`
+                ).then((r) => { if (!r.success) console.error(`STK ${payerLabel} customer SMS failed for ${receipt}:`, r.error); })
+              : Promise.resolve();
+            const merchantSms = merchant.phone
+              ? sendSMS(
+                  merchant.phone,
+                  `Payment Received. KES ${stkReq.amount.toLocaleString()} received via M-PESA (${link.invoiceId ? 'Invoice' : 'Payment Link'}). Ref: ${receipt}. Your updated PayChain available balance is KES ${(updatedMerchant.kesBalance || 0).toLocaleString()}.`
+                ).then((r) => { if (!r.success) console.error(`STK ${payerLabel} merchant SMS failed for ${receipt}:`, r.error); })
+              : Promise.resolve();
+            await Promise.all([customerSms, merchantSms]);
           }
         }
       } else {
@@ -554,8 +577,11 @@ export const stkCallback = async (req, res) => {
         // (For STK top up, we skip inflation shield since they are funding their local wallet intentionally)
         const merchant = await Merchant.findById(stkReq.merchantId);
         if (merchant) {
-          merchant.kesBalance = (merchant.kesBalance || 0) + stkReq.amount;
-          await merchant.save();
+          const updatedMerchant = await Merchant.findByIdAndUpdate(
+            merchant._id,
+            { $inc: { kesBalance: stkReq.amount } },
+            { returnDocument: 'after' }
+          );
 
           await Transaction.create({
             merchantId: merchant._id,
@@ -576,6 +602,15 @@ export const stkCallback = async (req, res) => {
             title: 'Wallet topped up',
             message: `KES ${stkReq.amount.toLocaleString()} was added to your balance via M-PESA.`,
           });
+
+          // Self-funded top-up — one SMS to the merchant's own registered
+          // number is enough (no separate "customer" in this flow).
+          if (merchant.phone) {
+            sendSMS(
+              merchant.phone,
+              `Confirmed. KES ${stkReq.amount.toLocaleString()} added to your PayChain wallet via M-PESA. Ref: ${receipt}. Your updated available balance is KES ${(updatedMerchant.kesBalance || 0).toLocaleString()}.`
+            ).then((r) => { if (!r.success) console.error(`Wallet top-up SMS failed for merchant ${merchant._id}:`, r.error); });
+          }
         }
       }
     } else {
@@ -709,13 +744,26 @@ export const b2cCallback = async (req, res) => {
 
     // Update the ledger entry this callback confirms (single B2C transfer or a bulk-pay row)
     const transaction = await Transaction.findOne({ reference });
+    // Bulk-pay rows get ONE summary SMS when the whole batch resolves
+    // (below), not one per row — texting the merchant once per supplier in
+    // a multi-payee batch would be spam. Single B2C withdrawals get an
+    // immediate SMS since there's no batch to summarize.
+    const isBulkPayRow = transaction?.type === 'bulk_pay';
+
     if (transaction && transaction.status === 'pending') {
       transaction.status = succeeded ? 'completed' : 'failed';
       await transaction.save();
 
+      let merchantForSms = null;
       if (!succeeded) {
         // The payout never landed — return the funds to the merchant's balance
-        await Merchant.findByIdAndUpdate(transaction.merchantId, { $inc: { kesBalance: transaction.amount } });
+        merchantForSms = await Merchant.findByIdAndUpdate(
+          transaction.merchantId,
+          { $inc: { kesBalance: transaction.amount } },
+          { returnDocument: 'after' }
+        );
+      } else if (!isBulkPayRow) {
+        merchantForSms = await Merchant.findById(transaction.merchantId).select('phone');
       }
 
       createNotification({
@@ -726,6 +774,15 @@ export const b2cCallback = async (req, res) => {
           ? `KES ${transaction.amount.toLocaleString()} was successfully paid to ${transaction.recipient?.name || 'the recipient'}.`
           : `KES ${transaction.amount.toLocaleString()} payout to ${transaction.recipient?.name || 'the recipient'} failed and was refunded to your balance.`,
       });
+
+      if (!isBulkPayRow && merchantForSms?.phone) {
+        const message = succeeded
+          ? `Payout Sent. KES ${transaction.amount.toLocaleString()} paid to ${transaction.recipient?.name || 'the recipient'}. Ref: ${reference}.`
+          : `Payout Failed. KES ${transaction.amount.toLocaleString()} to ${transaction.recipient?.name || 'the recipient'} could not be completed and has been refunded. Your updated PayChain available balance is KES ${(merchantForSms.kesBalance || 0).toLocaleString()}.`;
+        sendSMS(merchantForSms.phone, message).then((r) => {
+          if (!r.success) console.error(`B2C payout SMS failed for merchant ${transaction.merchantId}:`, r.error);
+        });
+      }
     }
 
     // Update the matching row inside a bulk-pay batch, if this reference belongs to one
@@ -733,6 +790,7 @@ export const b2cCallback = async (req, res) => {
     if (batch) {
       const row = batch.transactions.find((t) => t.receiptNumber === reference);
       if (row && row.status === 'pending') {
+        const previousBatchStatus = batch.status;
         row.status = succeeded ? 'completed' : 'failed';
 
         const statuses = batch.transactions.map((t) => t.status);
@@ -741,6 +799,21 @@ export const b2cCallback = async (req, res) => {
         else if (statuses.some((s) => s === 'failed')) batch.status = 'Partial';
 
         await batch.save();
+
+        // Every row just settled (batch left 'Pending' for the first time)
+        // — send the one summary SMS for the whole batch here.
+        const justResolved = previousBatchStatus === 'Pending' && batch.status !== 'Pending';
+        if (justResolved) {
+          const merchant = await Merchant.findById(batch.merchantId).select('phone');
+          if (merchant?.phone) {
+            const succeededCount = statuses.filter((s) => s === 'completed').length;
+            const failedCount = statuses.filter((s) => s === 'failed').length;
+            const message = `Bulk Payout ${batch.status}. ${succeededCount} of ${batch.transactions.length} payout(s) completed (KES ${batch.totalNetAmount.toLocaleString()} total)${failedCount > 0 ? `; ${failedCount} failed and refunded` : ''}. Batch Ref: ${batch.batchReference}.`;
+            sendSMS(merchant.phone, message).then((r) => {
+              if (!r.success) console.error(`Bulk payout batch SMS failed for merchant ${batch.merchantId}:`, r.error);
+            });
+          }
+        }
       }
     }
   } catch (error) {

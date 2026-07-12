@@ -1,5 +1,6 @@
 import Merchant from '../models/Merchant.js';
 import { createNotification } from './notificationController.js';
+import { sendSMS } from '../utils/sms.js';
 import {
   validateMerchantCode,
   validateCollectionAmount,
@@ -98,6 +99,22 @@ export const handleNcbaReconciliationWebhook = async (req, res) => {
       title: 'Payment received',
       message: `You received KES ${grossAmount.toLocaleString()} via NCBA Virtual Account. Ref: ${transactionReference}.`,
     }).catch((e) => logEvent('error', 'ncba_reconciliation_notification_failed', { transactionReference, error: e.message }));
+
+    // Non-blocking merchant SMS — sendSMS never throws (see utils/sms.js),
+    // fired-and-forgotten so a slow/down SMS provider can never delay this
+    // webhook's ack to NCBA. Same phrasing as the sibling Account-Level
+    // Notification webhook (controllers/ncbaAccountNotificationController.js)
+    // for a consistent tone across both NCBA-sourced payment paths.
+    if (merchant.phone) {
+      sendSMS(
+        merchant.phone,
+        `Payment received: KES ${grossAmount.toLocaleString()} via NCBA. Ref: ${transactionReference}. New balance: KES ${ledgerResult.merchant.kesBalance.toLocaleString()}.`
+      ).then((result) => {
+        if (!result.success) {
+          logEvent('error', 'ncba_reconciliation_sms_failed', { transactionReference, merchantId: merchant._id.toString(), error: result.error });
+        }
+      });
+    }
 
     return accept(res, transactionReference);
   } catch (err) {
