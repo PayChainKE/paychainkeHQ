@@ -5,6 +5,9 @@
 // means there's exactly one place to change if the provider or its config
 // ever changes.
 
+// Memoized for the process lifetime — safe because Render restarts the
+// entire process on every env var change/redeploy, so this can never keep
+// serving a stale AT_API_KEY/AT_USERNAME pair across a live credential swap.
 let smsClient = null;
 
 // Lazily initialize on first use rather than at import time — importing
@@ -51,10 +54,39 @@ export function toE164Kenyan(rawPhone) {
  * failure interrupt a core flow (OTP dispatch, transaction alerts) are
  * expected to wrap this in their own try/catch — see utils/sms.js.
  */
+// Live-gate parity with controllers/mpesaController.js's MPESA_LIVE_ENABLED
+// convention: going live is never inferred from a single env var alone.
+// AT_USERNAME being a real (non-'sandbox') username is necessary but not
+// sufficient — AT_LIVE_ENABLED must also be explicitly 'true' before a real,
+// billed SMS is allowed to hit Africa's Talking's live gateway.
+function isAtLiveGateOpen() {
+  return process.env.AT_USERNAME !== 'sandbox' && process.env.AT_LIVE_ENABLED === 'true';
+}
+
 export async function sendAfricasTalkingSms(rawPhone, message) {
   const to = toE164Kenyan(rawPhone);
   if (!to) {
     throw new Error(`Cannot dispatch SMS — "${rawPhone}" is not a valid Kenyan mobile number`);
+  }
+
+  const username = process.env.AT_USERNAME;
+
+  // Real/live credentials are configured (AT_USERNAME isn't AT's own
+  // 'sandbox' account) but nobody has deliberately flipped AT_LIVE_ENABLED —
+  // refuse to let that single env var alone put a real, billed SMS on the
+  // wire. Intercept and simulate instead: log a loud warning, print the
+  // exact compiled message body to the console, and hand back an
+  // AT-shaped response so any caller inspecting the result doesn't break.
+  if (username !== 'sandbox' && !isAtLiveGateOpen()) {
+    console.warn('⚠️ AT Live Bypass: SMS routed to console simulation due to missing AT_LIVE_ENABLED flag');
+    console.log(`[AT SIMULATION] To: ${to} | Message (${message.length} chars): ${message}`);
+
+    return {
+      SMSMessageData: {
+        Message: 'Simulated — AT_LIVE_ENABLED is not set to true',
+        Recipients: [{ number: to, status: 'Simulated', statusCode: 0, cost: 'KES 0.0000', messageId: null }],
+      },
+    };
   }
 
   const sms = await getSmsClient();
@@ -63,7 +95,7 @@ export async function sendAfricasTalkingSms(rawPhone, message) {
 
   // Sandbox accounts can't send from a custom alphanumeric sender ID/short
   // code — only attach one for real, non-sandbox AT accounts.
-  if (process.env.AT_USERNAME !== 'sandbox' && process.env.AT_SENDER_ID) {
+  if (username !== 'sandbox' && process.env.AT_SENDER_ID) {
     options.from = process.env.AT_SENDER_ID;
   }
 

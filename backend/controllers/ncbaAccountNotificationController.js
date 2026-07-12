@@ -1,6 +1,7 @@
 import Merchant from '../models/Merchant.js';
 import { createNotification } from './notificationController.js';
-import { sendSMS } from '../utils/sms.js';
+import { safeSendSMS, buildStrictSms } from '../utils/smsSanitizer.js';
+import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { parseSoapXmlSafely, findFirstTagValue, XmlSecurityError } from '../utils/xmlSecurity.js';
 import {
   extractMerchantCode,
@@ -14,6 +15,7 @@ import { timingSafeStringEqual } from '../utils/timingSafeCompare.js';
 import { buildNcbaOkResult, buildNcbaFailResult } from '../utils/ncbaSoapResponses.js';
 import { creditNcbaCollection, DuplicateCollectionError } from '../services/ncbaLedgerService.js';
 import { NcbaTariffBoundsError } from '../config/ncbaTariffCard.js';
+import { getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
 
 const respondOk = (res, detail) => res.status(200).type('application/xml').send(buildNcbaOkResult(detail));
 const respondFail = (res, detail) => res.status(200).type('application/xml').send(buildNcbaFailResult(detail));
@@ -181,15 +183,42 @@ export const handleNcbaAccountNotification = async (req, res) => {
       message: `You received KES ${transAmount.toLocaleString()} via NCBA. Ref: ${transId}.`,
     }).catch((e) => logEvent('error', 'ncba_account_notification_notification_failed', { transId, error: e.message }));
 
-    // Non-blocking SMS alert — sendSMS never throws (see utils/sms.js), but
-    // this is still fired-and-forgotten rather than awaited so a slow or
-    // down SMS provider can never delay the bank's ACK or hold the request
-    // open; a delivery failure here only ever produces a log line.
+    // Non-blocking customer + merchant SMS — sendSMS never throws (see
+    // utils/sms.js), fired-and-forgotten so a slow or down SMS provider can
+    // never delay the bank's ACK or hold the request open; a delivery
+    // failure here only ever produces a log line. rawTransTime is NCBA's
+    // own authoritative transaction timestamp (YYMMDDhhmm) — same
+    // convention as the M-Pesa messages, which use Safaricom's TransTime
+    // rather than the server's receive time.
+    const { date, time } = formatTransactionDateTime(rawTransTime);
+    const accountRef = getNcbaVirtualAccountNumber(merchantCode) || merchantCode;
+
+    // rawPhoneNr is best-effort per NCBA's own guide (may be blank, or
+    // occupied with something other than a phone number) — sendSMS/
+    // toE164Kenyan fail closed and silently on anything not phone-shaped,
+    // so attempting this is safe even when the field is unreliable.
+    if (rawPhoneNr) {
+      // businessName is the only unbounded field here.
+      safeSendSMS({
+        to: rawPhoneNr,
+        message: buildStrictSms(
+          ({ ref, amt, name, acct, date, time }) =>
+            `${ref} Confirmed. KES ${amt} paid to ${name} for account ${acct} on ${date} at ${time}. Thank you for your payment.`,
+          {
+            fixed: { ref: transId, amt: transAmount.toLocaleString(), acct: accountRef, date, time },
+            truncatable: [{ key: 'name', value: merchant.businessName, minLength: 10 }],
+          }
+        ).message,
+      }).then((result) => {
+        if (!result.success) logEvent('error', 'ncba_account_notification_customer_sms_failed', { transId, error: result.error });
+      });
+    }
+
     if (merchant.phone) {
-      sendSMS(
-        merchant.phone,
-        `Payment received: KES ${transAmount.toLocaleString()} via NCBA. Ref: ${transId}. New balance: KES ${ledgerResult.merchant.kesBalance.toLocaleString()}.`
-      ).then((result) => {
+      safeSendSMS({
+        to: merchant.phone,
+        message: `${transId} Payment Received. KES ${transAmount.toLocaleString()} received via NCBA on ${date} at ${time}. New balance: KES ${ledgerResult.merchant.kesBalance.toLocaleString()}.`,
+      }).then((result) => {
         if (!result.success) {
           logEvent('error', 'ncba_account_notification_sms_failed', { transId, merchantId: merchant._id.toString(), error: result.error });
         }
