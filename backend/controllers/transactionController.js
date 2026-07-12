@@ -4,6 +4,7 @@ import PaymentLink from '../models/PaymentLink.js';
 import crypto from 'crypto';
 import axios from 'axios';
 import STKRequest from '../models/STKRequest.js';
+import { isLive, mpesaBaseUrl, shortCode, passkey, callbackBase, stkCallback } from './mpesaController.js';
 import { settleInflationShield, provisionMerchantWallet, getWalletBalance, swapUsdcToKesOnChain } from '../utils/stellarHelper.js';
 import { encryptKey } from '../utils/cryptoHelper.js';
 import { getLiveKesToUsdcRate } from '../utils/rateEngine.js';
@@ -505,15 +506,74 @@ export const processPaymentLink = async (req, res) => {
   try {
     const { linkId } = req.params;
     const { phone } = req.body;
-    const token = req.mpesaToken; // From generateToken middleware
-    
+
     const link = await PaymentLink.findOne({ linkId }).populate('merchantId');
     if (!link || link.status !== 'active') {
       return res.status(400).json({ error: 'Payment link is invalid or expired.' });
     }
 
-    const stkShortCode = '174379'; 
-    const passkey = process.env.MPESA_PASSKEY;
+    let formattedPhone = String(phone || '').trim();
+    if (formattedPhone.startsWith('0')) formattedPhone = '254' + formattedPhone.slice(1);
+    if (formattedPhone.startsWith('+')) formattedPhone = formattedPhone.slice(1);
+
+    // ── SANDBOX MODE: local simulation, no real Safaricom call ──────────────
+    // Mirrors mpesaController.js#initiateSTKPush's sandbox branch — no live
+    // money at risk, and no dependency on Safaricom's sandbox-specific
+    // shortcode/passkey pairing (which differ from this deploy's real
+    // MPESA_SHORTCODE/MPESA_PASSKEY, reserved for live use only). The
+    // simulated confirmation is fed through the real stkCallback handler
+    // (by linkId) so it exercises the exact same completion logic — link/
+    // invoice status, ledger credit, notifications, SMS — as a real payment
+    // would, rather than a second hand-maintained copy of that logic.
+    if (!isLive) {
+      const checkoutRequestId = `SANDBOX-LINK-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+      console.log(`🧪 [SANDBOX] Simulating Payment Link STK Push for ${formattedPhone} KES ${link.amount} | Link: ${linkId}`);
+
+      await STKRequest.create({
+        merchantId: link.merchantId._id,
+        checkoutRequestId,
+        linkId: link.linkId,
+        amount: link.amount,
+        phone: formattedPhone,
+        status: 'pending',
+      });
+
+      setTimeout(() => {
+        const fakeReq = {
+          body: {
+            Body: {
+              stkCallback: {
+                CheckoutRequestID: checkoutRequestId,
+                ResultCode: 0,
+                ResultDesc: 'Sandbox simulation — no real money moved',
+                CallbackMetadata: { Item: [{ Name: 'MpesaReceiptNumber', Value: `SBXLINK-${checkoutRequestId.slice(-8)}` }] },
+              },
+            },
+          },
+        };
+        const fakeRes = { status: () => ({ json: () => {} }) };
+        stkCallback(fakeReq, fakeRes).catch((e) => console.error('❌ [SANDBOX] Payment link auto-confirm error:', e.message));
+      }, 4000);
+
+      return res.status(200).json({
+        success: true,
+        checkoutRequestId,
+        message: '[Sandbox] STK simulated — funds will confirm in ~4 seconds. No real money moved.',
+      });
+    }
+
+    // ── LIVE MODE ─────────────────────────────────────────────────────────
+    if (process.env.MPESA_LIVE_ENABLED !== 'true') {
+      return res.status(503).json({ error: 'Live M-PESA payments are not enabled. Set MPESA_LIVE_ENABLED=true to activate.' });
+    }
+    if (!shortCode || !passkey) {
+      return res.status(500).json({ error: 'STK Push not fully configured (MPESA_SHORTCODE / MPESA_PASSKEY missing).' });
+    }
+    if (!callbackBase) {
+      return res.status(500).json({ error: 'MPESA_CALLBACK_URL is not set.' });
+    }
+
+    const token = req.mpesaToken; // From generateToken middleware — same mpesaBaseUrl this call targets
 
     const date = new Date();
     const timestamp = date.getFullYear() +
@@ -523,31 +583,23 @@ export const processPaymentLink = async (req, res) => {
       ('0' + date.getMinutes()).slice(-2) +
       ('0' + date.getSeconds()).slice(-2);
 
-    const password = Buffer.from(`${stkShortCode}${passkey}${timestamp}`).toString('base64');
-    
-    let formattedPhone = phone.trim();
-    if (formattedPhone.startsWith('0')) formattedPhone = '254' + formattedPhone.slice(1);
-    if (formattedPhone.startsWith('+')) formattedPhone = formattedPhone.slice(1);
-
-    const url = process.env.NODE_ENV === 'production'
-      ? 'https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest'
-      : 'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest';
+    const password = Buffer.from(`${shortCode}${passkey}${timestamp}`).toString('base64');
 
     const data = {
-      BusinessShortCode: stkShortCode,
+      BusinessShortCode: shortCode,
       Password: password,
       Timestamp: timestamp,
       TransactionType: 'CustomerPayBillOnline',
       Amount: link.amount,
       PartyA: formattedPhone,
-      PartyB: stkShortCode,
+      PartyB: shortCode,
       PhoneNumber: formattedPhone,
-      CallBackURL: 'https://shiny-horses-write.loca.lt/api/callbacks/stk-callback', 
+      CallBackURL: `${callbackBase}/api/callbacks/stk-callback`,
       AccountReference: `Link ${linkId}`,
       TransactionDesc: 'Payment Link Settlement'
     };
 
-    const response = await axios.post(url, data, {
+    const response = await axios.post(`${mpesaBaseUrl}/mpesa/stkpush/v1/processrequest`, data, {
       headers: { Authorization: `Bearer ${token}` }
     });
 

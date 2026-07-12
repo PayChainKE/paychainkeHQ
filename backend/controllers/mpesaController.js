@@ -17,8 +17,15 @@ import { createNotification } from './notificationController.js';
 // Never derive this from NODE_ENV: hosting platforms set NODE_ENV='production'
 // even for staging deployments, which would accidentally hit the live API.
 const mpesaEnv      = (process.env.MPESA_ENVIRONMENT || 'sandbox').toLowerCase();
-const isLive        = mpesaEnv === 'live';
-const mpesaBaseUrl  = isLive
+// Exported so every M-PESA-calling code path in the app (not just this
+// file) derives live/sandbox and the target Daraja host from the same
+// single source of truth — a second, independently-computed copy of this
+// logic elsewhere (e.g. keyed off NODE_ENV instead) is exactly how a
+// token/endpoint mismatch bug happens: generateToken below fetches an
+// OAuth token scoped to one Daraja host, and a caller using a different
+// host for the actual API call gets rejected.
+export const isLive        = mpesaEnv === 'live';
+export const mpesaBaseUrl  = isLive
   ? 'https://api.safaricom.co.ke'
   : 'https://sandbox.safaricom.co.ke';
 
@@ -30,11 +37,11 @@ if (isLive) {
 
 const consumerKey     = process.env.MPESA_CONSUMER_KEY;
 const consumerSecret  = process.env.MPESA_CONSUMER_SECRET;
-const shortCode       = process.env.MPESA_SHORTCODE;
-const passkey         = process.env.MPESA_PASSKEY;
+export const shortCode = process.env.MPESA_SHORTCODE;
+export const passkey   = process.env.MPESA_PASSKEY;
 // Public URL Safaricom will POST callbacks to.
 // Must be HTTPS and reachable by Safaricom servers.
-const callbackBase    = (process.env.MPESA_CALLBACK_URL || '').replace(/\/$/, '');
+export const callbackBase = (process.env.MPESA_CALLBACK_URL || '').replace(/\/$/, '');
 
 // Safaricom's C2B TransTime arrives as YYYYMMDDhhmmss — this is the
 // authoritative transaction timestamp (matches what M-Pesa's own SMS shows),
