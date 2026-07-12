@@ -15,6 +15,7 @@
   "dependencies": {
     "@simplewebauthn/server": "^13.3.2",
     "@stellar/stellar-sdk": "^16.0.1",
+    "africastalking": "^0.7.9",
     "axios": "^1.18.1",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^1.41.3",

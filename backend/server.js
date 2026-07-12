@@ -17,6 +17,7 @@ import notificationRoutes from './routes/notificationRoutes.js';
 import invoiceRoutes from './routes/invoiceRoutes.js';
 import cashAdvanceRoutes from './routes/cashAdvanceRoutes.js';
 import ncbaRoutes from './routes/ncbaRoutes.js';
+import merchantSmsAuthRoutes from './routes/merchantSmsAuthRoutes.js';
 import { ensurePrimaryOwner } from './migrations/ensurePrimaryOwner.js';
 import { backfillTransactionFees } from './migrations/backfillTransactionFees.js';
 import { backfillNcbaMerchantCodes } from './migrations/backfillNcbaMerchantCodes.js';
@@ -112,6 +113,9 @@ app.get('/api/health', (req, res) => {
 // All data routes require an active Mongo connection.
 app.use('/api', requireDb);
 app.use('/api/auth', authRoutes);
+// New, additive SMS 2FA — independent of the email-OTP flow mounted above
+// under /api/auth (routes/authRoutes.js). See routes/merchantSmsAuthRoutes.js.
+app.use('/api/auth/merchant/sms', merchantSmsAuthRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/waitlist', waitlistRoutes);
 app.use('/api/newsletter', newsletterRoutes);
