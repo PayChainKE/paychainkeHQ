@@ -28,7 +28,7 @@ export default function MyAccountsTab() {
         <View className="mb-6">
           <Text className="font-jakarta-extrabold text-[28px] text-[#00351d] tracking-tight leading-tight mb-2">My Accounts</Text>
           <Text className="text-[#707971] text-[14px] font-jakarta-medium leading-relaxed opacity-80">
-            Manage your registered PayChain Virtual Accounts, linked transfer accounts, and assigned managers.
+            Manage your registered PayChain accounts, linked transfer accounts, and assigned managers.
           </Text>
         </View>
 

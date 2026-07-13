@@ -428,7 +428,7 @@ export default function Collections() {
       <div class="value">${businessName}</div>
     </div>
     <div class="item">
-      <div class="label">Virtual Account</div>
+      <div class="label">PayChain Account No.</div>
       <div class="value">${virtualAccountNumber}</div>
     </div>
     <div class="item">

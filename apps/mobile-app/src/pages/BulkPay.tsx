@@ -1628,7 +1628,7 @@ export default function BulkPay() {
                   </View>
                   <View>
                     <Text className="font-jakarta-bold text-[14px] text-[#0c2010]">{fundingSourceLabel}</Text>
-                    <Text className="text-[#707971] font-jakarta-medium text-[11px] mt-0.5">Virtual Account No: {fundingSourceNumber}</Text>
+                    <Text className="text-[#707971] font-jakarta-medium text-[11px] mt-0.5">PayChain Account No: {fundingSourceNumber}</Text>
                   </View>
                 </View>
               </View>

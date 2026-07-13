@@ -1467,7 +1467,7 @@ export default function BulkPay() {
                             </div>
                             <div>
                               <h5 className="font-bold text-sm text-primary leading-tight">{account.name}</h5>
-                              <p className="text-[10px] text-on-surface-variant font-medium mt-1 opacity-60">Virtual Account No: {account.number}</p>
+                              <p className="text-[10px] text-on-surface-variant font-medium mt-1 opacity-60">PayChain Account No: {account.number}</p>
                             </div>
                           </div>
                         </div>

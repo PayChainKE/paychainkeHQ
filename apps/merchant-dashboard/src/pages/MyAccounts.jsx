@@ -27,7 +27,7 @@ export default function MyAccounts() {
         <div className="mb-6 lg:mb-10">
           <h2 className="font-headline font-bold text-3xl lg:text-4xl text-primary tracking-tight leading-tight">My Accounts</h2>
           <p className="text-on-surface-variant text-[11px] lg:text-sm font-medium mt-1.5 opacity-80 leading-relaxed">
-            Manage your registered PayChain Virtual Accounts, linked transfer accounts, and assigned managers.
+            Manage your registered PayChain accounts, linked transfer accounts, and assigned managers.
           </p>
         </div>
 
