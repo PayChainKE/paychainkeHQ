@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 interface TruthPingProps {
   isVerified: boolean;
   amount?: number;
-  tillNumber?: string;
+  virtualAccountNumber?: string;
   timestamp?: string;
   onAnimate?: () => void;
 }
@@ -13,7 +13,7 @@ interface TruthPingProps {
 const TruthPing: React.FC<TruthPingProps> = ({
   isVerified,
   amount = 1500,
-  tillNumber = "123456",
+  virtualAccountNumber = "123456",
   timestamp,
 }) => {
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);

@@ -359,7 +359,7 @@ export default function Collections() {
       .join('');
 
     const businessName = esc(merchant?.businessName || 'Merchant');
-    const tillNumber = esc(merchant?.paybillAccount || '—');
+    const virtualAccountNumber = esc(merchant?.paybillAccount || '—');
 
     return `<!doctype html>
 <html>
@@ -428,8 +428,8 @@ export default function Collections() {
       <div class="value">${businessName}</div>
     </div>
     <div class="item">
-      <div class="label">Till / Paybill</div>
-      <div class="value">${tillNumber}</div>
+      <div class="label">Virtual Account</div>
+      <div class="value">${virtualAccountNumber}</div>
     </div>
     <div class="item">
       <div class="label">Period</div>
@@ -660,7 +660,7 @@ export default function Collections() {
 
   return (
     <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
-      <TopBar title="Collections" subtitle={`Till ${merchant?.paybillAccount || 'PENDING'}`} showBack={false} />
+      <TopBar title="Collections" subtitle={`Account ${merchant?.paybillAccount || 'PENDING'}`} showBack={false} />
 
       <ScrollView
         className="flex-1 z-10 mt-6"

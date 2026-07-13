@@ -98,7 +98,13 @@ export function MerchantAuthProvider({ children }) {
         axios.defaults.headers.common['Authorization'] = `Bearer ${jwt}`;
       }
       
-      return { success: true, email: res.data.email, mfaRequired: res.data.mfaRequired };
+      return {
+        success: true,
+        email: res.data.email,
+        mfaRequired: res.data.mfaRequired,
+        channel: res.data.channel,
+        maskedPhone: res.data.maskedPhone,
+      };
     } catch (err) {
       return { success: false, error: err.response?.data?.error || 'Login failed' };
     }
@@ -125,7 +131,12 @@ export function MerchantAuthProvider({ children }) {
   async function resendOTP(email) {
     try {
       const res = await axios.post(`${API_URL}/api/auth/merchant/resend-otp`, { email });
-      return { success: true, message: res.data.message };
+      return {
+        success: true,
+        message: res.data.message,
+        channel: res.data.channel,
+        maskedPhone: res.data.maskedPhone,
+      };
     } catch (err) {
       return { success: false, error: err.response?.data?.error || 'Failed to resend OTP' };
     }

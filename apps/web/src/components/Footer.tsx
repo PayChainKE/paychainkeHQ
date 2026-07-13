@@ -46,7 +46,7 @@ const Footer: React.FC = () => {
           <div className="lg:col-span-3">
             <h4 className="text-white font-bold text-xs mb-4 uppercase tracking-widest">Solutions</h4>
             <ul className="space-y-2 text-sm">
-              <li><Link to="/products/hybrid-smart-till" className="hover:text-emerald-400 transition-colors">Smart Till</Link></li>
+              <li><Link to="/products/virtual-account" className="hover:text-emerald-400 transition-colors">Virtual Account</Link></li>
               <li><Link to="/products/inflation-shield" className="hover:text-emerald-400 transition-colors">Inflation Shield</Link></li>
               <li><Link to="/products/bulk-pay" className="hover:text-emerald-400 transition-colors">Bulk Payments</Link></li>
               <li><Link to="/products/cash-advance" className="hover:text-emerald-400 transition-colors">Cash Advance</Link></li>

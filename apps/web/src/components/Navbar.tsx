@@ -53,7 +53,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
       icon: ShoppingCart,
       hasDropdown: true,
         dropdownItems: [
-        { path: '/products/hybrid-smart-till', label: 'The Hybrid Smart Till', emoji: '🧾', description: 'Portable POS and offline-first till' },
+        { path: '/products/virtual-account', label: 'PayChain Virtual Account', emoji: '🧾', description: 'A dedicated, verified account for every payment you collect' },
         { path: '/products/inflation-shield', label: 'The Inflation Shield', emoji: '🛡️', description: 'Stablecoin vaults and auto-swap' },
         { path: '/products/bulk-pay', label: 'Paychain Bulk Pay', emoji: '📤', description: 'Batch payroll and mass payouts' },
         { path: '/products/cash-advance', label: 'Cash Advance', emoji: '💸', description: 'Working capital and short-term advances' },

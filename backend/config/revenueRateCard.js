@@ -62,10 +62,11 @@ export const REVENUE_STREAMS = [
   {
     id: 'transaction_fee',
     label: 'Transaction Fee',
-    description: 'PayChain charges 0.50% on every inbound paybill receipt — applied on top of the standard Safaricom tariff.',
+    description: 'Tiered PayChain fee on every inbound M-Pesa receipt (C2B paybill + STK Push) — applied on top of the standard Safaricom tariff. No single rate; see utils/pricingEngine.js.',
     icon: 'point_of_sale',
     accent: 'emerald',
-    rate: PAYCHAIN_TXN_RATE,
+    tiered: true,
+    rate: null,
     minFee: 0,
     txTypes: ['inbound'],
     statuses: ['completed', 'verified'],

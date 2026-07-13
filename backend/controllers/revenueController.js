@@ -1,6 +1,7 @@
 import Transaction from '../models/Transaction.js';
 import { REVENUE_STREAMS, SAFARICOM_TARIFF } from '../config/revenueRateCard.js';
 import { ncbaMarkupMongoExpr } from '../config/ncbaTariffCard.js';
+import { mpesaMerchantFeeMongoExpr } from '../utils/pricingEngine.js';
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 const RANGES = ['24h', '7d', '30d', '90d', 'ytd', 'all'];
@@ -73,6 +74,9 @@ const KES_BASIS = {
 function feeExpr(stream, basisExpr = KES_BASIS) {
   if (stream.id === 'ncba_collection_fee') {
     return ncbaMarkupMongoExpr(basisExpr);
+  }
+  if (stream.id === 'transaction_fee') {
+    return mpesaMerchantFeeMongoExpr(basisExpr);
   }
   return {
     $max: [

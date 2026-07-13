@@ -9,12 +9,12 @@ import { ValidatedTextInput } from '../components/ValidatedTextInput';
 import api from '../api/config';
 import TopBar from '../components/layout/TopBar';
 
-import MyTillsTab from '../components/tabs/MyTillsTab';
+import MyAccountsTab from '../components/tabs/MyAccountsTab';
 import SupportTab from '../components/tabs/SupportTab';
 import SettingsTab from '../components/tabs/SettingsTab';
 import SecurityTab from '../components/tabs/SecurityTab';
 
-type SectionKey = 'my-tills' | 'support' | 'settings' | 'security' | 'wallet' | 'payment-link' | 'statement' | 'business-profile';
+type SectionKey = 'my-accounts' | 'support' | 'settings' | 'security' | 'wallet' | 'payment-link' | 'statement' | 'business-profile';
 
 const MENU_ITEMS: Array<{
   key: SectionKey;
@@ -22,7 +22,7 @@ const MENU_ITEMS: Array<{
   icon: keyof typeof MaterialIcons.glyphMap;
   external?: boolean;
 }> = [
-  { key: 'my-tills', label: 'My Tills', icon: 'point-of-sale' },
+  { key: 'my-accounts', label: 'My Accounts', icon: 'point-of-sale' },
   { key: 'support', label: 'Help & Support', icon: 'help-outline' },
   { key: 'settings', label: 'Settings', icon: 'tune' },
   { key: 'security', label: 'Security', icon: 'security' },
@@ -317,7 +317,7 @@ function BusinessProfilePanel({ merchant }: { merchant: any }) {
           <ProfileRow label="Business Name" value={merchant?.businessName || 'N/A'} />
           <ProfileRow label="Email" value={merchant?.email || 'N/A'} />
           <ProfileRow label="Phone" value={merchant?.phone || 'N/A'} />
-          <ProfileRow label="Till / Paybill" value={merchant?.paybillAccount || 'Pending'} />
+          <ProfileRow label="Virtual Account / Paybill" value={merchant?.paybillAccount || 'Pending'} />
           <ProfileRow label="KRA PIN" value={merchant?.kraPin || 'Not set'} />
           <ProfileRow label="Business Reg Number" value={merchant?.businessNumber || 'Not set'} />
         </View>
@@ -339,7 +339,7 @@ function ProfileRow({ label, value }: { label: string; value: string }) {
 
 export default function Profile({ navigation }: any) {
   const { merchant, logout } = useAuth();
-  const [activeSection, setActiveSection] = useState<SectionKey>('my-tills');
+  const [activeSection, setActiveSection] = useState<SectionKey>('my-accounts');
 
   const digitalWalletEnabled = merchant?.features?.digitalWallet !== false;
   const visibleMenuItems = useMemo(
@@ -354,8 +354,8 @@ export default function Profile({ navigation }: any) {
 
   const renderContent = () => {
     switch (activeSection) {
-      case 'my-tills':
-        return <MyTillsTab />;
+      case 'my-accounts':
+        return <MyAccountsTab />;
       case 'support':
         return <SupportTab />;
       case 'settings':
@@ -369,7 +369,7 @@ export default function Profile({ navigation }: any) {
       case 'business-profile':
         return <BusinessProfilePanel merchant={merchant} />;
       default:
-        return <MyTillsTab />;
+        return <MyAccountsTab />;
     }
   };
 

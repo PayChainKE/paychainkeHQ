@@ -28,7 +28,7 @@ const navItems = [
       { name: 'Trust Score', icon: 'verified_user', path: '/trust-score' },
     ]
   },
-  { name: 'My Tills', icon: 'point_of_sale', path: '/tills' },
+  { name: 'My Accounts', icon: 'point_of_sale', path: '/accounts' },
 ]
 
 function NavItem({ item, depth = 0 }) {
@@ -170,7 +170,7 @@ export default function MerchantSidebar({ isOpen, onClose }) {
           </div>
           <div>
             <p className="text-white text-xs font-bold leading-tight truncate w-[130px]">{mockMerchant.businessName}</p>
-            <p className="text-[#a8b3a8] text-[9px] uppercase tracking-wider mt-0.5">TILL: {mockMerchant.tillNumber} • TRUST: {mockMerchant.trustScore.current}/100</p>
+            <p className="text-[#a8b3a8] text-[9px] uppercase tracking-wider mt-0.5">ACCOUNT: {mockMerchant.virtualAccountNumber} • TRUST: {mockMerchant.trustScore.current}/100</p>
           </div>
         </div>
 

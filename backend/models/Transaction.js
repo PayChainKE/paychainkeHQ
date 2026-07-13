@@ -9,7 +9,7 @@ const transactionSchema = new mongoose.Schema({
   },
   accountNumber: {
     type: String,
-    required: [true, 'Account number (till) is required'],
+    required: [true, 'Account number (virtual account) is required'],
   },
   type: {
     type: String,

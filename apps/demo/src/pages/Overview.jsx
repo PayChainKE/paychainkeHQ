@@ -71,9 +71,9 @@ export default function Overview() {
           </div>
           <div className="relative z-10 flex flex-col h-full">
             <div className="flex justify-between items-start mb-8 lg:mb-10">
-              <span className="bg-[#1F4D3C] text-[#5EFEB3] px-3 lg:px-4 py-1.5 rounded-full text-[8px] lg:text-[9px] font-black tracking-[0.15em] uppercase border border-white/10">Business Till Account</span>
+              <span className="bg-[#1F4D3C] text-[#5EFEB3] px-3 lg:px-4 py-1.5 rounded-full text-[8px] lg:text-[9px] font-black tracking-[0.15em] uppercase border border-white/10">PayChain Virtual Account</span>
               <div className="flex items-center gap-3 lg:gap-4 text-[8px] lg:text-[9px]">
-                <span className="text-white/40 uppercase font-bold tracking-[0.15em] hidden sm:inline">Till: {mockMerchant.tillNumber}</span>
+                <span className="text-white/40 uppercase font-bold tracking-[0.15em] hidden sm:inline">Account: {mockMerchant.virtualAccountNumber}</span>
                 <button
                   onClick={togglePrivacy}
                   className="text-white/40 hover:text-white transition-colors p-1"

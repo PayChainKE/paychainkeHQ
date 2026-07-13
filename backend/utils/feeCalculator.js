@@ -1,5 +1,6 @@
 import { REVENUE_STREAMS, safaricomFeeFor } from '../config/revenueRateCard.js';
 import { getNcbaTariffBand } from '../config/ncbaTariffCard.js';
+import { calculateMerchantFee } from './pricingEngine.js';
 
 // Build the type → stream map once at module load.
 const TYPE_TO_STREAM = (() => {
@@ -31,6 +32,23 @@ export function calculateFees(type, kesAmount) {
     return {
       paychainFee: markup,
       safaricomFee,
+      streamId: stream?.id || null,
+    };
+  }
+
+  // M-Pesa inbound collections (C2B paybill + STK Push) price off the
+  // tiered band matrix in utils/pricingEngine.js rather than a flat linear
+  // rate — this is the exact same number mpesaController.js deducts from
+  // the merchant before crediting their wallet, so the ledger and the real
+  // balance can never disagree. safaricomFee here is the Safaricom tariff
+  // the *customer* pays — a pass-through PayChain never collects, tracked
+  // for transparency only (unchanged from the generic path below).
+  if (type === 'inbound') {
+    const paychainFee = v > 0 ? calculateMerchantFee(v) : 0;
+    const safaricomFee = stream?.passthrough === 'safaricom' && v > 0 ? safaricomFeeFor(v) : 0;
+    return {
+      paychainFee: Math.round(paychainFee * 100) / 100,
+      safaricomFee: Math.round(safaricomFee * 100) / 100,
       streamId: stream?.id || null,
     };
   }

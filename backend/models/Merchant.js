@@ -233,6 +233,15 @@ const merchantSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  // Which channel the currently-pending `otp` was dispatched through — set
+  // whenever a fresh OTP is minted (login/resend) so "resend" can repeat the
+  // same channel the merchant originally received without the client having
+  // to track/re-send that context itself.
+  otpChannel: {
+    type: String,
+    enum: ['email', 'sms'],
+    default: 'email',
+  },
   lastLogin: {
     type: Date,
     default: null,

@@ -43,6 +43,7 @@ export default function Login() {
   const [signupEcommerce, setSignupEcommerce] = useState('yes')
   const [signupCounty, setSignupCounty] = useState('')
   const [countySearch, setCountySearch] = useState('')
+  const [agreedToTerms, setAgreedToTerms] = useState(false)
 
   // Reset Flow States
   const [isResetMode, setIsResetMode] = useState(false)
@@ -68,6 +69,8 @@ export default function Login() {
   const [isSignupPasswordStep, setIsSignupPasswordStep] = useState(false)
   const [otpFlowType, setOtpFlowType] = useState('') // 'login' or 'reset'
   const [authEmail, setAuthEmail] = useState('') // Captured from backend for OTP verification
+  const [otpChannel, setOtpChannel] = useState('email') // 'email' or 'sms' — which channel the current OTP went out on
+  const [otpMaskedPhone, setOtpMaskedPhone] = useState('')
   const [resendTimer, setResendTimer] = useState(59)
   const [hasAccount, setHasAccount] = useState(() => localStorage.getItem('hasAccount') === 'true')
   
@@ -103,6 +106,8 @@ export default function Login() {
         setOtpFlowType('login')
         setIsOTPMode(true)
         setResendTimer(59)
+        setOtpChannel(res.channel || 'email')
+        setOtpMaskedPhone(res.maskedPhone || '')
       } else {
         nav('/overview')
       }
@@ -238,9 +243,11 @@ export default function Login() {
     setLoading(false)
     if (res.success) {
       setResendTimer(59)
+      setOtpChannel(res.channel || otpChannel)
+      setOtpMaskedPhone(res.maskedPhone || otpMaskedPhone)
       addNotification({
         title: 'Code Sent',
-        message: 'A new security code has been dispatched.',
+        message: res.channel === 'sms' ? 'A new security code has been sent to your phone.' : 'A new security code has been dispatched.',
         type: 'success'
       })
     } else {
@@ -333,6 +340,7 @@ export default function Login() {
   function finishSignup() {
     setActiveTab('login')
     setPassword('')
+    setAgreedToTerms(false)
     addNotification({
       title: 'Account Created',
       message: 'Sign in with your new credentials to access your dashboard.',
@@ -402,6 +410,9 @@ export default function Login() {
                   setIsSignupPasswordStep(false)
                   setNewPasswordInput('')
                   setConfirmPassword('')
+                  setAgreedToTerms(false)
+                  setOtpChannel('email')
+                  setOtpMaskedPhone('')
                   setErr('')
                 }}
                 className={`flex-1 py-3 px-2 rounded-xl text-[10px] md:text-[11px] font-black uppercase tracking-widest transition-all ${
@@ -494,6 +505,38 @@ export default function Login() {
                       </div>
                     </div>
 
+                    <div className="flex items-start gap-3 pt-2">
+                      <input
+                        type="checkbox"
+                        id="agreeTermsMerchant"
+                        checked={agreedToTerms}
+                        onChange={e => setAgreedToTerms(e.target.checked)}
+                        className="mt-0.5 w-4 h-4 shrink-0 rounded border-outline-variant/30 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                      />
+                      <label htmlFor="agreeTermsMerchant" className="text-xs text-on-surface-variant leading-relaxed cursor-pointer">
+                        I confirm that I have read and agree to PayChain's{' '}
+                        <a
+                          href="https://www.paychain.co.ke/privacy-policy"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={e => e.stopPropagation()}
+                          className="font-bold text-emerald-600 hover:text-emerald-700 underline underline-offset-2"
+                        >
+                          Privacy Policy
+                        </a>{' '}
+                        and{' '}
+                        <a
+                          href="https://www.paychain.co.ke/terms-of-service"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={e => e.stopPropagation()}
+                          className="font-bold text-emerald-600 hover:text-emerald-700 underline underline-offset-2"
+                        >
+                          Terms of Service
+                        </a>.
+                      </label>
+                    </div>
+
                     <div className="pt-4">
                       {err && (
                         <div className="bg-red-50 border border-red-200 p-4 rounded-xl flex items-center gap-3 text-red-700 animate-shake mb-4">
@@ -501,9 +544,9 @@ export default function Login() {
                           <p className="text-xs font-bold">{err}</p>
                         </div>
                       )}
-                      <button 
-                        className="w-full bg-[#06201B] text-white py-4 lg:py-5 rounded-2xl font-black text-lg shadow-2xl hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-white/10 disabled:opacity-30 disabled:grayscale" 
-                        disabled={loading || !Object.values(strength).every(v=>v) || !confirmPassword || newPassword !== confirmPassword}
+                      <button
+                        className="w-full bg-[#06201B] text-white py-4 lg:py-5 rounded-2xl font-black text-lg shadow-2xl hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-white/10 disabled:opacity-30 disabled:grayscale"
+                        disabled={loading || !Object.values(strength).every(v=>v) || !confirmPassword || newPassword !== confirmPassword || !agreedToTerms}
                       >
                         {loading ? (
                           <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
@@ -807,6 +850,8 @@ export default function Login() {
                 <p className="text-on-surface-variant text-sm mt-2 opacity-60 leading-relaxed max-w-xs mx-auto">
                   {otpFlowType === 'reset' ? (
                     <>6-digit code sent to <span className="text-primary font-bold opacity-100">{maskedResetEmail || 'your inbox'}</span></>
+                  ) : otpChannel === 'sms' ? (
+                    <>6-digit code sent via SMS to <span className="text-primary font-bold opacity-100">{otpMaskedPhone || 'your phone'}</span></>
                   ) : (
                     <>6-digit code sent to your registered email</>
                   )}

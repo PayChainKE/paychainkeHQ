@@ -30,7 +30,7 @@ const VideoSection: React.FC = () => {
   const features = [
     {
       title: "Verified Collections",
-      description: "Registered PayChain till numbers for secure, fraud-proof inbound payments.",
+      description: "Registered PayChain Virtual Accounts for secure, fraud-proof inbound payments.",
       icon: ShieldCheck,
     },
     {

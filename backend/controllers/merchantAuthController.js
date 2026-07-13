@@ -9,6 +9,49 @@ import { encryptKey } from '../utils/cryptoHelper.js';
 import bcrypt from 'bcryptjs';
 import { createNotification } from './notificationController.js';
 import { getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
+import { toE164Kenyan } from '../utils/notificationService.js';
+import { safeSendSMS } from '../utils/smsSanitizer.js';
+
+// Mask a phone number for safe display in the UI, e.g. +254712345678 →
+// +254•••••••78. Falls back to the raw digits if the number can't be
+// normalized to E.164 (still masks — never shows the full number either way).
+const maskPhone = (raw) => {
+  const e164 = toE164Kenyan(raw);
+  const digits = (e164 || String(raw || '')).replace(/\D/g, '');
+  if (digits.length < 6) return null;
+  const start = digits.slice(0, 3);
+  const end = digits.slice(-2);
+  const maskedLen = Math.max(3, digits.length - start.length - end.length);
+  return `+${start}${'•'.repeat(maskedLen)}${end}`;
+};
+
+// Sends the login/resend OTP through whichever channel matches how the
+// merchant is signing in: SMS when they typed their phone number, email
+// otherwise. Never throws (safeSendSMS/sendOTP both swallow their own
+// errors) and always returns enough info for the response to tell the
+// frontend which channel was used and how to render "sent to ...".
+async function dispatchOtp(merchant, { viaPhone, otp }) {
+  if (viaPhone) {
+    const e164Phone = toE164Kenyan(merchant.phone);
+    if (e164Phone) {
+      const result = await safeSendSMS({
+        to: e164Phone,
+        message: `Your PayChain verification code is ${otp}. It expires in 10 minutes. Do not share this code.`,
+      });
+      if (!result.success) {
+        console.error(`📱 SMS Error: Failed to send OTP to ${e164Phone}:`, result.error);
+      }
+      return { channel: 'sms', maskedPhone: maskPhone(merchant.phone) };
+    }
+    console.warn(`📱 Merchant ${merchant._id} phone "${merchant.phone}" would not normalize — falling back to email OTP.`);
+  }
+
+  console.log(`📧 Dispatching OTP via Resend to: ${merchant.email}`);
+  await sendOTP(merchant.email, otp).catch((err) => {
+    console.error(`📧 Resend Error: Failed to send OTP to ${merchant.email}:`, err);
+  });
+  return { channel: 'email', maskedPhone: null };
+}
 
 // Helper to generate unique 5-digit account number
 const generateUniquePaybillAccount = async () => {
@@ -281,30 +324,35 @@ export const loginMerchant = async (req, res) => {
       return res.status(403).json({ error: 'This account has been locked. Please contact PayChain support.' });
     }
 
-    // Always require OTP verification for every login (removed 3-day bypass)
+    // Always require OTP verification for every login (removed 3-day bypass).
+    // Login was via phone when the identifier the merchant typed had no '@'
+    // (same check used above to build phoneVariations) — in that case the
+    // OTP goes out over SMS instead of email.
+    const viaPhone = !loginIdentifier.includes('@');
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
 
-    // Fire email and DB write in parallel — don't wait for one before the other
-    console.log(`📧 Dispatching OTP via Resend to: ${merchant.email}`);
-    await Promise.all([
-      Merchant.updateOne({ _id: merchant._id }, { $set: { otp, otpExpires } }),
-      sendOTP(merchant.email, otp).catch(err => {
-        console.error(`📧 Resend Error: Failed to send OTP to ${merchant.email}:`, err);
-      }),
-    ]);
+    // Dispatch first (it may fall back from sms to email internally), then
+    // persist the OTP alongside whichever channel was *actually* used — so
+    // a later resend repeats the real delivery channel, not just the
+    // originally-intended one.
+    const { channel, maskedPhone } = await dispatchOtp(merchant, { viaPhone, otp });
+    await Merchant.updateOne({ _id: merchant._id }, { $set: { otp, otpExpires, otpChannel: channel } });
 
     logAudit({
       action: 'merchant.login.otp_requested', category: 'auth', severity: 'info',
-      message: 'Password validated — OTP dispatched',
+      message: `Password validated — OTP dispatched via ${channel}`,
       merchant, req,
+      metadata: { channel },
     });
 
     return res.json({
       success: true,
       mfaRequired: true,
       email: merchant.email,
-      message: 'OTP sent to your email. Proceed to Stage 2.'
+      channel,
+      maskedPhone,
+      message: channel === 'sms' ? 'OTP sent to your phone. Proceed to Stage 2.' : 'OTP sent to your email. Proceed to Stage 2.'
     });
   } catch (error) {
     console.error('Login Merchant Error:', error);
@@ -327,15 +375,18 @@ export const resendMerchantOTP = async (req, res) => {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
 
-    console.log(`📧 Dispatching Resend OTP via Resend to: ${merchant.email}`);
-    await Promise.all([
-      Merchant.updateOne({ _id: merchant._id }, { $set: { otp, otpExpires } }),
-      sendOTP(merchant.email, otp).catch(err => {
-        console.error(`📧 Resend Error: Failed to resend OTP to ${merchant.email}:`, err);
-      }),
-    ]);
+    // Repeat whichever channel the merchant's currently-pending OTP was sent
+    // through (set on the original login/resend) rather than defaulting back
+    // to email — a merchant who logged in with their phone keeps getting SMS.
+    const { channel, maskedPhone } = await dispatchOtp(merchant, { viaPhone: merchant.otpChannel === 'sms', otp });
+    await Merchant.updateOne({ _id: merchant._id }, { $set: { otp, otpExpires, otpChannel: channel } });
 
-    res.json({ success: true, message: 'New security code sent successfully.' });
+    res.json({
+      success: true,
+      channel,
+      maskedPhone,
+      message: channel === 'sms' ? 'New security code sent to your phone.' : 'New security code sent successfully.'
+    });
   } catch (error) {
     console.error('Resend OTP Error:', error);
     res.status(500).json({ error: error.message || 'Server Error' });

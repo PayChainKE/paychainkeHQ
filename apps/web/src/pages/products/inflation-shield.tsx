@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Repeat, Percent, Send, Shield, Wallet, Zap, ChevronDown } from 'lucide-react';
 import './inflation-shield.css';
+import Breadcrumbs from '@/components/Breadcrumbs';
 
 const data = [
   { year: '2021', kes: 100, usdc: 100 },
@@ -45,15 +46,22 @@ const InflationShield: React.FC = () => {
     <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
       <Navbar />
 
+      {/* Breadcrumb strip */}
+      <div className="pt-24 pb-2 bg-gray-50">
+        <div className="container mx-auto px-6 lg:px-8">
+          <Breadcrumbs currentPage="Inflation Shield" />
+        </div>
+      </div>
+
       <main className="flex-grow">
         {/* HERO SECTION */}
-        <section className="relative pt-32 pb-20 lg:pt-40 lg:pb-28 overflow-hidden bg-[#0a0a0a] text-white">
+        <section className="relative pb-20 lg:pb-28 overflow-hidden bg-[#0a0a0a] text-white">
           <div className="absolute inset-0 overflow-hidden">
             <div className="absolute -top-1/2 -right-1/4 w-[1000px] h-[1000px] rounded-full bg-[#00bf63]/10 blur-3xl" />
             <div className="absolute -bottom-1/2 -left-1/4 w-[800px] h-[800px] rounded-full bg-blue-500/10 blur-3xl" />
           </div>
 
-          <div className="container mx-auto px-6 lg:px-8 relative z-10">
+          <div className="container mx-auto px-6 lg:px-8 relative z-10 pt-16">
             <div className="grid lg:grid-cols-2 gap-12 items-center">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -181,7 +189,7 @@ const InflationShield: React.FC = () => {
                     <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[#00bf63]/10 flex items-center justify-center text-[#00bf63] font-bold text-lg">1</div>
                     <div>
                       <h5 className="font-bold text-gray-900 mb-2">Fund Your KES Balance</h5>
-                      <p className="text-gray-600">Collect payments through your PayChain Smart Till or via mobile money deposits.</p>
+                      <p className="text-gray-600">Collect payments through your PayChain Virtual Account or via mobile money deposits.</p>
                     </div>
                   </div>
                   <div className="flex gap-4">

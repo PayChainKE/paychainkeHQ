@@ -49,7 +49,7 @@ export default function Wallet() {
   }
 
   // QR Logic
-  const qrData = `paychain://pay?till=${mockMerchant.tillNumber}&name=${encodeURIComponent(mockMerchant.businessName)}`
+  const qrData = `paychain://pay?account=${mockMerchant.virtualAccountNumber}&name=${encodeURIComponent(mockMerchant.businessName)}`
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrData)}&margin=10&bgcolor=FFFFFF&color=00351D`
 
   const handleDownload = () => {
@@ -104,7 +104,7 @@ export default function Wallet() {
     setIsGeneratingLink(true)
     setTimeout(() => {
       setIsGeneratingLink(false)
-      const link = `https://pay.paychain.ke/${mockMerchant.tillNumber}/${paymentLinkAmount}`
+      const link = `https://pay.paychain.ke/${mockMerchant.virtualAccountNumber}/${paymentLinkAmount}`
       setGeneratedLink(link)
       addToast({
         title: 'Payment Link Created',
@@ -402,7 +402,7 @@ export default function Wallet() {
                       <div className="text-center relative z-10 w-full px-4">
                         <p className="text-emerald-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2 opacity-80">Settlement QR</p>
                         <div className="space-y-1">
-                          <p className="text-white text-3xl font-headline tracking-widest">{mockMerchant.tillNumber}</p>
+                          <p className="text-white text-3xl font-headline tracking-widest">{mockMerchant.virtualAccountNumber}</p>
                           <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest leading-relaxed">Merchant: {mockMerchant.businessName}</p>
                         </div>
                       </div>
