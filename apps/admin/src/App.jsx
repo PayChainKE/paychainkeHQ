@@ -18,6 +18,7 @@ import Invoices from './pages/Invoices';
 import CallCentre from './pages/CallCentre';
 import AuditLog from './pages/AuditLog';
 import Revenue from './pages/Revenue';
+import Bookkeeping from './pages/Bookkeeping';
 import ToastHost from './components/ui/Toast';
 import { Analytics as VercelAnalytics } from "@vercel/analytics/react";
 
@@ -47,6 +48,7 @@ export default function App(){
             <Route path="/cash-advance-requests" element={<Protected><CashAdvanceRequests/></Protected>} />
             <Route path="/ledger" element={<Protected><Ledger/></Protected>} />
             <Route path="/revenue" element={<Protected><Revenue/></Protected>} />
+            <Route path="/bookkeeping" element={<Protected><Bookkeeping/></Protected>} />
             <Route path="/wallet-audit" element={<Protected><WalletAudit/></Protected>} />
             <Route path="/invoices" element={<Protected><Invoices/></Protected>} />
             <Route path="/audit-log" element={<Protected><AuditLog/></Protected>} />

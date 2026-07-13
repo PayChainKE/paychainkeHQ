@@ -36,6 +36,13 @@ import { runWalletAudit } from '../controllers/walletAuditController.js';
 import { adminListInvoices } from '../controllers/invoiceController.js';
 import { getRevenue } from '../controllers/revenueController.js';
 import { adminListCashAdvanceRequests, adminUpdateCashAdvanceRequest } from '../controllers/cashAdvanceController.js';
+import {
+  listExpenses,
+  createExpense,
+  updateExpense,
+  deleteExpense,
+  getBookkeepingSummary,
+} from '../controllers/bookkeepingController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -95,6 +102,13 @@ router.get('/invoices', protect, adminListInvoices);
 // request between pending/reviewing/approved/declined.
 router.get('/cash-advance/requests', protect, adminListCashAdvanceRequests);
 router.patch('/cash-advance/requests/:id', protect, sensitiveActionLimiter, adminUpdateCashAdvanceRequest);
+
+// Bookkeeping — expense ledger + P&L summary for KRA-ready record keeping.
+router.get('/bookkeeping/summary',        protect, getBookkeepingSummary);
+router.get('/bookkeeping/expenses',       protect, listExpenses);
+router.post('/bookkeeping/expenses',      protect, createExpense);
+router.put('/bookkeeping/expenses/:id',   protect, updateExpense);
+router.delete('/bookkeeping/expenses/:id',protect, deleteExpense);
 
 // Compact health pulse for the sidebar widget.
 router.get('/system-status', protect, getSystemStatus);

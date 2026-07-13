@@ -18,10 +18,29 @@ const KENYAN_COUNTIES = [
   "Uasin Gishu", "Vihiga", "Wajir", "West Pokot"
 ]
 
+// Remembers the last identifier (email/phone) that successfully signed in on
+// this device — lets a returning merchant skip straight to the fingerprint
+// prompt instead of retyping their username, the same way bank/M-PESA apps
+// keep the last account on the lock screen. Never stores a password/token.
+const LAST_IDENTIFIER_KEY = 'paychain_last_identifier'
+
+const maskIdentifier = (raw) => {
+  const value = String(raw || '').trim()
+  if (!value) return ''
+  if (value.includes('@')) {
+    const [user, domain] = value.split('@')
+    return `${user.slice(0, 2)}${'•'.repeat(Math.max(2, user.length - 2))}@${domain}`
+  }
+  const digits = value.replace(/\D/g, '')
+  if (digits.length >= 6) return `${digits.slice(0, 3)}${'•'.repeat(digits.length - 5)}${digits.slice(-2)}`
+  return value
+}
+
 export default function Login() {
   const { login, loginWithPasskey, signup, verifyOTP, resendOTP, forgotPassword, verifyResetOTP, resetPassword, isAuthenticated } = useMerchantAuth()
   const { addNotification } = useNotification()
-  const [phone, setPhone] = useState('')
+  const [phone, setPhone] = useState(() => localStorage.getItem(LAST_IDENTIFIER_KEY) || '')
+  const [quickLogin, setQuickLogin] = useState(() => !!localStorage.getItem(LAST_IDENTIFIER_KEY))
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
@@ -101,6 +120,7 @@ export default function Login() {
     const res = await login(phone, password)
     setLoading(false)
     if (res.success) {
+      localStorage.setItem(LAST_IDENTIFIER_KEY, phone)
       setAuthEmail(res.email)
       if (res.mfaRequired) {
         setOtpFlowType('login')
@@ -346,6 +366,14 @@ export default function Login() {
       message: 'Sign in with your new credentials to access your dashboard.',
       type: 'success',
     })
+  }
+
+  // "Not you?" — forgets the remembered device identifier and drops back to
+  // the full manual sign-in form.
+  function switchAccount() {
+    localStorage.removeItem(LAST_IDENTIFIER_KEY)
+    setPhone('')
+    setQuickLogin(false)
   }
 
   const SecurityRequirement = ({ met, label }) => (
@@ -734,38 +762,62 @@ export default function Login() {
             /* LOGIN FORM */
             <>
               <div className="mb-8 lg:mb-10">
-                 <h3 className="font-headline text-3xl lg:text-5xl text-primary tracking-tight font-black">Sign in</h3>
+                 <h3 className="font-headline text-3xl lg:text-5xl text-primary tracking-tight font-black">
+                   {quickLogin ? 'Welcome back' : 'Sign in'}
+                 </h3>
                  <p className="text-on-surface-variant font-medium mt-2 opacity-70">
-                   Enter credentials provided during onboarding.
+                   {quickLogin ? 'Use your fingerprint or Face ID to continue instantly.' : 'Enter credentials provided during onboarding.'}
                  </p>
               </div>
 
               <form onSubmit={handleLogin} className="space-y-5 lg:space-y-6">
 
-                {/* Unified Login Field (Email or Phone Number) */}
-                <div className="space-y-2">
-                  <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Email or Phone Number</label>
-                  <div className="flex group">
-                    <div className="bg-surface-container-low border border-outline-variant/15 border-r-0 rounded-l-2xl px-4 lg:px-5 flex items-center justify-center text-primary/40 group-focus-within:border-primary transition-colors">
-                      <span className="material-symbols-outlined text-xl">person</span>
+                {/* Unified Login Field (Email or Phone Number) — collapsed into a
+                    remembered-account chip once this device has signed in before,
+                    so a returning merchant never has to retype it. */}
+                {quickLogin ? (
+                  <div className="flex items-center justify-between gap-3 bg-surface-container-low rounded-2xl py-3 px-4 lg:px-5 border border-outline-variant/10">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-9 h-9 rounded-full bg-[#06201B] flex items-center justify-center shrink-0">
+                        <span className="material-symbols-outlined text-emerald-400 text-lg">person</span>
+                      </div>
+                      <span className="text-sm font-bold text-primary truncate">{maskIdentifier(phone)}</span>
                     </div>
-                    <input 
-                      className="flex-1 w-full bg-white border border-outline-variant/15 rounded-r-2xl py-3 lg:py-4 px-4 lg:px-5 text-lg font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40"
-                      value={phone} 
-                      onChange={e => setPhone(e.target.value)} 
-                      placeholder="john@example.com or 0712..."
-                      type="text"
-                      autoComplete="username"
-                      required
-                    />
+                    <button
+                      type="button"
+                      onClick={switchAccount}
+                      className="shrink-0 text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:text-emerald-700"
+                    >
+                      Not you?
+                    </button>
                   </div>
-                </div>
+                ) : (
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Email or Phone Number</label>
+                    <div className="flex group">
+                      <div className="bg-surface-container-low border border-outline-variant/15 border-r-0 rounded-l-2xl px-4 lg:px-5 flex items-center justify-center text-primary/40 group-focus-within:border-primary transition-colors">
+                        <span className="material-symbols-outlined text-xl">person</span>
+                      </div>
+                      <input
+                        className="flex-1 w-full bg-white border border-outline-variant/15 rounded-r-2xl py-3 lg:py-4 px-4 lg:px-5 text-lg font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40"
+                        value={phone}
+                        onChange={e => setPhone(e.target.value)}
+                        placeholder="john@example.com or 0712..."
+                        type="text"
+                        autoComplete="username"
+                        required
+                      />
+                    </div>
+                  </div>
+                )}
 
-                {/* Biometric fast-login — renders only when the device supports it */}
+                {/* Biometric fast-login — renders only when the device supports it.
+                    Skips password AND OTP entirely on success (see webauthnController.js). */}
                 <div className="space-y-3">
                   <BiometricLoginButton
                     email={phone}
                     onSuccess={(result) => {
+                      localStorage.setItem(LAST_IDENTIFIER_KEY, phone)
                       loginWithPasskey(result)
                       nav('/overview')
                     }}

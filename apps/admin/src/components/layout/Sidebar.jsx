@@ -27,6 +27,7 @@ const NAV_SECTIONS = [
     title: 'Financials & Compliance',
     items: [
       { icon: 'account_balance', label: 'Ledger',                 path: '/ledger'                 },
+      { icon: 'calculate',       label: 'Bookkeeping',            path: '/bookkeeping'            },
       { icon: 'receipt_long',    label: 'Invoices',                path: '/invoices'               },
       { icon: 'savings',         label: 'Cash Advance Requests', path: '/cash-advance-requests' },
       { icon: 'security',        label: 'Wallet Audit',           path: '/wallet-audit'           },
