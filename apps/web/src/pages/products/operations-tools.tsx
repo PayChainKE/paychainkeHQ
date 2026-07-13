@@ -1,8 +1,8 @@
-import React from 'react'
-import { Link } from "react-router-dom";
-import { useEffect, useRef } from "react";
-import Navbar from '@/components/Navbar'
-import Footer from '@/components/Footer'
+import React from 'react';
+import { Link } from 'react-router-dom';
+import Navbar from '@/components/Navbar';
+import Footer from '@/components/Footer';
+import { motion } from 'framer-motion';
 import {
   LayoutDashboard,
   FileCheck,
@@ -12,296 +12,295 @@ import {
   Download,
   Bell,
   Layers,
-} from "lucide-react";
-import { Line } from "react-chartjs-2";
-import "chart.js/auto";
-import useOperationAnimations from "./useOperationAnimations";
-import "./operations-tools.css";
-import Breadcrumbs from "@/components/Breadcrumbs";
+} from 'lucide-react';
+import { Line } from 'react-chartjs-2';
+import 'chart.js/auto';
+import Breadcrumbs from '@/components/Breadcrumbs';
 
 const features = [
-  {
-    icon: LayoutDashboard,
-    title: "Real-Time Merchant Dashboard",
-    body:
-      "Every transaction — collections, payments, FX swaps, cash advance activity — updated in real time. Your full financial picture, always current.",
-  },
-  {
-    icon: FileCheck,
-    title: "KRA e-TIMS Tax Compliance",
-    body:
-      "Automatically generates KRA e-TIMS compliant tax records from your transaction history. Clean records for KRA. One click download for your accountant.",
-  },
-  {
-    icon: TrendingUp,
-    title: "Trust Score Monitor",
-    body:
-      "Track your Trust Score in real time — see exactly how close you are to unlocking your next Cash Advance tier.",
-  },
-  {
-    icon: Users,
-    title: "Team Access & Spending Controls",
-    body:
-      "Add team members with defined roles, set spending limits, require approval for large transactions — without giving up full account access.",
-  },
-  {
-    icon: BarChart2,
-    title: "Business Analytics & Insights",
-    body:
-      "Revenue trends, peak payment periods, top customers by volume, month-on-month growth — all visualized clearly. Decisions based on data, not guesswork.",
-  },
-  {
-    icon: Download,
-    title: "Downloadable Financial Reports",
-    body:
-      "Export transaction histories, payroll records, FX logs, and tax summaries — formatted for your accountant, investors, or your own records.",
-  },
-  {
-    icon: Bell,
-    title: "Smart Notifications & Alerts",
-    body:
-      "Custom alerts for large inflows, low balances, upcoming payments, and Trust Score milestones. Stay in control without watching the dashboard all day.",
-  },
-  {
-    icon: Layers,
-    title: "Multi-Account Management",
-    body:
-      "Multiple business locations or entities? Manage separate dashboards with consolidated reporting and shared team access under one login.",
-  },
+  { icon: LayoutDashboard, title: 'Real-Time Merchant Dashboard', body: 'Every transaction — collections, payments, FX swaps, cash advance activity — updated in real time. Your full financial picture, always current.' },
+  { icon: FileCheck, title: 'KRA e-TIMS Tax Compliance', body: 'Automatically generates KRA e-TIMS compliant tax records from your transaction history. Clean records for KRA. One click download for your accountant.' },
+  { icon: TrendingUp, title: 'Trust Score Monitor', body: 'Track your Trust Score in real time — see exactly how close you are to unlocking your next Cash Advance tier.' },
+  { icon: Users, title: 'Team Access & Spending Controls', body: 'Add team members with defined roles, set spending limits, require approval for large transactions — without giving up full account access.' },
+  { icon: BarChart2, title: 'Business Analytics & Insights', body: 'Revenue trends, peak payment periods, top customers by volume, month-on-month growth — all visualized clearly. Decisions based on data, not guesswork.' },
+  { icon: Download, title: 'Downloadable Financial Reports', body: 'Export transaction histories, payroll records, FX logs, and tax summaries — formatted for your accountant, investors, or your own records.' },
+  { icon: Bell, title: 'Smart Notifications & Alerts', body: 'Custom alerts for large inflows, low balances, upcoming payments, and Trust Score milestones. Stay in control without watching the dashboard all day.' },
+  { icon: Layers, title: 'Multi-Account Management', body: 'Multiple business locations or entities? Manage separate dashboards with consolidated reporting and shared team access under one login.' },
+];
+
+const useCases = [
+  { title: 'Retail & Hospitality', desc: 'Monitor daily revenue in real time, track peak hours, and run end-of-day reconciliation automatically.' },
+  { title: 'Service Agencies', desc: 'Generate records, track payments, run payroll, and download clean tax records — all from one place.' },
+  { title: 'Import/Export Traders', desc: 'Monitor KES and USDC balances simultaneously, track FX history, manage supplier payment schedules.' },
+  { title: 'Multi-Location Businesses', desc: 'Manage multiple merchant accounts under one login with consolidated reporting across all locations.' },
 ];
 
 const chartData = {
-  labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"],
+  labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'],
   datasets: [
     {
-      label: "Revenue (KES)",
+      label: 'Revenue (KES)',
       data: [120000, 140000, 125000, 165000, 180000, 172000, 195000],
-      borderColor: "#10B981",
-      backgroundColor: "rgba(16,185,129,0.08)",
+      borderColor: '#00bf63',
+      backgroundColor: 'rgba(0,191,99,0.12)',
       fill: true,
-      tension: 0.3,
+      tension: 0.35,
+      pointRadius: 0,
+      borderWidth: 2.5,
     },
   ],
 };
 
+const chartOptions = {
+  maintainAspectRatio: false,
+  plugins: { legend: { display: false } },
+  scales: {
+    x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(255,255,255,0.4)', font: { size: 10 } } },
+    y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(255,255,255,0.4)', font: { size: 10 } } },
+  },
+};
+
 const OperationsTools = () => {
-  const containerRef = useRef<HTMLElement | null>(null);
-  useOperationAnimations(containerRef);
-
   return (
-    <div className="min-h-screen bg-gray-50 text-[#0A192F] font-sans">
+    <div className="min-h-screen bg-white font-sans">
       <Navbar />
-      <main className="operations-page container mx-auto px-6 py-12" ref={containerRef}>
-        <div style={{ paddingTop: '80px' }}>
-          <Breadcrumbs currentPage="Operations tools" />
+
+      {/* Breadcrumb strip */}
+      <div className="pt-24 pb-2 bg-white">
+        <div className="container mx-auto px-6 lg:px-8">
+          <Breadcrumbs currentPage="Operations Tools" />
         </div>
-        {/* HERO */}
-        <section className="hero grid md:grid-cols-2 gap-8 items-center">
-        <div className="hero-copy">
-          <h1 className="text-3xl md:text-5xl font-bold leading-tight">
-            Run Your Entire Business from One Intelligent Dashboard.
-          </h1>
-          <p className="mt-4 text-muted-foreground max-w-2xl">
-            PayChain Operation Tools gives you real-time visibility, financial
-            controls, compliance automation, and team management — everything you
-            need to run a modern Kenyan business, without the complexity.
-          </p>
-          <div className="mt-6">
-            <Link
-              to="/waitlist"
-              className="inline-flex items-center gap-3 bg-primary text-white px-5 py-3 rounded-md shadow-sm"
-              aria-label="See It in Action"
-            >
-              See It in Action
-            </Link>
-          </div>
+      </div>
+
+      {/* HERO */}
+      <section className="relative pb-20 lg:pb-28 overflow-hidden bg-[#0a0a0a] text-white">
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute -top-1/2 -right-1/4 w-[1000px] h-[1000px] rounded-full bg-sky-500/10 blur-3xl" />
+          <div className="absolute -bottom-1/2 -left-1/4 w-[800px] h-[800px] rounded-full bg-[#00bf63]/10 blur-3xl" />
         </div>
 
-        <div className="hero-visual bg-white rounded-xl shadow-md p-4" aria-hidden>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="col-span-2">
-              <div className="flex gap-4 mb-4">
-                <div className="stat-card p-3 bg-gray-50 rounded-md">
-                  <div className="text-xs text-muted-foreground">Balance</div>
-                  <div className="text-lg font-semibold">KES 1,254,300</div>
-                </div>
-                <div className="stat-card p-3 bg-gray-50 rounded-md">
-                  <div className="text-xs text-muted-foreground">Today</div>
-                  <div className="text-lg font-semibold">KES 42,300</div>
-                </div>
+        <div className="container mx-auto px-6 lg:px-8 relative z-10 pt-16">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 backdrop-blur-md mb-6">
+                <span className="w-2 h-2 rounded-full bg-[#00bf63] animate-pulse" />
+                <span className="text-sm font-medium text-gray-200">The command center behind every PayChain product</span>
               </div>
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.05] mb-6">
+                Run Your Business from <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00bf63] to-emerald-300">One Intelligent Dashboard.</span>
+              </h1>
+              <p className="text-lg text-gray-400 mb-8 max-w-xl leading-relaxed">
+                PayChain Operations Tools gives you real-time visibility, financial controls, compliance automation, and team management — everything you need to run a modern Kenyan business, without the complexity.
+              </p>
+              <Link to="/waitlist" className="inline-flex items-center justify-center px-8 py-4 text-base font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_20px_rgba(0,191,99,0.3)]">
+                See It in Action
+              </Link>
+            </motion.div>
 
-              <div className="chart-box bg-white rounded-md p-3">
-                <Line data={chartData} options={{ maintainAspectRatio: false }} />
-              </div>
-            </div>
-
-            <aside className="col-span-1 flex flex-col gap-4">
-              <div className="trust-card p-3 bg-gray-50 rounded-md">
-                <div className="text-xs text-muted-foreground">Trust Score</div>
-                <div className="mt-2">
-                  <div className="w-full bg-gray-200 h-3 rounded-full overflow-hidden">
-                    <div className="trust-fill h-3 rounded-full" style={{ width: "72%" }} />
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.8, delay: 0.2 }} className="relative">
+              <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl">
+                <div className="grid grid-cols-3 gap-4 mb-4">
+                  <div className="col-span-2">
+                    <div className="flex gap-3 mb-4">
+                      <div className="flex-1 bg-white/5 border border-white/5 rounded-xl p-3">
+                        <div className="text-[10px] uppercase tracking-widest text-gray-500 mb-1">Balance</div>
+                        <div className="text-base font-bold text-white">KES 1,254,300</div>
+                      </div>
+                      <div className="flex-1 bg-white/5 border border-white/5 rounded-xl p-3">
+                        <div className="text-[10px] uppercase tracking-widest text-gray-500 mb-1">Today</div>
+                        <div className="text-base font-bold text-white">KES 42,300</div>
+                      </div>
+                    </div>
+                    <div className="bg-white/5 border border-white/5 rounded-xl p-3 h-[140px]">
+                      <Line data={chartData} options={chartOptions} />
+                    </div>
                   </div>
-                  <div className="text-sm mt-2 font-medium">72 — Good</div>
+
+                  <aside className="col-span-1 flex flex-col gap-3">
+                    <div className="bg-white/5 border border-white/5 rounded-xl p-3">
+                      <div className="text-[10px] uppercase tracking-widest text-gray-500 mb-2">Trust Score</div>
+                      <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden mb-2">
+                        <motion.div
+                          className="h-2 rounded-full bg-gradient-to-r from-[#00bf63] to-emerald-300"
+                          initial={{ width: 0 }}
+                          animate={{ width: '72%' }}
+                          transition={{ duration: 1, delay: 0.6 }}
+                        />
+                      </div>
+                      <div className="text-xs font-semibold text-white">72 — Good</div>
+                    </div>
+                    <div className="bg-white/5 border border-white/5 rounded-xl p-3 flex-1">
+                      <div className="text-[10px] uppercase tracking-widest text-gray-500 mb-2">Team activity</div>
+                      <ul className="text-[11px] text-gray-300 space-y-1.5 leading-relaxed">
+                        <li>Mary approved payout — 10m ago</li>
+                        <li>Ken requested FX swap — 1h ago</li>
+                        <li>New user added: John — today</li>
+                      </ul>
+                    </div>
+                  </aside>
                 </div>
-              </div>
 
-              <div className="activity p-3 bg-gray-50 rounded-md">
-                <div className="text-xs text-muted-foreground">Team activity</div>
-                <ul className="mt-2 text-sm">
-                  <li>Mary approved payout — 10m ago</li>
-                  <li>Ken requested FX swap — 1h ago</li>
-                  <li>New user added: John — today</li>
-                </ul>
-              </div>
-            </aside>
-          </div>
-
-          <div className="mt-4 transaction-feed bg-white rounded-md p-3 border">
-            <div className="text-sm text-muted-foreground mb-2">Recent transactions</div>
-            <div className="overflow-auto max-h-44">
-              <table className="w-full text-sm">
-                <tbody>
-                  <tr>
-                    <td>INV-001234</td>
-                    <td className="text-muted-foreground">Card • KES 4,200</td>
-                    <td className="text-right text-sm">2h ago</td>
-                  </tr>
-                  <tr>
-                    <td>INV-001233</td>
-                    <td className="text-muted-foreground">Mpesa • KES 12,400</td>
-                    <td className="text-right text-sm">5h ago</td>
-                  </tr>
-                  <tr>
-                    <td>INV-001232</td>
-                    <td className="text-muted-foreground">Card • KES 2,800</td>
-                    <td className="text-right text-sm">1d ago</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="problem mt-12 bg-gray-900 text-white p-8 rounded-md reveal">
-        <h2 className="text-2xl font-semibold">Most Kenyan Merchants Are Running Blind.</h2>
-        <p className="mt-3 max-w-3xl">
-          No real-time transaction data. No automated tax records. No team spending
-          controls. No clear picture of what came in, what went out, and what's left.
-          Just a phone full of SMS notifications and a notebook that never quite adds up.
-          PayChain Operation Tools changes all of that.
-        </p>
-      </section>
-
-      <section className="explainer mt-12 reveal">
-        <h3 className="text-xl font-semibold">The Control Center Your Business Has Always Needed.</h3>
-        <p className="mt-3 max-w-3xl">
-          PayChain Operation Tools is the intelligence layer across all four PayChain
-          products — a unified command center giving you real-time data, automated
-          compliance, team controls, and business insights on one dashboard built for Kenyan SMEs.
-        </p>
-      </section>
-
-      <section className="features mt-12">
-        <h3 className="text-2xl font-semibold">Every Tool You Need. Nothing You Don't.</h3>
-        <div className="mt-6 grid gap-8">
-          {features.map((f, i) => {
-            const Icon = f.icon as unknown as React.ComponentType<React.SVGProps<SVGSVGElement>>;
-            const left = i % 2 === 0;
-            return (
-              <div key={f.title} className={`feature-row grid md:grid-cols-2 gap-6 items-center reveal ${left ? "" : "md:flex-row-reverse"}`}>
-                <div className="feature-icon flex items-start">
-                  <div className="icon bg-primary/10 text-primary rounded-md p-3">
-                    <Icon />
+                <div className="bg-white/5 border border-white/5 rounded-xl p-3">
+                  <div className="text-[10px] uppercase tracking-widest text-gray-500 mb-2">Recent transactions</div>
+                  <div className="space-y-1.5">
+                    {[
+                      ['INV-001234', 'Card • KES 4,200', '2h ago'],
+                      ['INV-001233', 'M-PESA • KES 12,400', '5h ago'],
+                      ['INV-001232', 'Card • KES 2,800', '1d ago'],
+                    ].map(([id, meta, time]) => (
+                      <div key={id} className="flex items-center justify-between text-[11px] py-1">
+                        <span className="text-white font-medium">{id}</span>
+                        <span className="text-gray-500">{meta}</span>
+                        <span className="text-gray-600">{time}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
-                <div>
-                  <h4 className="text-lg font-semibold">{f.title}</h4>
-                  <p className="mt-2 text-muted-foreground">{f.body}</p>
-                </div>
               </div>
-            );
-          })}
+            </motion.div>
+          </div>
         </div>
       </section>
 
-      <section className="kra-spotlight mt-12 reveal">
-        <div className="paper bg-white p-6 rounded-md border">
-          <h3 className="text-xl font-semibold">Tax Compliance Without the Headache.</h3>
-          <p className="mt-3 text-muted-foreground max-w-3xl">
-            KRA's e-TIMS system requires merchants to electronically submit transaction
-            records for tax purposes. For most Kenyan businesses, this means manual data entry,
-            spreadsheets, and accountants charging by the hour. PayChain eliminates all of that.
-            Every verified transaction is automatically formatted for e-TIMS compliance, organized
-            by period, and available for download with one click. Your accountant gets clean records.
-            KRA gets what it needs. You get to run your business.
-          </p>
+      {/* PROBLEM */}
+      <section className="py-20 bg-white">
+        <div className="container mx-auto px-6 lg:px-8">
+          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6 }} className="max-w-3xl mx-auto text-center">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">Most Kenyan Merchants Are Running Blind.</h2>
+            <p className="text-lg text-gray-600 leading-relaxed">
+              No real-time transaction data. No automated tax records. No team spending controls. No clear picture of what came in, what went out, and what's left. Just a phone full of SMS notifications and a notebook that never quite adds up. PayChain Operations Tools changes all of that.
+            </p>
+          </motion.div>
+        </div>
+      </section>
 
-          <div className="tax-mock mt-6 grid md:grid-cols-3 gap-4 items-start">
-            <div className="md:col-span-2 bg-gray-50 p-4 rounded-md">
-              <div className="flex justify-between items-center">
-                <div>
-                  <div className="text-sm text-muted-foreground">Period</div>
-                  <div className="font-medium">Jan 2026 — Mar 2026</div>
+      {/* EXPLAINER */}
+      <section className="py-20 bg-gray-50 border-y border-gray-200">
+        <div className="container mx-auto px-6 lg:px-8 max-w-3xl mx-auto text-center">
+          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6 }}>
+            <h3 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">The Control Center Your Business Has Always Needed.</h3>
+            <p className="text-lg text-gray-600 leading-relaxed">
+              PayChain Operations Tools is the intelligence layer across all four PayChain products — a unified command center giving you real-time data, automated compliance, team controls, and business insights on one dashboard built for Kenyan SMEs.
+            </p>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* FEATURES */}
+      <section className="py-20 bg-white">
+        <div className="container mx-auto px-6 lg:px-8">
+          <motion.h3 initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-3xl md:text-4xl font-bold text-gray-900 mb-12 text-center">
+            Every Tool You Need. Nothing You Don't.
+          </motion.h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+            {features.map((f, i) => {
+              const Icon = f.icon;
+              return (
+                <motion.div
+                  key={f.title}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.5, delay: (i % 3) * 0.08 }}
+                  className="bg-gray-50 border border-gray-100 rounded-2xl p-8 hover:shadow-lg transition-all duration-300 hover:border-[#00bf63]/30 group"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-white shadow-sm border border-gray-100 flex items-center justify-center mb-6 group-hover:bg-[#00bf63] transition-colors duration-300">
+                    <Icon className="w-6 h-6 text-gray-700 group-hover:text-white transition-colors duration-300" />
+                  </div>
+                  <h4 className="text-lg font-bold text-gray-900 mb-3">{f.title}</h4>
+                  <p className="text-gray-600 leading-relaxed text-sm">{f.body}</p>
+                </motion.div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* KRA SPOTLIGHT */}
+      <section className="py-20 bg-gray-50 border-y border-gray-200">
+        <div className="container mx-auto px-6 lg:px-8">
+          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="max-w-5xl mx-auto bg-white rounded-3xl border border-gray-200 shadow-sm p-8 lg:p-12">
+            <h3 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">Tax Compliance Without the Headache.</h3>
+            <p className="text-gray-600 leading-relaxed max-w-3xl mb-10">
+              KRA's e-TIMS system requires merchants to electronically submit transaction records for tax purposes. For most Kenyan businesses, this means manual data entry, spreadsheets, and accountants charging by the hour. PayChain eliminates all of that. Every verified transaction is automatically formatted for e-TIMS compliance, organized by period, and available for download with one click. Your accountant gets clean records. KRA gets what it needs. You get to run your business.
+            </p>
+
+            <div className="grid lg:grid-cols-3 gap-4 items-stretch">
+              <div className="lg:col-span-2 bg-gray-50 border border-gray-100 rounded-2xl p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <div className="text-xs uppercase tracking-widest text-gray-500 mb-1">Period</div>
+                    <div className="font-bold text-gray-900">Jan 2026 — Mar 2026</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs uppercase tracking-widest text-gray-500 mb-1">Total transactions</div>
+                    <div className="font-bold text-gray-900">1,248</div>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-sm text-muted-foreground">Total transactions</div>
-                  <div className="font-medium">1,248</div>
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <div className="text-xs uppercase tracking-widest text-gray-500 mb-1">Total revenue</div>
+                    <div className="text-xl font-extrabold text-gray-900">KES 3,412,800</div>
+                  </div>
+                  <div>
+                    <div className="text-xs uppercase tracking-widest text-gray-500 mb-1">VAT summary</div>
+                    <div className="text-xl font-extrabold text-gray-900">KES 280,400</div>
+                  </div>
                 </div>
               </div>
 
-              <div className="mt-4 grid grid-cols-2 gap-4">
-                <div>
-                  <div className="text-sm text-muted-foreground">Total revenue</div>
-                  <div className="font-semibold">KES 3,412,800</div>
-                </div>
-                <div>
-                  <div className="text-sm text-muted-foreground">VAT summary</div>
-                  <div className="font-semibold">KES 280,400</div>
-                </div>
+              <div className="flex flex-col justify-center gap-3">
+                <button className="w-full inline-flex items-center justify-center gap-2 bg-[#0a0a0a] text-white font-bold px-4 py-3 rounded-xl hover:bg-gray-800 transition-colors">
+                  <Download className="w-4 h-4" /> Download e-TIMS report
+                </button>
+                <div className="text-xs text-gray-500 text-center">Official format — ready for KRA</div>
               </div>
             </div>
+          </motion.div>
+        </div>
+      </section>
 
-            <div className="md:col-span-1 flex flex-col gap-3">
-              <button className="bg-primary text-white px-4 py-2 rounded-md">Download e-TIMS report</button>
-              <div className="text-sm text-muted-foreground">Official format — ready for KRA</div>
+      {/* USE CASES */}
+      <section className="py-20 bg-white">
+        <div className="container mx-auto px-6 lg:px-8">
+          <motion.h3 initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-3xl md:text-4xl font-bold text-gray-900 mb-12 text-center">
+            Built for How Kenyan Businesses Actually Operate
+          </motion.h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {useCases.map((uc, i) => (
+              <motion.div
+                key={uc.title}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: i * 0.08 }}
+                className="bg-gray-50 border border-gray-100 rounded-2xl p-6 hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
+              >
+                <h4 className="font-bold text-gray-900 mb-2">{uc.title}</h4>
+                <p className="text-sm text-gray-600 leading-relaxed">{uc.desc}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="py-24 bg-gray-50 border-t border-gray-200">
+        <div className="container mx-auto px-6 lg:px-8">
+          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="bg-gradient-to-br from-[#0a0a0a] to-gray-900 rounded-3xl p-12 text-center max-w-4xl mx-auto border border-gray-800 shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-[#00bf63]/20 rounded-full blur-3xl" />
+            <div className="absolute bottom-0 left-0 w-64 h-64 bg-sky-500/20 rounded-full blur-3xl" />
+            <h2 className="text-3xl md:text-4xl font-bold text-white mb-6 relative z-10">Stop Running Your Business on Guesswork.</h2>
+            <p className="text-xl text-gray-400 mb-10 relative z-10">Join our closed beta launching Q2 2026 and experience full financial visibility for the first time.</p>
+            <div className="relative z-10">
+              <Link to="/waitlist" className="inline-flex px-8 py-4 text-lg font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_30px_rgba(0,191,99,0.3)]">
+                Join the Waitlist
+              </Link>
             </div>
-          </div>
+          </motion.div>
         </div>
       </section>
 
-      <section className="use-cases mt-12 reveal">
-        <h3 className="text-2xl font-semibold">Built for How Kenyan Businesses Actually Operate</h3>
-        <div className="mt-6 grid md:grid-cols-4 gap-4">
-          <div className="card p-4 bg-white rounded-md">
-            <h4 className="font-semibold">Retail & Hospitality</h4>
-            <p className="mt-2 text-sm text-muted-foreground">Monitor daily revenue in real time, track peak hours, and run end-of-day reconciliation automatically.</p>
-          </div>
-          <div className="card p-4 bg-white rounded-md">
-            <h4 className="font-semibold">Service Agencies</h4>
-            <p className="mt-2 text-sm text-muted-foreground">Generate records, track payments, run payroll, and download clean tax records — all from one place.</p>
-          </div>
-          <div className="card p-4 bg-white rounded-md">
-            <h4 className="font-semibold">Import/Export Traders</h4>
-            <p className="mt-2 text-sm text-muted-foreground">Monitor KES and USDC balances simultaneously, track FX history, manage supplier payment schedules.</p>
-          </div>
-          <div className="card p-4 bg-white rounded-md">
-            <h4 className="font-semibold">Multi-Location Businesses</h4>
-            <p className="mt-2 text-sm text-muted-foreground">Manage multiple merchant accounts under one login with consolidated reporting across all locations.</p>
-          </div>
-        </div>
-      </section>
-
-      <section className="final-cta mt-12 text-center reveal">
-        <h3 className="text-2xl font-semibold">Stop Running Your Business on Guesswork.</h3>
-        <p className="mt-2 text-muted-foreground">Join our closed beta launching Q2 2026 and experience full financial visibility for the first time.</p>
-        <div className="mt-4">
-          <Link to="/waitlist" className="bg-primary text-white px-6 py-3 rounded-md inline-block">Join the Waitlist</Link>
-        </div>
-      </section>
-      </main>
       <Footer />
     </div>
   );
