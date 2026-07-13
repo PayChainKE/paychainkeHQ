@@ -884,6 +884,46 @@ export default function Wallet() {
             </div>
           </section>
 
+              {/* Bank Transfer / EFT / PesaLink — NCBA Virtual Account */}
+              <section className="col-span-12 bg-white rounded-[32px] lg:rounded-[40px] border border-outline-variant/5 shadow-sm overflow-hidden editorial-shadow animate-fade-in-up [animation-delay:175ms] p-6 md:p-8">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                      <span className="material-symbols-outlined text-2xl">account_balance</span>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/40 mb-1">Bank Transfer · EFT · PesaLink</p>
+                      <h3 className="font-headline text-lg md:text-xl text-primary tracking-tight">NCBA Virtual Account</h3>
+                      <p className="text-xs text-on-surface-variant opacity-70 mt-1 max-w-md">
+                        Customers can also pay directly from their bank using this dedicated NCBA account number — funds reflect automatically once received.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="w-full md:w-auto shrink-0">
+                    {merchant?.ncbaVirtualAccountNumber ? (
+                      <div className="flex items-center gap-3 bg-surface-container-low rounded-2xl px-5 py-4">
+                        <span className="font-mono text-lg md:text-xl font-bold text-primary tracking-widest">{merchant.ncbaVirtualAccountNumber}</span>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(merchant.ncbaVirtualAccountNumber)
+                            addToast({ title: 'Copied', message: 'NCBA account number copied to clipboard', type: 'success' })
+                          }}
+                          className="p-2 rounded-xl bg-primary text-white hover:opacity-90 transition-all"
+                          title="Copy account number"
+                        >
+                          <span className="material-symbols-outlined text-lg">content_copy</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 text-amber-700">
+                        <span className="material-symbols-outlined text-lg">hourglass_empty</span>
+                        <span className="text-xs font-bold uppercase tracking-widest">Pending bank assignment</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </section>
+
               {/* Wallet History */}
               <section className="col-span-12 lg:col-span-12 bg-white rounded-[32px] lg:rounded-[40px] border border-outline-variant/5 shadow-sm overflow-hidden editorial-shadow animate-fade-in-up [animation-delay:200ms]">
             <div className="p-6 md:p-8 border-b border-surface-container flex items-center justify-between">

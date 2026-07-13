@@ -11,11 +11,23 @@ export default function MyAccounts() {
     {
       service: 'PayChain',
       accountNumber: merchant?.paybillAccount || '84729',
-      type: 'Account',
+      type: 'M-Pesa Paybill',
       name: merchant?.businessName || 'Merchant',
       linkedTransferAccount: '—',
       manager: merchant?.name || 'Owner',
       status: 'Active'
+    },
+    {
+      service: 'NCBA Bank',
+      // ncbaVirtualAccountNumber is null until NCBA_INSTITUTION_PREFIX is
+      // configured on the backend (i.e. until NCBA assigns PayChain's
+      // 4-digit institution code) — show a pending state, not an error.
+      accountNumber: merchant?.ncbaVirtualAccountNumber || 'Pending bank assignment',
+      type: 'Bank Transfer / EFT / PesaLink',
+      name: merchant?.businessName || 'Merchant',
+      linkedTransferAccount: '—',
+      manager: merchant?.name || 'Owner',
+      status: merchant?.ncbaVirtualAccountNumber ? 'Active' : 'Pending'
     }
   ]
 
