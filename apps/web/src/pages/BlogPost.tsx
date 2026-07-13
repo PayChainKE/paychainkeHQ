@@ -76,7 +76,7 @@ const allArticlesData: Record<string, ArticleData> = {
 
       <h2>Commitment to the Kenyan Market</h2>
       <p>Kenya remains one of the most dynamic and innovative fintech markets globally. By establishing a formalized presence, PayChain Financial Services Ltd is uniquely positioned to address the complex challenges faced by modern merchants, including high transaction costs, currency volatility, and lack of access to working capital.</p>
-      <p>With this regulatory milestone achieved, PayChain will begin scaling its flagship products, including the Hybrid Smart Till and the Inflation Shield, providing Kenyan businesses with the robust, secure, and offline-capable tools they need to thrive.</p>
+      <p>With this regulatory milestone achieved, PayChain will begin scaling its flagship products, including the PayChain Virtual Account and the Inflation Shield, providing Kenyan businesses with the robust, secure, and offline-capable tools they need to thrive.</p>
     `,
   }
 };

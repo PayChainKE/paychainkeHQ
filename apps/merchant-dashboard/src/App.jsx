@@ -13,7 +13,7 @@ import CashAdvance from './pages/CashAdvance'
 import Profile from './pages/Profile'
 import Support from './pages/Support'
 import Notifications from './pages/Notifications'
-import MyTills from './pages/MyTills'
+import MyAccounts from './pages/MyAccounts'
 import Wallet from './pages/Wallet'
 import SendMoney from './pages/SendMoney'
 import RequestMoney from './pages/RequestMoney'
@@ -82,7 +82,9 @@ export default function App(){
             <Route path="/bulk-pay" element={<Protected><BulkPay/></Protected>} />
             <Route path="/inflation-shield" element={<Protected><FeatureGuard featureName="inflationShield"><InflationShield/></FeatureGuard></Protected>} />
             <Route path="/cash-advance" element={<Protected><CashAdvance/></Protected>} />
-            <Route path="/tills" element={<Protected><MyTills/></Protected>} />
+            <Route path="/accounts" element={<Protected><MyAccounts/></Protected>} />
+            {/* Old page URL — keep resolving so existing bookmarks/shared links don't break */}
+            <Route path="/tills" element={<Navigate to="/accounts" replace />} />
             <Route path="/profile" element={<Protected><Profile/></Protected>} />
             <Route path="/support" element={<Protected><Support/></Protected>} />
             <Route path="/notifications" element={<Protected><Notifications/></Protected>} />

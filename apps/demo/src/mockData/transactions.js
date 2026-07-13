@@ -19,7 +19,7 @@ const inbound = Array.from({length:100}).map((_,i)=>{
     reference: ref('QJX'),
     status:'verified',
     channel:'M-PESA',
-    tillNumber:'PC847291',
+    virtualAccountNumber:'PC847291',
     description: ['Grocery purchase','Goods payment','Invoice settlement','Wholesale order'][i%4],
     timestamp: daysAgo(randInt(0,89)),
     onChainHash: `0x${Math.floor(rng()*1e16).toString(16)}`,

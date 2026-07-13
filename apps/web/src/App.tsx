@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Analytics } from "@vercel/analytics/react";
 import { useState, useEffect } from "react";
 import Index from "./pages/Index";
@@ -12,7 +12,7 @@ import FAQ from './pages/FAQ';
 import ContactUs from "./pages/ContactUs";
 import Products from "./pages/Products";
 import InflationShield from "./pages/products/inflation-shield";
-import HybridSmartTill from "./pages/products/hybrid-smart-till";
+import VirtualAccount from "./pages/products/virtual-account";
 import PaychainBulkPay from "./pages/products/paychain-bulk-pay";
 import OperationsTools from "./pages/products/operations-tools";
 import CashAdvance from "./pages/products/cash-advance";
@@ -77,7 +77,9 @@ const App = () => {
                   <Route path="/signup" element={<PaychainDashboardProxy />} />
                   <Route path="/forgot-password" element={<PaychainDashboardProxy />} />
                   <Route path="/kyc/*" element={<PaychainDashboardProxy />} />
-                  <Route path="/products/hybrid-smart-till" element={<HybridSmartTill />} />
+                  <Route path="/products/virtual-account" element={<VirtualAccount />} />
+                  {/* Old product URL — keep resolving so existing bookmarks/shared links don't break */}
+                  <Route path="/products/hybrid-smart-till" element={<Navigate to="/products/virtual-account" replace />} />
                   <Route path="/products/inflation-shield" element={<InflationShield />} />
                   <Route path="/products/bulk-pay" element={<PaychainBulkPay />} />
                   <Route path="/products/operations-tools" element={<OperationsTools />} />

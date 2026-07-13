@@ -108,7 +108,7 @@ const AboutProblemSolution: React.FC = () => {
                   <ShieldCheck className="w-6 h-6" />
                 </div>
                 <p className="text-base sm:text-lg leading-relaxed font-medium text-white/90">
-                  When you join PayChain you get a verified till number. Every customer payment is confirmed instantly on your dashboard, not by screenshot. <span className="font-bold text-emerald-400 block mt-3">Real verification. Fraud becomes impossible.</span>
+                  When you join PayChain you get a verified PayChain Virtual Account. Every customer payment is confirmed instantly on your dashboard, not by screenshot. <span className="font-bold text-emerald-400 block mt-3">Real verification. Fraud becomes impossible.</span>
                 </p>
               </motion.div>
 

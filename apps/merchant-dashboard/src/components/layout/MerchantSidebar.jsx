@@ -28,7 +28,7 @@ const baseNavItems = [
     path: '/cash-advance',
     showOverview: false,
   },
-  { name: 'My Tills', icon: 'point_of_sale', path: '/tills' },
+  { name: 'My Accounts', icon: 'point_of_sale', path: '/accounts' },
   { name: 'Settings', icon: 'settings', path: '/profile' },
   { name: 'Support', icon: 'help_outline', path: '/support' },
 ]

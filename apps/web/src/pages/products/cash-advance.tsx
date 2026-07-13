@@ -100,7 +100,7 @@ const CashAdvance: React.FC = () => {
         <section className="explainer mt-12 grid md:grid-cols-2 gap-8 items-center">
           <div>
             <h3 className="text-2xl font-semibold">Working Capital That Understands Your Business.</h3>
-            <p className="mt-4 text-lg leading-7">PayChain Cash Advance is a data-driven working capital facility embedded in your merchant dashboard. After 3 months of verified transaction history through your PayChain Smart Till, your business automatically becomes eligible — with a limit determined entirely by your real revenue data. No application forms. No collateral valuation. No credit committee. Just your data, a transparent offer, and funds in your account.</p>
+            <p className="mt-4 text-lg leading-7">PayChain Cash Advance is a data-driven working capital facility embedded in your merchant dashboard. After 3 months of verified transaction history through your PayChain Virtual Account, your business automatically becomes eligible — with a limit determined entirely by your real revenue data. No application forms. No collateral valuation. No credit committee. Just your data, a transparent offer, and funds in your account.</p>
           </div>
 
           <div className="mock-right">
@@ -131,7 +131,7 @@ const CashAdvance: React.FC = () => {
               <div className="step-number">1</div>
               <div className="step-body">
                 <h4 className="font-semibold">Transact Through PayChain (Months 1–3)</h4>
-                <p>Every verified collection through your Smart Till builds your merchant ledger — a tamper-proof record of your real business activity.</p>
+                <p>Every verified collection through your PayChain Virtual Account builds your merchant ledger — a tamper-proof record of your real business activity.</p>
               </div>
             </li>
             <li className="step">
@@ -295,7 +295,7 @@ const CashAdvance: React.FC = () => {
           <div className="on-track p-6 bg-emerald-50 rounded-md">
             <h4 className="font-semibold">You're on track if:</h4>
             <ul className="mt-3 space-y-2 text-sm">
-              <li>Active PayChain Smart Till for 3+ months</li>
+              <li>Active PayChain Virtual Account for 3+ months</li>
               <li>Trust Score at or above eligibility threshold</li>
               <li>KYC-verified merchant account in Kenya</li>
               <li>No defaulted PayChain advance</li>

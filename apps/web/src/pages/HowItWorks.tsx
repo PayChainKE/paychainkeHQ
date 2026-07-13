@@ -11,12 +11,12 @@ import { UserCheck, ShieldCheck, CreditCard, Zap, Users, Repeat, BarChart3, Star
 const steps = [
   {
     title: 'Sign Up & Get Verified',
-    desc: 'Create your PayChain merchant account and complete a simple KYC verification. Once approved, you receive your registered PayChain till number — a dedicated, aggregator-backed M-PESA channel that is fully secure and verified. No queues. No paperwork. Verification is digital, fast, and done entirely on your dashboard.',
+    desc: 'Create your PayChain merchant account and complete a simple KYC verification. Once approved, you receive your registered PayChain Virtual Account — a dedicated, aggregator-backed M-PESA channel that is fully secure and verified. No queues. No paperwork. Verification is digital, fast, and done entirely on your dashboard.',
     Icon: UserCheck,
   },
   {
     title: 'Start Collecting Payments Securely',
-    desc: 'Share your PayChain till number with customers and start receiving verified inbound payments instantly. Every transaction is logged, timestamped, and stored in your merchant ledger — creating an unbreakable record of your real business activity. No more fake screenshots. No more SMS fraud.',
+    desc: 'Share your PayChain Virtual Account with customers and start receiving verified inbound payments instantly. Every transaction is logged, timestamped, and stored in your merchant ledger — creating an unbreakable record of your real business activity. No more fake screenshots. No more SMS fraud.',
     Icon: ShieldCheck,
   },
   {
@@ -33,7 +33,7 @@ const steps = [
 
 const features = [
   {
-    title: 'Verified Till Number',
+    title: 'Verified Virtual Account',
     desc: 'Fraud-proof M-PESA collections, every time',
     Icon: ShieldCheck,
   },

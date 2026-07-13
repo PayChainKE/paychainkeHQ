@@ -11,7 +11,7 @@ const docSections = [
     description: 'Get up and running with payChainKE in under 5 minutes.',
     items: [
       'Create a merchant account',
-      'Register your Till Number',
+      'Register your Virtual Account',
       'Install the POS SDK',
       'Receive your first Truth Ping',
     ],

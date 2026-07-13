@@ -26,7 +26,7 @@ The command center. Features a Hybrid Ledger (combining KES and USDC balances), 
 ### 2. 🛡️ Inflation Shield
 Protect purchasing power automatically. The Inflation Shield is a built-in KES-to-USDC conversion engine that lets you swap vulnerable fiat balances into stable USDC on Base L2 at a flat 0.5% rate.
 
-### 3. 💸 Verified Smart Till (Collections)
+### 3. 💸 PayChain Virtual Account (Collections)
 A comprehensive ledger of all verified inbound M-PESA payments. Every transaction is verified against the Safaricom Daraja API in under 100ms. No SMS fraud, no fake screenshots.
 
 ### 4. 👥 Bulk Payments
@@ -42,7 +42,7 @@ A proprietary creditworthiness measure built entirely from your verified merchan
 
 ## 🛠️ How It Works
 
-1.  **Sign Up & Get Verified**: Create your account and complete digital KYC in under 24 hours to receive your verified PayChain till number.
+1.  **Sign Up & Get Verified**: Create your account and complete digital KYC in under 24 hours to receive your verified PayChain Virtual Account.
 2.  **Start Collecting**: Receive verified inbound payments instantly. Every transaction is logged and immutable.
 3.  **Manage & Protect**: Use Bulk Pay for payroll and Inflation Shield to swap KES to USDC.
 4.  **Unlock Growth**: After 3 months of activity, automatically become eligible for revenue-based Cash Advances.

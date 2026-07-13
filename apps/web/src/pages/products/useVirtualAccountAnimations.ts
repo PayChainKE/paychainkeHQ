@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-export default function useSmartTillAnimations(): void {
+export default function useVirtualAccountAnimations(): void {
   useEffect(() => {
     try {
       const io = new IntersectionObserver((entries) => {
@@ -8,7 +8,7 @@ export default function useSmartTillAnimations(): void {
           const target = e.target as HTMLElement;
           if (e.isIntersecting) {
             target.classList.add('in-view');
-            const svg = target.querySelector<SVGElement>('.till-svg');
+            const svg = target.querySelector<SVGElement>('.account-svg');
             if (svg) svg.classList.add('play');
           }
         });
@@ -17,7 +17,7 @@ export default function useSmartTillAnimations(): void {
       const animated = document.querySelectorAll<HTMLElement>('[data-animate]');
       animated.forEach((el) => io.observe(el));
 
-      const heroSvg = document.querySelector<SVGElement>('.till-svg');
+      const heroSvg = document.querySelector<SVGElement>('.account-svg');
       if (heroSvg) setTimeout(() => heroSvg.classList.add('play'), 300);
 
       return () => {

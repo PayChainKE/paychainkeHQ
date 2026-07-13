@@ -181,7 +181,7 @@ const InflationShield: React.FC = () => {
                     <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[#00bf63]/10 flex items-center justify-center text-[#00bf63] font-bold text-lg">1</div>
                     <div>
                       <h5 className="font-bold text-gray-900 mb-2">Fund Your KES Balance</h5>
-                      <p className="text-gray-600">Collect payments through your PayChain Smart Till or via mobile money deposits.</p>
+                      <p className="text-gray-600">Collect payments through your PayChain Virtual Account or via mobile money deposits.</p>
                     </div>
                   </div>
                   <div className="flex gap-4">

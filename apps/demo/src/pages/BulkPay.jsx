@@ -290,7 +290,7 @@ export default function BulkPay() {
     method: 'Mobile Money',
     phone: ''
   })
-  const [selectedTill, setSelectedTill] = useState(null)
+  const [selectedFundingSource, setSelectedFundingSource] = useState(null)
 
   // Security Verification Modal State
   const [showSecurityModal, setShowSecurityModal] = useState(false)
@@ -980,28 +980,28 @@ export default function BulkPay() {
                   <h4 className="text-sm font-bold text-primary uppercase tracking-widest mb-6">Select Funding Source</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {[
-                      { id: 'TILL_1', name: 'Main Business Till', balance: 184250, number: '852300' },
-                      { id: 'TILL_2', name: 'Nairobi Branch Till', balance: 45000, number: '852301' },
-                    ].map(till => (
-                      <div 
-                        key={till.id}
-                        onClick={() => setSelectedTill(till.id)}
-                        className={`p-6 rounded-2xl border-2 transition-all cursor-pointer ${selectedTill === till.id ? 'border-emerald-500 bg-emerald-50/50 shadow-lg shadow-emerald-500/10' : 'border-outline-variant/10 hover:border-emerald-500/30 bg-white shadow-sm hover:shadow-md'}`}
+                      { id: 'ACCOUNT_1', name: 'Main Business Account', balance: 184250, number: '852300' },
+                      { id: 'ACCOUNT_2', name: 'Nairobi Branch Account', balance: 45000, number: '852301' },
+                    ].map(account => (
+                      <div
+                        key={account.id}
+                        onClick={() => setSelectedFundingSource(account.id)}
+                        className={`p-6 rounded-2xl border-2 transition-all cursor-pointer ${selectedFundingSource === account.id ? 'border-emerald-500 bg-emerald-50/50 shadow-lg shadow-emerald-500/10' : 'border-outline-variant/10 hover:border-emerald-500/30 bg-white shadow-sm hover:shadow-md'}`}
                       >
                         <div className="flex justify-between items-start mb-6">
                           <div className="flex items-center gap-3">
-                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${selectedTill === till.id ? 'bg-emerald-500 text-white shadow-sm' : 'bg-surface-container-low text-primary'}`}>
-                              <span className="material-symbols-outlined">{selectedTill === till.id ? 'check' : 'storefront'}</span>
+                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${selectedFundingSource === account.id ? 'bg-emerald-500 text-white shadow-sm' : 'bg-surface-container-low text-primary'}`}>
+                              <span className="material-symbols-outlined">{selectedFundingSource === account.id ? 'check' : 'storefront'}</span>
                             </div>
                             <div>
-                              <h5 className="font-bold text-sm text-primary leading-tight">{till.name}</h5>
-                              <p className="text-[10px] text-on-surface-variant font-medium mt-1 opacity-60">Till No: {till.number}</p>
+                              <h5 className="font-bold text-sm text-primary leading-tight">{account.name}</h5>
+                              <p className="text-[10px] text-on-surface-variant font-medium mt-1 opacity-60">Virtual Account No: {account.number}</p>
                             </div>
                           </div>
                         </div>
                         <div className="pt-4 border-t border-outline-variant/5">
                           <p className="text-[9px] text-on-surface-variant uppercase tracking-[0.2em] font-black opacity-40 mb-1.5">Available Balance</p>
-                          <p className="font-headline text-xl text-primary font-bold">{formatKES(till.balance)}</p>
+                          <p className="font-headline text-xl text-primary font-bold">{formatKES(account.balance)}</p>
                         </div>
                       </div>
                     ))}
@@ -1115,7 +1115,7 @@ export default function BulkPay() {
                     )}
                     <button 
                       onClick={step === 1 ? () => setStep(2) : step === 2 ? () => setStep(3) : () => setShowSecurityModal(true)}
-                      disabled={batchTotal === 0 || isLiquidityLow || (step === 3 && !selectedTill)}
+                      disabled={batchTotal === 0 || isLiquidityLow || (step === 3 && !selectedFundingSource)}
                       className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-400 text-[#00351D] px-6 py-2.5 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 group disabled:opacity-20 disabled:grayscale text-xs md:text-sm"
                     >
                       {step === 1 ? 'Review Batch' : step === 2 ? 'Proceed to Settlement' : 'Authorize Batch'}

@@ -146,12 +146,13 @@ export default function BulkPay() {
   const [showCsvUpload, setShowCsvUpload] = useState(false);
   const [showFunding, setShowFunding] = useState(false);
   const [showBatchDetails, setShowBatchDetails] = useState<BatchHistory | null>(null);
-  const [showTillSelect, setShowTillSelect] = useState(false);
+  const [showFundingSourceSelect, setShowFundingSourceSelect] = useState(false);
   const [showSecurity, setShowSecurity] = useState(false);
 
-  // Funding source (till) — mirrors the dashboard's single-till selector,
-  // derived from the merchant's own profile (no separate tills backend).
-  const [selectedTill, setSelectedTill] = useState(false);
+  // Funding source (virtual account) — mirrors the dashboard's single
+  // funding-source selector, derived from the merchant's own profile (no
+  // separate multi-account backend).
+  const [selectedFundingSource, setSelectedFundingSource] = useState(false);
 
   // Security verification (OTP-then-PIN), matches the dashboard's two-step
   // "Verification" modal. The OTP step is not backend-verified on the
@@ -161,7 +162,7 @@ export default function BulkPay() {
   const [securityOtp, setSecurityOtp] = useState('');
 
   // Which batch is pending authorization — set right before opening the
-  // Till Select -> Security flow, consumed once the PIN is confirmed.
+  // Funding Source Select -> Security flow, consumed once the PIN is confirmed.
   const [pendingBatch, setPendingBatch] = useState<{ source: 'manual' | 'csv' } | null>(null);
 
   // Invoices
@@ -767,22 +768,23 @@ export default function BulkPay() {
     setShowAuthorize(true);
   };
 
-  // Till label matches the dashboard's single-till card: derived from the
-  // merchant's own profile, since there's no real multi-till backend.
-  const tillLabel = merchant?.businessName || 'Main Business Till';
-  const tillNumber = merchant?.paybillAccount || '—';
+  // Funding source label matches the dashboard's single funding-source card:
+  // derived from the merchant's own profile, since there's no real
+  // multi-account backend.
+  const fundingSourceLabel = merchant?.businessName || 'Main Business Account';
+  const fundingSourceNumber = merchant?.paybillAccount || '—';
 
   // ── Step 3: confirm funding source, then move to Security (OTP -> PIN) ──
-  const proceedToTillSelect = (source: 'manual' | 'csv') => {
+  const proceedToFundingSourceSelect = (source: 'manual' | 'csv') => {
     setPendingBatch({ source });
     setShowAuthorize(false);
     setShowCsvUpload(false);
-    setSelectedTill(false);
-    setShowTillSelect(true);
+    setSelectedFundingSource(false);
+    setShowFundingSourceSelect(true);
   };
 
-  const confirmTillAndVerify = () => {
-    setShowTillSelect(false);
+  const confirmFundingSourceAndVerify = () => {
+    setShowFundingSourceSelect(false);
     setSecurityStep(1);
     setSecurityOtp('');
     setAuthPin('');
@@ -827,7 +829,7 @@ export default function BulkPay() {
 
       const res = await api.post('/api/bulkpay/authorize', {
         batchRows,
-        fundingSource: tillLabel,
+        fundingSource: fundingSourceLabel,
         pin: authPin,
       });
 
@@ -1532,7 +1534,7 @@ export default function BulkPay() {
               </View>
             </View>
             <TouchableOpacity
-              onPress={() => proceedToTillSelect('manual')}
+              onPress={() => proceedToFundingSourceSelect('manual')}
               className="w-full bg-[#00351d] h-[56px] rounded-full flex-row items-center justify-center"
             >
               <Feather name="arrow-right" size={16} color="#fff" />
@@ -1591,7 +1593,7 @@ export default function BulkPay() {
               </ScrollView>
 
               <TouchableOpacity
-                onPress={() => proceedToTillSelect('csv')}
+                onPress={() => proceedToFundingSourceSelect('csv')}
                 disabled={csvPreview.length === 0}
                 className="w-full bg-[#00351d] h-[56px] rounded-full flex-row items-center justify-center"
                 style={{ opacity: csvPreview.length === 0 ? 0.7 : 1 }}
@@ -1607,26 +1609,26 @@ export default function BulkPay() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* ── Till Select Modal (Step 3: Funding Source) ── */}
-      <Modal visible={showTillSelect} transparent animationType="slide" onRequestClose={() => setShowTillSelect(false)}>
+      {/* ── Funding Source Select Modal (Step 3: Funding Source) ── */}
+      <Modal visible={showFundingSourceSelect} transparent animationType="slide" onRequestClose={() => setShowFundingSourceSelect(false)}>
         <View className="flex-1 justify-end bg-black/50">
-          <TouchableOpacity className="absolute inset-0" activeOpacity={1} onPress={() => setShowTillSelect(false)} />
+          <TouchableOpacity className="absolute inset-0" activeOpacity={1} onPress={() => setShowFundingSourceSelect(false)} />
           <View className="w-full max-w-lg mx-auto bg-white rounded-t-[36px] px-6 pt-4 pb-8 mt-auto">
             <View className="items-center mb-4"><View className="w-12 h-1.5 bg-[#e7ece7] rounded-full" /></View>
             <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#707971] mb-4 ml-1">Select Funding Source</Text>
             <TouchableOpacity
-              onPress={() => setSelectedTill(true)}
+              onPress={() => setSelectedFundingSource(true)}
               activeOpacity={0.85}
-              className={`p-5 rounded-2xl border-2 mb-6 ${selectedTill ? 'border-[#00351d] bg-[#f0fdf4]' : 'border-[#e7ece7] bg-white'}`}
+              className={`p-5 rounded-2xl border-2 mb-6 ${selectedFundingSource ? 'border-[#00351d] bg-[#f0fdf4]' : 'border-[#e7ece7] bg-white'}`}
             >
               <View className="flex-row items-start justify-between mb-5">
                 <View className="flex-row items-center gap-3">
-                  <View className={`w-12 h-12 rounded-xl items-center justify-center ${selectedTill ? 'bg-[#00351d]' : 'bg-[#f7faf7]'}`}>
-                    <Feather name={selectedTill ? 'check' : 'home'} size={18} color={selectedTill ? '#fff' : '#00351d'} />
+                  <View className={`w-12 h-12 rounded-xl items-center justify-center ${selectedFundingSource ? 'bg-[#00351d]' : 'bg-[#f7faf7]'}`}>
+                    <Feather name={selectedFundingSource ? 'check' : 'home'} size={18} color={selectedFundingSource ? '#fff' : '#00351d'} />
                   </View>
                   <View>
-                    <Text className="font-jakarta-bold text-[14px] text-[#0c2010]">{tillLabel}</Text>
-                    <Text className="text-[#707971] font-jakarta-medium text-[11px] mt-0.5">Till No: {tillNumber}</Text>
+                    <Text className="font-jakarta-bold text-[14px] text-[#0c2010]">{fundingSourceLabel}</Text>
+                    <Text className="text-[#707971] font-jakarta-medium text-[11px] mt-0.5">Virtual Account No: {fundingSourceNumber}</Text>
                   </View>
                 </View>
               </View>
@@ -1636,10 +1638,10 @@ export default function BulkPay() {
               </View>
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={confirmTillAndVerify}
-              disabled={!selectedTill}
+              onPress={confirmFundingSourceAndVerify}
+              disabled={!selectedFundingSource}
               className="w-full bg-[#00351d] h-[56px] rounded-full flex-row items-center justify-center"
-              style={{ opacity: selectedTill ? 1 : 0.5 }}
+              style={{ opacity: selectedFundingSource ? 1 : 0.5 }}
             >
               <Text className="text-white font-jakarta-bold text-[15px] mr-2">Continue</Text>
               <Feather name="arrow-right" size={16} color="#fff" />

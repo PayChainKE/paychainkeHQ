@@ -194,7 +194,7 @@ const PrivacyPolicy: React.FC = () => {
 
                 <h3 className="text-lg mt-6 mb-2">2.3 Financial and Transaction Data</h3>
                 <ul className="list-disc pl-6 space-y-1">
-                  <li>M-PESA till number and Paybill details</li>
+                  <li>M-PESA till number, Paybill details, and your PayChain Virtual Account number</li>
                   <li>Transaction history: payment amounts, dates, counterparties, reference numbers</li>
                   <li>Bank account details (where provided for settlements)</li>
                   <li>USDC wallet address (for PROTECT users)</li>

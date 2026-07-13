@@ -35,7 +35,7 @@ const payoutBatchSchema = new mongoose.Schema(
     },
     fundingSource: {
       type: String,
-      default: 'Main Business Till',
+      default: 'Main Business Account',
     },
     transactions: [
       {

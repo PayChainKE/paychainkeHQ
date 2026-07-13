@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 
 const featurePills = [
-  { label: 'Verified Smart Till', icon: Zap },
+  { label: 'Verified Virtual Account', icon: Zap },
   { label: 'Bulk Pay', icon: Users },
   { label: 'Inflation Shield', icon: ShieldCheck },
   { label: 'Cash Advance', icon: TrendingUp },

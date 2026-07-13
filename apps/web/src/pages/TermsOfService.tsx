@@ -143,7 +143,7 @@ const TermsOfService: React.FC = () => {
                 <h2 className="text-2xl mb-4">1. Definitions</h2>
                 <ul className="list-disc pl-6 space-y-2">
                   <li><strong>1.1 "Agreement"</strong> means these Terms of Service, together with our Privacy Policy, any Acceptable Use Policy, and any other policies or supplemental terms incorporated by reference herein.</li>
-                  <li><strong>1.2 "COLLECT"</strong> means PayChain's verified till-number payment collection service.</li>
+                  <li><strong>1.2 "COLLECT"</strong> means PayChain's verified Virtual Account payment collection service.</li>
                   <li><strong>1.3 "Company", "we", "us", or "our"</strong> means PayChain Financial Services Ltd, Company No. PVT-9L1QY658, Nairobi, Kenya.</li>
                   <li><strong>1.4 "GROW"</strong> means PayChain's data-driven merchant Trust Score and working capital access service.</li>
                   <li><strong>1.5 "Merchant" or "you"</strong> means any individual, sole proprietorship, partnership, or legal entity that registers for and uses the Platform.</li>
@@ -201,10 +201,10 @@ const TermsOfService: React.FC = () => {
 
                 <h3 className="text-lg mt-6 mb-2">3.1 COLLECT — Verified Payment Collection</h3>
                 <ul className="list-disc pl-6 space-y-1">
-                  <li>(a) PayChain assigns Merchants a verified till number linked to the PayChain blockchain-anchored verification system.</li>
+                  <li>(a) PayChain assigns Merchants a verified PayChain Virtual Account linked to the PayChain blockchain-anchored verification system.</li>
                   <li>(b) The COLLECT service enables Merchants to receive M-PESA payments with real-time transaction verification, eliminating fake-SMS payment fraud.</li>
                   <li>(c) We do not guarantee uninterrupted availability of COLLECT, as it depends on the availability of the Safaricom M-PESA Daraja API, which is outside our control.</li>
-                  <li>(d) Merchants must not modify, replicate, or misrepresent their verified till number.</li>
+                  <li>(d) Merchants must not modify, replicate, or misrepresent their verified PayChain Virtual Account.</li>
                 </ul>
 
                 <h3 className="text-lg mt-6 mb-2">3.2 PAY — Bulk Payroll and Supplier Settlements</h3>

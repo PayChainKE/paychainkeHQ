@@ -453,7 +453,7 @@ export const authorizeBatch = async (req, res) => {
       totalNetAmount: totalNet,
       payeeCount: transactions.length,
       status: batchStatus,
-      fundingSource: fundingSource || 'Main Business Till',
+      fundingSource: fundingSource || 'Main Business Account',
       transactions,
     });
 
