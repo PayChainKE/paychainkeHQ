@@ -317,7 +317,7 @@ function BusinessProfilePanel({ merchant }: { merchant: any }) {
           <ProfileRow label="Business Name" value={merchant?.businessName || 'N/A'} />
           <ProfileRow label="Email" value={merchant?.email || 'N/A'} />
           <ProfileRow label="Phone" value={merchant?.phone || 'N/A'} />
-          <ProfileRow label="Virtual Account / Paybill" value={merchant?.paybillAccount || 'Pending'} />
+          <ProfileRow label="PayChain Account Number" value={merchant?.paybillAccount || 'Pending'} />
           <ProfileRow label="KRA PIN" value={merchant?.kraPin || 'Not set'} />
           <ProfileRow label="Business Reg Number" value={merchant?.businessNumber || 'Not set'} />
         </View>

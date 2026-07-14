@@ -12,11 +12,23 @@ export default function MyAccountsTab() {
     {
       service: 'PayChain',
       accountNumber: merchant?.paybillAccount || '84729',
-      type: 'Primary Account',
+      type: 'M-Pesa Paybill',
       name: merchant?.businessName || 'Merchant',
       linkedTransferAccount: 'Linked to M-Pesa',
       manager: merchant?.name || 'Owner',
       status: 'Active'
+    },
+    {
+      service: 'NCBA Bank',
+      // ncbaVirtualAccountNumber is null until NCBA_INSTITUTION_PREFIX is
+      // configured on the backend (i.e. until NCBA assigns PayChain's
+      // 4-digit institution code) — show a pending state, not an error.
+      accountNumber: merchant?.ncbaVirtualAccountNumber || 'Pending bank assignment',
+      type: 'Bank / EFT / PesaLink',
+      name: merchant?.businessName || 'Merchant',
+      linkedTransferAccount: 'Direct bank transfer',
+      manager: merchant?.name || 'Owner',
+      status: merchant?.ncbaVirtualAccountNumber ? 'Active' : 'Pending'
     }
   ];
 
@@ -28,7 +40,7 @@ export default function MyAccountsTab() {
         <View className="mb-6">
           <Text className="font-jakarta-extrabold text-[28px] text-[#00351d] tracking-tight leading-tight mb-2">My Accounts</Text>
           <Text className="text-[#707971] text-[14px] font-jakarta-medium leading-relaxed opacity-80">
-            Manage your registered PayChain Virtual Accounts, linked transfer accounts, and assigned managers.
+            Manage your registered PayChain accounts, linked transfer accounts, and assigned managers.
           </Text>
         </View>
 

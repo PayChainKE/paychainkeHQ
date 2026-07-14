@@ -102,7 +102,7 @@ export const simulateIncomingPayment = async (req, res) => {
       merchantId: merchant._id,
       kind: 'payment',
       title: 'Payment received',
-      message: `You received KES ${Number(amount).toLocaleString()} from ${senderName || 'a customer'} via your PayChain Virtual Account ${merchant.paybillAccount}.`,
+      message: `You received KES ${Number(amount).toLocaleString()} from ${senderName || 'a customer'} via your PayChain Account Number ${merchant.paybillAccount}.`,
     });
 
     res.status(201).json({

@@ -654,6 +654,42 @@ export default function DigitalWallet({ navigation }: any) {
             </View>
           </View>
 
+          {/* Bank Transfer / EFT / PesaLink — NCBA Virtual Account */}
+          <View className="bg-white rounded-[32px] p-6 mb-8 border border-[#eff4ef] shadow-sm shadow-[#00351d]/5">
+            <View className="flex-row items-start gap-4 mb-4">
+              <View className="w-11 h-11 rounded-2xl bg-blue-50 items-center justify-center">
+                <MaterialIcons name="account-balance" size={20} color="#2563eb" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-[0.2em] text-[#707971] mb-1">Bank Transfer · EFT · PesaLink</Text>
+                <Text className="font-jakarta-extrabold text-[16px] text-[#00351d] tracking-tight">NCBA Virtual Account</Text>
+                <Text className="text-[#707971] text-[11px] font-jakarta-medium mt-1 leading-relaxed">
+                  Customers can also pay directly from their bank using this dedicated NCBA account number.
+                </Text>
+              </View>
+            </View>
+            {merchant?.ncbaVirtualAccountNumber ? (
+              <View className="flex-row items-center justify-between bg-[#f0fdf4] rounded-2xl px-5 py-4">
+                <Text className="font-jakarta-extrabold text-[16px] text-[#00351d] tracking-widest">{merchant.ncbaVirtualAccountNumber}</Text>
+                <TouchableOpacity
+                  onPress={async () => {
+                    await Clipboard.setStringAsync(merchant.ncbaVirtualAccountNumber);
+                    Alert.alert('Copied', 'NCBA account number copied to clipboard.');
+                  }}
+                  activeOpacity={0.85}
+                  className="p-2.5 bg-[#006c4e] rounded-xl"
+                >
+                  <Feather name="copy" size={15} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View className="flex-row items-center gap-2 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4">
+                <Feather name="clock" size={15} color="#b45309" />
+                <Text className="text-amber-700 text-[11px] font-jakarta-extrabold uppercase tracking-widest">Pending bank assignment</Text>
+              </View>
+            )}
+          </View>
+
           {/* Recent Wallet Activity */}
           <View className="mb-4">
             <View className="flex-row items-center justify-between mb-4">
