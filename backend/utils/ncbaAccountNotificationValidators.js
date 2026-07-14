@@ -10,8 +10,14 @@ export class NcbaAccountNotificationError extends Error {
 }
 
 const EIGHT_DIGIT_RUN = /\b(\d{8})\b/;
+const TWELVE_DIGIT_RUN = /\b(\d{12})\b/;
 
-function findEightDigitCode(text) {
+// `allowTwelveDigitFallback` is only ever passed for Narrative (see
+// extractMerchantCode below) — never for PhoneNr/CustomerName, since a
+// Kenyan MSISDN in 254XXXXXXXXX form is also exactly 12 digits, and blindly
+// slicing "the last 8 digits" out of what's actually a phone number would
+// misattribute the payment instead of just failing safe.
+function findEightDigitCode(text, { allowTwelveDigitFallback = false } = {}) {
   const prefix = process.env.NCBA_INSTITUTION_PREFIX;
   const str = String(text ?? '');
 
@@ -21,7 +27,23 @@ function findEightDigitCode(text) {
   }
 
   const bareMatch = str.match(EIGHT_DIGIT_RUN);
-  return bareMatch ? bareMatch[1] : null;
+  if (bareMatch) return bareMatch[1];
+
+  // Safety net for when NCBA_INSTITUTION_PREFIX isn't configured yet but
+  // the field already carries the full 12-digit virtual account number
+  // (institution prefix + merchant code) as one contiguous run — the
+  // prefix match above can't fire without knowing the prefix's digits, and
+  // \b(\d{8})\b can never match 8 digits out of the middle of a 12-digit
+  // run (there's no word-boundary between two adjacent digits). The
+  // merchant code is always the last 8 digits of that 12-digit number by
+  // construction (see generateMerchantCode/getNcbaVirtualAccountNumber),
+  // so this is a safe positional extraction, not a guess.
+  if (allowTwelveDigitFallback) {
+    const twelveMatch = str.match(TWELVE_DIGIT_RUN);
+    if (twelveMatch) return twelveMatch[1].slice(-8);
+  }
+
+  return null;
 }
 
 function logStructuralConflict(fields) {
@@ -68,7 +90,7 @@ function logStructuralConflict(fields) {
  * arrived that we couldn't attribute to any merchant.
  */
 export function extractMerchantCode({ narrative, phoneNr, customerName, transId } = {}) {
-  const narrativeCode = findEightDigitCode(narrative);
+  const narrativeCode = findEightDigitCode(narrative, { allowTwelveDigitFallback: true });
   const phoneCode = findEightDigitCode(phoneNr);
   const customerNameCode = findEightDigitCode(customerName);
 
