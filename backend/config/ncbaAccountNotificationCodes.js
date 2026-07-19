@@ -27,6 +27,7 @@ export const RECONCILABLE_TXN_TYPES = new Set([
   '887', // Pesalink Transfer
   '549', // Internal Transfer
   '550', // Internal Transfer
+  '171', // Payment Credit (confirmed via Rose Soy UAT test, FTC260715IUTY)
 ]);
 
 export function isReconcilableTxnType(transType) {
