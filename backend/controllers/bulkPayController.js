@@ -4,6 +4,7 @@ import Merchant from '../models/Merchant.js';
 import Transaction from '../models/Transaction.js';
 import { calculatePAYE } from '../utils/kraCalculator.js';
 import { generateSecurityCredential } from '../utils/safaricomCrypto.js';
+import { submitNcbaBankTransfer } from './ncbaOpenBankingController.js';
 import axios from 'axios';
 import csv from 'csv-parser';
 import fs from 'fs';
@@ -30,7 +31,7 @@ export const addPayee = async (req, res) => {
   try {
     const {
       name, type, paymentMethod, mobileMoneyType, phone, paybillNumber,
-      businessAccount, tillNumber, bankName, accountNumber, kraPin, idNumber,
+      businessAccount, tillNumber, bankName, accountNumber, bankCode, kraPin, idNumber,
       nssfNumber, shifNumber, etimsInvoiceNumber, cuNumber, defaultAmount
     } = req.body;
 
@@ -48,7 +49,7 @@ export const addPayee = async (req, res) => {
     const payee = new Payee({
       merchantId: req.merchant._id,
       name, type, paymentMethod, mobileMoneyType, phone, paybillNumber,
-      businessAccount, tillNumber, bankName, accountNumber, kraPin, idNumber,
+      businessAccount, tillNumber, bankName, accountNumber, bankCode, kraPin, idNumber,
       nssfNumber, shifNumber, etimsInvoiceNumber, cuNumber, defaultAmount
     });
 
@@ -66,7 +67,7 @@ export const updatePayee = async (req, res) => {
   try {
     const {
       name, type, paymentMethod, mobileMoneyType, phone, paybillNumber,
-      businessAccount, tillNumber, bankName, accountNumber, kraPin, idNumber,
+      businessAccount, tillNumber, bankName, accountNumber, bankCode, kraPin, idNumber,
       nssfNumber, shifNumber, etimsInvoiceNumber, cuNumber, defaultAmount
     } = req.body;
 
@@ -88,7 +89,7 @@ export const updatePayee = async (req, res) => {
       req.params.id,
       {
         name, type, paymentMethod, mobileMoneyType, phone, paybillNumber,
-        businessAccount, tillNumber, bankName, accountNumber, kraPin, idNumber,
+        businessAccount, tillNumber, bankName, accountNumber, bankCode, kraPin, idNumber,
         nssfNumber, shifNumber, etimsInvoiceNumber, cuNumber, defaultAmount,
         updatedAt: new Date()
       },
@@ -337,12 +338,38 @@ export const authorizeBatch = async (req, res) => {
         await payee.save();
       }
 
-      // Bank transfers aren't wired to a live settlement rail yet — leave them
-      // pending for manual processing rather than pretending they were paid.
       let darajaStatus = 'pending';
       let darajaRef = `BULK_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
-      if (payee.paymentMethod === 'Mobile Money') {
+      if (payee.paymentMethod === 'Bank') {
+        if (!payee.bankCode || !payee.accountNumber) {
+          darajaStatus = 'failed';
+          refundAmount += row.netAmount;
+          console.error(`❌ Bulk payout to ${payee.name} failed: no bank code on file for this payee.`);
+        } else {
+          try {
+            const { transactionId } = await submitNcbaBankTransfer({
+              businessName: merchant.businessName,
+              bankCode: payee.bankCode,
+              accountNumber: payee.accountNumber,
+              accountName: payee.name,
+              amount: row.netAmount,
+              narration: `Bulk Payout to ${payee.name}`,
+            });
+            // Unlike the Mobile Money branch below (which only gets an
+            // "accepted" ack here and confirms completion later via
+            // Daraja's b2c-callback), NCBA PesaLink resolves synchronously
+            // — submitNcbaBankTransfer already throws on rejection, so
+            // reaching this line means the transfer succeeded.
+            darajaRef = transactionId;
+            darajaStatus = 'completed';
+          } catch (err) {
+            console.error(`❌ NCBA PesaLink rejected payout for ${payee.name}:`, err.message);
+            darajaStatus = 'failed';
+            refundAmount += row.netAmount;
+          }
+        }
+      } else if (payee.paymentMethod === 'Mobile Money') {
         if (liveBlocked) {
           darajaStatus = 'failed';
           refundAmount += row.netAmount;
@@ -400,11 +427,14 @@ export const authorizeBatch = async (req, res) => {
         }
       }
 
-      // Record standard Transaction ledger entry
+      // Record standard Transaction ledger entry. Bank-routed rows use
+      // 'ncba_outbound' (fee-mapped to ncba_disbursement_fee in
+      // revenueRateCard.js), matching services/ncbaBulkPaymentService.js's
+      // convention, rather than 'bulk_pay' which earns no fee for those.
       await Transaction.create({
         merchantId: merchant._id,
         accountNumber: merchant.paybillAccount || 'WALLET_FUND',
-        type: 'bulk_pay',
+        type: payee.paymentMethod === 'Bank' ? 'ncba_outbound' : 'bulk_pay',
         amount: row.netAmount,
         kesAmount: row.netAmount,
         currency: 'KES',

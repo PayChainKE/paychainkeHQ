@@ -87,6 +87,8 @@ export default function SendMoney() {
   const [step, setStep] = useState(1)
   const [destination, setDestination]       = useState('')
   const [recipientAccount, setRecipientAccount] = useState('')
+  const [bankCode, setBankCode]             = useState('')
+  const [bankCodes, setBankCodes]           = useState([])
   const [amount, setAmount]                 = useState('')
   const [reference, setReference]           = useState('')
   const [pin, setPin]                       = useState('')
@@ -116,6 +118,13 @@ export default function SendMoney() {
   const totalSteps  = hasPin ? 3 : 4
 
   useEffect(() => { setPinError('') }, [pin, newPin, confirmPin])
+
+  useEffect(() => {
+    if (destination !== 'bank' || bankCodes.length > 0) return
+    axios.get(`${API_URL}/api/v1/openbanking/bank-codes`, cfg())
+      .then(res => setBankCodes(res.data?.bankCodes || []))
+      .catch(e => console.error('Failed to load bank codes', e))
+  }, [destination])
 
   const goNext = async () => {
     if (step < (hasPin ? 2 : 3)) { setStep(s => s + 1); return }
@@ -160,6 +169,15 @@ export default function SendMoney() {
             fee,
             reference,
           }, cfg())
+        } else if (destination === 'bank') {
+          await axios.post(`${API_URL}/api/v1/openbanking/bank-payout`, {
+            bankCode,
+            accountNumber: recipientAccount,
+            accountName: reference || undefined,
+            amount: Number(amount),
+            narration: reference || `Transfer to ${recipientAccount}`,
+            pin,
+          }, cfg())
         } else {
           await axios.post(`${API_URL}/api/transactions/send-money`, {
             destination: recipientAccount,
@@ -187,7 +205,7 @@ export default function SendMoney() {
 
   const canContinue = () => {
     if (step === 1) return !!destination
-    if (step === 2) return !!amount && Number(amount) > 0 && !!recipientAccount
+    if (step === 2) return !!amount && Number(amount) > 0 && !!recipientAccount && (destination !== 'bank' || !!bankCode)
     if (!hasPin && step === 3) return newPin.length === 4 && confirmPin.length === 4
     if (step === confirmStep) return pin.length === 4
     return true
@@ -339,6 +357,22 @@ export default function SendMoney() {
                   <p className="text-[10px] text-slate-400">Fee: {fee === 0 ? 'Free' : formatKES(fee)}</p>
                 </div>
               </div>
+
+              {destination === 'bank' && (
+                <div className="space-y-2">
+                  <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Bank</label>
+                  <select
+                    value={bankCode}
+                    onChange={e => setBankCode(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 px-4 text-primary font-bold focus:border-[#00351D] focus:ring-2 focus:ring-[#00351D]/10 outline-none transition-all"
+                  >
+                    <option value="">Select destination bank</option>
+                    {bankCodes.map(b => (
+                      <option key={b.code} value={b.code}>{b.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">

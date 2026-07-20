@@ -1,6 +1,7 @@
 import express from 'express';
 import { handleNcbaReconciliationWebhook, handleInitiateBulkPayment } from '../controllers/ncbaController.js';
 import { handleNcbaAccountNotification } from '../controllers/ncbaAccountNotificationController.js';
+import { handleBankPayout, handlePesaLinkCallback, getBankCodes } from '../controllers/ncbaOpenBankingController.js';
 import { protectMerchant } from '../middleware/authMiddleware.js';
 import { timingSafeStringEqual } from '../utils/timingSafeCompare.js';
 
@@ -77,5 +78,17 @@ router.post(
 
 // Merchant-initiated NCBA bulk disbursements (suppliers + utility payouts).
 router.post('/bulk-payments', protectMerchant, handleInitiateBulkPayment);
+
+// Merchant-initiated single withdrawal to a bank account via NCBA Open
+// Banking's PesaLink rail — see controllers/ncbaOpenBankingController.js.
+router.post('/openbanking/bank-payout', protectMerchant, handleBankPayout);
+router.get('/openbanking/bank-codes', protectMerchant, getBankCodes);
+
+// Public webhook — NCBA's Open Banking per-transaction result callback. Not
+// currently invoked by anything (PesaLink/EFT resolve synchronously and
+// don't accept a callbackUrl per NCBA's UAT Guide); kept ready for
+// whichever async rail (KPLC/water/mobile wallet) gets wired up next — see
+// handlePesaLinkCallback's doc comment.
+router.post('/webhooks/ncba-openbanking-callback', handlePesaLinkCallback);
 
 export default router;
