@@ -3,6 +3,7 @@ import axios from 'axios'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import { formatKES, formatUSDC } from '../utils/formatCurrency'
 import { formatDateISO } from '../utils/formatDate'
+import { getAmountSign, getAmountColorClass, isCreditTransaction, isSwapTransaction } from '../utils/transactionDirection'
 import { ValidatedInput } from '../components/ValidatedInput'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useToast } from '../context/NotificationContext'
@@ -1003,19 +1004,19 @@ export default function Wallet() {
                 <div key={tx.id} className="px-4 md:px-8 py-2.5 flex items-center justify-between hover:bg-surface-container-low/30 transition-all group border-b border-surface-container last:border-0">
                   <div className="flex items-center gap-3 md:gap-4">
                     <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center text-base md:text-lg shadow-sm border ${
-                      (tx.type === 'withdrawal' || tx.type === 'outbound' || tx.type === 'settlement' || tx.type === 'bulk_pay') ? 'bg-amber-50 text-amber-600 border-amber-100' : 
-                      tx.type === 'inbound' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                      'bg-blue-50 text-blue-600 border-blue-100'
+                      isCreditTransaction(tx.type) ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                      isSwapTransaction(tx.type) ? 'bg-purple-50 text-purple-600 border-purple-100' :
+                      'bg-rose-50 text-rose-600 border-rose-100'
                     }`}>
                       <span className="material-symbols-outlined text-base md:text-lg">
-                        {(tx.type === 'withdrawal' || tx.type === 'outbound' || tx.type === 'settlement' || tx.type === 'bulk_pay') ? 'logout' : 
-                         tx.type === 'inbound' ? 'login' : 'sync'}
+                        {isCreditTransaction(tx.type) ? 'login' :
+                         isSwapTransaction(tx.type) ? 'sync' : 'logout'}
                       </span>
                     </div>
                     <div>
                       <p className="text-[11px] md:text-xs font-bold text-primary capitalize">
-                        {tx.type === 'inbound' ? 'Funds Deposit' : 
-                         (tx.type === 'withdrawal' || tx.type === 'outbound' || tx.type === 'settlement' || tx.type === 'bulk_pay') ? 'Funds Withdrawal' : 'Currency Swap'}
+                        {isCreditTransaction(tx.type) ? 'Funds Deposit' :
+                         isSwapTransaction(tx.type) ? 'Currency Swap' : 'Funds Withdrawal'}
                       </p>
                       <div className="flex items-center gap-2 mt-0.5">
                         <p className="text-[9px] md:text-[10px] text-on-surface-variant font-medium opacity-60">{formatDateISO(tx.createdAt || tx.timestamp)}</p>
@@ -1025,8 +1026,8 @@ export default function Wallet() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className={`text-[11px] md:text-xs font-black text-primary transition-all duration-300 ${!showAmounts && 'blur-sm'}`}>
-                      {tx.type === 'inbound' ? '+' : (tx.type === 'withdrawal' || tx.type === 'outbound' || tx.type === 'settlement' || tx.type === 'bulk_pay' ? '-' : '')}{tx.type === 'fx_swap' ? formatUSDC(tx.usdcAmount) : formatKES(tx.kesAmount || tx.amount || 0)}
+                    <p className={`text-[11px] md:text-xs font-black tabular-nums transition-all duration-300 ${!showAmounts && 'blur-sm'} ${getAmountColorClass(tx.type)}`}>
+                      {getAmountSign(tx.type)}{tx.type === 'fx_swap' ? formatUSDC(tx.usdcAmount) : formatKES(tx.kesAmount || tx.amount || 0)}
                     </p>
                     <span className={`text-[8px] md:text-[9px] px-2 py-0.5 rounded font-bold uppercase tracking-widest mt-0.5 inline-block ${
                        tx.status === 'completed' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'

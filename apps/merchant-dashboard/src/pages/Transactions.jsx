@@ -5,6 +5,7 @@ import CalendarRangePicker from '../components/ui/CalendarRangePicker'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { formatDateISO } from '../utils/formatDate'
 import { formatKES, formatUSDC } from '../utils/formatCurrency'
+import { getAmountSign, getAmountColorClass } from '../utils/transactionDirection'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useNotification } from '../context/NotificationContext'
 import logo from '../assets/logo2.png'
@@ -522,16 +523,8 @@ export default function Transactions() {
     if (tx.type === 'fx_swap') return `${(tx.usdcAmount || 0).toFixed(4)} USDC`
     return formatKES(tx.amount || tx.kesAmount || 0)
   }
-  const txSign = (tx) => {
-    if (['inbound', 'top_up'].includes(tx.type)) return '+'
-    if (tx.type === 'fx_swap') return '±'
-    return '-'
-  }
-  const txAmountColor = (tx) => {
-    if (['inbound', 'top_up'].includes(tx.type)) return 'text-emerald-600'
-    if (tx.type === 'fx_swap') return 'text-purple-600'
-    return 'text-primary'
-  }
+  const txSign = (tx) => getAmountSign(tx.type)
+  const txAmountColor = (tx) => getAmountColorClass(tx.type)
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -662,7 +655,7 @@ export default function Transactions() {
                           <p className="text-[10px] font-mono text-on-surface-variant group-hover:text-primary transition-colors leading-tight">{tx.reference}</p>
                         </td>
                         <td className="px-6 py-2">
-                          <p className={`text-[13px] font-bold transition-all duration-300 ${txAmountColor(tx)}`}>
+                          <p className={`text-[13px] font-bold tabular-nums transition-all duration-300 ${txAmountColor(tx)}`}>
                             {txSign(tx)}{txAmount(tx)}
                           </p>
                         </td>
@@ -713,7 +706,7 @@ export default function Transactions() {
                   </p>
 
                   {/* Amount */}
-                  <p className={`text-xl font-headline tracking-tighter ${txAmountColor(tx)}`}>
+                  <p className={`text-xl font-headline tracking-tighter tabular-nums ${txAmountColor(tx)}`}>
                     {txSign(tx)}{txAmount(tx)}
                   </p>
 
@@ -804,8 +797,8 @@ export default function Transactions() {
                   {/* Settlement Section */}
                   <div className="space-y-3">
                     <p className="text-[10px] text-on-surface-variant/60 font-bold uppercase tracking-[0.2em]">Settlement</p>
-                    <p className={`text-3xl lg:text-4xl font-headline text-primary transition-all duration-300 ${!showAmounts && 'blur-lg'}`}>
-                      {selectedTx.type === 'fx_swap' ? formatUSDC(selectedTx.usdcAmount) : formatKES(selectedTx.amount || selectedTx.kesAmount || 0)}
+                    <p className={`text-3xl lg:text-4xl font-headline tabular-nums transition-all duration-300 ${!showAmounts && 'blur-lg'} ${getAmountColorClass(selectedTx.type)}`}>
+                      {getAmountSign(selectedTx.type)}{selectedTx.type === 'fx_swap' ? formatUSDC(selectedTx.usdcAmount) : formatKES(selectedTx.amount || selectedTx.kesAmount || 0)}
                     </p>
                   </div>
 

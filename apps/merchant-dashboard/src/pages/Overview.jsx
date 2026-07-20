@@ -3,6 +3,7 @@ import axios from 'axios'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import RevenueChart from '../components/charts/RevenueChart'
 import { formatKES, formatUSDC } from '../utils/formatCurrency'
+import { getAmountSign, getAmountColorClassWithHover, isCreditTransaction, isSwapTransaction } from '../utils/transactionDirection'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { useNavigate } from 'react-router-dom'
@@ -506,16 +507,13 @@ export default function Overview() {
               recentTx.map(tx => {
                 const party = tx.sender?.name || tx.recipient?.name || 'PayChain'
                 const initials = party.slice(0, 2).toUpperCase()
-                const isIn  = tx.type === 'inbound'
-                const isSwp = tx.type === 'fx_swap'
-                const sign  = isIn ? '+' : isSwp ? '±' : '-'
+                const isIn  = isCreditTransaction(tx.type)
+                const isSwp = isSwapTransaction(tx.type)
+                const sign  = getAmountSign(tx.type)
                 const displayAmt = isSwp
                   ? `${(tx.usdcAmount || 0).toFixed(4)} USDC`
                   : formatKES(tx.kesAmount || tx.amount || 0)
-                const amtColor = isIn
-                  ? 'text-emerald-700 group-hover:text-[#5EFEB3]'
-                  : isSwp ? 'text-purple-400 group-hover:text-purple-300'
-                  : 'text-rose-500 group-hover:text-rose-400'
+                const amtColor = getAmountColorClassWithHover(tx.type)
                 const TYPE_LABEL = { inbound: 'Payment In', outbound: 'Withdrawal', fx_swap: 'FX Swap', bulk_pay: 'Bulk Pay', settlement: 'Settlement' }
                 return (
                   <div key={tx._id || tx.id} className="px-4 lg:px-8 py-2.5 lg:py-3 flex items-center justify-between hover:bg-[#00351D] transition-all group cursor-pointer border-b border-slate-200 last:border-0">
@@ -541,7 +539,7 @@ export default function Overview() {
                     </div>
 
                     <div className="flex flex-col items-end shrink-0 ml-3">
-                      <p className={`text-[12px] lg:text-[13px] font-black transition-colors leading-none mb-1 ${amtColor}`}>
+                      <p className={`text-[12px] lg:text-[13px] font-black tabular-nums transition-colors leading-none mb-1 ${amtColor}`}>
                         {sign}{displayAmt}
                       </p>
                       <p className="text-[8px] text-on-surface-variant font-bold opacity-30 tracking-widest group-hover:text-white/30 transition-colors uppercase">
