@@ -250,6 +250,7 @@ export const verifyMerchantOTP = async (req, res) => {
         settlementMobile: merchant.settlementMobile,
         settlementBankName: merchant.settlementBankName,
         settlementBankAccount: merchant.settlementBankAccount,
+        settlementBankCode: merchant.settlementBankCode,
         hasBulkPayPin: !!merchant.bulkPayPin,
         hasAppPin: !!merchant.appPin,
         biometricsEnabled: merchant.biometricsEnabled,
@@ -832,6 +833,7 @@ export const getMerchantMe = async (req, res) => {
         settlementMobile: merchant.settlementMobile,
         settlementBankName: merchant.settlementBankName,
         settlementBankAccount: merchant.settlementBankAccount,
+        settlementBankCode: merchant.settlementBankCode,
         hasBulkPayPin: !!merchant.bulkPayPin,
         hasAppPin: !!merchant.appPin,
         biometricsEnabled: merchant.biometricsEnabled,
@@ -854,7 +856,7 @@ export const updateMerchantProfile = async (req, res) => {
       return res.status(404).json({ error: 'Merchant not found' });
     }
 
-    const { kraPin, businessNumber, settlementMobile, settlementBankName, settlementBankAccount } = req.body;
+    const { kraPin, businessNumber, settlementMobile, settlementBankName, settlementBankAccount, settlementBankCode } = req.body;
     
     // Validate KRA Pin and Mock eTIMS API
     if (kraPin !== undefined && kraPin !== merchant.kraPin) {
@@ -884,6 +886,9 @@ export const updateMerchantProfile = async (req, res) => {
     }
     if (settlementBankAccount !== undefined && settlementBankAccount !== merchant.settlementBankAccount) {
       merchant.settlementBankAccount = settlementBankAccount; changedFields.push('settlementBankAccount');
+    }
+    if (settlementBankCode !== undefined && settlementBankCode !== merchant.settlementBankCode) {
+      merchant.settlementBankCode = settlementBankCode; changedFields.push('settlementBankCode');
     }
 
     await merchant.save();

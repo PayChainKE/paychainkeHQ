@@ -159,6 +159,13 @@ const merchantSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
+  // NCBA bank clearing code (see config/kenyanBankCodes.js) for
+  // settlementBankAccount — required to route a merchant's own bank
+  // withdrawal through NCBA PesaLink/EFT.
+  settlementBankCode: {
+    type: String,
+    default: null,
+  },
   kesBalance: {
     type: Number,
     default: 0,

@@ -1,0 +1,297 @@
+import bcrypt from 'bcryptjs';
+import Merchant from '../models/Merchant.js';
+import Transaction from '../models/Transaction.js';
+import PayoutBatch from '../models/PayoutBatch.js';
+import {
+  validatePesaLinkAccount,
+  submitPesaLinkTransfer,
+  NcbaOpenBankingValidationError,
+} from '../services/ncbaOpenBankingService.js';
+import { createNotification } from './notificationController.js';
+import { safeSendSMS } from '../utils/smsSanitizer.js';
+import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
+import { KENYAN_BANK_CODES } from '../config/kenyanBankCodes.js';
+
+export class InsufficientFundsError extends Error {
+  constructor(merchantId, requested, available) {
+    super(`Merchant ${merchantId} has insufficient balance: requested ${requested}, available ${available}`);
+    this.name = 'InsufficientFundsError';
+  }
+}
+
+function logEvent(level, event, fields) {
+  const line = JSON.stringify({ level, event, ts: new Date().toISOString(), ...fields });
+  if (level === 'error') console.error(line);
+  else if (level === 'warn') console.warn(line);
+  else console.log(line);
+}
+
+/**
+ * Validates the destination and submits a PesaLink transfer. Pure
+ * submit-only helper — does NOT touch Merchant balance or create a
+ * Transaction record, so it's safe to call from contexts that already
+ * manage their own balance reservation (bulkPayController.authorizeBatch's
+ * Bank branch reserves the whole batch's total upfront, one level above
+ * this per-row call).
+ *
+ * Per NCBA's UAT Guide, PesaLink resolves synchronously — if this resolves
+ * at all, the transfer succeeded (submitPesaLinkTransfer throws on a
+ * non-'000' resultCode, unlike M-Pesa's B2C/bulk-pay rails, which only ever
+ * report "accepted" here and confirm completion later via a callback).
+ *
+ * Throws NcbaOpenBankingValidationError on bad input or a failed
+ * destination-account validation, or NcbaOpenBankingRequestError on a
+ * synchronous rejection from NCBA.
+ */
+export async function submitNcbaBankTransfer({ businessName, bankCode, accountNumber, accountName, amount, narration }) {
+  const numericAmount = Number(amount);
+  if (!bankCode || !accountNumber || !Number.isFinite(numericAmount) || numericAmount <= 0) {
+    throw new NcbaOpenBankingValidationError('bankCode, accountNumber and a positive amount are required for a bank payout');
+  }
+
+  // Fail fast on a bad destination account before touching balance.
+  await validatePesaLinkAccount({
+    bankCode,
+    accountNumber,
+    debitAccount: process.env.NCBA_OPENBANKING_ACCOUNT_NUMBER,
+  });
+
+  const transactionId = `NCBA-PL-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+
+  const hostResponse = await submitPesaLinkTransfer({
+    transactionId,
+    beneficiaryAccountNumber: accountNumber,
+    beneficiaryBankCode: bankCode,
+    beneficiaryName: accountName || 'PayChain Payout',
+    amount: numericAmount,
+    narration: narration || `PayChain Payout - ${businessName || 'Merchant'}`,
+  });
+
+  return { transactionId, hostResponse };
+}
+
+/**
+ * Atomically reserves a merchant's balance and submits a PesaLink transfer
+ * in one call — used by handleBankPayout below (single, merchant-initiated
+ * withdrawals) where balance hasn't been reserved by anything else yet.
+ *
+ * Throws NcbaOpenBankingValidationError, InsufficientFundsError, or
+ * whatever ncbaOpenBankingService throws on a submission failure (after
+ * refunding the reservation).
+ */
+export async function executeNcbaBankPayout({ merchantId, bankCode, accountNumber, accountName, amount, narration }) {
+  const numericAmount = Number(amount);
+
+  // Fail fast on a bad destination account before touching balance —
+  // submitNcbaBankTransfer would validate again below, but checking here
+  // too avoids reserving funds for input that's already known-invalid.
+  if (!bankCode || !accountNumber || !Number.isFinite(numericAmount) || numericAmount <= 0) {
+    throw new NcbaOpenBankingValidationError('bankCode, accountNumber and a positive amount are required for a bank payout');
+  }
+
+  // Atomically reserve funds — the $gte guard means this either fully
+  // succeeds (balance was sufficient) or matches zero documents (it
+  // wasn't), so no read-then-write gap for a concurrent request to race
+  // through. Mirrors services/ncbaBulkPaymentService.js's reservation
+  // pattern.
+  const reservedMerchant = await Merchant.findOneAndUpdate(
+    { _id: merchantId, kesBalance: { $gte: numericAmount } },
+    { $inc: { kesBalance: -numericAmount } },
+    { returnDocument: 'after' }
+  );
+
+  if (!reservedMerchant) {
+    const merchant = await Merchant.findById(merchantId);
+    throw new InsufficientFundsError(merchantId, numericAmount, merchant?.kesBalance ?? 0);
+  }
+
+  let transactionId, hostResponse;
+  try {
+    ({ transactionId, hostResponse } = await submitNcbaBankTransfer({
+      businessName: reservedMerchant.businessName, bankCode, accountNumber, accountName, amount: numericAmount, narration,
+    }));
+  } catch (err) {
+    // Submission never reached (or was rejected outright by) NCBA — refund
+    // the reservation in full since nothing was disbursed.
+    await Merchant.findByIdAndUpdate(merchantId, { $inc: { kesBalance: numericAmount } });
+    throw err;
+  }
+
+  const transaction = await Transaction.create({
+    merchantId,
+    accountNumber: reservedMerchant.paybillAccount || 'WALLET_FUND',
+    // Already fee-mapped to the ncba_disbursement_fee revenue stream (see
+    // config/revenueRateCard.js) — unlike 'withdrawal', which earns nothing.
+    type: 'ncba_outbound',
+    amount: numericAmount,
+    kesAmount: numericAmount,
+    currency: 'KES',
+    // 'completed', not 'pending' — PesaLink resolves synchronously (see
+    // submitNcbaBankTransfer); by this point NCBA has already confirmed
+    // the transfer succeeded, or an error was thrown and caught above.
+    status: 'completed',
+    reference: transactionId,
+    sender: { name: reservedMerchant.businessName, id: process.env.NCBA_OPENBANKING_ACCOUNT_NUMBER || 'PAYCHAIN_NCBA_ACCOUNT' },
+    recipient: { name: accountName || 'Bank Account', id: accountNumber },
+  });
+
+  return { transaction, hostResponse, merchant: reservedMerchant };
+}
+
+// @desc    List NCBA-recognized bank clearing codes, for the merchant
+//          dashboard's bank-destination picker.
+// @route   GET /openbanking/bank-codes (mounted at /api/v1 and /v1)
+// @access  Private (merchant)
+export const getBankCodes = (req, res) => {
+  res.json({ bankCodes: KENYAN_BANK_CODES });
+};
+
+// @desc    Merchant-initiated single withdrawal to a bank account via NCBA PesaLink
+// @route   POST /openbanking/bank-payout (mounted at /api/v1 and /v1)
+// @access  Private (merchant)
+export const handleBankPayout = async (req, res) => {
+  const merchantId = req.merchant._id;
+  const { bankCode, accountNumber, accountName, amount, narration, pin } = req.body;
+
+  try {
+    if (!pin || String(pin).length !== 4) {
+      return res.status(400).json({ error: 'A valid 4-digit payment PIN is required.' });
+    }
+
+    // PIN checked inline, within this same request that executes the
+    // transfer — deliberately not the decoupled verify-payment-pin
+    // pre-flight pattern the frontend uses elsewhere, which nothing
+    // server-side actually enforces.
+    const merchant = await Merchant.findById(merchantId).select('+appPin');
+    if (!merchant) return res.status(404).json({ error: 'Merchant not found' });
+
+    if (!merchant.appPin) {
+      return res.status(400).json({ error: 'Please set up your payment PIN first.', pinNotSet: true });
+    }
+
+    const pinMatches = await bcrypt.compare(String(pin), merchant.appPin);
+    if (!pinMatches) {
+      return res.status(401).json({ error: 'Incorrect PIN. Please try again.' });
+    }
+
+    const { transaction, hostResponse, merchant: updatedMerchant } = await executeNcbaBankPayout({
+      merchantId, bankCode, accountNumber, accountName, amount, narration,
+    });
+
+    createNotification({
+      merchantId,
+      kind: 'payment',
+      title: 'Bank payout completed',
+      message: `KES ${Number(amount).toLocaleString()} was sent to your bank account via PesaLink.`,
+    }).catch((e) => logEvent('error', 'ncba_openbanking_payout_notification_failed', { transactionId: transaction.reference, error: e.message }));
+
+    res.status(200).json({
+      success: true,
+      message: 'Bank transfer completed via NCBA PesaLink.',
+      transaction,
+      newBalance: updatedMerchant.kesBalance,
+      hostResponse,
+    });
+  } catch (err) {
+    if (err instanceof InsufficientFundsError) {
+      return res.status(400).json({ error: 'Insufficient KES balance for this transfer.' });
+    }
+    if (err instanceof NcbaOpenBankingValidationError) {
+      return res.status(400).json({ error: err.message });
+    }
+    logEvent('error', 'ncba_openbanking_payout_error', { merchantId: merchantId.toString(), error: err.message, stack: err.stack });
+    res.status(502).json({ error: 'Failed to process bank payout. Please try again.' });
+  }
+};
+
+// @desc    NCBA Open Banking per-transaction result callback — distinct
+//          from the account-level SOAP notification webhook
+//          (ncbaAccountNotificationController.js).
+//
+//          NOT currently invoked: per NCBA's UAT Guide, PesaLink/EFT
+//          (the only rails this module submits today) resolve
+//          synchronously and don't accept a callbackUrl at all — unlike
+//          NCBA's bill-pay/wallet endpoints (KPLC, water, KRA, mobile
+//          wallets), which DO carry a callbackUrl and report an
+//          "accepted" response before confirming later. This route is
+//          kept in place, ready for whichever of those async rails gets
+//          wired up next — it's a harmless no-op today since nothing
+//          created by this module is ever left 'pending' for it to match.
+// @route   POST /webhooks/ncba-openbanking-callback (mounted at /api/v1 and /v1)
+// @access  Public (NCBA host-to-host)
+export const handlePesaLinkCallback = async (req, res) => {
+  // Ack immediately — same "banks retry on non-200/slow response"
+  // convention as the account-notification webhook and mpesaController's
+  // b2cCallback.
+  res.status(200).json({ resultCode: '0', resultDescription: 'Accepted' });
+
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const reference = body.TransactionID || body.transactionId || body.reference;
+  if (!reference) {
+    logEvent('warn', 'ncba_openbanking_callback_missing_reference', { body });
+    return;
+  }
+
+  try {
+    const succeeded = ['SUCCESS', 'COMPLETED', '0'].includes(String(body.Status || body.status || '').toUpperCase());
+
+    const transaction = await Transaction.findOne({ reference });
+    if (!transaction || transaction.status !== 'pending') {
+      logEvent('info', 'ncba_openbanking_callback_no_pending_match', { reference });
+      return;
+    }
+
+    transaction.status = succeeded ? 'completed' : 'failed';
+    await transaction.save();
+
+    let merchantForSms = null;
+    if (!succeeded) {
+      // The payout never landed — return the funds to the merchant's balance.
+      merchantForSms = await Merchant.findByIdAndUpdate(
+        transaction.merchantId,
+        { $inc: { kesBalance: transaction.amount } },
+        { returnDocument: 'after' }
+      );
+    } else {
+      merchantForSms = await Merchant.findById(transaction.merchantId).select('phone');
+    }
+
+    createNotification({
+      merchantId: transaction.merchantId,
+      kind: 'payment',
+      title: succeeded ? 'Bank payout completed' : 'Bank payout failed',
+      message: succeeded
+        ? `KES ${transaction.amount.toLocaleString()} was successfully sent to ${transaction.recipient?.name || 'the recipient'}.`
+        : `KES ${transaction.amount.toLocaleString()} bank payout to ${transaction.recipient?.name || 'the recipient'} failed and was refunded to your balance.`,
+    }).catch((e) => logEvent('error', 'ncba_openbanking_callback_notification_failed', { reference, error: e.message }));
+
+    if (merchantForSms?.phone) {
+      const { date, time } = formatTransactionDateTime();
+      const recipientName = transaction.recipient?.name || 'the recipient';
+      const message = succeeded
+        ? `${reference} Bank Payout Sent. KES ${transaction.amount.toLocaleString()} paid to ${recipientName} on ${date} at ${time}.`
+        : `${reference} Bank Payout Failed. KES ${transaction.amount.toLocaleString()} to ${recipientName} could not be completed on ${date} at ${time} and has been refunded. Your updated PayChain available balance is KES ${(merchantForSms.kesBalance || 0).toLocaleString()}.`;
+      safeSendSMS({ to: merchantForSms.phone, message }).then((r) => {
+        if (!r.success) logEvent('error', 'ncba_openbanking_callback_sms_failed', { reference, error: r.error });
+      });
+    }
+
+    // Update the matching row inside a bulk-pay batch, if this reference belongs to one.
+    const batch = await PayoutBatch.findOne({ 'transactions.receiptNumber': reference });
+    if (batch) {
+      const row = batch.transactions.find((t) => t.receiptNumber === reference);
+      if (row && row.status === 'pending') {
+        row.status = succeeded ? 'completed' : 'failed';
+        const statuses = batch.transactions.map((t) => t.status);
+        if (statuses.every((s) => s === 'completed')) batch.status = 'Processed';
+        else if (statuses.some((s) => s === 'pending')) batch.status = 'Pending';
+        else if (statuses.some((s) => s === 'failed')) batch.status = 'Partial';
+        await batch.save();
+      }
+    }
+
+    logEvent('info', 'ncba_openbanking_callback_processed', { reference, succeeded });
+  } catch (err) {
+    logEvent('error', 'ncba_openbanking_callback_error', { reference, error: err.message, stack: err.stack });
+  }
+};

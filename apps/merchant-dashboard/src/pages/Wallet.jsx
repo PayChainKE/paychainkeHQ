@@ -19,12 +19,16 @@ export default function Wallet() {
   const [withdrawAmount, setWithdrawAmount] = useState('')
   const [destination, setDestination] = useState(withdrawalDestinations[0].id)
   const [destinationAccountValue, setDestinationAccountValue] = useState('')
+  const [withdrawBankCode, setWithdrawBankCode] = useState('')
+  const [withdrawPin, setWithdrawPin] = useState('')
+  const [bankCodes, setBankCodes] = useState([])
   const [isWithdrawing, setIsWithdrawing] = useState(false)
 
   // Settlement Settings
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [settleBankName, setSettleBankName] = useState('')
   const [settleBankAccount, setSettleBankAccount] = useState('')
+  const [settleBankCode, setSettleBankCode] = useState('')
   const [settleMobile, setSettleMobile] = useState('')
   const [isSavingSettings, setIsSavingSettings] = useState(false)
   
@@ -93,13 +97,16 @@ export default function Wallet() {
       addToast({ title: 'Missing Account Details', message: 'Please input the correct values for your destination field.', type: 'error' })
       return
     }
+    const destType = withdrawalDestinations.find(d => d.id === destination)?.type;
+    if (destType === 'Bank' && (!withdrawBankCode || withdrawPin.length !== 4)) {
+      addToast({ title: 'Missing Details', message: 'Select a bank and enter your 4-digit payment PIN to withdraw.', type: 'error' })
+      return
+    }
     setIsWithdrawing(true)
     try {
       const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
       const token = localStorage.getItem('paychain_merchant_token')
-      
-      const destType = withdrawalDestinations.find(d => d.id === destination)?.type;
-      
+
       if (destType === 'Mobile') {
         await axios.post(`${API_URL}/api/callbacks/b2c-request`, {
           phone: destinationAccountValue.replace(/^(?:\+?254|0)/, '254'),
@@ -108,6 +115,18 @@ export default function Wallet() {
           headers: { Authorization: `Bearer ${token}` }
         });
         addToast({ title: 'Withdrawal Processing', message: `KES ${withdrawAmount} sent to phone. B2C Transfer initiated.`, type: 'success' });
+      } else if (destType === 'Bank') {
+        await axios.post(`${API_URL}/api/v1/openbanking/bank-payout`, {
+          bankCode: withdrawBankCode,
+          accountNumber: destinationAccountValue,
+          amount: Number(withdrawAmount),
+          narration: `Withdrawal to ${destinationAccountValue}`,
+          pin: withdrawPin,
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        addToast({ title: 'Withdrawal Submitted', message: `KES ${withdrawAmount} sent via NCBA PesaLink.`, type: 'success' })
+        setWithdrawPin('')
       } else {
         await axios.post(`${API_URL}/api/transactions/send-money`, {
           amount: Number(withdrawAmount),
@@ -118,7 +137,7 @@ export default function Wallet() {
         })
         addToast({ title: 'Withdrawal Initiated', message: `KES ${withdrawAmount} sent to destination.`, type: 'success' })
       }
-      
+
       setWithdrawAmount('')
       setDestinationAccountValue('')
       await refreshSession()
@@ -128,6 +147,16 @@ export default function Wallet() {
       setIsWithdrawing(false)
     }
   }
+
+  useEffect(() => {
+    const destType = withdrawalDestinations.find(d => d.id === destination)?.type;
+    if (destType !== 'Bank' || bankCodes.length > 0) return
+    const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+    const token = localStorage.getItem('paychain_merchant_token')
+    axios.get(`${API_URL}/api/v1/openbanking/bank-codes`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => setBankCodes(res.data?.bankCodes || []))
+      .catch(e => console.error('Failed to load bank codes', e))
+  }, [destination])
 
   const handleSaveSettings = async (e) => {
     e.preventDefault()
@@ -139,6 +168,7 @@ export default function Wallet() {
       await axios.put(`${API_URL}/api/auth/merchant/profile`, {
         settlementBankName: settleBankName,
         settlementBankAccount: settleBankAccount,
+        settlementBankCode: settleBankCode,
         settlementMobile: settleMobile
       }, {
         headers: { Authorization: `Bearer ${token}` }
@@ -159,7 +189,15 @@ export default function Wallet() {
     if (showSettingsModal && merchant) {
       setSettleBankName(merchant.settlementBankName || '')
       setSettleBankAccount(merchant.settlementBankAccount || '')
+      setSettleBankCode(merchant.settlementBankCode || '')
       setSettleMobile(merchant.settlementMobile || '')
+      if (bankCodes.length === 0) {
+        const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+        const token = localStorage.getItem('paychain_merchant_token')
+        axios.get(`${API_URL}/api/v1/openbanking/bank-codes`, { headers: { Authorization: `Bearer ${token}` } })
+          .then(res => setBankCodes(res.data?.bankCodes || []))
+          .catch(e => console.error('Failed to load bank codes', e))
+      }
     }
   }, [showSettingsModal, merchant])
 
@@ -638,6 +676,32 @@ export default function Wallet() {
                       Not configured in settings
                     </p>
                   )}
+                </div>
+              )}
+
+              {selectedDest && selectedDest.type === 'Bank' && (
+                <div className="space-y-3 mt-4 animate-scale-in">
+                  <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Destination Bank</label>
+                  <select
+                    value={withdrawBankCode}
+                    onChange={(e) => setWithdrawBankCode(e.target.value)}
+                    className="w-full bg-surface-container-low border border-outline-variant/5 rounded-2xl py-3 px-4 text-primary font-bold focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
+                  >
+                    <option value="">Select bank</option>
+                    {bankCodes.map(b => (
+                      <option key={b.code} value={b.code}>{b.name}</option>
+                    ))}
+                  </select>
+                  <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Payment PIN</label>
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    maxLength={4}
+                    value={withdrawPin}
+                    onChange={(e) => setWithdrawPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                    placeholder="****"
+                    className="w-full bg-surface-container-low border border-outline-variant/5 rounded-2xl py-3 px-4 text-primary font-bold tracking-[0.5em] focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
+                  />
                 </div>
               )}
 
@@ -1390,6 +1454,19 @@ export default function Wallet() {
                     placeholder="e.g. 1122334455"
                     className="w-full bg-surface-container-low border border-outline-variant/5 rounded-2xl py-4 px-5 text-lg font-headline text-primary focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
                   />
+                </div>
+                <div className="space-y-3">
+                  <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Bank (for PesaLink/EFT payouts)</label>
+                  <select
+                    value={settleBankCode}
+                    onChange={(e) => setSettleBankCode(e.target.value)}
+                    className="w-full bg-surface-container-low border border-outline-variant/5 rounded-2xl py-4 px-5 text-lg font-headline text-primary focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
+                  >
+                    <option value="">Select bank</option>
+                    {bankCodes.map(b => (
+                      <option key={b.code} value={b.code}>{b.name}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
