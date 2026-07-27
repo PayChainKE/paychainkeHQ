@@ -18,12 +18,6 @@ export default function FundAccountModal({ method, onClose }) {
   const [statusText, setStatusText] = useState('');
   const [phase, setPhase] = useState('idle'); // idle | sent | success | failed
 
-  // Card State
-  const [cardName, setCardName] = useState('');
-  const [cardNumber, setCardNumber] = useState('');
-  const [expiry, setExpiry] = useState('');
-  const [cvv, setCvv] = useState('');
-
   const pollRef = useRef(null);
 
   const stopPolling = () => {
@@ -109,29 +103,7 @@ export default function FundAccountModal({ method, onClose }) {
     }
   };
 
-  const handleCardSubmit = async (e) => {
-    e.preventDefault();
-    if (!amount || Number(amount) <= 0) { addToast({ title: 'Invalid Amount', message: 'Enter a valid amount.', type: 'error' }); return; }
-    setIsLoading(true);
-    try {
-      const token = localStorage.getItem('paychain_merchant_token');
-      await axios.post(`${API_URL}/api/transactions/simulate`, {
-        accountNumber: merchant?.paybillAccount,
-        amount: Number(amount),
-        senderName: cardName,
-        senderPhone: 'CARD_PAYMENT',
-      }, { headers: { Authorization: `Bearer ${token}` } });
-      addToast({ title: 'Payment Successful', message: `KES ${Number(amount).toLocaleString()} added to your account.`, type: 'success' });
-      await refreshSession();
-      onClose();
-    } catch (err) {
-      addToast({ title: 'Payment Failed', message: err.response?.data?.error || 'Failed to process card payment.', type: 'error' });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const METHOD_TITLE = { mobile: 'Mobile Money Top-up', card: 'Secure Card Payment', bank: 'Bank Transfer Details' };
+  const METHOD_TITLE = { mobile: 'Mobile Money Top-up', bank: 'Bank Transfer Details' };
 
   return (
     <>
@@ -261,53 +233,6 @@ export default function FundAccountModal({ method, onClose }) {
                   </form>
                 )}
               </>
-            )}
-
-            {/* ── CARD ── */}
-            {method === 'card' && (
-              <form onSubmit={handleCardSubmit} className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Cardholder Name</label>
-                  <ValidatedInput kind="personName" value={cardName} onChange={e => setCardName(e.target.value)}
-                    placeholder="JOHN DOE" required
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3.5 px-4 text-primary font-bold focus:border-[#00351D] focus:ring-2 focus:ring-[#00351D]/10 outline-none transition-all uppercase" />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Card Number</label>
-                  <div className="relative">
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-300 text-xl">credit_card</span>
-                    <ValidatedInput kind="cardNumber" value={cardNumber} onChange={e => setCardNumber(e.target.value)}
-                      placeholder="0000 0000 0000 0000" required
-                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3.5 px-4 text-primary font-mono font-bold tracking-widest focus:border-[#00351D] focus:ring-2 focus:ring-[#00351D]/10 outline-none transition-all" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Expiry</label>
-                    <ValidatedInput kind="cardExpiry" value={expiry} onChange={e => setExpiry(e.target.value)}
-                      placeholder="MM/YY" required
-                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3.5 px-4 text-primary font-mono text-center tracking-widest focus:border-[#00351D] focus:ring-2 focus:ring-[#00351D]/10 outline-none transition-all" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">CVV</label>
-                    <ValidatedInput kind="cardCvv" value={cvv} onChange={e => setCvv(e.target.value)}
-                      placeholder="•••" required
-                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3.5 px-4 text-primary font-mono text-center tracking-widest focus:border-[#00351D] focus:ring-2 focus:ring-[#00351D]/10 outline-none transition-all" />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Amount (KES)</label>
-                  <ValidatedInput kind="amount" value={amount} onChange={e => setAmount(e.target.value)}
-                    placeholder="0.00" required
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3.5 px-4 text-primary font-headline font-bold text-xl focus:border-[#00351D] focus:ring-2 focus:ring-[#00351D]/10 outline-none transition-all" />
-                </div>
-                <button type="submit" disabled={isLoading}
-                  className="w-full bg-[#00351D] text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 mt-2 disabled:opacity-40">
-                  {isLoading
-                    ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    : <><span className="material-symbols-outlined text-emerald-400 text-lg">lock</span>Pay Securely</>}
-                </button>
-              </form>
             )}
 
             {/* ── BANK TRANSFER ── */}

@@ -1,3 +1,4 @@
+import bcrypt from 'bcryptjs';
 import Merchant from '../models/Merchant.js';
 import { createNotification } from './notificationController.js';
 import { safeSendSMS, buildStrictSms } from '../utils/smsSanitizer.js';
@@ -163,7 +164,21 @@ export const handleNcbaReconciliationWebhook = async (req, res) => {
 // @access  Private (merchant)
 export const handleInitiateBulkPayment = async (req, res) => {
   try {
-    const { payoutItems } = req.body;
+    const { payoutItems, pin } = req.body;
+
+    if (!pin) {
+      return res.status(400).json({ error: 'Payment PIN is required.' });
+    }
+    const merchant = await Merchant.findById(req.merchant._id).select('+appPin');
+    if (!merchant) return res.status(404).json({ error: 'Merchant not found' });
+    if (!merchant.appPin) {
+      return res.status(400).json({ error: 'Please set up your payment PIN first.' });
+    }
+    const pinMatches = await bcrypt.compare(String(pin), merchant.appPin);
+    if (!pinMatches) {
+      return res.status(401).json({ error: 'Invalid PIN.' });
+    }
+
     const result = await initiateBulkPayment(req.merchant._id, payoutItems);
 
     res.status(200).json({

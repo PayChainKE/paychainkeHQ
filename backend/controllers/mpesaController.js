@@ -1,4 +1,5 @@
 import axios from 'axios';
+import bcrypt from 'bcryptjs';
 import Transaction from '../models/Transaction.js';
 import Merchant from '../models/Merchant.js';
 import { safeSendSMS, buildStrictSms } from '../utils/smsSanitizer.js';
@@ -720,28 +721,42 @@ import { generateSecurityCredential } from '../utils/safaricomCrypto.js';
 // --- DARAJA B2C (OUTBOUND PAYMENTS) ---
 
 export const initiateB2C = async (req, res) => {
+  let debited = false;
   try {
     const token = req.mpesaToken;
-    const { phone, amount, destination } = req.body;
+    const { phone, amount, destination, pin } = req.body;
     const merchantId = req.merchant._id;
-    
+
     // Safety: block live transactions unless explicitly enabled
     if (isLive && process.env.MPESA_LIVE_ENABLED !== 'true') {
       return res.status(503).json({ error: 'Live M-PESA payments are not yet enabled. Set MPESA_LIVE_ENABLED=true to activate.' });
     }
 
-    // Fetch merchant to check balance
-    const merchant = await Merchant.findById(merchantId);
-    if (!merchant) return res.status(404).json({ error: 'Merchant not found' });
-
-    // Check if sufficient funds
-    if (merchant.kesBalance < amount) {
-      return res.status(400).json({ error: 'Insufficient KES balance for this transfer' });
+    if (!pin) {
+      return res.status(400).json({ error: 'Payment PIN is required.' });
     }
 
-    // Immediately deduct balance to prevent double spending
-    merchant.kesBalance -= amount;
-    await merchant.save();
+    const merchantWithPin = await Merchant.findById(merchantId).select('+appPin');
+    if (!merchantWithPin) return res.status(404).json({ error: 'Merchant not found' });
+    if (!merchantWithPin.appPin) {
+      return res.status(400).json({ error: 'Please set up your payment PIN first.' });
+    }
+    const pinMatches = await bcrypt.compare(String(pin), merchantWithPin.appPin);
+    if (!pinMatches) {
+      return res.status(401).json({ error: 'Invalid PIN.' });
+    }
+
+    // Atomic conditional deduct — avoids two concurrent B2C requests both
+    // passing a stale in-memory balance check and over-withdrawing.
+    const merchant = await Merchant.findOneAndUpdate(
+      { _id: merchantId, kesBalance: { $gte: amount } },
+      { $inc: { kesBalance: -amount } },
+      { returnDocument: 'after' }
+    );
+    if (!merchant) {
+      return res.status(400).json({ error: 'Insufficient KES balance for this transfer' });
+    }
+    debited = true;
 
     // 1. Security Credential Generation
     const b2cPassword = process.env.MPESA_B2C_PASSWORD || 'Safaricom999!@#';
@@ -789,11 +804,10 @@ export const initiateB2C = async (req, res) => {
 
   } catch (error) {
     console.error('❌ B2C Transfer Error:', error.response?.data || error);
-    // Refund the merchant if Daraja fails to accept the request
-    const merchant = await Merchant.findById(req.merchant._id);
-    if (merchant) {
-      merchant.kesBalance += req.body.amount;
-      await merchant.save();
+    // Refund the merchant only if the deduction actually happened — an
+    // earlier failure (e.g. PIN check) never touched the balance.
+    if (debited && req.body.amount) {
+      await Merchant.findByIdAndUpdate(req.merchant._id, { $inc: { kesBalance: req.body.amount } });
     }
     res.status(500).json({ error: error.response?.data?.errorMessage || 'Failed to initiate Daraja B2C transfer' });
   }

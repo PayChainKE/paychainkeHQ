@@ -1085,19 +1085,12 @@ export default function Wallet() {
                       icon: 'account_balance',
                       color: 'bg-blue-50 text-blue-600 border-blue-100'
                     },
-                    { 
-                      id: 'mobile', 
-                      name: 'Mobile Money', 
-                      desc: 'M-Pesa, Airtel Money', 
+                    {
+                      id: 'mobile',
+                      name: 'Mobile Money',
+                      desc: 'M-Pesa, Airtel Money',
                       icon: 'smartphone',
                       color: 'bg-emerald-50 text-emerald-600 border-emerald-100'
-                    },
-                    { 
-                      id: 'card', 
-                      name: 'Card Top-up', 
-                      desc: 'Visa / Mastercard', 
-                      icon: 'credit_card',
-                      color: 'bg-amber-50 text-amber-600 border-amber-100'
                     }
                   ].map((method) => (
                     <div 
@@ -1310,86 +1303,7 @@ export default function Wallet() {
                     </button>
                   </div>
                 </div>
-              ) : (
-                /* Card Top-up Detail */
-                <div className="space-y-8 animate-fade-in-up">
-                  <div className="bg-amber-50/50 p-6 rounded-3xl border border-amber-100 flex items-start gap-4">
-                    <span className="material-symbols-outlined text-amber-600 mt-1">credit_card</span>
-                    <p className="text-xs md:text-sm text-amber-900 leading-relaxed font-medium">
-                      Top up instantly using your credit or debit card. Processing fee: <span className="font-bold">2.5%</span>.
-                    </p>
-                  </div>
-
-                  <div className="space-y-6">
-                    <div className="space-y-3">
-                      <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Amount (KES)</label>
-                      <ValidatedInput
-                        kind="amount"
-                        value={topUpAmount}
-                        onChange={(e) => setTopUpAmount(e.target.value)}
-                        placeholder="Enter amount"
-                        className="w-full bg-surface-container-low border border-outline-variant/5 rounded-2xl py-4 px-6 text-xl font-headline text-primary focus:ring-2 focus:ring-primary outline-none"
-                      />
-                    </div>
-                    
-                    <div className="p-6 rounded-3xl bg-surface-container-high border border-outline-variant/10 space-y-4 shadow-inner">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-primary/40">Card Details</label>
-                        <div className="bg-white rounded-xl border border-outline-variant/10 p-4 font-mono text-sm tracking-widest text-primary">
-                          XXXX XXXX XXXX XXXX
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-primary/40">Expiry</label>
-                          <div className="bg-white rounded-xl border border-outline-variant/10 p-4 font-mono text-sm text-primary">MM / YY</div>
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-primary/40">CVC</label>
-                          <div className="bg-white rounded-xl border border-outline-variant/10 p-4 font-mono text-sm text-primary">***</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <button 
-                      onClick={async () => {
-                        if (!topUpAmount) return
-                        setIsProcessingTopUp(true)
-                        try {
-                          await new Promise(r => setTimeout(r, 1500))
-                          const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
-                          const token = localStorage.getItem('paychain_merchant_token')
-                          await axios.post(`${API_URL}/api/transactions/simulate`, {
-                            accountNumber: merchant?.paybillAccount,
-                            amount: Number(topUpAmount),
-                            senderName: merchant?.name || 'Card Top-up',
-                            senderPhone: 'CARD_PAYMENT'
-                          }, {
-                            headers: { Authorization: `Bearer ${token}` }
-                          })
-                          addToast({ title: 'Top Up Successful', message: `Successfully funded ${topUpAmount} KES.`, type: 'success' })
-                          await refreshSession()
-                          setShowTopUpSelection(false)
-                          setSelectedFundingMethod(null)
-                          setTopUpAmount('')
-                        } catch (err) {
-                          addToast({ title: 'Top Up Failed', message: err.response?.data?.error || 'Failed to process top up.', type: 'error' })
-                        } finally {
-                          setIsProcessingTopUp(false)
-                        }
-                      }}
-                      disabled={isProcessingTopUp || !topUpAmount}
-                      className="w-full bg-primary text-white py-5 rounded-3xl font-bold text-lg shadow-xl hover:bg-primary-dark transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-                    >
-                      {isProcessingTopUp ? (
-                        <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
-                      ) : (
-                        <>Top Up KES {topUpAmount ? Number(topUpAmount).toLocaleString() : '0'}</>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              )}
+              ) : null}
             </div>
 
             {/* Modal Footer (Optional but good for selection) */}

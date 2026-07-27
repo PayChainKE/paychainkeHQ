@@ -5,6 +5,7 @@ import Transaction from '../models/Transaction.js';
 import { calculatePAYE } from '../utils/kraCalculator.js';
 import { generateSecurityCredential } from '../utils/safaricomCrypto.js';
 import { submitNcbaBankTransfer } from './ncbaOpenBankingController.js';
+import { submitNcbaUtilityPayment } from '../services/ncbaBulkPaymentService.js';
 import axios from 'axios';
 import csv from 'csv-parser';
 import fs from 'fs';
@@ -31,8 +32,8 @@ export const addPayee = async (req, res) => {
   try {
     const {
       name, type, paymentMethod, mobileMoneyType, phone, paybillNumber,
-      businessAccount, tillNumber, bankName, accountNumber, bankCode, kraPin, idNumber,
-      nssfNumber, shifNumber, etimsInvoiceNumber, cuNumber, defaultAmount
+      businessAccount, tillNumber, bankName, accountNumber, bankCode, utilityProvider,
+      kraPin, idNumber, nssfNumber, shifNumber, etimsInvoiceNumber, cuNumber, defaultAmount
     } = req.body;
 
     // Strict KRA validations (Simulated for real-world robustness)
@@ -49,8 +50,8 @@ export const addPayee = async (req, res) => {
     const payee = new Payee({
       merchantId: req.merchant._id,
       name, type, paymentMethod, mobileMoneyType, phone, paybillNumber,
-      businessAccount, tillNumber, bankName, accountNumber, bankCode, kraPin, idNumber,
-      nssfNumber, shifNumber, etimsInvoiceNumber, cuNumber, defaultAmount
+      businessAccount, tillNumber, bankName, accountNumber, bankCode, utilityProvider,
+      kraPin, idNumber, nssfNumber, shifNumber, etimsInvoiceNumber, cuNumber, defaultAmount
     });
 
     const savedPayee = await payee.save();
@@ -67,8 +68,8 @@ export const updatePayee = async (req, res) => {
   try {
     const {
       name, type, paymentMethod, mobileMoneyType, phone, paybillNumber,
-      businessAccount, tillNumber, bankName, accountNumber, bankCode, kraPin, idNumber,
-      nssfNumber, shifNumber, etimsInvoiceNumber, cuNumber, defaultAmount
+      businessAccount, tillNumber, bankName, accountNumber, bankCode, utilityProvider,
+      kraPin, idNumber, nssfNumber, shifNumber, etimsInvoiceNumber, cuNumber, defaultAmount
     } = req.body;
 
     // Validate ownership
@@ -89,8 +90,8 @@ export const updatePayee = async (req, res) => {
       req.params.id,
       {
         name, type, paymentMethod, mobileMoneyType, phone, paybillNumber,
-        businessAccount, tillNumber, bankName, accountNumber, bankCode, kraPin, idNumber,
-        nssfNumber, shifNumber, etimsInvoiceNumber, cuNumber, defaultAmount,
+        businessAccount, tillNumber, bankName, accountNumber, bankCode, utilityProvider,
+        kraPin, idNumber, nssfNumber, shifNumber, etimsInvoiceNumber, cuNumber, defaultAmount,
         updatedAt: new Date()
       },
       { returnDocument: 'after' }
@@ -297,18 +298,40 @@ export const authorizeBatch = async (req, res) => {
       }
     }
 
-    // 2. Validate Liquidity
-    if (merchant.kesBalance < totalNet) {
+    // 2 & 3. Atomic conditional deduct — avoids two concurrent batch
+    // submissions both passing a stale in-memory balance check.
+    const debitedMerchant = await Merchant.findOneAndUpdate(
+      { _id: merchant._id, kesBalance: { $gte: totalNet } },
+      { $inc: { kesBalance: -totalNet } },
+      { returnDocument: 'after' }
+    );
+    if (!debitedMerchant) {
       return res.status(400).json({ message: 'Insufficient funds to process this batch' });
     }
-
-    // 3. Deduct upfront to prevent double-spending
-    merchant.kesBalance -= totalNet;
-    await merchant.save();
+    merchant.kesBalance = debitedMerchant.kesBalance;
 
     const transactions = [];
     const b2cPassword = process.env.MPESA_B2C_PASSWORD || 'Safaricom999!@#';
-    const securityCredential = generateSecurityCredential(b2cPassword);
+    // Lazily computed and cached inside the Mobile Money branch below, not
+    // upfront — the balance has already been atomically deducted by this
+    // point, and this function throws when Safaricom's B2C certificate
+    // isn't configured (see utils/safaricomCrypto.js). Generating it here
+    // would let that throw escape to the outer catch, which never refunds
+    // the deduction — treating a missing/invalid credential the same as
+    // any other per-row Daraja failure (below) keeps the refund path intact.
+    let cachedSecurityCredential = null;
+    let securityCredentialError = null;
+    const getSecurityCredential = () => {
+      if (cachedSecurityCredential) return cachedSecurityCredential;
+      if (securityCredentialError) throw securityCredentialError;
+      try {
+        cachedSecurityCredential = generateSecurityCredential(b2cPassword);
+        return cachedSecurityCredential;
+      } catch (err) {
+        securityCredentialError = err;
+        throw err;
+      }
+    };
 
     const mpesaEnv = (process.env.MPESA_ENVIRONMENT || 'sandbox').toLowerCase();
     const isLiveMpesa = mpesaEnv === 'live';
@@ -341,7 +364,31 @@ export const authorizeBatch = async (req, res) => {
       let darajaStatus = 'pending';
       let darajaRef = `BULK_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
-      if (payee.paymentMethod === 'Bank') {
+      if (payee.type === 'utility' && payee.utilityProvider) {
+        if (!payee.accountNumber) {
+          darajaStatus = 'failed';
+          refundAmount += row.netAmount;
+          console.error(`❌ Bulk payout to ${payee.name} failed: no meter/account number on file for this utility payee.`);
+        } else {
+          try {
+            const { transactionId } = await submitNcbaUtilityPayment({
+              utilityProvider: payee.utilityProvider,
+              accountNumber: payee.accountNumber,
+              amount: row.netAmount,
+              name: payee.name,
+            });
+            // Unlike PesaLink/EFT below, NCBA's Bulk H2H "BILLPAY" rail is
+            // asynchronous — a successful submission only means NCBA
+            // accepted the instruction, not that the bill is paid yet.
+            // darajaStatus stays 'pending' (its default above).
+            darajaRef = transactionId;
+          } catch (err) {
+            console.error(`❌ NCBA BillPay rejected payout for ${payee.name}:`, err.message);
+            darajaStatus = 'failed';
+            refundAmount += row.netAmount;
+          }
+        }
+      } else if (payee.paymentMethod === 'Bank') {
         if (!payee.bankCode || !payee.accountNumber) {
           darajaStatus = 'failed';
           refundAmount += row.netAmount;
@@ -379,40 +426,42 @@ export const authorizeBatch = async (req, res) => {
           refundAmount += row.netAmount;
           console.error(`❌ Bulk payout to ${payee.name} failed: no Daraja auth token available.`);
         } else {
-          const mpesaBaseUrl = isLiveMpesa ? 'https://api.safaricom.co.ke' : 'https://sandbox.safaricom.co.ke';
-          const isB2C = payee.mobileMoneyType === 'Personal Number';
-          const url = isB2C
-            ? `${mpesaBaseUrl}/mpesa/b2c/v1/paymentrequest`
-            : `${mpesaBaseUrl}/mpesa/b2b/v1/paymentrequest`;
-
-          const payload = isB2C ? {
-            InitiatorName: process.env.MPESA_B2C_INITIATOR || 'testapi',
-            SecurityCredential: securityCredential,
-            CommandID: 'BusinessPayment',
-            Amount: row.netAmount,
-            PartyA: process.env.MPESA_SHORTCODE || '600000',
-            PartyB: payee.phone,
-            Remarks: `Bulk Payout to ${payee.name}`,
-            QueueTimeOutURL: callbackBase ? `${callbackBase}/api/callbacks/b2c-timeout` : 'https://sandbox.paychain.co.ke/api/callbacks/b2c-timeout',
-            ResultURL: callbackBase ? `${callbackBase}/api/callbacks/b2c-callback` : 'https://sandbox.paychain.co.ke/api/callbacks/b2c-callback',
-            Occasion: 'PayChain Settlement'
-          } : {
-            // B2B Payload
-            Initiator: process.env.MPESA_B2C_INITIATOR || 'testapi',
-            SecurityCredential: securityCredential,
-            CommandID: payee.mobileMoneyType === 'Paybill' ? 'BusinessPayBill' : 'BusinessBuyGoods',
-            SenderIdentifierType: '4',
-            RecieverIdentifierType: '4',
-            Amount: row.netAmount,
-            PartyA: process.env.MPESA_SHORTCODE || '600000',
-            PartyB: payee.paybillNumber || payee.tillNumber,
-            AccountReference: payee.businessAccount || 'Settlement',
-            Remarks: `Bulk B2B Payout to ${payee.name}`,
-            QueueTimeOutURL: callbackBase ? `${callbackBase}/api/callbacks/b2c-timeout` : 'https://sandbox.paychain.co.ke/api/callbacks/b2c-timeout',
-            ResultURL: callbackBase ? `${callbackBase}/api/callbacks/b2c-callback` : 'https://sandbox.paychain.co.ke/api/callbacks/b2c-callback',
-          };
-
           try {
+            const securityCredential = getSecurityCredential();
+
+            const mpesaBaseUrl = isLiveMpesa ? 'https://api.safaricom.co.ke' : 'https://sandbox.safaricom.co.ke';
+            const isB2C = payee.mobileMoneyType === 'Personal Number';
+            const url = isB2C
+              ? `${mpesaBaseUrl}/mpesa/b2c/v1/paymentrequest`
+              : `${mpesaBaseUrl}/mpesa/b2b/v1/paymentrequest`;
+
+            const payload = isB2C ? {
+              InitiatorName: process.env.MPESA_B2C_INITIATOR || 'testapi',
+              SecurityCredential: securityCredential,
+              CommandID: 'BusinessPayment',
+              Amount: row.netAmount,
+              PartyA: process.env.MPESA_SHORTCODE || '600000',
+              PartyB: payee.phone,
+              Remarks: `Bulk Payout to ${payee.name}`,
+              QueueTimeOutURL: callbackBase ? `${callbackBase}/api/callbacks/b2c-timeout` : 'https://sandbox.paychain.co.ke/api/callbacks/b2c-timeout',
+              ResultURL: callbackBase ? `${callbackBase}/api/callbacks/b2c-callback` : 'https://sandbox.paychain.co.ke/api/callbacks/b2c-callback',
+              Occasion: 'PayChain Settlement'
+            } : {
+              // B2B Payload
+              Initiator: process.env.MPESA_B2C_INITIATOR || 'testapi',
+              SecurityCredential: securityCredential,
+              CommandID: payee.mobileMoneyType === 'Paybill' ? 'BusinessPayBill' : 'BusinessBuyGoods',
+              SenderIdentifierType: '4',
+              RecieverIdentifierType: '4',
+              Amount: row.netAmount,
+              PartyA: process.env.MPESA_SHORTCODE || '600000',
+              PartyB: payee.paybillNumber || payee.tillNumber,
+              AccountReference: payee.businessAccount || 'Settlement',
+              Remarks: `Bulk B2B Payout to ${payee.name}`,
+              QueueTimeOutURL: callbackBase ? `${callbackBase}/api/callbacks/b2c-timeout` : 'https://sandbox.paychain.co.ke/api/callbacks/b2c-timeout',
+              ResultURL: callbackBase ? `${callbackBase}/api/callbacks/b2c-callback` : 'https://sandbox.paychain.co.ke/api/callbacks/b2c-callback',
+            };
+
             const mpesaRes = await axios.post(url, payload, {
               headers: { Authorization: `Bearer ${token}` }
             });
@@ -427,14 +476,16 @@ export const authorizeBatch = async (req, res) => {
         }
       }
 
-      // Record standard Transaction ledger entry. Bank-routed rows use
-      // 'ncba_outbound' (fee-mapped to ncba_disbursement_fee in
-      // revenueRateCard.js), matching services/ncbaBulkPaymentService.js's
-      // convention, rather than 'bulk_pay' which earns no fee for those.
+      // Record standard Transaction ledger entry. Bank- and utility-routed
+      // rows both go through NCBA and use 'ncba_outbound' (fee-mapped to
+      // ncba_disbursement_fee in revenueRateCard.js), matching
+      // services/ncbaBulkPaymentService.js's convention, rather than
+      // 'bulk_pay' which earns no fee for those.
+      const isNcbaRouted = payee.paymentMethod === 'Bank' || (payee.type === 'utility' && payee.utilityProvider);
       await Transaction.create({
         merchantId: merchant._id,
         accountNumber: merchant.paybillAccount || 'WALLET_FUND',
-        type: payee.paymentMethod === 'Bank' ? 'ncba_outbound' : 'bulk_pay',
+        type: isNcbaRouted ? 'ncba_outbound' : 'bulk_pay',
         amount: row.netAmount,
         kesAmount: row.netAmount,
         currency: 'KES',
@@ -459,8 +510,12 @@ export const authorizeBatch = async (req, res) => {
 
     // Refund whatever was rejected synchronously so the batch deduction stays accurate
     if (refundAmount > 0) {
-      merchant.kesBalance += refundAmount;
-      await merchant.save();
+      const refundedMerchant = await Merchant.findByIdAndUpdate(
+        merchant._id,
+        { $inc: { kesBalance: refundAmount } },
+        { returnDocument: 'after' }
+      );
+      merchant.kesBalance = refundedMerchant.kesBalance;
     }
 
     // Batch status reflects reality: rows still 'pending' await the Daraja
