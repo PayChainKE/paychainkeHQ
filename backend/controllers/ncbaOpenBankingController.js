@@ -10,6 +10,7 @@ import {
 import { createNotification } from './notificationController.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
+import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { KENYAN_BANK_CODES } from '../config/kenyanBankCodes.js';
 
 export class InsufficientFundsError extends Error {
@@ -169,10 +170,19 @@ export const handleBankPayout = async (req, res) => {
       return res.status(400).json({ error: 'Please set up your payment PIN first.', pinNotSet: true });
     }
 
+    try {
+      await assertPinNotLocked(merchantId);
+    } catch (e) {
+      if (e instanceof PinLockedError) return res.status(429).json({ error: e.message });
+      throw e;
+    }
+
     const pinMatches = await bcrypt.compare(String(pin), merchant.appPin);
     if (!pinMatches) {
+      await recordFailedPinAttempt(merchantId);
       return res.status(401).json({ error: 'Incorrect PIN. Please try again.' });
     }
+    await resetPinAttempts(merchantId);
 
     const { transaction, hostResponse, merchant: updatedMerchant } = await executeNcbaBankPayout({
       merchantId, bankCode, accountNumber, accountName, amount, narration,

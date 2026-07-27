@@ -18,9 +18,19 @@ const seedAdmin = async () => {
       console.log(`ℹ️  No legacy admin to remove for: ${legacyEmail}`);
     }
 
-    const email = 'admin@paychain.co.ke';
-    const password = 'PayChainadmin@2025 !';
-    const name = 'Brandon Omutiti';
+    // Required via env, never hardcoded here — a committed real admin
+    // credential doesn't fail loudly, it just sits in source control (and
+    // git history) as a live password for whoever finds it. Fail closed
+    // instead: this script simply can't run without the operator supplying
+    // both values explicitly at invocation time.
+    const email = process.env.SEED_ADMIN_EMAIL;
+    const password = process.env.SEED_ADMIN_PASSWORD;
+    const name = process.env.SEED_ADMIN_NAME || 'Admin';
+
+    if (!email || !password) {
+      console.error('❌ SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD must both be set to run this script.');
+      process.exit(1);
+    }
 
     let admin = await Admin.findOne({ email });
 

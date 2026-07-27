@@ -3,6 +3,7 @@ import Merchant from '../models/Merchant.js';
 import { createNotification } from './notificationController.js';
 import { safeSendSMS, buildStrictSms } from '../utils/smsSanitizer.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
+import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import {
   validateMerchantCode,
   validateCollectionAmount,
@@ -174,10 +175,18 @@ export const handleInitiateBulkPayment = async (req, res) => {
     if (!merchant.appPin) {
       return res.status(400).json({ error: 'Please set up your payment PIN first.' });
     }
+    try {
+      await assertPinNotLocked(req.merchant._id);
+    } catch (e) {
+      if (e instanceof PinLockedError) return res.status(429).json({ error: e.message });
+      throw e;
+    }
     const pinMatches = await bcrypt.compare(String(pin), merchant.appPin);
     if (!pinMatches) {
+      await recordFailedPinAttempt(req.merchant._id);
       return res.status(401).json({ error: 'Invalid PIN.' });
     }
+    await resetPinAttempts(req.merchant._id);
 
     const result = await initiateBulkPayment(req.merchant._id, payoutItems);
 

@@ -22,7 +22,7 @@ const protect = async (req, res, next) => {
 
   let decoded;
   try {
-    decoded = jwt.verify(token, process.env.JWT_SECRET);
+    decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
   } catch (err) {
     const code = err?.name === 'TokenExpiredError' ? 'TOKEN_EXPIRED' : 'TOKEN_INVALID';
     const msg  = code === 'TOKEN_EXPIRED'
@@ -51,7 +51,7 @@ const protectMerchant = async (req, res, next) => {
 
   let decoded;
   try {
-    decoded = jwt.verify(token, process.env.JWT_SECRET);
+    decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
   } catch (err) {
     const code = err?.name === 'TokenExpiredError' ? 'TOKEN_EXPIRED' : 'TOKEN_INVALID';
     const msg  = code === 'TOKEN_EXPIRED'
@@ -79,4 +79,19 @@ const protectMerchant = async (req, res, next) => {
   }
 };
 
-export { protect, protectMerchant };
+// Role gate for admin routes — must run after `protect` (relies on
+// req.admin already being attached). `Admin.role` is 'owner'|'admin'|
+// 'analyst' (models/Admin.js); analyst is meant to be a read-only reporting
+// tier, but nothing enforced that beyond team management until now — every
+// mutating admin route should list which roles may actually call it.
+const requireRole = (...allowedRoles) => (req, res, next) => {
+  if (!req.admin) {
+    return fail(res, 401, 'NO_TOKEN', 'Authentication required. Please sign in.');
+  }
+  if (!allowedRoles.includes(req.admin.role)) {
+    return fail(res, 403, 'INSUFFICIENT_ROLE', 'Your admin role does not have permission to perform this action.');
+  }
+  return next();
+};
+
+export { protect, protectMerchant, requireRole };

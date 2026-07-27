@@ -1,4 +1,5 @@
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 import { handleNcbaReconciliationWebhook, handleInitiateBulkPayment } from '../controllers/ncbaController.js';
 import { handleNcbaAccountNotification } from '../controllers/ncbaAccountNotificationController.js';
 import { handleBankPayout, handlePesaLinkCallback, getBankCodes } from '../controllers/ncbaOpenBankingController.js';
@@ -6,6 +7,16 @@ import { protectMerchant } from '../middleware/authMiddleware.js';
 import { timingSafeStringEqual } from '../utils/timingSafeCompare.js';
 
 const router = express.Router();
+
+// Both routes below check a 4-digit PIN inline — same brute-force exposure
+// as every other PIN-guarded endpoint in the app.
+const pinLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many PIN attempts. Try again in 15 minutes.' },
+});
 
 // Inline HTTP Basic Auth for the NCBA webhook — this is a bank-to-server
 // credential check, deliberately separate from protectMerchant's JWT flow
@@ -77,11 +88,11 @@ router.post(
 );
 
 // Merchant-initiated NCBA bulk disbursements (suppliers + utility payouts).
-router.post('/bulk-payments', protectMerchant, handleInitiateBulkPayment);
+router.post('/bulk-payments', protectMerchant, pinLimiter, handleInitiateBulkPayment);
 
 // Merchant-initiated single withdrawal to a bank account via NCBA Open
 // Banking's PesaLink rail — see controllers/ncbaOpenBankingController.js.
-router.post('/openbanking/bank-payout', protectMerchant, handleBankPayout);
+router.post('/openbanking/bank-payout', protectMerchant, pinLimiter, handleBankPayout);
 router.get('/openbanking/bank-codes', protectMerchant, getBankCodes);
 
 // Public webhook — NCBA's Open Banking per-transaction result callback. Not

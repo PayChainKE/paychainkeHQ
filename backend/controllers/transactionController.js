@@ -14,6 +14,7 @@ import { createNotification } from './notificationController.js';
 import { getCheckoutTotal } from '../utils/pricingEngine.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
+import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 
 // @desc    Get merchant transactions
 // @route   GET /api/transactions
@@ -365,10 +366,18 @@ export const sendMoney = async (req, res) => {
     if (!merchantWithPin.appPin) {
       return res.status(400).json({ error: 'Please set up your payment PIN first.' });
     }
+    try {
+      await assertPinNotLocked(merchantId);
+    } catch (e) {
+      if (e instanceof PinLockedError) return res.status(429).json({ error: e.message });
+      throw e;
+    }
     const pinMatches = await bcrypt.compare(String(pin), merchantWithPin.appPin);
     if (!pinMatches) {
+      await recordFailedPinAttempt(merchantId);
       return res.status(401).json({ error: 'Invalid PIN.' });
     }
+    await resetPinAttempts(merchantId);
 
     // Atomic conditional deduct — avoids the read-then-write race of
     // fetching balance, checking it, then saving separately, where two

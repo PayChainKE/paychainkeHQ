@@ -58,7 +58,12 @@ app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
 
-    const isAllowed = allowedOrigins.includes(origin) || (origin && origin.includes('vercel.app'));
+    // Previously also allowed any origin containing "vercel.app" — that's a
+    // substring match against every free/attacker-controlled Vercel deploy
+    // on the planet, not just PayChain's own. Removed: allowedOrigins above
+    // already covers every real PayChain frontend + local dev ports; add a
+    // specific preview URL explicitly if one is ever needed again.
+    const isAllowed = allowedOrigins.includes(origin);
 
     if (isAllowed) {
       callback(null, true);
@@ -83,6 +88,35 @@ app.use(helmet({
 // 5mb to comfortably fit a base64-encoded multi-page statement PDF attachment
 // (statement emailing uploads the already-generated PDF for Resend to send).
 app.use(express.json({ limit: '5mb' }));
+
+// Defense-in-depth against NoSQL operator injection (e.g. a client sending
+// { email: { $ne: null } } instead of a string). No exploitable path was
+// found in a full audit — Mongoose's own type-casting already rejects most
+// of these against typed schema paths — but there's no systematic
+// protection either. Deliberately not express-mongo-sanitize: that package
+// tries to reassign req.query, which is getter-only in Express 5 and
+// crashes the server; this only touches req.body, which stays mutable.
+function stripMongoOperators(value) {
+  if (Array.isArray(value)) {
+    value.forEach(stripMongoOperators);
+    return value;
+  }
+  if (value && typeof value === 'object') {
+    for (const key of Object.keys(value)) {
+      if (key.startsWith('$') || key.includes('.')) {
+        delete value[key];
+        continue;
+      }
+      stripMongoOperators(value[key]);
+    }
+  }
+  return value;
+}
+
+app.use((req, res, next) => {
+  if (req.body && typeof req.body === 'object') stripMongoOperators(req.body);
+  next();
+});
 
 app.get('/', (req, res) => {
   res.send('PayChainKE API is running...');
@@ -138,7 +172,14 @@ app.use('/v1', ncbaRoutes);
 
 app.use((err, req, res, next) => {
   console.error('Unhandled Error:', err);
-  res.status(500).json({ error: err.message || 'An unexpected server error occurred' });
+  // Full detail always goes server-side via console.error above. The
+  // client only gets err.message in non-production — in prod a future
+  // error whose .message happens to carry an internal detail (a raw DB
+  // error string, etc.) shouldn't be handed back verbatim.
+  const message = process.env.NODE_ENV === 'production'
+    ? 'An unexpected server error occurred'
+    : (err.message || 'An unexpected server error occurred');
+  res.status(500).json({ error: message });
 });
 
 const PORT = process.env.PORT || 5000;

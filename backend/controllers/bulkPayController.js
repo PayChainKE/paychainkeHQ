@@ -14,6 +14,7 @@ import { sendBatchReceiptEmail } from '../utils/resend.js';
 import { createNotification } from './notificationController.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
+import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 
 // @desc    Get all payees for a merchant
 // @route   GET /api/bulkpay/payees
@@ -157,10 +158,19 @@ export const resetBulkPayPin = async (req, res) => {
       return res.status(400).json({ message: 'No existing PIN found to reset.' });
     }
 
+    try {
+      await assertPinNotLocked(req.merchant._id);
+    } catch (e) {
+      if (e instanceof PinLockedError) return res.status(429).json({ message: e.message });
+      throw e;
+    }
+
     const isMatch = await bcrypt.compare(currentPin, merchant.bulkPayPin);
     if (!isMatch) {
+      await recordFailedPinAttempt(req.merchant._id);
       return res.status(401).json({ message: 'Current PIN is incorrect.' });
     }
+    await resetPinAttempts(req.merchant._id);
 
     const salt = await bcrypt.genSalt(12);
     const hashedPin = await bcrypt.hash(newPin, salt);
@@ -282,10 +292,19 @@ export const authorizeBatch = async (req, res) => {
       return res.status(400).json({ message: 'Please set up your Bulk Pay PIN first' });
     }
 
+    try {
+      await assertPinNotLocked(req.merchant._id);
+    } catch (e) {
+      if (e instanceof PinLockedError) return res.status(429).json({ message: e.message });
+      throw e;
+    }
+
     const isMatch = await bcrypt.compare(pin, merchant.bulkPayPin);
     if (!isMatch) {
+      await recordFailedPinAttempt(req.merchant._id);
       return res.status(401).json({ message: 'Invalid PIN' });
     }
+    await resetPinAttempts(req.merchant._id);
 
     // 1. Calculate Totals
     let totalGross = 0;
