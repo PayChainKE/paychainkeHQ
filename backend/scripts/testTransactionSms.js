@@ -59,11 +59,24 @@ const messages = [
   },
 ];
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Sending 9 texts to the same number within the same second is what got
+// 6 of them stuck at Africa's Talking's "Sent" (submitted, no delivery
+// receipt yet) instead of "Success" (confirmed delivered) last run —
+// Safaricom's network throttles same-sender-to-same-recipient bursts. A
+// few seconds of real spacing avoids that; real production traffic never
+// hits this since one merchant's transactions aren't machine-gunned like
+// this test script does.
+const DELAY_MS = 4000;
+
 const run = async () => {
-  for (const { label, message } of messages) {
+  for (let i = 0; i < messages.length; i++) {
+    const { label, message } = messages[i];
     process.stdout.write(`Sending "${label}"... `);
     const result = await safeSendSMS({ to, message });
     console.log(result.success ? `OK (${message.length} chars)` : `FAILED — ${result.error}`);
+    if (i < messages.length - 1) await sleep(DELAY_MS);
   }
 };
 
