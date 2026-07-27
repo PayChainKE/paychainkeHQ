@@ -13,6 +13,7 @@ import PaymentLink from '../models/PaymentLink.js';
 import Invoice from '../models/Invoice.js';
 import { createNotification } from './notificationController.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
+import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 
 // ── M-PESA configuration ──────────────────────────────────────────────────────
 // MPESA_ENVIRONMENT controls which Daraja endpoint is used.
@@ -45,6 +46,13 @@ export const passkey   = process.env.MPESA_PASSKEY;
 // Public URL Safaricom will POST callbacks to.
 // Must be HTTPS and reachable by Safaricom servers.
 export const callbackBase = (process.env.MPESA_CALLBACK_URL || '').replace(/\/$/, '');
+
+// Appended to every callback URL handed to Safaricom — routes/mpesaRoutes.js
+// rejects any callback that doesn't carry this in ?key=. Daraja has no
+// native webhook signature, so a secret embedded in the URL itself is the
+// standard practical substitute.
+const webhookSecret = process.env.MPESA_WEBHOOK_SECRET || '';
+const withWebhookSecret = (url) => `${url}${webhookSecret ? `?key=${encodeURIComponent(webhookSecret)}` : ''}`;
 
 
 // Generate OAuth Token for Safaricom Daraja API
@@ -117,7 +125,9 @@ export const validationURL = (req, res) => {
 export const confirmationURL = async (req, res) => {
   try {
     const payload = req.body;
-    console.log('📥 Received M-PESA Confirmation payload:', payload);
+    // Summary only, not the full payload — it carries customer MSISDN/name
+    // (PII) which doesn't need to sit in plaintext stdout logs.
+    console.log(`📥 M-PESA Confirmation: TransID=${payload?.TransID} Amount=${payload?.TransAmount} BillRef=${payload?.BillRefNumber}`);
 
     /*
       Expected Payload:
@@ -334,7 +344,12 @@ export const confirmationURL = async (req, res) => {
 
 export const initiateSTKPush = async (req, res) => {
   try {
-    const { amount, phone, merchantId } = req.body;
+    const { amount, phone } = req.body;
+    // Always the authenticated caller's own account — never trust a
+    // client-supplied merchantId (route requires protectMerchant). Taking
+    // it from req.body let any authenticated merchant credit an arbitrary
+    // merchant's balance, which the sandbox auto-confirm made instant.
+    const merchantId = req.merchant._id;
     const token = req.mpesaToken;
 
     // Normalise phone to 254XXXXXXXXX
@@ -432,7 +447,7 @@ export const initiateSTKPush = async (req, res) => {
       PartyA: formattedPhone,
       PartyB: shortCode,
       PhoneNumber: formattedPhone,
-      CallBackURL: `${callbackBase}/api/callbacks/stk-callback`,
+      CallBackURL: withWebhookSecret(`${callbackBase}/api/callbacks/stk-callback`),
       AccountReference: 'PayChain Wallet',
       TransactionDesc: 'Wallet Top Up',
     };
@@ -483,9 +498,11 @@ export const initiateSTKPush = async (req, res) => {
 export const stkCallback = async (req, res) => {
   try {
     const payload = req.body.Body.stkCallback;
-    console.log('📥 STK Push Callback:', JSON.stringify(payload, null, 2));
-
     const { CheckoutRequestID, ResultCode, ResultDesc, CallbackMetadata } = payload;
+    // Summary only, not the full payload — CallbackMetadata carries the
+    // customer's phone number (PII) which doesn't need to sit in plaintext
+    // stdout logs.
+    console.log(`📥 STK Push Callback: CheckoutRequestID=${CheckoutRequestID} ResultCode=${ResultCode} ResultDesc=${ResultDesc}`);
     
     const stkReq = await STKRequest.findOne({ checkoutRequestId: CheckoutRequestID });
     if (!stkReq) {
@@ -741,10 +758,18 @@ export const initiateB2C = async (req, res) => {
     if (!merchantWithPin.appPin) {
       return res.status(400).json({ error: 'Please set up your payment PIN first.' });
     }
+    try {
+      await assertPinNotLocked(merchantId);
+    } catch (e) {
+      if (e instanceof PinLockedError) return res.status(429).json({ error: e.message });
+      throw e;
+    }
     const pinMatches = await bcrypt.compare(String(pin), merchantWithPin.appPin);
     if (!pinMatches) {
+      await recordFailedPinAttempt(merchantId);
       return res.status(401).json({ error: 'Invalid PIN.' });
     }
+    await resetPinAttempts(merchantId);
 
     // Atomic conditional deduct — avoids two concurrent B2C requests both
     // passing a stale in-memory balance check and over-withdrawing.
@@ -775,8 +800,8 @@ export const initiateB2C = async (req, res) => {
         PartyA: process.env.MPESA_SHORTCODE || '600000',
         PartyB: phone,
         Remarks: `Withdrawal to ${destination}`,
-        QueueTimeOutURL: `${callbackBase}/api/callbacks/b2c-timeout`,
-        ResultURL: `${callbackBase}/api/callbacks/b2c-callback`,
+        QueueTimeOutURL: withWebhookSecret(`${callbackBase}/api/callbacks/b2c-timeout`),
+        ResultURL: withWebhookSecret(`${callbackBase}/api/callbacks/b2c-callback`),
         Occasion: 'PayChain Settlement'
       }, {
         headers: { Authorization: `Bearer ${token}` }
@@ -814,8 +839,11 @@ export const initiateB2C = async (req, res) => {
 };
 
 export const b2cCallback = async (req, res) => {
-  console.log('--- DARAJA B2C CALLBACK RECEIVED ---');
-  console.log(JSON.stringify(req.body, null, 2));
+  // Summary only, not the full payload — ResultParameters carries the
+  // recipient's name/phone (PII) which doesn't need to sit in plaintext
+  // stdout logs.
+  const resultSummary = req.body?.Result;
+  console.log(`--- DARAJA B2C CALLBACK RECEIVED --- ResultCode=${resultSummary?.ResultCode} ResultDesc=${resultSummary?.ResultDesc} Ref=${resultSummary?.OriginatorConversationID || resultSummary?.ConversationID}`);
 
   // Acknowledge receipt immediately — Safaricom retries on anything but a fast 200.
   res.status(200).json({ ResultCode: 0, ResultDesc: 'Accepted' });

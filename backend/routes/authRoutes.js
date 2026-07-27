@@ -75,6 +75,18 @@ const merchantOtpLimiter = rateLimit({
   message: { error: 'Too many verification attempts. Restart the login flow.' },
 });
 
+// PIN endpoints guard a 4-digit code (10,000 combinations) with a valid
+// session already in hand — IP rate limiting alone doesn't stop a botnet,
+// but it closes the trivial single-IP brute force this had zero protection
+// against before.
+const pinLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many PIN attempts. Try again in 15 minutes.' },
+});
+
 // Admin Auth Routes
 router.post('/login', adminLoginLimiter, login);
 router.post('/verify-otp', adminOtpLimiter, verifyOTP);
@@ -105,7 +117,7 @@ router.get('/merchant/me', protectMerchant, getMerchantMe);
 router.put('/merchant/profile', protectMerchant, updateMerchantProfile);
 router.put('/merchant/biometrics', protectMerchant, toggleBiometrics);
 router.post('/merchant/set-app-pin', protectMerchant, setAppPin);
-router.post('/merchant/verify-payment-pin', protectMerchant, verifyPaymentPin);
+router.post('/merchant/verify-payment-pin', protectMerchant, pinLimiter, verifyPaymentPin);
 
 // WebAuthn / Passkey routes
 // Public — called before the user holds a JWT

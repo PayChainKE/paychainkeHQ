@@ -11,6 +11,7 @@ import { createNotification } from './notificationController.js';
 import { getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
 import { toE164Kenyan } from '../utils/notificationService.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
+import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 
 // Mask a phone number for safe display in the UI, e.g. +254712345678 →
 // +254•••••••78. Falls back to the raw digits if the number can't be
@@ -1103,8 +1104,16 @@ export const verifyPaymentPin = async (req, res) => {
       return res.status(400).json({ error: 'No payment PIN has been set. Please set one first.', pinNotSet: true });
     }
 
+    try {
+      await assertPinNotLocked(merchant._id);
+    } catch (e) {
+      if (e instanceof PinLockedError) return res.status(429).json({ error: e.message });
+      throw e;
+    }
+
     const isMatch = await bcrypt.compare(String(pin), merchant.appPin);
     if (!isMatch) {
+      await recordFailedPinAttempt(merchant._id);
       logAudit({
         action: 'merchant.payment_pin.failed', category: 'security', severity: 'warning',
         message: 'Payment PIN verification failed',
@@ -1112,6 +1121,7 @@ export const verifyPaymentPin = async (req, res) => {
       });
       return res.status(401).json({ error: 'Incorrect PIN. Please try again.' });
     }
+    await resetPinAttempts(merchant._id);
 
     logAudit({
       action: 'merchant.payment_pin.verified', category: 'security', severity: 'info',

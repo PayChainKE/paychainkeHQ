@@ -43,9 +43,13 @@ import {
   deleteExpense,
   getBookkeepingSummary,
 } from '../controllers/bookkeepingController.js';
-import { protect } from '../middleware/authMiddleware.js';
+import { protect, requireRole } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
+
+// analyst is a read-only reporting tier (models/Admin.js) — every mutating
+// route below requires owner/admin; GET routes stay open to all roles.
+const requireMutator = requireRole('owner', 'admin');
 
 // Admin Auth Routes
 router.use('/auth', authRoutes);
@@ -70,16 +74,16 @@ const sensitiveActionLimiter = rateLimit({
 
 // Merchant Management Routes (admin-only)
 router.get('/merchants', protect, getMerchants);
-router.post('/merchants', protect, merchantCreateLimiter, createMerchant);
+router.post('/merchants', protect, requireMutator, merchantCreateLimiter, createMerchant);
 router.get('/merchants/analytics', protect, getMerchantAnalytics);
 // IMPORTANT: keep `/merchants/:id` AFTER `/merchants/analytics` so Express
 // matches the literal path first instead of treating "analytics" as :id.
 router.get('/merchants/:id', protect, getMerchantDetail);
-router.post('/merchants/:id/request-action', protect, sensitiveActionLimiter, requestMerchantAction);
-router.post('/merchants/:id/confirm-action', protect, sensitiveActionLimiter, confirmMerchantAction);
-router.post('/merchants/:id/flag', protect, sensitiveActionLimiter, flagMerchant);
-router.post('/merchants/:id/unflag', protect, sensitiveActionLimiter, unflagMerchant);
-router.patch('/merchants/:id/features', protect, sensitiveActionLimiter, updateMerchantFeatures);
+router.post('/merchants/:id/request-action', protect, requireMutator, sensitiveActionLimiter, requestMerchantAction);
+router.post('/merchants/:id/confirm-action', protect, requireMutator, sensitiveActionLimiter, confirmMerchantAction);
+router.post('/merchants/:id/flag', protect, requireMutator, sensitiveActionLimiter, flagMerchant);
+router.post('/merchants/:id/unflag', protect, requireMutator, sensitiveActionLimiter, unflagMerchant);
+router.patch('/merchants/:id/features', protect, requireMutator, sensitiveActionLimiter, updateMerchantFeatures);
 router.get('/merchants/:id/audit-log', protect, getMerchantAuditLog);
 
 // Executive insights — aggregated KPIs / GTV / funnel / leaderboards.
@@ -101,14 +105,14 @@ router.get('/invoices', protect, adminListInvoices);
 // Cash advance review queue — list every merchant's application, move a
 // request between pending/reviewing/approved/declined.
 router.get('/cash-advance/requests', protect, adminListCashAdvanceRequests);
-router.patch('/cash-advance/requests/:id', protect, sensitiveActionLimiter, adminUpdateCashAdvanceRequest);
+router.patch('/cash-advance/requests/:id', protect, requireMutator, sensitiveActionLimiter, adminUpdateCashAdvanceRequest);
 
 // Bookkeeping — expense ledger + P&L summary for KRA-ready record keeping.
 router.get('/bookkeeping/summary',        protect, getBookkeepingSummary);
 router.get('/bookkeeping/expenses',       protect, listExpenses);
-router.post('/bookkeeping/expenses',      protect, createExpense);
-router.put('/bookkeeping/expenses/:id',   protect, updateExpense);
-router.delete('/bookkeeping/expenses/:id',protect, deleteExpense);
+router.post('/bookkeeping/expenses',      protect, requireMutator, createExpense);
+router.put('/bookkeeping/expenses/:id',   protect, requireMutator, updateExpense);
+router.delete('/bookkeeping/expenses/:id',protect, requireMutator, deleteExpense);
 
 // Compact health pulse for the sidebar widget.
 router.get('/system-status', protect, getSystemStatus);
@@ -118,9 +122,9 @@ router.get('/audit-log', protect, getAuditLog);
 
 // Call-centre / inbound communications console.
 router.get('/communications',                protect, getCommunications);
-router.patch('/communications/:id',          protect, updateCommunication);
-router.post('/communications/:id/notes',     protect, addCommunicationNote);
-router.delete('/communications/:id',         protect, deleteCommunication);
+router.patch('/communications/:id',          protect, requireMutator, updateCommunication);
+router.post('/communications/:id/notes',     protect, requireMutator, addCommunicationNote);
+router.delete('/communications/:id',         protect, requireMutator, deleteCommunication);
 
 // Team management (owner-only mutations enforced inside the controller).
 router.get('/team',                          protect, listTeam);

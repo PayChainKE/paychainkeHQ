@@ -142,6 +142,20 @@ const merchantSchema = new mongoose.Schema({
     select: false,
     default: null,
   },
+  // Account-level PIN brute-force lockout — IP rate limiting alone is
+  // bypassable via botnets/proxies and doesn't protect a single targeted
+  // account. See utils/pinLockout.js for the read/write helpers; every PIN
+  // check in the app (payment PIN, bulk-pay PIN) goes through it.
+  failedPinAttempts: {
+    type: Number,
+    select: false,
+    default: 0,
+  },
+  pinLockedUntil: {
+    type: Date,
+    select: false,
+    default: null,
+  },
   registrationSource: {
     type: String,
     enum: ['web', 'mobile'],

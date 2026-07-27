@@ -4,10 +4,6 @@ import api from '../api/api';
 
 const AuthContext = createContext();
 
-// Credentials provided by user for local/dev login
-const ADMIN_EMAIL = 'brandon@paychain.co.ke';
-const ADMIN_PW = 'Paychain@25';
-
 export function AuthProvider({ children }){
   const [admin, setAdmin] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
