@@ -181,6 +181,16 @@ export const handleInitiateBulkPayment = async (req, res) => {
 
     const result = await initiateBulkPayment(req.merchant._id, payoutItems);
 
+    if (result.merchant.phone) {
+      const { date, time } = formatTransactionDateTime();
+      safeSendSMS({
+        to: result.merchant.phone,
+        message: `${result.batch.batchReference} NCBA Bulk Payout Submitted. KES ${result.totalAmount.toLocaleString()} to ${payoutItems.length} recipient${payoutItems.length === 1 ? '' : 's'} on ${date} at ${time}. New balance: KES ${result.merchant.kesBalance.toLocaleString()}.`,
+      }).then((r) => {
+        if (!r.success) console.error(`NCBA bulk payment SMS failed for merchant ${req.merchant._id}:`, r.error);
+      });
+    }
+
     res.status(200).json({
       message: 'NCBA bulk payment batch submitted successfully.',
       batch: result.batch,

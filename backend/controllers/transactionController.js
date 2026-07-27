@@ -12,6 +12,8 @@ import { getLiveKesToUsdcRate } from '../utils/rateEngine.js';
 import { sendWalletActivationEmail, sendStatementEmail } from '../utils/resend.js';
 import { createNotification } from './notificationController.js';
 import { getCheckoutTotal } from '../utils/pricingEngine.js';
+import { safeSendSMS } from '../utils/smsSanitizer.js';
+import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 
 // @desc    Get merchant transactions
 // @route   GET /api/transactions
@@ -186,6 +188,16 @@ export const swapKesToUsdc = async (req, res) => {
           { returnDocument: 'after' }
         );
 
+        if (merchant.phone) {
+          const { date, time } = formatTransactionDateTime();
+          safeSendSMS({
+            to: merchant.phone,
+            message: `Swap Confirmed. KES ${Number(amount).toLocaleString()} converted to ${usdcPayoutValue} USDC on ${date} at ${time}. New KES balance: KES ${debited.kesBalance.toLocaleString()}.`,
+          }).then((result) => {
+            if (!result.success) console.error(`Swap SMS failed for merchant ${merchant._id}:`, result.error);
+          });
+        }
+
         res.status(200).json({
           success: true,
           message: 'Swap successful',
@@ -235,6 +247,16 @@ export const swapKesToUsdc = async (req, res) => {
           sender: { name: merchant.businessName, id: merchant.stellarPublicKey },
           recipient: { name: 'Manual Swap', id: 'MASTER_WALLET' }
         });
+
+        if (merchant.phone) {
+          const { date, time } = formatTransactionDateTime();
+          safeSendSMS({
+            to: merchant.phone,
+            message: `Swap Confirmed. ${Number(amount).toLocaleString()} USDC converted to KES ${kesPayoutValue.toLocaleString(undefined, { maximumFractionDigits: 2 })} on ${date} at ${time}. New KES balance: KES ${merchant.kesBalance.toLocaleString()}.`,
+          }).then((result) => {
+            if (!result.success) console.error(`Swap SMS failed for merchant ${merchant._id}:`, result.error);
+          });
+        }
 
         res.status(200).json({
           success: true,
@@ -374,6 +396,16 @@ export const sendMoney = async (req, res) => {
       sender: { name: merchant.businessName, id: merchant.phone },
       recipient: { name: reference || destination || 'Withdrawal', id: destination },
     });
+
+    if (merchant.phone) {
+      const { date, time } = formatTransactionDateTime();
+      safeSendSMS({
+        to: merchant.phone,
+        message: `${ref} Sent. KES ${totalDeduction.toLocaleString()} sent to ${reference || destination || 'recipient'} on ${date} at ${time}. New balance: KES ${merchant.kesBalance.toLocaleString()}.`,
+      }).then((result) => {
+        if (!result.success) console.error(`Send-money SMS failed for merchant ${merchant._id}:`, result.error);
+      });
+    }
 
     res.status(200).json({
       success: true,

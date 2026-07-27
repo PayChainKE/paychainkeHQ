@@ -185,6 +185,16 @@ export const handleBankPayout = async (req, res) => {
       message: `KES ${Number(amount).toLocaleString()} was sent to your bank account via PesaLink.`,
     }).catch((e) => logEvent('error', 'ncba_openbanking_payout_notification_failed', { transactionId: transaction.reference, error: e.message }));
 
+    if (updatedMerchant.phone) {
+      const { date, time } = formatTransactionDateTime();
+      safeSendSMS({
+        to: updatedMerchant.phone,
+        message: `${transaction.reference} Bank Payout Sent. KES ${Number(amount).toLocaleString()} paid to ${accountName || 'your bank account'} on ${date} at ${time}. New balance: KES ${updatedMerchant.kesBalance.toLocaleString()}.`,
+      }).then((result) => {
+        if (!result.success) logEvent('error', 'ncba_openbanking_payout_sms_failed', { transactionId: transaction.reference, error: result.error });
+      });
+    }
+
     res.status(200).json({
       success: true,
       message: 'Bank transfer completed via NCBA PesaLink.',

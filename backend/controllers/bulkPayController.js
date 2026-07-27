@@ -12,6 +12,8 @@ import fs from 'fs';
 import bcrypt from 'bcryptjs';
 import { sendBatchReceiptEmail } from '../utils/resend.js';
 import { createNotification } from './notificationController.js';
+import { safeSendSMS } from '../utils/smsSanitizer.js';
+import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 
 // @desc    Get all payees for a merchant
 // @route   GET /api/bulkpay/payees
@@ -550,6 +552,20 @@ export const authorizeBatch = async (req, res) => {
       title: 'Bulk payout submitted',
       message: `Batch of ${transactions.length} payout${transactions.length === 1 ? '' : 's'} (KES ${totalNet.toLocaleString()}) has been submitted${refundAmount > 0 ? `; KES ${refundAmount.toLocaleString()} was refunded for payouts that failed to send.` : '.'}`,
     });
+
+    // Non-blocking — a pending row here still gets its own resolution SMS
+    // later from b2cCallback once Daraja confirms it, same as a standalone
+    // B2C payout. This one is just the submission acknowledgment.
+    if (merchant.phone) {
+      const failedCount = rowStatuses.filter((s) => s === 'failed').length;
+      const { date, time } = formatTransactionDateTime();
+      safeSendSMS({
+        to: merchant.phone,
+        message: `${savedBatch.batchReference} Bulk Payout Submitted. KES ${totalNet.toLocaleString()} to ${transactions.length} recipient${transactions.length === 1 ? '' : 's'} on ${date} at ${time}.${failedCount > 0 ? ` ${failedCount} failed and were refunded.` : ''} New balance: KES ${merchant.kesBalance.toLocaleString()}.`,
+      }).then((result) => {
+        if (!result.success) console.error(`Bulk payout SMS failed for merchant ${merchant._id}:`, result.error);
+      });
+    }
 
     // Trigger Email Receipt in the background if email exists
     if (merchant.email) {
