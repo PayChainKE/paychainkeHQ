@@ -303,21 +303,6 @@ export default function Overview() {
                         </div>
                       </button>
 
-                      <button onClick={() => { setActiveFundMethod('card'); setShowFundAccount(false); }} className="w-full text-left p-3 hover:bg-emerald-50/50 rounded-xl transition-all group relative overflow-hidden">
-                        <div className="flex items-center gap-3 relative z-10">
-                          <div className="w-10 h-10 rounded-xl bg-[#0D2444] text-blue-300 flex items-center justify-center shrink-0 shadow-lg group-hover:scale-105 transition-transform">
-                            <span className="material-symbols-outlined text-lg">credit_card</span>
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between mb-0.5">
-                              <p className="text-[10px] font-black uppercase tracking-widest text-[#00351D]">Card Top-up</p>
-                              <span className="material-symbols-outlined text-slate-300 text-xs group-hover:translate-x-1 transition-transform">arrow_forward</span>
-                            </div>
-                            <p className="text-[9px] text-slate-500 font-medium leading-tight line-clamp-1">Visa / Mastercard</p>
-                          </div>
-                        </div>
-                      </button>
-
                       <button onClick={() => { setActiveFundMethod('bank'); setShowFundAccount(false); }} className="w-full text-left p-3 hover:bg-emerald-50/50 rounded-xl transition-all group relative overflow-hidden">
                         <div className="flex items-center gap-3 relative z-10">
                           <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 shadow-lg group-hover:scale-105 transition-transform">

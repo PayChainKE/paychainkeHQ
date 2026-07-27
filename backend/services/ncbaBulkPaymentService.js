@@ -245,3 +245,36 @@ export async function initiateBulkPayment(merchantId, payoutItems) {
 
   return { batch, hostResponse, totalAmount, merchant: reservedMerchant };
 }
+
+/**
+ * Submit a single utility bill payout (KPLC/water) via NCBA's Bulk H2H rail.
+ * Used by bulkPayController.js's per-payee authorization loop, which
+ * already reserves the whole batch's balance atomically upfront — this
+ * function deliberately does NOT touch kesBalance or create a Transaction
+ * itself; the caller does both uniformly for every payee row, mirroring how
+ * submitNcbaBankTransfer (ncbaOpenBankingController.js) works for the Bank
+ * branch of the same loop.
+ *
+ * Unlike NCBA Open Banking's PesaLink/EFT (synchronous — resultCode is the
+ * final answer), this H2H rail is asynchronous: a successful submission
+ * here only means NCBA *accepted* the instruction, not that the bill was
+ * paid. The caller should record the resulting Transaction as 'pending',
+ * matching initiateBulkPayment's Transaction rows above.
+ */
+export async function submitNcbaUtilityPayment({ utilityProvider, accountNumber, amount, name }) {
+  const item = { type: 'utility', utilityProvider, accountNumber, amount, name };
+  const validatedAmount = validatePayoutItem(item, 0);
+  const instruction = buildPaymentInstruction(item, 0);
+
+  const payload = {
+    BatchReference: instruction.PaymentReference,
+    ValueDate: new Date().toISOString().slice(0, 10).replace(/-/g, ''),
+    DebitAccountNumber: ncbaDebitAccount || 'PAYCHAIN_SETTLEMENT_ACCOUNT',
+    TotalAmount: validatedAmount,
+    TotalCount: 1,
+    Payments: [instruction],
+  };
+
+  const hostResponse = await submitToNcbaHostToHost(payload);
+  return { transactionId: instruction.PaymentReference, hostResponse };
+}

@@ -1,9 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import { useNotification } from '../context/NotificationContext'
 import { ValidatedInput } from '../components/ValidatedInput'
+import PinBoxes from '../components/PinBoxes'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { formatKES } from '../utils/formatCurrency'
 
@@ -16,67 +17,6 @@ const DESTINATIONS = [
   { id: 'till',          label: 'Till Number',              icon: 'point_of_sale',     fee: 50, hint: 'Pay to a Safaricom Till' },
   { id: 'paybill',       label: 'Paybill',                  icon: 'receipt_long',      fee: 50, hint: 'Pay to a Paybill number' },
 ]
-
-// 4 individual PIN boxes — same premium feel as the OTP entry
-function PinBoxes({ value, onChange, autoFocus }) {
-  const refs = useRef([])
-
-  const handleChange = (e, i) => {
-    const digit = e.target.value.replace(/\D/g, '').slice(-1)
-    const arr = value.split('')
-    arr[i] = digit
-    const next = arr.join('').slice(0, 4)
-    onChange(next)
-    if (digit && i < 3) refs.current[i + 1]?.focus()
-  }
-
-  const handleKey = (e, i) => {
-    if (e.key === 'Backspace') {
-      if (value[i]) {
-        const arr = value.split('')
-        arr[i] = ''
-        onChange(arr.join(''))
-      } else if (i > 0) {
-        refs.current[i - 1]?.focus()
-      }
-    }
-  }
-
-  const handlePaste = (e) => {
-    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 4)
-    if (pasted) {
-      onChange(pasted.padEnd(4, '').slice(0, 4))
-      refs.current[Math.min(pasted.length, 3)]?.focus()
-    }
-    e.preventDefault()
-  }
-
-  return (
-    <div className="flex items-center justify-center gap-3">
-      {[0, 1, 2, 3].map(i => (
-        <input
-          key={i}
-          ref={el => { refs.current[i] = el }}
-          type="password"
-          inputMode="numeric"
-          maxLength={1}
-          autoFocus={autoFocus && i === 0}
-          value={value[i] || ''}
-          onChange={e => handleChange(e, i)}
-          onKeyDown={e => handleKey(e, i)}
-          onPaste={i === 0 ? handlePaste : undefined}
-          onFocus={e => e.target.select()}
-          className={`
-            w-14 h-16 rounded-2xl text-center font-black text-2xl outline-none transition-all duration-200
-            ${value[i]
-              ? 'bg-[#00351D] text-white shadow-[0_0_20px_rgba(0,53,29,0.4)] scale-105'
-              : 'bg-slate-100 border-2 border-slate-200 text-slate-400 focus:border-[#00351D] focus:bg-white focus:shadow-md'}
-          `}
-        />
-      ))}
-    </div>
-  )
-}
 
 export default function SendMoney() {
   const navigate = useNavigate()
@@ -168,6 +108,7 @@ export default function SendMoney() {
             destination: selectedDest.label,
             fee,
             reference,
+            pin,
           }, cfg())
         } else if (destination === 'bank') {
           await axios.post(`${API_URL}/api/v1/openbanking/bank-payout`, {
@@ -184,6 +125,7 @@ export default function SendMoney() {
             amount: Number(amount),
             fee,
             reference: reference || `Transfer to ${recipientAccount}`,
+            pin,
           }, cfg())
         }
 

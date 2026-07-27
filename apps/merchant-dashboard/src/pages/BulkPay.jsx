@@ -97,6 +97,12 @@ export default function BulkPay() {
     cuNumber: ''
   })
 
+  // KPLC/Water route through NCBA's biller-code BillPay rail (real payment
+  // execution, see authorizeBatch), so they skip Settlement Method entirely
+  // in favour of a meter/account number. Rent/Internet aren't real NCBA
+  // billers — they still settle via Mobile Money/Bank like any other payee.
+  const isNcbaBillableUtility = newPayee.type === 'Utility' && ['Electricity', 'Water'].includes(newPayee.utilityType)
+
   // Filter payees based on active tab
   const filteredPayees = payeesList.filter(p => {
     if (activeFilter === 'All') return true;
@@ -123,6 +129,7 @@ export default function BulkPay() {
     setNewPayee({
       name: p.name,
       type: p.type.charAt(0).toUpperCase() + p.type.slice(1),
+      utilityType: p.utilityProvider === 'KPLC' ? 'Electricity' : p.utilityProvider === 'WATER' ? 'Water' : 'Electricity',
       paymentMethod: p.paymentMethod || 'Mobile Money',
       mobileMoneyType: p.mobileMoneyType || 'Personal Number',
       amount: (p.salary || p.amount || 0).toString(),
@@ -169,7 +176,12 @@ export default function BulkPay() {
     }
 
     // Professional Settlement Format Validation
-    if (newPayee.paymentMethod === 'Mobile Money') {
+    if (isNcbaBillableUtility) {
+      if (!newPayee.accountNumber?.trim()) {
+        addNotification({ title: 'Missing Info', message: `${newPayee.utilityType === 'Electricity' ? 'Meter' : 'Account'} number is required.`, type: 'error' });
+        return;
+      }
+    } else if (newPayee.paymentMethod === 'Mobile Money') {
       if (newPayee.mobileMoneyType === 'Personal Number') {
         if (!isValidPhoneKE(newPayee.phone)) {
           addNotification({ title: 'Invalid Format', message: 'Please enter a valid Kenyan phone number (07..., 01..., +2547..., +2541...).', type: 'error' });
@@ -204,9 +216,13 @@ export default function BulkPay() {
     const numericAmount = parseFloat(newPayee.amount.replace(/,/g, '')) || 0;
     try {
       const token = localStorage.getItem('paychain_merchant_token');
+      const utilityProvider = newPayee.type === 'Utility'
+        ? (newPayee.utilityType === 'Electricity' ? 'KPLC' : newPayee.utilityType === 'Water' ? 'WATER' : null)
+        : null;
       const payload = {
         ...newPayee,
         type: newPayee.type.toLowerCase(),
+        utilityProvider,
         defaultAmount: numericAmount
       };
       const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
@@ -1003,6 +1019,24 @@ export default function BulkPay() {
                         />
                       </div>
 
+                      {isNcbaBillableUtility ? (
+                        <div className="space-y-1.5 pt-4 animate-in fade-in duration-300">
+                          <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">
+                            {newPayee.utilityType === 'Electricity' ? 'Meter Number' : 'Account Number'}
+                          </label>
+                          <ValidatedInput
+                            kind={newPayee.utilityType === 'Electricity' ? 'integer' : 'text'}
+                            value={newPayee.accountNumber}
+                            onChange={(e) => setNewPayee({...newPayee, accountNumber: e.target.value})}
+                            placeholder={newPayee.utilityType === 'Electricity' ? 'e.g. 12345678901' : 'e.g. 987654321'}
+                            className="w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 md:px-6 md:py-4 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none"
+                          />
+                          <p className="text-[10px] text-on-surface-variant/50 font-medium ml-1">
+                            Paid directly via NCBA — no Settlement Method needed for {newPayee.utilityType}.
+                          </p>
+                        </div>
+                      ) : (
+                      <>
                       <div className="space-y-4 pt-4">
                         <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Settlement Method</label>
                         <div className="flex gap-2 p-1.5 bg-surface-container-low/50 rounded-2xl border border-outline-variant/5">
@@ -1119,6 +1153,8 @@ export default function BulkPay() {
                           </div>
                         )}
                       </div>
+                      </>
+                      )}
                     </div>
 
                     <div className="flex gap-4 pt-4">
@@ -1362,7 +1398,7 @@ export default function BulkPay() {
                           </td>
                           <td className="px-6 py-4 border-r border-outline-variant/5">
                             <div className="flex flex-col">
-                              <span className="text-[10px] font-black text-primary/80 uppercase tracking-wider">{p.paymentMethod}</span>
+                              <span className="text-[10px] font-black text-primary/80 uppercase tracking-wider">{p.utilityProvider ? 'NCBA Bill Pay' : p.paymentMethod}</span>
                               <span className="text-[10px] font-medium text-on-surface-variant opacity-60 tabular-nums">{p.phone || p.paybillNumber || p.accountNumber}</span>
                             </div>
                           </td>
@@ -1411,7 +1447,7 @@ export default function BulkPay() {
                           </div>
                           <div>
                             <p className="text-[11px] font-bold text-primary leading-none">{p.name}</p>
-                            <p className="text-[8px] text-on-surface-variant font-bold uppercase tracking-widest mt-1 opacity-50">{p.paymentMethod}</p>
+                            <p className="text-[8px] text-on-surface-variant font-bold uppercase tracking-widest mt-1 opacity-50">{p.utilityProvider ? 'NCBA Bill Pay' : p.paymentMethod}</p>
                           </div>
                         </div>
                         {step === 1 && (

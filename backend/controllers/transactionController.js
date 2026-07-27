@@ -3,6 +3,7 @@ import Merchant from '../models/Merchant.js';
 import PaymentLink from '../models/PaymentLink.js';
 import crypto from 'crypto';
 import axios from 'axios';
+import bcrypt from 'bcryptjs';
 import STKRequest from '../models/STKRequest.js';
 import { isLive, mpesaBaseUrl, shortCode, passkey, callbackBase, stkCallback } from './mpesaController.js';
 import { settleInflationShield, provisionMerchantWallet, getWalletBalance, swapUsdcToKesOnChain } from '../utils/stellarHelper.js';
@@ -53,19 +54,27 @@ export const emailStatement = async (req, res) => {
   }
 };
 
-// @desc    Simulate incoming M-PESA payment
+// @desc    Simulate incoming M-PESA payment — dev/staging tool only, never
+//          reachable in production. Previously public with zero auth and a
+//          client-supplied accountNumber, which let anyone credit any
+//          merchant's real balance for free; now requires a session and can
+//          only ever credit the caller's own account.
 // @route   POST /api/transactions/simulate
-// @access  Public (for testing)
+// @access  Private (non-production only)
 export const simulateIncomingPayment = async (req, res) => {
   try {
-    const { accountNumber, amount, senderName, senderPhone } = req.body;
-
-    if (!accountNumber || !amount) {
-      return res.status(400).json({ error: 'Account number and amount are required' });
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(404).json({ error: 'Not found' });
     }
 
-    // Find the merchant by paybill account
-    const merchant = await Merchant.findOne({ paybillAccount: accountNumber });
+    const { amount, senderName, senderPhone } = req.body;
+
+    if (!amount) {
+      return res.status(400).json({ error: 'Amount is required' });
+    }
+
+    // Always the caller's own account — never trust a client-supplied one.
+    const merchant = await Merchant.findById(req.merchant._id);
 
     if (!merchant) {
       return res.status(404).json({ error: 'No merchant found with this account number' });
@@ -140,19 +149,23 @@ export const swapKesToUsdc = async (req, res) => {
     const liveRate = await getLiveKesToUsdcRate(); // Returns USDC per 1 KES
 
     if (direction === 'KES_TO_USDC') {
-      if (merchant.kesBalance < amount) {
+      // Atomic conditional deduct — avoids two concurrent swaps both
+      // passing a stale in-memory balance check.
+      const debited = await Merchant.findOneAndUpdate(
+        { _id: merchant._id, kesBalance: { $gte: amount } },
+        { $inc: { kesBalance: -amount } },
+        { returnDocument: 'after' }
+      );
+      if (!debited) {
         return res.status(400).json({ error: 'Insufficient KES balance' });
       }
 
       const usdcPayoutValue = (amount * liveRate).toFixed(7);
       console.log(`💱 Manual Swap: Converting ${amount} KES to ${usdcPayoutValue} USDC for ${merchant.paybillAccount}`);
-      
-      merchant.kesBalance -= amount;
-      await merchant.save();
 
       try {
         const txHash = await settleInflationShield(merchant.stellarPublicKey, usdcPayoutValue);
-        
+
         await Transaction.create({
           merchantId: merchant._id,
           accountNumber: merchant.paybillAccount,
@@ -167,21 +180,23 @@ export const swapKesToUsdc = async (req, res) => {
           recipient: { name: merchant.businessName, id: merchant.stellarPublicKey }
         });
 
-        merchant.usdcBalance = (merchant.usdcBalance || 0) + parseFloat(usdcPayoutValue);
-        await merchant.save();
+        const credited = await Merchant.findByIdAndUpdate(
+          merchant._id,
+          { $inc: { usdcBalance: parseFloat(usdcPayoutValue) } },
+          { returnDocument: 'after' }
+        );
 
         res.status(200).json({
           success: true,
           message: 'Swap successful',
-          newKesBalance: merchant.kesBalance,
-          newUsdcBalance: merchant.usdcBalance,
+          newKesBalance: debited.kesBalance,
+          newUsdcBalance: credited.usdcBalance,
           txHash
         });
 
       } catch (e) {
         console.error('❌ KES→USDC swap failed:', e.message);
-        merchant.kesBalance += amount;
-        await merchant.save();
+        await Merchant.findByIdAndUpdate(merchant._id, { $inc: { kesBalance: amount } });
         return res.status(500).json({ error: e.message || 'Blockchain settlement failed. KES balance refunded.' });
       }
     } else if (direction === 'USDC_TO_KES') {
@@ -196,9 +211,16 @@ export const swapKesToUsdc = async (req, res) => {
       try {
         const txHash = await swapUsdcToKesOnChain(merchant.stellarEncryptedSecretKey, amount);
 
-        merchant.kesBalance = (merchant.kesBalance || 0) + kesPayoutValue;
-        merchant.usdcBalance = liveUsdcBalance - amount;
-        await merchant.save();
+        // usdcBalance is set (not $inc'd) to match the just-fetched live
+        // chain balance minus this swap — kesBalance is a pure atomic
+        // credit, consistent with the KES_TO_USDC branch above.
+        const updated = await Merchant.findByIdAndUpdate(
+          merchant._id,
+          { $inc: { kesBalance: kesPayoutValue }, $set: { usdcBalance: liveUsdcBalance - amount } },
+          { returnDocument: 'after' }
+        );
+        merchant.kesBalance = updated.kesBalance;
+        merchant.usdcBalance = updated.usdcBalance;
 
         await Transaction.create({
           merchantId: merchant._id,
@@ -302,28 +324,42 @@ export const getLiveRate = async (req, res) => {
 // @access  Private
 export const sendMoney = async (req, res) => {
   try {
-    const { destination, amount, fee, reference } = req.body;
+    const { destination, amount, fee, reference, pin } = req.body;
     const merchantId = req.merchant._id;
 
     if (!amount || amount <= 0) {
       return res.status(400).json({ error: 'Valid amount is required.' });
     }
+    if (!pin) {
+      return res.status(400).json({ error: 'Payment PIN is required.' });
+    }
 
     const totalDeduction = Number(amount) + Number(fee || 0);
 
-    // Verify balance
-    const merchant = await Merchant.findById(merchantId);
-    if (!merchant) {
+    const merchantWithPin = await Merchant.findById(merchantId).select('+appPin');
+    if (!merchantWithPin) {
       return res.status(404).json({ error: 'Merchant not found.' });
     }
-
-    if (merchant.kesBalance < totalDeduction) {
-      return res.status(400).json({ error: 'Insufficient KES balance for this transfer.' });
+    if (!merchantWithPin.appPin) {
+      return res.status(400).json({ error: 'Please set up your payment PIN first.' });
+    }
+    const pinMatches = await bcrypt.compare(String(pin), merchantWithPin.appPin);
+    if (!pinMatches) {
+      return res.status(401).json({ error: 'Invalid PIN.' });
     }
 
-    // Deduct balance
-    merchant.kesBalance -= totalDeduction;
-    await merchant.save();
+    // Atomic conditional deduct — avoids the read-then-write race of
+    // fetching balance, checking it, then saving separately, where two
+    // concurrent requests could both pass the check against the same
+    // starting balance.
+    const merchant = await Merchant.findOneAndUpdate(
+      { _id: merchantId, kesBalance: { $gte: totalDeduction } },
+      { $inc: { kesBalance: -totalDeduction } },
+      { returnDocument: 'after' }
+    );
+    if (!merchant) {
+      return res.status(400).json({ error: 'Insufficient KES balance for this transfer.' });
+    }
 
     const ref = `OUT-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
     const transaction = await Transaction.create({

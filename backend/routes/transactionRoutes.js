@@ -5,7 +5,7 @@ import { generateToken } from '../controllers/mpesaController.js';
 
 const router = express.Router();
 
-router.post('/simulate', simulateIncomingPayment);
+router.post('/simulate', protectMerchant, simulateIncomingPayment);
 router.post('/swap', protectMerchant, swapKesToUsdc);
 router.post('/activate-wallet', protectMerchant, activateWallet);
 router.post('/sync-wallet', protectMerchant, syncWalletBalance);
