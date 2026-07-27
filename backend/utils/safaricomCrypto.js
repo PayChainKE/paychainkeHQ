@@ -1,19 +1,19 @@
 import crypto from 'crypto';
 
-// Safaricom issues separate RSA public certificates for the Daraja sandbox
-// and production environments (downloaded from the Daraja portal — the
-// production one only becomes available once B2C is approved on your live
-// app). Supplied via env var, never hardcoded here: a real production
-// certificate is account-specific key material that shouldn't sit in
-// source control, and a fabricated/placeholder certificate (the previous
-// state of this file) doesn't fail loudly — it just produces a bogus
-// SecurityCredential that Safaricom silently rejects, or that a caller
-// mistakes for a real one.
+// Daraja's "Test Credentials" portal tool encrypts your Initiator Password
+// with Safaricom's public key server-side and hands back the finished
+// SecurityCredential string directly — it doesn't expose a downloadable
+// certificate file. RSA/PKCS1 encryption of the same password decrypts to
+// the same password on Safaricom's end regardless of when it was encrypted,
+// so that value is static: generate it once per environment on the portal
+// and store it as MPESA_B2C_SECURITY_CREDENTIAL_SANDBOX /
+// MPESA_B2C_SECURITY_CREDENTIAL_PRODUCTION. It only needs regenerating if
+// the Initiator password itself changes.
 //
-// MPESA_B2C_SANDBOX_CERT / MPESA_B2C_PRODUCTION_CERT — paste the cert
-// exactly as downloaded, with real newlines replaced by literal \n
-// (most hosting UIs, including Render, require single-line values for
-// multi-line secrets; normalizeCert() below reverses that).
+// If a real certificate ever does become available (e.g. via a Safaricom
+// account rep), MPESA_B2C_SANDBOX_CERT / MPESA_B2C_PRODUCTION_CERT are
+// still supported as a fallback so the credential can be derived from a
+// password at request time instead of a fixed precomputed value.
 const mpesaEnv = (process.env.MPESA_ENVIRONMENT || 'sandbox').toLowerCase();
 const isLive = mpesaEnv === 'live';
 
@@ -29,12 +29,18 @@ function normalizeCert(cert) {
 }
 
 export const generateSecurityCredential = (password) => {
-  const envVar = isLive ? 'MPESA_B2C_PRODUCTION_CERT' : 'MPESA_B2C_SANDBOX_CERT';
-  const cert = normalizeCert(process.env[envVar]);
+  const staticEnvVar = isLive ? 'MPESA_B2C_SECURITY_CREDENTIAL_PRODUCTION' : 'MPESA_B2C_SECURITY_CREDENTIAL_SANDBOX';
+  const staticCredential = process.env[staticEnvVar];
+  if (staticCredential) {
+    return staticCredential;
+  }
+
+  const certEnvVar = isLive ? 'MPESA_B2C_PRODUCTION_CERT' : 'MPESA_B2C_SANDBOX_CERT';
+  const cert = normalizeCert(process.env[certEnvVar]);
 
   if (!cert) {
     throw new SecurityCredentialError(
-      `${envVar} is not set — B2C cannot generate a valid SecurityCredential without Safaricom's real certificate for this environment.`
+      `Neither ${staticEnvVar} nor ${certEnvVar} is set — B2C cannot generate a valid SecurityCredential for this environment.`
     );
   }
   if (!password) {
