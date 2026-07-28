@@ -84,12 +84,24 @@ export const handleNcbaAccountNotification = async (req, res) => {
       return respondFail(res, 'Endpoint not configured');
     }
 
-    const credentialsOk =
-      timingSafeStringEqual(rawUser, expectedUser) &
-      timingSafeStringEqual(rawPassword, expectedPassword);
+    // Checked and logged separately (still never logging the actual
+    // received/expected values) so a live mismatch during an NCBA test can
+    // be diagnosed from Render logs alone — "which field is wrong" beats a
+    // single generic "auth_failed" when someone's on a call trying to
+    // figure out why a test transaction didn't land.
+    const userOk = timingSafeStringEqual(rawUser, expectedUser);
+    const passwordOk = timingSafeStringEqual(rawPassword, expectedPassword);
 
-    if (!credentialsOk) {
-      logEvent('warn', 'ncba_account_notification_auth_failed', { transId });
+    if (!userOk || !passwordOk) {
+      logEvent('warn', 'ncba_account_notification_auth_failed', {
+        transId,
+        userMatched: userOk,
+        passwordMatched: passwordOk,
+        receivedUserLength: String(rawUser ?? '').length,
+        expectedUserLength: expectedUser.length,
+        receivedPasswordLength: String(rawPassword ?? '').length,
+        expectedPasswordLength: expectedPassword.length,
+      });
       return respondFail(res, 'Invalid credentials');
     }
 
@@ -106,7 +118,26 @@ export const handleNcbaAccountNotification = async (req, res) => {
     });
 
     if (!hashOk) {
-      logEvent('warn', 'ncba_account_notification_hash_mismatch', { transId, txnType: rawTransType });
+      // Field lengths only (never the secret key, the fields themselves,
+      // or the hash values) — enough to spot "NCBA sent this field empty/
+      // differently formatted than expected" without logging anything
+      // sensitive.
+      logEvent('warn', 'ncba_account_notification_hash_mismatch', {
+        transId,
+        txnType: rawTransType,
+        receivedHashValLength: String(rawHashVal ?? '').length,
+        fieldLengths: {
+          transType: String(rawTransType ?? '').length,
+          transId: String(rawTransId ?? '').length,
+          transTime: String(rawTransTime ?? '').length,
+          transAmount: String(rawTransAmount ?? '').length,
+          accountNr: String(rawAccountNr ?? '').length,
+          narrative: String(rawNarrative ?? '').length,
+          phoneNr: String(rawPhoneNr ?? '').length,
+          customerName: String(rawCustomerName ?? '').length,
+          status: String(rawStatus ?? '').length,
+        },
+      });
       return respondFail(res, 'HashVal verification failed');
     }
 
