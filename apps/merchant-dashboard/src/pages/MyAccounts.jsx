@@ -11,7 +11,10 @@ export default function MyAccounts() {
     {
       service: 'PayChain',
       accountNumber: merchant?.paybillAccount || '84729',
-      type: 'M-Pesa Paybill',
+      // Not "the Paybill" — this is PayChain's own internal reference
+      // number, used for wallet top-ups (STK Push). The actual Paybill
+      // customers pay into is NCBA's 880100, shown on the row below.
+      type: 'Wallet Reference',
       name: merchant?.businessName || 'Merchant',
       linkedTransferAccount: '—',
       manager: merchant?.name || 'Owner',
@@ -25,7 +28,11 @@ export default function MyAccounts() {
       accountNumber: merchant?.ncbaVirtualAccountNumber || 'Pending bank assignment',
       type: 'Bank Transfer / EFT / PesaLink',
       name: merchant?.businessName || 'Merchant',
-      linkedTransferAccount: '—',
+      // NCBA's real M-Pesa Paybill business number — how a customer sends
+      // money into the account number above via M-Pesa (Pay Bill > 880100 >
+      // Account No. = the NCBA virtual account above). Constant, not
+      // merchant-specific.
+      linkedTransferAccount: 'M-Pesa Paybill 880100',
       manager: merchant?.name || 'Owner',
       status: merchant?.ncbaVirtualAccountNumber ? 'Active' : 'Pending'
     }

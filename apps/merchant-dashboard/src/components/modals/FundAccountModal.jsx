@@ -118,7 +118,11 @@ export default function FundAccountModal({ method, onClose }) {
             <div className="relative z-10">
               <h3 className="font-headline text-xl font-bold tracking-tight">{METHOD_TITLE[method]}</h3>
               <p className="text-[11px] text-emerald-300 font-medium mt-0.5">
-                Account: <span className="font-bold text-white">{merchant?.paybillAccount}</span>
+                Account: <span className="font-bold text-white">
+                  {method === 'bank'
+                    ? (merchant?.ncbaVirtualAccountNumber || 'Pending bank assignment')
+                    : merchant?.paybillAccount}
+                </span>
               </p>
             </div>
             <button
@@ -241,20 +245,37 @@ export default function FundAccountModal({ method, onClose }) {
                 <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex items-start gap-3">
                   <span className="material-symbols-outlined text-emerald-600 shrink-0 text-base">info</span>
                   <p className="text-xs text-emerald-800 font-medium leading-relaxed">
-                    Transfer to your dedicated PayChain account. Funds reflect automatically once cleared.
+                    {merchant?.ncbaVirtualAccountNumber
+                      ? 'Pay via M-Pesa Paybill above, or transfer directly from your bank using this account number. Funds reflect automatically once cleared.'
+                      : "Bank transfer isn't available on your account yet — your dedicated NCBA account is still being assigned."}
                   </p>
                 </div>
                 {[
-                  ['Bank', 'PayChain Kenya Bank Ltd'],
+                  ['Bank', 'NCBA Bank Kenya PLC'],
+                  // NCBA's real M-Pesa Paybill business number — this is how a
+                  // customer actually sends money into the NCBA account number
+                  // below via M-Pesa (Lipa na M-Pesa > Pay Bill > 880100 >
+                  // Account No. = the NCBA virtual account). Constant, not
+                  // merchant-specific — always show it, even while the account
+                  // number itself is still pending.
+                  ['Paybill Number', '880100'],
                   ['Account Name', merchant?.businessName],
-                  ['Account Number', merchant?.paybillAccount],
+                  // ncbaVirtualAccountNumber is null until NCBA_INSTITUTION_PREFIX is
+                  // configured on the backend (i.e. until NCBA assigns PayChain's
+                  // 4-digit institution code) — same pending state as MyAccounts.jsx.
+                  // This used to show merchant.paybillAccount here, which is the
+                  // unrelated 5-digit M-Pesa Paybill sub-account, not a bank account.
+                  ['Account Number', merchant?.ncbaVirtualAccountNumber || 'Pending bank assignment'],
                 ].map(([label, value]) => (
                   <div key={label}>
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">{label}</span>
                     <div className="flex items-center justify-between bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3">
                       <span className="font-bold text-primary text-sm">{value}</span>
-                      <button onClick={() => navigator.clipboard.writeText(value)}
-                        className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-emerald-600 hover:bg-emerald-50 transition-colors">
+                      <button
+                        onClick={() => navigator.clipboard.writeText(value)}
+                        disabled={label === 'Account Number' && !merchant?.ncbaVirtualAccountNumber}
+                        className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-emerald-600 hover:bg-emerald-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white"
+                      >
                         <span className="material-symbols-outlined text-sm">content_copy</span>
                       </button>
                     </div>

@@ -54,6 +54,9 @@ export default function Profile() {
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isUpdatingSecurity, setIsUpdatingSecurity] = useState(false)
 
   // PIN Reset states
@@ -67,6 +70,7 @@ export default function Profile() {
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(false)
   const [questionAnswers, setQuestionAnswers] = useState(['', '', ''])
   const [questionsPassword, setQuestionsPassword] = useState('')
+  const [showQuestionsPassword, setShowQuestionsPassword] = useState(false)
   const [isSavingQuestions, setIsSavingQuestions] = useState(false)
 
   const [kraPinLocked, setKraPinLocked] = useState(!!merchant?.kraPin)
@@ -462,33 +466,60 @@ export default function Profile() {
                     
                       <div className="space-y-2">
                         <label className="text-[9px] text-white/40 font-black uppercase tracking-widest pl-1">Current password</label>
-                        <input 
-                          type="password"
-                          value={currentPassword}
-                          onChange={(e) => setCurrentPassword(e.target.value)}
-                          placeholder="••••••••••••"
-                          className="w-full bg-white/5 border border-white/10 rounded-xl py-3.5 px-5 text-sm font-medium text-white focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 outline-none transition-all placeholder:text-white/10"
-                        />
+                        <div className="relative">
+                          <input
+                            type={showCurrentPassword ? 'text' : 'password'}
+                            value={currentPassword}
+                            onChange={(e) => setCurrentPassword(e.target.value)}
+                            placeholder="••••••••••••"
+                            className="w-full bg-white/5 border border-white/10 rounded-xl py-3.5 pl-5 pr-11 text-sm font-medium text-white focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 outline-none transition-all placeholder:text-white/10"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/70 transition-colors p-1"
+                          >
+                            <span className="material-symbols-outlined text-lg">{showCurrentPassword ? 'visibility_off' : 'visibility'}</span>
+                          </button>
+                        </div>
                       </div>
                       <div className="space-y-2">
                         <label className="text-[9px] text-white/40 font-black uppercase tracking-widest pl-1">New password</label>
-                        <input 
-                          type="password"
-                          value={newPassword}
-                          onChange={(e) => setNewPassword(e.target.value)}
-                          placeholder="••••••••••••"
-                          className="w-full bg-white/5 border border-white/10 rounded-xl py-3.5 px-5 text-sm font-medium text-white focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 outline-none transition-all placeholder:text-white/10"
-                        />
+                        <div className="relative">
+                          <input
+                            type={showNewPassword ? 'text' : 'password'}
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            placeholder="••••••••••••"
+                            className="w-full bg-white/5 border border-white/10 rounded-xl py-3.5 pl-5 pr-11 text-sm font-medium text-white focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 outline-none transition-all placeholder:text-white/10"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowNewPassword(!showNewPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/70 transition-colors p-1"
+                          >
+                            <span className="material-symbols-outlined text-lg">{showNewPassword ? 'visibility_off' : 'visibility'}</span>
+                          </button>
+                        </div>
                       </div>
                       <div className="space-y-2">
                         <label className="text-[9px] text-white/40 font-black uppercase tracking-widest pl-1">Confirm new password</label>
-                        <input 
-                          type="password"
-                          value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
-                          placeholder="••••••••••••"
-                          className="w-full bg-white/5 border border-white/10 rounded-xl py-3.5 px-5 text-sm font-medium text-white focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 outline-none transition-all placeholder:text-white/10"
-                        />
+                        <div className="relative">
+                          <input
+                            type={showConfirmPassword ? 'text' : 'password'}
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            placeholder="••••••••••••"
+                            className="w-full bg-white/5 border border-white/10 rounded-xl py-3.5 pl-5 pr-11 text-sm font-medium text-white focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 outline-none transition-all placeholder:text-white/10"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/70 transition-colors p-1"
+                          >
+                            <span className="material-symbols-outlined text-lg">{showConfirmPassword ? 'visibility_off' : 'visibility'}</span>
+                          </button>
+                        </div>
                       </div>
                   </div>
 
@@ -678,14 +709,24 @@ export default function Profile() {
                         <span className="w-1 h-1 rounded-full bg-amber-500"></span>
                         Confirm your password
                       </label>
-                      <input
-                        type="password"
-                        value={questionsPassword}
-                        onChange={(e) => setQuestionsPassword(e.target.value)}
-                        placeholder="••••••••••••"
-                        disabled={isSavingQuestions}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl py-3.5 px-5 text-sm font-medium text-white focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 outline-none transition-all placeholder:text-white/10 disabled:opacity-50"
-                      />
+                      <div className="relative">
+                        <input
+                          type={showQuestionsPassword ? 'text' : 'password'}
+                          value={questionsPassword}
+                          onChange={(e) => setQuestionsPassword(e.target.value)}
+                          placeholder="••••••••••••"
+                          disabled={isSavingQuestions}
+                          className="w-full bg-white/5 border border-white/10 rounded-xl py-3.5 pl-5 pr-11 text-sm font-medium text-white focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 outline-none transition-all placeholder:text-white/10 disabled:opacity-50"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowQuestionsPassword(!showQuestionsPassword)}
+                          disabled={isSavingQuestions}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/70 transition-colors p-1 disabled:opacity-50"
+                        >
+                          <span className="material-symbols-outlined text-lg">{showQuestionsPassword ? 'visibility_off' : 'visibility'}</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
 

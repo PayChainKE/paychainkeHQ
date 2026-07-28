@@ -294,7 +294,7 @@ export default function CashAdvanceRequests() {
                             <Avatar name={request.merchantName} />
                             <div>
                               <p className="font-bold text-xs text-on-surface tracking-tight">{request.merchantName}</p>
-                              <p className="text-2xs text-on-surface-variant/55">Paybill #{request.paybillAccount} · {request.merchantEmail}</p>
+                              <p className="text-2xs text-on-surface-variant/55">Acc #{request.paybillAccount} · {request.merchantEmail}</p>
                             </div>
                           </div>
                         </Td>
@@ -415,7 +415,7 @@ export default function CashAdvanceRequests() {
                   )}
 
                   <div className="mt-4 space-y-2.5 text-xs text-on-surface-variant/70">
-                    <Row label="Paybill" value={`#${selectedRequest.paybillAccount}`} />
+                    <Row label="Account No." value={`#${selectedRequest.paybillAccount}`} />
                     <Row label="Assigned analyst" value={selectedRequest.manager} />
                     <Row label="Last decision" value={formatDateISO(selectedRequest.updatedAt)} />
                     <Row label="Admin notes" value={selectedRequest.notes} />

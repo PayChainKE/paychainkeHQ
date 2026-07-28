@@ -219,7 +219,7 @@ export default function Transactions() {
 
     const acctLines = [
       ['Account Name',   merchant?.name        || '—', 'Business',   merchant?.businessName || '—'],
-      ['Paybill / Acc',  `400200 / ${merchant?.paybillAccount || '—'}`, 'Email', merchant?.email || '—'],
+      ['Paybill / Acc',  `880100 / ${merchant?.ncbaVirtualAccountNumber || 'Pending'}`, 'Email', merchant?.email || '—'],
       ['Phone',          merchant?.phone        || '—', 'Statement Period', periodLabel],
     ]
     acctLines.forEach(([lk, lv, rk, rv]) => {
