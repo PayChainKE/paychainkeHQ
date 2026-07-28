@@ -15,7 +15,6 @@ import { createNotification } from './notificationController.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
-import { PAYCHAIN_TXN_RATE } from '../config/revenueRateCard.js';
 
 // @desc    Get all payees for a merchant
 // @route   GET /api/bulkpay/payees
@@ -320,25 +319,15 @@ export const authorizeBatch = async (req, res) => {
       }
     }
 
-    // PayChain's own margin on top of what actually goes to payees — every
-    // row here is either 'bulk_pay' or 'ncba_outbound', both mapped to a
-    // stream at PAYCHAIN_TXN_RATE in config/revenueRateCard.js. Previously
-    // this was computed by Transaction's pre-save hook for reporting only
-    // and never actually charged — merchants weren't paying it despite it
-    // showing up in revenue reports. Now folded into what's actually
-    // reserved/deducted so the two can't disagree.
-    const paychainFee = Math.round(totalNet * PAYCHAIN_TXN_RATE * 100) / 100;
-    const totalDebit = Math.round((totalNet + paychainFee) * 100) / 100;
-
     // 2 & 3. Atomic conditional deduct — avoids two concurrent batch
     // submissions both passing a stale in-memory balance check.
     const debitedMerchant = await Merchant.findOneAndUpdate(
-      { _id: merchant._id, kesBalance: { $gte: totalDebit } },
-      { $inc: { kesBalance: -totalDebit } },
+      { _id: merchant._id, kesBalance: { $gte: totalNet } },
+      { $inc: { kesBalance: -totalNet } },
       { returnDocument: 'after' }
     );
     if (!debitedMerchant) {
-      return res.status(400).json({ message: 'Insufficient funds to process this batch, including the PayChain service fee' });
+      return res.status(400).json({ message: 'Insufficient funds to process this batch' });
     }
     merchant.kesBalance = debitedMerchant.kesBalance;
 
@@ -399,7 +388,7 @@ export const authorizeBatch = async (req, res) => {
       if (payee.type === 'utility' && payee.utilityProvider) {
         if (!payee.accountNumber) {
           darajaStatus = 'failed';
-          refundAmount += row.netAmount * (1 + PAYCHAIN_TXN_RATE);
+          refundAmount += row.netAmount;
           console.error(`❌ Bulk payout to ${payee.name} failed: no meter/account number on file for this utility payee.`);
         } else {
           try {
@@ -417,13 +406,13 @@ export const authorizeBatch = async (req, res) => {
           } catch (err) {
             console.error(`❌ NCBA BillPay rejected payout for ${payee.name}:`, err.message);
             darajaStatus = 'failed';
-            refundAmount += row.netAmount * (1 + PAYCHAIN_TXN_RATE);
+            refundAmount += row.netAmount;
           }
         }
       } else if (payee.paymentMethod === 'Bank') {
         if (!payee.bankCode || !payee.accountNumber) {
           darajaStatus = 'failed';
-          refundAmount += row.netAmount * (1 + PAYCHAIN_TXN_RATE);
+          refundAmount += row.netAmount;
           console.error(`❌ Bulk payout to ${payee.name} failed: no bank code on file for this payee.`);
         } else {
           try {
@@ -445,17 +434,17 @@ export const authorizeBatch = async (req, res) => {
           } catch (err) {
             console.error(`❌ NCBA PesaLink rejected payout for ${payee.name}:`, err.message);
             darajaStatus = 'failed';
-            refundAmount += row.netAmount * (1 + PAYCHAIN_TXN_RATE);
+            refundAmount += row.netAmount;
           }
         }
       } else if (payee.paymentMethod === 'Mobile Money') {
         if (liveBlocked) {
           darajaStatus = 'failed';
-          refundAmount += row.netAmount * (1 + PAYCHAIN_TXN_RATE);
+          refundAmount += row.netAmount;
           console.error(`❌ Bulk payout to ${payee.name} blocked: live M-PESA is not enabled (set MPESA_LIVE_ENABLED=true).`);
         } else if (!token) {
           darajaStatus = 'failed';
-          refundAmount += row.netAmount * (1 + PAYCHAIN_TXN_RATE);
+          refundAmount += row.netAmount;
           console.error(`❌ Bulk payout to ${payee.name} failed: no Daraja auth token available.`);
         } else {
           try {
@@ -503,7 +492,7 @@ export const authorizeBatch = async (req, res) => {
           } catch (err) {
             console.error(`❌ Daraja API rejected payout for ${payee.name}:`, err.response?.data?.errorMessage || err.message);
             darajaStatus = 'failed';
-            refundAmount += row.netAmount * (1 + PAYCHAIN_TXN_RATE);
+            refundAmount += row.netAmount;
           }
         }
       }
@@ -540,10 +529,7 @@ export const authorizeBatch = async (req, res) => {
       });
     }
 
-    // Refund whatever was rejected synchronously so the batch deduction stays accurate.
-    // Rounded once here rather than per-addition, since refundAmount accumulates
-    // several row.netAmount * (1 + PAYCHAIN_TXN_RATE) terms above.
-    refundAmount = Math.round(refundAmount * 100) / 100;
+    // Refund whatever was rejected synchronously so the batch deduction stays accurate
     if (refundAmount > 0) {
       const refundedMerchant = await Merchant.findByIdAndUpdate(
         merchant._id,

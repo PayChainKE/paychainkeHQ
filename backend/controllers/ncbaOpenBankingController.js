@@ -12,7 +12,6 @@ import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { KENYAN_BANK_CODES } from '../config/kenyanBankCodes.js';
-import { PAYCHAIN_TXN_RATE } from '../config/revenueRateCard.js';
 
 export class InsufficientFundsError extends Error {
   constructor(merchantId, requested, available) {
@@ -91,27 +90,20 @@ export async function executeNcbaBankPayout({ merchantId, bankCode, accountNumbe
     throw new NcbaOpenBankingValidationError('bankCode, accountNumber and a positive amount are required for a bank payout');
   }
 
-  // PayChain's own margin on top of the transfer amount — 'ncba_outbound'
-  // is mapped to the ncba_disbursement_fee stream at PAYCHAIN_TXN_RATE
-  // (config/revenueRateCard.js). Previously computed only for reporting
-  // (stamped on the Transaction doc) and never actually charged.
-  const paychainFee = Math.round(numericAmount * PAYCHAIN_TXN_RATE * 100) / 100;
-  const totalDebit = Math.round((numericAmount + paychainFee) * 100) / 100;
-
   // Atomically reserve funds — the $gte guard means this either fully
   // succeeds (balance was sufficient) or matches zero documents (it
   // wasn't), so no read-then-write gap for a concurrent request to race
   // through. Mirrors services/ncbaBulkPaymentService.js's reservation
   // pattern.
   const reservedMerchant = await Merchant.findOneAndUpdate(
-    { _id: merchantId, kesBalance: { $gte: totalDebit } },
-    { $inc: { kesBalance: -totalDebit } },
+    { _id: merchantId, kesBalance: { $gte: numericAmount } },
+    { $inc: { kesBalance: -numericAmount } },
     { returnDocument: 'after' }
   );
 
   if (!reservedMerchant) {
     const merchant = await Merchant.findById(merchantId);
-    throw new InsufficientFundsError(merchantId, totalDebit, merchant?.kesBalance ?? 0);
+    throw new InsufficientFundsError(merchantId, numericAmount, merchant?.kesBalance ?? 0);
   }
 
   let transactionId, hostResponse;
@@ -121,8 +113,8 @@ export async function executeNcbaBankPayout({ merchantId, bankCode, accountNumbe
     }));
   } catch (err) {
     // Submission never reached (or was rejected outright by) NCBA — refund
-    // the full reservation (amount + fee) since nothing was disbursed.
-    await Merchant.findByIdAndUpdate(merchantId, { $inc: { kesBalance: totalDebit } });
+    // the reservation in full since nothing was disbursed.
+    await Merchant.findByIdAndUpdate(merchantId, { $inc: { kesBalance: numericAmount } });
     throw err;
   }
 

@@ -3,7 +3,6 @@ import mongoose from 'mongoose';
 import Merchant from '../models/Merchant.js';
 import Transaction from '../models/Transaction.js';
 import PayoutBatch from '../models/PayoutBatch.js';
-import { PAYCHAIN_TXN_RATE } from '../config/revenueRateCard.js';
 
 // ── NCBA Bulk Payments (Host-to-Host) configuration ───────────────────────
 // Same "never derive from NODE_ENV" rule as mpesaController.js — hosting
@@ -155,28 +154,18 @@ export async function initiateBulkPayment(merchantId, payoutItems) {
   const validatedAmounts = payoutItems.map(validatePayoutItem);
   const totalAmount = Math.round(validatedAmounts.reduce((sum, a) => sum + a, 0) * 100) / 100;
 
-  // PayChain's own margin on top of what's actually disbursed — every row
-  // here is 'ncba_outbound', mapped to the ncba_disbursement_fee stream at
-  // PAYCHAIN_TXN_RATE (config/revenueRateCard.js). Previously computed
-  // only for reporting and never actually charged. Deliberately NOT added
-  // to payload.TotalAmount below — NCBA only ever disburses totalAmount to
-  // payees; the fee is PayChain's own separate cut, reserved from the
-  // merchant but never sent to NCBA.
-  const paychainFee = Math.round(totalAmount * PAYCHAIN_TXN_RATE * 100) / 100;
-  const totalDebit = Math.round((totalAmount + paychainFee) * 100) / 100;
-
   // Atomically reserve funds — the $gte guard means this either fully
   // succeeds (balance was sufficient) or matches zero documents (it wasn't).
   // No read-then-write gap for a concurrent request to race through.
   const reservedMerchant = await Merchant.findOneAndUpdate(
-    { _id: merchantId, kesBalance: { $gte: totalDebit } },
-    { $inc: { kesBalance: -totalDebit } },
+    { _id: merchantId, kesBalance: { $gte: totalAmount } },
+    { $inc: { kesBalance: -totalAmount } },
     { returnDocument: 'after' }
   );
 
   if (!reservedMerchant) {
     const merchant = await Merchant.findById(merchantId);
-    throw new InsufficientFundsError(merchantId, totalDebit, merchant?.kesBalance ?? 0);
+    throw new InsufficientFundsError(merchantId, totalAmount, merchant?.kesBalance ?? 0);
   }
 
   const batchReference = `NCBA-BAT-${Date.now()}`;
@@ -196,8 +185,8 @@ export async function initiateBulkPayment(merchantId, payoutItems) {
     hostResponse = await submitToNcbaHostToHost(payload);
   } catch (err) {
     // Submission never reached (or was rejected outright by) NCBA — refund
-    // the full reservation (amount + fee) since nothing was disbursed.
-    await Merchant.findByIdAndUpdate(merchantId, { $inc: { kesBalance: totalDebit } });
+    // the reservation in full since nothing was disbursed.
+    await Merchant.findByIdAndUpdate(merchantId, { $inc: { kesBalance: totalAmount } });
     throw err;
   }
 
