@@ -12,28 +12,37 @@
 // Rate edits happen here — every aggregator, P&L export and board report
 // reads from this file.
 
-// ── Safaricom standard tariff (Send Money / PayBill) ──────────────────
-// Source: Safaricom public M-Pesa tariff (KES). Pass-through cost — the
-// sender pays this to Safaricom, never to PayChain. Used purely for
-// transparency in the admin Revenue page.
+// ── Safaricom standard Paybill tariff — Business Bouquet ───────────────
+// Source: Safaricom's own published tariff sheet, "PAYBILL STANDARD
+// TARIFF" (PAYBILL-STANDARD-TARIFF.pdf), Business Bouquet column — the
+// tariff PayChain actually operates under (business pays Safaricom KES 0;
+// the paying customer bears the full charge). Verified against every
+// band in the PDF; replaces a previous table that didn't match any of
+// the three real Safaricom tariff options (Mgao / Business Bouquet /
+// Customer Bouquet). Pass-through cost — the customer pays this to
+// Safaricom, never to PayChain. Used purely for transparency in the
+// admin Revenue page.
 export const SAFARICOM_TARIFF = [
   { max: 49,      fee: 0   },
   { max: 100,     fee: 0   },
-  { max: 500,     fee: 7   },
-  { max: 1000,    fee: 13  },
-  { max: 1500,    fee: 23  },
-  { max: 2500,    fee: 33  },
-  { max: 3500,    fee: 53  },
-  { max: 5000,    fee: 57  },
-  { max: 7500,    fee: 78  },
-  { max: 10000,   fee: 90  },
-  { max: 15000,   fee: 100 },
-  { max: 20000,   fee: 105 },
-  { max: 35000,   fee: 108 },
-  { max: 50000,   fee: 108 },
-  { max: 150000,  fee: 108 },
-  { max: 250000,  fee: 108 },
-  { max: 500000,  fee: 108 },
+  { max: 500,     fee: 5   },
+  { max: 1_000,   fee: 10  },
+  { max: 1_500,   fee: 15  },
+  { max: 2_500,   fee: 20  },
+  { max: 3_500,   fee: 25  },
+  { max: 5_000,   fee: 34  },
+  { max: 7_500,   fee: 42  },
+  { max: 10_000,  fee: 48  },
+  { max: 15_000,  fee: 57  },
+  { max: 20_000,  fee: 62  },
+  { max: 25_000,  fee: 67  },
+  { max: 30_000,  fee: 72  },
+  { max: 35_000,  fee: 83  },
+  { max: 40_000,  fee: 99  },
+  { max: 45_000,  fee: 103 },
+  { max: 50_000,  fee: 108 },
+  { max: 70_000,  fee: 108 },
+  { max: 250_000, fee: 108 },
 ];
 
 export function safaricomFeeFor(kesAmount) {
