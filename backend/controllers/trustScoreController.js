@@ -8,10 +8,12 @@ export async function calculateTrustScore(merchant) {
   const createdAt = new Date(merchant.createdAt || Date.now());
   const now = new Date();
 
-  // 1. Fetch all completed inbound transactions
+  // 1. Fetch all completed inbound transactions — 'inbound' (legacy M-Pesa
+  // Paybill path) and 'ncba_inbound' (real NCBA virtual account collections,
+  // the live production path) both count as revenue the merchant received.
   const transactions = await Transaction.find({
     merchantId,
-    type: 'inbound',
+    type: { $in: ['inbound', 'ncba_inbound'] },
     status: 'completed'
   }).sort({ createdAt: 1 });
 
@@ -22,10 +24,12 @@ export async function calculateTrustScore(merchant) {
   const tenureScore = Math.min(20, Math.floor(tenureScoreRaw));
 
   // === CALCULATE FREQUENCY (Max 20 Points) ===
-  // 50 transactions = 20 points
+  // Deliberately slow build: every 800 completed transactions adds 5
+  // points, capped at the same 20-point ceiling as before (full marks at
+  // 3,200 transactions) — real merchant trust should take real volume to
+  // earn, not a handful of test payments.
   const totalTransactions = transactions.length;
-  const frequencyScoreRaw = (totalTransactions / 50) * 20;
-  const frequencyScore = Math.min(20, Math.floor(frequencyScoreRaw));
+  const frequencyScore = Math.min(20, Math.floor(totalTransactions / 800) * 5);
 
   // === CALCULATE VOLUME (Max 30 Points) ===
   // KES 50,000 total volume = 30 points
