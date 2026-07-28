@@ -156,15 +156,30 @@ export const handleNcbaAccountNotification = async (req, res) => {
       return respondOk(res);
     }
 
-    const merchantCode = extractMerchantCode({ narrative: rawNarrative, phoneNr: rawPhoneNr, customerName: rawCustomerName, transId });
+    const merchantCode = extractMerchantCode({ narrative: rawNarrative, customerName: rawCustomerName, transId });
 
     if (!merchantCode) {
-      // This IS a reconcilable credit type — failing to attribute it to a
-      // merchant is a real gap that needs a human to look at the payload,
-      // not a routine rejection. Logged at 'error' deliberately.
-      logEvent('error', 'ncba_account_notification_unattributed', {
+      // Before NCBA has assigned PayChain's institution prefix, virtual
+      // accounts don't exist yet on their end — every notification they
+      // send during this phase necessarily has no merchant reference to
+      // extract, by construction, not by error. Confirmed live with
+      // NCBA's integration team on 2026-07-28: right now they're only
+      // testing that the notification itself arrives, authenticates, and
+      // is acknowledged — not per-merchant routing, which can't be tested
+      // until virtual accounts exist. Acknowledge as OK (never credits a
+      // merchant either way — merchantCode is still null) so their UAT
+      // shows success; still logged for visibility. The moment
+      // NCBA_INSTITUTION_PREFIX is set (real go-live), this reverts to a
+      // hard failure automatically, since attribution should always be
+      // possible from then on and a miss would be a genuine problem.
+      const virtualAccountsLive = /^\d{4}$/.test(process.env.NCBA_INSTITUTION_PREFIX || '');
+      logEvent(virtualAccountsLive ? 'error' : 'warn', 'ncba_account_notification_unattributed', {
         transId, txnType: rawTransType, narrative: rawNarrative, phoneNr: rawPhoneNr, customerName: rawCustomerName, transAmount,
+        virtualAccountsLive,
       });
+      if (!virtualAccountsLive) {
+        return respondOk(res, 'Notification received — virtual accounts not yet provisioned');
+      }
       return respondFail(res, 'Could not attribute this credit to a merchant');
     }
 
