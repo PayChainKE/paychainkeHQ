@@ -54,6 +54,7 @@ const TYPE_LABELS: Record<string, string> = {
   withdrawal: 'Withdrawal',
   ncba_inbound: 'Inbound',
   ncba_outbound: 'Bank Transfer',
+  mpesa_b2c: 'M-PESA Withdrawal',
 };
 
 export function typeLabel(type: TxType): string {

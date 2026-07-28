@@ -531,6 +531,7 @@ export default function Transactions() {
     withdrawal:   'Withdrawal',
     ncba_inbound: 'Payment In',
     ncba_outbound:'Bank Transfer',
+    mpesa_b2c:    'M-PESA Withdrawal',
   }
   const TX_COLOR = {
     inbound:      'bg-emerald-500/10 text-emerald-700',
@@ -542,6 +543,7 @@ export default function Transactions() {
     withdrawal:   'bg-rose-500/10 text-rose-700',
     ncba_inbound: 'bg-emerald-500/10 text-emerald-700',
     ncba_outbound:'bg-amber-500/10  text-amber-700',
+    mpesa_b2c:    'bg-rose-500/10 text-rose-700',
   }
   const txLabel = (type) => TX_LABEL[type] || type.replace(/_/g,' ')
   const txColor = (type) => TX_COLOR[type] || 'bg-slate-500/10 text-slate-700'

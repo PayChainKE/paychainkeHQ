@@ -837,11 +837,17 @@ export const initiateB2C = async (req, res) => {
       b2cRes = { data: { OriginatorConversationID: `SIM_B2C_${Date.now()}` } };
     }
 
-    // Transaction successfully sent to Daraja
+    // Transaction successfully sent to Daraja. type: 'mpesa_b2c' (not the
+    // generic 'withdrawal' used by other zero-fee ledger debits) so the fee
+    // calculator's dedicated branch stamps paychainFee/safaricomFee from
+    // the same getB2cTariff(amount) band used above to compute b2cFee —
+    // previously this fee vanished untracked (paychainFee always 0 for
+    // 'withdrawal'), invisible to revenue reporting and to any pool-balance
+    // reconciliation despite being real money deducted from the merchant.
     const tx = await Transaction.create({
       merchantId: merchant._id,
       accountNumber: merchant.paybillAccount || 'WALLET_FUND',
-      type: 'withdrawal',
+      type: 'mpesa_b2c',
       amount: amount,
       kesAmount: amount,
       currency: 'KES',
@@ -899,10 +905,20 @@ export const b2cCallback = async (req, res) => {
 
       let merchantForSms = null;
       if (!succeeded) {
-        // The payout never landed — return the funds to the merchant's balance
+        // The payout never landed — return the funds to the merchant's
+        // balance. For mpesa_b2c specifically, the Safaricom B2C fee was
+        // ALSO deducted alongside `amount` at initiation (initiateB2C's
+        // totalDebit) — refunding only `amount` here used to permanently
+        // cost the merchant that fee even though the transfer never went
+        // through and PayChain never actually paid it to Safaricom either.
+        let refundAmount = transaction.amount;
+        if (transaction.type === 'mpesa_b2c') {
+          const { totalFee } = getB2cTariff(transaction.amount);
+          refundAmount += totalFee;
+        }
         merchantForSms = await Merchant.findByIdAndUpdate(
           transaction.merchantId,
-          { $inc: { kesBalance: transaction.amount } },
+          { $inc: { kesBalance: refundAmount } },
           { returnDocument: 'after' }
         );
       } else if (!isBulkPayRow) {

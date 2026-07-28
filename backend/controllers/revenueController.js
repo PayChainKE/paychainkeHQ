@@ -4,6 +4,7 @@ import BankReconciliation from '../models/BankReconciliation.js';
 import { REVENUE_STREAMS, SAFARICOM_TARIFF } from '../config/revenueRateCard.js';
 import { ncbaMarkupMongoExpr } from '../config/ncbaTariffCard.js';
 import { mpesaMerchantFeeMongoExpr } from '../utils/pricingEngine.js';
+import { mpesaB2cMarkupMongoExpr } from '../config/mpesaB2cTariffCard.js';
 import { LIVE_DATA_CUTOFF } from '../config/liveDataCutoff.js';
 import { runRevenueSweep } from '../services/revenueSweepService.js';
 import { recordReconciliation } from '../services/reconciliationService.js';
@@ -20,6 +21,7 @@ const TYPE_TO_CHANNEL = {
   bulk_pay:   'Mobile Money',
   settlement: 'Bank Transfer',
   fx_swap:    'On-Chain (Stellar)',
+  mpesa_b2c:  'Mobile Money',
 };
 
 // Corporate operating account where accumulated fees sweep to. Was a
@@ -94,6 +96,9 @@ function feeExpr(stream, basisExpr = KES_BASIS) {
   }
   if (stream.id === 'transaction_fee') {
     return mpesaMerchantFeeMongoExpr(basisExpr);
+  }
+  if (stream.id === 'mpesa_b2c_fee') {
+    return mpesaB2cMarkupMongoExpr();
   }
   return {
     $max: [

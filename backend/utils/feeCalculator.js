@@ -1,6 +1,7 @@
 import { REVENUE_STREAMS, safaricomFeeFor } from '../config/revenueRateCard.js';
 import { getNcbaTariffBand } from '../config/ncbaTariffCard.js';
 import { calculateMerchantFee } from './pricingEngine.js';
+import { getB2cTariff } from '../config/mpesaB2cTariffCard.js';
 
 // Build the type → stream map once at module load.
 const TYPE_TO_STREAM = (() => {
@@ -29,6 +30,25 @@ export function calculateFees(type, kesAmount) {
       return { paychainFee: 0, safaricomFee: 0, streamId: stream?.id || null };
     }
     const { safaricomFee, markup } = getNcbaTariffBand(v);
+    return {
+      paychainFee: markup,
+      safaricomFee,
+      streamId: stream?.id || null,
+    };
+  }
+
+  // M-Pesa B2C withdrawals (initiateB2C in mpesaController.js) price off
+  // Safaricom's banded B2C tariff, not a linear rate — see
+  // config/mpesaB2cTariffCard.js. This is the exact same figure the
+  // controller already deducted from the merchant's balance via
+  // getB2cTariff(amount) before creating this Transaction, so the two can
+  // never disagree. paychainFee is PAYCHAIN_B2C_MARKUP (0 today); the rest
+  // is the real Safaricom cost, passed straight through.
+  if (type === 'mpesa_b2c') {
+    if (v <= 0) {
+      return { paychainFee: 0, safaricomFee: 0, streamId: stream?.id || null };
+    }
+    const { safaricomFee, markup } = getB2cTariff(v);
     return {
       paychainFee: markup,
       safaricomFee,
