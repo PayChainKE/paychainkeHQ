@@ -1,5 +1,6 @@
 import Transaction from '../models/Transaction.js';
 import RevenueSweep from '../models/RevenueSweep.js';
+import Merchant from '../models/Merchant.js';
 import Admin from '../models/Admin.js';
 import { submitNcbaBankTransfer } from '../controllers/ncbaOpenBankingController.js';
 import { sendRevenueSweepNotification } from '../utils/resend.js';
@@ -50,6 +51,30 @@ async function computeUnsweptRevenue() {
   const unswept = Math.round((totalAccrued - totalSwept) * 100) / 100;
 
   return { unswept: Math.max(0, unswept), transactionCount };
+}
+
+// What the pooled NCBA account SHOULD contain right now, per PayChain's own
+// ledger: every merchant's claim on it, plus PayChain's own accrued-but-not-
+// yet-swept-out fee revenue. Used by reconciliationService.js to compare
+// against what a human reports the real bank balance actually is — the
+// only way today to catch money having left the pool through anything
+// other than a merchant's own withdrawal or the revenue sweep itself.
+export async function computeExpectedPoolBalance() {
+  const [merchantAgg, { unswept, transactionCount }] = await Promise.all([
+    Merchant.aggregate([{ $group: { _id: null, total: { $sum: '$kesBalance' }, count: { $sum: 1 } } }]),
+    computeUnsweptRevenue(),
+  ]);
+
+  const merchantBalanceTotal = Math.round((merchantAgg[0]?.total || 0) * 100) / 100;
+  const merchantCount = merchantAgg[0]?.count || 0;
+
+  return {
+    merchantBalanceTotal,
+    merchantCount,
+    unsweptRevenue: unswept,
+    unsweptRevenueTransactionCount: transactionCount,
+    expectedPoolBalance: Math.round((merchantBalanceTotal + unswept) * 100) / 100,
+  };
 }
 
 // The sweep has no human approval step before it moves money (it's not

@@ -1329,3 +1329,73 @@ export const sendRevenueSweepNotification = async (email, sweep) => {
     throw error;
   }
 };
+
+// @desc  Sent to every active owner-role admin when a manual bank
+// reconciliation check (services/reconciliationService.js) finds the real
+// NCBA pooled-account balance doesn't match what PayChain's own ledger
+// expects (Σ merchant balances + unswept revenue). Only fires on an actual
+// discrepancy — the admin who ran the check already sees a clean result
+// immediately, so this is reserved for the case that actually needs urgent
+// attention: money in the pool not accounted for by anything in the ledger.
+export const sendReconciliationAlertEmail = async (email, record) => {
+  try {
+    const fmt = (n) => Number(n).toLocaleString(undefined, { minimumFractionDigits: 2 });
+    const short = record.difference > 0 ? 'more' : 'less';
+
+    const data = await resend.emails.send({
+      from: 'PayChain Security <info@paychain.co.ke>',
+      to: [email],
+      subject: `[PayChain] Bank reconciliation discrepancy — KES ${fmt(Math.abs(record.difference))}`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 560px; margin: auto; background: #ffffff; border: 1px solid #eef0ee; border-radius: 18px; overflow: hidden;">
+          <div style="background: linear-gradient(135deg, #450a0a 0%, #7f1d1d 100%); padding: 32px 32px 36px;">
+            <div style="margin-bottom: 20px;">${logoImgWhite(108, 'left')}</div>
+            <div style="display: inline-flex; align-items: center; gap: 10px;">
+              <span style="display: inline-block; width: 36px; height: 36px; border-radius: 999px; background: rgba(255,255,255,0.15); text-align: center; line-height: 36px; color: #fca5a5; font-size: 18px; font-weight: 800;">!</span>
+              <div>
+                <p style="margin: 0; color: #fca5a5; font-size: 11px; font-weight: 800; letter-spacing: 2.5px; text-transform: uppercase;">Reconciliation Alert</p>
+                <h1 style="margin: 4px 0 0; color: #fff; font-size: 22px; font-weight: 800; letter-spacing: -0.3px;">The bank balance doesn't match the ledger</h1>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding: 36px 32px;">
+            <p style="margin: 0 0 22px; color: #4b5563; font-size: 15px; line-height: 1.6;">
+              A reconciliation check just found the real NCBA account balance is <strong>KES ${fmt(Math.abs(record.difference))} ${short}</strong> than PayChain's own ledger expects. This needs a look before it's explained away.
+            </p>
+
+            <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 20px 22px; margin: 0 0 22px;">
+              <div style="display: flex; justify-content: space-between; padding: 6px 0;">
+                <span style="color: #7f1d1d; font-size: 13px;">Reported (real) balance</span>
+                <span style="color: #450a0a; font-size: 13px; font-weight: 700;">KES ${fmt(record.reportedBalance)}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding: 6px 0;">
+                <span style="color: #7f1d1d; font-size: 13px;">Expected (ledger) balance</span>
+                <span style="color: #450a0a; font-size: 13px; font-weight: 700;">KES ${fmt(record.expectedPoolBalance)}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding: 6px 0; border-top: 1px solid #fecaca; margin-top: 4px; padding-top: 10px;">
+                <span style="color: #7f1d1d; font-size: 13px; font-weight: 700;">Difference</span>
+                <span style="color: #450a0a; font-size: 13px; font-weight: 800;">KES ${fmt(record.difference)}</span>
+              </div>
+              <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #fecaca; display: flex; justify-content: space-between;">
+                <span style="color: #7f1d1d; font-size: 12px;">= ${record.merchantCount} merchant balances (KES ${fmt(record.merchantBalanceTotal)}) + unswept revenue (KES ${fmt(record.unsweptRevenue)})</span>
+              </div>
+            </div>
+
+            <a href="${ADMIN_URL}/revenue" style="display: inline-block; background: #450a0a; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 12px; font-weight: 800; font-size: 14px; letter-spacing: 0.4px;">Review in admin dashboard →</a>
+          </div>
+
+          <div style="padding: 22px 30px; background: #fafafa; border-top: 1px solid #eef0ee; text-align: center;">
+            <p style="margin: 0; color: #9ca3af; font-size: 11px;">Automated security message — do not reply.</p>
+            <p style="margin: 8px 0 0; color: #bbb; font-size: 11px;">&copy; ${new Date().getFullYear()} PayChainKE · Nairobi, Kenya</p>
+          </div>
+        </div>
+      `,
+    });
+    console.log(`📧 Reconciliation alert → ${email} (diff KES ${record.difference})`);
+    return data;
+  } catch (error) {
+    console.error('❌ Resend Reconciliation Alert Error:', error);
+    throw error;
+  }
+};

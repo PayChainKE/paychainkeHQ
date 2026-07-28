@@ -34,7 +34,7 @@ import {
 } from '../controllers/teamController.js';
 import { runWalletAudit } from '../controllers/walletAuditController.js';
 import { adminListInvoices } from '../controllers/invoiceController.js';
-import { getRevenue, getRevenueSweeps, triggerRevenueSweep } from '../controllers/revenueController.js';
+import { getRevenue, getRevenueSweeps, triggerRevenueSweep, getReconciliations, submitReconciliation } from '../controllers/revenueController.js';
 import { adminListCashAdvanceRequests, adminUpdateCashAdvanceRequest } from '../controllers/cashAdvanceController.js';
 import {
   listExpenses,
@@ -100,6 +100,12 @@ router.get('/revenue', protect, getRevenue);
 // revenue to PayChain's own account) + a manual "run now" trigger.
 router.get('/revenue/sweeps', protect, getRevenueSweeps);
 router.post('/revenue/sweeps/run', protect, requireMutator, sensitiveActionLimiter, triggerRevenueSweep);
+
+// Manual bank reconciliation — no NCBA API exists to pull the real pooled
+// account balance automatically, so an admin pastes it in periodically and
+// this flags any gap against what the ledger expects.
+router.get('/revenue/reconciliations', protect, getReconciliations);
+router.post('/revenue/reconciliations', protect, requireMutator, sensitiveActionLimiter, submitReconciliation);
 
 // Stellar Wallet Audit (live Horizon cross-reference)
 router.get('/wallet-audit', protect, runWalletAudit);
