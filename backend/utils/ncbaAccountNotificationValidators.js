@@ -139,3 +139,32 @@ export function validateTransId(transId) {
   }
   return id;
 }
+
+const KENYAN_MSISDN = /\b(254\d{9}|0\d{9})\b/;
+
+/**
+ * Best-effort split of NCBA's CustomerName field into { name, phone }.
+ *
+ * Observed live from real (non-test) NCBA collections — e.g.
+ * "ROSE CHELANGAT SOY 254715237398 UG" — CustomerName carries the payer's
+ * name followed by their MSISDN followed by a trailing bank-channel code
+ * we don't need. This is more reliable in practice than PhoneNr: in the
+ * same live traffic, PhoneNr has been observed carrying the Account
+ * Number instead of a phone number (matches NCBA's own guide, which
+ * documents PhoneNr as possibly "occupied with the account ncba number").
+ *
+ * Returns { name: string|null, phone: string|null } — either can be null
+ * if the field is blank or doesn't contain a recognizable MSISDN; callers
+ * should degrade gracefully (e.g. "a customer", or fall back to PhoneNr).
+ */
+export function parseNcbaCustomerField(customerName) {
+  const str = String(customerName ?? '').trim();
+  if (!str) return { name: null, phone: null };
+
+  const match = str.match(KENYAN_MSISDN);
+  if (!match) return { name: str, phone: null };
+
+  const phone = match[1];
+  const name = str.slice(0, match.index).trim() || null;
+  return { name, phone };
+}

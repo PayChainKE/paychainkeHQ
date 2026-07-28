@@ -5,6 +5,7 @@ import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { parseSoapXmlSafely, findFirstTagValue, XmlSecurityError } from '../utils/xmlSecurity.js';
 import {
   extractMerchantCode,
+  parseNcbaCustomerField,
   validateTransAmount,
   validateTransId,
   NcbaAccountNotificationError,
@@ -239,14 +240,22 @@ export const handleNcbaAccountNotification = async (req, res) => {
     const { date, time } = formatTransactionDateTime(rawTransTime);
     const accountRef = getNcbaVirtualAccountNumber(merchantCode) || merchantCode;
 
-    // rawPhoneNr is best-effort per NCBA's own guide (may be blank, or
-    // occupied with something other than a phone number) — sendSMS/
-    // toE164Kenyan fail closed and silently on anything not phone-shaped,
-    // so attempting this is safe even when the field is unreliable.
-    if (rawPhoneNr) {
+    // CustomerName has proven more reliable than PhoneNr for actually
+    // reaching the payer — observed live, PhoneNr has carried the Account
+    // Number instead of a phone number, while CustomerName consistently
+    // carries "NAME MSISDN <channel code>" (see parseNcbaCustomerField).
+    // Prefer the parsed MSISDN; fall back to PhoneNr only if CustomerName
+    // didn't yield one. Either way sendSMS/toE164Kenyan fail closed and
+    // silently on anything not phone-shaped, so attempting this is safe
+    // even when both sources are unreliable.
+    const parsedCustomer = parseNcbaCustomerField(rawCustomerName);
+    const customerPhone = parsedCustomer.phone || rawPhoneNr;
+    const customerDisplayName = parsedCustomer.name || 'a customer';
+
+    if (customerPhone) {
       // businessName is the only unbounded field here.
       safeSendSMS({
-        to: rawPhoneNr,
+        to: customerPhone,
         message: buildStrictSms(
           ({ ref, amt, name, acct, date, time }) =>
             `${ref} Confirmed. KES ${amt} paid to ${name} for account ${acct} on ${date} at ${time}. Thank you for your payment.`,
@@ -263,12 +272,30 @@ export const handleNcbaAccountNotification = async (req, res) => {
     if (merchant.phone) {
       safeSendSMS({
         to: merchant.phone,
-        message: `${transId} Payment Received. KES ${transAmount.toLocaleString()} received via NCBA on ${date} at ${time}. New balance: KES ${ledgerResult.merchant.kesBalance.toLocaleString()}.`,
+        // customerDisplayName is the only unbounded field here (comes from
+        // NCBA's free-text CustomerName) — customerPhone is a bounded,
+        // regex-matched MSISDN or empty, safe as fixed.
+        message: buildStrictSms(
+          ({ ref, amt, name, phone, date, time, balance }) =>
+            `${ref} Payment Received. KES ${amt} from ${name}${phone ? ` (${phone})` : ''} via M-PESA on ${date} at ${time}. New balance: KES ${balance}.`,
+          {
+            fixed: { ref: transId, amt: transAmount.toLocaleString(), phone: customerPhone || '', date, time, balance: ledgerResult.merchant.kesBalance.toLocaleString() },
+            truncatable: [{ key: 'name', value: customerDisplayName, minLength: 10 }],
+          }
+        ).message,
       }).then((result) => {
-        if (!result.success) {
+        // Logged on both outcomes — previously only failures were logged,
+        // which made "SMS silently succeeded" and "SMS was never attempted
+        // because merchant.phone was empty" indistinguishable from Render
+        // logs alone (both produced zero output).
+        if (result.success) {
+          logEvent('info', 'ncba_account_notification_sms_sent', { transId, merchantId: merchant._id.toString(), phone: merchant.phone });
+        } else {
           logEvent('error', 'ncba_account_notification_sms_failed', { transId, merchantId: merchant._id.toString(), error: result.error });
         }
       });
+    } else {
+      logEvent('warn', 'ncba_account_notification_sms_skipped_no_phone', { transId, merchantId: merchant._id.toString() });
     }
 
     return respondOk(res);
