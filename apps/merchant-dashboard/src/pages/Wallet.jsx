@@ -99,8 +99,12 @@ export default function Wallet() {
       return
     }
     const destType = withdrawalDestinations.find(d => d.id === destination)?.type;
-    if (destType === 'Bank' && (!withdrawBankCode || withdrawPin.length !== 4)) {
-      addToast({ title: 'Missing Details', message: 'Select a bank and enter your 4-digit payment PIN to withdraw.', type: 'error' })
+    if (destType === 'Bank' && !withdrawBankCode) {
+      addToast({ title: 'Missing Details', message: 'Select a destination bank to withdraw.', type: 'error' })
+      return
+    }
+    if ((destType === 'Bank' || destType === 'Mobile') && withdrawPin.length !== 4) {
+      addToast({ title: 'Missing Details', message: 'Enter your 4-digit payment PIN to withdraw.', type: 'error' })
       return
     }
     setIsWithdrawing(true)
@@ -111,11 +115,13 @@ export default function Wallet() {
       if (destType === 'Mobile') {
         await axios.post(`${API_URL}/api/callbacks/b2c-request`, {
           phone: destinationAccountValue.replace(/^(?:\+?254|0)/, '254'),
-          amount: Number(withdrawAmount)
+          amount: Number(withdrawAmount),
+          pin: withdrawPin,
         }, {
           headers: { Authorization: `Bearer ${token}` }
         });
         addToast({ title: 'Withdrawal Processing', message: `KES ${withdrawAmount} sent to phone. B2C Transfer initiated.`, type: 'success' });
+        setWithdrawPin('')
       } else if (destType === 'Bank') {
         await axios.post(`${API_URL}/api/v1/openbanking/bank-payout`, {
           bankCode: withdrawBankCode,
@@ -693,6 +699,11 @@ export default function Wallet() {
                       <option key={b.code} value={b.code}>{b.name}</option>
                     ))}
                   </select>
+                </div>
+              )}
+
+              {selectedDest && (selectedDest.type === 'Bank' || selectedDest.type === 'Mobile') && (
+                <div className="space-y-3 mt-4 animate-scale-in">
                   <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Payment PIN</label>
                   <input
                     type="password"
