@@ -83,7 +83,3 @@ export function useAuth(){
 }
 
 export default AuthContext;
-
-// TODO: Replace mock auth with real API
-// POST /api/auth/login
-// GET /api/auth/me

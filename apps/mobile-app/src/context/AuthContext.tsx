@@ -8,6 +8,7 @@ const AuthContext = createContext<any>(null);
 
 const STORAGE_KEY        = 'paychain_merchant_session'; // merchant profile (non-sensitive)
 const TOKEN_KEY          = 'paychain_merchant_token';   // JWT in OS secure enclave
+const PIN_KEY            = 'paychain_app_pin';          // app-unlock PIN in OS secure enclave
 const BIOMETRIC_DONE_KEY = 'paychain_biometrics_setup'; // 'true' once setup screen is shown
 
 // ── SecureStore helpers ──────────────────────────────────────────────────────
@@ -22,6 +23,18 @@ async function loadToken(): Promise<string | null> {
 async function clearToken() {
   if (Platform.OS === 'web') return;
   await SecureStore.deleteItemAsync(TOKEN_KEY);
+}
+
+// App-unlock PIN — previously stored in plain-text AsyncStorage (readable
+// unencrypted on-device, e.g. via backup extraction or a rooted device);
+// moved to the same OS-encrypted keystore as the JWT.
+async function storeAppPin(pin: string) {
+  if (Platform.OS === 'web') return;
+  await SecureStore.setItemAsync(PIN_KEY, pin);
+}
+async function loadAppPin(): Promise<string | null> {
+  if (Platform.OS === 'web') return null;
+  return SecureStore.getItemAsync(PIN_KEY);
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -48,7 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const [rawMerchant, rawOnboarding, rawPin, rawBiometricDone] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEY),
           AsyncStorage.getItem('paychain_onboarding_complete'),
-          AsyncStorage.getItem('paychain_app_pin'),
+          loadAppPin(),
           AsyncStorage.getItem(BIOMETRIC_DONE_KEY),
         ]);
 
@@ -265,7 +278,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       console.warn('Failed to sync PIN to backend:', err);
     }
-    await AsyncStorage.setItem('paychain_app_pin', pin);
+    await storeAppPin(pin);
     setAppPinState(pin);
   }
 

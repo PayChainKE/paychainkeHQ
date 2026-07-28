@@ -1,5 +1,5 @@
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
 /**
@@ -34,16 +34,24 @@ const api = axios.create({
   },
 });
 
-// Request Interceptor: Automatically attach the token if we have one
+// Request Interceptor: Automatically attach the token if we have one.
+// AuthContext already sets api.defaults.headers.common['Authorization']
+// right after login/session-restore, so this is a safety net for any
+// request that could otherwise fire before that default is set — reads
+// from the same OS-encrypted keystore AuthContext writes to (previously
+// read from AsyncStorage under this key, which AuthContext never wrote
+// to, so this never actually found a token).
 api.interceptors.request.use(
   async (config) => {
     try {
-      const token = await AsyncStorage.getItem('paychain_merchant_token');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+      if (Platform.OS !== 'web') {
+        const token = await SecureStore.getItemAsync('paychain_merchant_token');
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
       }
     } catch (error) {
-      console.error('Error retrieving token from SecureStorage', error);
+      console.error('Error retrieving token from SecureStore', error);
     }
     return config;
   },

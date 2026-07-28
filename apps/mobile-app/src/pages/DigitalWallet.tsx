@@ -16,7 +16,7 @@ function formatKES(n: number | null | undefined) {
 }
 
 type Destination = 'bank' | 'mpesa';
-type FundingMethod = 'virtual' | 'mobile' | 'card';
+type FundingMethod = 'mobile';
 
 export default function DigitalWallet({ navigation }: any) {
   const { merchant, refreshSession } = useAuth();
@@ -312,27 +312,6 @@ export default function DigitalWallet({ navigation }: any) {
       } else {
         Alert.alert('STK Push Failed', err?.response?.data?.error || 'Could not send STK Push. Please try again.');
       }
-    }
-  };
-
-  const submitCardTopUp = async () => {
-    if (!topUpAmount) return;
-    setIsProcessingTopUp(true);
-    try {
-      await api.post('/api/transactions/simulate', {
-        accountNumber: merchant?.paybillAccount,
-        amount: Number(topUpAmount),
-        senderName: merchant?.name || 'Card Top-up',
-        senderPhone: 'CARD_PAYMENT',
-      });
-      Alert.alert('Top Up Successful', `Successfully funded ${topUpAmount} KES.`);
-      await refreshSession();
-      fetchData();
-      closeTopUp();
-    } catch (err: any) {
-      Alert.alert('Top Up Failed', err?.response?.data?.error || 'Failed to process top up.');
-    } finally {
-      setIsProcessingTopUp(false);
     }
   };
 
@@ -827,7 +806,7 @@ export default function DigitalWallet({ navigation }: any) {
             <View className="flex-row justify-between items-center mb-6">
               <View>
                 <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[22px] text-[#0c2010]">
-                  {fundingMethod === 'virtual' ? 'Virtual Account Transfer' : fundingMethod === 'mobile' ? 'Mobile Money' : fundingMethod === 'card' ? 'Card Top-up' : 'Select Funding Method'}
+                  {fundingMethod === 'mobile' ? 'Mobile Money' : 'Select Funding Method'}
                 </Text>
                 <Text className="text-[9px] text-[#707971] font-jakarta-bold uppercase tracking-[0.2em] mt-1 opacity-70">
                   {fundingMethod ? 'Complete your deposit' : 'Choose how to top up your wallet'}
@@ -845,9 +824,7 @@ export default function DigitalWallet({ navigation }: any) {
               {!fundingMethod ? (
                 <View className="gap-3">
                   {[
-                    { id: 'virtual' as const, name: 'Virtual Account Transfer', desc: 'Transfer to your dedicated USD/KES account', icon: 'briefcase' as const, bg: '#eff6ff', color: '#2563eb' },
                     { id: 'mobile' as const, name: 'Mobile Money', desc: 'M-Pesa, Airtel Money', icon: 'smartphone' as const, bg: '#e7f8ef', color: '#059669' },
-                    { id: 'card' as const, name: 'Card Top-up', desc: 'Visa / Mastercard', icon: 'credit-card' as const, bg: '#fef3e7', color: '#b45309' },
                   ].map((method) => (
                     <TouchableOpacity
                       key={method.id}
@@ -868,48 +845,7 @@ export default function DigitalWallet({ navigation }: any) {
                     </TouchableOpacity>
                   ))}
                 </View>
-              ) : fundingMethod === 'virtual' ? (
-                <View className="gap-5">
-                  <View className="bg-[#eff6ff] p-5 rounded-2xl border border-blue-100 flex-row items-start gap-3">
-                    <Feather name="info" size={15} color="#2563eb" style={{ marginTop: 1 }} />
-                    <Text className="flex-1 text-[12px] text-[#1e3a8a] font-jakarta-medium leading-relaxed">
-                      Funds transferred to these accounts reflect in your wallet within <Text className="font-jakarta-extrabold">2-5 minutes</Text> once verified.
-                    </Text>
-                  </View>
-
-                  <View className="bg-[#f7faf7] p-5 rounded-2xl border border-[#eff4ef]">
-                    <Text className="text-[9px] font-jakarta-extrabold uppercase tracking-widest text-[#707971] mb-3">Dedicated KES Settlement Account</Text>
-                    <Text className="text-[10px] text-[#707971] font-jakarta-bold uppercase tracking-wider mb-1">Bank Name</Text>
-                    <Text className="text-[14px] font-jakarta-bold text-[#00351d] mb-3">PayChain Commercial Bank</Text>
-                    <Text className="text-[10px] text-[#707971] font-jakarta-bold uppercase tracking-wider mb-1">Account Number</Text>
-                    <View className="flex-row items-center justify-between">
-                      <Text className="text-[20px] font-jakarta-extrabold text-[#00351d] tracking-widest">994 0023 4455</Text>
-                      <TouchableOpacity
-                        onPress={async () => { await Clipboard.setStringAsync('99400234455'); Alert.alert('Copied', 'Account number copied to clipboard.'); }}
-                        className="px-4 py-2 bg-[#00351d] rounded-xl"
-                      >
-                        <Text className="text-white text-[10px] font-jakarta-extrabold uppercase tracking-wider">Copy</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-
-                  <View className="bg-[#f7faf7] p-5 rounded-2xl border border-[#eff4ef]">
-                    <Text className="text-[9px] font-jakarta-extrabold uppercase tracking-widest text-[#707971] mb-3">Dedicated USD Settlement Account (Global)</Text>
-                    <Text className="text-[10px] text-[#707971] font-jakarta-bold uppercase tracking-wider mb-1">Bank Name</Text>
-                    <Text className="text-[14px] font-jakarta-bold text-[#00351d] mb-3">Stellar Global Trust</Text>
-                    <Text className="text-[10px] text-[#707971] font-jakarta-bold uppercase tracking-wider mb-1">SWIFT / Routing</Text>
-                    <View className="flex-row items-center justify-between">
-                      <Text className="text-[18px] font-jakarta-extrabold text-[#00351d] tracking-widest uppercase">PCN-US-88229</Text>
-                      <TouchableOpacity
-                        onPress={async () => { await Clipboard.setStringAsync('PCN-US-88229'); Alert.alert('Copied', 'Routing ID copied to clipboard.'); }}
-                        className="px-4 py-2 bg-[#00351d] rounded-xl"
-                      >
-                        <Text className="text-white text-[10px] font-jakarta-extrabold uppercase tracking-wider">Copy</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </View>
-              ) : fundingMethod === 'mobile' ? (
+              ) : (
                 <View className="gap-5">
                   <View className="bg-[#e7f8ef] p-5 rounded-2xl border border-emerald-100 flex-row items-start gap-3">
                     <Feather name="smartphone" size={15} color="#059669" style={{ marginTop: 1 }} />
@@ -957,53 +893,6 @@ export default function DigitalWallet({ navigation }: any) {
                         <Text className="text-white font-jakarta-bold text-[15px] mr-2">Request STK Push</Text>
                         <Feather name="send" size={16} color="#fff" />
                       </>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <View className="gap-5">
-                  <View className="bg-[#fef3e7] p-5 rounded-2xl border border-amber-100 flex-row items-start gap-3">
-                    <Feather name="credit-card" size={15} color="#b45309" style={{ marginTop: 1 }} />
-                    <Text className="flex-1 text-[12px] text-[#78350f] font-jakarta-medium leading-relaxed">
-                      Top up instantly using your credit or debit card. Processing fee: <Text className="font-jakarta-extrabold">2.5%</Text>.
-                    </Text>
-                  </View>
-
-                  <View>
-                    <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#00351d]/60 mb-2 ml-1">Amount (KES)</Text>
-                    <TextInput
-                      keyboardType="numeric"
-                      value={topUpAmount}
-                      onChangeText={setTopUpAmount}
-                      placeholder="Enter amount"
-                      placeholderTextColor="#a1a1aa"
-                      className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-5 py-4 text-[18px] font-jakarta-extrabold text-[#00351d]"
-                    />
-                  </View>
-
-                  <View className="bg-[#f7faf7] p-5 rounded-2xl border border-[#eff4ef] gap-3">
-                    <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#00351d]/60">Card Details</Text>
-                    <View className="bg-white rounded-xl border border-[#eff4ef] p-4">
-                      <Text className="font-jakarta-bold text-[14px] text-[#00351d] tracking-widest">XXXX XXXX XXXX XXXX</Text>
-                    </View>
-                    <View className="flex-row gap-3">
-                      <View className="flex-1 bg-white rounded-xl border border-[#eff4ef] p-4">
-                        <Text className="font-jakarta-bold text-[13px] text-[#00351d]">MM / YY</Text>
-                      </View>
-                      <View className="flex-1 bg-white rounded-xl border border-[#eff4ef] p-4">
-                        <Text className="font-jakarta-bold text-[13px] text-[#00351d]">***</Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  <TouchableOpacity
-                    onPress={submitCardTopUp}
-                    disabled={isProcessingTopUp || !topUpAmount}
-                    className="w-full bg-[#00351d] h-[56px] rounded-full flex-row items-center justify-center shadow-lg shadow-[#00351d]/20"
-                    style={{ opacity: isProcessingTopUp || !topUpAmount ? 0.5 : 1 }}
-                  >
-                    {isProcessingTopUp ? <ActivityIndicator color="#fff" /> : (
-                      <Text className="text-white font-jakarta-bold text-[15px]">Top Up KES {topUpAmount ? Number(topUpAmount).toLocaleString() : '0'}</Text>
                     )}
                   </TouchableOpacity>
                 </View>
