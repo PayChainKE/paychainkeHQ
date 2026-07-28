@@ -654,7 +654,7 @@ export default function DigitalWallet({ navigation }: any) {
             </View>
           </View>
 
-          {/* Bank Transfer / EFT / PesaLink — NCBA Virtual Account */}
+          {/* Bank Transfer / EFT / PesaLink — PayChain Account */}
           <View className="bg-white rounded-[32px] p-6 mb-8 border border-[#eff4ef] shadow-sm shadow-[#00351d]/5">
             <View className="flex-row items-start gap-4 mb-4">
               <View className="w-11 h-11 rounded-2xl bg-blue-50 items-center justify-center">
@@ -662,9 +662,9 @@ export default function DigitalWallet({ navigation }: any) {
               </View>
               <View className="flex-1">
                 <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-[0.2em] text-[#707971] mb-1">Bank Transfer · EFT · PesaLink</Text>
-                <Text className="font-jakarta-extrabold text-[16px] text-[#00351d] tracking-tight">NCBA Virtual Account</Text>
+                <Text className="font-jakarta-extrabold text-[16px] text-[#00351d] tracking-tight">PayChain Account</Text>
                 <Text className="text-[#707971] text-[11px] font-jakarta-medium mt-1 leading-relaxed">
-                  Customers can also pay directly from their bank using this dedicated NCBA account number.
+                  Customers can also pay directly from their bank using this dedicated account number.
                 </Text>
               </View>
             </View>
@@ -679,7 +679,7 @@ export default function DigitalWallet({ navigation }: any) {
                   onPress={async () => {
                     const value = merchant.ncbaVirtualAccountNumber || merchant.ncbaMerchantCode;
                     await Clipboard.setStringAsync(value);
-                    Alert.alert('Copied', 'NCBA account number copied to clipboard.');
+                    Alert.alert('Copied', 'PayChain Account number copied to clipboard.');
                   }}
                   activeOpacity={0.85}
                   className="p-2.5 bg-[#006c4e] rounded-xl"

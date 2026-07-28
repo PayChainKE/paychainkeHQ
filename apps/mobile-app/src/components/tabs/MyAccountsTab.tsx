@@ -22,7 +22,7 @@ export default function MyAccountsTab() {
       status: 'Active'
     },
     {
-      service: 'NCBA Bank',
+      service: 'PayChain Account',
       // ncbaVirtualAccountNumber is null until NCBA_INSTITUTION_PREFIX is
       // configured on the backend (i.e. until NCBA assigns PayChain's
       // 4-digit institution code) — falls back to the 8-digit merchant

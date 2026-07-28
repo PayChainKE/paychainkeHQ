@@ -990,8 +990,8 @@ const ConvertModal = ({ state, onClose, onConfirm }) => {
           <h3 className="text-xl font-bold text-on-surface mb-2">Merchant created</h3>
           <p className="text-sm text-on-surface-variant mb-4">A secure setup invite has been emailed to <strong>{state.done.email}</strong>.</p>
           <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 mb-5 inline-block">
-            <p className="text-2xs font-bold uppercase tracking-widest text-emerald-700 mb-1">Account Number</p>
-            <p className="font-mono text-xl font-bold text-emerald-900">{state.done.paybillAccount}</p>
+            <p className="text-2xs font-bold uppercase tracking-widest text-emerald-700 mb-1">PayChain Account</p>
+            <p className="font-mono text-xl font-bold text-emerald-900">{state.done.ncbaVirtualAccountNumber || state.done.ncbaMerchantCode || 'Pending'}</p>
           </div>
           <div>
             <button onClick={onClose} className="px-5 py-2.5 rounded-lg bg-primary text-white text-sm font-semibold uppercase tracking-widest hover:shadow-lg">Done</button>

@@ -136,7 +136,7 @@ const Merchants = () => {
       // Search
       if (q) {
         const haystack = [
-          m.businessName, m.name, m.email, m.paybillAccount,
+          m.businessName, m.name, m.email, m.paybillAccount, m.ncbaMerchantCode, m.ncbaVirtualAccountNumber,
         ].filter(Boolean).map((s) => String(s).toLowerCase());
         const phoneMatch = qPhone && normalizePhone(m.phone).includes(qPhone);
         const textMatch = haystack.some((s) => s.includes(q));
@@ -185,7 +185,8 @@ const Merchants = () => {
       'Contact Name': m.name || '',
       Email: m.email || '',
       Phone: m.phone || '',
-      'Account #': m.paybillAccount || '',
+      'PayChain Account': m.ncbaVirtualAccountNumber || m.ncbaMerchantCode || '',
+      'Wallet Reference': m.paybillAccount || '',
       Status: m.status === 'locked' ? 'Locked' : 'Active',
       Verified: m.isVerified ? 'Yes' : 'No',
       'KRA Verified': m.isKRAVerified ? 'Yes' : 'No',
@@ -558,7 +559,7 @@ const Merchants = () => {
                   <Th>#</Th>
                   <Th>Merchant</Th>
                   <Th>Contact</Th>
-                  <Th>Account #</Th>
+                  <Th>PayChain Account</Th>
                   <Th>Activity</Th>
                   <Th>Status</Th>
                   <Th>Registered</Th>
@@ -614,8 +615,8 @@ const Merchants = () => {
                         <p className="text-2xs text-on-surface-variant/60">{m.email}</p>
                       </td>
                       <td className="py-2 px-3 border-b border-outline-variant/5">
-                        <span className="font-mono text-xs font-bold text-on-surface bg-surface-container-low px-2 py-1 rounded">
-                          {m.paybillAccount || '—'}
+                        <span className={`font-mono text-xs font-bold px-2 py-1 rounded ${m.ncbaVirtualAccountNumber ? 'text-on-surface bg-surface-container-low' : m.ncbaMerchantCode ? 'text-amber-800 bg-amber-50' : 'text-on-surface-variant/50 bg-surface-container-low'}`}>
+                          {m.ncbaVirtualAccountNumber || m.ncbaMerchantCode || 'Pending'}
                         </span>
                       </td>
                       <td className="py-2 px-3 border-b border-outline-variant/5">
@@ -716,12 +717,12 @@ const Merchants = () => {
                 <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 mb-5 inline-block text-left">
                   {success.ncbaVirtualAccountNumber ? (
                     <>
-                      <p className="text-2xs font-bold uppercase tracking-widest text-emerald-700 mb-1">PayChain Account Number</p>
+                      <p className="text-2xs font-bold uppercase tracking-widest text-emerald-700 mb-1">PayChain Account</p>
                       <p className="font-mono text-xl font-bold text-emerald-900">{success.ncbaVirtualAccountNumber}</p>
                     </>
                   ) : (
                     <>
-                      <p className="text-2xs font-bold uppercase tracking-widest text-amber-700 mb-1">PayChain Account Number</p>
+                      <p className="text-2xs font-bold uppercase tracking-widest text-amber-700 mb-1">PayChain Account</p>
                       <p className="font-mono text-xl font-bold text-amber-900">{success.ncbaMerchantCode || '—'}</p>
                       <p className="text-2xs text-on-surface-variant/60 mt-1">Interim number — full account pending bank assignment. Safe to give out for payments and testing.</p>
                     </>
@@ -1229,7 +1230,7 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
             {/* Account */}
             <Section title="PayChain Account" icon="account_balance_wallet">
               <Row label="Paybill" value={<span className="font-mono">880100</span>} />
-              <Row label="PayChain Account Number" value={
+              <Row label="Account Number" value={
                 m.ncbaVirtualAccountNumber
                   ? <span className="font-mono font-bold text-base text-on-surface bg-surface-container-low px-2 py-1 rounded">{m.ncbaVirtualAccountNumber}</span>
                   : m.ncbaMerchantCode
