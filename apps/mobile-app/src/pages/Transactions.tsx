@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import api from '../api/config';
 import TopBar from '../components/layout/TopBar';
+import { isCreditTransaction, typeLabel as txTypeLabel } from '../utils/transactionDirection';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -85,7 +86,7 @@ export default function Transactions({ navigation }: any) {
   }, []);
 
   // ─── Stats calculation (mirroring merchant dashboard) ─────────────────────
-  const inboundTxs = transactions.filter(t => t.type === 'inbound' || t.type === 'INBOUND');
+  const inboundTxs = transactions.filter(t => isCreditTransaction(t.type));
 
   const now = new Date();
   const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
@@ -223,13 +224,13 @@ export default function Transactions({ navigation }: any) {
               </View>
             ) : (
               currentTransactions.map((tx, index) => {
-                const isInbound = tx.type === 'inbound';
+                const isInbound = isCreditTransaction(tx.type);
                 const isSwap = tx.type === 'fx_swap';
                 const name = isInbound
                   ? (tx.sender?.name || 'Unknown')
                   : (tx.recipient?.name || tx.sender?.name || 'Treasury');
                 const verified = tx.status === 'completed' || tx.status === 'verified';
-                const typeLabel = (tx.type || 'inbound').toString().replace('_', ' ').toUpperCase();
+                const typeLabel = txTypeLabel(tx.type || 'inbound').toUpperCase();
                 const dateStr = new Date(tx.createdAt || tx.timestamp).toLocaleDateString('en-KE', {
                   day: '2-digit', month: 'short', year: 'numeric'
                 });

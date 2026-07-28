@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, LayoutAnimation, Platform, UIManager, Linking } from 'react-native';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import TopBar from '../components/layout/TopBar';
@@ -9,6 +9,13 @@ if (Platform.OS === 'android') {
     UIManager.setLayoutAnimationEnabledExperimental(true);
   }
 }
+
+// Same real contact details as the merchant dashboard's Support page
+// (apps/merchant-dashboard/src/pages/Support.jsx) — single source of truth
+// so mobile and web never drift apart again.
+const SUPPORT_WHATSAPP_URL = 'https://wa.me/254790889066';
+const SUPPORT_EMAIL = 'support@paychain.co.ke';
+const SUPPORT_HOURS = 'Mon–Sat 7am–9pm EAT';
 
 const FAQItem = ({ question, answer }: { question: string, answer: string }) => {
   const [expanded, setExpanded] = useState(false);
@@ -63,7 +70,7 @@ export default function SupportPage({ navigation }: any) {
           {/* Contact Options Bento Grid */}
           <View className="gap-6 mb-14">
             {/* WhatsApp Card */}
-            <TouchableOpacity activeOpacity={0.9} className="bg-[#ebfbf3] p-8 rounded-[40px] shadow-sm shadow-[#25D366]/10 border border-[#25D366]/10">
+            <TouchableOpacity activeOpacity={0.9} onPress={() => Linking.openURL(SUPPORT_WHATSAPP_URL)} className="bg-[#ebfbf3] p-8 rounded-[40px] shadow-sm shadow-[#25D366]/10 border border-[#25D366]/10">
               <View className="flex-row justify-between items-start mb-8">
                 <View className="w-14 h-14 bg-white rounded-full items-center justify-center shadow-sm shadow-black/5">
                   <MaterialIcons name="chat-bubble" size={28} color="#25D366" />
@@ -73,21 +80,21 @@ export default function SupportPage({ navigation }: any) {
                 </View>
               </View>
               <Text className="font-jakarta-extrabold text-[24px] tracking-tight text-[#00351d] mb-2">Chat on WhatsApp</Text>
-              <Text className="font-jakarta-medium text-[#404942] text-[15px] mb-8">Mon–Fri 9am–5pm EAT.</Text>
+              <Text className="font-jakarta-medium text-[#404942] text-[15px] mb-8">{SUPPORT_HOURS}.</Text>
               <View className="bg-[#25D366] py-4 rounded-full items-center justify-center shadow-md shadow-[#25D366]/20">
                 <Text className="font-jakarta-bold text-white text-[16px]">Chat Now</Text>
               </View>
             </TouchableOpacity>
 
             {/* Email Card */}
-            <TouchableOpacity activeOpacity={0.9} className="bg-white p-8 rounded-[40px] shadow-sm shadow-[#00351d]/5 border border-[#bfc9bf]/10">
+            <TouchableOpacity activeOpacity={0.9} onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`)} className="bg-white p-8 rounded-[40px] shadow-sm shadow-[#00351d]/5 border border-[#bfc9bf]/10">
               <View className="flex-row justify-between items-start mb-8">
                 <View className="w-14 h-14 bg-[#f7faf7] rounded-full items-center justify-center border border-[#eff4ef]">
                   <MaterialIcons name="mail" size={24} color="#00351d" />
                 </View>
               </View>
               <Text className="font-jakarta-extrabold text-[24px] tracking-tight text-[#00351d] mb-2">Email Support</Text>
-              <Text className="font-jakarta-medium text-[#404942] text-[15px] mb-8">hello@paychainke.co</Text>
+              <Text className="font-jakarta-medium text-[#404942] text-[15px] mb-8">{SUPPORT_EMAIL}</Text>
               <View className="border-[2px] border-[#0c2010] py-4 rounded-full items-center justify-center">
                 <Text className="font-jakarta-bold text-[#0c2010] text-[16px]">Send Email</Text>
               </View>
@@ -106,25 +113,17 @@ export default function SupportPage({ navigation }: any) {
                 question="How do I withdraw funds?" 
                 answer="Navigate to your balance card, tap 'Withdraw', and select your linked bank or mobile money account. Transfers are processed instantly." 
               />
-              <FAQItem 
-                question="Is my money safe?" 
-                answer="Yes. PayChain utilizes bank-grade 256-bit encryption and is fully licensed by the Central Bank. Your funds are held in secure escrow accounts." 
+              <FAQItem
+                question="Is my money safe?"
+                answer="Your funds move through NCBA's own virtual account rails, and your password and PIN are hashed — never stored or logged in plain text, not even our own team can read them."
               />
-              <FAQItem 
-                question="How to increase my Trust Score?" 
-                answer="Consistent transaction volume, timely repayments of advances, and positive customer feedback are the fastest ways to improve your score." 
+              <FAQItem
+                question="How to increase my Trust Score?"
+                answer="Consistent transaction volume, timely repayments of advances, and positive customer feedback are the fastest ways to improve your score."
               />
-              <FAQItem 
-                question="What are the transaction fees?" 
-                answer="We offer a flat rate of 1.5% for all inward payments. Outward transfers to mobile money start from KES 25 depending on the amount." 
-              />
-              <FAQItem 
-                question="Can I use PayChain offline?" 
-                answer="You can receive payments via your merchant USSD code even without an internet connection. App features require data access." 
-              />
-              <FAQItem 
-                question="How do I link a second store?" 
-                answer="Go to Profile > Manage Business > Add New Branch. You can toggle between different business entities seamlessly within the same app." 
+              <FAQItem
+                question="What are the transaction fees?"
+                answer="PayChain adds a 0.5% margin on top of Safaricom's standard tariff for inbound payments. FX conversions (KES to USDC) carry a 2% spread. There's no flat rate — see your Revenue page for the exact breakdown."
               />
             </View>
           </View>
@@ -133,7 +132,7 @@ export default function SupportPage({ navigation }: any) {
           <View className="mb-4 p-8 bg-[#5efeb3] rounded-[40px] overflow-hidden flex-row items-center justify-between shadow-sm">
             <View className="z-10 flex-1 pr-8">
               <Text style={{ fontFamily: 'DMSerifDisplay_400Regular_Italic' }} className="text-[26px] text-[#00351d] mb-2 leading-tight">Expert help, just a tap away.</Text>
-              <Text className="font-jakarta-bold text-[10px] uppercase tracking-[0.15em] text-[#006c4e] mt-1">Available 24/7 for urgent issues</Text>
+              <Text className="font-jakarta-bold text-[10px] uppercase tracking-[0.15em] text-[#006c4e] mt-1">{SUPPORT_HOURS}</Text>
             </View>
             <View className="absolute -right-8 -bottom-6 opacity-20">
               <MaterialIcons name="support-agent" size={140} color="#006c4e" />

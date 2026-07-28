@@ -830,8 +830,8 @@ export default function BulkPay() {
               <p className="text-sm md:text-base text-white/70 mb-8 leading-relaxed">
                 To unlock Bulk Payments and ensure full regulatory compliance, please add your KRA PIN and Business License Number to your profile.
               </p>
-              <button 
-                onClick={() => navigate('/profile')}
+              <button
+                onClick={() => navigate('/profile', { state: { focusFields: ['kraPin', 'businessNumber'] } })}
                 className="w-full bg-emerald-500 text-[#06201B] px-8 py-4 rounded-xl font-black text-[11px] uppercase tracking-widest shadow-xl hover:bg-white transition-all active:scale-95 flex items-center justify-center gap-2"
               >
                 Complete Profile Now

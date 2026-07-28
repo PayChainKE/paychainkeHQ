@@ -17,8 +17,11 @@ const getBaseUrl = () => {
     }
     return 'http://localhost:5000';
   }
-  // Production fallback
-  return 'https://www.paychain.co.ke';
+  // Production — the real backend (Render), same URL every other PayChain
+  // frontend (merchant-dashboard, admin) points at. www.paychain.co.ke is
+  // the marketing site and has no /api routes at all — it was a dead,
+  // never-functional value here (confirmed: returns 404 on every request).
+  return 'https://paychainke-backend.onrender.com';
 };
 
 const API_BASE_URL = getBaseUrl();

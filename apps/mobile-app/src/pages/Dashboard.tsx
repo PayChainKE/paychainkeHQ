@@ -7,17 +7,17 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/config';
 import PrivateValue from '../components/PrivateValue';
+import { isCreditTransaction, isDebitTransaction } from '../utils/transactionDirection';
 
 type Timeframe = '7D' | '30D' | '6M';
-const OUTBOUND_TYPES = ['bulk_pay', 'settlement', 'outbound'];
 const DAY_NAMES = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const MONTH_NAMES = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
 // Same bucketing convention as the merchant dashboard's Overview chart
 // (apps/merchant-dashboard/src/pages/Overview.jsx generateChartData), ported to RN.
 function computeChartData(transactions: any[]) {
-  const inboundTxs = transactions.filter((t) => t.type === 'inbound');
-  const outboundTxs = transactions.filter((t) => OUTBOUND_TYPES.includes(t.type));
+  const inboundTxs = transactions.filter((t) => isCreditTransaction(t.type));
+  const outboundTxs = transactions.filter((t) => isDebitTransaction(t.type));
   const now = new Date();
   const sumFor = (txs: any[], matches: (t: any) => boolean) =>
     txs.filter(matches).reduce((sum, t) => sum + (t.kesAmount || t.amount || 0), 0);
@@ -182,7 +182,7 @@ export default function Dashboard({ navigation }: any) {
     a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
   const isSameMonth = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
 
-  const inboundTransactions = transactions.filter((tx) => tx.type === 'inbound');
+  const inboundTransactions = transactions.filter((tx) => isCreditTransaction(tx.type));
   const todayInbound = inboundTransactions.filter((tx) => isSameDay(new Date(tx.createdAt), now));
   const monthInbound = inboundTransactions.filter((tx) => isSameMonth(new Date(tx.createdAt), now));
   const todayTotal = todayInbound.reduce((sum, tx) => sum + (tx.kesAmount || tx.amount || 0), 0);
@@ -554,7 +554,7 @@ export default function Dashboard({ navigation }: any) {
                 </View>
               ) : (
                 transactions.slice(0, 5).map((tx, index) => {
-                  const isInbound = tx.type === 'inbound';
+                  const isInbound = isCreditTransaction(tx.type);
                   const isSwap = tx.type === 'fx_swap';
                   const name = isInbound ? (tx.sender?.name || 'Unknown') : (tx.recipient?.name || tx.sender?.name || 'Treasury');
                   const verified = tx.status === 'completed' || tx.status === 'verified';

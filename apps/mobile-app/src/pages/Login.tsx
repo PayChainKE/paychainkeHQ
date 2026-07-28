@@ -59,9 +59,7 @@ export default function Login({ route }: any) {
 
   // Navigation Tabs
   const [activeTab, setActiveTab] = useState(route?.params?.initialTab || 'login');
-  const [isSignupSuccess, setIsSignupSuccess] = useState(false);
   const [isSignupPasswordStep, setIsSignupPasswordStep] = useState(false);
-  const [isSignupBiometricStep, setIsSignupBiometricStep] = useState(false);
   const [otpFlowType, setOtpFlowType] = useState('');
   const [authEmail, setAuthEmail] = useState('');
   const [otpChannel, setOtpChannel] = useState('email'); // 'email' or 'sms' — which channel the current OTP went out on
@@ -244,19 +242,6 @@ export default function Login({ route }: any) {
     }
   };
 
-  const handleSetupBiometric = async () => {
-    setLoading(true);
-    const result = await authenticateBiometric('Enable Biometrics for PayChain');
-    if (result.success) {
-      // biometric setup is handled by BiometricSetup screen in the navigator
-    } else if (!result.cancelled) {
-      setErr(result.error);
-    }
-    setLoading(false);
-    setIsSignupBiometricStep(false);
-    setIsSignupSuccess(true);
-  };
-
   const renderTabs = () => (
     <View className="flex-row bg-[#f0f2f1] p-1.5 rounded-2xl mb-8">
       {['signup', 'login', 'reset'].filter(t => t !== 'signup' || !hasAccount).map((tab) => (
@@ -266,7 +251,6 @@ export default function Login({ route }: any) {
             setActiveTab(tab);
             setIsOTPMode(false);
             setIsResetMode(false);
-            setIsSignupSuccess(false);
             setIsSignupPasswordStep(false);
             setNewPasswordInput('');
             setConfirmPassword('');
@@ -311,7 +295,7 @@ export default function Login({ route }: any) {
           </View>
 
           <View className="bg-white w-full flex-1 rounded-t-[32px] px-6 pt-10 pb-16 shadow-lg">
-            {!isSignupSuccess && !isSignupBiometricStep && !isSignupPasswordStep && !isOTPMode && !isResetMode && renderTabs()}
+            {!isSignupPasswordStep && !isOTPMode && !isResetMode && renderTabs()}
 
             {err ? (
               <View className="bg-red-50 border border-red-200 p-4 rounded-xl flex-row items-center mb-6">
@@ -461,7 +445,7 @@ export default function Login({ route }: any) {
               </View>
             )}
 
-            {activeTab === 'signup' && !isSignupPasswordStep && !isSignupBiometricStep && !isSignupSuccess && (
+            {activeTab === 'signup' && !isSignupPasswordStep && (
               <View>
                 <Text className="text-[#0c2010] text-[24px] font-jakarta-bold mb-2">Get started with us</Text>
                 <Text className="text-[#707971] text-[14px] font-jakarta-medium mb-6">Fill out the form below and we will connect you with the right person.</Text>
@@ -576,37 +560,6 @@ export default function Login({ route }: any) {
                  <TouchableOpacity onPress={handleSignupCreateAccount} disabled={loading || !agreedToTerms} className="w-full bg-[#06201b] py-4 rounded-2xl flex-row justify-center items-center">
                     {loading ? <ActivityIndicator color="white" /> : <Text className="text-white font-jakarta-bold text-[16px]">Create Account</Text>}
                  </TouchableOpacity>
-              </View>
-            )}
-
-            {isSignupBiometricStep && (
-              <View className="items-center py-10">
-                <View className="w-20 h-20 bg-[#ecfdf5] rounded-full justify-center items-center mb-6">
-                  <MaterialIcons name="fingerprint" size={32} color="#047857" />
-                </View>
-                <Text className="text-[#0c2010] text-[24px] font-jakarta-bold mb-4">Enable Biometrics</Text>
-                <Text className="text-[#707971] text-[14px] font-jakarta-medium text-center mb-8">Set up Face ID or Touch ID for instant, secure access to your merchant dashboard.</Text>
-                
-                <TouchableOpacity onPress={handleSetupBiometric} disabled={loading} className="w-full bg-[#06201b] py-4 rounded-2xl flex-row justify-center items-center mb-4">
-                  {loading ? <ActivityIndicator color="white" /> : <Text className="text-white font-jakarta-bold text-[16px]">Set Up Now</Text>}
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => { setIsSignupBiometricStep(false); setIsSignupSuccess(true); }} className="py-2">
-                  <Text className="text-[#707971] font-jakarta-bold text-[14px]">Skip for now</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {isSignupSuccess && (
-              <View className="items-center py-10">
-                <View className="w-20 h-20 bg-[#ecfdf5] rounded-full justify-center items-center mb-6">
-                  <Feather name="check-circle" size={32} color="#047857" />
-                </View>
-                <Text className="text-[#0c2010] text-[24px] font-jakarta-bold mb-4">Application Received</Text>
-                <Text className="text-[#707971] text-[14px] font-jakarta-medium text-center mb-8">Thank you for applying to join PayChain! Our team will review your details shortly.</Text>
-                
-                <TouchableOpacity onPress={() => { setIsSignupSuccess(false); setActiveTab('login'); }} className="w-full bg-[#06201b] py-4 rounded-2xl flex-row justify-center items-center">
-                  <Text className="text-white font-jakarta-bold text-[16px]">Back to Login</Text>
-                </TouchableOpacity>
               </View>
             )}
 

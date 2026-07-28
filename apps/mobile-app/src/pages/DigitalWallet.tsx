@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext';
 import { ValidatedTextInput } from '../components/ValidatedTextInput';
 import TopBar from '../components/layout/TopBar';
 import api from '../api/config';
+import { isCreditTransaction, isDebitTransaction } from '../utils/transactionDirection';
 
 function formatKES(n: number | null | undefined) {
   if (n == null) return 'KES 0.00';
@@ -320,8 +321,8 @@ export default function DigitalWallet({ navigation }: any) {
   };
 
   const activityMeta = (tx: any) => {
-    const isOut = ['withdrawal', 'outbound', 'settlement', 'bulk_pay'].includes(tx.type);
-    const isIn = tx.type === 'inbound';
+    const isOut = isDebitTransaction(tx.type);
+    const isIn = isCreditTransaction(tx.type);
     return {
       label: isIn ? 'Funds Deposit' : isOut ? 'Funds Withdrawal' : 'Currency Swap',
       icon: (isIn ? 'log-in' : isOut ? 'log-out' : 'refresh-cw') as keyof typeof Feather.glyphMap,
