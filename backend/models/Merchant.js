@@ -1,7 +1,6 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
-import Counter from './Counter.js';
-import { generateMerchantCode } from '../utils/ncbaValidators.js';
+import { generateRandomMerchantCode } from '../utils/ncbaValidators.js';
 
 const merchantSchema = new mongoose.Schema({
   name: {
@@ -294,20 +293,26 @@ merchantSchema.pre('save', async function() {
   this.password = await bcrypt.hash(this.password, salt);
 });
 
-// Auto-assign an NCBA merchant code to every new merchant. Atomic counter
-// increment (see Counter.js) guarantees no two merchants can ever collide,
-// even under concurrent signups — mirrors getNextInvoiceNumber's pattern.
+// Auto-assign an NCBA merchant code to every new merchant. Random rather
+// than sequential (see generateRandomMerchantCode) so codes don't read as
+// "00000001, 00000002, ..." to a customer paying by hand. Checked against
+// the DB before assigning — the unique index on ncbaMerchantCode is the
+// final backstop if two signups ever raced on the same random value.
 merchantSchema.pre('save', async function() {
   if (!this.isNew || this.ncbaMerchantCode) {
     return;
   }
 
-  const counter = await Counter.findByIdAndUpdate(
-    'ncbaMerchantCode',
-    { $inc: { seq: 1 } },
-    { returnDocument: 'after', upsert: true }
-  );
-  this.ncbaMerchantCode = generateMerchantCode(counter.seq);
+  const MAX_ATTEMPTS = 10;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const candidate = generateRandomMerchantCode();
+    const exists = await this.constructor.exists({ ncbaMerchantCode: candidate });
+    if (!exists) {
+      this.ncbaMerchantCode = candidate;
+      return;
+    }
+  }
+  throw new Error('Failed to generate a unique NCBA merchant code after multiple attempts');
 });
 
 // Match user entered password to hashed password in database
