@@ -1135,3 +1135,114 @@ export const sendStatementEmail = async ({ to, businessName, periodLabel, pdfBas
     throw error;
   }
 };
+
+// @desc  7-day-out heads-up sent by services/dormancyReminderService.js once
+// a merchant hits 53 days of inactivity (no login, no transaction) — gives
+// them a week's notice before the 60-day dormancy mark.
+export const sendDormancyReminderEmail = async (email, name, businessName, daysRemaining) => {
+  try {
+    const safeName = (name || 'there').toString().replace(/</g, '&lt;');
+    const safeBiz  = (businessName || 'your business').toString().replace(/</g, '&lt;');
+
+    const data = await resend.emails.send({
+      from: 'PayChain <info@paychain.co.ke>',
+      to: [email],
+      subject: `Reminder: keep your PayChain account active (${daysRemaining} day${daysRemaining === 1 ? '' : 's'} left)`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 560px; margin: auto; background: #ffffff; border: 1px solid #eef0ee; border-radius: 18px; overflow: hidden;">
+          <div style="background: linear-gradient(135deg, #06201B 0%, #0a3029 100%); padding: 32px 32px 36px;">
+            <div style="margin-bottom: 20px;">${logoImgWhite(108, 'left')}</div>
+            <div style="display: inline-flex; align-items: center; gap: 10px;">
+              <span style="display: inline-block; width: 36px; height: 36px; border-radius: 999px; background: rgba(245, 158, 11, 0.18); text-align: center; line-height: 36px; color: #f59e0b; font-size: 18px; font-weight: 800;">!</span>
+              <div>
+                <p style="margin: 0; color: #5EFEB3; font-size: 11px; font-weight: 800; letter-spacing: 2.5px; text-transform: uppercase;">Account Activity</p>
+                <h1 style="margin: 4px 0 0; color: #fff; font-size: 22px; font-weight: 800; letter-spacing: -0.3px;">We haven't seen you in a while</h1>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding: 36px 32px;">
+            <p style="margin: 0 0 16px; color: #111; font-size: 15px;">Hi ${safeName},</p>
+            <p style="margin: 0 0 22px; color: #4b5563; font-size: 15px; line-height: 1.6;">
+              We haven't seen any activity on <strong>${safeBiz}</strong>'s PayChain account recently — no sign-ins and no transactions.
+            </p>
+
+            <div style="background: #fff7ed; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 16px 18px; margin: 0 0 26px;">
+              <p style="margin: 0 0 6px; color: #92400e; font-size: 13px; font-weight: 700;">${daysRemaining} day${daysRemaining === 1 ? '' : 's'} until your account is marked dormant</p>
+              <p style="margin: 0; color: #78350f; font-size: 13px; line-height: 1.5;">
+                Accounts inactive for 60 days straight are marked dormant. Simply signing in or receiving a payment keeps your account active — no other action needed.
+              </p>
+            </div>
+
+            <a href="${FRONTEND_URL}/login" style="display: inline-block; background: #06201B; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 12px; font-weight: 800; font-size: 14px; letter-spacing: 0.4px;">Sign in to your dashboard →</a>
+          </div>
+
+          <div style="padding: 22px 30px; background: #fafafa; border-top: 1px solid #eef0ee; text-align: center;">
+            <p style="margin: 0; color: #9ca3af; font-size: 11px;">Questions? Contact <a href="mailto:support@paychain.co.ke" style="color: #6b7280;">support@paychain.co.ke</a>.</p>
+            <p style="margin: 8px 0 0; color: #bbb; font-size: 11px;">&copy; ${new Date().getFullYear()} PayChainKE · Nairobi, Kenya</p>
+          </div>
+        </div>
+      `,
+    });
+    console.log(`📧 Dormancy reminder → ${email} (${daysRemaining}d remaining)`);
+    return data;
+  } catch (error) {
+    console.error('❌ Resend Dormancy Reminder Error:', error);
+    throw error;
+  }
+};
+
+// @desc  Final notice sent by services/dormancyReminderService.js the day a
+// merchant crosses 60 days of inactivity (no login, no transaction).
+export const sendDormancyFinalWarningEmail = async (email, name, businessName) => {
+  try {
+    const safeName = (name || 'there').toString().replace(/</g, '&lt;');
+    const safeBiz  = (businessName || 'your business').toString().replace(/</g, '&lt;');
+
+    const data = await resend.emails.send({
+      from: 'PayChain <info@paychain.co.ke>',
+      to: [email],
+      subject: `Action required: your PayChain account is now dormant`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 560px; margin: auto; background: #ffffff; border: 1px solid #eef0ee; border-radius: 18px; overflow: hidden;">
+          <div style="background: linear-gradient(135deg, #06201B 0%, #0a3029 100%); padding: 32px 32px 36px;">
+            <div style="margin-bottom: 20px;">${logoImgWhite(108, 'left')}</div>
+            <div style="display: inline-flex; align-items: center; gap: 10px;">
+              <span style="display: inline-block; width: 36px; height: 36px; border-radius: 999px; background: rgba(239, 68, 68, 0.18); text-align: center; line-height: 36px; color: #ef4444; font-size: 18px; font-weight: 800;">!</span>
+              <div>
+                <p style="margin: 0; color: #5EFEB3; font-size: 11px; font-weight: 800; letter-spacing: 2.5px; text-transform: uppercase;">Account Activity</p>
+                <h1 style="margin: 4px 0 0; color: #fff; font-size: 22px; font-weight: 800; letter-spacing: -0.3px;">Your account is now dormant</h1>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding: 36px 32px;">
+            <p style="margin: 0 0 16px; color: #111; font-size: 15px;">Hi ${safeName},</p>
+            <p style="margin: 0 0 22px; color: #4b5563; font-size: 15px; line-height: 1.6;">
+              <strong>${safeBiz}</strong>'s PayChain account has now gone 60 days with no sign-ins and no transactions.
+            </p>
+
+            <div style="background: #fef2f2; border-left: 4px solid #ef4444; border-radius: 8px; padding: 16px 18px; margin: 0 0 26px;">
+              <p style="margin: 0 0 6px; color: #991b1b; font-size: 13px; font-weight: 700;">Keep using your account to avoid losing access</p>
+              <p style="margin: 0; color: #7f1d1d; font-size: 13px; line-height: 1.5;">
+                Continued inactivity puts your account at risk of losing access. Sign in or receive a payment today to keep it active — your balance and virtual account number aren't affected by this notice.
+              </p>
+            </div>
+
+            <a href="${FRONTEND_URL}/login" style="display: inline-block; background: #06201B; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 12px; font-weight: 800; font-size: 14px; letter-spacing: 0.4px;">Sign in now →</a>
+          </div>
+
+          <div style="padding: 22px 30px; background: #fafafa; border-top: 1px solid #eef0ee; text-align: center;">
+            <p style="margin: 0; color: #9ca3af; font-size: 11px;">Questions? Contact <a href="mailto:support@paychain.co.ke" style="color: #6b7280;">support@paychain.co.ke</a>.</p>
+            <p style="margin: 8px 0 0; color: #bbb; font-size: 11px;">&copy; ${new Date().getFullYear()} PayChainKE · Nairobi, Kenya</p>
+          </div>
+        </div>
+      `,
+    });
+    console.log(`📧 Dormancy final warning → ${email}`);
+    return data;
+  } catch (error) {
+    console.error('❌ Resend Dormancy Final Warning Error:', error);
+    throw error;
+  }
+};

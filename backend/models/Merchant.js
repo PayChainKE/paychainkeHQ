@@ -277,6 +277,19 @@ const merchantSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  // One-shot markers for the dormancy email reminders (see
+  // services/dormancyReminderService.js) — set when a notice goes out,
+  // cleared automatically the next time the merchant is active again, so a
+  // merchant who goes dormant more than once gets reminded every time, not
+  // just the first.
+  dormancyReminderSentAt: {
+    type: Date,
+    default: null,
+  },
+  dormancyFinalWarningSentAt: {
+    type: Date,
+    default: null,
+  },
 }, {
   timestamps: true
 });

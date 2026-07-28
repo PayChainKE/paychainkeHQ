@@ -21,6 +21,7 @@ import merchantSmsAuthRoutes from './routes/merchantSmsAuthRoutes.js';
 import { ensurePrimaryOwner } from './migrations/ensurePrimaryOwner.js';
 import { backfillTransactionFees } from './migrations/backfillTransactionFees.js';
 import { backfillNcbaMerchantCodes } from './migrations/backfillNcbaMerchantCodes.js';
+import { checkAndSendDormancyReminders } from './services/dormancyReminderService.js';
 
 dotenv.config();
 
@@ -225,6 +226,13 @@ async function bootstrap() {
       console.warn('⚠️ MongoDB not connected — retrying in background');
     }
   });
+
+  // Daily dormancy-reminder sweep. Long-running-process only (the
+  // `isServerless` early return above guarantees this line never runs
+  // inside a per-request serverless invocation) — runs once at boot, then
+  // once every 24h for as long as this process stays up.
+  checkAndSendDormancyReminders();
+  setInterval(checkAndSendDormancyReminders, 24 * 60 * 60 * 1000);
 }
 
 bootstrap();
