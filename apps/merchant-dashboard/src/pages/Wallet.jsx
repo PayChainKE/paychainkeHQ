@@ -310,7 +310,7 @@ export default function Wallet() {
   }
 
   // QR Logic
-  const qrData = `${window.location.origin}/pay/${merchant?.paybillAccount || '84729'}`
+  const qrData = `${window.location.origin}/pay/${merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || ''}`
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrData)}&margin=10&bgcolor=FFFFFF&color=00351D`
 
   const handleDownload = async () => {
@@ -322,7 +322,7 @@ export default function Wallet() {
       const a = document.createElement('a');
       a.style.display = 'none';
       a.href = url;
-      a.download = `PayChain-QR-${merchant?.paybillAccount || '84729'}.png`;
+      a.download = `PayChain-QR-${merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'account'}.png`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -355,7 +355,7 @@ export default function Wallet() {
             <img src="${qrUrl}" alt="Settlement QR" />
             <div class="text">
               <h1>Settlement QR</h1>
-              <p>ACC: ${merchant?.paybillAccount || '84729'}</p>
+              <p>ACC: ${merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending'}</p>
               <p>MERCHANT: ${merchant?.businessName || 'Merchant'}</p>
             </div>
             <script>
@@ -854,7 +854,7 @@ export default function Wallet() {
                       <p className="text-[#2775CA] text-[9px] font-black uppercase tracking-[0.2em] leading-none">Settlement QR</p>
                     </div>
                     <div className="space-y-1.5 w-full">
-                      <p className="text-white text-[15px] font-mono font-bold tracking-widest leading-none">ACC: {merchant?.paybillAccount || '84729'}</p>
+                      <p className="text-white text-[15px] font-mono font-bold tracking-widest leading-none">ACC: {merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending'}</p>
                       <p className="text-[#8B98A9] text-[8px] font-bold uppercase tracking-widest leading-tight break-words px-1 opacity-80">MERCHANT: {merchant?.businessName || 'Merchant'}</p>
                     </div>
                   </div>

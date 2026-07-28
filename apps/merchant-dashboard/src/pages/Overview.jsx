@@ -239,7 +239,7 @@ export default function Overview() {
             <div className="flex justify-between items-start mb-8 lg:mb-10">
               <span className="bg-[#1F4D3C] text-[#5EFEB3] px-3 lg:px-4 py-1.5 rounded-full text-[8px] lg:text-[9px] font-black tracking-[0.15em] uppercase border border-white/10">Business Account</span>
               <div className="flex items-center gap-3 lg:gap-4 text-[8px] lg:text-[9px]">
-                <span className="text-white/40 uppercase font-bold tracking-[0.15em] hidden sm:inline">Acc: {merchant?.paybillAccount || '84729'}</span>
+                <span className="text-white/40 uppercase font-bold tracking-[0.15em] hidden sm:inline">Acc: {merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending'}</span>
                 <button
                   onClick={togglePrivacy}
                   className="text-white/40 hover:text-white transition-colors p-1"

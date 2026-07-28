@@ -10,18 +10,6 @@ export default function MyAccountsTab() {
 
   const accountsData = [
     {
-      service: 'PayChain',
-      accountNumber: merchant?.paybillAccount || '84729',
-      // Not "the Paybill" — this is PayChain's own internal reference
-      // number, used for wallet top-ups (STK Push). The actual Paybill
-      // customers pay into is NCBA's 880100, shown on the row below.
-      type: 'Wallet Reference',
-      name: merchant?.businessName || 'Merchant',
-      linkedTransferAccount: 'Linked to M-Pesa',
-      manager: merchant?.name || 'Owner',
-      status: 'Active'
-    },
-    {
       service: 'PayChain Account',
       // ncbaVirtualAccountNumber is null until NCBA_INSTITUTION_PREFIX is
       // configured on the backend (i.e. until NCBA assigns PayChain's
