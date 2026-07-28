@@ -34,7 +34,7 @@ import {
 } from '../controllers/teamController.js';
 import { runWalletAudit } from '../controllers/walletAuditController.js';
 import { adminListInvoices } from '../controllers/invoiceController.js';
-import { getRevenue } from '../controllers/revenueController.js';
+import { getRevenue, getRevenueSweeps, triggerRevenueSweep } from '../controllers/revenueController.js';
 import { adminListCashAdvanceRequests, adminUpdateCashAdvanceRequest } from '../controllers/cashAdvanceController.js';
 import {
   listExpenses,
@@ -95,6 +95,11 @@ router.get('/ledger', protect, getLedger);
 // Revenue dashboard — per-stream fee aggregation, stacked time series,
 // top fee-generating merchants, projected ARR.
 router.get('/revenue', protect, getRevenue);
+
+// Real weekly sweep history (actual PesaLink transfers of accrued fee
+// revenue to PayChain's own account) + a manual "run now" trigger.
+router.get('/revenue/sweeps', protect, getRevenueSweeps);
+router.post('/revenue/sweeps/run', protect, requireMutator, sensitiveActionLimiter, triggerRevenueSweep);
 
 // Stellar Wallet Audit (live Horizon cross-reference)
 router.get('/wallet-audit', protect, runWalletAudit);

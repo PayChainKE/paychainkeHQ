@@ -1,8 +1,10 @@
 import Transaction from '../models/Transaction.js';
+import RevenueSweep from '../models/RevenueSweep.js';
 import { REVENUE_STREAMS, SAFARICOM_TARIFF } from '../config/revenueRateCard.js';
 import { ncbaMarkupMongoExpr } from '../config/ncbaTariffCard.js';
 import { mpesaMerchantFeeMongoExpr } from '../utils/pricingEngine.js';
 import { LIVE_DATA_CUTOFF } from '../config/liveDataCutoff.js';
+import { runRevenueSweep } from '../services/revenueSweepService.js';
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 const RANGES = ['24h', '7d', '30d', '90d', 'ytd', 'all'];
@@ -553,6 +555,40 @@ export const getRevenue = async (req, res) => {
     });
   } catch (error) {
     console.error('Get Revenue Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Real sweep history — actual PesaLink transfers of PayChain's
+//          accrued fee revenue out of the pooled NCBA paybill into
+//          PayChain's own account (see services/revenueSweepService.js).
+//          Distinct from `sweepBatches` above, which is a projected/accrual
+//          estimate re-derived from transaction fees on every request; this
+//          is the real settlement record.
+// @route   GET /api/admin/revenue/sweeps
+// @access  Private (Admin)
+export const getRevenueSweeps = async (req, res) => {
+  try {
+    const sweeps = await RevenueSweep.find({}).sort('-createdAt').limit(52).lean();
+    res.json({ success: true, count: sweeps.length, data: sweeps });
+  } catch (error) {
+    console.error('Get Revenue Sweeps Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Manually trigger a revenue sweep attempt right now, outside the
+//          normal weekly schedule — useful to sweep immediately after
+//          configuring the destination account for the first time, or to
+//          verify the pipeline works before waiting for the next Monday.
+// @route   POST /api/admin/revenue/sweeps/run
+// @access  Private (Admin, owner/admin only)
+export const triggerRevenueSweep = async (req, res) => {
+  try {
+    const sweep = await runRevenueSweep();
+    res.json({ success: true, data: sweep });
+  } catch (error) {
+    console.error('Trigger Revenue Sweep Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };
