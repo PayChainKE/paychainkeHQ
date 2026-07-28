@@ -724,6 +724,8 @@ export const createMerchant = async (req, res) => {
         phone: merchant.phone,
         businessName: merchant.businessName,
         paybillAccount: merchant.paybillAccount,
+        ncbaMerchantCode: merchant.ncbaMerchantCode,
+        ncbaVirtualAccountNumber: getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode),
         createdAt: merchant.createdAt,
         isVerified: merchant.isVerified,
       },

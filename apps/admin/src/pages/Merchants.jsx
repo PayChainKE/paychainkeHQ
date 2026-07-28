@@ -297,6 +297,8 @@ const Merchants = () => {
         setSuccess({
           email: res.data.data.email,
           paybillAccount: res.data.data.paybillAccount,
+          ncbaMerchantCode: res.data.data.ncbaMerchantCode,
+          ncbaVirtualAccountNumber: res.data.data.ncbaVirtualAccountNumber,
           businessName: res.data.data.businessName,
         });
         fetchMerchants();
@@ -711,9 +713,20 @@ const Merchants = () => {
                   <strong>{success.businessName}</strong> has been onboarded.<br/>
                   A password-setup link has been emailed to <strong>{success.email}</strong>.
                 </p>
-                <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 mb-5 inline-block">
-                  <p className="text-2xs font-bold uppercase tracking-widest text-emerald-700 mb-1">Account Number</p>
-                  <p className="font-mono text-xl font-bold text-emerald-900">{success.paybillAccount}</p>
+                <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 mb-5 inline-block text-left">
+                  {success.ncbaVirtualAccountNumber ? (
+                    <>
+                      <p className="text-2xs font-bold uppercase tracking-widest text-emerald-700 mb-1">NCBA Account Number</p>
+                      <p className="font-mono text-xl font-bold text-emerald-900">{success.ncbaVirtualAccountNumber}</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-2xs font-bold uppercase tracking-widest text-amber-700 mb-1">NCBA Merchant Code</p>
+                      <p className="font-mono text-xl font-bold text-amber-900">{success.ncbaMerchantCode || '—'}</p>
+                      <p className="text-2xs text-on-surface-variant/60 mt-1">Full NCBA account number pending — institution prefix not yet assigned. Use this code for test attribution.</p>
+                    </>
+                  )}
+                  <p className="text-2xs text-on-surface-variant/50 mt-3 pt-2 border-t border-emerald-100">PayChain Reference No. <span className="font-mono font-semibold text-on-surface-variant">{success.paybillAccount}</span></p>
                 </div>
                 <div className="flex gap-2 justify-center">
                   <button onClick={() => setShowModal(false)} className="px-5 py-2.5 rounded-lg bg-primary text-white text-sm font-semibold uppercase tracking-widest hover:shadow-lg active:scale-95 transition-all">Done</button>
