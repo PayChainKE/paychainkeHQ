@@ -3,7 +3,7 @@ import axios from 'axios'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import RevenueChart from '../components/charts/RevenueChart'
 import { formatKES, formatUSDC } from '../utils/formatCurrency'
-import { getAmountSign, getAmountColorClassWithHover, isCreditTransaction, isSwapTransaction } from '../utils/transactionDirection'
+import { getAmountSign, getAmountColorClassWithHover, isCreditTransaction, isDebitTransaction, isSwapTransaction } from '../utils/transactionDirection'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { useNavigate } from 'react-router-dom'
@@ -84,11 +84,11 @@ export default function Overview() {
   monthAgo.setMonth(today.getMonth() - 1)
 
   const todaysRevenue = liveTransactions
-    .filter(t => t.type === 'inbound' && new Date(t.createdAt) >= today)
+    .filter(t => isCreditTransaction(t.type) && new Date(t.createdAt) >= today)
     .reduce((s, t) => s + (t.kesAmount || t.amount || 0), 0)
 
   const thisMonthRevenue = liveTransactions
-    .filter(t => t.type === 'inbound' && new Date(t.createdAt) >= monthAgo)
+    .filter(t => isCreditTransaction(t.type) && new Date(t.createdAt) >= monthAgo)
     .reduce((s, t) => s + (t.kesAmount || t.amount || 0), 0)
 
   const totalTransactionsCount = liveTransactions.length
@@ -98,13 +98,12 @@ export default function Overview() {
     .slice(0, 5)
 
   // --- Dynamic Chart Data Aggregation ---
-  // Outbound set mirrors the "Total Money Out" convention used on the
-  // Transactions statement export, for consistency across the app.
-  const OUTBOUND_TYPES = ['bulk_pay', 'settlement', 'outbound'];
-
+  // Uses the same credit/debit classification as every other amount in the
+  // app (transactionDirection.js) so real NCBA-routed transactions
+  // (ncba_inbound/ncba_outbound) are counted here too, not just 'inbound'.
   const generateChartData = () => {
-    const inboundTxs = liveTransactions.filter(t => t.type === 'inbound');
-    const outboundTxs = liveTransactions.filter(t => OUTBOUND_TYPES.includes(t.type));
+    const inboundTxs = liveTransactions.filter(t => isCreditTransaction(t.type));
+    const outboundTxs = liveTransactions.filter(t => isDebitTransaction(t.type));
     const now = new Date();
 
     const sumFor = (txs, matches) => txs
@@ -499,7 +498,7 @@ export default function Overview() {
                   ? `${(tx.usdcAmount || 0).toFixed(4)} USDC`
                   : formatKES(tx.kesAmount || tx.amount || 0)
                 const amtColor = getAmountColorClassWithHover(tx.type)
-                const TYPE_LABEL = { inbound: 'Payment In', outbound: 'Withdrawal', fx_swap: 'FX Swap', bulk_pay: 'Bulk Pay', settlement: 'Settlement' }
+                const TYPE_LABEL = { inbound: 'Payment In', outbound: 'Withdrawal', fx_swap: 'FX Swap', bulk_pay: 'Bulk Pay', settlement: 'Settlement', top_up: 'Top Up', withdrawal: 'Withdrawal', ncba_inbound: 'Payment In', ncba_outbound: 'Bank Transfer' }
                 return (
                   <div key={tx._id || tx.id} className="px-4 lg:px-8 py-2.5 lg:py-3 flex items-center justify-between hover:bg-[#00351D] transition-all group cursor-pointer border-b border-slate-200 last:border-0">
                     <div className="flex items-center gap-3 flex-1 min-w-0">

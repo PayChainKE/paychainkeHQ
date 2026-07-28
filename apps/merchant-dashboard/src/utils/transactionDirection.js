@@ -16,6 +16,14 @@ export function isSwapTransaction(type) {
   return SWAP_TYPES.has(type)
 }
 
+// Debit = money leaving that isn't a swap. Defined as "not credit, not
+// swap" (rather than its own hardcoded list) so a future debit type is
+// correctly classified everywhere by default, matching how CREDIT_TYPES
+// is the single opt-in list.
+export function isDebitTransaction(type) {
+  return !isCreditTransaction(type) && !isSwapTransaction(type)
+}
+
 export function getAmountSign(type) {
   if (isCreditTransaction(type)) return '+'
   if (isSwapTransaction(type)) return '±'
