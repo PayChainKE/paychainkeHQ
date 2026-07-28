@@ -318,7 +318,6 @@ function BusinessProfilePanel({ merchant }: { merchant: any }) {
           <ProfileRow label="Email" value={merchant?.email || 'N/A'} />
           <ProfileRow label="Phone" value={merchant?.phone || 'N/A'} />
           <ProfileRow label="PayChain Account" value={merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending'} />
-          <ProfileRow label="Wallet Reference" value={merchant?.paybillAccount || 'Pending'} />
           <ProfileRow label="KRA PIN" value={merchant?.kraPin || 'Not set'} />
           <ProfileRow label="Business Reg Number" value={merchant?.businessNumber || 'Not set'} />
         </View>

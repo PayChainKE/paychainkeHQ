@@ -548,7 +548,7 @@ export default function Transactions() {
         {/* Page Title & Subtext */}
         <div className="mb-6 lg:mb-8">
           <h2 className="font-headline font-bold text-3xl lg:text-4xl text-primary tracking-tight">Transactions</h2>
-          <p className="text-on-surface-variant text-[11px] lg:text-sm font-medium mt-1.5 opacity-80">All money movements — payments in, withdrawals, swaps and bulk pays for account {merchant?.paybillAccount || '—'}</p>
+          <p className="text-on-surface-variant text-[11px] lg:text-sm font-medium mt-1.5 opacity-80">All money movements — payments in, withdrawals, swaps and bulk pays for account {merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending'}</p>
         </div>
 
         {liveTransactions.length === 0 ? (
@@ -558,7 +558,7 @@ export default function Transactions() {
             </div>
             <h3 className="text-2xl font-headline font-bold text-primary mb-3">No Transactions Yet</h3>
             <p className="text-[15px] text-on-surface-variant font-medium max-w-md mx-auto leading-relaxed opacity-80">
-              Real-time payments made to your business account will appear here instantly. Instruct your customers to use your account number <strong className="text-primary">{merchant?.paybillAccount || '84729'}</strong>.
+              Real-time payments made to your business account will appear here instantly. Instruct your customers to pay via M-Pesa Paybill <strong className="text-primary">880100</strong>, Account Number <strong className="text-primary">{merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending'}</strong>.
             </p>
           </div>
         ) : (

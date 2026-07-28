@@ -763,7 +763,7 @@ export default function BulkPay() {
   // derived from the merchant's own profile, since there's no real
   // multi-account backend.
   const fundingSourceLabel = merchant?.businessName || 'Main Business Account';
-  const fundingSourceNumber = merchant?.paybillAccount || '—';
+  const fundingSourceNumber = merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending';
 
   // ── Step 3: confirm funding source, then move to Security (OTP -> PIN) ──
   const proceedToFundingSourceSelect = (source: 'manual' | 'csv') => {

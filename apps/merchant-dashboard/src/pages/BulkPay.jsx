@@ -1473,7 +1473,7 @@ export default function BulkPay() {
                   <h4 className="text-sm font-bold text-primary uppercase tracking-widest mb-6">Select Funding Source</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {[
-                      { id: 'ACCOUNT_1', name: merchant?.businessName || 'Main Business Account', balance: merchant?.kesBalance ?? 0, number: merchant?.paybillAccount || '852300' },
+                      { id: 'ACCOUNT_1', name: merchant?.businessName || 'Main Business Account', balance: merchant?.kesBalance ?? 0, number: merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending' },
                     ].map(account => (
                       <div
                         key={account.id}

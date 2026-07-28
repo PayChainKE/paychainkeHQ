@@ -126,7 +126,7 @@ export default function FundAccountModal({ method, onClose }) {
               <h3 className="font-headline text-xl font-bold tracking-tight">{METHOD_TITLE[method]}</h3>
               <p className="text-[11px] text-emerald-300 font-medium mt-0.5">
                 Account: <span className="font-bold text-white">
-                  {method === 'bank' ? ncbaAccountDisplay : merchant?.paybillAccount}
+                  {ncbaAccountDisplay}
                 </span>
               </p>
             </div>

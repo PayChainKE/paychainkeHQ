@@ -76,7 +76,7 @@ export default function DigitalWallet({ navigation }: any) {
   const [isProcessingTopUp, setIsProcessingTopUp] = useState(false);
   const [stkStatusText, setStkStatusText] = useState('');
 
-  const qrData = `https://paychain.co.ke/pay/${merchant?.paybillAccount || '84729'}`;
+  const qrData = `https://paychain.co.ke/pay/${merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || ''}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrData)}&margin=10&bgcolor=FFFFFF&color=00351D`;
 
   const fetchData = useCallback(async () => {
@@ -239,7 +239,7 @@ export default function DigitalWallet({ navigation }: any) {
       </style></head><body>
         <img src="${qrUrl}" />
         <h1>Settlement QR</h1>
-        <p>ACC: ${merchant?.paybillAccount || '84729'}</p>
+        <p>ACC: ${merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending'}</p>
         <p>MERCHANT: ${merchant?.businessName || 'Merchant'}</p>
       </body></html>`;
       const { uri } = await Print.printToFileAsync({ html, base64: false });
@@ -562,7 +562,7 @@ export default function DigitalWallet({ navigation }: any) {
                 <View className="bg-[#2775CA]/10 border border-[#2775CA]/20 rounded-md px-2.5 py-1 mb-2">
                   <Text className="text-[#2775CA] text-[9px] font-jakarta-extrabold uppercase tracking-[0.2em]">Settlement QR</Text>
                 </View>
-                <Text className="text-white text-[14px] font-jakarta-bold tracking-widest">ACC: {merchant?.paybillAccount || '84729'}</Text>
+                <Text className="text-white text-[14px] font-jakarta-bold tracking-widest">ACC: {merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending'}</Text>
                 <Text className="text-[#8B98A9] text-[9px] font-jakarta-bold uppercase tracking-widest mt-1">{merchant?.businessName || 'Merchant'}</Text>
               </View>
 

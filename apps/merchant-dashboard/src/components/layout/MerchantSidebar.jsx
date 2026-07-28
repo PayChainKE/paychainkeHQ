@@ -180,7 +180,7 @@ export default function MerchantSidebar({ isOpen, onClose }) {
           </div>
           <div>
             <p className="text-white text-xs font-bold leading-tight truncate w-[130px]">{merchant?.businessName || 'Admin'}</p>
-            <p className="text-[#a8b3a8] text-[9px] uppercase tracking-wider mt-0.5">ACC: {merchant?.paybillAccount || '84729'}</p>
+            <p className="text-[#a8b3a8] text-[9px] uppercase tracking-wider mt-0.5">ACC: {merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending'}</p>
           </div>
         </div>
 
