@@ -36,7 +36,7 @@ function findEightDigitCode(text, { allowTwelveDigitFallback = false } = {}) {
   // \b(\d{8})\b can never match 8 digits out of the middle of a 12-digit
   // run (there's no word-boundary between two adjacent digits). The
   // merchant code is always the last 8 digits of that 12-digit number by
-  // construction (see generateMerchantCode/getNcbaVirtualAccountNumber),
+  // construction (see generateRandomMerchantCode/getNcbaVirtualAccountNumber),
   // so this is a safe positional extraction, not a guess.
   if (allowTwelveDigitFallback) {
     const twelveMatch = str.match(TWELVE_DIGIT_RUN);

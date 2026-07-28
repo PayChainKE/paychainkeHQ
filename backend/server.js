@@ -21,6 +21,7 @@ import merchantSmsAuthRoutes from './routes/merchantSmsAuthRoutes.js';
 import { ensurePrimaryOwner } from './migrations/ensurePrimaryOwner.js';
 import { backfillTransactionFees } from './migrations/backfillTransactionFees.js';
 import { backfillNcbaMerchantCodes } from './migrations/backfillNcbaMerchantCodes.js';
+import { checkAndSendDormancyReminders } from './services/dormancyReminderService.js';
 
 dotenv.config();
 
@@ -39,6 +40,11 @@ const allowedOrigins = [
   'https://demo.paychain.co.ke',
   // Legacy alias (kept short-term so existing magic links still work)
   'https://merchant.paychain.co.ke',
+  // Merchant dashboard's actual live Vercel deployment URL — the
+  // app.paychain.co.ke custom domain isn't the only thing merchants hit in
+  // practice. Removing the old blanket "*.vercel.app" wildcard (see below)
+  // broke login here; this is the specific real origin, not the wildcard.
+  'https://apppaychain.vercel.app',
   'http://localhost:5173',
   'http://localhost:5174',
   'http://localhost:5175',
@@ -220,6 +226,13 @@ async function bootstrap() {
       console.warn('⚠️ MongoDB not connected — retrying in background');
     }
   });
+
+  // Daily dormancy-reminder sweep. Long-running-process only (the
+  // `isServerless` early return above guarantees this line never runs
+  // inside a per-request serverless invocation) — runs once at boot, then
+  // once every 24h for as long as this process stays up.
+  checkAndSendDormancyReminders();
+  setInterval(checkAndSendDormancyReminders, 24 * 60 * 60 * 1000);
 }
 
 bootstrap();

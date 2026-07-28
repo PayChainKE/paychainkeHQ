@@ -5,7 +5,7 @@ import CalendarRangePicker from '../components/ui/CalendarRangePicker'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { formatDateISO } from '../utils/formatDate'
 import { formatKES, formatUSDC } from '../utils/formatCurrency'
-import { getAmountSign, getAmountColorClass } from '../utils/transactionDirection'
+import { getAmountSign, getAmountColorClass, isCreditTransaction, isDebitTransaction } from '../utils/transactionDirection'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useNotification } from '../context/NotificationContext'
 import logo from '../assets/logo2.png'
@@ -55,8 +55,8 @@ export default function Transactions() {
       (t.reference || '').toLowerCase().includes(searchQuery.toLowerCase())
     
     if (activeTab === 'All') return matchesSearch
-    if (activeTab === 'Inbound') return matchesSearch && (t.type === 'inbound' || t.type === 'top_up')
-    if (activeTab === 'Outbound') return matchesSearch && (t.type === 'bulk_pay' || t.type === 'settlement' || t.type === 'outbound' || t.type === 'withdrawal')
+    if (activeTab === 'Inbound') return matchesSearch && isCreditTransaction(t.type)
+    if (activeTab === 'Outbound') return matchesSearch && isDebitTransaction(t.type)
     if (activeTab === 'FX Swaps') return matchesSearch && t.type === 'fx_swap'
     return matchesSearch
   })
@@ -142,7 +142,7 @@ export default function Transactions() {
     }
 
     const periodLabel = formatPeriodLabel(from, to)
-    const { pdfBase64, filename } = handleExport(rows, periodLabel)
+    const { pdfBase64, filename } = handleExport(rows, periodLabel, to)
     setShowExportModal(false)
 
     try {
@@ -158,7 +158,7 @@ export default function Transactions() {
     }
   }
 
-  const handleExport = (rows, periodLabel) => {
+  const handleExport = (rows, periodLabel, periodEnd) => {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
     const W = doc.internal.pageSize.getWidth()   // 210
     const H = doc.internal.pageSize.getHeight()  // 297
@@ -235,10 +235,29 @@ export default function Transactions() {
     })
 
     // ── SUMMARY STRIP ────────────────────────────────────────────────────────
-    const totalIn   = rows.filter(t => t.type === 'inbound').reduce((s, o) => s + (o.amount || 0), 0)
-    const totalOut  = rows.filter(t => ['bulk_pay','settlement','outbound'].includes(t.type)).reduce((s, o) => s + (o.amount || 0), 0)
+    const totalIn   = rows.filter(t => isCreditTransaction(t.type)).reduce((s, o) => s + (o.kesAmount || o.amount || 0), 0)
+    const totalOut  = rows.filter(t => isDebitTransaction(t.type)).reduce((s, o) => s + (o.kesAmount || o.amount || 0), 0)
     const fmtKES    = (n) => `KES ${Number(n).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     const fmtNum    = (n) => Number(n).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+    // ── OPENING BALANCE ──────────────────────────────────────────────────────
+    // The running balance column needs a real starting point, not zero, or
+    // a "Last 7 Days" statement's closing balance would never match the
+    // merchant's actual account balance. Work backwards from that real,
+    // authoritative balance (merchant.kesBalance) by undoing every
+    // transaction that happened after this period ended.
+    const signedKesDelta = (t) => {
+      if (isCreditTransaction(t.type)) return (t.kesAmount || t.amount || 0)
+      if (t.type === 'fx_swap') return -(t.kesAmount || 0)
+      return -(t.kesAmount || t.amount || 0) // debit
+    }
+    const netChangeWithinPeriod = rows.reduce((s, t) => s + signedKesDelta(t), 0)
+    const netChangeAfterPeriod = periodEnd
+      ? liveTransactions
+          .filter(t => new Date(t.createdAt || t.timestamp) > periodEnd)
+          .reduce((s, t) => s + signedKesDelta(t), 0)
+      : 0
+    const openingBalance = (merchant?.kesBalance || 0) - netChangeWithinPeriod - netChangeAfterPeriod
 
     y += 3
     const summaryItems = [
@@ -264,17 +283,21 @@ export default function Transactions() {
     doc.text('Transaction Ledger', L, y)
     doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(120, 130, 125)
     doc.text(`${rows.length} record${rows.length !== 1 ? 's' : ''}`, R, y, { align: 'right' })
+    y += 5
+    doc.text(`Opening Balance: ${fmtKES(openingBalance)}`, L, y)
 
-    // Build rows with running balance
-    let runBalance = 0
+    // Build rows with running balance — starts from the real opening
+    // balance above, not zero, so BALANCE (KES) and the closing strip
+    // below always reconcile with the merchant's actual live account balance.
+    let runBalance = openingBalance
     const tableRows = [...rows]
       .sort((a, b) => new Date(a.createdAt || a.timestamp) - new Date(b.createdAt || b.timestamp))
       .map(tx => {
         const dt = new Date(tx.createdAt || tx.timestamp)
         const dateStr = dt.toLocaleDateString('en-KE', { day: '2-digit', month: 'short', year: '2-digit' })
         const timeStr = dt.toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit', hour12: false })
-        const isIn  = ['inbound', 'top_up'].includes(tx.type)
-        const isOut = ['bulk_pay','settlement','outbound','withdrawal'].includes(tx.type)
+        const isIn  = isCreditTransaction(tx.type)
+        const isOut = isDebitTransaction(tx.type)
         const isSwp = tx.type === 'fx_swap'
         const rawAmt = tx.amount || tx.kesAmount || 0
 
@@ -499,22 +522,26 @@ export default function Transactions() {
   }, [activeTab, searchQuery])
 
   const TX_LABEL = {
-    inbound:    'Payment In',
-    outbound:   'Outbound',
-    bulk_pay:   'Bulk Pay',
-    settlement: 'Settlement',
-    fx_swap:    'FX Swap',
-    top_up:     'Top Up',
-    withdrawal: 'Withdrawal',
+    inbound:      'Payment In',
+    outbound:     'Outbound',
+    bulk_pay:     'Bulk Pay',
+    settlement:   'Settlement',
+    fx_swap:      'FX Swap',
+    top_up:       'Top Up',
+    withdrawal:   'Withdrawal',
+    ncba_inbound: 'Payment In',
+    ncba_outbound:'Bank Transfer',
   }
   const TX_COLOR = {
-    inbound:    'bg-emerald-500/10 text-emerald-700',
-    outbound:   'bg-amber-500/10  text-amber-700',
-    bulk_pay:   'bg-orange-500/10 text-orange-700',
-    settlement: 'bg-blue-500/10   text-blue-700',
-    fx_swap:    'bg-purple-500/10 text-purple-700',
-    top_up:     'bg-teal-500/10 text-teal-700',
-    withdrawal: 'bg-rose-500/10 text-rose-700',
+    inbound:      'bg-emerald-500/10 text-emerald-700',
+    outbound:     'bg-amber-500/10  text-amber-700',
+    bulk_pay:     'bg-orange-500/10 text-orange-700',
+    settlement:   'bg-blue-500/10   text-blue-700',
+    fx_swap:      'bg-purple-500/10 text-purple-700',
+    top_up:       'bg-teal-500/10 text-teal-700',
+    withdrawal:   'bg-rose-500/10 text-rose-700',
+    ncba_inbound: 'bg-emerald-500/10 text-emerald-700',
+    ncba_outbound:'bg-amber-500/10  text-amber-700',
   }
   const txLabel = (type) => TX_LABEL[type] || type.replace(/_/g,' ')
   const txColor = (type) => TX_COLOR[type] || 'bg-slate-500/10 text-slate-700'
@@ -533,7 +560,7 @@ export default function Transactions() {
   const monthAgo = new Date(today);
   monthAgo.setMonth(today.getMonth() - 1);
 
-  const inboundTxs = liveTransactions.filter(t => ['inbound', 'top_up'].includes(t.type));
+  const inboundTxs = liveTransactions.filter(t => isCreditTransaction(t.type));
   
   const stats = {
     today: inboundTxs.filter(t => new Date(t.createdAt || t.timestamp) >= today).reduce((s, t) => s + (t.kesAmount || t.amount || 0), 0),

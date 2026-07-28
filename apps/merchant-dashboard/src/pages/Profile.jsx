@@ -5,6 +5,7 @@ import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { ValidatedInput } from '../components/ValidatedInput'
 import { BiometricRegisterButton } from '../components/BiometricButton'
+import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 
 const DEFAULT_SECURITY_QUESTIONS = [
@@ -45,6 +46,7 @@ function relativeTime(iso) {
 export default function Profile() {
   const { showAmounts } = usePrivacyMode()
   const { merchant, logout, token } = useMerchantAuth()
+  const navigate = useNavigate()
   const [name, setName] = useState(merchant?.name || 'Admin')
   const [email, setEmail] = useState(merchant?.email || 'admin@paychain.ke')
   const [kraPin, setKraPin] = useState(merchant?.kraPin || '')
@@ -449,7 +451,7 @@ export default function Profile() {
                 <div className="flex items-center justify-between mb-10">
                   <div>
                     <h3 className="font-headline font-bold text-2xl text-white tracking-tight">Security</h3>
-                    <p className="text-[10px] text-emerald-400/60 font-black uppercase tracking-[0.2em] mt-1">Encryption & Access Rules</p>
+                    <p className="text-[10px] text-emerald-400/60 font-black uppercase tracking-[0.2em] mt-1">Keeping your account safe</p>
                   </div>
                   <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-emerald-400 border border-white/5">
                     <span className="material-symbols-outlined text-2xl">shield_locked</span>
@@ -528,7 +530,7 @@ export default function Profile() {
                     <div className="space-y-6">
                       <h4 className="text-[10px] text-white/30 font-black uppercase tracking-widest flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                        Advanced Methods & Authorizations
+                        Extra layers of protection
                       </h4>
                       
                       {/* Bulk Pay PIN Reset */}
@@ -593,14 +595,22 @@ export default function Profile() {
 
                     </div>
 
-                    <div className="p-5 bg-amber-500/5 rounded-[24px] border border-amber-500/10">
+                    <button
+                      type="button"
+                      onClick={() => navigate('/support')}
+                      className="w-full text-left p-5 bg-amber-500/5 rounded-[24px] border border-amber-500/10 hover:bg-amber-500/10 hover:border-amber-500/20 transition-all group"
+                    >
                        <div className="flex gap-4">
-                         <span className="material-symbols-outlined text-amber-500 text-lg">help</span>
-                         <p className="text-[10px] text-amber-200/50 leading-relaxed font-medium">
-                           Need help with your security keys? Reach out to your account manager or use the encrypted support portal.
-                         </p>
+                         <span className="material-symbols-outlined text-amber-500 text-lg">support_agent</span>
+                         <div>
+                           <p className="text-[11px] text-amber-100/80 font-bold mb-1">Need a hand securing your account?</p>
+                           <p className="text-[10px] text-amber-200/50 leading-relaxed font-medium">
+                             Our support team is real people — reach us by call, WhatsApp, or email, Mon–Sat 7am–9pm.
+                             <span className="text-amber-400 font-bold group-hover:underline ml-1">Contact support →</span>
+                           </p>
+                         </div>
                        </div>
-                    </div>
+                    </button>
                   </div>
 
                   {/* Trust / Protection Panel */}
@@ -614,22 +624,22 @@ export default function Profile() {
                       <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-emerald-400/25 to-emerald-600/10 flex items-center justify-center mb-6 border border-emerald-400/10">
                         <span className="material-symbols-outlined text-3xl text-emerald-400">encrypted</span>
                       </div>
-                      <h4 className="font-headline text-lg text-white mb-2 leading-tight">Your account, fully shielded.</h4>
+                      <h4 className="font-headline text-lg text-white mb-2 leading-tight">Protected the way a bank protects you.</h4>
                       <p className="text-[11px] text-white/40 leading-relaxed mb-6">
-                        Every credential you set here is encrypted at rest, never logged in plain text, and every change is recorded to your security audit trail.
+                        Your password and PIN are hashed, not stored as plain text — not even our own team can read them. Every change you make here is logged for your protection.
                       </p>
                       <div className="space-y-3.5">
                         <div className="flex items-center gap-3">
                           <span className="material-symbols-outlined text-emerald-400 text-base">lock</span>
-                          <p className="text-[10px] text-white/50 font-medium">256-bit encrypted storage</p>
+                          <p className="text-[10px] text-white/50 font-medium">Passwords hashed, never stored in plain text</p>
                         </div>
                         <div className="flex items-center gap-3">
                           <span className="material-symbols-outlined text-emerald-400 text-base">history</span>
-                          <p className="text-[10px] text-white/50 font-medium">Every change is audit-logged</p>
+                          <p className="text-[10px] text-white/50 font-medium">Every change is logged for security</p>
                         </div>
                         <div className="flex items-center gap-3">
                           <span className="material-symbols-outlined text-emerald-400 text-base">support_agent</span>
-                          <p className="text-[10px] text-white/50 font-medium">24/7 human security support</p>
+                          <p className="text-[10px] text-white/50 font-medium">Real people on support, Mon–Sat 7am–9pm</p>
                         </div>
                       </div>
                     </div>
@@ -768,12 +778,33 @@ export default function Profile() {
                 <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center text-white mb-6">
                   <span className="material-symbols-outlined text-2xl">id_card</span>
                 </div>
-                <h4 className="text-[10px] text-blue-200/60 font-bold uppercase tracking-widest mb-1">Merchant Identity</h4>
-                <p className={`font-headline text-2xl lg:text-3xl mb-1 transition-all duration-300 ${!showAmounts && 'blur-md'}`}>ACC: {merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending'}</p>
-                <p className="text-sm text-blue-100/60 font-medium">Verified Merchant since {merchant?.createdAt ? new Date(merchant.createdAt).toLocaleString('en-US', { month: 'short', year: 'numeric' }) : '—'}</p>
+                <h4 className="text-[10px] text-blue-200/60 font-bold uppercase tracking-widest mb-5">Merchant Identity</h4>
+
+                <div className="grid grid-cols-2 gap-4 mb-5">
+                  <div>
+                    <p className="text-[9px] text-blue-200/50 font-bold uppercase tracking-widest mb-1">Paybill</p>
+                    <p className="font-headline text-lg lg:text-xl">880100</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] text-blue-200/50 font-bold uppercase tracking-widest mb-1">Account Number</p>
+                    <p className={`font-headline text-lg lg:text-xl tabular-nums transition-all duration-300 ${!showAmounts && 'blur-md'}`}>{merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending'}</p>
+                  </div>
+                </div>
+
+                <p className="text-sm text-blue-100/60 font-medium">Verified merchant since {merchant?.createdAt ? new Date(merchant.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}</p>
+
                 <div className="mt-8 pt-8 border-t border-white/10 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-emerald-400 text-sm" style={{fontVariationSettings: "'FILL' 1"}}>check_circle</span>
-                  <span className="text-xs font-bold uppercase tracking-widest">Active Status</span>
+                  {merchant?.status === 'locked' ? (
+                    <>
+                      <span className="material-symbols-outlined text-red-400 text-sm" style={{fontVariationSettings: "'FILL' 1"}}>lock</span>
+                      <span className="text-xs font-bold uppercase tracking-widest">Account Locked</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-emerald-400 text-sm" style={{fontVariationSettings: "'FILL' 1"}}>check_circle</span>
+                      <span className="text-xs font-bold uppercase tracking-widest">Active Status</span>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
