@@ -27,8 +27,27 @@ export class NcbaValidationError extends Error {
 const RANDOM_CODE_MIN = 10_000_000;
 const RANDOM_CODE_MAX = 99_999_999;
 
+// A run like "55555" or "77777" inside an otherwise random code looks just
+// as suspicious as a sequential one — reject and re-roll rather than hand
+// one out. True 8-digit randomness rarely produces a run this long, so
+// this almost never costs more than one extra draw.
+const MAX_REPEATED_DIGIT_RUN = 3;
+
+function hasLongRepeatedDigitRun(digits) {
+  let runLength = 1;
+  for (let i = 1; i < digits.length; i++) {
+    runLength = digits[i] === digits[i - 1] ? runLength + 1 : 1;
+    if (runLength > MAX_REPEATED_DIGIT_RUN) return true;
+  }
+  return false;
+}
+
 export function generateRandomMerchantCode() {
-  return String(Math.floor(Math.random() * (RANDOM_CODE_MAX - RANDOM_CODE_MIN + 1)) + RANDOM_CODE_MIN);
+  let candidate;
+  do {
+    candidate = String(Math.floor(Math.random() * (RANDOM_CODE_MAX - RANDOM_CODE_MIN + 1)) + RANDOM_CODE_MIN);
+  } while (hasLongRepeatedDigitRun(candidate));
+  return candidate;
 }
 
 /**
