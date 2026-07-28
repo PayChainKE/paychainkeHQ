@@ -825,6 +825,14 @@ export const initiateB2C = async (req, res) => {
         headers: { Authorization: `Bearer ${token}` }
       });
     } catch (err) {
+      // Only pretend-succeed in sandbox, where Daraja's own test environment
+      // is flaky/unavailable by design and merchants aren't real. In live
+      // mode this used to swallow a genuine Safaricom rejection/outage and
+      // tell the merchant "Transfer initiated successfully" with their
+      // balance already debited and no real money ever sent — rethrowing
+      // here instead lets the outer catch below refund them and report the
+      // real failure.
+      if (isLive) throw err;
       console.warn('Daraja B2C API failed, falling back to simulation. Error:', err.response?.data?.errorMessage || err.message);
       b2cRes = { data: { OriginatorConversationID: `SIM_B2C_${Date.now()}` } };
     }
