@@ -12,6 +12,7 @@ import Contact from '../models/Contact.js';
 import Communication from '../models/Communication.js';
 import { sendMerchantInvite, sendAdminActionOTP } from '../utils/resend.js';
 import { logAudit } from '../utils/auditLog.js';
+import { getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
 
 // Build an `actor` shape from req.admin so audit rows attribute admin-initiated
 // actions to the right operator even when the merchant is the subject.
@@ -583,6 +584,9 @@ export const getMerchantDetail = async (req, res) => {
         certificateUrl: merchant.certificateUrl,
         // Account
         paybillAccount: merchant.paybillAccount,
+        // Real bank account number, paid into via NCBA's Paybill (880100) —
+        // null until NCBA_INSTITUTION_PREFIX is configured.
+        ncbaVirtualAccountNumber: getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode),
         status: merchant.status,
         isVerified: merchant.isVerified,
         registrationSource: merchant.registrationSource,
@@ -692,7 +696,7 @@ export const createMerchant = async (req, res) => {
 
     const setupLink = `${MERCHANT_DASHBOARD_URL.replace(/\/$/, '')}/setup-password?token=${rawToken}`;
 
-    sendMerchantInvite(email, name, businessName, paybillAccount, setupLink).catch((err) => {
+    sendMerchantInvite(email, name, businessName, paybillAccount, setupLink, getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode)).catch((err) => {
       console.error(`📧 Failed to send invite to ${email}:`, err);
     });
 

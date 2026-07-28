@@ -560,7 +560,7 @@ export default function Overview() {
             </div>
             <div>
               <p className="text-[9px] font-bold text-emerald-800 uppercase tracking-[0.2em] mb-1">Growth Tip</p>
-              <p className="text-[11px] text-emerald-900 leading-snug font-medium opacity-80">Instruct your customers to use Paybill {merchant?.paybillAccount || '...'} to increase your daily volume.</p>
+              <p className="text-[11px] text-emerald-900 leading-snug font-medium opacity-80">Instruct your customers to pay via M-Pesa Paybill 880100, Account Number {merchant?.ncbaVirtualAccountNumber || '...'}, to increase your daily volume.</p>
             </div>
           </section>
         </div>

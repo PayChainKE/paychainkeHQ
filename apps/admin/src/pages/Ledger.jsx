@@ -168,7 +168,7 @@ const Ledger = () => {
       'USDC Amount': t.usdcAmount || '',
       Account: t.accountNumber,
       'Merchant Business': t.merchant?.businessName || '',
-      'Merchant Paybill': t.merchant?.paybillAccount || '',
+      'Merchant Account No.': t.merchant?.paybillAccount || '',
       'Sender Name': t.sender?.name || '',
       'Sender ID': t.sender?.id || '',
     }));
@@ -631,7 +631,7 @@ const TxnDrawer = ({ txn, onClose, onCopy, copiedRef }) => {
                   <p className="text-2xs font-bold uppercase tracking-widest text-emerald-700 mb-1">Merchant</p>
                   <p className="font-bold text-on-surface text-sm">{txn.merchant.businessName}</p>
                   {txn.merchant.paybillAccount && (
-                    <p className="text-2xs text-on-surface-variant/70 font-mono">Paybill #{txn.merchant.paybillAccount}</p>
+                    <p className="text-2xs text-on-surface-variant/70 font-mono">Acc #{txn.merchant.paybillAccount}</p>
                   )}
                 </div>
               )}

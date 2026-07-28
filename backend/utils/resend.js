@@ -279,8 +279,14 @@ export const sendWalletActivationEmail = async (email, name, stellarPublicKey) =
 };
 
 // Send Welcome Email with Credentials
-export const sendWelcomeEmail = async (email, name, password, phone, paybillAccount) => {
+// ncbaVirtualAccountNumber: the merchant's real bank account number, paid
+// into via NCBA's Paybill (880100) — see utils/ncbaValidators.js's
+// getNcbaVirtualAccountNumber. Null until NCBA_INSTITUTION_PREFIX is
+// configured (NCBA hasn't assigned it yet); rendered as a pending state
+// rather than a fake/placeholder number.
+export const sendWelcomeEmail = async (email, name, password, phone, paybillAccount, ncbaVirtualAccountNumber) => {
   const firstName = (name || '').split(' ')[0] || 'Merchant';
+  const accountDisplay = ncbaVirtualAccountNumber || 'Pending assignment';
   try {
     const data = await resend.emails.send({
       from: 'PayChain <info@paychain.co.ke>',
@@ -320,11 +326,11 @@ export const sendWelcomeEmail = async (email, name, password, phone, paybillAcco
                 <tr>
                   <td width="50%" style="padding-right:12px;border-right:1px solid rgba(255,255,255,0.12);">
                     <p style="margin:0 0 6px;font-size:10px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:rgba(255,255,255,0.45);">Paybill Number</p>
-                    <p style="margin:0;font-size:34px;font-weight:800;color:#5EFEB3;letter-spacing:2px;font-family:monospace;">400200</p>
+                    <p style="margin:0;font-size:34px;font-weight:800;color:#5EFEB3;letter-spacing:2px;font-family:monospace;">880100</p>
                   </td>
                   <td width="50%" style="padding-left:28px;">
                     <p style="margin:0 0 6px;font-size:10px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:rgba(255,255,255,0.45);">Account Number</p>
-                    <p style="margin:0;font-size:34px;font-weight:800;color:#ffffff;letter-spacing:2px;font-family:monospace;">${paybillAccount}</p>
+                    <p style="margin:0;font-size:${ncbaVirtualAccountNumber ? '34px' : '18px'};font-weight:800;color:#ffffff;letter-spacing:2px;font-family:monospace;">${accountDisplay}</p>
                   </td>
                 </tr>
               </table>
@@ -354,11 +360,11 @@ export const sendWelcomeEmail = async (email, name, password, phone, paybillAcco
               </tr>
               <tr>
                 <td width="32" style="vertical-align:top;padding:5px 12px 5px 0;"><div style="width:24px;height:24px;border-radius:50%;background:#06201B;text-align:center;"><span style="font-size:11px;font-weight:800;color:#5EFEB3;line-height:24px;display:block;">4</span></div></td>
-                <td style="font-size:13px;color:#374151;padding:5px 0;line-height:1.5;">Business No: <strong style="color:#06201B;font-family:monospace;">400200</strong></td>
+                <td style="font-size:13px;color:#374151;padding:5px 0;line-height:1.5;">Business No: <strong style="color:#06201B;font-family:monospace;">880100</strong></td>
               </tr>
               <tr>
                 <td width="32" style="vertical-align:top;padding:5px 12px 5px 0;"><div style="width:24px;height:24px;border-radius:50%;background:#06201B;text-align:center;"><span style="font-size:11px;font-weight:800;color:#5EFEB3;line-height:24px;display:block;">5</span></div></td>
-                <td style="font-size:13px;color:#374151;padding:5px 0;line-height:1.5;">Account No: <strong style="color:#06201B;font-family:monospace;">${paybillAccount}</strong></td>
+                <td style="font-size:13px;color:#374151;padding:5px 0;line-height:1.5;">Account No: <strong style="color:#06201B;font-family:monospace;">${accountDisplay}</strong></td>
               </tr>
               <tr>
                 <td width="32" style="vertical-align:top;padding:5px 12px 5px 0;"><div style="width:24px;height:24px;border-radius:50%;background:#06201B;text-align:center;"><span style="font-size:11px;font-weight:800;color:#5EFEB3;line-height:24px;display:block;">6</span></div></td>
@@ -559,7 +565,7 @@ export const sendAdminActionOTP = async (email, otp, actionLabel, target) => {
 
 // Send Merchant Invite (Admin-Onboarded) — credentialless invite with a
 // single-use, time-limited setup link. We never send the password in the email.
-export const sendMerchantInvite = async (email, name, businessName, paybillAccount, setupLink) => {
+export const sendMerchantInvite = async (email, name, businessName, paybillAccount, setupLink, ncbaVirtualAccountNumber) => {
   try {
     const data = await resend.emails.send({
       from: 'PayChain Onboarding <info@paychain.co.ke>',
@@ -586,8 +592,8 @@ export const sendMerchantInvite = async (email, name, businessName, paybillAccou
             <div style="margin-top: 35px; padding: 22px; background: #f0fdf4; border-radius: 12px; border: 1px solid #bbf7d0;">
               <h3 style="margin: 0 0 12px; color: #166534; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Your Payment Collection Details</h3>
               <div style="color: #14532d; font-size: 14px; line-height: 1.8;">
-                <p style="margin: 6px 0;"><strong>Paybill:</strong> 400200</p>
-                <p style="margin: 6px 0;"><strong>Account Number:</strong> ${paybillAccount}</p>
+                <p style="margin: 6px 0;"><strong>Paybill:</strong> 880100</p>
+                <p style="margin: 6px 0;"><strong>Account Number:</strong> ${ncbaVirtualAccountNumber || 'Pending assignment'}</p>
               </div>
               <p style="margin: 12px 0 0; color: #15803d; font-size: 12px;">Share these with your customers to receive M-PESA payments directly into your PayChain wallet.</p>
             </div>

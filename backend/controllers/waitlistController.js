@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import Waitlist from '../models/Waitlist.js';
 import Merchant from '../models/Merchant.js';
 import { sendWaitlistConfirmation, sendMerchantInvite } from '../utils/resend.js';
+import { getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
 
 const MERCHANT_DASHBOARD_URL =
   process.env.MERCHANT_DASHBOARD_URL || 'https://app.paychain.co.ke';
@@ -282,7 +283,7 @@ export const convertWaitlistEntry = async (req, res) => {
     });
 
     const setupLink = `${MERCHANT_DASHBOARD_URL.replace(/\/$/, '')}/setup-password?token=${rawToken}`;
-    sendMerchantInvite(entry.email, entry.fullName, entry.businessName, paybillAccount, setupLink)
+    sendMerchantInvite(entry.email, entry.fullName, entry.businessName, paybillAccount, setupLink, getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode))
       .catch((err) => console.error('Convert: invite email failed:', err));
 
     entry.status = 'converted';
