@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "paychain-mobile",
+    "name": "PayChain",
     "slug": "paychain-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -13,7 +13,9 @@
       "package": "co.ke.paychain.mobile",
       "adaptiveIcon": {
         "backgroundColor": "#faf9f6",
-        "foregroundImage": "./assets/icon.png"
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
