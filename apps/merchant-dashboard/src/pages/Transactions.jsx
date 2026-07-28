@@ -142,7 +142,7 @@ export default function Transactions() {
     }
 
     const periodLabel = formatPeriodLabel(from, to)
-    const { pdfBase64, filename } = handleExport(rows, periodLabel)
+    const { pdfBase64, filename } = handleExport(rows, periodLabel, to)
     setShowExportModal(false)
 
     try {
@@ -158,7 +158,7 @@ export default function Transactions() {
     }
   }
 
-  const handleExport = (rows, periodLabel) => {
+  const handleExport = (rows, periodLabel, periodEnd) => {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
     const W = doc.internal.pageSize.getWidth()   // 210
     const H = doc.internal.pageSize.getHeight()  // 297
@@ -240,6 +240,25 @@ export default function Transactions() {
     const fmtKES    = (n) => `KES ${Number(n).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     const fmtNum    = (n) => Number(n).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
+    // ── OPENING BALANCE ──────────────────────────────────────────────────────
+    // The running balance column needs a real starting point, not zero, or
+    // a "Last 7 Days" statement's closing balance would never match the
+    // merchant's actual account balance. Work backwards from that real,
+    // authoritative balance (merchant.kesBalance) by undoing every
+    // transaction that happened after this period ended.
+    const signedKesDelta = (t) => {
+      if (isCreditTransaction(t.type)) return (t.kesAmount || t.amount || 0)
+      if (t.type === 'fx_swap') return -(t.kesAmount || 0)
+      return -(t.kesAmount || t.amount || 0) // debit
+    }
+    const netChangeWithinPeriod = rows.reduce((s, t) => s + signedKesDelta(t), 0)
+    const netChangeAfterPeriod = periodEnd
+      ? liveTransactions
+          .filter(t => new Date(t.createdAt || t.timestamp) > periodEnd)
+          .reduce((s, t) => s + signedKesDelta(t), 0)
+      : 0
+    const openingBalance = (merchant?.kesBalance || 0) - netChangeWithinPeriod - netChangeAfterPeriod
+
     y += 3
     const summaryItems = [
       { label: 'Total Money In',  value: fmtKES(totalIn),  color: [6, 32, 27] },
@@ -264,9 +283,13 @@ export default function Transactions() {
     doc.text('Transaction Ledger', L, y)
     doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(120, 130, 125)
     doc.text(`${rows.length} record${rows.length !== 1 ? 's' : ''}`, R, y, { align: 'right' })
+    y += 5
+    doc.text(`Opening Balance: ${fmtKES(openingBalance)}`, L, y)
 
-    // Build rows with running balance
-    let runBalance = 0
+    // Build rows with running balance — starts from the real opening
+    // balance above, not zero, so BALANCE (KES) and the closing strip
+    // below always reconcile with the merchant's actual live account balance.
+    let runBalance = openingBalance
     const tableRows = [...rows]
       .sort((a, b) => new Date(a.createdAt || a.timestamp) - new Date(b.createdAt || b.timestamp))
       .map(tx => {
