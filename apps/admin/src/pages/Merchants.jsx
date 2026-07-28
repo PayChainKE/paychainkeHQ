@@ -716,14 +716,14 @@ const Merchants = () => {
                 <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 mb-5 inline-block text-left">
                   {success.ncbaVirtualAccountNumber ? (
                     <>
-                      <p className="text-2xs font-bold uppercase tracking-widest text-emerald-700 mb-1">NCBA Account Number</p>
+                      <p className="text-2xs font-bold uppercase tracking-widest text-emerald-700 mb-1">PayChain Account Number</p>
                       <p className="font-mono text-xl font-bold text-emerald-900">{success.ncbaVirtualAccountNumber}</p>
                     </>
                   ) : (
                     <>
-                      <p className="text-2xs font-bold uppercase tracking-widest text-amber-700 mb-1">NCBA Merchant Code</p>
+                      <p className="text-2xs font-bold uppercase tracking-widest text-amber-700 mb-1">PayChain Account Number</p>
                       <p className="font-mono text-xl font-bold text-amber-900">{success.ncbaMerchantCode || '—'}</p>
-                      <p className="text-2xs text-on-surface-variant/60 mt-1">Full NCBA account number pending — institution prefix not yet assigned. Use this code for test attribution.</p>
+                      <p className="text-2xs text-on-surface-variant/60 mt-1">Interim number — full account pending bank assignment. Safe to give out for payments and testing.</p>
                     </>
                   )}
                   <p className="text-2xs text-on-surface-variant/50 mt-3 pt-2 border-t border-emerald-100">PayChain Reference No. <span className="font-mono font-semibold text-on-surface-variant">{success.paybillAccount}</span></p>
@@ -1228,15 +1228,14 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
 
             {/* Account */}
             <Section title="PayChain Account" icon="account_balance_wallet">
-              <Row label="NCBA Paybill" value={<span className="font-mono">880100</span>} />
-              <Row label="NCBA Account Number" value={<span className="font-mono font-bold text-base text-on-surface bg-surface-container-low px-2 py-1 rounded">{m.ncbaVirtualAccountNumber || 'Pending bank assignment'}</span>} />
-              {!m.ncbaVirtualAccountNumber && (
-                <Row label="NCBA Merchant Code" value={
-                  m.ncbaMerchantCode
-                    ? <span className="font-mono font-bold text-base text-on-surface bg-amber-50 text-amber-800 px-2 py-1 rounded" title="Use this in the Narrative/AccountNr field to test NCBA notification attribution before the institution prefix is assigned.">{m.ncbaMerchantCode}</span>
-                    : '— not assigned —'
-                } />
-              )}
+              <Row label="Paybill" value={<span className="font-mono">880100</span>} />
+              <Row label="PayChain Account Number" value={
+                m.ncbaVirtualAccountNumber
+                  ? <span className="font-mono font-bold text-base text-on-surface bg-surface-container-low px-2 py-1 rounded">{m.ncbaVirtualAccountNumber}</span>
+                  : m.ncbaMerchantCode
+                    ? <span className="font-mono font-bold text-base text-on-surface bg-amber-50 text-amber-800 px-2 py-1 rounded" title="Interim account number — full number pending bank assignment. Safe to give out for payments and testing.">{m.ncbaMerchantCode}</span>
+                    : <span className="font-mono font-bold text-base text-on-surface bg-surface-container-low px-2 py-1 rounded">Pending bank assignment</span>
+              } />
               <Row label="PayChain Reference No." value={<span className="font-mono">{m.paybillAccount || '—'}</span>} />
               <Row label="Registration Source" value={m.registrationSource === 'mobile' ? 'Mobile App' : 'Web Dashboard'} />
               <Row label="Registered" value={fmtDate(m.createdAt)} />
