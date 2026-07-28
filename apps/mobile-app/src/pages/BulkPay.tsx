@@ -144,7 +144,6 @@ export default function BulkPay() {
   const [showAuthorize, setShowAuthorize] = useState(false);
   const [showReceipts, setShowReceipts] = useState(false);
   const [showCsvUpload, setShowCsvUpload] = useState(false);
-  const [showFunding, setShowFunding] = useState(false);
   const [showBatchDetails, setShowBatchDetails] = useState<BatchHistory | null>(null);
   const [showFundingSourceSelect, setShowFundingSourceSelect] = useState(false);
   const [showSecurity, setShowSecurity] = useState(false);
@@ -199,14 +198,6 @@ export default function BulkPay() {
   const [batchHistory, setBatchHistory] = useState<BatchHistory[]>([]);
   const [batchFilter, setBatchFilter] = useState('All');
   const [batchPage, setBatchPage] = useState(1);
-
-  // Funding — mirrors the dashboard's Fund Account modal, which is itself
-  // not wired to any real backend endpoint (no funding API exists); this is
-  // a simulated top-up flow for UI parity, same as the dashboard.
-  const [fundStep, setFundStep] = useState<1 | 2 | 3 | 4>(1);
-  const [fundingAmount, setFundingAmount] = useState('');
-  const [fundingMethod, setFundingMethod] = useState('Mobile Money');
-  const [fundingPhone, setFundingPhone] = useState('');
 
   // PIN flows
   const [setupPin, setSetupPin] = useState('');
@@ -1132,13 +1123,6 @@ export default function BulkPay() {
                 <Feather name={csvUploadLoading ? 'loader' : 'upload'} size={16} color="#1e40af" />
                 <Text className="text-[#1e40af] font-jakarta-bold text-[12px]">{csvUploadLoading ? 'Uploading' : 'CSV'}</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => { setFundStep(1); setFundingAmount(''); setFundingPhone(''); setShowFunding(true); }}
-                className="flex-1 bg-[#fef3e7] rounded-2xl p-3.5 flex-row items-center justify-center gap-2 border border-[#fed7aa]"
-              >
-                <Feather name="plus-circle" size={16} color="#b87333" />
-                <Text className="text-[#b87333] font-jakarta-bold text-[12px]">Fund</Text>
-              </TouchableOpacity>
               <TouchableOpacity onPress={fetchBatches} className="flex-1 bg-[#e7f8ef] rounded-2xl p-3.5 flex-row items-center justify-center gap-2 border border-[#bbf7d0]">
                 <Feather name="refresh-cw" size={16} color="#006c4e" />
                 <Text className="text-[#006c4e] font-jakarta-bold text-[12px]">Refresh</Text>
@@ -1718,133 +1702,6 @@ export default function BulkPay() {
                     )}
                   </TouchableOpacity>
                 </>
-              )}
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      {/* ── Fund Account Modal ── */}
-      <Modal visible={showFunding} transparent animationType="slide" onRequestClose={() => setShowFunding(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
-          <View className="flex-1 justify-end bg-black/50">
-            <TouchableOpacity className="absolute inset-0" activeOpacity={1} onPress={() => setShowFunding(false)} />
-            <View className="w-full max-w-lg mx-auto bg-white rounded-t-[36px] px-6 pt-4 pb-8 mt-auto">
-              <View className="items-center mb-4"><View className="w-12 h-1.5 bg-[#e7ece7] rounded-full" /></View>
-              <View className="flex-row items-center justify-between mb-6">
-                <View>
-                  <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[22px] text-[#0c2010]">Fund Account</Text>
-                  <Text className="text-[#707971] font-jakarta-medium text-[11px] mt-0.5">
-                    {fundStep === 1 ? 'Select Funding Method' : fundStep === 2 ? 'Enter Details' : fundStep === 3 ? 'Confirm Funding' : 'Funding Successful'}
-                  </Text>
-                </View>
-                <TouchableOpacity onPress={() => setShowFunding(false)} className="w-9 h-9 rounded-full bg-[#f7faf7] items-center justify-center">
-                  <Feather name="x" size={16} color="#0c2010" />
-                </TouchableOpacity>
-              </View>
-
-              {fundStep === 1 && (
-                <View className="gap-3">
-                  {[
-                    { id: 'Virtual Account Transfer', icon: 'home' as const, desc: 'Transfer to your dedicated USD/KES account' },
-                    { id: 'Mobile Money', icon: 'smartphone' as const, desc: 'M-Pesa, Airtel Money' },
-                    { id: 'Card Top-up', icon: 'credit-card' as const, desc: 'Visa / Mastercard' },
-                  ].map((method) => (
-                    <TouchableOpacity
-                      key={method.id}
-                      onPress={() => { setFundingMethod(method.id); setFundStep(2); }}
-                      className="flex-row items-center gap-4 p-4 rounded-2xl border border-[#e7ece7]"
-                    >
-                      <View className="w-12 h-12 rounded-xl bg-[#f7faf7] items-center justify-center">
-                        <Feather name={method.icon} size={20} color="#00351d" />
-                      </View>
-                      <View className="flex-1">
-                        <Text className="font-jakarta-bold text-[13px] text-[#0c2010]">{method.id}</Text>
-                        <Text className="text-[#707971] font-jakarta-medium text-[10px] mt-0.5">{method.desc}</Text>
-                      </View>
-                      <Feather name="chevron-right" size={18} color="#bfc9bf" />
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-
-              {fundStep === 2 && (
-                <View className="gap-5">
-                  <View>
-                    <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#707971] mb-2 ml-1">Amount (KES)</Text>
-                    <TextInput
-                      value={fundingAmount}
-                      onChangeText={setFundingAmount}
-                      keyboardType="numeric"
-                      placeholder="e.g. 50,000"
-                      placeholderTextColor="#a1a1aa"
-                      className="bg-white border border-[#bfc9bf]/30 rounded-2xl px-5 py-4 text-[15px] font-jakarta-bold text-[#0c2010]"
-                    />
-                  </View>
-                  {fundingMethod === 'Mobile Money' && (
-                    <View>
-                      <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#707971] mb-2 ml-1">Phone Number</Text>
-                      <TextInput
-                        value={fundingPhone}
-                        onChangeText={setFundingPhone}
-                        keyboardType="phone-pad"
-                        placeholder="07XX XXX XXX"
-                        placeholderTextColor="#a1a1aa"
-                        className="bg-white border border-[#bfc9bf]/30 rounded-2xl px-5 py-4 text-[15px] font-jakarta-bold text-[#0c2010]"
-                      />
-                    </View>
-                  )}
-                  <View className="flex-row gap-3 pt-2">
-                    <TouchableOpacity onPress={() => setFundStep(1)} className="flex-1 py-4 rounded-2xl border border-[#e7ece7] items-center">
-                      <Text className="font-jakarta-bold text-[13px] text-[#0c2010]">Back</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => setFundStep(3)}
-                      disabled={!fundingAmount}
-                      className="flex-[2] py-4 rounded-2xl bg-[#00351d] items-center"
-                      style={{ opacity: fundingAmount ? 1 : 0.5 }}
-                    >
-                      <Text className="font-jakarta-bold text-[13px] text-white">Next Step</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
-
-              {fundStep === 3 && (
-                <View className="items-center py-4">
-                  <View className="w-20 h-20 rounded-full bg-[#e7f8ef] items-center justify-center mb-6">
-                    <Feather name="credit-card" size={30} color="#006c4e" />
-                  </View>
-                  <Text className="font-jakarta-bold text-[18px] text-[#0c2010] mb-1">Confirm Funding</Text>
-                  <Text className="text-[#707971] font-jakarta-medium text-[13px] mb-4">You are about to deposit</Text>
-                  <Text className="font-jakarta-extrabold text-[32px] text-[#0c2010] tracking-tight mb-1">{formatKES(Number(fundingAmount) || 0)}</Text>
-                  <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#707971]">via {fundingMethod}</Text>
-                  <View className="flex-row gap-3 pt-10 w-full">
-                    <TouchableOpacity onPress={() => setFundStep(2)} className="flex-1 py-4 rounded-2xl border border-[#e7ece7] items-center">
-                      <Text className="font-jakarta-bold text-[13px] text-[#0c2010]">Back</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => setFundStep(4)} className="flex-[2] py-4 rounded-2xl bg-[#00351d] items-center">
-                      <Text className="font-jakarta-bold text-[13px] text-white">Pay Now</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
-
-              {fundStep === 4 && (
-                <View className="items-center py-6">
-                  <View className="w-24 h-24 rounded-full bg-[#e7f8ef] items-center justify-center mb-6">
-                    <Feather name="check" size={40} color="#006c4e" />
-                  </View>
-                  <Text className="font-jakarta-extrabold text-[20px] text-[#0c2010] mb-2">Funds Received!</Text>
-                  <Text className="text-[#707971] font-jakarta-medium text-[13px] text-center mb-6">Your liquidity has been topped up successfully.</Text>
-                  <View className="bg-[#e7f8ef] rounded-2xl px-6 py-4 items-center mb-8">
-                    <Text className="text-[9px] font-jakarta-extrabold uppercase tracking-widest text-[#006c4e] mb-1">New Balance</Text>
-                    <Text className="font-jakarta-extrabold text-[22px] text-[#006c4e]">{formatKES(balance + (Number(fundingAmount) || 0))}</Text>
-                  </View>
-                  <TouchableOpacity onPress={() => setShowFunding(false)} className="w-full py-4 rounded-2xl bg-[#00351d] items-center">
-                    <Text className="font-jakarta-bold text-[13px] text-white">Continue to Bulk Pay</Text>
-                  </TouchableOpacity>
-                </View>
               )}
             </View>
           </View>

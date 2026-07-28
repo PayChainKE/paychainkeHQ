@@ -1083,13 +1083,6 @@ export default function Wallet() {
                 /* Selection List */
                 <div className="space-y-4">
                   {[
-                    { 
-                      id: 'virtual', 
-                      name: 'Virtual Account Transfer', 
-                      desc: 'Transfer to your dedicated USD/KES account', 
-                      icon: 'account_balance',
-                      color: 'bg-blue-50 text-blue-600 border-blue-100'
-                    },
                     {
                       id: 'mobile',
                       name: 'Mobile Money',
@@ -1115,66 +1108,6 @@ export default function Wallet() {
                       <span className="material-symbols-outlined text-primary/20 group-hover:text-primary group-hover:translate-x-1 transition-all">chevron_right</span>
                     </div>
                   ))}
-                </div>
-              ) : selectedFundingMethod.id === 'virtual' ? (
-                /* Virtual Account Detail */
-                <div className="space-y-8 animate-fade-in-up">
-                  <div className="bg-blue-50/50 p-6 rounded-3xl border border-blue-100 flex items-start gap-4">
-                    <span className="material-symbols-outlined text-blue-600 mt-1">info</span>
-                    <p className="text-xs md:text-sm text-blue-900 leading-relaxed font-medium">
-                      Funds transferred to these accounts will reflect in your wallet within <span className="font-bold">2-5 minutes</span> once the transaction is verified.
-                    </p>
-                  </div>
-                  
-                  <div className="space-y-6">
-                    <div className="p-6 rounded-3xl bg-white border border-outline-variant/10 shadow-sm relative overflow-hidden group">
-                      <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                         <span className="material-symbols-outlined text-6xl">account_balance</span>
-                      </div>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-primary/40 mb-4">Dedicated KES Settlement Account</p>
-                      <div className="flex justify-between items-end">
-                        <div>
-                          <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest opacity-40 mb-1">Bank Name</p>
-                          <p className="text-sm font-bold text-primary mb-3">PayChain Commercial Bank</p>
-                          <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest opacity-40 mb-1">Account Number</p>
-                          <p className="text-xl md:text-2xl font-headline font-bold text-primary tracking-widest">994 0023 4455</p>
-                        </div>
-                        <button 
-                          onClick={() => {
-                            navigator.clipboard.writeText('99400234455')
-                            addToast({ title: 'Copied', message: 'Account number copied to clipboard', type: 'success' })
-                          }}
-                          className="px-4 py-2 bg-primary text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg hover:shadow-xl active:scale-95 transition-all"
-                        >
-                          Copy
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="p-6 rounded-3xl bg-white border border-outline-variant/10 shadow-sm relative overflow-hidden group">
-                      <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                         <span className="material-symbols-outlined text-6xl">public</span>
-                      </div>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-primary/40 mb-4">Dedicated USD Settlement Account (Global)</p>
-                      <div className="flex justify-between items-end">
-                        <div>
-                          <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest opacity-40 mb-1">Bank Name</p>
-                          <p className="text-sm font-bold text-primary mb-3">Stellar Global Trust</p>
-                          <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest opacity-40 mb-1">SWIFT / Routing</p>
-                          <p className="text-xl md:text-2xl font-headline font-bold text-primary tracking-widest uppercase">PCN-US-88229</p>
-                        </div>
-                        <button 
-                          onClick={() => {
-                            navigator.clipboard.writeText('PCN-US-88229')
-                            addToast({ title: 'Copied', message: 'Routing ID copied to clipboard', type: 'success' })
-                          }}
-                          className="px-4 py-2 bg-primary text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg hover:shadow-xl active:scale-95 transition-all"
-                        >
-                          Copy
-                        </button>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               ) : selectedFundingMethod.id === 'mobile' ? (
                 /* Mobile Money Detail */
