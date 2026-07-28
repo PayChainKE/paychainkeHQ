@@ -668,12 +668,17 @@ export default function DigitalWallet({ navigation }: any) {
                 </Text>
               </View>
             </View>
-            {merchant?.ncbaVirtualAccountNumber ? (
+            {/* Full NCBA virtual account is null until NCBA assigns the
+                institution prefix — falls back to the 8-digit merchant
+                code, already safe to use (matched inside NCBA's Narrative
+                field), before showing a true pending state. */}
+            {(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode) ? (
               <View className="flex-row items-center justify-between bg-[#f0fdf4] rounded-2xl px-5 py-4">
-                <Text className="font-jakarta-extrabold text-[16px] text-[#00351d] tracking-widest">{merchant.ncbaVirtualAccountNumber}</Text>
+                <Text className="font-jakarta-extrabold text-[16px] text-[#00351d] tracking-widest">{merchant.ncbaVirtualAccountNumber || merchant.ncbaMerchantCode}</Text>
                 <TouchableOpacity
                   onPress={async () => {
-                    await Clipboard.setStringAsync(merchant.ncbaVirtualAccountNumber);
+                    const value = merchant.ncbaVirtualAccountNumber || merchant.ncbaMerchantCode;
+                    await Clipboard.setStringAsync(value);
                     Alert.alert('Copied', 'NCBA account number copied to clipboard.');
                   }}
                   activeOpacity={0.85}

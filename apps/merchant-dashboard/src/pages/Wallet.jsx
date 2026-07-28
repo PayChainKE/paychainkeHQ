@@ -965,12 +965,17 @@ export default function Wallet() {
                     </div>
                   </div>
                   <div className="w-full md:w-auto shrink-0">
-                    {merchant?.ncbaVirtualAccountNumber ? (
+                    {/* Full NCBA virtual account is null until NCBA assigns the
+                        institution prefix — falls back to the 8-digit merchant
+                        code, already safe to use (matched inside NCBA's
+                        Narrative field), before showing a true pending state. */}
+                    {(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode) ? (
                       <div className="flex items-center gap-3 bg-surface-container-low rounded-2xl px-5 py-4">
-                        <span className="font-mono text-lg md:text-xl font-bold text-primary tracking-widest">{merchant.ncbaVirtualAccountNumber}</span>
+                        <span className="font-mono text-lg md:text-xl font-bold text-primary tracking-widest">{merchant.ncbaVirtualAccountNumber || merchant.ncbaMerchantCode}</span>
                         <button
                           onClick={() => {
-                            navigator.clipboard.writeText(merchant.ncbaVirtualAccountNumber)
+                            const value = merchant.ncbaVirtualAccountNumber || merchant.ncbaMerchantCode
+                            navigator.clipboard.writeText(value)
                             addToast({ title: 'Copied', message: 'NCBA account number copied to clipboard', type: 'success' })
                           }}
                           className="p-2 rounded-xl bg-primary text-white hover:opacity-90 transition-all"

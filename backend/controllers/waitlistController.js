@@ -283,7 +283,7 @@ export const convertWaitlistEntry = async (req, res) => {
     });
 
     const setupLink = `${MERCHANT_DASHBOARD_URL.replace(/\/$/, '')}/setup-password?token=${rawToken}`;
-    sendMerchantInvite(entry.email, entry.fullName, entry.businessName, paybillAccount, setupLink, getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode))
+    sendMerchantInvite(entry.email, entry.fullName, entry.businessName, paybillAccount, setupLink, getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode), merchant.ncbaMerchantCode)
       .catch((err) => console.error('Convert: invite email failed:', err));
 
     entry.status = 'converted';

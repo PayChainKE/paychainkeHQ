@@ -25,15 +25,17 @@ export default function MyAccountsTab() {
       service: 'NCBA Bank',
       // ncbaVirtualAccountNumber is null until NCBA_INSTITUTION_PREFIX is
       // configured on the backend (i.e. until NCBA assigns PayChain's
-      // 4-digit institution code) — show a pending state, not an error.
-      accountNumber: merchant?.ncbaVirtualAccountNumber || 'Pending bank assignment',
+      // 4-digit institution code) — falls back to the 8-digit merchant
+      // code, already safe to use as an interim account number (PayChain's
+      // webhook matches it inside NCBA's Narrative field).
+      accountNumber: merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending bank assignment',
       type: 'M-Pesa / Bank / EFT / PesaLink',
       name: merchant?.businessName || 'Merchant',
       // NCBA's real M-Pesa Paybill business number — how a customer sends
       // money into the account number above via M-Pesa.
       linkedTransferAccount: 'M-Pesa Paybill 880100',
       manager: merchant?.name || 'Owner',
-      status: merchant?.ncbaVirtualAccountNumber ? 'Active' : 'Pending'
+      status: (merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode) ? 'Active' : 'Pending'
     }
   ];
 

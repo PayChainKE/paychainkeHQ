@@ -284,9 +284,15 @@ export const sendWalletActivationEmail = async (email, name, stellarPublicKey) =
 // getNcbaVirtualAccountNumber. Null until NCBA_INSTITUTION_PREFIX is
 // configured (NCBA hasn't assigned it yet); rendered as a pending state
 // rather than a fake/placeholder number.
-export const sendWelcomeEmail = async (email, name, password, phone, paybillAccount, ncbaVirtualAccountNumber) => {
+export const sendWelcomeEmail = async (email, name, password, phone, paybillAccount, ncbaVirtualAccountNumber, ncbaMerchantCode) => {
   const firstName = (name || '').split(' ')[0] || 'Merchant';
-  const accountDisplay = ncbaVirtualAccountNumber || 'Pending assignment';
+  // Full 12-digit virtual account is unavailable until NCBA assigns the
+  // institution prefix — until then, customers can pay using the 8-digit
+  // merchant code alone as the Account Number; PayChain's webhook matches
+  // it inside NCBA's Narrative field the same way it does for test
+  // attribution (see Merchants.jsx's "NCBA Merchant Code" admin view).
+  const accountDisplay = ncbaVirtualAccountNumber || ncbaMerchantCode || 'Pending assignment';
+  const accountIsInterim = !ncbaVirtualAccountNumber && !!ncbaMerchantCode;
   try {
     const data = await resend.emails.send({
       from: 'PayChain <info@paychain.co.ke>',
@@ -330,12 +336,14 @@ export const sendWelcomeEmail = async (email, name, password, phone, paybillAcco
                   </td>
                   <td width="50%" style="padding-left:28px;">
                     <p style="margin:0 0 6px;font-size:10px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:rgba(255,255,255,0.45);">Account Number</p>
-                    <p style="margin:0;font-size:${ncbaVirtualAccountNumber ? '34px' : '18px'};font-weight:800;color:#ffffff;letter-spacing:2px;font-family:monospace;">${accountDisplay}</p>
+                    <p style="margin:0;font-size:${accountDisplay === 'Pending assignment' ? '18px' : '34px'};font-weight:800;color:#ffffff;letter-spacing:2px;font-family:monospace;">${accountDisplay}</p>
                   </td>
                 </tr>
               </table>
               <p style="margin:20px 0 0;font-size:11px;color:rgba(255,255,255,0.35);font-weight:600;letter-spacing:0.05em;">
-                &#9432;&nbsp; This account number is unique to your business. Keep it safe.
+                ${accountIsInterim
+                  ? '&#9432;&nbsp; Temporary account number — will be upgraded automatically once your bank assigns your full account. Safe to share with customers now.'
+                  : '&#9432;&nbsp; This account number is unique to your business. Keep it safe.'}
               </p>
             </td>
           </tr>
@@ -565,7 +573,9 @@ export const sendAdminActionOTP = async (email, otp, actionLabel, target) => {
 
 // Send Merchant Invite (Admin-Onboarded) — credentialless invite with a
 // single-use, time-limited setup link. We never send the password in the email.
-export const sendMerchantInvite = async (email, name, businessName, paybillAccount, setupLink, ncbaVirtualAccountNumber) => {
+export const sendMerchantInvite = async (email, name, businessName, paybillAccount, setupLink, ncbaVirtualAccountNumber, ncbaMerchantCode) => {
+  const accountDisplay = ncbaVirtualAccountNumber || ncbaMerchantCode || 'Pending assignment';
+  const accountIsInterim = !ncbaVirtualAccountNumber && !!ncbaMerchantCode;
   try {
     const data = await resend.emails.send({
       from: 'PayChain Onboarding <info@paychain.co.ke>',
@@ -593,9 +603,11 @@ export const sendMerchantInvite = async (email, name, businessName, paybillAccou
               <h3 style="margin: 0 0 12px; color: #166534; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Your Payment Collection Details</h3>
               <div style="color: #14532d; font-size: 14px; line-height: 1.8;">
                 <p style="margin: 6px 0;"><strong>Paybill:</strong> 880100</p>
-                <p style="margin: 6px 0;"><strong>Account Number:</strong> ${ncbaVirtualAccountNumber || 'Pending assignment'}</p>
+                <p style="margin: 6px 0;"><strong>Account Number:</strong> ${accountDisplay}</p>
               </div>
-              <p style="margin: 12px 0 0; color: #15803d; font-size: 12px;">Share these with your customers to receive M-PESA payments directly into your PayChain wallet.</p>
+              <p style="margin: 12px 0 0; color: #15803d; font-size: 12px;">${accountIsInterim
+                ? 'Temporary account number — safe to share with customers now. It will be upgraded automatically once your bank assigns your full account.'
+                : 'Share these with your customers to receive M-PESA payments directly into your PayChain wallet.'}</p>
             </div>
 
             <div style="margin-top: 24px; padding: 16px; background: #fff7ed; border-radius: 10px; border: 1px solid #fed7aa;">
