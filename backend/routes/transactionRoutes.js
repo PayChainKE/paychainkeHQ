@@ -1,6 +1,6 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
-import { getTransactions, simulateIncomingPayment, swapKesToUsdc, activateWallet, getLiveRate, sendMoney, syncWalletBalance, generatePaymentLink, listPaymentLinks, getPaymentLink, processPaymentLink, emailStatement } from '../controllers/transactionController.js';
+import { getTransactions, simulateIncomingPayment, swapKesToUsdc, activateWallet, getLiveRate, sendMoney, syncWalletBalance, generatePaymentLink, listPaymentLinks, getPaymentLink, processPaymentLink, getMerchantByAccount, payToMerchantAccount, emailStatement } from '../controllers/transactionController.js';
 import { protectMerchant } from '../middleware/authMiddleware.js';
 import { generateToken } from '../controllers/mpesaController.js';
 
@@ -27,6 +27,19 @@ router.get('/payment-link', protectMerchant, listPaymentLinks);
 // Public Payment Link Routes
 router.get('/payment-link/:linkId', getPaymentLink);
 router.post('/payment-link/:linkId/pay', generateToken, processPaymentLink);
+
+// Public direct-account payment — powers the static "Settlement QR" on a
+// merchant's Wallet page (open amount, no pre-generated link), as opposed
+// to the fixed-amount PaymentLink routes above.
+const payAccountLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many payment attempts. Try again in 15 minutes.' },
+});
+router.get('/pay-account/:account', getMerchantByAccount);
+router.post('/pay-account/:account', payAccountLimiter, generateToken, payToMerchantAccount);
 
 router.post('/statement/email', protectMerchant, emailStatement);
 

@@ -76,7 +76,11 @@ export default function DigitalWallet({ navigation }: any) {
   const [isProcessingTopUp, setIsProcessingTopUp] = useState(false);
   const [stkStatusText, setStkStatusText] = useState('');
 
-  const qrData = `https://paychain.co.ke/pay/${merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || ''}`;
+  // app.paychain.co.ke, not the marketing site (paychain.co.ke) — that's
+  // where /pay/account/:account actually lives (merchant-dashboard's
+  // App.jsx). Previously pointed at the marketing site, which has no such
+  // route and would have 404'd on every scan.
+  const qrData = `https://app.paychain.co.ke/pay/account/${merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || ''}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrData)}&margin=10&bgcolor=FFFFFF&color=00351D`;
 
   const fetchData = useCallback(async () => {

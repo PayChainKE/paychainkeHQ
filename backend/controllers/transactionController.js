@@ -15,6 +15,21 @@ import { getCheckoutTotal } from '../utils/pricingEngine.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
+import { getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
+
+// Resolves either the 12-digit NCBA virtual account number or the 8-digit
+// interim merchant code (see getNcbaVirtualAccountNumber) to a merchant.
+// A 12-digit input's merchant code is always its last 8 digits, by
+// construction — same positional extraction used in
+// utils/ncbaAccountNotificationValidators.js.
+async function findMerchantByAccountNumber(account) {
+  const raw = String(account || '').trim();
+  let merchantCode = null;
+  if (/^\d{8}$/.test(raw)) merchantCode = raw;
+  else if (/^\d{12}$/.test(raw)) merchantCode = raw.slice(-8);
+  else return null;
+  return Merchant.findOne({ ncbaMerchantCode: merchantCode });
+}
 
 // @desc    Get merchant transactions
 // @route   GET /api/transactions
@@ -553,8 +568,8 @@ export const listPaymentLinks = async (req, res) => {
 export const getPaymentLink = async (req, res) => {
   try {
     const { linkId } = req.params;
-    const link = await PaymentLink.findOne({ linkId }).populate('merchantId', 'businessName paybillAccount');
-    
+    const link = await PaymentLink.findOne({ linkId }).populate('merchantId', 'businessName ncbaMerchantCode');
+
     if (!link) {
       return res.status(404).json({ error: 'Payment link not found or has expired.' });
     }
@@ -568,7 +583,12 @@ export const getPaymentLink = async (req, res) => {
       amount: link.amount,
       currency: link.currency,
       merchantName: link.merchantId.businessName,
-      account: link.merchantId.paybillAccount,
+      // Was merchant.paybillAccount (PayChain's internal 5-digit STK
+      // reference) mislabeled as "account" — same conflation bug fixed
+      // everywhere else this session. Customers here should see the real
+      // PayChain Account, not an internal reference that means nothing to
+      // them.
+      account: getNcbaVirtualAccountNumber(link.merchantId.ncbaMerchantCode) || link.merchantId.ncbaMerchantCode || 'Pending',
       expiresAt: link.expiresAt
     });
   } catch (error) {
@@ -709,6 +729,153 @@ export const processPaymentLink = async (req, res) => {
 
   } catch (error) {
     console.error('❌ Payment Link Processing Error:', error.response?.data || error.message);
+    res.status(400).json({ error: 'Failed to trigger payment on your phone.' });
+  }
+};
+
+// @desc    Look up a merchant by their PayChain Account number (the 12-digit
+//          NCBA virtual account, or the 8-digit interim merchant code before
+//          NCBA's institution prefix is assigned) — powers the static
+//          "Settlement QR" every merchant has on their Wallet page, as
+//          opposed to a one-off, fixed-amount PaymentLink above. The
+//          customer picks their own amount on the next screen.
+// @route   GET /api/transactions/pay-account/:account
+// @access  Public
+export const getMerchantByAccount = async (req, res) => {
+  try {
+    const merchant = await findMerchantByAccountNumber(req.params.account);
+    if (!merchant || merchant.status === 'locked') {
+      return res.status(404).json({ error: 'Account not found.' });
+    }
+    res.json({
+      success: true,
+      merchantName: merchant.businessName,
+      account: getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode) || merchant.ncbaMerchantCode,
+    });
+  } catch (error) {
+    console.error('❌ Error fetching merchant by account:', error);
+    res.status(500).json({ error: 'Failed to fetch account details.' });
+  }
+};
+
+// @desc    Pay an arbitrary amount directly to a merchant's PayChain Account
+//          number — the open-amount counterpart to processPaymentLink above
+//          (which settles one specific, pre-set-amount link). Reuses the
+//          exact same STKRequest + stkCallback machinery: creating the
+//          STKRequest with no linkId routes the confirmation through
+//          stkCallback's plain-wallet-top-up branch, crediting this
+//          merchant directly — no new completion-handling logic needed.
+// @route   POST /api/transactions/pay-account/:account
+// @access  Public
+export const payToMerchantAccount = async (req, res) => {
+  try {
+    const merchant = await findMerchantByAccountNumber(req.params.account);
+    if (!merchant || merchant.status === 'locked') {
+      return res.status(404).json({ error: 'Account not found.' });
+    }
+
+    const amount = Number(req.body.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ error: 'Enter a valid amount.' });
+    }
+
+    let formattedPhone = String(req.body.phone || '').trim();
+    if (formattedPhone.startsWith('0')) formattedPhone = '254' + formattedPhone.slice(1);
+    if (formattedPhone.startsWith('+')) formattedPhone = formattedPhone.slice(1);
+
+    const checkoutTotal = getCheckoutTotal(amount);
+
+    // ── SANDBOX MODE — mirrors processPaymentLink's sandbox branch exactly. ──
+    if (!isLive) {
+      const checkoutRequestId = `SANDBOX-ACCT-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+      console.log(`🧪 [SANDBOX] Simulating direct-account STK Push for ${formattedPhone} KES ${checkoutTotal} → merchant ${merchant._id}`);
+
+      await STKRequest.create({
+        merchantId: merchant._id,
+        checkoutRequestId,
+        amount: checkoutTotal,
+        phone: formattedPhone,
+        status: 'pending',
+      });
+
+      setTimeout(() => {
+        const fakeReq = {
+          body: {
+            Body: {
+              stkCallback: {
+                CheckoutRequestID: checkoutRequestId,
+                ResultCode: 0,
+                ResultDesc: 'Sandbox simulation — no real money moved',
+                CallbackMetadata: { Item: [{ Name: 'MpesaReceiptNumber', Value: `SBXACCT-${checkoutRequestId.slice(-8)}` }] },
+              },
+            },
+          },
+        };
+        const fakeRes = { status: () => ({ json: () => {} }) };
+        stkCallback(fakeReq, fakeRes).catch((e) => console.error('❌ [SANDBOX] Direct-account auto-confirm error:', e.message));
+      }, 4000);
+
+      return res.status(200).json({
+        success: true,
+        checkoutRequestId,
+        message: '[Sandbox] STK simulated — funds will confirm in ~4 seconds. No real money moved.',
+      });
+    }
+
+    // ── LIVE MODE ─────────────────────────────────────────────────────────
+    if (process.env.MPESA_LIVE_ENABLED !== 'true') {
+      return res.status(503).json({ error: 'Live M-PESA payments are not enabled. Set MPESA_LIVE_ENABLED=true to activate.' });
+    }
+    if (!shortCode || !passkey) {
+      return res.status(500).json({ error: 'STK Push not fully configured (MPESA_SHORTCODE / MPESA_PASSKEY missing).' });
+    }
+    if (!callbackBase) {
+      return res.status(500).json({ error: 'MPESA_CALLBACK_URL is not set.' });
+    }
+
+    const token = req.mpesaToken;
+
+    const date = new Date();
+    const timestamp = date.getFullYear() +
+      ('0' + (date.getMonth() + 1)).slice(-2) +
+      ('0' + date.getDate()).slice(-2) +
+      ('0' + date.getHours()).slice(-2) +
+      ('0' + date.getMinutes()).slice(-2) +
+      ('0' + date.getSeconds()).slice(-2);
+
+    const password = Buffer.from(`${shortCode}${passkey}${timestamp}`).toString('base64');
+
+    const data = {
+      BusinessShortCode: shortCode,
+      Password: password,
+      Timestamp: timestamp,
+      TransactionType: 'CustomerPayBillOnline',
+      Amount: checkoutTotal,
+      PartyA: formattedPhone,
+      PartyB: shortCode,
+      PhoneNumber: formattedPhone,
+      CallBackURL: `${callbackBase}/api/callbacks/stk-callback`,
+      AccountReference: `Acct ${req.params.account}`,
+      TransactionDesc: 'Direct Account Payment',
+    };
+
+    const response = await axios.post(`${mpesaBaseUrl}/mpesa/stkpush/v1/processrequest`, data, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    const checkoutRequestId = response.data.CheckoutRequestID;
+    await STKRequest.create({
+      merchantId: merchant._id,
+      checkoutRequestId,
+      amount: checkoutTotal,
+      phone: formattedPhone,
+      status: 'pending',
+    });
+
+    res.status(200).json({ success: true, checkoutRequestId, message: 'STK Push sent to phone' });
+
+  } catch (error) {
+    console.error('❌ Direct Account Payment Error:', error.response?.data || error.message);
     res.status(400).json({ error: 'Failed to trigger payment on your phone.' });
   }
 };

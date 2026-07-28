@@ -18,6 +18,7 @@ import Wallet from './pages/Wallet'
 import SendMoney from './pages/SendMoney'
 import RequestMoney from './pages/RequestMoney'
 import PaymentPage from './pages/PaymentPage'
+import PayAccountPage from './pages/PayAccountPage'
 import InvoiceView from './pages/InvoiceView'
 import ToastHost from './components/ui/Toast'
 import { Analytics as VercelAnalytics } from '@vercel/analytics/react'
@@ -74,6 +75,7 @@ export default function App(){
           <Routes>
             <Route path="/login" element={<LoginGuard><Login/></LoginGuard>} />
             <Route path="/setup-password" element={<SetupPassword/>} />
+            <Route path="/pay/account/:account" element={<PayAccountPage />} />
             <Route path="/pay/:linkId" element={<PaymentPage />} />
             <Route path="/invoice/:publicToken" element={<InvoiceView />} />
             <Route path="/" element={<Navigate to="/overview" replace />} />
