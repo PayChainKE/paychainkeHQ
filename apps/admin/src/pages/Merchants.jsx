@@ -1217,6 +1217,13 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
             <Section title="PayChain Account" icon="account_balance_wallet">
               <Row label="NCBA Paybill" value={<span className="font-mono">880100</span>} />
               <Row label="NCBA Account Number" value={<span className="font-mono font-bold text-base text-on-surface bg-surface-container-low px-2 py-1 rounded">{m.ncbaVirtualAccountNumber || 'Pending bank assignment'}</span>} />
+              {!m.ncbaVirtualAccountNumber && (
+                <Row label="NCBA Merchant Code" value={
+                  m.ncbaMerchantCode
+                    ? <span className="font-mono font-bold text-base text-on-surface bg-amber-50 text-amber-800 px-2 py-1 rounded" title="Use this in the Narrative/AccountNr field to test NCBA notification attribution before the institution prefix is assigned.">{m.ncbaMerchantCode}</span>
+                    : '— not assigned —'
+                } />
+              )}
               <Row label="PayChain Reference No." value={<span className="font-mono">{m.paybillAccount || '—'}</span>} />
               <Row label="Registration Source" value={m.registrationSource === 'mobile' ? 'Mobile App' : 'Web Dashboard'} />
               <Row label="Registered" value={fmtDate(m.createdAt)} />
