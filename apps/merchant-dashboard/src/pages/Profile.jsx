@@ -5,7 +5,7 @@ import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { ValidatedInput } from '../components/ValidatedInput'
 import { BiometricRegisterButton } from '../components/BiometricButton'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import axios from 'axios'
 
 const DEFAULT_SECURITY_QUESTIONS = [
@@ -47,6 +47,7 @@ export default function Profile() {
   const { showAmounts } = usePrivacyMode()
   const { merchant, logout, token } = useMerchantAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [name, setName] = useState(merchant?.name || 'Admin')
   const [email, setEmail] = useState(merchant?.email || 'admin@paychain.ke')
   const [kraPin, setKraPin] = useState(merchant?.kraPin || '')
@@ -78,6 +79,32 @@ export default function Profile() {
   const [kraPinLocked, setKraPinLocked] = useState(!!merchant?.kraPin)
   const [businessNumberLocked, setBusinessNumberLocked] = useState(!!merchant?.businessNumber)
   const toast = useToast()
+
+  // Arrived here from a "Complete Profile Now" prompt elsewhere (e.g. Bulk
+  // Pay gating on a missing KRA PIN / Business Number) — scroll straight to
+  // whichever of those fields is still actually empty and focus it, instead
+  // of leaving the merchant to hunt for it on a long settings page.
+  const focusFieldTargets = { kraPin: 'kra-pin-field', businessNumber: 'business-number-field' }
+  const focusInputTargets = { kraPin: 'kra-pin-input', businessNumber: 'business-number-input' }
+  const [highlightFields, setHighlightFields] = useState(() => {
+    const requested = location.state?.focusFields || []
+    return new Set(requested.filter((f) => !merchant?.[f]))
+  })
+
+  useEffect(() => {
+    if (highlightFields.size === 0) return
+    const firstField = Array.from(highlightFields)[0]
+    const fieldEl = document.getElementById(focusFieldTargets[firstField])
+    fieldEl?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    const focusTimer = setTimeout(() => {
+      document.getElementById(focusInputTargets[firstField])?.focus()
+    }, 400)
+    // Clears itself after a few seconds so the highlight reads as "look
+    // here" rather than a permanent, distracting decoration.
+    const clearTimer = setTimeout(() => setHighlightFields(new Set()), 5000)
+    return () => { clearTimeout(focusTimer); clearTimeout(clearTimer) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const fetchSecurityQuestions = useCallback(async () => {
     setIsLoadingQuestions(true)
@@ -362,7 +389,7 @@ export default function Profile() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-y-6 lg:gap-y-8 gap-x-12 mt-8 border-t border-slate-100 pt-8">
-                <div className="space-y-2 group">
+                <div id="kra-pin-field" className={`space-y-2 group rounded-2xl transition-all duration-500 ${highlightFields.has('kraPin') ? 'ring-2 ring-emerald-400 ring-offset-4 ring-offset-white' : ''}`}>
                   <div className="flex justify-between items-center pr-1">
                     <label className="text-[9px] text-on-surface-variant font-black uppercase tracking-[0.2em] pl-1 opacity-50 group-hover:opacity-100 transition-opacity">KRA PIN</label>
                     {kraPinLocked && (
@@ -373,9 +400,10 @@ export default function Profile() {
                   </div>
                   <div className="relative">
                     <ValidatedInput
+                      id="kra-pin-input"
                       kind="kraPin"
                       value={kraPin}
-                      onChange={(e) => setKraPin(e.target.value)}
+                      onChange={(e) => { setKraPin(e.target.value); setHighlightFields((prev) => { if (!prev.has('kraPin')) return prev; const next = new Set(prev); next.delete('kraPin'); return next }) }}
                       placeholder="e.g. P123456789A"
                       disabled={kraPinLocked}
                       className={`w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none ${kraPinLocked ? 'opacity-60 bg-slate-50 cursor-not-allowed pr-32' : 'pr-32'}`}
@@ -394,7 +422,7 @@ export default function Profile() {
                   </div>
                 </div>
 
-                <div className="space-y-2 group">
+                <div id="business-number-field" className={`space-y-2 group rounded-2xl transition-all duration-500 ${highlightFields.has('businessNumber') ? 'ring-2 ring-emerald-400 ring-offset-4 ring-offset-white' : ''}`}>
                   <div className="flex justify-between items-center pr-1">
                     <label className="text-[9px] text-on-surface-variant font-black uppercase tracking-[0.2em] pl-1 opacity-50 group-hover:opacity-100 transition-opacity">Business / License Number</label>
                     {businessNumberLocked && (
@@ -405,10 +433,11 @@ export default function Profile() {
                   </div>
                   <div className="relative">
                     <ValidatedInput
+                      id="business-number-input"
                       kind="businessReg"
                       optional
                       value={businessNumber}
-                      onChange={(e) => setBusinessNumber(e.target.value)}
+                      onChange={(e) => { setBusinessNumber(e.target.value); setHighlightFields((prev) => { if (!prev.has('businessNumber')) return prev; const next = new Set(prev); next.delete('businessNumber'); return next }) }}
                       placeholder="e.g. PVT-XXXXXX"
                       disabled={businessNumberLocked}
                       className={`w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none ${businessNumberLocked ? 'opacity-60 bg-slate-50 cursor-not-allowed pr-10' : ''}`}
