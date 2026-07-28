@@ -126,7 +126,7 @@ export default function Wallet() {
         }, {
           headers: { Authorization: `Bearer ${token}` }
         })
-        addToast({ title: 'Withdrawal Submitted', message: `KES ${withdrawAmount} sent via NCBA PesaLink.`, type: 'success' })
+        addToast({ title: 'Withdrawal Submitted', message: `KES ${withdrawAmount} sent via PesaLink.`, type: 'success' })
         setWithdrawPin('')
       } else {
         await axios.post(`${API_URL}/api/transactions/send-money`, {

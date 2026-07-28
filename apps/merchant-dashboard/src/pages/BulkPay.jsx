@@ -1032,7 +1032,7 @@ export default function BulkPay() {
                             className="w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 md:px-6 md:py-4 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none"
                           />
                           <p className="text-[10px] text-on-surface-variant/50 font-medium ml-1">
-                            Paid directly via NCBA — no Settlement Method needed for {newPayee.utilityType}.
+                            Paid directly via PayChain — no Settlement Method needed for {newPayee.utilityType}.
                           </p>
                         </div>
                       ) : (
@@ -1398,7 +1398,7 @@ export default function BulkPay() {
                           </td>
                           <td className="px-6 py-4 border-r border-outline-variant/5">
                             <div className="flex flex-col">
-                              <span className="text-[10px] font-black text-primary/80 uppercase tracking-wider">{p.utilityProvider ? 'NCBA Bill Pay' : p.paymentMethod}</span>
+                              <span className="text-[10px] font-black text-primary/80 uppercase tracking-wider">{p.utilityProvider ? 'PayChain Bill Pay' : p.paymentMethod}</span>
                               <span className="text-[10px] font-medium text-on-surface-variant opacity-60 tabular-nums">{p.phone || p.paybillNumber || p.accountNumber}</span>
                             </div>
                           </td>
@@ -1447,7 +1447,7 @@ export default function BulkPay() {
                           </div>
                           <div>
                             <p className="text-[11px] font-bold text-primary leading-none">{p.name}</p>
-                            <p className="text-[8px] text-on-surface-variant font-bold uppercase tracking-widest mt-1 opacity-50">{p.utilityProvider ? 'NCBA Bill Pay' : p.paymentMethod}</p>
+                            <p className="text-[8px] text-on-surface-variant font-bold uppercase tracking-widest mt-1 opacity-50">{p.utilityProvider ? 'PayChain Bill Pay' : p.paymentMethod}</p>
                           </div>
                         </div>
                         {step === 1 && (
