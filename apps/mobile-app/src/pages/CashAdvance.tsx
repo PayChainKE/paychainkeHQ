@@ -294,7 +294,7 @@ export default function CashAdvance({ navigation }: any) {
               </View>
               <Text className="text-[22px] font-jakarta-extrabold text-[#00351d] mb-3 text-center">Applications Are Currently Paused</Text>
               <Text className="text-[15px] text-[#707971] font-jakarta-medium text-center leading-relaxed max-w-[280px] opacity-80 mb-6">
-                Cash advance applications aren't open for your account right now. Reach out to your PayChain account manager for details.
+                Cash advance applications aren't open for your account right now. Contact support for details.
               </Text>
               <TouchableOpacity
                 onPress={() => Linking.openURL('mailto:support@paychain.co.ke?subject=Cash%20Advance%20Application')}

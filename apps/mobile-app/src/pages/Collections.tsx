@@ -9,17 +9,22 @@ import * as Sharing from 'expo-sharing';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/config';
 import TopBar from '../components/layout/TopBar';
+import { isCreditTransaction as isInboundType, isDebitTransaction as isOutboundType, typeLabel as txTypeLabel } from '../utils/transactionDirection';
 
 type DateFilter = 'all' | 'today' | 'yesterday' | 'week' | 'last7' | 'month' | 'last30' | 'year' | 'custom';
-// Backend type enum: 'inbound' | 'outbound' | 'bulk_pay' | 'settlement' | 'fx_swap'
-// Dashboard groups bulk_pay + settlement + outbound under "Outbound"
+// Backend type enum includes the legacy 'inbound'/'outbound'/'bulk_pay'/
+// 'settlement' set plus 'ncba_inbound'/'ncba_outbound' — the type real,
+// live NCBA virtual account transactions actually use (see
+// utils/transactionDirection.ts, which both isInboundType/isOutboundType
+// below delegate to). Dashboard groups bulk_pay + settlement + outbound +
+// ncba_outbound under "Outbound".
 type TypeFilter = 'all' | 'inbound' | 'outbound' | 'fx_swap';
 // Backend status enum: 'pending' | 'completed' | 'failed' | 'verified'
 type StatusFilter = 'all' | 'completed' | 'pending' | 'failed';
 
 type Tx = {
   _id: string;
-  type: 'inbound' | 'outbound' | 'bulk_pay' | 'settlement' | 'fx_swap';
+  type: 'inbound' | 'outbound' | 'bulk_pay' | 'settlement' | 'fx_swap' | 'top_up' | 'withdrawal' | 'ncba_inbound' | 'ncba_outbound';
   status: 'pending' | 'completed' | 'failed' | 'verified';
   amount: number;
   kesAmount: number;
@@ -31,9 +36,6 @@ type Tx = {
   createdAt: string;
   accountNumber?: string;
 };
-
-const isOutboundType = (t: Tx['type']) => t === 'outbound' || t === 'bulk_pay' || t === 'settlement';
-const isInboundType = (t: Tx['type']) => t === 'inbound';
 
 const counterpartyName = (tx: Tx): string => {
   if (isInboundType(tx.type)) return tx.sender?.name || 'Unknown';
@@ -315,16 +317,6 @@ export default function Collections() {
     });
 
     const esc = (s: any) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const typeLabel = (t: Tx['type']) => {
-      switch (t) {
-        case 'inbound': return 'Inbound';
-        case 'outbound': return 'Outbound';
-        case 'bulk_pay': return 'Bulk Pay';
-        case 'settlement': return 'Settlement';
-        case 'fx_swap': return 'FX Swap';
-        default: return t;
-      }
-    };
 
     const rows = periodTxs
       .slice()
@@ -351,7 +343,7 @@ export default function Collections() {
               <div class="primary">${esc(counterpartyName(tx))}</div>
               <div class="muted">${esc(tx.reference || '—')}</div>
             </td>
-            <td class="type">${esc(typeLabel(tx.type))}</td>
+            <td class="type">${esc(txTypeLabel(tx.type))}</td>
             <td class="status">${esc((tx.status || 'completed').toUpperCase())}</td>
             <td class="amount" style="color: ${amtColor}">${amtText}</td>
           </tr>`;
@@ -479,7 +471,7 @@ export default function Collections() {
       </table>`}
 
   <div class="footer">
-    This statement is computer-generated and serves as a true record of activity on the named account for the period indicated. For queries, contact your PayChain account manager or email support@paychain.co.ke. Verified via Safaricom Daraja API.
+    This statement is computer-generated and serves as a true record of activity on the named account for the period indicated. For queries, contact PayChain support at support@paychain.co.ke or +254 790 889 066, Mon–Sat 7am–9pm. Verified via Safaricom Daraja API.
     <div class="signature">
       <div class="col">
         <div class="line">PayChain Operations</div>

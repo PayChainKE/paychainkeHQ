@@ -1,11 +1,17 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, Linking } from 'react-native';
 import { MaterialIcons, Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
+// Same real contact details as the merchant dashboard's Support page
+// (apps/merchant-dashboard/src/pages/Support.jsx) — single source of truth
+// so mobile and web never drift apart again.
+const SUPPORT_WHATSAPP_URL = 'https://wa.me/254790889066';
+const SUPPORT_EMAIL = 'support@paychain.co.ke';
+
 export default function SupportTab() {
   const [search, setSearch] = useState('');
-  
+
   const solutions = [
     { title: 'Payments failing', icon: 'error-outline', desc: 'Common issues with M-Pesa', color: '#e6f4ea', iconColor: '#006c4e' },
     { title: 'Cash Advance', icon: 'payments', desc: 'Eligibility and repayment', color: '#fef3c7', iconColor: '#d97706' },
@@ -15,8 +21,8 @@ export default function SupportTab() {
 
   const faqs = [
     { q: 'How do I withdraw my USDC balance?', a: 'You can swap USDC back to KES in the Inflation Shield page and then settle to your bank account.' },
-    { q: 'What are the transaction fees?', a: 'Paychain charges a flat 1.5% for collections and 0.5% for FX swaps. Bulk pay is free for employees.' },
-    { q: 'Is my data secure?', a: 'Yes, we use bank-level encryption and all transactions are verified on-chain for maximum security.' },
+    { q: 'What are the transaction fees?', a: 'PayChain adds a 0.5% margin on top of Safaricom\'s standard tariff for inbound payments, and a 2% spread on FX conversions. There\'s no flat rate.' },
+    { q: 'Is my data secure?', a: 'Your password and PIN are hashed, never stored or logged in plain text — not even our own team can read them.' },
   ];
 
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
@@ -102,10 +108,10 @@ export default function SupportTab() {
           <LinearGradient colors={['#00351d', '#001a0e']} className="p-8 relative">
             <View className="absolute bottom-0 right-0 w-48 h-48 bg-[#006c4e]/20 rounded-full -mr-16 -mb-16 blur-xl" />
             <Text className="font-jakarta-extrabold text-[28px] text-white mb-2 relative z-10 tracking-tight">Talk to us</Text>
-            <Text className="text-[13px] text-white/60 mb-8 relative z-10 leading-relaxed font-jakarta-medium">Our support team is available 24/7 to help you scale your business.</Text>
-            
+            <Text className="text-[13px] text-white/60 mb-8 relative z-10 leading-relaxed font-jakarta-medium">Our support team is here Mon–Sat, 7am–9pm, to help you scale your business.</Text>
+
             <View className="gap-4 relative z-10">
-              <TouchableOpacity className="w-full bg-white/10 p-4 rounded-2xl flex-row items-center justify-between border border-white/5 active:bg-white/20">
+              <TouchableOpacity onPress={() => Linking.openURL(SUPPORT_WHATSAPP_URL)} className="w-full bg-white/10 p-4 rounded-2xl flex-row items-center justify-between border border-white/5 active:bg-white/20">
                 <View className="flex-row items-center gap-4">
                   <View className="w-12 h-12 rounded-xl bg-[#006c4e] flex items-center justify-center shadow-lg shadow-[#006c4e]/50">
                     <MaterialIcons name="chat" size={24} color="white" />
@@ -117,15 +123,15 @@ export default function SupportTab() {
                 </View>
                 <Feather name="arrow-right" size={20} color="rgba(255,255,255,0.3)" />
               </TouchableOpacity>
-              
-              <TouchableOpacity className="w-full bg-white/10 p-4 rounded-2xl flex-row items-center justify-between border border-white/5 active:bg-white/20">
+
+              <TouchableOpacity onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`)} className="w-full bg-white/10 p-4 rounded-2xl flex-row items-center justify-between border border-white/5 active:bg-white/20">
                 <View className="flex-row items-center gap-4">
                   <View className="w-12 h-12 rounded-xl bg-blue-500/30 flex items-center justify-center shadow-lg shadow-blue-500/20">
                     <MaterialIcons name="mail" size={24} color="#93c5fd" />
                   </View>
                   <View>
                     <Text className="text-[15px] font-jakarta-extrabold text-white tracking-tight mb-0.5">Email Support</Text>
-                    <Text className="text-[11px] text-white/50 font-jakarta-medium">hello@paychainke.co</Text>
+                    <Text className="text-[11px] text-white/50 font-jakarta-medium">{SUPPORT_EMAIL}</Text>
                   </View>
                 </View>
                 <Feather name="arrow-right" size={20} color="rgba(255,255,255,0.3)" />
