@@ -960,7 +960,7 @@ export default function Wallet() {
                       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/40 mb-1">Bank Transfer · EFT · PesaLink</p>
                       <h3 className="font-headline text-lg md:text-xl text-primary tracking-tight">NCBA Virtual Account</h3>
                       <p className="text-xs text-on-surface-variant opacity-70 mt-1 max-w-md">
-                        Customers can also pay directly from their bank using this dedicated NCBA account number — funds reflect automatically once received.
+                        Customers can pay via M-Pesa Paybill <span className="font-bold text-primary">880100</span>, or transfer directly from their bank, using this dedicated NCBA account number — funds reflect automatically once received.
                       </p>
                     </div>
                   </div>

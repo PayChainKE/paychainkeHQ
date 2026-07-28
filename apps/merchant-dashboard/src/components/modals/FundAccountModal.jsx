@@ -246,12 +246,19 @@ export default function FundAccountModal({ method, onClose }) {
                   <span className="material-symbols-outlined text-emerald-600 shrink-0 text-base">info</span>
                   <p className="text-xs text-emerald-800 font-medium leading-relaxed">
                     {merchant?.ncbaVirtualAccountNumber
-                      ? 'Transfer to your dedicated PayChain account. Funds reflect automatically once cleared.'
+                      ? 'Pay via M-Pesa Paybill above, or transfer directly from your bank using this account number. Funds reflect automatically once cleared.'
                       : "Bank transfer isn't available on your account yet — your dedicated NCBA account is still being assigned."}
                   </p>
                 </div>
                 {[
-                  ['Bank', 'PayChain Kenya Bank Ltd'],
+                  ['Bank', 'NCBA Bank Kenya PLC'],
+                  // NCBA's real M-Pesa Paybill business number — this is how a
+                  // customer actually sends money into the NCBA account number
+                  // below via M-Pesa (Lipa na M-Pesa > Pay Bill > 880100 >
+                  // Account No. = the NCBA virtual account). Constant, not
+                  // merchant-specific — always show it, even while the account
+                  // number itself is still pending.
+                  ['Paybill Number', '880100'],
                   ['Account Name', merchant?.businessName],
                   // ncbaVirtualAccountNumber is null until NCBA_INSTITUTION_PREFIX is
                   // configured on the backend (i.e. until NCBA assigns PayChain's

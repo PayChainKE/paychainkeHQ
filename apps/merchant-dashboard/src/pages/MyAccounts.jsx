@@ -25,7 +25,11 @@ export default function MyAccounts() {
       accountNumber: merchant?.ncbaVirtualAccountNumber || 'Pending bank assignment',
       type: 'Bank Transfer / EFT / PesaLink',
       name: merchant?.businessName || 'Merchant',
-      linkedTransferAccount: '—',
+      // NCBA's real M-Pesa Paybill business number — how a customer sends
+      // money into the account number above via M-Pesa (Pay Bill > 880100 >
+      // Account No. = the NCBA virtual account above). Constant, not
+      // merchant-specific.
+      linkedTransferAccount: 'M-Pesa Paybill 880100',
       manager: merchant?.name || 'Owner',
       status: merchant?.ncbaVirtualAccountNumber ? 'Active' : 'Pending'
     }
