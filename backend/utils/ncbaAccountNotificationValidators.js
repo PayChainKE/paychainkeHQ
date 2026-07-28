@@ -64,42 +64,43 @@ function logStructuralConflict(fields) {
  * guide it's the field meant to carry "Paybill account number, Customer
  * Name etc." (it may also be blank).
  *
- * `PhoneNr` and `CustomerName` are consulted only as an explicit secondary
- * checkpoint, reached solely when Narrative is empty or does not
- * structurally contain a valid 8-digit code — they never override a
- * Narrative match. This matters because NCBA's guide documents both as
- * overloaded free text that can drift outside their nominal purpose:
- *   - PhoneNr: "phone number of the transaction initiator... may be
- *     occupied with the account ncba number... or may be blank"
- *   - CustomerName: "name of the transaction initiator... may be occupied
- *     with the transaction reference and the phone number of the sender"
- * PhoneNr is checked ahead of CustomerName in that checkpoint since it's
- * the more likely of the two to carry a numeric account reference.
+ * `CustomerName` is consulted only as an explicit secondary checkpoint,
+ * reached solely when Narrative is empty or does not structurally contain
+ * a valid 8-digit code — it never overrides a Narrative match. This
+ * matters because NCBA's guide documents it as overloaded free text that
+ * can drift outside its nominal purpose ("name of the transaction
+ * initiator... may be occupied with the transaction reference and the
+ * phone number of the sender").
  *
- * All three fields are independently scanned up front (regardless of which
- * one ultimately wins) purely to detect disagreement: if more than one
- * field carries a distinct 8-digit run, that's logged as a structural
- * conflict for manual review, since a payment that inconsistently quotes
- * two different-looking merchant codes across fields is exactly the kind
- * of case that leads to silent misattribution. Narrative's priority still
- * applies to which code is actually used — the conflict log is a red flag,
- * not a veto.
+ * `PhoneNr` is deliberately NOT consulted (dropped 2026-07-28, confirmed
+ * live with NCBA's integration team) — during UAT they've been sending
+ * PhoneNr as a real MSISDN or PayChain's settlement account number, never
+ * a merchant code, and per their own guide it's meant to carry "phone
+ * number of the transaction initiator." Treating it as a merchant-code
+ * source risked misreading an actual phone number as an account
+ * reference and misattributing the payment.
+ *
+ * Both fields are independently scanned up front (regardless of which one
+ * ultimately wins) purely to detect disagreement: if they carry distinct
+ * 8-digit runs, that's logged as a structural conflict for manual review,
+ * since a payment that inconsistently quotes two different-looking
+ * merchant codes is exactly the kind of case that leads to silent
+ * misattribution. Narrative's priority still applies to which code is
+ * actually used — the conflict log is a red flag, not a veto.
  *
  * Returns null (not a thrown error) if no field yields anything — the
  * caller should log this loudly, since it means a reconcilable credit
  * arrived that we couldn't attribute to any merchant.
  */
-export function extractMerchantCode({ narrative, phoneNr, customerName, transId } = {}) {
+export function extractMerchantCode({ narrative, customerName, transId } = {}) {
   const narrativeCode = findEightDigitCode(narrative, { allowTwelveDigitFallback: true });
-  const phoneCode = findEightDigitCode(phoneNr);
   const customerNameCode = findEightDigitCode(customerName);
 
-  const distinctCandidates = new Set([narrativeCode, phoneCode, customerNameCode].filter(Boolean));
+  const distinctCandidates = new Set([narrativeCode, customerNameCode].filter(Boolean));
   if (distinctCandidates.size > 1) {
     logStructuralConflict({
       transId: transId ?? null,
       narrativeCode,
-      phoneCode,
       customerNameCode,
     });
   }
@@ -111,9 +112,6 @@ export function extractMerchantCode({ narrative, phoneNr, customerName, transId 
 
   // Secondary checkpoint: only reached because Narrative was empty/blank
   // or structurally invalid (no 8-digit run found).
-  if (phoneCode) {
-    return phoneCode;
-  }
   if (customerNameCode) {
     return customerNameCode;
   }
