@@ -13,6 +13,7 @@ import Communication from '../models/Communication.js';
 import { sendMerchantInvite, sendAdminActionOTP } from '../utils/resend.js';
 import { logAudit } from '../utils/auditLog.js';
 import { getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
+import { LIVE_DATA_CUTOFF } from '../config/liveDataCutoff.js';
 
 // Build an `actor` shape from req.admin so audit rows attribute admin-initiated
 // actions to the right operator even when the merchant is the subject.
@@ -916,6 +917,15 @@ export const getInsights = async (req, res) => {
     // Previous period of equal length for delta computation.
     const prevSince = new Date(since.getTime() - days * 24 * 60 * 60 * 1000);
 
+    // Transaction-only clamp: the five weeks before LIVE_DATA_CUTOFF are
+    // pre-production sandbox/simulated transactions, never real money —
+    // every Transaction aggregation below uses these instead of the raw
+    // since/prevSince above. Deliberately NOT applied to the Merchant
+    // queries (newMerchantsCurr/Prev etc.) — real merchants genuinely did
+    // sign up during that window, that history is real and should count.
+    const txnSince = since.getTime() < LIVE_DATA_CUTOFF.getTime() ? LIVE_DATA_CUTOFF : since;
+    const txnPrevSince = prevSince.getTime() < LIVE_DATA_CUTOFF.getTime() ? LIVE_DATA_CUTOFF : prevSince;
+
     const pctChange = (curr, prev) => {
       if (!prev) return curr > 0 ? 100 : 0;
       return Number((((curr - prev) / prev) * 100).toFixed(1));
@@ -956,16 +966,16 @@ export const getInsights = async (req, res) => {
     // ── Transaction / GTV / GMV ────────────────────────────────────────────
     const [gtvCurr, gtvPrev, gtvSeries, lifetimeAgg] = await Promise.all([
       Transaction.aggregate([
-        { $match: { createdAt: { $gte: since }, status: { $in: ['completed', 'verified'] } } },
+        { $match: { createdAt: { $gte: txnSince }, status: { $in: ['completed', 'verified'] } } },
         { $group: { _id: null, count: { $sum: 1 }, kesVolume: kesVolReal, usdcVolume: usdcVolReal } },
       ]),
       Transaction.aggregate([
-        { $match: { createdAt: { $gte: prevSince, $lt: since }, status: { $in: ['completed', 'verified'] } } },
+        { $match: { createdAt: { $gte: txnPrevSince, $lt: txnSince }, status: { $in: ['completed', 'verified'] } } },
         { $group: { _id: null, count: { $sum: 1 }, kesVolume: kesVolReal, usdcVolume: usdcVolReal } },
       ]),
       // Daily volume series for the sparkline / area chart.
       Transaction.aggregate([
-        { $match: { createdAt: { $gte: since }, status: { $in: ['completed', 'verified'] } } },
+        { $match: { createdAt: { $gte: txnSince }, status: { $in: ['completed', 'verified'] } } },
         {
           $group: {
             _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
@@ -977,7 +987,7 @@ export const getInsights = async (req, res) => {
         { $sort: { _id: 1 } },
       ]),
       Transaction.aggregate([
-        { $match: { status: { $in: ['completed', 'verified'] } } },
+        { $match: { createdAt: { $gte: LIVE_DATA_CUTOFF }, status: { $in: ['completed', 'verified'] } } },
         { $group: { _id: null, count: { $sum: 1 }, kesVolume: kesVolReal, usdcVolume: usdcVolReal } },
       ]),
     ]);
@@ -1139,7 +1149,7 @@ export const getInsights = async (req, res) => {
     // ── Top merchants by volume ──────────────────────────────────────
     // ── Top merchants by volume ──────────────────────────────────────
     const topMerchantsRaw = await Transaction.aggregate([
-      { $match: { createdAt: { $gte: since }, status: { $in: ['completed', 'verified'] }, merchantId: { $ne: null } } },
+      { $match: { createdAt: { $gte: txnSince }, status: { $in: ['completed', 'verified'] }, merchantId: { $ne: null } } },
       {
         $group: {
           _id: '$merchantId',
@@ -1172,7 +1182,7 @@ export const getInsights = async (req, res) => {
     // ── Transaction type mix ─────────────────────────────────────────
     // All statuses included so fx_swap / settlement rows are never filtered out.
     const txnTypeMix = await Transaction.aggregate([
-      { $match: { createdAt: { $gte: since } } },
+      { $match: { createdAt: { $gte: txnSince } } },
       { $group: { _id: '$type', count: { $sum: 1 }, volume: kesVolReal } },
       { $sort: { volume: -1 } },
     ]);

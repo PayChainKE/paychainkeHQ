@@ -2,6 +2,7 @@ import Transaction from '../models/Transaction.js';
 import { REVENUE_STREAMS, SAFARICOM_TARIFF } from '../config/revenueRateCard.js';
 import { ncbaMarkupMongoExpr } from '../config/ncbaTariffCard.js';
 import { mpesaMerchantFeeMongoExpr } from '../utils/pricingEngine.js';
+import { LIVE_DATA_CUTOFF } from '../config/liveDataCutoff.js';
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 const RANGES = ['24h', '7d', '30d', '90d', 'ytd', 'all'];
@@ -17,10 +18,22 @@ const TYPE_TO_CHANNEL = {
   fx_swap:    'On-Chain (Stellar)',
 };
 
-// Corporate operating account where accumulated fees sweep to. Real-world
-// this would be configurable; for now PayChain ops uses a single Standard
-// Chartered USD operating account.
-const CORPORATE_DESTINATION = 'Standard Chartered — OpEx ·4829';
+// Corporate operating account where accumulated fees sweep to. Was a
+// fabricated placeholder ("Standard Chartered — OpEx ·4829") — PayChain
+// doesn't have this account. Now env-configurable like every other real
+// destination account in this codebase (e.g. NCBA_SETTLEMENT_ACCOUNT);
+// shows an honest pending state until the real one is set.
+const CORPORATE_DESTINATION = process.env.PAYCHAIN_CORPORATE_SWEEP_ACCOUNT || 'Not configured';
+
+// Every window this resolves to is clamped to LIVE_DATA_CUTOFF — the
+// five weeks of pre-production sandbox/simulated transactions before that
+// date should never appear in revenue figures, regardless of range or
+// prior-period comparison. Clamping both bounds here (rather than in each
+// individual query below) means every aggregation in this file inherits
+// the cutoff automatically.
+function clamp(date) {
+  return date.getTime() < LIVE_DATA_CUTOFF.getTime() ? LIVE_DATA_CUTOFF : date;
+}
 
 function resolveWindow(range) {
   const now = new Date();
@@ -28,18 +41,18 @@ function resolveWindow(range) {
     // Use the earliest possible — Mongo will still index-scan efficiently.
     const start = new Date('2020-01-01');
     const prev  = new Date('2019-01-01');
-    return { since: start, prevSince: prev };
+    return { since: clamp(start), prevSince: clamp(prev) };
   }
   if (range === 'ytd') {
     const start = new Date(now.getFullYear(), 0, 1);
     const lastYear = new Date(now.getFullYear() - 1, 0, 1);
-    return { since: start, prevSince: lastYear };
+    return { since: clamp(start), prevSince: clamp(lastYear) };
   }
   const map = { '24h': 1, '7d': 7, '30d': 30, '90d': 90 };
   const days = map[range] ?? 30;
   const since = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
   const prevSince = new Date(since.getTime() - days * 24 * 60 * 60 * 1000);
-  return { since, prevSince };
+  return { since: clamp(since), prevSince: clamp(prevSince) };
 }
 
 function bucketFormat(range) {
@@ -471,7 +484,7 @@ export const getRevenue = async (req, res) => {
     // daily run-rate × 365.
     let runRate;
     if (range === 'all' || range === 'ytd') {
-      const start = new Date(range === 'ytd' ? new Date().getFullYear() : 2020, 0, 1);
+      const start = clamp(new Date(range === 'ytd' ? new Date().getFullYear() : 2020, 0, 1));
       const days = Math.max(1, (Date.now() - start.getTime()) / (1000 * 60 * 60 * 24));
       runRate = (totalRevenue / days) * 365;
     } else {
