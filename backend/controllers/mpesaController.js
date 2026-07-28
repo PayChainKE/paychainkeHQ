@@ -14,6 +14,7 @@ import Invoice from '../models/Invoice.js';
 import { createNotification } from './notificationController.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
+import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard.js';
 
 // ── M-PESA configuration ──────────────────────────────────────────────────────
 // MPESA_ENVIRONMENT controls which Daraja endpoint is used.
@@ -739,10 +740,23 @@ import { generateSecurityCredential } from '../utils/safaricomCrypto.js';
 
 export const initiateB2C = async (req, res) => {
   let debited = false;
+  let totalDebit = 0;
   try {
     const token = req.mpesaToken;
     const { phone, amount, destination, pin } = req.body;
     const merchantId = req.merchant._id;
+
+    // Standard Safaricom M-Pesa B2C ("Business Bouquet") tariff — the real
+    // cost Safaricom charges PayChain per B2C payout, passed through to
+    // the merchant. No PayChain markup on top yet (PAYCHAIN_B2C_MARKUP is
+    // 0 until that's decided) — see config/mpesaB2cTariffCard.js.
+    let b2cFee;
+    try {
+      ({ totalFee: b2cFee } = getB2cTariff(amount));
+    } catch (e) {
+      if (e instanceof B2cTariffBoundsError) return res.status(400).json({ error: e.message });
+      throw e;
+    }
 
     // Safety: block live transactions unless explicitly enabled
     if (isLive && process.env.MPESA_LIVE_ENABLED !== 'true') {
@@ -772,14 +786,18 @@ export const initiateB2C = async (req, res) => {
     await resetPinAttempts(merchantId);
 
     // Atomic conditional deduct — avoids two concurrent B2C requests both
-    // passing a stale in-memory balance check and over-withdrawing.
+    // passing a stale in-memory balance check and over-withdrawing. Amount
+    // requested to Safaricom stays the raw `amount` (see Amount: amount
+    // below) — the fee is PayChain's own separate deduction, never sent
+    // to Daraja as part of the payout.
+    totalDebit = Math.round((Number(amount) + b2cFee) * 100) / 100;
     const merchant = await Merchant.findOneAndUpdate(
-      { _id: merchantId, kesBalance: { $gte: amount } },
-      { $inc: { kesBalance: -amount } },
+      { _id: merchantId, kesBalance: { $gte: totalDebit } },
+      { $inc: { kesBalance: -totalDebit } },
       { returnDocument: 'after' }
     );
     if (!merchant) {
-      return res.status(400).json({ error: 'Insufficient KES balance for this transfer' });
+      return res.status(400).json({ error: 'Insufficient KES balance for this transfer, including the M-Pesa B2C charge' });
     }
     debited = true;
 
@@ -830,9 +848,11 @@ export const initiateB2C = async (req, res) => {
   } catch (error) {
     console.error('❌ B2C Transfer Error:', error.response?.data || error);
     // Refund the merchant only if the deduction actually happened — an
-    // earlier failure (e.g. PIN check) never touched the balance.
-    if (debited && req.body.amount) {
-      await Merchant.findByIdAndUpdate(req.merchant._id, { $inc: { kesBalance: req.body.amount } });
+    // earlier failure (e.g. PIN check) never touched the balance. Refunds
+    // the full totalDebit (amount + B2C fee), matching what was actually
+    // reserved above.
+    if (debited && totalDebit > 0) {
+      await Merchant.findByIdAndUpdate(req.merchant._id, { $inc: { kesBalance: totalDebit } });
     }
     res.status(500).json({ error: error.response?.data?.errorMessage || 'Failed to initiate Daraja B2C transfer' });
   }

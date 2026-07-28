@@ -26,7 +26,7 @@ export default function MyAccounts() {
       // configured on the backend (i.e. until NCBA assigns PayChain's
       // 4-digit institution code) — show a pending state, not an error.
       accountNumber: merchant?.ncbaVirtualAccountNumber || 'Pending bank assignment',
-      type: 'Bank Transfer / EFT / PesaLink',
+      type: 'M-Pesa / Bank Transfer / EFT / PesaLink',
       name: merchant?.businessName || 'Merchant',
       // NCBA's real M-Pesa Paybill business number — how a customer sends
       // money into the account number above via M-Pesa (Pay Bill > 880100 >

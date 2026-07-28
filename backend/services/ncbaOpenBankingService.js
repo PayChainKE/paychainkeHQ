@@ -125,6 +125,17 @@ async function getAccessToken({ forceRefresh = false } = {}) {
  * than our conservative local TTL assumes).
  */
 async function ncbaOpenBankingPost(path, body, { retrying = false } = {}) {
+  // Every real call funnels through here — validatePesaLinkAccount,
+  // submitPesaLinkTransfer, and submitEftTransfer all end up needing
+  // PayChain's own NCBA account number (as SenderAccountNumber/
+  // DebitAccountNumber, or as the debitAccount fallback). Unlike
+  // ncbaBulkPaymentService.js's equivalent check, this used to be missing
+  // here — a blank value would silently ride along as `undefined` in the
+  // request body instead of failing clearly before ever reaching NCBA.
+  if (!ncbaOpenBankingAccountNumber) {
+    throw new NcbaOpenBankingAuthError('NCBA Open Banking is not fully configured (NCBA_OPENBANKING_ACCOUNT_NUMBER missing)');
+  }
+
   const { accessToken, tokenType } = await getAccessToken();
 
   try {

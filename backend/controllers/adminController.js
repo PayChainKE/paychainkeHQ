@@ -584,6 +584,13 @@ export const getMerchantDetail = async (req, res) => {
         certificateUrl: merchant.certificateUrl,
         // Account
         paybillAccount: merchant.paybillAccount,
+        // The raw 8-digit code NCBA's Account-Level Notification webhook
+        // matches against (extractMerchantCode in
+        // utils/ncbaAccountNotificationValidators.js) — needed for NCBA to
+        // test attribution against a real merchant even before the
+        // institution prefix is assigned, since ncbaVirtualAccountNumber
+        // below is null until then.
+        ncbaMerchantCode: merchant.ncbaMerchantCode,
         // Real bank account number, paid into via NCBA's Paybill (880100) —
         // null until NCBA_INSTITUTION_PREFIX is configured.
         ncbaVirtualAccountNumber: getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode),
