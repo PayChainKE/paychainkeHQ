@@ -193,6 +193,7 @@ export const getMerchants = async (req, res) => {
       delete m.passwordResetExpires;
       return {
         ...m,
+        ncbaVirtualAccountNumber: getNcbaVirtualAccountNumber(m.ncbaMerchantCode),
         txnCount30d:  t?.txnCount30d  || 0,
         txnCount24h:  t?.txnCount24h  || 0,
         volume30d:    t?.volume30d     || 0,

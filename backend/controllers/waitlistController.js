@@ -299,6 +299,8 @@ export const convertWaitlistEntry = async (req, res) => {
         waitlistId: entry._id,
         merchantId: merchant._id,
         paybillAccount,
+        ncbaMerchantCode: merchant.ncbaMerchantCode,
+        ncbaVirtualAccountNumber: getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode),
         email: entry.email,
       },
     });

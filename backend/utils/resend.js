@@ -335,7 +335,7 @@ export const sendWelcomeEmail = async (email, name, password, phone, paybillAcco
                     <p style="margin:0;font-size:34px;font-weight:800;color:#5EFEB3;letter-spacing:2px;font-family:monospace;">880100</p>
                   </td>
                   <td width="50%" style="padding-left:28px;">
-                    <p style="margin:0 0 6px;font-size:10px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:rgba(255,255,255,0.45);">Account Number</p>
+                    <p style="margin:0 0 6px;font-size:10px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:rgba(255,255,255,0.45);">PayChain Account</p>
                     <p style="margin:0;font-size:${accountDisplay === 'Pending assignment' ? '18px' : '34px'};font-weight:800;color:#ffffff;letter-spacing:2px;font-family:monospace;">${accountDisplay}</p>
                   </td>
                 </tr>
@@ -603,7 +603,7 @@ export const sendMerchantInvite = async (email, name, businessName, paybillAccou
               <h3 style="margin: 0 0 12px; color: #166534; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Your Payment Collection Details</h3>
               <div style="color: #14532d; font-size: 14px; line-height: 1.8;">
                 <p style="margin: 6px 0;"><strong>Paybill:</strong> 880100</p>
-                <p style="margin: 6px 0;"><strong>Account Number:</strong> ${accountDisplay}</p>
+                <p style="margin: 6px 0;"><strong>PayChain Account:</strong> ${accountDisplay}</p>
               </div>
               <p style="margin: 12px 0 0; color: #15803d; font-size: 12px;">${accountIsInterim
                 ? 'Temporary account number — safe to share with customers now. It will be upgraded automatically once your bank assigns your full account.'

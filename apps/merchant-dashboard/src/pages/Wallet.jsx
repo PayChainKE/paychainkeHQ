@@ -949,7 +949,7 @@ export default function Wallet() {
             </div>
           </section>
 
-              {/* Bank Transfer / EFT / PesaLink — NCBA Virtual Account */}
+              {/* Bank Transfer / EFT / PesaLink — PayChain Account */}
               <section className="col-span-12 bg-white rounded-[32px] lg:rounded-[40px] border border-outline-variant/5 shadow-sm overflow-hidden editorial-shadow animate-fade-in-up [animation-delay:175ms] p-6 md:p-8">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                   <div className="flex items-start gap-4">
@@ -958,9 +958,9 @@ export default function Wallet() {
                     </div>
                     <div>
                       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/40 mb-1">Bank Transfer · EFT · PesaLink</p>
-                      <h3 className="font-headline text-lg md:text-xl text-primary tracking-tight">NCBA Virtual Account</h3>
+                      <h3 className="font-headline text-lg md:text-xl text-primary tracking-tight">PayChain Account</h3>
                       <p className="text-xs text-on-surface-variant opacity-70 mt-1 max-w-md">
-                        Customers can pay via M-Pesa Paybill <span className="font-bold text-primary">880100</span>, or transfer directly from their bank, using this dedicated NCBA account number — funds reflect automatically once received.
+                        Customers can pay via M-Pesa Paybill <span className="font-bold text-primary">880100</span>, or transfer directly from their bank, using this dedicated account number — funds reflect automatically once received.
                       </p>
                     </div>
                   </div>
@@ -976,7 +976,7 @@ export default function Wallet() {
                           onClick={() => {
                             const value = merchant.ncbaVirtualAccountNumber || merchant.ncbaMerchantCode
                             navigator.clipboard.writeText(value)
-                            addToast({ title: 'Copied', message: 'NCBA account number copied to clipboard', type: 'success' })
+                            addToast({ title: 'Copied', message: 'PayChain Account number copied to clipboard', type: 'success' })
                           }}
                           className="p-2 rounded-xl bg-primary text-white hover:opacity-90 transition-all"
                           title="Copy account number"
