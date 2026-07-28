@@ -139,7 +139,7 @@ export const registerMerchant = async (req, res) => {
     });
 
     console.log(`📧 Dispatching Welcome Email to: ${merchant.email}`);
-    sendWelcomeEmail(merchant.email, merchant.name, password, merchant.phone, merchant.paybillAccount, getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode)).catch(err => {
+    sendWelcomeEmail(merchant.email, merchant.name, password, merchant.phone, merchant.paybillAccount, getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode), merchant.ncbaMerchantCode).catch(err => {
       console.error(`📧 Resend Error: Failed to send Welcome Email to ${merchant.email}:`, err);
     });
 
@@ -1045,7 +1045,7 @@ export const setupPassword = async (req, res) => {
     // Send confirmation email with their official credentials so the merchant
     // has a record of their username (email/phone) and the password they just set.
     // Fire-and-forget — never block the response on email delivery.
-    sendWelcomeEmail(merchant.email, merchant.name, password, merchant.phone, merchant.paybillAccount, getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode))
+    sendWelcomeEmail(merchant.email, merchant.name, password, merchant.phone, merchant.paybillAccount, getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode), merchant.ncbaMerchantCode)
       .catch((err) => console.error(`📧 Failed to send credentials email to ${merchant.email}:`, err));
 
     res.json({ success: true, message: 'Password set successfully. You can now sign in.' });

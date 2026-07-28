@@ -703,7 +703,7 @@ export const createMerchant = async (req, res) => {
 
     const setupLink = `${MERCHANT_DASHBOARD_URL.replace(/\/$/, '')}/setup-password?token=${rawToken}`;
 
-    sendMerchantInvite(email, name, businessName, paybillAccount, setupLink, getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode)).catch((err) => {
+    sendMerchantInvite(email, name, businessName, paybillAccount, setupLink, getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode), merchant.ncbaMerchantCode).catch((err) => {
       console.error(`📧 Failed to send invite to ${email}:`, err);
     });
 
@@ -724,6 +724,8 @@ export const createMerchant = async (req, res) => {
         phone: merchant.phone,
         businessName: merchant.businessName,
         paybillAccount: merchant.paybillAccount,
+        ncbaMerchantCode: merchant.ncbaMerchantCode,
+        ncbaVirtualAccountNumber: getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode),
         createdAt: merchant.createdAt,
         isVerified: merchant.isVerified,
       },
