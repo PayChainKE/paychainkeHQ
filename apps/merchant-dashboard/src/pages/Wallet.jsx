@@ -310,7 +310,7 @@ export default function Wallet() {
   }
 
   // QR Logic
-  const qrData = `${window.location.origin}/pay/${merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || ''}`
+  const qrData = `${window.location.origin}/pay/account/${merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || ''}`
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrData)}&margin=10&bgcolor=FFFFFF&color=00351D`
 
   const handleDownload = async () => {
