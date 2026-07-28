@@ -265,10 +265,18 @@ export const handleNcbaAccountNotification = async (req, res) => {
         to: merchant.phone,
         message: `${transId} Payment Received. KES ${transAmount.toLocaleString()} received via NCBA on ${date} at ${time}. New balance: KES ${ledgerResult.merchant.kesBalance.toLocaleString()}.`,
       }).then((result) => {
-        if (!result.success) {
+        // Logged on both outcomes — previously only failures were logged,
+        // which made "SMS silently succeeded" and "SMS was never attempted
+        // because merchant.phone was empty" indistinguishable from Render
+        // logs alone (both produced zero output).
+        if (result.success) {
+          logEvent('info', 'ncba_account_notification_sms_sent', { transId, merchantId: merchant._id.toString(), phone: merchant.phone });
+        } else {
           logEvent('error', 'ncba_account_notification_sms_failed', { transId, merchantId: merchant._id.toString(), error: result.error });
         }
       });
+    } else {
+      logEvent('warn', 'ncba_account_notification_sms_skipped_no_phone', { transId, merchantId: merchant._id.toString() });
     }
 
     return respondOk(res);
