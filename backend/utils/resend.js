@@ -6,6 +6,7 @@ dotenv.config();
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 const FRONTEND_URL = process.env.MERCHANT_DASHBOARD_URL || 'https://app.paychain.co.ke';
+const ADMIN_URL = process.env.ADMIN_DASHBOARD_URL || 'https://admin.paychain.co.ke';
 
 // Hosted on Cloudinary so the logo renders inline in the email body as a
 // normal remote image — not as a downloadable attachment on the message.
@@ -1243,6 +1244,88 @@ export const sendDormancyFinalWarningEmail = async (email, name, businessName) =
     return data;
   } catch (error) {
     console.error('❌ Resend Dormancy Final Warning Error:', error);
+    throw error;
+  }
+};
+
+// @desc  Sent to every active owner-role admin after each weekly revenue
+// sweep attempt (services/revenueSweepService.js) — completed, failed, or
+// skipped. The sweep itself has no human approval step (it's not tied to
+// any merchant, so nothing to PIN-gate), so this is the only checkpoint:
+// nobody has to remember to check the admin dashboard to know a real
+// transfer of PayChain's own money happened, or didn't, and why.
+export const sendRevenueSweepNotification = async (email, sweep) => {
+  try {
+    const amount = Number(sweep.status === 'completed' ? sweep.amount : sweep.attemptedAmount).toLocaleString(undefined, { minimumFractionDigits: 2 });
+    const period = `${new Date(sweep.periodStart).toLocaleDateString('en-KE', { day: 'numeric', month: 'short' })} – ${new Date(sweep.periodEnd).toLocaleDateString('en-KE', { day: 'numeric', month: 'short' })}`;
+
+    const theme = {
+      completed: { accent: '#5EFEB3', dot: '#10b981', dotBg: 'rgba(16,185,129,0.18)', label: 'Sweep completed', headline: `KES ${amount} moved to your revenue account` },
+      failed:    { accent: '#fca5a5', dot: '#ef4444', dotBg: 'rgba(239,68,68,0.18)',  label: 'Sweep failed',    headline: `KES ${amount} could not be transferred` },
+      skipped:   { accent: '#fcd34d', dot: '#f59e0b', dotBg: 'rgba(245,158,11,0.18)', label: 'Sweep skipped',   headline: `No transfer this week` },
+    }[sweep.status] || { accent: '#9ca3af', dot: '#9ca3af', dotBg: 'rgba(156,163,175,0.18)', label: 'Sweep update', headline: '' };
+
+    const data = await resend.emails.send({
+      from: 'PayChain <info@paychain.co.ke>',
+      to: [email],
+      subject: `[PayChain Revenue] ${theme.label} — KES ${amount}`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 560px; margin: auto; background: #ffffff; border: 1px solid #eef0ee; border-radius: 18px; overflow: hidden;">
+          <div style="background: linear-gradient(135deg, #06201B 0%, #0a3029 100%); padding: 32px 32px 36px;">
+            <div style="margin-bottom: 20px;">${logoImgWhite(108, 'left')}</div>
+            <div style="display: inline-flex; align-items: center; gap: 10px;">
+              <span style="display: inline-block; width: 36px; height: 36px; border-radius: 999px; background: ${theme.dotBg}; text-align: center; line-height: 36px; color: ${theme.dot}; font-size: 18px; font-weight: 800;">$</span>
+              <div>
+                <p style="margin: 0; color: ${theme.accent}; font-size: 11px; font-weight: 800; letter-spacing: 2.5px; text-transform: uppercase;">Revenue Sweep</p>
+                <h1 style="margin: 4px 0 0; color: #fff; font-size: 22px; font-weight: 800; letter-spacing: -0.3px;">${theme.headline}</h1>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding: 36px 32px;">
+            <p style="margin: 0 0 22px; color: #4b5563; font-size: 15px; line-height: 1.6;">
+              The weekly sweep of PayChain's accrued transaction fees (${period}) just ran automatically — no PIN or manual approval, since this moves PayChain's own revenue, not a merchant's.
+            </p>
+
+            <div style="background: #f6fbf7; border: 1px solid #d8ecdd; border-radius: 12px; padding: 20px 22px; margin: 0 0 22px;">
+              <div style="display: flex; justify-content: space-between; padding: 6px 0;">
+                <span style="color: #6b7280; font-size: 13px;">Status</span>
+                <span style="color: #06201B; font-size: 13px; font-weight: 700; text-transform: capitalize;">${sweep.status}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding: 6px 0;">
+                <span style="color: #6b7280; font-size: 13px;">Amount</span>
+                <span style="color: #06201B; font-size: 13px; font-weight: 700;">KES ${amount}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding: 6px 0;">
+                <span style="color: #6b7280; font-size: 13px;">Transactions covered</span>
+                <span style="color: #06201B; font-size: 13px; font-weight: 700;">${sweep.transactionCount || 0}</span>
+              </div>
+              ${sweep.ncbaReference ? `
+              <div style="display: flex; justify-content: space-between; padding: 6px 0;">
+                <span style="color: #6b7280; font-size: 13px;">NCBA reference</span>
+                <span style="color: #06201B; font-size: 13px; font-weight: 700; font-family: 'Courier New', monospace;">${sweep.ncbaReference}</span>
+              </div>` : ''}
+              ${sweep.failureReason ? `
+              <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #d8ecdd;">
+                <span style="color: #6b7280; font-size: 13px;">${sweep.status === 'failed' ? 'Failure reason' : 'Reason'}</span>
+                <p style="margin: 4px 0 0; color: #06201B; font-size: 13px; line-height: 1.5;">${sweep.failureReason}</p>
+              </div>` : ''}
+            </div>
+
+            <a href="${ADMIN_URL}/revenue" style="display: inline-block; background: #06201B; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 12px; font-weight: 800; font-size: 14px; letter-spacing: 0.4px;">View in admin dashboard →</a>
+          </div>
+
+          <div style="padding: 22px 30px; background: #fafafa; border-top: 1px solid #eef0ee; text-align: center;">
+            <p style="margin: 0; color: #9ca3af; font-size: 11px;">Automated system message — do not reply.</p>
+            <p style="margin: 8px 0 0; color: #bbb; font-size: 11px;">&copy; ${new Date().getFullYear()} PayChainKE · Nairobi, Kenya</p>
+          </div>
+        </div>
+      `,
+    });
+    console.log(`📧 Revenue sweep notification → ${email} (${sweep.status}, KES ${amount})`);
+    return data;
+  } catch (error) {
+    console.error('❌ Resend Revenue Sweep Notification Error:', error);
     throw error;
   }
 };

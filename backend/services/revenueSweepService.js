@@ -1,6 +1,8 @@
 import Transaction from '../models/Transaction.js';
 import RevenueSweep from '../models/RevenueSweep.js';
+import Admin from '../models/Admin.js';
 import { submitNcbaBankTransfer } from '../controllers/ncbaOpenBankingController.js';
+import { sendRevenueSweepNotification } from '../utils/resend.js';
 import { LIVE_DATA_CUTOFF } from '../config/liveDataCutoff.js';
 
 // NCBA PesaLink's own per-transfer ceiling (services/ncbaOpenBankingService.js).
@@ -50,6 +52,32 @@ async function computeUnsweptRevenue() {
   return { unswept: Math.max(0, unswept), transactionCount };
 }
 
+// The sweep has no human approval step before it moves money (it's not
+// tied to any merchant, so there's nothing to PIN-gate) — this notification
+// is the only checkpoint, so every outcome (completed/failed/skipped) fires
+// it, not just failures. Fire-and-forget: a notification bug should never
+// block or fail the sweep record itself from being saved.
+async function notifyOwners(sweep) {
+  try {
+    const owners = await Admin.find({ role: 'owner', status: 'active' }).select('email');
+    await Promise.all(
+      owners.map((owner) =>
+        sendRevenueSweepNotification(owner.email, sweep).catch((e) =>
+          logEvent('error', 'revenue_sweep_notification_failed', { email: owner.email, error: e.message })
+        )
+      )
+    );
+  } catch (e) {
+    logEvent('error', 'revenue_sweep_notification_lookup_failed', { error: e.message });
+  }
+}
+
+async function recordSweep(fields) {
+  const sweep = await RevenueSweep.create(fields);
+  notifyOwners(sweep).catch(() => {}); // notifyOwners already catches internally; belt-and-suspenders
+  return sweep;
+}
+
 // Runs one sweep attempt. Idempotent/self-healing — safe to call more than
 // once in the same window (e.g. a redeploy re-triggering the boot check):
 // a run with nothing new to sweep just records a 'skipped' row and moves on.
@@ -63,7 +91,7 @@ export async function runRevenueSweep() {
 
   if (!destinationBankCode || !destinationAccountNumber) {
     logEvent('warn', 'revenue_sweep_skipped_unconfigured', { unswept });
-    return RevenueSweep.create({
+    return recordSweep({
       periodStart, periodEnd, attemptedAmount, transactionCount, status: 'skipped',
       failureReason: 'PAYCHAIN_REVENUE_BANK_CODE / PAYCHAIN_REVENUE_ACCOUNT_NUMBER not set yet — open the destination account first.',
     });
@@ -71,7 +99,7 @@ export async function runRevenueSweep() {
 
   if (attemptedAmount < MIN_TRANSFER_AMOUNT) {
     logEvent('info', 'revenue_sweep_skipped_below_minimum', { unswept });
-    return RevenueSweep.create({
+    return recordSweep({
       periodStart, periodEnd, attemptedAmount, transactionCount, status: 'skipped',
       destinationBankCode, destinationAccountNumber,
       failureReason: unswept <= 0
@@ -91,13 +119,13 @@ export async function runRevenueSweep() {
     });
 
     logEvent('info', 'revenue_sweep_completed', { amount: attemptedAmount, transactionId });
-    return RevenueSweep.create({
+    return recordSweep({
       periodStart, periodEnd, attemptedAmount, amount: attemptedAmount, transactionCount,
       status: 'completed', destinationBankCode, destinationAccountNumber, ncbaReference: transactionId,
     });
   } catch (err) {
     logEvent('error', 'revenue_sweep_failed', { amount: attemptedAmount, error: err.message });
-    return RevenueSweep.create({
+    return recordSweep({
       periodStart, periodEnd, attemptedAmount, transactionCount, status: 'failed',
       destinationBankCode, destinationAccountNumber, failureReason: err.message,
     });
