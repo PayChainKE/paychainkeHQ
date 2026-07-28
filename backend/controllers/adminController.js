@@ -116,14 +116,6 @@ const phoneVariations = (raw) => {
 // fx_swap and settlement transactions store `amount` in USDC; `kesAmount` holds
 // the correct KES equivalent. Using raw $amount causes tiny USDC values to
 // appear instead of real KES figures in every chart and stat.
-const KES_VOL = {
-  $cond: {
-    if: { $eq: ['$currency', 'USDC'] },
-    then: { $ifNull: ['$kesAmount', 0] },
-    else: '$amount',
-  },
-};
-
 const KES_VOL_REAL = {
   $ifNull: ['$kesAmount', { $cond: [{ $eq: ['$currency', 'USDC'] }, 0, '$amount'] }]
 };
@@ -540,28 +532,41 @@ export const getMerchantDetail = async (req, res) => {
 
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const oneDayAgo    = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const [txnCount30d, txnCount24h, lastTxn, lifetimeAgg] = await Promise.all([
+    const [txnCount30d, txnCount24h, lastTxn, thirtyDayAgg, lifetimeAgg] = await Promise.all([
       Transaction.countDocuments({ merchantId: merchant._id, createdAt: { $gte: thirtyDaysAgo } }),
       Transaction.countDocuments({ merchantId: merchant._id, createdAt: { $gte: oneDayAgo } }),
       Transaction.findOne({ merchantId: merchant._id }).sort('-createdAt').select('createdAt amount status type').lean(),
+      // 30d KES + USDC volume (NCBA-normalised, mirrors getMerchants)
+      Transaction.aggregate([
+        { $match: { merchantId: merchant._id, createdAt: { $gte: thirtyDaysAgo } } },
+        {
+          $group: {
+            _id: null,
+            volume30d:     { $sum: KES_VOL_REAL },
+            usdcVolume30d: { $sum: USDC_VOL_REAL },
+          },
+        },
+      ]),
       // All-time KES-normalised volume by transaction type
       Transaction.aggregate([
         { $match: { merchantId: merchant._id } },
         {
           $group: {
             _id: null,
-            totalVolume: { $sum: KES_VOL },
+            totalVolume: { $sum: KES_VOL_REAL },
+            totalUsdcVolume: { $sum: USDC_VOL_REAL },
             totalCount:  { $sum: 1 },
-            inbound:     { $sum: { $cond: [{ $eq: ['$type', 'inbound']    }, KES_VOL, 0] } },
-            outbound:    { $sum: { $cond: [{ $eq: ['$type', 'outbound']   }, KES_VOL, 0] } },
-            bulk_pay:    { $sum: { $cond: [{ $eq: ['$type', 'bulk_pay']   }, KES_VOL, 0] } },
-            fx_swap:     { $sum: { $cond: [{ $eq: ['$type', 'fx_swap']    }, KES_VOL, 0] } },
-            settlement:  { $sum: { $cond: [{ $eq: ['$type', 'settlement'] }, KES_VOL, 0] } },
+            inbound:     { $sum: { $cond: [{ $eq: ['$type', 'inbound']    }, KES_VOL_REAL, 0] } },
+            outbound:    { $sum: { $cond: [{ $eq: ['$type', 'outbound']   }, KES_VOL_REAL, 0] } },
+            bulk_pay:    { $sum: { $cond: [{ $eq: ['$type', 'bulk_pay']   }, KES_VOL_REAL, 0] } },
+            fx_swap:     { $sum: { $cond: [{ $eq: ['$type', 'fx_swap']    }, KES_VOL_REAL, 0] } },
+            settlement:  { $sum: { $cond: [{ $eq: ['$type', 'settlement'] }, KES_VOL_REAL, 0] } },
           },
         },
       ]),
     ]);
-    const lt = lifetimeAgg[0] || { totalVolume: 0, totalCount: 0, inbound: 0, outbound: 0, bulk_pay: 0, fx_swap: 0, settlement: 0 };
+    const t30 = thirtyDayAgg[0] || { volume30d: 0, usdcVolume30d: 0 };
+    const lt = lifetimeAgg[0] || { totalVolume: 0, totalUsdcVolume: 0, totalCount: 0, inbound: 0, outbound: 0, bulk_pay: 0, fx_swap: 0, settlement: 0 };
 
     const lastActivityAt = [merchant.lastLogin, lastTxn?.createdAt]
       .filter(Boolean)
@@ -632,6 +637,18 @@ export const getMerchantDetail = async (req, res) => {
         activityTier: tierFor(lastActivityAt ? new Date(lastActivityAt) : null),
         txnCount30d,
         txnCount24h,
+        volume30d: t30.volume30d || 0,
+        usdcVolume30d: t30.usdcVolume30d || 0,
+        totalVolume: lt.totalVolume || 0,
+        totalUsdcVolume: lt.totalUsdcVolume || 0,
+        totalCount: lt.totalCount || 0,
+        volumeByType: {
+          inbound:    lt.inbound    || 0,
+          outbound:   lt.outbound   || 0,
+          bulk_pay:   lt.bulk_pay   || 0,
+          fx_swap:    lt.fx_swap    || 0,
+          settlement: lt.settlement || 0,
+        },
         lastTransaction: lastTxn ? {
           createdAt: lastTxn.createdAt,
           amount: lastTxn.amount,
