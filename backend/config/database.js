@@ -98,6 +98,17 @@ const attachConnectionHandlers = () => {
   });
 };
 
+// Coalesces concurrent callers onto a single in-flight attempt. Without
+// this, the boot-time call below and the disconnected-event handler's own
+// scheduleReconnect() -> connectDB() call could each open an independent
+// 5-attempt retry loop against the same shared global mongoose connection
+// at the same time — seen for real on a flaky-network deploy where a
+// mid-handshake TLS drop (SSL alert 80) triggered a 'disconnected' event
+// while the original retry loop was still mid-attempt, producing
+// interleaved connect/disconnect/reconnect log lines from two loops
+// stepping on each other's state.
+let inFlightConnect = null;
+
 /**
  * Connect to MongoDB with retries. Returns once connected.
  * Throws after all attempts fail so callers can decide whether to exit.
@@ -106,32 +117,44 @@ const connectDB = async ({ retries = 5, silent = false } = {}) => {
   const dbUri = getDbUri();
 
   if (isDbReady()) return mongoose.connection;
+  if (inFlightConnect) return inFlightConnect;
 
   attachConnectionHandlers();
 
-  let lastError;
-  for (let attempt = 1; attempt <= retries; attempt += 1) {
-    try {
-      const conn = await mongoose.connect(dbUri, CONNECT_OPTS);
-      if (!silent) {
-        console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
-        console.log(`📂 Database Name: ${conn.connection.db.databaseName}`);
-      }
-      return conn;
-    } catch (error) {
-      lastError = error;
-      if (!silent) {
-        logConnectError(error);
-        if (attempt < retries) {
-          const delayMs = Math.min(2_000 * attempt, 10_000);
-          console.warn(`⏳ MongoDB retry ${attempt}/${retries} in ${delayMs / 1000}s…`);
+  inFlightConnect = (async () => {
+    let lastError;
+    for (let attempt = 1; attempt <= retries; attempt += 1) {
+      try {
+        const conn = await mongoose.connect(dbUri, CONNECT_OPTS);
+        if (!silent) {
+          // Optional-chained: under the same flakiness that causes a retry
+          // loop in the first place, .connection/.db can still be mid-setup
+          // the instant this promise resolves. A crash here would burn a
+          // retry attempt over a connection that actually succeeded.
+          console.log(`✅ MongoDB Connected: ${conn.connection?.host ?? 'host pending'}`);
+          console.log(`📂 Database Name: ${conn.connection?.db?.databaseName ?? 'pending'}`);
         }
+        return conn;
+      } catch (error) {
+        lastError = error;
+        if (!silent) {
+          logConnectError(error);
+          if (attempt < retries) {
+            const delayMs = Math.min(2_000 * attempt, 10_000);
+            console.warn(`⏳ MongoDB retry ${attempt}/${retries} in ${delayMs / 1000}s…`);
+          }
+        }
+        if (attempt < retries) await sleep(Math.min(2_000 * attempt, 10_000));
       }
-      if (attempt < retries) await sleep(Math.min(2_000 * attempt, 10_000));
     }
-  }
+    throw lastError;
+  })();
 
-  throw lastError;
+  try {
+    return await inFlightConnect;
+  } finally {
+    inFlightConnect = null;
+  }
 };
 
 export const startBackgroundDbRetry = () => {
