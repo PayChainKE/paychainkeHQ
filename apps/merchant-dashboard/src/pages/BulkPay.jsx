@@ -23,7 +23,17 @@ export default function BulkPay() {
   const navigate = useNavigate()
   
   const isProfileComplete = Boolean(merchant?.kraPin && merchant?.businessNumber)
-  
+
+  // Lock page scroll while the profile-incomplete gate is up — the blurred
+  // page behind it has no reason to scroll since it's not interactive, and
+  // an unlockable page made this screen feel broken rather than gated.
+  useEffect(() => {
+    if (isProfileComplete) return
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prevOverflow }
+  }, [isProfileComplete])
+
   useEffect(() => {
     const fetchPayees = async () => {
       try {
@@ -822,26 +832,48 @@ export default function BulkPay() {
     <MerchantLayout title="Bulk Payments">
       <div className="relative">
         {!isProfileComplete && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-[#0A2540]/90 backdrop-blur-xl p-8 md:p-12 rounded-[32px] md:rounded-[40px] text-center shadow-2xl max-w-lg w-full border border-white/10 animate-fade-in-up">
-              <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center mx-auto mb-6 text-white/50">
-                <span className="material-symbols-outlined text-3xl">lock</span>
+          // Fixed to the viewport (not absolute over the page) and anchored
+          // below the header, with a z-index under both the header (z-40)
+          // and sidebar (z-[50]) — the gate blocks Bulk Pay, not navigation;
+          // merchants can still open the menu, switch pages, or sign out.
+          <div className="fixed inset-x-0 bottom-0 top-[64px] lg:top-[56px] z-30 flex items-center justify-center p-4">
+            <div className="relative bg-gradient-to-br from-[#0A2540] to-[#0d3358] p-8 md:p-12 rounded-[32px] md:rounded-[40px] text-center shadow-[0_40px_100px_-20px_rgba(10,37,64,0.55)] max-w-lg w-full border border-white/10 overflow-hidden animate-fade-in-up">
+              <div className="absolute -top-24 -right-24 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="relative">
+                <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-400/20 flex items-center justify-center mx-auto mb-6 text-emerald-300">
+                  <span className="material-symbols-outlined text-3xl">verified_user</span>
+                </div>
+                <p className="text-2xs font-bold uppercase tracking-[0.3em] text-emerald-300 mb-2">Verification Required</p>
+                <h2 className="font-headline text-2xl md:text-3xl font-bold text-white mb-3">Complete Your Profile</h2>
+                <p className="text-sm md:text-base text-white/60 mb-6 leading-relaxed">
+                  Bulk Payments require a verified KRA PIN and Business License Number for regulatory compliance.
+                </p>
+                <div className="text-left bg-white/5 border border-white/10 rounded-2xl p-4 mb-8 space-y-2.5">
+                  <div className="flex items-center gap-3">
+                    <span className={`material-symbols-outlined text-lg ${merchant?.kraPin ? 'text-emerald-400' : 'text-white/30'}`}>
+                      {merchant?.kraPin ? 'check_circle' : 'radio_button_unchecked'}
+                    </span>
+                    <span className={`text-xs font-bold ${merchant?.kraPin ? 'text-white/50 line-through' : 'text-white'}`}>KRA PIN</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className={`material-symbols-outlined text-lg ${merchant?.businessNumber ? 'text-emerald-400' : 'text-white/30'}`}>
+                      {merchant?.businessNumber ? 'check_circle' : 'radio_button_unchecked'}
+                    </span>
+                    <span className={`text-xs font-bold ${merchant?.businessNumber ? 'text-white/50 line-through' : 'text-white'}`}>Business License Number</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => navigate('/profile', { state: { focusFields: ['kraPin', 'businessNumber'] } })}
+                  className="w-full bg-emerald-500 text-[#06201B] px-8 py-4 rounded-xl font-black text-[11px] uppercase tracking-widest shadow-xl hover:bg-white transition-all active:scale-95 flex items-center justify-center gap-2"
+                >
+                  Complete Profile Now
+                  <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                </button>
               </div>
-              <h2 className="font-headline text-2xl md:text-3xl font-bold text-white mb-3">Profile Incomplete</h2>
-              <p className="text-sm md:text-base text-white/70 mb-8 leading-relaxed">
-                To unlock Bulk Payments and ensure full regulatory compliance, please add your KRA PIN and Business License Number to your profile.
-              </p>
-              <button
-                onClick={() => navigate('/profile', { state: { focusFields: ['kraPin', 'businessNumber'] } })}
-                className="w-full bg-emerald-500 text-[#06201B] px-8 py-4 rounded-xl font-black text-[11px] uppercase tracking-widest shadow-xl hover:bg-white transition-all active:scale-95 flex items-center justify-center gap-2"
-              >
-                Complete Profile Now
-                <span className="material-symbols-outlined text-sm">arrow_forward</span>
-              </button>
             </div>
           </div>
         )}
-        
+
         <div className={`px-1 lg:px-0 max-w-7xl mx-auto flex flex-col lg:flex-row gap-6 lg:gap-8 relative transition-all duration-500 ${!isProfileComplete ? 'blur-md pointer-events-none opacity-40 select-none' : ''}`}>
         
         {/* Add/Edit Payee Modal Overlay */}
