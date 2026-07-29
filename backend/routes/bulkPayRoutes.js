@@ -7,8 +7,21 @@ import { generateToken } from '../controllers/mpesaController.js';
 
 const router = express.Router();
 
-// Setup Multer for CSV uploads (store in temp dir or memory)
-const upload = multer({ dest: 'uploads/' });
+// Setup Multer for CSV uploads (store in temp dir or memory). Previously
+// had no size cap or type filter at all — any authenticated merchant could
+// upload arbitrarily large or arbitrary-type files to disk repeatedly.
+// Bulk pay CSVs are just payee lists; 2MB comfortably fits thousands of
+// rows. text/csv is inconsistently reported by browsers/OSes, so this
+// also allows the generic octet-stream/plain fallbacks multer commonly
+// sees for .csv, same pattern as newsletterRoutes.js's image fileFilter.
+const upload = multer({
+  dest: 'uploads/',
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const ok = ['text/csv', 'application/vnd.ms-excel', 'application/octet-stream', 'text/plain'];
+    cb(null, ok.includes(file.mimetype) || file.originalname?.toLowerCase().endsWith('.csv'));
+  },
+});
 
 // Protect all bulk pay routes with Merchant Auth
 router.use(protectMerchant);

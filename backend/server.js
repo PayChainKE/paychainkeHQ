@@ -22,6 +22,7 @@ import { ensurePrimaryOwner } from './migrations/ensurePrimaryOwner.js';
 import { backfillTransactionFees } from './migrations/backfillTransactionFees.js';
 import { backfillNcbaMerchantCodes } from './migrations/backfillNcbaMerchantCodes.js';
 import { checkAndSendDormancyReminders } from './services/dormancyReminderService.js';
+import { runWeeklyRevenueSweepIfDue } from './services/revenueSweepService.js';
 
 dotenv.config();
 
@@ -233,6 +234,16 @@ async function bootstrap() {
   // once every 24h for as long as this process stays up.
   checkAndSendDormancyReminders();
   setInterval(checkAndSendDormancyReminders, 24 * 60 * 60 * 1000);
+
+  // Weekly PayChain revenue sweep — checks daily, only actually attempts a
+  // transfer on the configured weekday (PAYCHAIN_REVENUE_SWEEP_DAY, default
+  // Monday). No-ops safely until PAYCHAIN_REVENUE_BANK_CODE /
+  // PAYCHAIN_REVENUE_ACCOUNT_NUMBER are set, and until then just logs a
+  // 'skipped' record each week so the gap is visible, not silent.
+  runWeeklyRevenueSweepIfDue().catch((e) => console.error('Revenue sweep check failed:', e));
+  setInterval(() => {
+    runWeeklyRevenueSweepIfDue().catch((e) => console.error('Revenue sweep check failed:', e));
+  }, 24 * 60 * 60 * 1000);
 }
 
 bootstrap();

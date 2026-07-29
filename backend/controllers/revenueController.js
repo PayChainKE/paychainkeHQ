@@ -1,8 +1,13 @@
 import Transaction from '../models/Transaction.js';
+import RevenueSweep from '../models/RevenueSweep.js';
+import BankReconciliation from '../models/BankReconciliation.js';
 import { REVENUE_STREAMS, SAFARICOM_TARIFF } from '../config/revenueRateCard.js';
 import { ncbaMarkupMongoExpr } from '../config/ncbaTariffCard.js';
 import { mpesaMerchantFeeMongoExpr } from '../utils/pricingEngine.js';
+import { mpesaB2cMarkupMongoExpr } from '../config/mpesaB2cTariffCard.js';
 import { LIVE_DATA_CUTOFF } from '../config/liveDataCutoff.js';
+import { runRevenueSweep } from '../services/revenueSweepService.js';
+import { recordReconciliation } from '../services/reconciliationService.js';
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 const RANGES = ['24h', '7d', '30d', '90d', 'ytd', 'all'];
@@ -16,6 +21,7 @@ const TYPE_TO_CHANNEL = {
   bulk_pay:   'Mobile Money',
   settlement: 'Bank Transfer',
   fx_swap:    'On-Chain (Stellar)',
+  mpesa_b2c:  'Mobile Money',
 };
 
 // Corporate operating account where accumulated fees sweep to. Was a
@@ -90,6 +96,9 @@ function feeExpr(stream, basisExpr = KES_BASIS) {
   }
   if (stream.id === 'transaction_fee') {
     return mpesaMerchantFeeMongoExpr(basisExpr);
+  }
+  if (stream.id === 'mpesa_b2c_fee') {
+    return mpesaB2cMarkupMongoExpr();
   }
   return {
     $max: [
@@ -553,6 +562,81 @@ export const getRevenue = async (req, res) => {
     });
   } catch (error) {
     console.error('Get Revenue Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Real sweep history — actual PesaLink transfers of PayChain's
+//          accrued fee revenue out of the pooled NCBA paybill into
+//          PayChain's own account (see services/revenueSweepService.js).
+//          Distinct from `sweepBatches` above, which is a projected/accrual
+//          estimate re-derived from transaction fees on every request; this
+//          is the real settlement record.
+// @route   GET /api/admin/revenue/sweeps
+// @access  Private (Admin)
+export const getRevenueSweeps = async (req, res) => {
+  try {
+    const sweeps = await RevenueSweep.find({}).sort('-createdAt').limit(52).lean();
+    res.json({ success: true, count: sweeps.length, data: sweeps });
+  } catch (error) {
+    console.error('Get Revenue Sweeps Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Manually trigger a revenue sweep attempt right now, outside the
+//          normal weekly schedule — useful to sweep immediately after
+//          configuring the destination account for the first time, or to
+//          verify the pipeline works before waiting for the next Monday.
+// @route   POST /api/admin/revenue/sweeps/run
+// @access  Private (Admin, owner/admin only)
+export const triggerRevenueSweep = async (req, res) => {
+  try {
+    const sweep = await runRevenueSweep();
+    res.json({ success: true, data: sweep });
+  } catch (error) {
+    console.error('Trigger Revenue Sweep Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Bank reconciliation history — every past check of the real NCBA
+//          pooled-account balance against what PayChain's own ledger
+//          expects it to be (see services/reconciliationService.js).
+// @route   GET /api/admin/revenue/reconciliations
+// @access  Private (Admin)
+export const getReconciliations = async (req, res) => {
+  try {
+    const records = await BankReconciliation.find({})
+      .sort('-createdAt')
+      .limit(52)
+      .populate('checkedBy', 'email name')
+      .lean();
+    res.json({ success: true, count: records.length, data: records });
+  } catch (error) {
+    console.error('Get Reconciliations Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Submit a manual reconciliation check — admin pastes in the real
+//          NCBA pooled-account balance (there's no API to pull it
+//          automatically) and this compares it against what PayChain's
+//          ledger expects (Σ merchant balances + unswept revenue), alerting
+//          every owner if they don't match within rounding tolerance.
+// @route   POST /api/admin/revenue/reconciliations
+// @access  Private (Admin, owner/admin only)
+export const submitReconciliation = async (req, res) => {
+  try {
+    const { reportedBalance, note } = req.body || {};
+    const numeric = Number(reportedBalance);
+    if (!Number.isFinite(numeric) || numeric < 0) {
+      return res.status(400).json({ error: 'A valid, non-negative reportedBalance is required.' });
+    }
+    const record = await recordReconciliation({ reportedBalance: numeric, note, checkedBy: req.admin._id });
+    res.json({ success: true, data: record });
+  } catch (error) {
+    console.error('Submit Reconciliation Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };

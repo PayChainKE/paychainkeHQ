@@ -197,8 +197,22 @@ export const uploadCSV = async (req, res) => {
     // Fetch existing payees to match against
     const existingPayees = await Payee.find({ merchantId: req.merchant._id });
 
+    // Guards against a malformed/non-CSV upload leaving the temp file on
+    // disk forever and the request hanging with no response — previously
+    // only the 'end' event cleaned up or replied at all.
+    let responded = false;
+    const cleanupAndFail = (error) => {
+      if (responded) return;
+      responded = true;
+      fs.unlink(filePath, () => {});
+      console.error('CSV parse error:', error.message);
+      res.status(400).json({ message: 'Could not read the uploaded file. Please check it is a valid CSV.' });
+    };
+
     fs.createReadStream(filePath)
+      .on('error', cleanupAndFail)
       .pipe(csv())
+      .on('error', cleanupAndFail)
       .on('data', (data) => {
         // Expected CSV Columns: name, type, phone, amount
         // If type is employee, amount is considered Gross Pay
@@ -244,6 +258,8 @@ export const uploadCSV = async (req, res) => {
         results.push(processedRow);
       })
       .on('end', () => {
+        if (responded) return; // already replied via cleanupAndFail
+        responded = true;
         // Clean up uploaded file
         fs.unlinkSync(filePath);
 

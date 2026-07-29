@@ -53,6 +53,7 @@ export default function DigitalWallet({ navigation }: any) {
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [destination, setDestination] = useState<Destination>('bank');
   const [destinationValue, setDestinationValue] = useState('');
+  const [withdrawPin, setWithdrawPin] = useState('');
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const selectedDest = destinations.find((d) => d.id === destination)!;
 
@@ -150,22 +151,28 @@ export default function DigitalWallet({ navigation }: any) {
       Alert.alert('Missing Account Details', 'Please enter the destination account details.');
       return;
     }
+    if (withdrawPin.length !== 4) {
+      Alert.alert('Missing Details', 'Enter your 4-digit payment PIN to withdraw.');
+      return;
+    }
     setIsWithdrawing(true);
     try {
       if (selectedDest.type === 'Mobile') {
         const phone = destinationValue.replace(/^(?:\+?254|0)/, '254');
-        await api.post('/api/callbacks/b2c-request', { phone, amount });
+        await api.post('/api/callbacks/b2c-request', { phone, amount, pin: withdrawPin });
         Alert.alert('Withdrawal Processing', `KES ${withdrawAmount} sent to phone. B2C transfer initiated.`);
       } else {
         await api.post('/api/transactions/send-money', {
           amount,
           destination,
           reference: `Withdrawal to ${destinationValue}`,
+          pin: withdrawPin,
         });
         Alert.alert('Withdrawal Initiated', `KES ${withdrawAmount} sent to destination.`);
       }
       setWithdrawAmount('');
       setDestinationValue('');
+      setWithdrawPin('');
       await refreshSession();
       fetchData();
     } catch (err: any) {
@@ -529,6 +536,18 @@ export default function DigitalWallet({ navigation }: any) {
                 <Text className="text-[10px] font-jakarta-bold uppercase tracking-wider text-[#b45309]">Not configured in settings</Text>
               </View>
             )}
+
+            <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#00351d]/60 mb-2 ml-1 mt-4">Payment PIN</Text>
+            <TextInput
+              value={withdrawPin}
+              onChangeText={(t) => setWithdrawPin(t.replace(/\D/g, '').slice(0, 4))}
+              placeholder="****"
+              placeholderTextColor="#a1a1aa"
+              keyboardType="number-pad"
+              secureTextEntry
+              maxLength={4}
+              className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-5 py-4 text-[18px] font-jakarta-extrabold text-[#00351d] tracking-[0.5em]"
+            />
 
             <View className="bg-[#f0fdf4] rounded-2xl border border-[#e7ece7] p-4 flex-row items-start gap-3 mt-4 mb-6">
               <Feather name="info" size={15} color="#006c4e" style={{ marginTop: 1 }} />

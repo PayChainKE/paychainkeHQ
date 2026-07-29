@@ -77,3 +77,13 @@ export function getB2cTariff(amount) {
     totalFee: round2(safaricomFee + PAYCHAIN_B2C_MARKUP),
   };
 }
+
+// Mongo-side equivalent of `markup` above, for controllers/revenueController.js's
+// per-stream aggregation (which prices from a Mongo expression rather than
+// re-reading the stored Transaction.paychainFee field). Flat rather than a
+// $switch over the band table like ncbaMarkupMongoExpr — the markup itself
+// doesn't vary by amount, only PAYCHAIN_B2C_MARKUP does (currently 0), so a
+// literal is all a real revenue-share here would ever need.
+export function mpesaB2cMarkupMongoExpr() {
+  return round2(PAYCHAIN_B2C_MARKUP);
+}
