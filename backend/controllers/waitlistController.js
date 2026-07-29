@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import mongoose from 'mongoose';
 import Waitlist from '../models/Waitlist.js';
 import Merchant from '../models/Merchant.js';
+import RetiredMerchantCode from '../models/RetiredMerchantCode.js';
 import { sendWaitlistConfirmation, sendMerchantInvite } from '../utils/resend.js';
 import { getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
 
@@ -258,8 +259,11 @@ export const convertWaitlistEntry = async (req, res) => {
     let paybillAccount;
     for (let i = 0; i < 25; i++) {
       const candidate = crypto.randomInt(10000, 100000).toString();
-      const exists = await Merchant.exists({ paybillAccount: candidate });
-      if (!exists) { paybillAccount = candidate; break; }
+      const [exists, retired] = await Promise.all([
+        Merchant.exists({ paybillAccount: candidate }),
+        RetiredMerchantCode.exists({ type: 'paybillAccount', code: candidate }),
+      ]);
+      if (!exists && !retired) { paybillAccount = candidate; break; }
     }
     if (!paybillAccount) {
       return res.status(500).json({ error: 'Could not allocate a unique account number.' });

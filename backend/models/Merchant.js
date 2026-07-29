@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import { generateRandomMerchantCode } from '../utils/ncbaValidators.js';
+import RetiredMerchantCode from './RetiredMerchantCode.js';
 
 const merchantSchema = new mongoose.Schema({
   name: {
@@ -413,8 +414,11 @@ merchantSchema.pre('save', async function() {
   const MAX_ATTEMPTS = 10;
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const candidate = generateRandomMerchantCode();
-    const exists = await this.constructor.exists({ ncbaMerchantCode: candidate });
-    if (!exists) {
+    const [exists, retired] = await Promise.all([
+      this.constructor.exists({ ncbaMerchantCode: candidate }),
+      RetiredMerchantCode.exists({ type: 'ncbaMerchantCode', code: candidate }),
+    ]);
+    if (!exists && !retired) {
       this.ncbaMerchantCode = candidate;
       return;
     }

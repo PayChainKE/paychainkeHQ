@@ -7,6 +7,7 @@ import PayoutBatch from '../models/PayoutBatch.js';
 import STKRequest from '../models/STKRequest.js';
 import Payee from '../models/Payee.js';
 import PaymentLink from '../models/PaymentLink.js';
+import RetiredMerchantCode from '../models/RetiredMerchantCode.js';
 import Waitlist from '../models/Waitlist.js';
 import Contact from '../models/Contact.js';
 import Communication from '../models/Communication.js';
@@ -89,8 +90,11 @@ const safeEqual = (a, b) => {
 export const generateUniquePaybillAccount = async () => {
   for (let i = 0; i < 25; i++) {
     const candidate = (crypto.randomInt(10000, 100000)).toString();
-    const exists = await Merchant.exists({ paybillAccount: candidate });
-    if (!exists) return candidate;
+    const [exists, retired] = await Promise.all([
+      Merchant.exists({ paybillAccount: candidate }),
+      RetiredMerchantCode.exists({ type: 'paybillAccount', code: candidate }),
+    ]);
+    if (!exists && !retired) return candidate;
   }
   throw new Error('Could not allocate a unique merchant account number');
 };
@@ -354,12 +358,32 @@ export const confirmMerchantAction = async (req, res) => {
         message: `Account permanently deleted — "${merchant.businessName || merchant.email}"`,
         merchant, actor: adminActor(admin), req,
       });
+      // Retire this merchant's account-identifier codes permanently, before
+      // deleting them, so the random generators for ncbaMerchantCode/
+      // paybillAccount never hand them out to a future, unrelated merchant
+      // (see RetiredMerchantCode.js for why that matters).
+      const retirements = [];
+      if (merchant.ncbaMerchantCode) {
+        retirements.push({ type: 'ncbaMerchantCode', code: merchant.ncbaMerchantCode, formerMerchantId: merchant._id, formerBusinessName: merchant.businessName || null });
+      }
+      if (merchant.paybillAccount) {
+        retirements.push({ type: 'paybillAccount', code: merchant.paybillAccount, formerMerchantId: merchant._id, formerBusinessName: merchant.businessName || null });
+      }
+
       await Promise.all([
         Transaction.deleteMany({ merchantId: merchant._id }),
         PayoutBatch.deleteMany({ merchantId: merchant._id }),
         STKRequest.deleteMany({ merchantId: merchant._id }),
         Payee.deleteMany({ merchantId: merchant._id }),
         PaymentLink.deleteMany({ merchantId: merchant._id }),
+        retirements.length
+          ? RetiredMerchantCode.insertMany(retirements, { ordered: false }).catch((err) => {
+              // A duplicate-key here just means this code was already
+              // retired (e.g. a prior partial delete) — never let it block
+              // the actual deletion.
+              console.error('Failed to retire merchant code(s):', err?.message || err);
+            })
+          : Promise.resolve(),
       ]);
       await Merchant.deleteOne({ _id: merchant._id });
     }
