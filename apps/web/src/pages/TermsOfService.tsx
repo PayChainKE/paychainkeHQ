@@ -387,7 +387,7 @@ const TermsOfService: React.FC = () => {
                 <div className="space-y-2 text-sm text-gray-600">
                   <p className="flex items-center gap-2"><MapPin className="w-4 h-4 text-emerald-600" /> Nairobi, Kenya</p>
                   <p className="flex items-center gap-2"><Mail className="w-4 h-4 text-emerald-600" /> <a href="mailto:admin@paychain.co.ke" className="hover:text-emerald-700">admin@paychain.co.ke</a></p>
-                  <p className="flex items-center gap-2"><Phone className="w-4 h-4 text-emerald-600" /> +254 743 283 382</p>
+                  <p className="flex items-center gap-2"><Phone className="w-4 h-4 text-emerald-600" /> +254 743 283 782</p>
                 </div>
               </div>
             </div>

@@ -61,8 +61,8 @@ const CONTACT_DETAILS: ContactDetail[] = [
   {
     icon: Phone,
     label: "Phone",
-    value: "+254 743 283 382",
-    href: "tel:+254743283382",
+    value: "+254 743 283 782",
+    href: "tel:+254743283782",
   },
   {
     icon: MapPin,
@@ -81,7 +81,7 @@ const CARD_DATA: CardData[] = [
       "Our support team is Nairobi-based and responds to every message personally. Whether you want to understand how Cash Advance eligibility works, need help with your waitlist application, or just want to know if PayChain is right for your business, ask us directly.",
     response: "We respond within 24 hours on business days.",
     emailHref: "mailto:support@paychain.co.ke",
-    phoneHref: "tel:+254743283382",
+    phoneHref: "tel:+254743283782",
     secondary: { label: "Or join the waitlist →", href: "/waitlist" },
   },
   {
@@ -237,7 +237,7 @@ export default function ContactUs() {
   useEffect(() => {
     const metas = [
       { property: "og:title", content: "Contact PayChain — Get in Touch" },
-      { property: "og:description", content: "Reach the PayChain team directly. Phone: +254 743 283 382. Based in Nairobi, Kenya." },
+      { property: "og:description", content: "Reach the PayChain team directly. Phone: +254 743 283 782. Based in Nairobi, Kenya." },
       { property: "og:url", content: "https://www.paychain.co.ke/contact" },
       { name: "twitter:card", content: "summary" },
     ];
@@ -324,7 +324,7 @@ export default function ContactUs() {
                 <div className={styles.contactRows}>
                   <div className={styles.contactRow}><Mail size={16} color="#1D9E75" /><a href="mailto:info@paychain.co.ke" className={styles.directLink}>info@paychain.co.ke</a></div>
                   <div className={styles.contactRow}><Mail size={16} color="#1D9E75" /><a href="mailto:support@paychain.co.ke" className={styles.directLink}>support@paychain.co.ke</a></div>
-                  <div className={styles.contactRow}><Phone size={16} color="#1D9E75" /><a href="tel:+254743283382" className={styles.directLink}>+254 743 283 382</a></div>
+                  <div className={styles.contactRow}><Phone size={16} color="#1D9E75" /><a href="tel:+254743283782" className={styles.directLink}>+254 743 283 782</a></div>
                 </div>
                 <div className={styles.hoursRow}><Clock size={14} className={styles.mutedIcon} /><span className={styles.hoursText}>Mon - Fri, 9:00 - 17:00 EAT</span></div>
               </div>
@@ -419,7 +419,7 @@ export default function ContactUs() {
                     <div className={styles.successDirect}>Or reach us directly:</div>
                     <a href="mailto:info@paychain.co.ke" className={styles.successLink}>info@paychain.co.ke</a>
                     <a href="mailto:support@paychain.co.ke" className={styles.successLink}>support@paychain.co.ke</a>
-                    <a href="tel:+254743283382" className={styles.successLink}>+254 743 283 382</a>
+                    <a href="tel:+254743283782" className={styles.successLink}>+254 743 283 782</a>
                     <div className={styles.successCtas}>
                       <a href="/how-it-works" className={styles.successCta}>How PayChain Works →</a>
                       <a href="/waitlist" className={styles.successCta}>Join the Waitlist →</a>
@@ -454,7 +454,7 @@ export default function ContactUs() {
                     <a href={card.emailHref} className={styles.cardPrimary}>{card.emailHref.replace('mailto:', '')} <ArrowRight size={14} /></a>
                   )}
                   {card.phoneHref && (
-                    <a href={card.phoneHref} className={styles.cardPhone}><Phone size={14} /> +254 743 283 382</a>
+                    <a href={card.phoneHref} className={styles.cardPhone}><Phone size={14} /> +254 743 283 782</a>
                   )}
                   {card.secondary && (
                     <a href={card.secondary.href} className={styles.cardSecondary}>{card.secondary.label}</a>
@@ -507,7 +507,7 @@ export default function ContactUs() {
               <div className={styles.contactRows}>
                 <div className={styles.contactRow}><Mail size={16} color="#1D9E75" /><a href="mailto:info@paychain.co.ke" className={styles.directLink}>info@paychain.co.ke</a></div>
                 <div className={styles.contactRow}><Mail size={16} color="#1D9E75" /><a href="mailto:support@paychain.co.ke" className={styles.directLink}>support@paychain.co.ke</a></div>
-                <div className={styles.contactRow}><Phone size={16} color="#1D9E75" /><a href="tel:+254743283382" className={styles.directLink}>+254 743 283 382</a></div>
+                <div className={styles.contactRow}><Phone size={16} color="#1D9E75" /><a href="tel:+254743283782" className={styles.directLink}>+254 743 283 782</a></div>
               </div>
             </div>
             <div className={styles.mapCard} role="img" aria-label="Map showing PayChain's location in Nairobi, Kenya">

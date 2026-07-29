@@ -4,9 +4,9 @@ import MerchantLayout from '../components/layout/MerchantLayout'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 
 const SUPPORT_EMAIL = 'support@paychain.co.ke'
-const SUPPORT_PHONE_DISPLAY = '+254 743 283 382'
-const SUPPORT_PHONE_TEL = '+254743283382'
-const SUPPORT_WHATSAPP = 'https://wa.me/254743283382'
+const SUPPORT_PHONE_DISPLAY = '+254 743 283 782'
+const SUPPORT_PHONE_TEL = '+254743283782'
+const SUPPORT_WHATSAPP = 'https://wa.me/254743283782'
 
 export default function Support() {
   const { merchant } = useMerchantAuth()

@@ -405,7 +405,7 @@ export default function Transactions() {
     doc.setDrawColor(200, 210, 205); doc.setLineWidth(0.3)
     doc.line(L, footerY - 4, R, footerY - 4)
     doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(140, 150, 145)
-    doc.text('This is a computer-generated statement and requires no signature. For support: support@paychain.co.ke | +254 743 283 382', W / 2, footerY, { align: 'center' })
+    doc.text('This is a computer-generated statement and requires no signature. For support: support@paychain.co.ke | +254 743 283 782', W / 2, footerY, { align: 'center' })
     doc.text(`© ${now.getFullYear()} PayChain Kenya Limited  •  Ref: ${statementId}  •  Page 1 of ${doc.internal.getNumberOfPages()}`, W / 2, footerY + 5, { align: 'center' })
 
     const filename = `PayChain_Statement_${now.toISOString().slice(0,10)}.pdf`
