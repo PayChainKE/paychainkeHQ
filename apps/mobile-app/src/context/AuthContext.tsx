@@ -148,6 +148,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  // Poll for balance/profile changes so kesBalance (and everything else
+  // derived from `merchant`) stays live across every screen without each
+  // one needing its own refresh loop. Keyed on merchant._id (not the whole
+  // object) so the interval isn't torn down and recreated on every tick.
+  useEffect(() => {
+    if (!merchant?._id) return;
+    const interval = setInterval(refreshSession, 5000);
+    return () => clearInterval(interval);
+  }, [merchant?._id]);
+
   async function login(email: string, password: string) {
     try {
       const res = await api.post('/api/auth/merchant/login', { email, password });

@@ -60,37 +60,54 @@ export default function Wallet() {
   const [isActivatingWallet, setIsActivatingWallet] = useState(false)
   const hasSynced = React.useRef(false)
 
-  useEffect(() => {
-    const fetchTransactions = async () => {
-      try {
-        const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
-        const token = localStorage.getItem('paychain_merchant_token')
-        
-        // 1. Sync Live Wallet Balance if not already synced this session
-        if (merchant?.stellarPublicKey && !hasSynced.current) {
-          try {
-            hasSynced.current = true; // Mark as synced to prevent infinite loop on refreshSession
-            await axios.post(`${API_URL}/api/transactions/sync-wallet`, {}, {
-              headers: { Authorization: `Bearer ${token}` }
-            })
-            await refreshSession()
-          } catch(e) { console.error('Failed to sync wallet', e) }
-        }
+  const fetchTransactions = React.useCallback(async () => {
+    if (!merchant) return
+    try {
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+      const token = localStorage.getItem('paychain_merchant_token')
 
-        // 2. Fetch Transactions (will include the external deposit if just created)
-        const res = await axios.get(`${API_URL}/api/transactions`, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        setLiveTransactions(res.data)
-      } catch (err) {
-        console.error('Failed to fetch transactions', err)
-      } finally {
-        setIsLoading(false)
+      // 1. Sync Live Wallet Balance if not already synced this session
+      if (merchant?.stellarPublicKey && !hasSynced.current) {
+        try {
+          hasSynced.current = true; // Mark as synced to prevent infinite loop on refreshSession
+          await axios.post(`${API_URL}/api/transactions/sync-wallet`, {}, {
+            headers: { Authorization: `Bearer ${token}` }
+          })
+          await refreshSession()
+        } catch(e) { console.error('Failed to sync wallet', e) }
       }
+
+      // 2. Fetch Transactions (will include the external deposit if just created)
+      const res = await axios.get(`${API_URL}/api/transactions`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      setLiveTransactions(res.data)
+    } catch (err) {
+      console.error('Failed to fetch transactions', err)
+    } finally {
+      setIsLoading(false)
     }
+  }, [merchant])
+
+  // Initial load
+  useEffect(() => {
     if (merchant) fetchTransactions()
     else setIsLoading(false)
-  }, [merchant])
+  }, [merchant, fetchTransactions])
+
+  // Poll every 5s so wallet activity and balance stay live without a manual refresh
+  useEffect(() => {
+    if (!merchant) return
+    const interval = setInterval(fetchTransactions, 5000)
+    return () => clearInterval(interval)
+  }, [merchant, fetchTransactions])
+
+  // Also refresh instantly when the user returns to the tab
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchTransactions() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [fetchTransactions])
 
   const handleWithdraw = async (e) => {
     e.preventDefault()
@@ -1038,7 +1055,9 @@ export default function Wallet() {
                       <div className="flex items-center gap-2 mt-0.5">
                         <p className="text-[9px] md:text-[10px] text-on-surface-variant font-medium opacity-60">{formatDateISO(tx.createdAt || tx.timestamp)}</p>
                         <span className="text-[9px] md:text-[10px] text-on-surface-variant/20 block md:hidden">•</span>
-                        <p className="hidden md:block text-[9px] text-on-surface-variant uppercase font-black tracking-widest opacity-40">{tx.destination || 'Internal Account'}</p>
+                        <p className="hidden md:block text-[9px] text-on-surface-variant uppercase font-black tracking-widest opacity-40">
+                          {isCreditTransaction(tx.type) ? (tx.sender?.name || 'Unknown') : (tx.recipient?.name || tx.sender?.name || 'Internal Account')}
+                        </p>
                       </div>
                     </div>
                   </div>

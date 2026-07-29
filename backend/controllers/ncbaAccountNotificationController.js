@@ -195,6 +195,14 @@ export const handleNcbaAccountNotification = async (req, res) => {
       return respondFail(res, `Merchant account is ${merchant.status}`);
     }
 
+    // CustomerName has proven more reliable than PhoneNr for actually
+    // reaching the payer — observed live, PhoneNr has carried the Account
+    // Number instead of a phone number, while CustomerName consistently
+    // carries "NAME MSISDN <channel code>" (see parseNcbaCustomerField).
+    // Parsed here (before the ledger write) so the real payer name reaches
+    // the Transaction record itself, not just the merchant's SMS below.
+    const parsedCustomer = parseNcbaCustomerField(rawCustomerName);
+
     let ledgerResult;
     try {
       ledgerResult = await creditNcbaCollection({
@@ -202,6 +210,7 @@ export const handleNcbaAccountNotification = async (req, res) => {
         grossAmount: transAmount,
         bankRef: transId,
         customerPhone: rawPhoneNr || null,
+        customerName: parsedCustomer.name || null,
       });
     } catch (err) {
       if (err instanceof DuplicateCollectionError) {
@@ -240,15 +249,11 @@ export const handleNcbaAccountNotification = async (req, res) => {
     const { date, time } = formatTransactionDateTime(rawTransTime);
     const accountRef = formatAccountNumberDisplay(getNcbaVirtualAccountNumber(merchantCode) || merchantCode);
 
-    // CustomerName has proven more reliable than PhoneNr for actually
-    // reaching the payer — observed live, PhoneNr has carried the Account
-    // Number instead of a phone number, while CustomerName consistently
-    // carries "NAME MSISDN <channel code>" (see parseNcbaCustomerField).
+    // parsedCustomer was already computed above (before the ledger write).
     // Prefer the parsed MSISDN; fall back to PhoneNr only if CustomerName
     // didn't yield one. Either way sendSMS/toE164Kenyan fail closed and
     // silently on anything not phone-shaped, so attempting this is safe
     // even when both sources are unreliable.
-    const parsedCustomer = parseNcbaCustomerField(rawCustomerName);
     const customerPhone = parsedCustomer.phone || rawPhoneNr;
     const customerDisplayName = parsedCustomer.name || 'a customer';
 

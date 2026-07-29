@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Modal, TextInput, ActivityIndicator, Alert, RefreshControl } from 'react-native';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -126,7 +126,7 @@ export default function Collections() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  const fetchTransactions = async () => {
+  const fetchTransactions = useCallback(async () => {
     try {
       const res = await api.get('/api/transactions');
       // Backend returns either a raw array (res.data is the array)
@@ -144,7 +144,7 @@ export default function Collections() {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (merchant) {
@@ -154,7 +154,14 @@ export default function Collections() {
       setTransactions([]);
       setIsLoading(false);
     }
-  }, [merchant]);
+  }, [merchant, fetchTransactions]);
+
+  // Poll every 5s so the collections list stays live without a manual refresh
+  useEffect(() => {
+    if (!merchant) return;
+    const interval = setInterval(fetchTransactions, 5000);
+    return () => clearInterval(interval);
+  }, [merchant, fetchTransactions]);
 
   const onRefresh = () => {
     setIsRefreshing(true);

@@ -24,30 +24,46 @@ export default function Transactions() {
   const [liveTransactions, setLiveTransactions] = useState([])
   const [isLoading, setIsLoading] = useState(true)
 
-  useEffect(() => {
-    const fetchTransactions = async () => {
-      try {
-        const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
-        const token = localStorage.getItem('paychain_merchant_token');
-        const res = await axios.get(`${API_URL}/api/transactions`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setLiveTransactions(res.data);
-      } catch (err) {
-        console.error('Failed to load transactions', err);
-        setLiveTransactions([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const fetchTransactions = React.useCallback(async () => {
+    if (!merchant) return;
+    try {
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      const token = localStorage.getItem('paychain_merchant_token');
+      const res = await axios.get(`${API_URL}/api/transactions`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setLiveTransactions(res.data);
+    } catch (err) {
+      console.error('Failed to load transactions', err);
+      setLiveTransactions([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [merchant]);
 
+  // Initial load
+  useEffect(() => {
     if (merchant) {
       fetchTransactions();
     } else {
       setLiveTransactions([]);
       setIsLoading(false);
     }
-  }, [merchant]);
+  }, [merchant, fetchTransactions]);
+
+  // Poll every 5s so the transaction list stays live without a manual refresh
+  useEffect(() => {
+    if (!merchant) return;
+    const interval = setInterval(fetchTransactions, 5000);
+    return () => clearInterval(interval);
+  }, [merchant, fetchTransactions]);
+
+  // Also refresh instantly when the user returns to the tab
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchTransactions(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [fetchTransactions]);
   
   const filteredRows = liveTransactions.filter(t => {
     const matchesSearch = !searchQuery || 

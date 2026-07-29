@@ -64,10 +64,10 @@ export default function Overview() {
     else setIsLoading(false)
   }, [merchant, fetchData])
 
-  // Poll every 30 s so revenue chart and recent transactions stay live
+  // Poll every 5s so revenue chart and recent transactions stay live
   useEffect(() => {
     if (!merchant) return
-    const interval = setInterval(fetchData, 30000)
+    const interval = setInterval(fetchData, 5000)
     return () => clearInterval(interval)
   }, [merchant, fetchData])
 
