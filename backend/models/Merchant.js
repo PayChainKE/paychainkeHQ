@@ -192,9 +192,13 @@ const merchantSchema = new mongoose.Schema({
       type: Boolean,
       default: true
     },
+    // Defaults to off — Cash Advance is a credit product that likely falls
+    // under CBK's Digital Credit Providers Regulations, 2022, and licensing
+    // status hasn't been confirmed. Re-enable per-merchant (or flip this
+    // default back) once that's resolved, not before.
     cashAdvanceForm: {
       type: Boolean,
-      default: true
+      default: false
     }
   },
   stellarPublicKey: {
