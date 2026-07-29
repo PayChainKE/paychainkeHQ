@@ -10,6 +10,7 @@ import { ValidatedTextInput } from '../components/ValidatedTextInput';
 import TopBar from '../components/layout/TopBar';
 import api from '../api/config';
 import { isCreditTransaction, isDebitTransaction } from '../utils/transactionDirection';
+import { formatAccountNumber } from '../utils/formatAccountNumber';
 
 function formatKES(n: number | null | undefined) {
   if (n == null) return 'KES 0.00';
@@ -251,7 +252,7 @@ export default function DigitalWallet({ navigation }: any) {
       </style></head><body>
         <img src="${qrUrl}" />
         <h1>Settlement QR</h1>
-        <p>ACC: ${merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending'}</p>
+        <p>ACC: ${formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending')}</p>
         <p>MERCHANT: ${merchant?.businessName || 'Merchant'}</p>
       </body></html>`;
       const { uri } = await Print.printToFileAsync({ html, base64: false });
@@ -586,7 +587,7 @@ export default function DigitalWallet({ navigation }: any) {
                 <View className="bg-[#2775CA]/10 border border-[#2775CA]/20 rounded-md px-2.5 py-1 mb-2">
                   <Text className="text-[#2775CA] text-[9px] font-jakarta-extrabold uppercase tracking-[0.2em]">Settlement QR</Text>
                 </View>
-                <Text className="text-white text-[14px] font-jakarta-bold tracking-widest">ACC: {merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending'}</Text>
+                <Text className="text-white text-[14px] font-jakarta-bold tracking-widest">ACC: {formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending')}</Text>
                 <Text className="text-[#8B98A9] text-[9px] font-jakarta-bold uppercase tracking-widest mt-1">{merchant?.businessName || 'Merchant'}</Text>
               </View>
 
@@ -677,7 +678,7 @@ export default function DigitalWallet({ navigation }: any) {
                 field), before showing a true pending state. */}
             {(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode) ? (
               <View className="flex-row items-center justify-between bg-[#f0fdf4] rounded-2xl px-5 py-4">
-                <Text className="font-jakarta-extrabold text-[16px] text-[#00351d] tracking-widest">{merchant.ncbaVirtualAccountNumber || merchant.ncbaMerchantCode}</Text>
+                <Text className="font-jakarta-extrabold text-[16px] text-[#00351d] tracking-widest">{formatAccountNumber(merchant.ncbaVirtualAccountNumber || merchant.ncbaMerchantCode)}</Text>
                 <TouchableOpacity
                   onPress={async () => {
                     const value = merchant.ncbaVirtualAccountNumber || merchant.ncbaMerchantCode;

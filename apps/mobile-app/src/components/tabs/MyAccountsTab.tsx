@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TextInput, TouchableOpacity } from 'react-nativ
 import { MaterialIcons, Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
+import { formatAccountNumber } from '../../utils/formatAccountNumber';
 
 export default function MyAccountsTab() {
   const { merchant } = useAuth();
@@ -83,7 +84,7 @@ export default function MyAccountsTab() {
                 <View className="bg-[#f0fdf4] rounded-2xl p-5 border border-[#eff4ef] gap-4">
                   <View className="flex-row justify-between items-center">
                     <Text className="text-[12px] text-[#707971] font-jakarta-bold uppercase tracking-widest">Account No</Text>
-                    <Text className="text-[16px] font-jakarta-extrabold text-[#00351d] tracking-tight">{account.accountNumber}</Text>
+                    <Text className="text-[16px] font-jakarta-extrabold text-[#00351d] tracking-tight">{formatAccountNumber(account.accountNumber)}</Text>
                   </View>
 
                   <View className="flex-row justify-between items-center">

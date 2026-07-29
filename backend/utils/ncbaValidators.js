@@ -104,6 +104,19 @@ export function getNcbaVirtualAccountNumber(ncbaMerchantCode) {
   return `${prefix}${ncbaMerchantCode}`;
 }
 
+// Display-only grouping ("123456789012" -> "1234 5678 9012") so the 12-digit
+// account number reads professionally instead of as one long digit string.
+// Only touches values that are exactly 12 raw digits — the 8-digit interim
+// ncbaMerchantCode, "Pending assignment", or anything else passed through
+// unchanged, so callers can safely wrap every display site with this
+// without special-casing the various fallback states.
+export function formatAccountNumberDisplay(value) {
+  if (!value) return value;
+  const digits = String(value).replace(/\s+/g, '');
+  if (!/^\d{12}$/.test(digits)) return value;
+  return digits.match(/.{1,4}/g).join(' ');
+}
+
 export function validateCollectionAmount(amount) {
   const value = Number(amount);
   if (!Number.isFinite(value) || value <= 0) {

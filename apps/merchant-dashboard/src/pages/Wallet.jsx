@@ -3,6 +3,7 @@ import axios from 'axios'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import { formatKES, formatUSDC } from '../utils/formatCurrency'
 import { formatDateISO } from '../utils/formatDate'
+import { formatAccountNumber } from '../utils/formatAccountNumber'
 import { getAmountSign, getAmountColorClass, isCreditTransaction, isSwapTransaction } from '../utils/transactionDirection'
 import { ValidatedInput } from '../components/ValidatedInput'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
@@ -361,7 +362,7 @@ export default function Wallet() {
             <img src="${qrUrl}" alt="Settlement QR" />
             <div class="text">
               <h1>Settlement QR</h1>
-              <p>ACC: ${merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending'}</p>
+              <p>ACC: ${formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending')}</p>
               <p>MERCHANT: ${merchant?.businessName || 'Merchant'}</p>
             </div>
             <script>
@@ -865,7 +866,7 @@ export default function Wallet() {
                       <p className="text-[#2775CA] text-[9px] font-black uppercase tracking-[0.2em] leading-none">Settlement QR</p>
                     </div>
                     <div className="space-y-1.5 w-full">
-                      <p className="text-white text-[15px] font-mono font-bold tracking-widest leading-none">ACC: {merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending'}</p>
+                      <p className="text-white text-[15px] font-mono font-bold tracking-widest leading-none">ACC: {formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending')}</p>
                       <p className="text-[#8B98A9] text-[8px] font-bold uppercase tracking-widest leading-tight break-words px-1 opacity-80">MERCHANT: {merchant?.businessName || 'Merchant'}</p>
                     </div>
                   </div>
@@ -982,7 +983,7 @@ export default function Wallet() {
                         Narrative field), before showing a true pending state. */}
                     {(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode) ? (
                       <div className="flex items-center gap-3 bg-surface-container-low rounded-2xl px-5 py-4">
-                        <span className="font-mono text-lg md:text-xl font-bold text-primary tracking-widest">{merchant.ncbaVirtualAccountNumber || merchant.ncbaMerchantCode}</span>
+                        <span className="font-mono text-lg md:text-xl font-bold text-primary tracking-widest">{formatAccountNumber(merchant.ncbaVirtualAccountNumber || merchant.ncbaMerchantCode)}</span>
                         <button
                           onClick={() => {
                             const value = merchant.ncbaVirtualAccountNumber || merchant.ncbaMerchantCode

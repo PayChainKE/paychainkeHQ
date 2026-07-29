@@ -4,6 +4,7 @@ import { usePrivacyMode } from '../../hooks/usePrivacyMode'
 import { useMerchantAuth } from '../../context/MerchantAuthContext'
 import { useNotification } from '../../context/NotificationContext'
 import { formatKES } from '../../utils/formatCurrency'
+import { formatAccountNumber } from '../../utils/formatAccountNumber'
 import userIcon from '../../assets/user-icon.png'
 import logo from '../../assets/logo2.png'
 
@@ -180,7 +181,7 @@ export default function MerchantSidebar({ isOpen, onClose }) {
           </div>
           <div>
             <p className="text-white text-xs font-bold leading-tight truncate w-[130px]">{merchant?.businessName || 'Admin'}</p>
-            <p className="text-[#a8b3a8] text-[9px] uppercase tracking-wider mt-0.5">ACC: {merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending'}</p>
+            <p className="text-[#a8b3a8] text-[9px] uppercase tracking-wider mt-0.5">ACC: {formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending')}</p>
           </div>
         </div>
 

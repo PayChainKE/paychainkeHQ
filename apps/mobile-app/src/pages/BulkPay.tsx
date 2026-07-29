@@ -13,6 +13,7 @@ import { ValidatedTextInput } from '../components/ValidatedTextInput';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/config';
 import TopBar from '../components/layout/TopBar';
+import { formatAccountNumber } from '../utils/formatAccountNumber';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type PayeeType = 'employee' | 'supplier' | 'utility' | 'contractor';
@@ -763,7 +764,7 @@ export default function BulkPay() {
   // derived from the merchant's own profile, since there's no real
   // multi-account backend.
   const fundingSourceLabel = merchant?.businessName || 'Main Business Account';
-  const fundingSourceNumber = merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending';
+  const fundingSourceNumber = formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending');
 
   // ── Step 3: confirm funding source, then move to Security (OTP -> PIN) ──
   const proceedToFundingSourceSelect = (source: 'manual' | 'csv') => {

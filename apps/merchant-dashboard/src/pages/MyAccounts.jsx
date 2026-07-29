@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
+import { formatAccountNumber } from '../utils/formatAccountNumber'
 
 export default function MyAccounts() {
   const { merchant } = useMerchantAuth()
@@ -104,7 +105,7 @@ export default function MyAccounts() {
                           <span className="text-sm font-bold text-primary">{account.service}</span>
                         </div>
                       </td>
-                      <td className="py-5 px-4 border border-slate-300 text-sm font-bold tracking-tight text-primary">{account.accountNumber}</td>
+                      <td className="py-5 px-4 border border-slate-300 text-sm font-bold tracking-tight text-primary">{formatAccountNumber(account.accountNumber)}</td>
                       <td className="py-5 px-4 border border-slate-300 text-xs font-medium text-on-surface-variant"><span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider">{account.type}</span></td>
                       <td className="py-5 px-4 border border-slate-300 text-sm font-bold text-primary">{account.name}</td>
                       <td className="py-5 px-4 border border-slate-300 text-xs font-medium text-on-surface-variant italic opacity-60">{account.linkedTransferAccount}</td>

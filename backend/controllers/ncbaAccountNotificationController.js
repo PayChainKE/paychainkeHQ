@@ -16,7 +16,7 @@ import { timingSafeStringEqual } from '../utils/timingSafeCompare.js';
 import { buildNcbaOkResult, buildNcbaFailResult } from '../utils/ncbaSoapResponses.js';
 import { creditNcbaCollection, DuplicateCollectionError } from '../services/ncbaLedgerService.js';
 import { NcbaTariffBoundsError } from '../config/ncbaTariffCard.js';
-import { getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
+import { getNcbaVirtualAccountNumber, formatAccountNumberDisplay } from '../utils/ncbaValidators.js';
 
 const respondOk = (res, detail) => res.status(200).type('application/xml').send(buildNcbaOkResult(detail));
 const respondFail = (res, detail) => res.status(200).type('application/xml').send(buildNcbaFailResult(detail));
@@ -238,7 +238,7 @@ export const handleNcbaAccountNotification = async (req, res) => {
     // convention as the M-Pesa messages, which use Safaricom's TransTime
     // rather than the server's receive time.
     const { date, time } = formatTransactionDateTime(rawTransTime);
-    const accountRef = getNcbaVirtualAccountNumber(merchantCode) || merchantCode;
+    const accountRef = formatAccountNumberDisplay(getNcbaVirtualAccountNumber(merchantCode) || merchantCode);
 
     // CustomerName has proven more reliable than PhoneNr for actually
     // reaching the payer — observed live, PhoneNr has carried the Account

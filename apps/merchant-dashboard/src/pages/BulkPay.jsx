@@ -7,6 +7,7 @@ import MerchantLayout from '../components/layout/MerchantLayout'
 import FundAccountModal from '../components/modals/FundAccountModal'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { formatKES } from '../utils/formatCurrency'
+import { formatAccountNumber } from '../utils/formatAccountNumber'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useNotification } from '../context/NotificationContext'
 import { isValidPhoneKE } from '../utils/validators'
@@ -1487,7 +1488,7 @@ export default function BulkPay() {
                             </div>
                             <div>
                               <h5 className="font-bold text-sm text-primary leading-tight">{account.name}</h5>
-                              <p className="text-[10px] text-on-surface-variant font-medium mt-1 opacity-60">PayChain Account No: {account.number}</p>
+                              <p className="text-[10px] text-on-surface-variant font-medium mt-1 opacity-60">PayChain Account No: {formatAccountNumber(account.number)}</p>
                             </div>
                           </div>
                         </div>

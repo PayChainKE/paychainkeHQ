@@ -4,6 +4,7 @@ import { useMerchantAuth } from '../../context/MerchantAuthContext';
 import { ValidatedInput } from '../ValidatedInput';
 import { useToast } from '../../context/NotificationContext';
 import { formatKES } from '../../utils/formatCurrency';
+import { formatAccountNumber } from '../../utils/formatAccountNumber';
 
 const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
@@ -279,7 +280,7 @@ export default function FundAccountModal({ method, onClose }) {
                   <div key={label}>
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">{label}</span>
                     <div className="flex items-center justify-between bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3">
-                      <span className="font-bold text-primary text-sm">{value}</span>
+                      <span className="font-bold text-primary text-sm">{formatAccountNumber(value)}</span>
                       <button
                         onClick={() => navigator.clipboard.writeText(value)}
                         disabled={label === 'PayChain Account' && !ncbaAccountIsUsable}

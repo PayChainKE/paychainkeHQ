@@ -10,6 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api/config';
 import TopBar from '../components/layout/TopBar';
 import { isCreditTransaction as isInboundType, isDebitTransaction as isOutboundType, typeLabel as txTypeLabel } from '../utils/transactionDirection';
+import { formatAccountNumber } from '../utils/formatAccountNumber';
 
 type DateFilter = 'all' | 'today' | 'yesterday' | 'week' | 'last7' | 'month' | 'last30' | 'year' | 'custom';
 // Backend type enum includes the legacy 'inbound'/'outbound'/'bulk_pay'/
@@ -351,7 +352,7 @@ export default function Collections() {
       .join('');
 
     const businessName = esc(merchant?.businessName || 'Merchant');
-    const virtualAccountNumber = esc(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending');
+    const virtualAccountNumber = esc(formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending'));
 
     return `<!doctype html>
 <html>
@@ -652,7 +653,7 @@ export default function Collections() {
 
   return (
     <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
-      <TopBar title="Collections" subtitle={`Account ${merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'PENDING'}`} showBack={false} />
+      <TopBar title="Collections" subtitle={`Account ${formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'PENDING')}`} showBack={false} />
 
       <ScrollView
         className="flex-1 z-10 mt-6"
@@ -1139,7 +1140,7 @@ export default function Collections() {
                   {selectedTx ? counterpartyName(selectedTx) : 'Unknown'}
                 </Text>
                 <Text className="text-[10px] text-[#707971] font-jakarta-bold mt-1 uppercase tracking-widest">
-                  {selectedTx?.accountNumber || merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'SYSTEM'}
+                  {formatAccountNumber(selectedTx?.accountNumber || merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'SYSTEM')}
                 </Text>
               </View>
 

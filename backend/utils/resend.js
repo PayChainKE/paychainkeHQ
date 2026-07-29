@@ -1,5 +1,6 @@
 import { Resend } from 'resend';
 import dotenv from 'dotenv';
+import { formatAccountNumberDisplay } from './ncbaValidators.js';
 
 dotenv.config();
 
@@ -292,7 +293,7 @@ export const sendWelcomeEmail = async (email, name, password, phone, paybillAcco
   // merchant code alone as the Account Number; PayChain's webhook matches
   // it inside NCBA's Narrative field the same way it does for test
   // attribution (see Merchants.jsx's "NCBA Merchant Code" admin view).
-  const accountDisplay = ncbaVirtualAccountNumber || ncbaMerchantCode || 'Pending assignment';
+  const accountDisplay = formatAccountNumberDisplay(ncbaVirtualAccountNumber || ncbaMerchantCode || 'Pending assignment');
   const accountIsInterim = !ncbaVirtualAccountNumber && !!ncbaMerchantCode;
   try {
     const data = await resend.emails.send({
@@ -575,7 +576,7 @@ export const sendAdminActionOTP = async (email, otp, actionLabel, target) => {
 // Send Merchant Invite (Admin-Onboarded) — credentialless invite with a
 // single-use, time-limited setup link. We never send the password in the email.
 export const sendMerchantInvite = async (email, name, businessName, paybillAccount, setupLink, ncbaVirtualAccountNumber, ncbaMerchantCode) => {
-  const accountDisplay = ncbaVirtualAccountNumber || ncbaMerchantCode || 'Pending assignment';
+  const accountDisplay = formatAccountNumberDisplay(ncbaVirtualAccountNumber || ncbaMerchantCode || 'Pending assignment');
   const accountIsInterim = !ncbaVirtualAccountNumber && !!ncbaMerchantCode;
   try {
     const data = await resend.emails.send({

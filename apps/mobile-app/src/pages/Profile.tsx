@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
 import { useAuth } from '../context/AuthContext';
+import { formatAccountNumber } from '../utils/formatAccountNumber';
 import { ValidatedTextInput } from '../components/ValidatedTextInput';
 import api from '../api/config';
 import TopBar from '../components/layout/TopBar';
@@ -317,7 +318,7 @@ function BusinessProfilePanel({ merchant }: { merchant: any }) {
           <ProfileRow label="Business Name" value={merchant?.businessName || 'N/A'} />
           <ProfileRow label="Email" value={merchant?.email || 'N/A'} />
           <ProfileRow label="Phone" value={merchant?.phone || 'N/A'} />
-          <ProfileRow label="PayChain Account" value={merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending'} />
+          <ProfileRow label="PayChain Account" value={formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending')} />
           <ProfileRow label="KRA PIN" value={merchant?.kraPin || 'Not set'} />
           <ProfileRow label="Business Reg Number" value={merchant?.businessNumber || 'Not set'} />
         </View>
