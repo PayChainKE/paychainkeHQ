@@ -45,8 +45,9 @@ const NAV_SECTIONS = [
   {
     title: 'System Administration',
     items: [
-      { icon: 'badge',    label: 'Team',     path: '/team'     },
-      { icon: 'settings', label: 'Settings', path: '/settings' },
+      { icon: 'badge',       label: 'Team',      path: '/team'      },
+      { icon: 'how_to_reg',  label: 'Officers',  path: '/officers'  },
+      { icon: 'settings',    label: 'Settings',  path: '/settings'  },
     ],
   },
 ];

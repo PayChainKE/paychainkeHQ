@@ -61,9 +61,10 @@ const CATEGORY_TONE = {
 };
 
 const ACTOR_TONE = {
-  self:   'text-emerald-700',
-  admin:  'text-amber-700',
-  system: 'text-gray-500',
+  self:    'text-emerald-700',
+  admin:   'text-amber-700',
+  officer: 'text-blue-700',
+  system:  'text-gray-500',
 };
 
 const CATEGORY_OPTIONS = [
@@ -85,10 +86,11 @@ const SEVERITY_OPTIONS = [
 ];
 
 const ACTOR_OPTIONS = [
-  { v: 'all',    l: 'Any actor' },
-  { v: 'self',   l: 'Merchant (self)' },
-  { v: 'admin',  l: 'Admin' },
-  { v: 'system', l: 'System' },
+  { v: 'all',      l: 'Any actor' },
+  { v: 'self',     l: 'Merchant (self)' },
+  { v: 'admin',    l: 'Admin' },
+  { v: 'officer',  l: 'Officer' },
+  { v: 'system',   l: 'System' },
 ];
 
 const PLATFORM_OPTIONS = [
@@ -238,7 +240,7 @@ export default function AuditLog() {
         'Severity': r.severity || '',
         'Platform': r.platform || '',
         'Actor Type': r.actor?.type || 'self',
-        'Actor': r.actor?.type === 'admin' ? (r.actor?.name || r.actor?.email || 'admin') : '',
+        'Actor': ['admin', 'officer'].includes(r.actor?.type) ? (r.actor?.name || r.actor?.email || r.actor.type) : '',
         'Merchant Name': r.merchantName || '',
         'Merchant Email': r.merchantEmail || '',
         'IP': r.ip || '',
@@ -455,6 +457,7 @@ export default function AuditLog() {
                       <td className="py-2 px-3 border-b border-outline-variant/5 align-top">
                         <p className={`text-2xs font-bold ${actCls}`}>
                           {r.actor?.type === 'admin' ? r.actor?.name || r.actor?.email || 'admin'
+                            : r.actor?.type === 'officer' ? r.actor?.name || r.actor?.email || 'officer'
                             : r.actor?.type === 'system' ? 'System'
                             : 'Merchant'}
                         </p>

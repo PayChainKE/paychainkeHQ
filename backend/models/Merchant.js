@@ -111,6 +111,7 @@ const merchantSchema = new mongoose.Schema({
   paybillAccount: {
     type: String,
     unique: true,
+    sparse: true,
     minlength: 5,
     maxlength: 5,
   },
@@ -159,6 +160,95 @@ const merchantSchema = new mongoose.Schema({
     type: String,
     enum: ['web', 'mobile'],
     default: 'web',
+  },
+  // ── Onboarding-Officer KYC pipeline (unset for self-serve merchants) ──
+  // kybStatus has NO default — it must stay genuinely absent on every
+  // merchant created by self-serve signup or the admin direct-onboard flow,
+  // so `Merchant.find({ kybStatus: { $exists: true } })` scopes the officer
+  // queue to officer-originated applications only, permanently, with no
+  // migration/backfill needed for pre-existing merchants.
+  businessType: {
+    type: String,
+    default: null,
+    trim: true,
+  },
+  kybStatus: {
+    type: String,
+    enum: ['pending', 'requires_revision', 'approved', 'rejected'],
+  },
+  kybDocuments: {
+    type: [{
+      type: { type: String, enum: ['business_registration', 'kra_pin', 'national_id', 'address_proof'], required: true },
+      url: { type: String, required: true },
+      uploadedAt: { type: Date, default: Date.now },
+      status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+      note: { type: String, default: null },
+    }],
+    default: [],
+  },
+  kybChecklist: {
+    legalNameMatch: { type: Boolean, default: false },
+    ubosIdentified: { type: Boolean, default: false },
+    kraPinVerified: { type: Boolean, default: false },
+    tillVerified: { type: Boolean, default: false },
+    businessTypeCompliant: { type: Boolean, default: false },
+  },
+  riskTier: {
+    type: String,
+    enum: ['low', 'medium', 'high'],
+  },
+  onboardingOfficerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin',
+    default: null,
+  },
+  claimedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin',
+    default: null,
+  },
+  claimedAt: {
+    type: Date,
+    default: null,
+  },
+  kybNotes: {
+    type: [{
+      authorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
+      authorName: { type: String, default: null },
+      note: { type: String, required: true },
+      createdAt: { type: Date, default: Date.now },
+    }],
+    default: [],
+  },
+  submittedAt: {
+    type: Date,
+    default: null,
+  },
+  reviewedAt: {
+    type: Date,
+    default: null,
+  },
+  reviewedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin',
+    default: null,
+  },
+  resubmissionCount: {
+    type: Number,
+    default: 0,
+  },
+  // Public resubmission link token (sha256 hex at rest) — same shape as
+  // passwordResetToken above. Lets an applicant fix flagged KYC documents
+  // without officer involvement or re-entering everything from scratch.
+  kybResubmitToken: {
+    type: String,
+    select: false,
+    default: null,
+  },
+  kybResubmitTokenExpires: {
+    type: Date,
+    select: false,
+    default: null,
   },
   biometricsEnabled: {
     type: Boolean,

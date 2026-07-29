@@ -130,6 +130,11 @@ export const updateMe = async (req, res) => {
 // @access  Private (Admin)
 export const changePassword = async (req, res) => {
   try {
+    // Officers get their password set directly by an admin and can never
+    // change it themselves — only an admin's reset-password action may.
+    if (req.admin.role === 'officer') {
+      return res.status(403).json({ error: 'Officers cannot change their own password. Contact an admin.', code: 'OFFICER_PASSWORD_LOCKED' });
+    }
     const { currentPassword, newPassword } = req.body || {};
     if (!currentPassword || !newPassword) {
       return res.status(400).json({ error: 'Current and new password are required.' });

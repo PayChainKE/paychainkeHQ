@@ -18,9 +18,11 @@ import invoiceRoutes from './routes/invoiceRoutes.js';
 import cashAdvanceRoutes from './routes/cashAdvanceRoutes.js';
 import ncbaRoutes from './routes/ncbaRoutes.js';
 import merchantSmsAuthRoutes from './routes/merchantSmsAuthRoutes.js';
+import officerRoutes from './routes/officerRoutes.js';
 import { ensurePrimaryOwner } from './migrations/ensurePrimaryOwner.js';
 import { backfillTransactionFees } from './migrations/backfillTransactionFees.js';
 import { backfillNcbaMerchantCodes } from './migrations/backfillNcbaMerchantCodes.js';
+import { fixPaybillAccountSparseIndex } from './migrations/fixPaybillAccountSparseIndex.js';
 import { checkAndSendDormancyReminders } from './services/dormancyReminderService.js';
 import { runWeeklyRevenueSweepIfDue } from './services/revenueSweepService.js';
 
@@ -33,6 +35,9 @@ const allowedOrigins = [
   // Admin console
   'https://www.admin.paychain.co.ke',
   'https://admin.paychain.co.ke',
+  // Onboarding officer console
+  'https://www.officer.paychain.co.ke',
+  'https://officer.paychain.co.ke',
   // Merchant dashboard
   'https://www.app.paychain.co.ke',
   'https://app.paychain.co.ke',
@@ -49,12 +54,14 @@ const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:5174',
   'http://localhost:5175',
+  'http://localhost:5176',
   'http://localhost:5000',
   'http://localhost:8080',
   'http://localhost:8081',
   'http://127.0.0.1:5173',
   'http://127.0.0.1:5174',
   'http://127.0.0.1:5175',
+  'http://127.0.0.1:5176',
   'http://127.0.0.1:5000',
   'http://127.0.0.1:8081',
 ];
@@ -158,6 +165,7 @@ app.use('/api/auth', authRoutes);
 // under /api/auth (routes/authRoutes.js). See routes/merchantSmsAuthRoutes.js.
 app.use('/api/auth/merchant/sms', merchantSmsAuthRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/officer', officerRoutes);
 app.use('/api/waitlist', waitlistRoutes);
 app.use('/api/newsletter', newsletterRoutes);
 app.use('/api/contact', contactRoutes);
@@ -205,6 +213,7 @@ async function bootstrap() {
     await ensurePrimaryOwner();
     await backfillTransactionFees();
     await backfillNcbaMerchantCodes();
+    await fixPaybillAccountSparseIndex();
   } catch (error) {
     // Hard-exiting on a failed initial connection only makes sense for a
     // traditional long-running deploy — killing the process is meaningless

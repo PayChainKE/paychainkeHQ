@@ -1,0 +1,74 @@
+@import "tailwindcss";
+@source "./**/*.{js,jsx}";
+
+@theme {
+  --font-body: "Plus Jakarta Sans", sans-serif;
+  --font-headline: "DM Serif Display", serif;
+  --font-label: "Plus Jakarta Sans", sans-serif;
+
+  --color-primary: #00351d;
+  --color-primary-container: #0b4d2e;
+  --color-primary-fixed-dim: #86f8c9;
+
+  --color-secondary: #006c4e;
+  --color-secondary-fixed: #86f8c9;
+  --color-secondary-container: #cdffd8;
+
+  --color-surface: #F0FDF4;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f7faf7;
+  --color-surface-container: #eff4ef;
+  --color-surface-container-high: #e7ece7;
+  --color-surface-container-highest: #dfe5df;
+
+  --color-on-surface: #0c2010;
+  --color-on-surface-variant: #404942;
+  --color-outline: #707971;
+  --color-outline-variant: #bfc9bf;
+  --color-border-offwhite: #E5E7EB;
+  --color-error: #ba1a1a;
+
+  --shadow-editorial: 0px 8px 32px rgba(0, 53, 29, 0.05);
+  --shadow-premium-glow: 0px 4px 24px rgba(0, 108, 78, 0.12);
+
+  --radius-sm: 0.125rem;
+  --radius-md: 0.125rem;
+  --radius-lg: 0.25rem;
+  --radius-xl: 0.5rem;
+  --radius-2xl: 0.75rem;
+
+  --tracking-tight: -0.02em;
+  --tracking-tighter: -0.05em;
+
+  --text-2xs: 0.625rem; /* 10px */
+  --text-2xs--line-height: 0.875rem; /* 14px */
+}
+
+@layer base {
+  body {
+    background-color: var(--color-surface);
+    color: var(--color-on-surface);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  vertical-align: middle;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.pc-spinner {
+  @apply w-6 h-6 border-2 rounded-full animate-spin;
+  border-color: var(--color-surface-container-highest) transparent transparent transparent;
+  border-top-color: var(--color-primary);
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #c0c9c0; border-radius: 10px; }
