@@ -12,7 +12,7 @@ type ContactType =
   | '';
 
 const CONTACT_EMAIL = 'hello@paychainke.co';
-const CONTACT_PHONE = '+254 743 283 382';
+const CONTACT_PHONE = '+254 743 283 782';
 
 const CONTACT_TYPES: { value: ContactType; label: string }[] = [
   { value: 'merchant', label: 'Merchant or Business Owner' },
@@ -128,7 +128,7 @@ export default function Contact(): JSX.Element {
       body: "Our support team is Nairobi-based and responds to every message personally. Whether you want to understand how Cash Advance eligibility works, need help with your waitlist application, or just want to know if PayChain is right for your business — ask us directly.",
       response: 'We respond within 24 hours on business days',
       email: `mailto:${CONTACT_EMAIL}`,
-      phone: `tel:+254743283382`
+      phone: `tel:+254743283782`
     },
     {
       id: 'partnerships',
@@ -180,7 +180,7 @@ export default function Contact(): JSX.Element {
             <span className="text"><span className="label">Email</span><span className="value">{CONTACT_EMAIL}</span></span>
           </a>
           <div className="divider" />
-          <a className="detail-block" href={`tel:+254743283382`}>
+          <a className="detail-block" href={`tel:+254743283782`}>
             <span className="icon-circle"><PhoneIcon /></span>
             <span className="text"><span className="label">Phone</span><span className="value">{CONTACT_PHONE}</span></span>
           </a>
@@ -237,7 +237,7 @@ export default function Contact(): JSX.Element {
             <div className="contact-block">
               <div className="small-label">Or reach us directly</div>
               <a href={`mailto:${CONTACT_EMAIL}`} className="contact-link">{CONTACT_EMAIL}</a>
-              <a href={`tel:+254743283382`} className="contact-link">{CONTACT_PHONE}</a>
+              <a href={`tel:+254743283782`} className="contact-link">{CONTACT_PHONE}</a>
             </div>
           </div>
 

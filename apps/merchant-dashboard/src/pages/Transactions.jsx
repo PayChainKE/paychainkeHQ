@@ -5,6 +5,7 @@ import CalendarRangePicker from '../components/ui/CalendarRangePicker'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { formatDateISO } from '../utils/formatDate'
 import { formatKES, formatUSDC } from '../utils/formatCurrency'
+import { formatAccountNumber } from '../utils/formatAccountNumber'
 import { getAmountSign, getAmountColorClass, isCreditTransaction, isDebitTransaction } from '../utils/transactionDirection'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useNotification } from '../context/NotificationContext'
@@ -23,30 +24,46 @@ export default function Transactions() {
   const [liveTransactions, setLiveTransactions] = useState([])
   const [isLoading, setIsLoading] = useState(true)
 
-  useEffect(() => {
-    const fetchTransactions = async () => {
-      try {
-        const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
-        const token = localStorage.getItem('paychain_merchant_token');
-        const res = await axios.get(`${API_URL}/api/transactions`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setLiveTransactions(res.data);
-      } catch (err) {
-        console.error('Failed to load transactions', err);
-        setLiveTransactions([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const fetchTransactions = React.useCallback(async () => {
+    if (!merchant) return;
+    try {
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      const token = localStorage.getItem('paychain_merchant_token');
+      const res = await axios.get(`${API_URL}/api/transactions`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setLiveTransactions(res.data);
+    } catch (err) {
+      console.error('Failed to load transactions', err);
+      setLiveTransactions([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [merchant]);
 
+  // Initial load
+  useEffect(() => {
     if (merchant) {
       fetchTransactions();
     } else {
       setLiveTransactions([]);
       setIsLoading(false);
     }
-  }, [merchant]);
+  }, [merchant, fetchTransactions]);
+
+  // Poll every 5s so the transaction list stays live without a manual refresh
+  useEffect(() => {
+    if (!merchant) return;
+    const interval = setInterval(fetchTransactions, 5000);
+    return () => clearInterval(interval);
+  }, [merchant, fetchTransactions]);
+
+  // Also refresh instantly when the user returns to the tab
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchTransactions(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [fetchTransactions]);
   
   const filteredRows = liveTransactions.filter(t => {
     const matchesSearch = !searchQuery || 
@@ -219,7 +236,7 @@ export default function Transactions() {
 
     const acctLines = [
       ['Account Name',   merchant?.name        || '—', 'Business',   merchant?.businessName || '—'],
-      ['Paybill / PayChain Account',  `880100 / ${merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending'}`, 'Email', merchant?.email || '—'],
+      ['Paybill / PayChain Account',  `880100 / ${formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending')}`, 'Email', merchant?.email || '—'],
       ['Phone',          merchant?.phone        || '—', 'Statement Period', periodLabel],
     ]
     acctLines.forEach(([lk, lv, rk, rv]) => {
@@ -404,7 +421,7 @@ export default function Transactions() {
     doc.setDrawColor(200, 210, 205); doc.setLineWidth(0.3)
     doc.line(L, footerY - 4, R, footerY - 4)
     doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(140, 150, 145)
-    doc.text('This is a computer-generated statement and requires no signature. For support: support@paychain.co.ke | +254 743 283 382', W / 2, footerY, { align: 'center' })
+    doc.text('This is a computer-generated statement and requires no signature. For support: support@paychain.co.ke | +254 743 283 782', W / 2, footerY, { align: 'center' })
     doc.text(`© ${now.getFullYear()} PayChain Kenya Limited  •  Ref: ${statementId}  •  Page 1 of ${doc.internal.getNumberOfPages()}`, W / 2, footerY + 5, { align: 'center' })
 
     const filename = `PayChain_Statement_${now.toISOString().slice(0,10)}.pdf`
@@ -577,7 +594,7 @@ export default function Transactions() {
         {/* Page Title & Subtext */}
         <div className="mb-6 lg:mb-8">
           <h2 className="font-headline font-bold text-3xl lg:text-4xl text-primary tracking-tight">Transactions</h2>
-          <p className="text-on-surface-variant text-[11px] lg:text-sm font-medium mt-1.5 opacity-80">All money movements — payments in, withdrawals, swaps and bulk pays for account {merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending'}</p>
+          <p className="text-on-surface-variant text-[11px] lg:text-sm font-medium mt-1.5 opacity-80">All money movements — payments in, withdrawals, swaps and bulk pays for account {formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending')}</p>
         </div>
 
         {liveTransactions.length === 0 ? (
@@ -587,7 +604,7 @@ export default function Transactions() {
             </div>
             <h3 className="text-2xl font-headline font-bold text-primary mb-3">No Transactions Yet</h3>
             <p className="text-[15px] text-on-surface-variant font-medium max-w-md mx-auto leading-relaxed opacity-80">
-              Real-time payments made to your business account will appear here instantly. Instruct your customers to pay via M-Pesa Paybill <strong className="text-primary">880100</strong>, Account Number <strong className="text-primary">{merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending'}</strong>.
+              Real-time payments made to your business account will appear here instantly. Instruct your customers to pay via M-Pesa Paybill <strong className="text-primary">880100</strong>, Account Number <strong className="text-primary">{formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending')}</strong>.
             </p>
           </div>
         ) : (

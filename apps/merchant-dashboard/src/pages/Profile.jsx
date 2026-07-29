@@ -4,6 +4,7 @@ import { useToast } from '../context/NotificationContext'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { ValidatedInput } from '../components/ValidatedInput'
+import { formatAccountNumber } from '../utils/formatAccountNumber'
 import { BiometricRegisterButton } from '../components/BiometricButton'
 import { useNavigate, useLocation } from 'react-router-dom'
 import axios from 'axios'
@@ -816,7 +817,7 @@ export default function Profile() {
                   </div>
                   <div>
                     <p className="text-[9px] text-blue-200/50 font-bold uppercase tracking-widest mb-1">Account Number</p>
-                    <p className={`font-headline text-lg lg:text-xl tabular-nums transition-all duration-300 ${!showAmounts && 'blur-md'}`}>{merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending'}</p>
+                    <p className={`font-headline text-lg lg:text-xl tabular-nums transition-all duration-300 ${!showAmounts && 'blur-md'}`}>{formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending')}</p>
                   </div>
                 </div>
 

@@ -1,11 +1,15 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { useIdleTimer } from '../hooks/useIdleTimer';
+import SessionTimeoutModal from '../components/modals/SessionTimeoutModal';
 
 const MerchantAuthContext = createContext();
 
 const STORAGE_KEY = 'paychain_merchant_session';
 const TOKEN_KEY = 'paychain_merchant_token';
+const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
+const IDLE_WARNING_MS = 2 * 60 * 1000;
 
 // Use the Vercel staging or production API URL based on environment
 const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
@@ -75,6 +79,25 @@ export function MerchantAuthProvider({ children }) {
       console.error("Failed to refresh session", err);
     }
   }
+
+  // Poll for balance/profile changes so kesBalance (and everything else
+  // derived from `merchant`) stays live across every page without each one
+  // needing its own refresh loop. Keyed on merchant._id (not the whole
+  // object) so the interval isn't torn down and recreated on every tick.
+  useEffect(() => {
+    if (!merchant?._id) return;
+    const interval = setInterval(refreshSession, 5000);
+    return () => clearInterval(interval);
+  }, [merchant?._id]);
+
+  // Idle auto-logout — 15 min of no activity (any tab, any app), warned at
+  // 13 min. See hooks/useIdleTimer.js for why this shape was chosen.
+  const { showWarning: showIdleWarning, resetActivity: stayLoggedIn } = useIdleTimer({
+    timeoutMs: IDLE_TIMEOUT_MS,
+    warningMs: IDLE_WARNING_MS,
+    onIdle: logout,
+    enabled: !!merchant,
+  });
 
   async function signup(formData) {
     try {
@@ -220,6 +243,13 @@ export function MerchantAuthProvider({ children }) {
       refreshSession
     }}>
       {children}
+      {showIdleWarning && (
+        <SessionTimeoutModal
+          countdownSec={IDLE_WARNING_MS / 1000}
+          onStay={stayLoggedIn}
+          onLogout={logout}
+        />
+      )}
     </MerchantAuthContext.Provider>
   );
 }

@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api/config';
 import PrivateValue from '../components/PrivateValue';
 import { isCreditTransaction, isDebitTransaction } from '../utils/transactionDirection';
+import { formatAccountNumber } from '../utils/formatAccountNumber';
 
 type Timeframe = '7D' | '30D' | '6M';
 const DAY_NAMES = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
@@ -149,10 +150,10 @@ export default function Dashboard({ navigation }: any) {
   }, [merchant, fetchDashboardData]);
 
   // Keep the balance/chart/transaction data live, matching the merchant
-  // dashboard Overview's 30s poll + refetch-on-focus behavior.
+  // dashboard Overview's 5s poll + refetch-on-focus behavior.
   useEffect(() => {
     if (!merchant) return;
-    const interval = setInterval(fetchDashboardData, 30000);
+    const interval = setInterval(fetchDashboardData, 5000);
     return () => clearInterval(interval);
   }, [merchant, fetchDashboardData]);
 
@@ -277,7 +278,7 @@ export default function Dashboard({ navigation }: any) {
                   </View>
                 ) : <View />}
                 <View className="bg-white/10 px-3 py-1.5 rounded-full border border-white/20 mb-1">
-                  <Text className="text-white text-[10px] font-jakarta-bold uppercase tracking-widest">Account No: {merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'PENDING'}</Text>
+                  <Text className="text-white text-[10px] font-jakarta-bold uppercase tracking-widest">Account No: {formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'PENDING')}</Text>
                 </View>
               </View>
             </View>

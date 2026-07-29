@@ -43,8 +43,13 @@ const round2 = (value) => Math.round((value + Number.EPSILON) * 100) / 100;
  * @param {string} [params.customerPhone] - Optional: NCBA's reconciliation
  *        push doesn't guarantee a payer MSISDN (unlike the M-Pesa STK/C2B
  *        flows elsewhere in this codebase), so this may be omitted.
+ * @param {string} [params.customerName] - Optional: the payer's real name,
+ *        when the calling webhook actually received one (e.g. the account
+ *        notification webhook's parsed CustomerName field). Falls back to a
+ *        generic label when omitted — the plain reconciliation webhook has
+ *        no name field at all, so this is always omitted from that caller.
  */
-export async function creditNcbaCollection({ merchant, grossAmount, bankRef, customerPhone = null }) {
+export async function creditNcbaCollection({ merchant, grossAmount, bankRef, customerPhone = null, customerName = null }) {
   // Validate + price the collection up front — fail fast, before opening a
   // session, for an amount that was never going to be creditable.
   const { safaricomFee, markup, totalFee } = getNcbaTariffBand(grossAmount);
@@ -69,7 +74,7 @@ export async function creditNcbaCollection({ merchant, grossAmount, bankRef, cus
               currency: 'KES',
               status: 'completed',
               reference: bankRef,
-              sender: { name: 'NCBA Virtual Account Customer', id: customerPhone },
+              sender: { name: customerName || 'NCBA Virtual Account Customer', id: customerPhone },
               recipient: { name: merchant.businessName, id: merchant.ncbaMerchantCode },
               // paychainFee/safaricomFee/revenueStream are auto-stamped by
               // the Transaction pre-save hook via calculateFees(), which

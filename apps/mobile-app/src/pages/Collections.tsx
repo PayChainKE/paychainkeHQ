@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Modal, TextInput, ActivityIndicator, Alert, RefreshControl } from 'react-native';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,6 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api/config';
 import TopBar from '../components/layout/TopBar';
 import { isCreditTransaction as isInboundType, isDebitTransaction as isOutboundType, typeLabel as txTypeLabel } from '../utils/transactionDirection';
+import { formatAccountNumber } from '../utils/formatAccountNumber';
 
 type DateFilter = 'all' | 'today' | 'yesterday' | 'week' | 'last7' | 'month' | 'last30' | 'year' | 'custom';
 // Backend type enum includes the legacy 'inbound'/'outbound'/'bulk_pay'/
@@ -125,7 +126,7 @@ export default function Collections() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  const fetchTransactions = async () => {
+  const fetchTransactions = useCallback(async () => {
     try {
       const res = await api.get('/api/transactions');
       // Backend returns either a raw array (res.data is the array)
@@ -143,7 +144,7 @@ export default function Collections() {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (merchant) {
@@ -153,7 +154,14 @@ export default function Collections() {
       setTransactions([]);
       setIsLoading(false);
     }
-  }, [merchant]);
+  }, [merchant, fetchTransactions]);
+
+  // Poll every 5s so the collections list stays live without a manual refresh
+  useEffect(() => {
+    if (!merchant) return;
+    const interval = setInterval(fetchTransactions, 5000);
+    return () => clearInterval(interval);
+  }, [merchant, fetchTransactions]);
 
   const onRefresh = () => {
     setIsRefreshing(true);
@@ -351,7 +359,7 @@ export default function Collections() {
       .join('');
 
     const businessName = esc(merchant?.businessName || 'Merchant');
-    const virtualAccountNumber = esc(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending');
+    const virtualAccountNumber = esc(formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending'));
 
     return `<!doctype html>
 <html>
@@ -471,7 +479,7 @@ export default function Collections() {
       </table>`}
 
   <div class="footer">
-    This statement is computer-generated and serves as a true record of activity on the named account for the period indicated. For queries, contact PayChain support at support@paychain.co.ke or +254 743 283 382, Mon–Sat 7am–9pm. Verified via Safaricom Daraja API.
+    This statement is computer-generated and serves as a true record of activity on the named account for the period indicated. For queries, contact PayChain support at support@paychain.co.ke or +254 743 283 782, Mon–Sat 7am–9pm. Verified via Safaricom Daraja API.
     <div class="signature">
       <div class="col">
         <div class="line">PayChain Operations</div>
@@ -652,7 +660,7 @@ export default function Collections() {
 
   return (
     <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
-      <TopBar title="Collections" subtitle={`Account ${merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'PENDING'}`} showBack={false} />
+      <TopBar title="Collections" subtitle={`Account ${formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'PENDING')}`} showBack={false} />
 
       <ScrollView
         className="flex-1 z-10 mt-6"
@@ -1139,7 +1147,7 @@ export default function Collections() {
                   {selectedTx ? counterpartyName(selectedTx) : 'Unknown'}
                 </Text>
                 <Text className="text-[10px] text-[#707971] font-jakarta-bold mt-1 uppercase tracking-widest">
-                  {selectedTx?.accountNumber || merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'SYSTEM'}
+                  {formatAccountNumber(selectedTx?.accountNumber || merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'SYSTEM')}
                 </Text>
               </View>
 

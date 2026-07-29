@@ -62,7 +62,7 @@ const Footer: React.FC = () => {
             <div className="mt-4 space-y-2 text-center lg:text-left">
               <div className="flex items-center justify-center lg:justify-start gap-2 text-xs text-emerald-100/40">
                 <Phone className="w-3 h-3" />
-                <span>0743283382</span>
+                <span>0743283782</span>
               </div>
               <div className="flex flex-col gap-1 items-center lg:items-start">
                 <div className="flex items-center gap-2 text-xs text-emerald-100/40">

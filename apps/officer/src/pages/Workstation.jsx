@@ -277,7 +277,7 @@ const Workstation = () => {
         )}
 
         {toast && (
-          <div className="fixed bottom-6 right-6 z-50 bg-on-surface text-on-inverse-surface px-4 py-2.5 rounded-xl shadow-lg text-xs font-bold">{toast}</div>
+          <div className="fixed bottom-6 right-6 z-50 bg-on-surface text-white px-4 py-2.5 rounded-xl shadow-lg text-xs font-bold">{toast}</div>
         )}
 
         {revisionOpen && <RevisionModal onClose={() => setRevisionOpen(false)} onSubmit={handleRequestRevision} />}

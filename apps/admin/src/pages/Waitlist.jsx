@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Layout from '../components/layout/Layout';
 import api from '../api/api';
+import { formatAccountNumber } from '../utils/formatAccountNumber';
 
 // ── Constants ─────────────────────────────────────────────────────────
 const STATUS_META = {
@@ -991,7 +992,7 @@ const ConvertModal = ({ state, onClose, onConfirm }) => {
           <p className="text-sm text-on-surface-variant mb-4">A secure setup invite has been emailed to <strong>{state.done.email}</strong>.</p>
           <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 mb-5 inline-block">
             <p className="text-2xs font-bold uppercase tracking-widest text-emerald-700 mb-1">PayChain Account</p>
-            <p className="font-mono text-xl font-bold text-emerald-900">{state.done.ncbaVirtualAccountNumber || state.done.ncbaMerchantCode || 'Pending'}</p>
+            <p className="font-mono text-xl font-bold text-emerald-900">{formatAccountNumber(state.done.ncbaVirtualAccountNumber || state.done.ncbaMerchantCode || 'Pending')}</p>
           </div>
           <div>
             <button onClick={onClose} className="px-5 py-2.5 rounded-lg bg-primary text-white text-sm font-semibold uppercase tracking-widest hover:shadow-lg">Done</button>

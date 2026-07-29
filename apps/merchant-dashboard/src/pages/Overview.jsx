@@ -3,6 +3,7 @@ import axios from 'axios'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import RevenueChart from '../components/charts/RevenueChart'
 import { formatKES, formatUSDC } from '../utils/formatCurrency'
+import { formatAccountNumber } from '../utils/formatAccountNumber'
 import { getAmountSign, getAmountColorClassWithHover, isCreditTransaction, isDebitTransaction, isSwapTransaction } from '../utils/transactionDirection'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
@@ -63,10 +64,10 @@ export default function Overview() {
     else setIsLoading(false)
   }, [merchant, fetchData])
 
-  // Poll every 30 s so revenue chart and recent transactions stay live
+  // Poll every 5s so revenue chart and recent transactions stay live
   useEffect(() => {
     if (!merchant) return
-    const interval = setInterval(fetchData, 30000)
+    const interval = setInterval(fetchData, 5000)
     return () => clearInterval(interval)
   }, [merchant, fetchData])
 
@@ -238,7 +239,7 @@ export default function Overview() {
             <div className="flex justify-between items-start mb-8 lg:mb-10">
               <span className="bg-[#1F4D3C] text-[#5EFEB3] px-3 lg:px-4 py-1.5 rounded-full text-[8px] lg:text-[9px] font-black tracking-[0.15em] uppercase border border-white/10">Business Account</span>
               <div className="flex items-center gap-3 lg:gap-4 text-[8px] lg:text-[9px]">
-                <span className="text-white/40 uppercase font-bold tracking-[0.15em] hidden sm:inline">Acc: {merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending'}</span>
+                <span className="text-white/40 uppercase font-bold tracking-[0.15em] hidden sm:inline">Acc: {formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending')}</span>
                 <button
                   onClick={togglePrivacy}
                   className="text-white/40 hover:text-white transition-colors p-1"
@@ -559,7 +560,7 @@ export default function Overview() {
             </div>
             <div>
               <p className="text-[9px] font-bold text-emerald-800 uppercase tracking-[0.2em] mb-1">Growth Tip</p>
-              <p className="text-[11px] text-emerald-900 leading-snug font-medium opacity-80">Instruct your customers to pay via M-Pesa Paybill 880100, Account Number {merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || '...'}, to increase your daily volume.</p>
+              <p className="text-[11px] text-emerald-900 leading-snug font-medium opacity-80">Instruct your customers to pay via M-Pesa Paybill 880100, Account Number {formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || '...')}, to increase your daily volume.</p>
             </div>
           </section>
         </div>

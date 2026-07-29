@@ -6,7 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 // Same real contact details as the merchant dashboard's Support page
 // (apps/merchant-dashboard/src/pages/Support.jsx) — single source of truth
 // so mobile and web never drift apart again.
-const SUPPORT_WHATSAPP_URL = 'https://wa.me/254743283382';
+const SUPPORT_WHATSAPP_URL = 'https://wa.me/254743283782';
 const SUPPORT_EMAIL = 'support@paychain.co.ke';
 
 export default function SupportTab() {

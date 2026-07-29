@@ -1,5 +1,6 @@
 import { Resend } from 'resend';
 import dotenv from 'dotenv';
+import { formatAccountNumberDisplay } from './ncbaValidators.js';
 
 dotenv.config();
 
@@ -48,7 +49,7 @@ export const sendOTP = async (email, otp) => {
           </div>
           <div style="margin-top: 36px; padding-top: 20px; border-top: 1px solid #eee; text-align: center;">
             <p style="margin: 0; color: #aaa; font-size: 11px;">This is an automated <strong>no-reply</strong> email. Do not reply to this address.</p>
-            <p style="margin: 5px 0 0; color: #aaa; font-size: 11px;">Need help? Contact <a href="mailto:support@paychain.co.ke" style="color: #06201B; text-decoration: none; font-weight: 600;">support@paychain.co.ke</a> or call <strong>0743283382</strong></p>
+            <p style="margin: 5px 0 0; color: #aaa; font-size: 11px;">Need help? Contact <a href="mailto:support@paychain.co.ke" style="color: #06201B; text-decoration: none; font-weight: 600;">support@paychain.co.ke</a> or call <strong>0743283782</strong></p>
             <p style="margin: 15px 0 0; color: #ccc; font-size: 10px;">&copy; ${new Date().getFullYear()} PayChainKE. All rights reserved.</p>
           </div>
         </div>
@@ -90,7 +91,7 @@ export const sendWaitlistConfirmation = async (email, name) => {
             </div>
           </div>
           <div style="padding: 30px; background: #fafafa; border-top: 1px solid #eee; text-align: center;">
-            <p style="margin: 0; color: #aaa; font-size: 11px;">This is a <strong>no-reply</strong> email. For assistance, reach out to <a href="mailto:support@paychain.co.ke" style="color: #06201B; text-decoration: none; font-weight: 600;">support@paychain.co.ke</a> or <strong>0743283382</strong></p>
+            <p style="margin: 0; color: #aaa; font-size: 11px;">This is a <strong>no-reply</strong> email. For assistance, reach out to <a href="mailto:support@paychain.co.ke" style="color: #06201B; text-decoration: none; font-weight: 600;">support@paychain.co.ke</a> or <strong>0743283782</strong></p>
             <p style="margin: 10px 0 0; color: #bbb; font-size: 11px;">&copy; ${new Date().getFullYear()} PayChainKE. Empowering the next generation of African merchants.</p>
           </div>
         </div>
@@ -121,7 +122,7 @@ export const sendNewsletterConfirmation = async (email) => {
           </div>
           <hr style="border: 0; border-top: 1px solid #eee; margin: 40px 0;">
           <div style="text-align: center; color: #aaa; font-size: 11px;">
-            <p>This is a <strong>no-reply</strong> email. For support, contact <a href="mailto:support@paychain.co.ke" style="color: #06201B; text-decoration: none; font-weight: 600;">support@paychain.co.ke</a> or call <strong>0743283382</strong></p>
+            <p>This is a <strong>no-reply</strong> email. For support, contact <a href="mailto:support@paychain.co.ke" style="color: #06201B; text-decoration: none; font-weight: 600;">support@paychain.co.ke</a> or call <strong>0743283782</strong></p>
             <p style="margin-top: 10px;">&copy; ${new Date().getFullYear()} PayChainKE. All rights reserved.</p>
           </div>
         </div>
@@ -292,7 +293,7 @@ export const sendWelcomeEmail = async (email, name, password, phone, paybillAcco
   // merchant code alone as the Account Number; PayChain's webhook matches
   // it inside NCBA's Narrative field the same way it does for test
   // attribution (see Merchants.jsx's "NCBA Merchant Code" admin view).
-  const accountDisplay = ncbaVirtualAccountNumber || ncbaMerchantCode || 'Pending assignment';
+  const accountDisplay = formatAccountNumberDisplay(ncbaVirtualAccountNumber || ncbaMerchantCode || 'Pending assignment');
   const accountIsInterim = !ncbaVirtualAccountNumber && !!ncbaMerchantCode;
   try {
     const data = await resend.emails.send({
@@ -438,7 +439,7 @@ export const sendWelcomeEmail = async (email, name, password, phone, paybillAcco
       <tr><td style="background:#F9FAFB;border-top:1px solid #E5E7EB;border-radius:0 0 16px 16px;padding:28px 40px;text-align:center;">
         <p style="margin:0 0 6px;font-size:12px;color:#374151;font-weight:700;">PayChain Kenya</p>
         <p style="margin:0 0 12px;font-size:11px;color:#9CA3AF;line-height:1.6;">
-          Need help? Email <a href="mailto:support@paychain.co.ke" style="color:#06201B;font-weight:700;text-decoration:none;">support@paychain.co.ke</a> or call <strong>0743 283 382</strong>
+          Need help? Email <a href="mailto:support@paychain.co.ke" style="color:#06201B;font-weight:700;text-decoration:none;">support@paychain.co.ke</a> or call <strong>0743 283 782</strong>
         </p>
         <p style="margin:0;font-size:10px;color:#D1D5DB;">&copy; 2026 PayChain Kenya Limited. All rights reserved.</p>
       </td></tr>
@@ -575,7 +576,7 @@ export const sendAdminActionOTP = async (email, otp, actionLabel, target) => {
 // Send Merchant Invite (Admin-Onboarded) — credentialless invite with a
 // single-use, time-limited setup link. We never send the password in the email.
 export const sendMerchantInvite = async (email, name, businessName, paybillAccount, setupLink, ncbaVirtualAccountNumber, ncbaMerchantCode) => {
-  const accountDisplay = ncbaVirtualAccountNumber || ncbaMerchantCode || 'Pending assignment';
+  const accountDisplay = formatAccountNumberDisplay(ncbaVirtualAccountNumber || ncbaMerchantCode || 'Pending assignment');
   const accountIsInterim = !ncbaVirtualAccountNumber && !!ncbaMerchantCode;
   try {
     const data = await resend.emails.send({
@@ -616,7 +617,7 @@ export const sendMerchantInvite = async (email, name, businessName, paybillAccou
             </div>
           </div>
           <div style="padding: 28px; background: #fafafa; border-top: 1px solid #eee; text-align: center;">
-            <p style="margin: 0; color: #aaa; font-size: 11px;">This is a <strong>no-reply</strong> email. For assistance, contact <a href="mailto:support@paychain.co.ke" style="color: #06201B; text-decoration: none;">support@paychain.co.ke</a> or call <strong>0743283382</strong></p>
+            <p style="margin: 0; color: #aaa; font-size: 11px;">This is a <strong>no-reply</strong> email. For assistance, contact <a href="mailto:support@paychain.co.ke" style="color: #06201B; text-decoration: none;">support@paychain.co.ke</a> or call <strong>0743283782</strong></p>
             <p style="margin: 10px 0 0; color: #bbb; font-size: 11px;">&copy; ${new Date().getFullYear()} PayChainKE. All rights reserved.</p>
           </div>
         </div>

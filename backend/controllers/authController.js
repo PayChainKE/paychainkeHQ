@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import Admin from '../models/Admin.js';
 import { sendOTP } from '../utils/resend.js';
 import generateToken from '../utils/generateToken.js';
+import { logAudit } from '../utils/auditLog.js';
 
 // Cryptographically generate a 6-digit OTP (avoids Math.random predictability).
 function generateOtp() {
@@ -197,6 +198,20 @@ export const verifyOTP = async (req, res) => {
     admin.lastLogin = new Date();
     admin.loginCount = (admin.loginCount || 0) + 1;
     await admin.save();
+
+    // Officer sign-ins are part of the same activity trail as the rest of
+    // their KYC-pipeline actions (see officerController.js) — the admin
+    // Audit Log page already filters by actor type 'officer'.
+    if (admin.role === 'officer') {
+      logAudit({
+        action: 'officer.login.success',
+        category: 'auth',
+        severity: 'info',
+        message: `${admin.name || admin.email} logged in`,
+        actor: { type: 'officer', id: admin._id, email: admin.email, name: admin.name },
+        req,
+      });
+    }
 
     res.json({
       success: true,

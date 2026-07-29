@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import api from '../api/api';
@@ -50,7 +50,7 @@ const NewApplication = () => {
         <div>
           <p className="text-2xs font-bold uppercase tracking-[0.3em] text-primary/60 mb-1">New KYC Application</p>
           <h1 className="text-2xl md:text-4xl font-bold text-on-surface tracking-tighter font-headline">Onboard a merchant</h1>
-          <p className="text-on-surface-variant/60 mt-1 text-sm">Enter the business's details and upload whatever KYC documents are available. Missing documents can be added later.</p>
+          <p className="text-on-surface-variant/60 mt-1 text-sm">Enter the business's details. Documents are optional — you can upload a file, take a photo, or submit without any and add them later.</p>
         </div>
 
         <form onSubmit={submit} className="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl p-6 shadow-editorial space-y-5">
@@ -79,17 +79,11 @@ const NewApplication = () => {
           </div>
 
           <div className="border-t border-outline-variant/10 pt-5">
-            <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 mb-3">KYC Documents</p>
+            <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 mb-1">KYC Documents</p>
+            <p className="text-2xs text-on-surface-variant/50 mb-3">Optional — none of these are required to submit. Add what you have now; the rest can be uploaded later.</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {DOC_TYPES.map((d) => (
-                <Field key={d.key} label={d.label}>
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,application/pdf"
-                    onChange={(e) => setFile(d.key, e.target.files?.[0] || null)}
-                    className="w-full text-xs file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-primary/10 file:text-primary file:text-2xs file:font-bold file:uppercase file:tracking-widest"
-                  />
-                </Field>
+                <DocUploadField key={d.key} label={d.label} file={files[d.key]} onChange={(f) => setFile(d.key, f)} />
               ))}
             </div>
           </div>
@@ -112,6 +106,52 @@ const NewApplication = () => {
 };
 
 const inputClass = 'w-full px-3 py-2.5 border border-outline-variant/40 rounded-lg text-sm focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none';
+
+// Two hidden file inputs behind styled buttons: one plain file picker, one
+// with capture="environment" which mobile browsers open directly to the
+// camera. Both feed the same onChange — the resulting File is identical
+// either way, so the backend/API layer never needs to know which was used.
+const DocUploadField = ({ label, file, onChange }) => {
+  const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
+
+  return (
+    <div>
+      <label className="block text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 mb-1.5">{label}</label>
+      <div className="flex items-center gap-2 flex-wrap">
+        <button type="button" onClick={() => fileInputRef.current?.click()} className="px-3 py-2 rounded-lg bg-primary/10 text-primary text-2xs font-bold uppercase tracking-widest flex items-center gap-1.5 hover:bg-primary/20 transition-all">
+          <span className="material-symbols-outlined text-sm">upload_file</span>
+          Upload
+        </button>
+        <button type="button" onClick={() => cameraInputRef.current?.click()} className="px-3 py-2 rounded-lg bg-primary/10 text-primary text-2xs font-bold uppercase tracking-widest flex items-center gap-1.5 hover:bg-primary/20 transition-all">
+          <span className="material-symbols-outlined text-sm">photo_camera</span>
+          Take Photo
+        </button>
+        {file && (
+          <button type="button" onClick={() => onChange(null)} title="Remove" className="p-2 text-on-surface-variant/40 hover:text-red-600 transition-colors">
+            <span className="material-symbols-outlined text-sm">close</span>
+          </button>
+        )}
+      </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,application/pdf"
+        onChange={(e) => onChange(e.target.files?.[0] || null)}
+        className="hidden"
+      />
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={(e) => onChange(e.target.files?.[0] || null)}
+        className="hidden"
+      />
+      <p className="text-2xs text-on-surface-variant/60 mt-1.5 truncate">{file ? file.name : 'No document selected yet'}</p>
+    </div>
+  );
+};
 
 const Field = ({ label, required, children }) => (
   <div>

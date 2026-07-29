@@ -180,7 +180,7 @@ export default function FAQPage(): JSX.Element {
           <h1 className="headline">How Can We Help You Scale?</h1>
           <p className="sub">
             Comprehensive documentation and strategic technical analysis for merchants operating on the PayChain ecosystem. 
-            Can't find a solution? Reach us directly at <a href="tel:+254743283382" className="underline-link">+254 743 283 382</a> or <a href="mailto:support@paychain.co.ke" className="underline-link">support@paychain.co.ke</a>
+            Can't find a solution? Reach us directly at <a href="tel:+254743283782" className="underline-link">+254 743 283 782</a> or <a href="mailto:support@paychain.co.ke" className="underline-link">support@paychain.co.ke</a>
           </p>
 
           <div className="search-wrapper" role="search" aria-label="Search FAQ">

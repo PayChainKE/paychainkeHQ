@@ -10,6 +10,7 @@ import {
   validatePhoneNumber,
   validateTransactionReference,
   getNcbaVirtualAccountNumber,
+  formatAccountNumberDisplay,
   NcbaValidationError,
 } from '../utils/ncbaValidators.js';
 import { creditNcbaCollection, DuplicateCollectionError } from '../services/ncbaLedgerService.js';
@@ -114,7 +115,7 @@ export const handleNcbaReconciliationWebhook = async (req, res) => {
     // NCBA_INSTITUTION_PREFIX is configured, else the bare 8-digit
     // merchant code as a fallback.
     const { date, time } = formatTransactionDateTime();
-    const accountRef = getNcbaVirtualAccountNumber(merchantCode) || merchantCode;
+    const accountRef = formatAccountNumberDisplay(getNcbaVirtualAccountNumber(merchantCode) || merchantCode);
 
     if (customerPhone) {
       // businessName is the only unbounded field — reference, amount,

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import Layout from '../components/layout/Layout';
 import api from '../api/api';
 import TablePagination from '../components/ui/TablePagination';
+import { formatAccountNumber } from '../utils/formatAccountNumber';
 
 const PAGE_SIZE = 20;
 
@@ -616,7 +617,7 @@ const Merchants = () => {
                       </td>
                       <td className="py-2 px-3 border-b border-outline-variant/5">
                         <span className={`font-mono text-xs font-bold px-2 py-1 rounded ${m.ncbaVirtualAccountNumber ? 'text-on-surface bg-surface-container-low' : m.ncbaMerchantCode ? 'text-amber-800 bg-amber-50' : 'text-on-surface-variant/50 bg-surface-container-low'}`}>
-                          {m.ncbaVirtualAccountNumber || m.ncbaMerchantCode || 'Pending'}
+                          {formatAccountNumber(m.ncbaVirtualAccountNumber || m.ncbaMerchantCode || 'Pending')}
                         </span>
                       </td>
                       <td className="py-2 px-3 border-b border-outline-variant/5">
@@ -718,7 +719,7 @@ const Merchants = () => {
                   {success.ncbaVirtualAccountNumber ? (
                     <>
                       <p className="text-2xs font-bold uppercase tracking-widest text-emerald-700 mb-1">PayChain Account</p>
-                      <p className="font-mono text-xl font-bold text-emerald-900">{success.ncbaVirtualAccountNumber}</p>
+                      <p className="font-mono text-xl font-bold text-emerald-900">{formatAccountNumber(success.ncbaVirtualAccountNumber)}</p>
                     </>
                   ) : (
                     <>
@@ -1232,7 +1233,7 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
               <Row label="Paybill" value={<span className="font-mono">880100</span>} />
               <Row label="Account Number" value={
                 m.ncbaVirtualAccountNumber
-                  ? <span className="font-mono font-bold text-base text-on-surface bg-surface-container-low px-2 py-1 rounded">{m.ncbaVirtualAccountNumber}</span>
+                  ? <span className="font-mono font-bold text-base text-on-surface bg-surface-container-low px-2 py-1 rounded">{formatAccountNumber(m.ncbaVirtualAccountNumber)}</span>
                   : m.ncbaMerchantCode
                     ? <span className="font-mono font-bold text-base text-on-surface bg-amber-50 text-amber-800 px-2 py-1 rounded" title="Interim account number — full number pending bank assignment. Safe to give out for payments and testing.">{m.ncbaMerchantCode}</span>
                     : <span className="font-mono font-bold text-base text-on-surface bg-surface-container-low px-2 py-1 rounded">Pending bank assignment</span>

@@ -872,6 +872,24 @@ export const initiateB2C = async (req, res) => {
   }
 };
 
+// Daraja's B2C result payload carries a ResultParameters.ResultParameter
+// array of { Key, Value } pairs, one of which (when present) is
+// ReceiverPartyPublicName — Safaricom's own verified "254712345678 - JOHN
+// DOE" string for who the money actually landed with. Extracts just the
+// name portion, or null if the field is missing (older Daraja response
+// shapes, or a failed payout never reaching a named recipient).
+function extractReceiverName(result) {
+  const params = result?.ResultParameters?.ResultParameter;
+  if (!Array.isArray(params)) return null;
+  const entry = params.find((p) => p?.Key === 'ReceiverPartyPublicName');
+  const value = entry?.Value;
+  if (!value || typeof value !== 'string') return null;
+  // Split only on the first " - " so a name that itself contains a hyphen
+  // (e.g. "MARY-JANE DOE") survives intact.
+  const match = value.match(/^[^-]*-\s*(.+)$/);
+  return match?.[1]?.trim() || null;
+}
+
 export const b2cCallback = async (req, res) => {
   // Summary only, not the full payload — ResultParameters carries the
   // recipient's name/phone (PII) which doesn't need to sit in plaintext
@@ -901,6 +919,17 @@ export const b2cCallback = async (req, res) => {
 
     if (transaction && transaction.status === 'pending') {
       transaction.status = succeeded ? 'completed' : 'failed';
+      // Reconcile the merchant's self-typed recipient label with Safaricom's
+      // own verified name for who the payout actually reached — covers both
+      // single B2C sends and bulk-pay Mobile Money rows, which both resolve
+      // through this same callback. Never overwrite a good label with
+      // nothing: only applied when Daraja actually included the field.
+      if (succeeded) {
+        const receiverName = extractReceiverName(result);
+        if (receiverName) {
+          transaction.recipient.name = receiverName;
+        }
+      }
       await transaction.save();
 
       let merchantForSms = null;
