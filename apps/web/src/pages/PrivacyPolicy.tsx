@@ -161,7 +161,7 @@ const PrivacyPolicy: React.FC = () => {
                   <p><strong className="text-gray-800">Registration No.:</strong> <span className="text-gray-600">PVT-9L1QY658</span></p>
                   <p><strong className="text-gray-800">Address:</strong> <span className="text-gray-600">Nairobi, Kenya</span></p>
                   <p><strong className="text-gray-800">Email:</strong> <span className="text-gray-600">info@paychain.co.ke</span></p>
-                  <p><strong className="text-gray-800">Phone:</strong> <span className="text-gray-600">+254 790 889 066</span></p>
+                  <p><strong className="text-gray-800">Phone:</strong> <span className="text-gray-600">+254 743 283 382</span></p>
                 </div>
                 <p>
                   We are in the process of registering with the Office of the Data Protection
@@ -549,7 +549,7 @@ const PrivacyPolicy: React.FC = () => {
                   <div className="space-y-2 text-sm text-gray-600">
                     <p className="flex items-center gap-2"><MapPin className="w-4 h-4 text-emerald-600" /> Nairobi, Kenya</p>
                     <p className="flex items-center gap-2"><Mail className="w-4 h-4 text-emerald-600" /> <a href="mailto:admin@paychain.co.ke" className="hover:text-emerald-700">admin@paychain.co.ke</a></p>
-                    <p className="flex items-center gap-2"><Phone className="w-4 h-4 text-emerald-600" /> +254 790 889 066</p>
+                    <p className="flex items-center gap-2"><Phone className="w-4 h-4 text-emerald-600" /> +254 743 283 382</p>
                     <p className="flex items-center gap-2">
                       Web:{' '}
                       <a href="https://www.paychain.co.ke/privacy-policy" className="hover:text-emerald-700">
