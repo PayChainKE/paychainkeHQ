@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 const FloatingWhatsApp: React.FC = () => {
   return (
     <motion.a
-      href="https://wa.me/254790889066"
+      href="https://wa.me/254743283382"
       target="_blank"
       rel="noopener noreferrer"
       className="fixed bottom-6 right-6 sm:bottom-8 sm:right-8 z-[100] flex items-center gap-2 sm:gap-3 bg-[#25D366] text-white px-4 py-3 sm:px-6 sm:py-3.5 rounded-full shadow-[0_8px_30px_rgba(37,211,102,0.3)] hover:shadow-[0_8px_40px_rgba(37,211,102,0.5)] hover:-translate-y-1 transition-all duration-300"

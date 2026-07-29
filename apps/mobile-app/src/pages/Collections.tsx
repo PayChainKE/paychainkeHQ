@@ -471,7 +471,7 @@ export default function Collections() {
       </table>`}
 
   <div class="footer">
-    This statement is computer-generated and serves as a true record of activity on the named account for the period indicated. For queries, contact PayChain support at support@paychain.co.ke or +254 790 889 066, Mon–Sat 7am–9pm. Verified via Safaricom Daraja API.
+    This statement is computer-generated and serves as a true record of activity on the named account for the period indicated. For queries, contact PayChain support at support@paychain.co.ke or +254 743 283 382, Mon–Sat 7am–9pm. Verified via Safaricom Daraja API.
     <div class="signature">
       <div class="col">
         <div class="line">PayChain Operations</div>
