@@ -1,8 +1,12 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/api';
+import { useIdleTimer } from '../hooks/useIdleTimer';
+import SessionTimeoutModal from '../components/modals/SessionTimeoutModal';
 
 const AuthContext = createContext();
+const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
+const IDLE_WARNING_MS = 2 * 60 * 1000;
 
 export function AuthProvider({ children }){
   const [admin, setAdmin] = useState(null);
@@ -79,9 +83,25 @@ export function AuthProvider({ children }){
     navigate('/login');
   }
 
+  // Idle auto-logout — 15 min of no activity (any tab, any app), warned at
+  // 13 min. See hooks/useIdleTimer.js for why this shape was chosen.
+  const { showWarning: showIdleWarning, resetActivity: stayLoggedIn } = useIdleTimer({
+    timeoutMs: IDLE_TIMEOUT_MS,
+    warningMs: IDLE_WARNING_MS,
+    onIdle: logout,
+    enabled: !!admin,
+  });
+
   return (
     <AuthContext.Provider value={{ admin, isLoading, isAuthenticated: !!admin, login, verifyOtp, logout }}>
       {children}
+      {showIdleWarning && (
+        <SessionTimeoutModal
+          countdownSec={IDLE_WARNING_MS / 1000}
+          onStay={stayLoggedIn}
+          onLogout={logout}
+        />
+      )}
     </AuthContext.Provider>
   );
 }
