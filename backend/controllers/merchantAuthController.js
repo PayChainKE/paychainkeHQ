@@ -54,18 +54,6 @@ async function dispatchOtp(merchant, { viaPhone, otp }) {
   return { channel: 'email', maskedPhone: null };
 }
 
-// Helper to generate unique 5-digit account number
-const generateUniquePaybillAccount = async () => {
-  let isUnique = false;
-  let accountNum;
-  while (!isUnique) {
-    accountNum = Math.floor(10000 + Math.random() * 90000).toString();
-    const existing = await Merchant.findOne({ paybillAccount: accountNum });
-    if (!existing) isUnique = true;
-  }
-  return accountNum;
-};
-
 // @desc    Register a new merchant
 // @route   POST /api/auth/merchant/register
 // @access  Public
@@ -118,7 +106,12 @@ export const registerMerchant = async (req, res) => {
     const certificateUrl = certificateFile ? certificateFile.path : null;
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
-    const paybillAccount = await generateUniquePaybillAccount();
+    // paybillAccount (the old 5-digit shared-Paybill sub-account) is
+    // deliberately no longer assigned to new merchants — the live payment
+    // rail is the NCBA virtual account (ncbaMerchantCode), auto-assigned by
+    // the Merchant model's pre-save hook. See RetiredMerchantCode.js /
+    // PR history for why the field itself is kept (existing merchants still
+    // have one) rather than dropped from the schema.
 
     const merchant = await Merchant.create({
       name,
@@ -131,7 +124,6 @@ export const registerMerchant = async (req, res) => {
       certificateUrl,
       otp,
       otpExpires,
-      paybillAccount,
       kesBalance: 0,
       usdcBalance: 0,
       isVerified: true,

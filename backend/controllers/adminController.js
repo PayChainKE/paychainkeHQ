@@ -83,22 +83,6 @@ const safeEqual = (a, b) => {
   return crypto.timingSafeEqual(A, B);
 };
 
-// Generate unique 5-digit paybill account number (PayChain merchant account).
-// Exported so officerController.js's approval flow (which mirrors this
-// activation step for officer-onboarded merchants) reuses the same logic
-// instead of a second, independently-drifting copy.
-export const generateUniquePaybillAccount = async () => {
-  for (let i = 0; i < 25; i++) {
-    const candidate = (crypto.randomInt(10000, 100000)).toString();
-    const [exists, retired] = await Promise.all([
-      Merchant.exists({ paybillAccount: candidate }),
-      RetiredMerchantCode.exists({ type: 'paybillAccount', code: candidate }),
-    ]);
-    if (!exists && !retired) return candidate;
-  }
-  throw new Error('Could not allocate a unique merchant account number');
-};
-
 const MERCHANT_DASHBOARD_URL =
   process.env.MERCHANT_DASHBOARD_URL || 'https://app.paychain.co.ke';
 
@@ -725,7 +709,10 @@ export const createMerchant = async (req, res) => {
       return res.status(409).json({ error: 'A merchant with that business registration number already exists.' });
     }
 
-    const paybillAccount = await generateUniquePaybillAccount();
+    // paybillAccount (the old 5-digit shared-Paybill sub-account) is
+    // deliberately no longer assigned to new merchants — the live payment
+    // rail is the NCBA virtual account (ncbaMerchantCode), auto-assigned by
+    // the Merchant model's pre-save hook.
 
     // Generate a 32-byte raw token (URL-safe) and store only its sha256.
     const rawToken = crypto.randomBytes(32).toString('hex');
@@ -739,7 +726,6 @@ export const createMerchant = async (req, res) => {
       businessName,
       kraPin,
       businessNumber,
-      paybillAccount,
       registrationSource: 'web',
       isVerified: true,
       invitedBy: req.admin?._id || null,
@@ -749,7 +735,7 @@ export const createMerchant = async (req, res) => {
 
     const setupLink = `${MERCHANT_DASHBOARD_URL.replace(/\/$/, '')}/setup-password?token=${rawToken}`;
 
-    sendMerchantInvite(email, name, businessName, paybillAccount, setupLink, getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode), merchant.ncbaMerchantCode).catch((err) => {
+    sendMerchantInvite(email, name, businessName, null, setupLink, getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode), merchant.ncbaMerchantCode).catch((err) => {
       console.error(`📧 Failed to send invite to ${email}:`, err);
     });
 
@@ -757,7 +743,6 @@ export const createMerchant = async (req, res) => {
       action: 'admin.merchant.created', category: 'admin', severity: 'success',
       message: `Onboarded by admin — invite sent to ${email}`,
       merchant, actor: adminActor(req.admin), req,
-      metadata: { paybillAccount },
     });
 
     res.status(201).json({

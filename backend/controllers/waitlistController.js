@@ -2,7 +2,6 @@ import crypto from 'crypto';
 import mongoose from 'mongoose';
 import Waitlist from '../models/Waitlist.js';
 import Merchant from '../models/Merchant.js';
-import RetiredMerchantCode from '../models/RetiredMerchantCode.js';
 import { sendWaitlistConfirmation, sendMerchantInvite } from '../utils/resend.js';
 import { getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
 
@@ -255,20 +254,10 @@ export const convertWaitlistEntry = async (req, res) => {
       return res.status(409).json({ error: 'A merchant with that phone already exists.' });
     }
 
-    // Mint unique paybill (retry up to 25× — collision is vanishingly rare).
-    let paybillAccount;
-    for (let i = 0; i < 25; i++) {
-      const candidate = crypto.randomInt(10000, 100000).toString();
-      const [exists, retired] = await Promise.all([
-        Merchant.exists({ paybillAccount: candidate }),
-        RetiredMerchantCode.exists({ type: 'paybillAccount', code: candidate }),
-      ]);
-      if (!exists && !retired) { paybillAccount = candidate; break; }
-    }
-    if (!paybillAccount) {
-      return res.status(500).json({ error: 'Could not allocate a unique account number.' });
-    }
-
+    // paybillAccount (the old 5-digit shared-Paybill sub-account) is
+    // deliberately no longer assigned to new merchants — the live payment
+    // rail is the NCBA virtual account (ncbaMerchantCode), auto-assigned by
+    // the Merchant model's pre-save hook.
     const rawToken = crypto.randomBytes(32).toString('hex');
     const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
     const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -278,7 +267,6 @@ export const convertWaitlistEntry = async (req, res) => {
       email: entry.email,
       phone,
       businessName: entry.businessName,
-      paybillAccount,
       registrationSource: 'web',
       isVerified: true,
       invitedBy: req.admin?._id || null,
@@ -287,7 +275,7 @@ export const convertWaitlistEntry = async (req, res) => {
     });
 
     const setupLink = `${MERCHANT_DASHBOARD_URL.replace(/\/$/, '')}/setup-password?token=${rawToken}`;
-    sendMerchantInvite(entry.email, entry.fullName, entry.businessName, paybillAccount, setupLink, getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode), merchant.ncbaMerchantCode)
+    sendMerchantInvite(entry.email, entry.fullName, entry.businessName, null, setupLink, getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode), merchant.ncbaMerchantCode)
       .catch((err) => console.error('Convert: invite email failed:', err));
 
     entry.status = 'converted';
@@ -302,7 +290,6 @@ export const convertWaitlistEntry = async (req, res) => {
       data: {
         waitlistId: entry._id,
         merchantId: merchant._id,
-        paybillAccount,
         ncbaMerchantCode: merchant.ncbaMerchantCode,
         ncbaVirtualAccountNumber: getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode),
         email: entry.email,
