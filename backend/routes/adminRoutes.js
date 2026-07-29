@@ -32,6 +32,13 @@ import {
   removeTeamMember,
   resendInvite,
 } from '../controllers/teamController.js';
+import {
+  listOfficers,
+  createOfficer,
+  updateOfficerStatus,
+  resetOfficerPassword,
+  deleteOfficer,
+} from '../controllers/officerAccountController.js';
 import { runWalletAudit } from '../controllers/walletAuditController.js';
 import { adminListInvoices } from '../controllers/invoiceController.js';
 import { getRevenue, getRevenueSweeps, triggerRevenueSweep, getReconciliations, submitReconciliation } from '../controllers/revenueController.js';
@@ -143,5 +150,13 @@ router.post('/team',                         protect, sensitiveActionLimiter, in
 router.patch('/team/:id',                    protect, updateTeamMember);
 router.delete('/team/:id',                   protect, removeTeamMember);
 router.post('/team/:id/resend-invite',       protect, sensitiveActionLimiter, resendInvite);
+
+// Onboarding officer account management (owner/admin only — officers can
+// never manage their own or each other's accounts).
+router.get('/officers',                      protect, requireMutator, listOfficers);
+router.post('/officers',                     protect, requireMutator, sensitiveActionLimiter, createOfficer);
+router.patch('/officers/:id',                protect, requireMutator, updateOfficerStatus);
+router.post('/officers/:id/reset-password',  protect, requireMutator, sensitiveActionLimiter, resetOfficerPassword);
+router.delete('/officers/:id',               protect, requireMutator, deleteOfficer);
 
 export default router;

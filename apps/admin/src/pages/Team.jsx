@@ -26,14 +26,6 @@ const STATUS_META = {
 // data, and intentionally separate from the live roster.
 const FUTURE_CONSOLES = [
   {
-    title: 'Onboarding Officer Console',
-    icon: 'how_to_reg',
-    tone: 'amber',
-    desc: 'Dedicated workspace for officers to onboard merchants, drive KYB checklists, request additional documents, and approve activations.',
-    capabilities: ['Queue of pending merchants', 'In-app KYB checklist + doc capture', 'Side-by-side document viewer', 'Approve / reject with reason', 'Officer leaderboard'],
-    eta: 'Q3 2026',
-  },
-  {
     title: 'CMO Marketing Console',
     icon: 'campaign',
     tone: 'pink',

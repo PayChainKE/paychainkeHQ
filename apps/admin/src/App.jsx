@@ -10,6 +10,7 @@ import Analytics from './pages/Analytics';
 import Messages from './pages/Messages';
 import Settings from './pages/Settings';
 import Team from './pages/Team';
+import Officers from './pages/Officers';
 import Ledger from './pages/Ledger';
 import CashAdvanceRequests from './pages/CashAdvanceRequests';
 import Newsletter from './pages/Newsletter';
@@ -41,6 +42,7 @@ export default function App(){
             <Route path="/waitlist" element={<Protected><Waitlist/></Protected>} />
             <Route path="/newsletter" element={<Protected><Newsletter/></Protected>} />
             <Route path="/team" element={<Protected><Team/></Protected>} />
+            <Route path="/officers" element={<Protected><Officers/></Protected>} />
             <Route path="/merchants" element={<Protected><Merchants/></Protected>} />
             <Route path="/analytics" element={<Protected><Analytics/></Protected>} />
             <Route path="/messages" element={<Protected><Messages/></Protected>} />

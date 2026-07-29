@@ -18,7 +18,7 @@ const AuditLogSchema = new mongoose.Schema({
   // Who performed the action. Self = same merchant; admin = an admin acted
   // on the merchant; system = automated process / boot migration.
   actor: {
-    type: { type: String, enum: ['self', 'admin', 'system'], default: 'self', index: true },
+    type: { type: String, enum: ['self', 'admin', 'officer', 'system'], default: 'self', index: true },
     id:    { type: mongoose.Schema.Types.ObjectId, default: null },
     email: { type: String, default: null },
     name:  { type: String, default: null },

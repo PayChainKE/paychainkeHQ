@@ -83,7 +83,10 @@ const safeEqual = (a, b) => {
 };
 
 // Generate unique 5-digit paybill account number (PayChain merchant account).
-const generateUniquePaybillAccount = async () => {
+// Exported so officerController.js's approval flow (which mirrors this
+// activation step for officer-onboarded merchants) reuses the same logic
+// instead of a second, independently-drifting copy.
+export const generateUniquePaybillAccount = async () => {
   for (let i = 0; i < 25; i++) {
     const candidate = (crypto.randomInt(10000, 100000)).toString();
     const exists = await Merchant.exists({ paybillAccount: candidate });
@@ -98,7 +101,7 @@ const MERCHANT_DASHBOARD_URL =
 // Generate every common storage variation of a Kenyan phone number so we can
 // detect duplicates regardless of how a previous record was saved (e.g. `0790...`,
 // `254790...`, `+254790...`, bare `790...`).
-const phoneVariations = (raw) => {
+export const phoneVariations = (raw) => {
   const cleaned = String(raw).replace(/\s+/g, '');
   let base = cleaned;
   if (base.startsWith('+254')) base = base.substring(4);

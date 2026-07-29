@@ -671,6 +671,141 @@ export const sendTeamInvite = async (email, name, role, invitedByName, setupLink
   }
 };
 
+// Officer credentials — unlike sendTeamInvite/sendMerchantInvite, this
+// states the login email + password directly rather than a setup link,
+// because officers can never self-set a password (only an admin's
+// create/reset action can). Weaker than the invite-link pattern used
+// elsewhere — an accepted tradeoff for this role, not an oversight.
+export const sendOfficerCredentials = async (email, name, password, loginUrl, adminName) => {
+  try {
+    const data = await resend.emails.send({
+      from: 'PayChain Console <info@paychain.co.ke>',
+      to: [email],
+      subject: 'Your PayChain Onboarding Officer account',
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 16px; overflow: hidden; background: #fff;">
+          <div style="background: linear-gradient(135deg, #06201B 0%, #0a3029 100%); padding: 44px 30px 46px; text-align: center; color: #fff;">
+            <div style="margin-bottom: 22px;">${logoImgWhite(126)}</div>
+            <h1 style="margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -0.5px;">Your officer account is ready</h1>
+            <p style="margin: 10px 0 0; color: #5EFEB3; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 2px;">PayChain Onboarding Console</p>
+          </div>
+          <div style="padding: 40px 30px;">
+            <h2 style="margin: 0 0 16px; color: #111; font-size: 22px;">Hi ${name || email.split('@')[0]},</h2>
+            <p style="color: #444; line-height: 1.7; font-size: 15px;"><strong>${adminName}</strong> created an Onboarding Officer account for you. Use the credentials below to sign in.</p>
+
+            <div style="margin: 24px 0; padding: 22px; background: #f0fdf4; border-radius: 12px; border: 1px solid #bbf7d0;">
+              <p style="margin: 0 0 8px; color: #14532d; font-size: 14px;"><strong>Login email:</strong> ${email}</p>
+              <p style="margin: 0; color: #14532d; font-size: 14px;"><strong>Password:</strong> <span style="font-family: monospace; font-size: 15px;">${password}</span></p>
+            </div>
+
+            <div style="margin: 30px 0; text-align: center;">
+              <a href="${loginUrl}" style="background: #00351D; color: #fff; padding: 14px 32px; text-decoration: none; border-radius: 10px; font-weight: 700; font-size: 15px; display: inline-block;">Sign In</a>
+            </div>
+
+            <div style="margin-top: 24px; padding: 16px; background: #fff7ed; border-radius: 10px; border: 1px solid #fed7aa;">
+              <p style="margin: 0; color: #9a3412; font-size: 12px; line-height: 1.6;"><strong>Note:</strong> Only an admin can change this password — you cannot reset it yourself. Contact ${adminName} or your PayChain administrator if you need it changed. Sign-in also requires a one-time code emailed to you at each login.</p>
+            </div>
+          </div>
+          <div style="padding: 28px; background: #fafafa; border-top: 1px solid #eee; text-align: center;">
+            <p style="margin: 0; color: #aaa; font-size: 11px;">For assistance contact <a href="mailto:support@paychain.co.ke" style="color: #06201B; text-decoration: none;">support@paychain.co.ke</a></p>
+            <p style="margin: 10px 0 0; color: #bbb; font-size: 11px;">&copy; ${new Date().getFullYear()} PayChainKE. All rights reserved.</p>
+          </div>
+        </div>
+      `,
+    });
+    console.log(`📧 Officer credentials sent to ${email}`);
+    return data;
+  } catch (error) {
+    console.error('❌ Resend Officer Credentials Error:', error);
+    throw new Error('Failed to send officer credentials email');
+  }
+};
+
+const KYB_DOC_LABELS = {
+  business_registration: 'Business Registration Certificate',
+  kra_pin: 'KRA PIN Certificate',
+  national_id: 'National ID / Passport',
+  address_proof: 'Proof of Address',
+};
+
+// Sent when an onboarding officer requests revision on a KYC application —
+// tells the applicant exactly which documents to fix and gives them a
+// direct link to re-upload just those, without redoing the whole application.
+export const sendKybRevisionRequest = async (email, name, businessName, docTypes, message, resubmitLink) => {
+  const docList = (docTypes || []).map((t) => KYB_DOC_LABELS[t] || t).join(', ');
+  try {
+    const data = await resend.emails.send({
+      from: 'PayChain Onboarding <info@paychain.co.ke>',
+      to: [email],
+      subject: `Action needed: your PayChain application for ${businessName}`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 16px; overflow: hidden; background: #fff;">
+          <div style="background: linear-gradient(135deg, #06201B 0%, #0a3029 100%); padding: 44px 30px 46px; text-align: center; color: #fff;">
+            <div style="margin-bottom: 22px;">${logoImgWhite(126)}</div>
+            <h1 style="margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -0.5px;">A few documents need fixing</h1>
+          </div>
+          <div style="padding: 40px 30px;">
+            <h2 style="margin: 0 0 16px; color: #111; font-size: 22px;">Hi ${name || email.split('@')[0]},</h2>
+            <p style="color: #444; line-height: 1.7; font-size: 15px;">We're reviewing your PayChain merchant application for <strong>${businessName}</strong>. Before we can continue, please re-upload:</p>
+            <ul style="color: #444; line-height: 1.8; font-size: 15px;">
+              ${(docTypes || []).map((t) => `<li>${KYB_DOC_LABELS[t] || t}</li>`).join('')}
+            </ul>
+            <div style="margin: 20px 0; padding: 18px; background: #fff7ed; border-radius: 10px; border: 1px solid #fed7aa;">
+              <p style="margin: 0; color: #9a3412; font-size: 14px; line-height: 1.6;">${message}</p>
+            </div>
+            <div style="margin: 30px 0; text-align: center;">
+              <a href="${resubmitLink}" style="background: #00351D; color: #fff; padding: 14px 32px; text-decoration: none; border-radius: 10px; font-weight: 700; font-size: 15px; display: inline-block;">Re-upload Documents</a>
+            </div>
+            <p style="color: #666; font-size: 13px; line-height: 1.6; text-align: center; margin: 0;">This link expires in <strong>7 days</strong>. You only need to re-upload the document(s) listed above — everything else stays as submitted.</p>
+          </div>
+          <div style="padding: 28px; background: #fafafa; border-top: 1px solid #eee; text-align: center;">
+            <p style="margin: 0; color: #aaa; font-size: 11px;">For assistance contact <a href="mailto:support@paychain.co.ke" style="color: #06201B; text-decoration: none;">support@paychain.co.ke</a></p>
+            <p style="margin: 10px 0 0; color: #bbb; font-size: 11px;">&copy; ${new Date().getFullYear()} PayChainKE. All rights reserved.</p>
+          </div>
+        </div>
+      `,
+    });
+    console.log(`📧 KYB revision request sent to ${email} (${docList})`);
+    return data;
+  } catch (error) {
+    console.error('❌ Resend KYB Revision Request Error:', error);
+    throw new Error('Failed to send KYB revision request email');
+  }
+};
+
+// Sent on a hard reject. Generic and brief on purpose — the officer's
+// internal rejection note is never included, it's for internal audit only.
+export const sendKybRejection = async (email, name, businessName) => {
+  try {
+    const data = await resend.emails.send({
+      from: 'PayChain Onboarding <info@paychain.co.ke>',
+      to: [email],
+      subject: `Update on your PayChain application for ${businessName}`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 16px; overflow: hidden; background: #fff;">
+          <div style="background: linear-gradient(135deg, #06201B 0%, #0a3029 100%); padding: 40px 30px; text-align: center; color: #fff;">
+            <div style="margin-bottom: 22px;">${logoImgWhite(126)}</div>
+            <h1 style="margin: 0; font-size: 24px; font-weight: 800;">Application update</h1>
+          </div>
+          <div style="padding: 40px 30px;">
+            <h2 style="margin: 0 0 16px; color: #111; font-size: 20px;">Hi ${name || email.split('@')[0]},</h2>
+            <p style="color: #444; line-height: 1.7; font-size: 15px;">Your PayChain merchant application for <strong>${businessName}</strong> was not approved at this time.</p>
+            <p style="color: #444; line-height: 1.7; font-size: 15px;">If you believe this is a mistake or would like more information, contact <a href="mailto:support@paychain.co.ke" style="color: #06201B;">support@paychain.co.ke</a>.</p>
+          </div>
+          <div style="padding: 28px; background: #fafafa; border-top: 1px solid #eee; text-align: center;">
+            <p style="margin: 0; color: #bbb; font-size: 11px;">&copy; ${new Date().getFullYear()} PayChainKE. All rights reserved.</p>
+          </div>
+        </div>
+      `,
+    });
+    console.log(`📧 KYB rejection notice sent to ${email}`);
+    return data;
+  } catch (error) {
+    console.error('❌ Resend KYB Rejection Error:', error);
+    throw new Error('Failed to send KYB rejection email');
+  }
+};
+
 // Confirmation email sent after a merchant successfully resets their
 // password. Industry best-practice: never email the new password itself —
 // emails sit in inboxes, backups and ESP logs indefinitely. Instead we send
