@@ -1,8 +1,16 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
-import { Platform } from 'react-native';
+import { AppState, AppStateStatus, Platform } from 'react-native';
 import api from '../api/config';
+
+// Re-lock threshold — if the app has been backgrounded for at least this
+// long, returning to the foreground re-arms the PIN gate (isPinUnlocked ->
+// false), same as a stranger picking the phone up needing to re-enter it.
+// Short enough to tolerate a quick app-switch (e.g. reading an SMS OTP)
+// without nagging, long enough that leaving the phone unattended for real
+// doesn't stay unlocked indefinitely.
+const REAUTH_BACKGROUND_MS = 30_000;
 
 const AuthContext = createContext<any>(null);
 
@@ -53,6 +61,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // hasBiometricToken = true when a JWT is stored in SecureStore (OS encrypted).
   // Biometric quick-login only works when this is true (there's a credential to unlock).
   const [hasBiometricToken, setHasBiometricToken] = useState(false);
+
+  // ── Re-lock on return from background ─────────────────────────────────────
+  // Plain ref, not state — this is a timestamp bookkeeping value read only
+  // inside the AppState listener itself, so there's nothing to re-render for.
+  const backgroundedAtRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const handleAppStateChange = (nextState: AppStateStatus) => {
+      if (nextState === 'background') {
+        backgroundedAtRef.current = Date.now();
+        return;
+      }
+      if (nextState !== 'active') return;
+
+      const backgroundedAt = backgroundedAtRef.current;
+      backgroundedAtRef.current = null;
+      if (backgroundedAt === null) return;
+      if (Date.now() - backgroundedAt < REAUTH_BACKGROUND_MS) return;
+
+      // Only matters once the user has actually unlocked into the app with
+      // a PIN set — re-locking a merchant who's still on Login/Onboarding
+      // is a no-op AppNavigator.tsx would ignore anyway, but skip the state
+      // update entirely rather than firing it pointlessly on every return.
+      setIsPinUnlocked((wasUnlocked: boolean) => (wasUnlocked ? false : wasUnlocked));
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription.remove();
+  }, []);
 
   // ── Session restore on app launch ─────────────────────────────────────────
   useEffect(() => {

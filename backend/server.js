@@ -2,7 +2,7 @@ import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import helmet from 'helmet';
-import connectDB, { isDbReady, startBackgroundDbRetry } from './config/database.js';
+import connectDB, { isDbReady, startBackgroundDbRetry, disconnectDB } from './config/database.js';
 import { requireDb } from './middleware/requireDb.js';
 import authRoutes from './routes/authRoutes.js';
 import waitlistRoutes from './routes/waitlistRoutes.js';
@@ -230,12 +230,45 @@ async function bootstrap() {
     return;
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
     if (!isDbReady()) {
       console.warn('⚠️ MongoDB not connected — retrying in background');
     }
   });
+
+  // Graceful shutdown — stop accepting new HTTP connections, then close the
+  // Mongo connection cleanly, so a Render redeploy (SIGTERM) doesn't leave
+  // stale pooled connections sitting against the connection-count limit
+  // until Atlas gets around to reaping them itself.
+  let shuttingDown = false;
+  const shutdown = (signal) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(`\n🛑 ${signal} received — closing HTTP server and MongoDB connection`);
+
+    // Render kills the process shortly after SIGTERM regardless — don't let
+    // a hung close() prevent exiting within that grace period.
+    const forceExitTimer = setTimeout(() => {
+      console.warn('⚠️ Graceful shutdown timed out — forcing exit');
+      process.exit(1);
+    }, 9_000);
+    forceExitTimer.unref();
+
+    server.close(async () => {
+      try {
+        await disconnectDB();
+        console.log('✅ MongoDB connection closed');
+      } catch (err) {
+        console.error('Error closing MongoDB connection:', err.message);
+      } finally {
+        clearTimeout(forceExitTimer);
+        process.exit(0);
+      }
+    });
+  };
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 
   // Daily dormancy-reminder sweep. Long-running-process only (the
   // `isServerless` early return above guarantees this line never runs

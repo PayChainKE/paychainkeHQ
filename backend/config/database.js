@@ -138,4 +138,19 @@ export const startBackgroundDbRetry = () => {
   scheduleReconnect();
 };
 
+// Closes the Mongo connection cleanly on process shutdown — without this,
+// a Render redeploy (SIGTERM to the old instance) leaves that instance's
+// pooled connections to linger until Atlas notices the socket died on its
+// own, rather than closing them immediately. On a shared M0 cluster
+// (500-connection cap) that lag adds up fast across frequent deploys.
+export const disconnectDB = async () => {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  if (mongoose.connection.readyState !== 0) {
+    await mongoose.connection.close();
+  }
+};
+
 export default connectDB;
