@@ -6,9 +6,16 @@ dotenv.config();
 // Fail fast instead of buffering queries for 10s when Mongo isn't connected yet.
 mongoose.set('bufferCommands', false);
 
+// maxPoolSize lowered from 10 -> 5 as a stopgap against the shared Atlas M0
+// tier's connection cap / SystemOverloadedError shedding — this is a single
+// Render instance (WEB_CONCURRENCY=1), so 5 concurrent in-flight operations
+// is still plenty of headroom for current traffic while cutting this app's
+// own contribution to the connection count in half. Doesn't raise the
+// underlying cap or fix shared-tier throttling from other Atlas tenants —
+// just reduces how often this app brushes up against either.
 const CONNECT_OPTS = {
   serverSelectionTimeoutMS: 12_000,
-  maxPoolSize: 10,
+  maxPoolSize: 5,
   heartbeatFrequencyMS: 10_000,
 };
 
