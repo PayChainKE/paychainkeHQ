@@ -728,7 +728,6 @@ const Merchants = () => {
                       <p className="text-2xs text-on-surface-variant/60 mt-1">Interim number — full account pending bank assignment. Safe to give out for payments and testing.</p>
                     </>
                   )}
-                  <p className="text-2xs text-on-surface-variant/50 mt-3 pt-2 border-t border-emerald-100">PayChain Reference No. <span className="font-mono font-semibold text-on-surface-variant">{success.paybillAccount}</span></p>
                 </div>
                 <div className="flex gap-2 justify-center">
                   <button onClick={() => setShowModal(false)} className="px-5 py-2.5 rounded-lg bg-primary text-white text-sm font-semibold uppercase tracking-widest hover:shadow-lg active:scale-95 transition-all">Done</button>

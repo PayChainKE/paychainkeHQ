@@ -7,6 +7,7 @@ import PayoutBatch from '../models/PayoutBatch.js';
 import STKRequest from '../models/STKRequest.js';
 import Payee from '../models/Payee.js';
 import PaymentLink from '../models/PaymentLink.js';
+import RetiredMerchantCode from '../models/RetiredMerchantCode.js';
 import Waitlist from '../models/Waitlist.js';
 import Contact from '../models/Contact.js';
 import Communication from '../models/Communication.js';
@@ -80,19 +81,6 @@ const safeEqual = (a, b) => {
   const B = Buffer.from(String(b));
   if (A.length !== B.length) return false;
   return crypto.timingSafeEqual(A, B);
-};
-
-// Generate unique 5-digit paybill account number (PayChain merchant account).
-// Exported so officerController.js's approval flow (which mirrors this
-// activation step for officer-onboarded merchants) reuses the same logic
-// instead of a second, independently-drifting copy.
-export const generateUniquePaybillAccount = async () => {
-  for (let i = 0; i < 25; i++) {
-    const candidate = (crypto.randomInt(10000, 100000)).toString();
-    const exists = await Merchant.exists({ paybillAccount: candidate });
-    if (!exists) return candidate;
-  }
-  throw new Error('Could not allocate a unique merchant account number');
 };
 
 const MERCHANT_DASHBOARD_URL =
@@ -354,12 +342,32 @@ export const confirmMerchantAction = async (req, res) => {
         message: `Account permanently deleted — "${merchant.businessName || merchant.email}"`,
         merchant, actor: adminActor(admin), req,
       });
+      // Retire this merchant's account-identifier codes permanently, before
+      // deleting them, so the random generators for ncbaMerchantCode/
+      // paybillAccount never hand them out to a future, unrelated merchant
+      // (see RetiredMerchantCode.js for why that matters).
+      const retirements = [];
+      if (merchant.ncbaMerchantCode) {
+        retirements.push({ type: 'ncbaMerchantCode', code: merchant.ncbaMerchantCode, formerMerchantId: merchant._id, formerBusinessName: merchant.businessName || null });
+      }
+      if (merchant.paybillAccount) {
+        retirements.push({ type: 'paybillAccount', code: merchant.paybillAccount, formerMerchantId: merchant._id, formerBusinessName: merchant.businessName || null });
+      }
+
       await Promise.all([
         Transaction.deleteMany({ merchantId: merchant._id }),
         PayoutBatch.deleteMany({ merchantId: merchant._id }),
         STKRequest.deleteMany({ merchantId: merchant._id }),
         Payee.deleteMany({ merchantId: merchant._id }),
         PaymentLink.deleteMany({ merchantId: merchant._id }),
+        retirements.length
+          ? RetiredMerchantCode.insertMany(retirements, { ordered: false }).catch((err) => {
+              // A duplicate-key here just means this code was already
+              // retired (e.g. a prior partial delete) — never let it block
+              // the actual deletion.
+              console.error('Failed to retire merchant code(s):', err?.message || err);
+            })
+          : Promise.resolve(),
       ]);
       await Merchant.deleteOne({ _id: merchant._id });
     }
@@ -701,7 +709,10 @@ export const createMerchant = async (req, res) => {
       return res.status(409).json({ error: 'A merchant with that business registration number already exists.' });
     }
 
-    const paybillAccount = await generateUniquePaybillAccount();
+    // paybillAccount (the old 5-digit shared-Paybill sub-account) is
+    // deliberately no longer assigned to new merchants — the live payment
+    // rail is the NCBA virtual account (ncbaMerchantCode), auto-assigned by
+    // the Merchant model's pre-save hook.
 
     // Generate a 32-byte raw token (URL-safe) and store only its sha256.
     const rawToken = crypto.randomBytes(32).toString('hex');
@@ -715,7 +726,6 @@ export const createMerchant = async (req, res) => {
       businessName,
       kraPin,
       businessNumber,
-      paybillAccount,
       registrationSource: 'web',
       isVerified: true,
       invitedBy: req.admin?._id || null,
@@ -725,7 +735,7 @@ export const createMerchant = async (req, res) => {
 
     const setupLink = `${MERCHANT_DASHBOARD_URL.replace(/\/$/, '')}/setup-password?token=${rawToken}`;
 
-    sendMerchantInvite(email, name, businessName, paybillAccount, setupLink, getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode), merchant.ncbaMerchantCode).catch((err) => {
+    sendMerchantInvite(email, name, businessName, null, setupLink, getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode), merchant.ncbaMerchantCode).catch((err) => {
       console.error(`📧 Failed to send invite to ${email}:`, err);
     });
 
@@ -733,7 +743,6 @@ export const createMerchant = async (req, res) => {
       action: 'admin.merchant.created', category: 'admin', severity: 'success',
       message: `Onboarded by admin — invite sent to ${email}`,
       merchant, actor: adminActor(req.admin), req,
-      metadata: { paybillAccount },
     });
 
     res.status(201).json({

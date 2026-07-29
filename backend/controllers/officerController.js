@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import mongoose from 'mongoose';
 import Merchant from '../models/Merchant.js';
 import { logAudit } from '../utils/auditLog.js';
-import { generateUniquePaybillAccount, phoneVariations } from './adminController.js';
+import { phoneVariations } from './adminController.js';
 import { getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
 import { sendMerchantInvite, sendKybRevisionRequest, sendKybRejection } from '../utils/resend.js';
 
@@ -412,14 +412,16 @@ export const approveApplication = async (req, res) => {
       return res.status(400).json({ error: 'Assign a risk tier before approving.' });
     }
 
-    const paybillAccount = await generateUniquePaybillAccount();
+    // paybillAccount (the old 5-digit shared-Paybill sub-account) is
+    // deliberately no longer assigned on approval — the live payment rail
+    // is the NCBA virtual account (ncbaMerchantCode), already auto-assigned
+    // by the Merchant model's pre-save hook when the application was created.
     const rawToken = crypto.randomBytes(32).toString('hex');
     const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
     const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
 
     application.isVerified = true;
     application.kybStatus = 'approved';
-    application.paybillAccount = paybillAccount;
     application.passwordResetToken = hashedToken;
     application.passwordResetExpires = expires;
     application.reviewedAt = new Date();
@@ -428,7 +430,7 @@ export const approveApplication = async (req, res) => {
 
     const setupLink = `${MERCHANT_DASHBOARD_URL.replace(/\/$/, '')}/setup-password?token=${rawToken}`;
     sendMerchantInvite(
-      application.email, application.name, application.businessName, paybillAccount, setupLink,
+      application.email, application.name, application.businessName, null, setupLink,
       getNcbaVirtualAccountNumber(application.ncbaMerchantCode), application.ncbaMerchantCode
     ).catch((err) => console.error(`📧 Failed to send approval invite to ${application.email}:`, err));
 
@@ -436,10 +438,10 @@ export const approveApplication = async (req, res) => {
       action: 'officer.application.approved', category: 'admin', severity: 'success',
       message: `Approved and activated — invite sent to ${application.email}`,
       merchant: application, actor: actorFor(req.admin), req,
-      metadata: { paybillAccount, riskTier: application.riskTier },
+      metadata: { riskTier: application.riskTier },
     });
 
-    res.json({ success: true, data: { _id: application._id, kybStatus: 'approved', isVerified: true, paybillAccount } });
+    res.json({ success: true, data: { _id: application._id, kybStatus: 'approved', isVerified: true } });
   } catch (error) {
     console.error('Approve Application Error:', error);
     if (error.code === 11000) return res.status(409).json({ error: 'Could not allocate account details — please retry.' });
