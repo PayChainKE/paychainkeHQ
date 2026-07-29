@@ -301,6 +301,20 @@ export const authorizeBatch = async (req, res) => {
       return res.status(400).json({ message: 'No transactions to process' });
     }
 
+    // batchRows is client-supplied (round-tripped from the upload-csv preview) —
+    // a negative netAmount here would make totalNet negative below, which
+    // would pass the kesBalance >= totalNet check for free and then credit
+    // the merchant via $inc: { kesBalance: -totalNet }. Every row's amounts
+    // must be validated as positive before they're allowed anywhere near
+    // the balance math.
+    for (const row of batchRows) {
+      const netAmount = Number(row.netAmount);
+      const grossAmount = Number(row.grossAmount);
+      if (!Number.isFinite(netAmount) || netAmount <= 0 || !Number.isFinite(grossAmount) || grossAmount <= 0) {
+        return res.status(400).json({ message: `Invalid amount for payee "${row.name || 'unknown'}" — amounts must be positive numbers.` });
+      }
+    }
+
     const merchant = await Merchant.findById(req.merchant._id).select('+bulkPayPin');
     if (!merchant) return res.status(404).json({ message: 'Merchant not found' });
 
