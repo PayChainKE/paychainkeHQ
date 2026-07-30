@@ -6,16 +6,20 @@ dotenv.config();
 // Fail fast instead of buffering queries for 10s when Mongo isn't connected yet.
 mongoose.set('bufferCommands', false);
 
-// maxPoolSize lowered from 10 -> 5 as a stopgap against the shared Atlas M0
-// tier's connection cap / SystemOverloadedError shedding — this is a single
-// Render instance (WEB_CONCURRENCY=1), so 5 concurrent in-flight operations
-// is still plenty of headroom for current traffic while cutting this app's
-// own contribution to the connection count in half. Doesn't raise the
-// underlying cap or fix shared-tier throttling from other Atlas tenants —
-// just reduces how often this app brushes up against either.
+// maxPoolSize: the 10 -> 5 stopgap (2026-07-30 AM) turned out to be too
+// tight once the 5s dashboard-polling feature (commit 2474ed0) is factored
+// in — every open merchant/admin/officer tab now checks out a connection
+// every 5s, and with only 5 slots total those polling requests were queuing
+// ahead of payment-webhook writes (M-Pesa confirmation, NCBA collection),
+// delaying the merchant's own SMS/notification behind a wait for a free
+// connection. Raised to 20: still a single Render instance
+// (WEB_CONCURRENCY=1) far short of Atlas M0's 500-connection cluster-wide
+// cap, so this doesn't reintroduce the SystemOverloadedError risk that
+// motivated the original cut — it just gives webhook writes enough headroom
+// to not get stuck behind polling traffic.
 const CONNECT_OPTS = {
   serverSelectionTimeoutMS: 12_000,
-  maxPoolSize: 5,
+  maxPoolSize: 20,
   heartbeatFrequencyMS: 10_000,
 };
 

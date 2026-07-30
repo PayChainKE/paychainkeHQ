@@ -10,7 +10,11 @@
 // with a bank not listed here.
 export const KENYAN_BANK_CODES = [
   { code: '0068', name: 'Equity Bank' },
-  { code: '01096', name: 'NCBA Bank' },
+  // NCBA's own PesaLink BeneficiaryBankBIC — 07000, confirmed directly by
+  // NCBA via email 2026-07-30 (supersedes the earlier unconfirmed '01096'
+  // guess this file carried, which didn't match the "00"-prefix pattern
+  // above and was never verified against NCBA's own documentation).
+  { code: '07000', name: 'NCBA Bank' },
   { code: 'KCBLKENX', name: 'KCB Bank (SWIFT — appears as a RTGS BeneficiaryBankBIC example, not confirmed for PesaLink)' },
 ];
 

@@ -217,9 +217,44 @@ export const confirmationURL = async (req, res) => {
     const netKESAmount = Math.round((amount - merchantFee) * 100) / 100;
     console.log(`💰 M-PESA C2B fee for ${TransID}: gross KES ${amount}, PayChain fee KES ${merchantFee}, net KES ${netKESAmount}`);
 
-    const liveRate = await getLiveKesToUsdcRate();
-    const usdcPayoutValue = (netKESAmount * liveRate).toFixed(7);
+    const { date, time } = formatTransactionDateTime(payload.TransTime);
 
+    // Customer receipt SMS fired here, immediately after the base
+    // Transaction record above — it only needs TransID/amount/name/account,
+    // none of which depend on the balance credit or Inflation Shield
+    // settlement below. Previously this was built after that settlement
+    // block, so a slow/retrying Stellar submission delayed the customer's
+    // receipt for no reason; sending it here means it goes out at the same
+    // speed regardless of whether this merchant has a Stellar wallet.
+    // Deliberately omits a "New M-PESA balance" line — that figure is the
+    // *paying customer's own personal M-Pesa wallet balance*, which
+    // Safaricom's C2B confirmation payload never includes (it belongs to
+    // the other side of the transaction). Fabricating a number there would
+    // be a real customer-facing correctness problem, not a cosmetic one.
+    const customerSms = MSISDN
+      ? safeSendSMS({
+          to: MSISDN,
+          // businessName is the only unbounded field here — never the
+          // reference, amount, account number, date or time.
+          message: buildStrictSms(
+            ({ ref, amt, name, acct, date, time }) =>
+              `${ref} Confirmed. KES ${amt} sent to ${name} for account ${acct} on ${date} at ${time}. Thank you for your payment.`,
+            {
+              fixed: { ref: TransID, amt: amount.toLocaleString(), acct: accountNumber, date, time },
+              truncatable: [{ key: 'name', value: merchant.businessName, minLength: 10 }],
+            }
+          ).message,
+        }).then((result) => {
+          if (!result.success) console.error(`Customer SMS receipt failed for ${TransID}:`, result.error);
+        })
+      : Promise.resolve();
+
+    // Live FX rate is only needed for the Inflation Shield conversion below
+    // — fetched inside that branch now instead of unconditionally here, so
+    // merchants without a Stellar wallet (the common case) never pay the
+    // latency of an external exchangerate-api.com round trip (up to 5s on a
+    // slow response) before their balance update and SMS.
+    //
     // Atomic $inc rather than a read-modify-write on the in-memory `merchant`
     // doc — the gap between fetching `merchant` above and saving here spans
     // several awaits (getLiveKesToUsdcRate, settleInflationShield), during
@@ -229,6 +264,9 @@ export const confirmationURL = async (req, res) => {
     let updatedMerchant;
     if (merchant.stellarPublicKey) {
       try {
+        const liveRate = await getLiveKesToUsdcRate();
+        const usdcPayoutValue = (netKESAmount * liveRate).toFixed(7);
+
         console.log(`🛡️ Executing Inflation Shield for Acc ${accountNumber}:`);
         console.log(`   - Gross M-Pesa KES: ${amount}`);
         console.log(`   - Live KES/USDC Rate (Fractional): ${liveRate}`);
@@ -282,32 +320,6 @@ export const confirmationURL = async (req, res) => {
       title: 'Payment received',
       message: `You received KES ${amount.toLocaleString()} from ${senderName || 'a customer'} via your PayChain Account Number ${merchant.paybillAccount}.`,
     });
-
-    const { date, time } = formatTransactionDateTime(payload.TransTime);
-
-    // Customer receipt SMS, styled after M-Pesa's own confirmation format.
-    // Deliberately omits a "New M-PESA balance" line — that figure is the
-    // *paying customer's own personal M-Pesa wallet balance*, which
-    // Safaricom's C2B confirmation payload never includes (it belongs to
-    // the other side of the transaction). Fabricating a number there would
-    // be a real customer-facing correctness problem, not a cosmetic one.
-    const customerSms = MSISDN
-      ? safeSendSMS({
-          to: MSISDN,
-          // businessName is the only unbounded field here — never the
-          // reference, amount, account number, date or time.
-          message: buildStrictSms(
-            ({ ref, amt, name, acct, date, time }) =>
-              `${ref} Confirmed. KES ${amt} sent to ${name} for account ${acct} on ${date} at ${time}. Thank you for your payment.`,
-            {
-              fixed: { ref: TransID, amt: amount.toLocaleString(), acct: accountNumber, date, time },
-              truncatable: [{ key: 'name', value: merchant.businessName, minLength: 10 }],
-            }
-          ).message,
-        }).then((result) => {
-          if (!result.success) console.error(`Customer SMS receipt failed for ${TransID}:`, result.error);
-        })
-      : Promise.resolve();
 
     // Merchant transaction alert SMS — new balance here IS real data we
     // hold (updatedMerchant.kesBalance from the atomic $inc above).
