@@ -117,7 +117,7 @@ const Bookkeeping = () => {
     setError('');
     try {
       const res = await api.get('/api/admin/bookkeeping/expenses', {
-        params: { preset: period, page, limit: 20, category, search },
+        params: { preset: period, page, limit: 25, category, search },
       });
       if (res.data?.success) setData(res.data.data);
       else setError(res.data?.error || 'Could not load expenses.');

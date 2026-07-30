@@ -93,7 +93,7 @@ const Ledger = () => {
     setError('');
     try {
       const res = await api.get('/api/admin/ledger', {
-        params: { range, page, limit: 20, type, status, q: search },
+        params: { range, page, limit: 25, type, status, q: search },
       });
       if (res.data?.success) {
         setData(res.data.data);

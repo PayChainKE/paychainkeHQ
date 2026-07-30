@@ -4,7 +4,7 @@ import api from '../api/api';
 import TablePagination from '../components/ui/TablePagination';
 import { formatAccountNumber } from '../utils/formatAccountNumber';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 25;
 
 const normalizePhoneKE = (value) => {
   let digits = String(value ?? '').replace(/\D/g, '');

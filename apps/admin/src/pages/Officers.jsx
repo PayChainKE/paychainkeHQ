@@ -2,6 +2,9 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import Layout from '../components/layout/Layout';
 import api from '../api/api';
 import { useAuth } from '../context/AuthContext';
+import TablePagination from '../components/ui/TablePagination';
+
+const PAGE_SIZE = 25;
 
 const STATUS_META = {
   active:   { label: 'Active',   pill: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500 animate-pulse' },
@@ -24,6 +27,7 @@ const Officers = () => {
   const [createOpen, setCreateOpen] = useState(false);
   const [revealModal, setRevealModal] = useState(null); // { email, password, title }
   const [toast, setToast] = useState('');
+  const [page, setPage] = useState(1);
 
   const fetchOfficers = useCallback(async () => {
     setLoading(true);
@@ -46,6 +50,13 @@ const Officers = () => {
     const s = search.toLowerCase();
     return o.email.toLowerCase().includes(s) || (o.name || '').toLowerCase().includes(s);
   }), [officers, search]);
+
+  useEffect(() => { setPage(1); }, [search]);
+
+  const pagedOfficers = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, page]);
 
   const stats = useMemo(() => ({
     total: officers.length,
@@ -158,20 +169,26 @@ const Officers = () => {
                   ))
                 ) : filtered.length === 0 ? (
                   <tr><td colSpan={5} className="px-4 py-10 text-center text-on-surface-variant/40 text-sm">{error || 'No officers yet.'}</td></tr>
-                ) : filtered.map((o) => (
+                ) : pagedOfficers.map((o) => (
                   <OfficerRow key={o._id} officer={o} canManage={canManage} onToggleStatus={() => handleToggleStatus(o)} onResetPassword={() => handleResetPassword(o)} onDelete={() => handleDelete(o)} />
                 ))}
               </tbody>
             </table>
           </div>
+          {!loading && <TablePagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPage={setPage} />}
         </div>
 
         <div className="md:hidden space-y-2">
           {loading ? <div className="p-8 text-center text-on-surface-variant/40 text-sm">Loading officers…</div> :
             filtered.length === 0 ? <div className="p-8 text-center text-on-surface-variant/40 text-sm">{error || 'No officers yet.'}</div> :
-            filtered.map((o) => (
+            pagedOfficers.map((o) => (
               <OfficerCard key={o._id} officer={o} canManage={canManage} onToggleStatus={() => handleToggleStatus(o)} onResetPassword={() => handleResetPassword(o)} onDelete={() => handleDelete(o)} />
             ))}
+          {!loading && filtered.length > 0 && (
+            <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 shadow-editorial overflow-hidden">
+              <TablePagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPage={setPage} />
+            </div>
+          )}
         </div>
 
         {createOpen && canManage && (
