@@ -123,7 +123,12 @@ export const settleInflationShield = async (destinationPublicKey, amount) => {
           throw err;
         }
         console.warn(`⚠️ Stellar network fetch failed. Retrying attempt ${attempts}...`);
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Shorter than the sweep function's backoff below — this retry loop
+        // sits directly in the M-Pesa webhook path and gates the merchant's
+        // payment-received SMS, so 3 attempts at 2s apart (up to 4s of pure
+        // sleep) was adding real, avoidable notification latency on top of
+        // Horizon's own round-trip time.
+        await new Promise(resolve => setTimeout(resolve, 800));
       }
     }
 
