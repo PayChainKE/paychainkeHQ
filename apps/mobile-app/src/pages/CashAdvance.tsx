@@ -287,6 +287,7 @@ export default function CashAdvance({ navigation }: any) {
         <TopBar title="Cash Advance" showBack={false} />
         <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 120 }}>
           <View className="w-full max-w-lg mx-auto px-6 pt-8">
+            <UnavailableNotice />
             <PageHeader />
             <View className="bg-white rounded-2xl shadow-sm border border-[#eff4ef] p-12 items-center">
               <View className="w-24 h-24 rounded-full bg-[#f7faf7] items-center justify-center mb-6 border border-[#eff4ef]">
@@ -324,7 +325,7 @@ export default function CashAdvance({ navigation }: any) {
               </View>
               <Text className="text-[22px] font-jakarta-extrabold text-[#00351d] mb-3 text-center">Keep building your Trust Score</Text>
               <Text className="text-[15px] text-[#707971] font-jakarta-medium text-center leading-relaxed max-w-[280px] opacity-80 mb-6">
-                Your Trust Score needs to reach 85 before you can get a Cash Advance. Keep transacting through your PayChain account and your score will keep going up!
+                Your Trust Score needs to reach 60 before you can get a Cash Advance. Keep transacting through your PayChain account and your score will keep going up!
               </Text>
               <TouchableOpacity
                 onPress={() => Linking.openURL(CASH_ADVANCE_LEARN_MORE_URL)}
