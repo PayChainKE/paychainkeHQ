@@ -25,6 +25,11 @@ const revenueSweepSchema = new mongoose.Schema({
   // trail linking this row to the real bank-side movement.
   ncbaReference: { type: String, default: null },
   failureReason: { type: String, default: null },
+  // True when this 'completed' row was produced with NCBA_OPENBANKING_LIVE_ENABLED
+  // off — nothing physically moved. computeUnsweptRevenue() must exclude these
+  // from "already swept" or a test run permanently (and silently) writes off
+  // real revenue as transferred when it never left the pooled account.
+  simulated: { type: Boolean, default: false },
 }, {
   timestamps: true,
 });
