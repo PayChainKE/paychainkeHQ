@@ -40,7 +40,8 @@ async function computeUnsweptRevenue() {
       { $group: { _id: null, total: { $sum: '$paychainFee' }, count: { $sum: 1 } } },
     ]),
     RevenueSweep.aggregate([
-      { $match: { status: 'completed' } },
+      // simulated rows never actually moved money — must not count as swept.
+      { $match: { status: 'completed', simulated: { $ne: true } } },
       { $group: { _id: null, total: { $sum: '$amount' } } },
     ]),
   ]);
@@ -134,7 +135,7 @@ export async function runRevenueSweep() {
   }
 
   try {
-    const { transactionId } = await submitNcbaBankTransfer({
+    const { transactionId, hostResponse } = await submitNcbaBankTransfer({
       businessName: 'PayChain Revenue Sweep',
       bankCode: destinationBankCode,
       accountNumber: destinationAccountNumber,
@@ -143,10 +144,11 @@ export async function runRevenueSweep() {
       narration: `PayChain fee revenue sweep ${periodStart.toISOString().slice(0, 10)}–${periodEnd.toISOString().slice(0, 10)}`,
     });
 
-    logEvent('info', 'revenue_sweep_completed', { amount: attemptedAmount, transactionId });
+    const simulated = hostResponse?.simulated === true;
+    logEvent('info', 'revenue_sweep_completed', { amount: attemptedAmount, transactionId, simulated });
     return recordSweep({
       periodStart, periodEnd, attemptedAmount, amount: attemptedAmount, transactionCount,
-      status: 'completed', destinationBankCode, destinationAccountNumber, ncbaReference: transactionId,
+      status: 'completed', destinationBankCode, destinationAccountNumber, ncbaReference: transactionId, simulated,
     });
   } catch (err) {
     logEvent('error', 'revenue_sweep_failed', { amount: attemptedAmount, error: err.message });

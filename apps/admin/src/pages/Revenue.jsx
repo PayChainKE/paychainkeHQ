@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import api from '../api/api';
+import { useAuth } from '../context/AuthContext';
 
 /**
  * Revenue & Fees — admin dashboard for PayChain's internal finance team.
@@ -244,6 +245,9 @@ const VolumeRevenueChart = ({ series, totalGmv, totalNet }) => {
 
 // ── Page ──────────────────────────────────────────────────────────────
 const Revenue = () => {
+  const { admin: currentAdmin } = useAuth();
+  const canRunSweep = currentAdmin?.role === 'owner' || currentAdmin?.role === 'admin';
+
   const [range, setRange] = useState('30d');
   const [granularity, setGranularity] = useState('daily');
   const [channelFilter, setChannelFilter] = useState('all');
@@ -266,6 +270,42 @@ const Revenue = () => {
   }, [range]);
 
   useEffect(() => { fetchRevenue(); }, [fetchRevenue]);
+
+  // Manual "Run Sweep Now" — POST /api/admin/revenue/sweeps/run. Distinct
+  // from the `sweeps`/sweepBatches table below, which is a projected estimate
+  // re-derived from transactions on every request; this actually attempts a
+  // real PesaLink transfer of PayChain's accrued fee revenue (or a simulated
+  // one, if NCBA_OPENBANKING_LIVE_ENABLED is off on the backend — this page
+  // has no way to know which, so the confirmation copy covers both).
+  const [sweepConfirmOpen, setSweepConfirmOpen] = useState(false);
+  const [sweepBusy, setSweepBusy] = useState(false);
+  const [toast, setToast] = useState('');
+  const showToast = useCallback((msg) => { setToast(msg); setTimeout(() => setToast(''), 4000); }, []);
+
+  const runSweepNow = useCallback(async () => {
+    setSweepBusy(true);
+    try {
+      const res = await api.post('/api/admin/revenue/sweeps/run');
+      const sweep = res.data?.data;
+      if (!sweep) {
+        showToast('Sweep request failed — no response data.');
+      } else if (sweep.status === 'completed') {
+        showToast(
+          `${sweep.simulated ? 'Simulated' : 'Real'} sweep completed: KES ${Number(sweep.amount || 0).toLocaleString()} ${sweep.simulated ? '(no funds moved)' : `→ ${sweep.destinationAccountNumber}`}`
+        );
+      } else if (sweep.status === 'skipped') {
+        showToast(`Sweep skipped: ${sweep.failureReason || 'nothing to sweep.'}`);
+      } else {
+        showToast(`Sweep failed: ${sweep.failureReason || 'unknown error.'}`);
+      }
+      fetchRevenue();
+    } catch (e) {
+      showToast(e?.response?.data?.error || 'Sweep request failed.');
+    } finally {
+      setSweepBusy(false);
+      setSweepConfirmOpen(false);
+    }
+  }, [showToast, fetchRevenue]);
 
   const kpis     = data?.kpis     || {};
   const channels = data?.channels || [];
@@ -519,12 +559,23 @@ const Revenue = () => {
                 Automated movement of accumulated fees from the PayChain FBO settlement account into the corporate operating account.
               </p>
             </div>
-            {!loading && data?.corporateDestination && (
-              <div className="hidden md:flex items-center gap-2 text-2xs text-on-surface-variant">
-                <span className="material-symbols-outlined text-sm">account_balance</span>
-                <span>Destination: <span className="text-on-surface font-bold">{data.corporateDestination}</span></span>
-              </div>
-            )}
+            <div className="flex items-center gap-3">
+              {!loading && data?.corporateDestination && (
+                <div className="hidden md:flex items-center gap-2 text-2xs text-on-surface-variant">
+                  <span className="material-symbols-outlined text-sm">account_balance</span>
+                  <span>Destination: <span className="text-on-surface font-bold">{data.corporateDestination}</span></span>
+                </div>
+              )}
+              {canRunSweep && (
+                <button
+                  onClick={() => setSweepConfirmOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-on-surface text-surface-container-lowest text-2xs font-bold uppercase tracking-widest hover:opacity-90 transition-opacity"
+                >
+                  <span className="material-symbols-outlined text-sm">bolt</span>
+                  Run Sweep Now
+                </button>
+              )}
+            </div>
           </div>
           <div className="bg-surface-container-lowest border border-outline-variant/40 rounded-lg overflow-hidden">
             {loading ? (
@@ -679,6 +730,35 @@ const Revenue = () => {
           </div>
         </section>
       </div>
+
+      {/* Run Sweep Now — confirmation */}
+      {sweepConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => !sweepBusy && setSweepConfirmOpen(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="p-7">
+              <div className="w-14 h-14 rounded-full bg-amber-50 text-amber-700 flex items-center justify-center mb-4">
+                <span className="material-symbols-outlined text-3xl">bolt</span>
+              </div>
+              <h3 className="text-xl font-bold text-on-surface mb-1">Run revenue sweep now?</h3>
+              <p className="text-sm text-on-surface-variant mb-5">
+                This attempts an immediate transfer of PayChain's entire accrued-but-unswept fee revenue to{' '}
+                <strong>{data?.corporateDestination || 'the configured destination account'}</strong> — the full real amount, not a test figure.
+                If live NCBA transfers are enabled on the backend, this moves real money and cannot be undone. If they're not enabled, it simulates the transfer and moves nothing.
+              </p>
+              <div className="flex gap-3">
+                <button onClick={() => setSweepConfirmOpen(false)} disabled={sweepBusy} className="flex-1 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40">Cancel</button>
+                <button onClick={runSweepNow} disabled={sweepBusy} className="flex-1 py-2.5 rounded-lg bg-on-surface text-surface-container-lowest text-sm font-semibold uppercase tracking-widest hover:opacity-90 disabled:opacity-50">
+                  {sweepBusy ? 'Running…' : 'Run Sweep'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 bg-on-surface text-on-inverse-surface px-4 py-2.5 rounded-xl shadow-lg text-xs font-bold max-w-sm">{toast}</div>
+      )}
     </Layout>
   );
 };
