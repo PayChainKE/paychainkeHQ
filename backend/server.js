@@ -46,6 +46,16 @@ const allowedOrigins = [
   'https://demo.paychain.co.ke',
   // Legacy alias (kept short-term so existing magic links still work)
   'https://merchant.paychain.co.ke',
+  // Merchant dashboard's actual live Vercel deployment URL. Removed once
+  // (thinking app.paychain.co.ke was the only real origin merchants hit)
+  // and that broke real production logins immediately — Render's own logs
+  // showed a wall of "CORS blocked for origin: https://apppaychain.vercel.app"
+  // right as merchants tried to sign in. Whatever the long-term domain
+  // story is, this origin is live production traffic right now. Do not
+  // remove again without confirming app.paychain.co.ke is actually where
+  // traffic is landing (e.g. check Vercel's domain config / DNS), not just
+  // where it's supposed to.
+  'https://apppaychain.vercel.app',
   'http://localhost:5173',
   'http://localhost:5174',
   'http://localhost:5175',
