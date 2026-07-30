@@ -397,8 +397,13 @@ merchantSchema.pre('save', async function() {
 
   // 12 rounds = OWASP 2024 recommendation. Existing rounds=10 hashes still
   // verify correctly via bcrypt.compare (rounds are embedded in the hash).
+  // Trimmed for the same reason matchPassword below trims the candidate —
+  // copying a password out of an email often drags along a trailing
+  // space/newline invisibly, which typing the same password never does.
+  // Hashing and comparing on the same trimmed string keeps both paths
+  // consistent regardless of which one was used when the password was set.
   const salt = await bcrypt.genSalt(12);
-  this.password = await bcrypt.hash(this.password, salt);
+  this.password = await bcrypt.hash(String(this.password).trim(), salt);
 });
 
 // Auto-assign an NCBA merchant code to every new merchant. Random rather
@@ -426,9 +431,13 @@ merchantSchema.pre('save', async function() {
   throw new Error('Failed to generate a unique NCBA merchant code after multiple attempts');
 });
 
-// Match user entered password to hashed password in database
+// Match user entered password to hashed password in database.
+// Trimmed — a password pasted from an email/password-manager can carry an
+// invisible trailing space or newline that typing the same password never
+// produces, which otherwise fails bcrypt.compare even though it "looks"
+// identical to the user.
 merchantSchema.methods.matchPassword = async function(enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
+  return await bcrypt.compare(String(enteredPassword).trim(), this.password);
 };
 
 const Merchant = mongoose.model('Merchant', merchantSchema);
