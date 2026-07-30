@@ -5,6 +5,7 @@ import MerchantLayout from '../components/layout/MerchantLayout'
 import { ValidatedInput } from '../components/ValidatedInput'
 import { useNotification } from '../context/NotificationContext'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
+import { getAppUrl } from '../utils/appUrl'
 
 const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
 
@@ -136,7 +137,7 @@ export default function RequestMoney() {
       }, { headers: authHeaders() })
 
       if (res.data?.success) {
-        setGeneratedLink(`${window.location.origin}/pay/${res.data.linkId}`)
+        setGeneratedLink(`${getAppUrl()}/pay/${res.data.linkId}`)
         addNotification({ title: 'Link Generated', message: 'Secure payment link created. Expires in 48 hours.', type: 'success' })
         setStep(3)
       }

@@ -90,7 +90,7 @@ function PaymentLinkPanel() {
     try {
       const res = await api.post('/api/transactions/payment-link', { amount: value });
       if (res.data?.success) {
-        setGeneratedLink(`https://paychain.co.ke/pay/${res.data.linkId}`);
+        setGeneratedLink(`https://app.paychain.co.ke/pay/${res.data.linkId}`);
         fetchHistory();
       }
     } catch (err: any) {
@@ -116,7 +116,7 @@ function PaymentLinkPanel() {
   };
 
   const copyHistoryLink = async (item: any) => {
-    await Clipboard.setStringAsync(`https://paychain.co.ke/pay/${item.linkId}`);
+    await Clipboard.setStringAsync(`https://app.paychain.co.ke/pay/${item.linkId}`);
     setCopiedLinkId(item.linkId);
     setTimeout(() => setCopiedLinkId((current) => (current === item.linkId ? null : current)), 1500);
   };
@@ -124,7 +124,7 @@ function PaymentLinkPanel() {
   const shareHistoryLink = async (item: any) => {
     try {
       await Share.share({
-        message: `Please pay me KES ${item.amount.toLocaleString()} via PayChain: https://paychain.co.ke/pay/${item.linkId}`,
+        message: `Please pay me KES ${item.amount.toLocaleString()} via PayChain: https://app.paychain.co.ke/pay/${item.linkId}`,
       });
     } catch {
       // user dismissed the share sheet

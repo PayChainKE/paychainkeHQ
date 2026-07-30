@@ -46,11 +46,6 @@ const allowedOrigins = [
   'https://demo.paychain.co.ke',
   // Legacy alias (kept short-term so existing magic links still work)
   'https://merchant.paychain.co.ke',
-  // Merchant dashboard's actual live Vercel deployment URL — the
-  // app.paychain.co.ke custom domain isn't the only thing merchants hit in
-  // practice. Removing the old blanket "*.vercel.app" wildcard (see below)
-  // broke login here; this is the specific real origin, not the wildcard.
-  'https://apppaychain.vercel.app',
   'http://localhost:5173',
   'http://localhost:5174',
   'http://localhost:5175',
