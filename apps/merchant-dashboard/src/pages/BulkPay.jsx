@@ -9,6 +9,7 @@ import { formatKES } from '../utils/formatCurrency'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useNotification } from '../context/NotificationContext'
 import { isValidPhoneKE } from '../utils/validators'
+import { formatPhoneDisplay } from '../utils/formatPhoneDisplay'
 import paychainLogo from '../assets/paychain-logo-dark.png'
 import paychainLogoWhite from '../assets/paychain-logo-white.png'
 import axios from 'axios'
@@ -592,6 +593,59 @@ export default function BulkPay() {
   const [securityStep, setSecurityStep] = useState(1) // 1: OTP, 2: PIN
   const [otp, setOtp] = useState('')
   const [pin, setPin] = useState('')
+  const [isSendingOtp, setIsSendingOtp] = useState(false)
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false)
+  const [otpError, setOtpError] = useState('')
+  const [otpResendCooldown, setOtpResendCooldown] = useState(0)
+
+  // Real, working SMS-OTP infrastructure (merchantSmsAuthController.js) —
+  // this modal used to just require 4+ arbitrary characters be typed with
+  // no backend call at all, so no OTP was ever actually sent. Reusing the
+  // same send/verify endpoints the merchant SMS-login 2FA flow uses.
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+
+  const sendBulkPayOtp = useCallback(async () => {
+    if (!merchant?.phone) {
+      setOtpError('No phone number is on file for this account. Add one in Profile first.')
+      return
+    }
+    setIsSendingOtp(true)
+    setOtpError('')
+    try {
+      await axios.post(`${API_BASE}/api/auth/merchant/sms/send-otp`, { phone: merchant.phone })
+      setOtpResendCooldown(30)
+    } catch (error) {
+      setOtpError(error.response?.data?.error || 'Could not send the verification code. Try again.')
+    } finally {
+      setIsSendingOtp(false)
+    }
+  }, [merchant?.phone, API_BASE])
+
+  useEffect(() => {
+    if (otpResendCooldown <= 0) return
+    const t = setTimeout(() => setOtpResendCooldown((s) => s - 1), 1000)
+    return () => clearTimeout(t)
+  }, [otpResendCooldown])
+
+  const verifyBulkPayOtp = async () => {
+    setIsVerifyingOtp(true)
+    setOtpError('')
+    try {
+      await axios.post(`${API_BASE}/api/auth/merchant/sms/verify-otp`, { phone: merchant?.phone, otp })
+      setSecurityStep(2)
+    } catch (error) {
+      setOtpError(error.response?.data?.error || 'Invalid or expired code.')
+      setOtp('')
+    } finally {
+      setIsVerifyingOtp(false)
+    }
+  }
+
+  const maskedPhone = (() => {
+    const p = formatPhoneDisplay(merchant?.phone)
+    if (!/^0\d{9}$/.test(p || '')) return merchant?.phone || 'your registered number'
+    return `${p.slice(0, 4)} ${p.slice(4, 7).replace(/./g, '•')} ${p.slice(7)}`
+  })()
 
   const handleSecurityVerification = () => {
     // Keep modals open until success or let handleAuthorize manage them
@@ -1603,22 +1657,15 @@ export default function BulkPay() {
                           if (merchant?.hasBulkPayPin === false) {
                             setShowPinSetupModal(true);
                           } else {
+                            setOtp('');
+                            setOtpError('');
+                            setSecurityStep(1);
                             setShowSecurityModal(true);
+                            sendBulkPayOtp();
                           }
                         }
                       }}
-                      disabled={
-                        step === 1
-                          // Step 1 only needs a selection — batchTotal can
-                          // legitimately be 0 here (a payee saved with no
-                          // default amount, e.g. a contractor paid a
-                          // variable amount each run). Gating on
-                          // batchTotal too would permanently lock the
-                          // merchant out of step 2, which is the page
-                          // where amounts actually get entered/edited.
-                          ? Object.values(selectedPayees).every((v) => !v)
-                          : batchTotal === 0 || isLiquidityLow || (step === 3 && !selectedTill)
-                      }
+                      disabled={batchTotal === 0 || isLiquidityLow || (step === 3 && !selectedTill)}
                       className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-400 text-[#00351D] px-6 py-2.5 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 group disabled:opacity-20 disabled:grayscale text-xs md:text-sm"
                     >
                       {step === 1 ? 'Review Batch' : step === 2 ? 'Proceed to Settlement' : 'Authorize Batch'}
@@ -2052,7 +2099,7 @@ export default function BulkPay() {
                     <p className="text-[10px] text-on-surface-variant font-medium mt-1 opacity-60">Security Check required for Settlement</p>
                   </div>
                   <button 
-                    onClick={() => { setShowSecurityModal(false); setSecurityStep(1); }}
+                    onClick={() => { setShowSecurityModal(false); setSecurityStep(1); setOtp(''); setOtpError(''); }}
                     className="w-10 h-10 rounded-full bg-surface-container-low flex items-center justify-center text-primary/40 hover:text-primary transition-colors"
                   >
                     <span className="material-symbols-outlined text-xl">close</span>
@@ -2065,24 +2112,39 @@ export default function BulkPay() {
                       <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center">
                         <span className="material-symbols-outlined text-3xl">sms</span>
                       </div>
-                      <p className="text-sm text-primary font-bold">Enter OTP Sent to 07XX XXX XXX</p>
+                      <p className="text-sm text-primary font-bold">
+                        {isSendingOtp ? 'Sending code…' : `Enter OTP Sent to ${maskedPhone}`}
+                      </p>
                     </div>
-                    
-                    <input 
+
+                    <input
                       type="text"
                       maxLength="6"
                       value={otp}
-                      onChange={(e) => setOtp(e.target.value)}
+                      onChange={(e) => { setOtp(e.target.value.replace(/\D/g, '')); setOtpError(''); }}
                       placeholder="• • • • • •"
                       className="w-full bg-surface-container-low/30 border border-outline-variant/20 rounded-2xl px-5 py-4 text-center font-headline tracking-[1em] text-xl font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none"
                     />
 
-                    <button 
-                      onClick={() => setSecurityStep(2)}
-                      disabled={otp.length < 4}
-                      className="w-full py-4 rounded-2xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold text-sm transition-all disabled:opacity-50"
+                    {otpError && (
+                      <p className="text-xs font-bold text-red-600 text-center -mt-3">{otpError}</p>
+                    )}
+
+                    <button
+                      onClick={verifyBulkPayOtp}
+                      disabled={otp.length < 4 || isVerifyingOtp || isSendingOtp}
+                      className="w-full py-4 rounded-2xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold text-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                     >
-                      Verify OTP
+                      {isVerifyingOtp && <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>}
+                      {isVerifyingOtp ? 'Verifying…' : 'Verify OTP'}
+                    </button>
+
+                    <button
+                      onClick={sendBulkPayOtp}
+                      disabled={isSendingOtp || otpResendCooldown > 0}
+                      className="w-full text-center text-[11px] font-bold text-on-surface-variant hover:text-primary disabled:opacity-40 transition-colors"
+                    >
+                      {otpResendCooldown > 0 ? `Resend code in ${otpResendCooldown}s` : 'Resend code'}
                     </button>
                   </div>
                 )}
