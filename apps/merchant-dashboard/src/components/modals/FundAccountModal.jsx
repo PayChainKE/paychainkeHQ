@@ -111,7 +111,20 @@ export default function FundAccountModal({ method, onClose }) {
     }
   };
 
-  const METHOD_TITLE = { mobile: 'Mobile Money Top-up', bank: 'Bank Transfer Details' };
+  const METHOD_TITLE = { mobile: 'Mobile Money Top-up', bank: 'Bank Transfer Details', paybill: 'Pay via Paybill' };
+
+  // Same NCBA M-Pesa Paybill business number shown in the Bank Transfer tab
+  // above — constant, not merchant-specific.
+  const PAYBILL_BUSINESS_NUMBER = '880100';
+
+  const PAYBILL_STEPS = [
+    'Go to the Lipa na M-PESA menu',
+    'Select Paybill',
+    `Enter ${PAYBILL_BUSINESS_NUMBER} as the business number`,
+    `Enter ${formatAccountNumber(ncbaAccountDisplay)} as the account number`,
+    'Enter the amount',
+    'Enter M-PESA PIN',
+  ];
 
   return (
     <>
@@ -291,6 +304,68 @@ export default function FundAccountModal({ method, onClose }) {
                     </div>
                   </div>
                 ))}
+                <button onClick={onClose}
+                  className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-3.5 rounded-2xl font-bold text-sm transition-all mt-2">
+                  Close
+                </button>
+              </div>
+            )}
+
+            {/* ── PAYBILL ── */}
+            {method === 'paybill' && (
+              <div className="space-y-5">
+                <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex items-start gap-3">
+                  <span className="material-symbols-outlined text-emerald-600 shrink-0 text-base">info</span>
+                  <p className="text-xs text-emerald-800 font-medium leading-relaxed">
+                    {ncbaAccountIsUsable
+                      ? 'Share these steps with your customers, or use them yourself to top up — funds reflect on your balance automatically once M-PESA confirms.'
+                      : 'Your dedicated account number is still being assigned — this account is not ready to receive Paybill payments yet.'}
+                  </p>
+                </div>
+
+                <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">
+                    Instructions for you and your customers
+                  </p>
+                  <ol className="space-y-3">
+                    {PAYBILL_STEPS.map((step, i) => (
+                      <li key={i} className="flex items-start gap-3">
+                        <span className="w-6 h-6 rounded-full bg-[#00351D] text-[#5EFEB3] text-[11px] font-black flex items-center justify-center shrink-0 mt-0.5">
+                          {i + 1}
+                        </span>
+                        <span className="text-sm font-medium text-primary leading-relaxed pt-0.5">{step}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Business Number</span>
+                  <div className="flex items-center justify-between bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3">
+                    <span className="font-bold text-primary text-sm">{PAYBILL_BUSINESS_NUMBER}</span>
+                    <button
+                      onClick={() => navigator.clipboard.writeText(PAYBILL_BUSINESS_NUMBER)}
+                      className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-emerald-600 hover:bg-emerald-50 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-sm">content_copy</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Account Number</span>
+                  <div className="flex items-center justify-between bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3">
+                    <span className="font-bold text-primary text-sm">{formatAccountNumber(ncbaAccountDisplay)}</span>
+                    <button
+                      onClick={() => navigator.clipboard.writeText(ncbaAccountDisplay)}
+                      disabled={!ncbaAccountIsUsable}
+                      className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-emerald-600 hover:bg-emerald-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white"
+                    >
+                      <span className="material-symbols-outlined text-sm">content_copy</span>
+                    </button>
+                  </div>
+                </div>
+
                 <button onClick={onClose}
                   className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-3.5 rounded-2xl font-bold text-sm transition-all mt-2">
                   Close

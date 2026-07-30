@@ -17,6 +17,7 @@ import { buildNcbaOkResult, buildNcbaFailResult } from '../utils/ncbaSoapRespons
 import { creditNcbaCollection, DuplicateCollectionError } from '../services/ncbaLedgerService.js';
 import { NcbaTariffBoundsError } from '../config/ncbaTariffCard.js';
 import { getNcbaVirtualAccountNumber, formatAccountNumberDisplay } from '../utils/ncbaValidators.js';
+import { formatPhoneDisplay } from '../utils/formatPhoneDisplay.js';
 
 const respondOk = (res, detail) => res.status(200).type('application/xml').send(buildNcbaOkResult(detail));
 const respondFail = (res, detail) => res.status(200).type('application/xml').send(buildNcbaFailResult(detail));
@@ -209,7 +210,7 @@ export const handleNcbaAccountNotification = async (req, res) => {
         merchant,
         grossAmount: transAmount,
         bankRef: transId,
-        customerPhone: rawPhoneNr || null,
+        customerPhone: formatPhoneDisplay(rawPhoneNr) || null,
         customerName: parsedCustomer.name || null,
       });
     } catch (err) {
@@ -284,7 +285,7 @@ export const handleNcbaAccountNotification = async (req, res) => {
           ({ ref, amt, name, phone, date, time, balance }) =>
             `${ref} Payment Received. KES ${amt} from ${name}${phone ? ` (${phone})` : ''} via M-PESA on ${date} at ${time}. New balance: KES ${balance}.`,
           {
-            fixed: { ref: transId, amt: transAmount.toLocaleString(), phone: customerPhone || '', date, time, balance: ledgerResult.merchant.kesBalance.toLocaleString() },
+            fixed: { ref: transId, amt: transAmount.toLocaleString(), phone: formatPhoneDisplay(customerPhone) || '', date, time, balance: ledgerResult.merchant.kesBalance.toLocaleString() },
             truncatable: [{ key: 'name', value: customerDisplayName, minLength: 10 }],
           }
         ).message,
