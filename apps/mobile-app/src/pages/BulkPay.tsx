@@ -127,7 +127,7 @@ const BATCH_STATUS_META: Record<string, { bg: string; text: string }> = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function BulkPay() {
-  const { merchant } = useAuth();
+  const { merchant, refreshSession } = useAuth();
 
   const [activeTab, setActiveTab] = useState<'Payees' | 'Batches' | 'Invoices'>('Payees');
   const [activeFilter, setActiveFilter] = useState<Filter>('All');
@@ -854,6 +854,10 @@ export default function BulkPay() {
       setPendingBatch(null);
       setShowReceipts(true);
       fetchBatches();
+      // Balance was just debited server-side — refresh now instead of
+      // waiting on the ambient 5s poll in AuthContext, so the balance shown
+      // elsewhere in the app reflects this payout immediately.
+      refreshSession();
     } catch (e: any) {
       Alert.alert('Authorization failed', e?.response?.data?.message || 'Could not process batch.');
       // Allow retry for PIN if it fails, matching the dashboard's behavior.

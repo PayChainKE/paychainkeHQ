@@ -5,6 +5,8 @@ import { Feather, MaterialIcons } from '@expo/vector-icons';
 import api from '../api/config';
 import TopBar from '../components/layout/TopBar';
 import { isCreditTransaction, typeLabel as txTypeLabel } from '../utils/transactionDirection';
+import { formatTxDate, formatTxTime } from '../utils/formatDate';
+import { formatPhoneDisplay } from '../utils/formatPhoneDisplay';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -231,9 +233,9 @@ export default function Transactions({ navigation }: any) {
                   : (tx.recipient?.name || tx.sender?.name || 'Treasury');
                 const verified = tx.status === 'completed' || tx.status === 'verified';
                 const typeLabel = txTypeLabel(tx.type || 'inbound').toUpperCase();
-                const dateStr = new Date(tx.createdAt || tx.timestamp).toLocaleDateString('en-KE', {
-                  day: '2-digit', month: 'short', year: 'numeric'
-                });
+                const dateStr = formatTxDate(tx.createdAt || tx.timestamp);
+                const timeStr = formatTxTime(tx.createdAt || tx.timestamp);
+                const phoneStr = formatPhoneDisplay(tx.sender?.id || tx.recipient?.id);
                 return (
                   <View
                     key={tx._id || index}
@@ -252,8 +254,13 @@ export default function Transactions({ navigation }: any) {
                         {verified && <MaterialIcons name="verified" size={12} color="#006c4e" style={{ marginLeft: 4 }} />}
                       </View>
                       <Text className="text-[#707971] text-[11px] font-jakarta-medium mt-0.5" numberOfLines={1} ellipsizeMode="tail">
-                        {dateStr} · {typeLabel}
+                        {dateStr}, {timeStr} · {typeLabel}
                       </Text>
+                      {!!phoneStr && (
+                        <Text className="text-[#707971]/70 text-[10px] font-jakarta-medium mt-0.5" numberOfLines={1} ellipsizeMode="tail">
+                          {phoneStr}
+                        </Text>
+                      )}
                     </View>
                     <Text
                       className={`font-jakarta-bold text-[14px] ${
