@@ -9,6 +9,7 @@ import { ValidatedInput } from '../components/ValidatedInput'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useToast } from '../context/NotificationContext'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
+import SettlementQrCard from '../components/ui/SettlementQrCard'
 
 export default function Wallet() {
   const { merchant, refreshSession } = useMerchantAuth()
@@ -333,23 +334,30 @@ export default function Wallet() {
     }
   }
 
-  // QR Logic
+  // QR Logic — rendered locally via qrcode.react (level="H" = ~30% error
+  // correction) rather than fetched from an external image API, so the
+  // PayChain mark can sit in the center (imageSettings' `excavate` clears
+  // the modules behind it) without breaking scannability.
   const qrData = `${window.location.origin}/pay/account/${merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || ''}`
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrData)}&margin=10&bgcolor=FFFFFF&color=00351D`
+  // qrcode.react v3's QRCodeCanvas is a plain function component (not
+  // forwardRef) — a `ref` prop on it is silently dropped. Grab the real
+  // <canvas> it renders via a wrapping container instead.
+  const qrContainerRef = React.useRef(null)
+
+  const getQrDataUrl = () => qrContainerRef.current?.querySelector('canvas')?.toDataURL('image/png')
 
   const handleDownload = async () => {
     setIsDownloading(true)
     try {
-      const response = await fetch(qrUrl);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
+      const dataUrl = getQrDataUrl();
+      if (!dataUrl) throw new Error('QR canvas not ready');
       const a = document.createElement('a');
       a.style.display = 'none';
-      a.href = url;
+      a.href = dataUrl;
       a.download = `PayChain-QR-${merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'account'}.png`;
       document.body.appendChild(a);
       a.click();
-      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
       addToast({ title: 'QR Code Downloaded', message: 'Your payment QR code has been downloaded.', type: 'success' })
     } catch (e) {
       addToast({ title: 'Download Failed', message: 'Could not download the QR image.', type: 'error' })
@@ -362,6 +370,11 @@ export default function Wallet() {
     setIsGeneratingPDF(true)
     setTimeout(() => {
       setIsGeneratingPDF(false)
+      const dataUrl = getQrDataUrl();
+      if (!dataUrl) {
+        addToast({ title: 'PDF Generation Failed', message: 'QR code was not ready — please try again.', type: 'error' })
+        return;
+      }
       const printWindow = window.open('', '', 'width=600,height=800');
       printWindow.document.write(`
         <html>
@@ -376,7 +389,7 @@ export default function Wallet() {
             </style>
           </head>
           <body>
-            <img src="${qrUrl}" alt="Settlement QR" />
+            <img src="${dataUrl}" alt="Settlement QR" />
             <div class="text">
               <h1>Settlement QR</h1>
               <p>ACC: ${formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending')}</p>
@@ -867,27 +880,14 @@ export default function Wallet() {
                 </div>
               </div>
 
-              {/* QR Code Container */}
+              {/* QR Code Container — premium bezel: gradient ring + corner brackets around the settlement QR */}
               <div className="w-full md:w-56 shrink-0 flex justify-center self-start md:self-center mt-2 md:mt-0">
-                <div className="bg-[#131722] p-5 rounded-[24px] flex flex-col items-center justify-center border border-[#1E2532] shadow-[0_8px_30px_rgba(0,0,0,0.6)] relative group w-full h-fit">
-                  <div className="bg-white p-2.5 rounded-[16px] shadow-lg mb-5 relative z-10 transition-transform group-hover:scale-[1.02] w-[160px] h-[160px] flex items-center justify-center shrink-0 border border-white/10">
-                    <img 
-                      src={qrUrl} 
-                      alt="Payment QR" 
-                      className="max-w-full max-h-full rounded-xl object-contain"
-                    />
-                  </div>
-                  
-                  <div className="text-center relative z-10 w-full flex flex-col items-center">
-                    <div className="inline-block px-2.5 py-1 bg-[#2775CA]/10 border border-[#2775CA]/20 rounded-md mb-2.5">
-                      <p className="text-[#2775CA] text-[9px] font-black uppercase tracking-[0.2em] leading-none">Settlement QR</p>
-                    </div>
-                    <div className="space-y-1.5 w-full">
-                      <p className="text-white text-[15px] font-mono font-bold tracking-widest leading-none">ACC: {formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending')}</p>
-                      <p className="text-[#8B98A9] text-[8px] font-bold uppercase tracking-widest leading-tight break-words px-1 opacity-80">MERCHANT: {merchant?.businessName || 'Merchant'}</p>
-                    </div>
-                  </div>
-                </div>
+                <SettlementQrCard
+                  qrData={qrData}
+                  businessName={merchant?.businessName || 'Merchant'}
+                  accountNumber={merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending'}
+                  containerRef={qrContainerRef}
+                />
               </div>
             </div>
 

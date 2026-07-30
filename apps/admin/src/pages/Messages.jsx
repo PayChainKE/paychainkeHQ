@@ -3,7 +3,7 @@ import Layout from '../components/layout/Layout';
 import api from '../api/api';
 import TablePagination from '../components/ui/TablePagination';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 25;
 
 // ── Constants ─────────────────────────────────────────────────────────
 const STATUS_META = {

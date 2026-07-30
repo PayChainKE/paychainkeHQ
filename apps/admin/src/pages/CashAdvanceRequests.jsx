@@ -3,6 +3,9 @@ import Layout from '../components/layout/Layout';
 import api from '../api/api';
 import { formatKES } from '../utils/formatCurrency';
 import { formatDateISO } from '../utils/formatDate';
+import TablePagination from '../components/ui/TablePagination';
+
+const PAGE_SIZE = 25;
 
 const STATUS_META = {
   pending: { label: 'Pending review', tone: 'bg-amber-50 text-amber-700 border-amber-200', icon: 'schedule' },
@@ -55,6 +58,7 @@ export default function CashAdvanceRequests() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
 
   const fetchRequests = useCallback(async () => {
     setLoading(true);
@@ -97,6 +101,13 @@ export default function CashAdvanceRequests() {
       return true;
     });
   }, [requests, search, statusFilter]);
+
+  useEffect(() => { setPage(1); }, [search, statusFilter]);
+
+  const pagedRequests = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return visibleRequests.slice(start, start + PAGE_SIZE);
+  }, [visibleRequests, page]);
 
   const selectedRequest = useMemo(
     () => visibleRequests.find((request) => request._id === selectedId) || visibleRequests[0] || null,
@@ -277,7 +288,7 @@ export default function CashAdvanceRequests() {
                   </tr>
                 </thead>
                 <tbody>
-                  {visibleRequests.map((request) => {
+                  {pagedRequests.map((request) => {
                     const id = request._id;
                     const active = selectedRequest && id === selectedRequest._id;
                     const status = request.status || 'pending';
@@ -338,6 +349,10 @@ export default function CashAdvanceRequests() {
                 </tbody>
               </table>
             </div>
+
+            {!loading && visibleRequests.length > 0 && (
+              <TablePagination page={page} pageSize={PAGE_SIZE} total={visibleRequests.length} onPage={setPage} />
+            )}
 
             {!loading && !visibleRequests.length && !error && (
               <div className="px-6 py-16 text-center">

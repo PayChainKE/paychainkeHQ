@@ -2,6 +2,9 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import Layout from '../components/layout/Layout';
 import api from '../api/api';
 import { useAuth } from '../context/AuthContext';
+import TablePagination from '../components/ui/TablePagination';
+
+const PAGE_SIZE = 25;
 
 const ROLE_OPTIONS = [
   { v: 'owner',   label: 'Owner',   desc: 'Full control. Can manage other team members and all platform settings.' },
@@ -55,6 +58,7 @@ const Team = () => {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [toast, setToast] = useState('');
+  const [page, setPage] = useState(1);
 
   const fetchTeam = useCallback(async () => {
     setLoading(true);
@@ -118,6 +122,13 @@ const Team = () => {
     }
     return true;
   }), [members, tier, status, search]);
+
+  useEffect(() => { setPage(1); }, [tier, status, search]);
+
+  const pagedMembers = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, page]);
 
   const stats = useMemo(() => ({
     total:      members.length,
@@ -282,7 +293,7 @@ const Team = () => {
                   [...Array(3)].map((_, i) => <SkeletonRow key={i} />)
                 ) : filtered.length === 0 ? (
                   <tr><td colSpan={8} className="px-4 py-10 text-center text-on-surface-variant/40 text-sm">{error || 'No team members match this view.'}</td></tr>
-                ) : filtered.map((m) => (
+                ) : pagedMembers.map((m) => (
                   <RosterRow
                     key={m._id}
                     member={m}
@@ -294,13 +305,14 @@ const Team = () => {
               </tbody>
             </table>
           </div>
+          {!loading && <TablePagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPage={setPage} />}
         </div>
 
         {/* Roster — mobile */}
         <div className="md:hidden space-y-2">
           {loading ? <div className="p-8 text-center text-on-surface-variant/40 text-sm">Loading team…</div> :
             filtered.length === 0 ? <div className="p-8 text-center text-on-surface-variant/40 text-sm">{error || 'No team members match this view.'}</div> :
-            filtered.map((m) => (
+            pagedMembers.map((m) => (
               <RosterCard
                 key={m._id}
                 member={m}
@@ -309,6 +321,11 @@ const Team = () => {
                 onEdit={() => setEditing(m)}
               />
             ))}
+          {!loading && filtered.length > 0 && (
+            <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 shadow-editorial overflow-hidden">
+              <TablePagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPage={setPage} />
+            </div>
+          )}
         </div>
 
         {/* Invite modal */}

@@ -60,6 +60,12 @@ const transactionSchema = new mongoose.Schema({
   paychainFee:  { type: Number, default: 0 },
   safaricomFee: { type: Number, default: 0 },
   revenueStream: { type: String, default: null },
+  // The merchant's KES balance immediately after this transaction was
+  // applied — captured at write time from the atomic $inc's returned
+  // document (never recomputed later), same "resulting balance" figure
+  // M-Pesa's own SMS shows. Optional/null on transaction types that don't
+  // stamp it yet — never back-computed from other rows.
+  balanceAfter: { type: Number, default: null },
 }, {
   timestamps: true
 });

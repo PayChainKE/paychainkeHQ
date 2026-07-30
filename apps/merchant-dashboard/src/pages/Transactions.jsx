@@ -3,9 +3,10 @@ import axios from 'axios'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import CalendarRangePicker from '../components/ui/CalendarRangePicker'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
-import { formatDateISO } from '../utils/formatDate'
+import { formatDateISO, formatTxDate, formatTxTime } from '../utils/formatDate'
 import { formatKES, formatUSDC } from '../utils/formatCurrency'
 import { formatAccountNumber } from '../utils/formatAccountNumber'
+import { formatPhoneDisplay } from '../utils/formatPhoneDisplay'
 import { getAmountSign, getAmountColorClass, isCreditTransaction, isDebitTransaction } from '../utils/transactionDirection'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useNotification } from '../context/NotificationContext'
@@ -688,8 +689,8 @@ export default function Transactions() {
                         }`}
                       >
                         <td className="px-6 py-2">
-                          <p className="text-[13px] font-semibold text-primary leading-tight">{formatDateISO(tx.createdAt || tx.timestamp).split(',')[0]}</p>
-                          <p className="text-[10px] text-on-surface-variant leading-tight">{formatDateISO(tx.createdAt || tx.timestamp).split(',')[1]}</p>
+                          <p className="text-[13px] font-semibold text-primary leading-tight">{formatTxDate(tx.createdAt || tx.timestamp)}</p>
+                          <p className="text-[10px] text-on-surface-variant leading-tight tabular-nums">{formatTxTime(tx.createdAt || tx.timestamp)}</p>
                         </td>
                         <td className="px-6 py-2">
                           <span className={`px-2 py-1 text-[9px] font-bold rounded-full uppercase tracking-tighter ${txColor(tx.type)}`}>
@@ -698,7 +699,9 @@ export default function Transactions() {
                         </td>
                         <td className="px-6 py-2">
                           <p className="text-[13px] font-semibold text-primary leading-tight">{tx.sender?.name || tx.recipient?.name || 'PayChain'}</p>
-                          <p className="text-[10px] font-mono text-on-surface-variant group-hover:text-primary transition-colors leading-tight">{tx.reference}</p>
+                          <p className="text-[10px] font-mono text-on-surface-variant group-hover:text-primary transition-colors leading-tight tabular-nums">
+                            {[formatPhoneDisplay(tx.sender?.id || tx.recipient?.id), tx.reference].filter(Boolean).join(' · ')}
+                          </p>
                         </td>
                         <td className="px-6 py-2">
                           <p className={`text-[13px] font-bold tabular-nums transition-all duration-300 ${txAmountColor(tx)}`}>
@@ -730,10 +733,10 @@ export default function Transactions() {
                 >
                   {/* Date/Time */}
                   <p className="text-[10px] text-on-surface-variant/40 font-bold uppercase tracking-[0.2em]">
-                    {formatDateISO(tx.createdAt || tx.timestamp).split(',')[0]}
+                    {formatTxDate(tx.createdAt || tx.timestamp)}
                   </p>
-                  <p className="text-[9px] text-on-surface-variant/30 font-bold uppercase tracking-widest -mt-1 mb-2">
-                    {formatDateISO(tx.createdAt || tx.timestamp).split(',')[1]}
+                  <p className="text-[9px] text-on-surface-variant/30 font-bold uppercase tracking-widest -mt-1 mb-2 tabular-nums">
+                    {formatTxTime(tx.createdAt || tx.timestamp)}
                   </p>
 
                   {/* Type Badge */}
@@ -747,8 +750,8 @@ export default function Transactions() {
                   <p className="text-base font-bold text-primary leading-tight">
                     {tx.sender?.name || tx.recipient?.name || 'PayChain'}
                   </p>
-                  <p className="text-[10px] text-on-surface-variant/40 font-mono tracking-tight mb-2">
-                    {tx.reference}
+                  <p className="text-[10px] text-on-surface-variant/40 font-mono tracking-tight mb-2 tabular-nums">
+                    {[formatPhoneDisplay(tx.sender?.id || tx.recipient?.id), tx.reference].filter(Boolean).join(' · ')}
                   </p>
 
                   {/* Amount */}
@@ -862,15 +865,25 @@ export default function Transactions() {
                     <p className="text-[10px] text-on-surface-variant/60 font-bold uppercase tracking-[0.2em]">Counterparty</p>
                     <div>
                       <p className="text-lg font-bold text-primary">{selectedTx.sender?.name || selectedTx.recipient?.name || 'Internal Treasury'}</p>
-                      <p className="text-[10px] text-on-surface-variant/40 font-bold mt-1 uppercase tracking-widest">{selectedTx.sender?.id || selectedTx.recipient?.id || 'SYSTEM'}</p>
+                      <p className="text-[10px] text-on-surface-variant/40 font-bold mt-1 uppercase tracking-widest">{formatPhoneDisplay(selectedTx.sender?.id || selectedTx.recipient?.id) || 'SYSTEM'}</p>
                     </div>
                   </div>
 
                   {/* Timestamp Section */}
                   <div className="space-y-3 pt-6 border-t border-outline-variant/5">
                     <p className="text-[10px] text-on-surface-variant/60 font-bold uppercase tracking-[0.2em]">Timestamp</p>
-                    <p className="text-xs font-bold text-primary/70 uppercase tracking-widest">{formatDateISO(selectedTx?.createdAt || selectedTx?.timestamp)}</p>
+                    <p className="text-xs font-bold text-primary/70 uppercase tracking-widest tabular-nums">
+                      {formatTxDate(selectedTx?.createdAt || selectedTx?.timestamp)} · {formatTxTime(selectedTx?.createdAt || selectedTx?.timestamp)}
+                    </p>
                   </div>
+
+                  {/* Resulting Balance Section — same "balance after" figure M-Pesa's own SMS shows, only present on transactions written after balanceAfter was added */}
+                  {selectedTx?.balanceAfter != null && (
+                    <div className="space-y-3 pt-6 border-t border-outline-variant/5">
+                      <p className="text-[10px] text-on-surface-variant/60 font-bold uppercase tracking-[0.2em]">Balance After</p>
+                      <p className="text-lg font-bold text-primary">{formatKES(selectedTx.balanceAfter)}</p>
+                    </div>
+                  )}
 
                   {/* Verification Section */}
                   <div className="space-y-3 pt-6 border-t border-outline-variant/5 border-b border-outline-variant/5 pb-10">

@@ -4,10 +4,8 @@ import domtoimage from 'dom-to-image'
 import { ValidatedInput } from '../components/ValidatedInput'
 import { useNavigate } from 'react-router-dom'
 import MerchantLayout from '../components/layout/MerchantLayout'
-import FundAccountModal from '../components/modals/FundAccountModal'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { formatKES } from '../utils/formatCurrency'
-import { formatAccountNumber } from '../utils/formatAccountNumber'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useNotification } from '../context/NotificationContext'
 import { isValidPhoneKE } from '../utils/validators'
@@ -18,22 +16,12 @@ import axios from 'axios'
 export default function BulkPay() {
   const { showAmounts } = usePrivacyMode()
   const { addNotification } = useNotification()
-  const { merchant } = useMerchantAuth()
+  const { merchant, refreshSession } = useMerchantAuth()
   const [payeesList, setPayeesList] = useState([])
   const navigate = useNavigate()
   
   const isProfileComplete = Boolean(merchant?.kraPin && merchant?.businessNumber)
-
-  // Lock page scroll while the profile-incomplete gate is up — the blurred
-  // page behind it has no reason to scroll since it's not interactive, and
-  // an unlockable page made this screen feel broken rather than gated.
-  useEffect(() => {
-    if (isProfileComplete) return
-    const prevOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = prevOverflow }
-  }, [isProfileComplete])
-
+  
   useEffect(() => {
     const fetchPayees = async () => {
       try {
@@ -109,12 +97,6 @@ export default function BulkPay() {
     cuNumber: ''
   })
 
-  // KPLC/Water route through NCBA's biller-code BillPay rail (real payment
-  // execution, see authorizeBatch), so they skip Settlement Method entirely
-  // in favour of a meter/account number. Rent/Internet aren't real NCBA
-  // billers — they still settle via Mobile Money/Bank like any other payee.
-  const isNcbaBillableUtility = newPayee.type === 'Utility' && ['Electricity', 'Water'].includes(newPayee.utilityType)
-
   // Filter payees based on active tab
   const filteredPayees = payeesList.filter(p => {
     if (activeFilter === 'All') return true;
@@ -141,7 +123,6 @@ export default function BulkPay() {
     setNewPayee({
       name: p.name,
       type: p.type.charAt(0).toUpperCase() + p.type.slice(1),
-      utilityType: p.utilityProvider === 'KPLC' ? 'Electricity' : p.utilityProvider === 'WATER' ? 'Water' : 'Electricity',
       paymentMethod: p.paymentMethod || 'Mobile Money',
       mobileMoneyType: p.mobileMoneyType || 'Personal Number',
       amount: (p.salary || p.amount || 0).toString(),
@@ -188,12 +169,7 @@ export default function BulkPay() {
     }
 
     // Professional Settlement Format Validation
-    if (isNcbaBillableUtility) {
-      if (!newPayee.accountNumber?.trim()) {
-        addNotification({ title: 'Missing Info', message: `${newPayee.utilityType === 'Electricity' ? 'Meter' : 'Account'} number is required.`, type: 'error' });
-        return;
-      }
-    } else if (newPayee.paymentMethod === 'Mobile Money') {
+    if (newPayee.paymentMethod === 'Mobile Money') {
       if (newPayee.mobileMoneyType === 'Personal Number') {
         if (!isValidPhoneKE(newPayee.phone)) {
           addNotification({ title: 'Invalid Format', message: 'Please enter a valid Kenyan phone number (07..., 01..., +2547..., +2541...).', type: 'error' });
@@ -228,13 +204,9 @@ export default function BulkPay() {
     const numericAmount = parseFloat(newPayee.amount.replace(/,/g, '')) || 0;
     try {
       const token = localStorage.getItem('paychain_merchant_token');
-      const utilityProvider = newPayee.type === 'Utility'
-        ? (newPayee.utilityType === 'Electricity' ? 'KPLC' : newPayee.utilityType === 'Water' ? 'WATER' : null)
-        : null;
       const payload = {
         ...newPayee,
         type: newPayee.type.toLowerCase(),
-        utilityProvider,
         defaultAmount: numericAmount
       };
       const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
@@ -607,7 +579,13 @@ export default function BulkPay() {
 
   // Fund Account Modal State
   const [showFundModal, setShowFundModal] = useState(false)
-  const [selectedFundingSource, setSelectedFundingSource] = useState(null)
+  const [fundStep, setFundStep] = useState(1)
+  const [fundDetails, setFundDetails] = useState({
+    amount: '',
+    method: 'Mobile Money',
+    phone: ''
+  })
+  const [selectedTill, setSelectedTill] = useState(null)
 
   // Security Verification Modal State
   const [showSecurityModal, setShowSecurityModal] = useState(false)
@@ -654,6 +632,17 @@ export default function BulkPay() {
     }
   }
 
+  const handleFundAccount = () => {
+    addNotification({
+      title: 'Funding Initiated',
+      message: `Your deposit of KES ${fundDetails.amount} via ${fundDetails.method} is being processed.`,
+      type: 'success'
+    });
+    setShowFundModal(false);
+    setFundStep(1);
+    setFundDetails({ amount: '', method: 'Mobile Money', phone: '' });
+  }
+
   const batchTotal = Object.keys(selectedPayees)
     .filter((id) => selectedPayees[id])
     .reduce((sum, id) => sum + (payoutAmounts[id] || 0), 0)
@@ -687,7 +676,7 @@ export default function BulkPay() {
       const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
       const res = await axios.post(`${API_URL}/api/bulkpay/authorize`, {
         batchRows,
-        fundingSource: selectedFundingSource || 'Main Business Account',
+        fundingSource: selectedTill || 'Main Business Till',
         pin: pin
       }, {
         headers: { Authorization: `Bearer ${token}` }
@@ -712,6 +701,11 @@ export default function BulkPay() {
       setAuthorizedReceipts(newReceipts);
       setStep(4);
       setCsvPreview(null); // Clear preview
+
+      // Balance was just debited server-side — refresh now instead of
+      // waiting for the ambient 5s poll in MerchantAuthContext, so the
+      // sidebar/Overview balance reflects this payout immediately.
+      refreshSession();
 
       addNotification({
         title: 'Batch Processed',
@@ -832,48 +826,26 @@ export default function BulkPay() {
     <MerchantLayout title="Bulk Payments">
       <div className="relative">
         {!isProfileComplete && (
-          // Fixed to the viewport (not absolute over the page) and anchored
-          // below the header, with a z-index under both the header (z-40)
-          // and sidebar (z-[50]) — the gate blocks Bulk Pay, not navigation;
-          // merchants can still open the menu, switch pages, or sign out.
-          <div className="fixed inset-x-0 bottom-0 top-[64px] lg:top-[56px] z-30 flex items-center justify-center p-4">
-            <div className="relative bg-gradient-to-br from-[#0A2540] to-[#0d3358] p-8 md:p-12 rounded-[32px] md:rounded-[40px] text-center shadow-[0_40px_100px_-20px_rgba(10,37,64,0.55)] max-w-lg w-full border border-white/10 overflow-hidden animate-fade-in-up">
-              <div className="absolute -top-24 -right-24 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-              <div className="relative">
-                <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-400/20 flex items-center justify-center mx-auto mb-6 text-emerald-300">
-                  <span className="material-symbols-outlined text-3xl">verified_user</span>
-                </div>
-                <p className="text-2xs font-bold uppercase tracking-[0.3em] text-emerald-300 mb-2">Verification Required</p>
-                <h2 className="font-headline text-2xl md:text-3xl font-bold text-white mb-3">Complete Your Profile</h2>
-                <p className="text-sm md:text-base text-white/60 mb-6 leading-relaxed">
-                  Bulk Payments require a verified KRA PIN and Business License Number for regulatory compliance.
-                </p>
-                <div className="text-left bg-white/5 border border-white/10 rounded-2xl p-4 mb-8 space-y-2.5">
-                  <div className="flex items-center gap-3">
-                    <span className={`material-symbols-outlined text-lg ${merchant?.kraPin ? 'text-emerald-400' : 'text-white/30'}`}>
-                      {merchant?.kraPin ? 'check_circle' : 'radio_button_unchecked'}
-                    </span>
-                    <span className={`text-xs font-bold ${merchant?.kraPin ? 'text-white/50 line-through' : 'text-white'}`}>KRA PIN</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className={`material-symbols-outlined text-lg ${merchant?.businessNumber ? 'text-emerald-400' : 'text-white/30'}`}>
-                      {merchant?.businessNumber ? 'check_circle' : 'radio_button_unchecked'}
-                    </span>
-                    <span className={`text-xs font-bold ${merchant?.businessNumber ? 'text-white/50 line-through' : 'text-white'}`}>Business License Number</span>
-                  </div>
-                </div>
-                <button
-                  onClick={() => navigate('/profile', { state: { focusFields: ['kraPin', 'businessNumber'] } })}
-                  className="w-full bg-emerald-500 text-[#06201B] px-8 py-4 rounded-xl font-black text-[11px] uppercase tracking-widest shadow-xl hover:bg-white transition-all active:scale-95 flex items-center justify-center gap-2"
-                >
-                  Complete Profile Now
-                  <span className="material-symbols-outlined text-sm">arrow_forward</span>
-                </button>
+          <div className="absolute inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-[#0A2540]/90 backdrop-blur-xl p-8 md:p-12 rounded-[32px] md:rounded-[40px] text-center shadow-2xl max-w-lg w-full border border-white/10 animate-fade-in-up">
+              <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center mx-auto mb-6 text-white/50">
+                <span className="material-symbols-outlined text-3xl">lock</span>
               </div>
+              <h2 className="font-headline text-2xl md:text-3xl font-bold text-white mb-3">Profile Incomplete</h2>
+              <p className="text-sm md:text-base text-white/70 mb-8 leading-relaxed">
+                To unlock Bulk Payments and ensure full regulatory compliance, please add your KRA PIN and Business License Number to your profile.
+              </p>
+              <button 
+                onClick={() => navigate('/profile')}
+                className="w-full bg-emerald-500 text-[#06201B] px-8 py-4 rounded-xl font-black text-[11px] uppercase tracking-widest shadow-xl hover:bg-white transition-all active:scale-95 flex items-center justify-center gap-2"
+              >
+                Complete Profile Now
+                <span className="material-symbols-outlined text-sm">arrow_forward</span>
+              </button>
             </div>
           </div>
         )}
-
+        
         <div className={`px-1 lg:px-0 max-w-7xl mx-auto flex flex-col lg:flex-row gap-6 lg:gap-8 relative transition-all duration-500 ${!isProfileComplete ? 'blur-md pointer-events-none opacity-40 select-none' : ''}`}>
         
         {/* Add/Edit Payee Modal Overlay */}
@@ -1036,24 +1008,6 @@ export default function BulkPay() {
                         />
                       </div>
 
-                      {isNcbaBillableUtility ? (
-                        <div className="space-y-1.5 pt-4 animate-in fade-in duration-300">
-                          <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">
-                            {newPayee.utilityType === 'Electricity' ? 'Meter Number' : 'Account Number'}
-                          </label>
-                          <ValidatedInput
-                            kind={newPayee.utilityType === 'Electricity' ? 'integer' : 'text'}
-                            value={newPayee.accountNumber}
-                            onChange={(e) => setNewPayee({...newPayee, accountNumber: e.target.value})}
-                            placeholder={newPayee.utilityType === 'Electricity' ? 'e.g. 12345678901' : 'e.g. 987654321'}
-                            className="w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 md:px-6 md:py-4 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none"
-                          />
-                          <p className="text-[10px] text-on-surface-variant/50 font-medium ml-1">
-                            Paid directly via PayChain — no Settlement Method needed for {newPayee.utilityType}.
-                          </p>
-                        </div>
-                      ) : (
-                      <>
                       <div className="space-y-4 pt-4">
                         <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Settlement Method</label>
                         <div className="flex gap-2 p-1.5 bg-surface-container-low/50 rounded-2xl border border-outline-variant/5">
@@ -1170,8 +1124,6 @@ export default function BulkPay() {
                           </div>
                         )}
                       </div>
-                      </>
-                      )}
                     </div>
 
                     <div className="flex gap-4 pt-4">
@@ -1415,7 +1367,7 @@ export default function BulkPay() {
                           </td>
                           <td className="px-6 py-4 border-r border-outline-variant/5">
                             <div className="flex flex-col">
-                              <span className="text-[10px] font-black text-primary/80 uppercase tracking-wider">{p.utilityProvider ? 'PayChain Bill Pay' : p.paymentMethod}</span>
+                              <span className="text-[10px] font-black text-primary/80 uppercase tracking-wider">{p.paymentMethod}</span>
                               <span className="text-[10px] font-medium text-on-surface-variant opacity-60 tabular-nums">{p.phone || p.paybillNumber || p.accountNumber}</span>
                             </div>
                           </td>
@@ -1464,7 +1416,7 @@ export default function BulkPay() {
                           </div>
                           <div>
                             <p className="text-[11px] font-bold text-primary leading-none">{p.name}</p>
-                            <p className="text-[8px] text-on-surface-variant font-bold uppercase tracking-widest mt-1 opacity-50">{p.utilityProvider ? 'PayChain Bill Pay' : p.paymentMethod}</p>
+                            <p className="text-[8px] text-on-surface-variant font-bold uppercase tracking-widest mt-1 opacity-50">{p.paymentMethod}</p>
                           </div>
                         </div>
                         {step === 1 && (
@@ -1506,27 +1458,27 @@ export default function BulkPay() {
                   <h4 className="text-sm font-bold text-primary uppercase tracking-widest mb-6">Select Funding Source</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {[
-                      { id: 'ACCOUNT_1', name: merchant?.businessName || 'Main Business Account', balance: merchant?.kesBalance ?? 0, number: merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending' },
-                    ].map(account => (
-                      <div
-                        key={account.id}
-                        onClick={() => setSelectedFundingSource(account.id)}
-                        className={`p-6 rounded-2xl border-2 transition-all cursor-pointer ${selectedFundingSource === account.id ? 'border-emerald-500 bg-emerald-50/50 shadow-lg shadow-emerald-500/10' : 'border-outline-variant/10 hover:border-emerald-500/30 bg-white shadow-sm hover:shadow-md'}`}
+                      { id: 'TILL_1', name: merchant?.businessName || 'Main Business Till', balance: merchant?.kesBalance ?? 0, number: merchant?.paybillAccount || '852300' },
+                    ].map(till => (
+                      <div 
+                        key={till.id}
+                        onClick={() => setSelectedTill(till.id)}
+                        className={`p-6 rounded-2xl border-2 transition-all cursor-pointer ${selectedTill === till.id ? 'border-emerald-500 bg-emerald-50/50 shadow-lg shadow-emerald-500/10' : 'border-outline-variant/10 hover:border-emerald-500/30 bg-white shadow-sm hover:shadow-md'}`}
                       >
                         <div className="flex justify-between items-start mb-6">
                           <div className="flex items-center gap-3">
-                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${selectedFundingSource === account.id ? 'bg-emerald-500 text-white shadow-sm' : 'bg-surface-container-low text-primary'}`}>
-                              <span className="material-symbols-outlined">{selectedFundingSource === account.id ? 'check' : 'storefront'}</span>
+                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${selectedTill === till.id ? 'bg-emerald-500 text-white shadow-sm' : 'bg-surface-container-low text-primary'}`}>
+                              <span className="material-symbols-outlined">{selectedTill === till.id ? 'check' : 'storefront'}</span>
                             </div>
                             <div>
-                              <h5 className="font-bold text-sm text-primary leading-tight">{account.name}</h5>
-                              <p className="text-[10px] text-on-surface-variant font-medium mt-1 opacity-60">PayChain Account No: {formatAccountNumber(account.number)}</p>
+                              <h5 className="font-bold text-sm text-primary leading-tight">{till.name}</h5>
+                              <p className="text-[10px] text-on-surface-variant font-medium mt-1 opacity-60">Till No: {till.number}</p>
                             </div>
                           </div>
                         </div>
                         <div className="pt-4 border-t border-outline-variant/5">
                           <p className="text-[9px] text-on-surface-variant uppercase tracking-[0.2em] font-black opacity-40 mb-1.5">Available Balance</p>
-                          <p className="font-headline text-xl text-primary font-bold">{formatKES(account.balance)}</p>
+                          <p className="font-headline text-xl text-primary font-bold">{formatKES(till.balance)}</p>
                         </div>
                       </div>
                     ))}
@@ -1655,7 +1607,7 @@ export default function BulkPay() {
                           }
                         }
                       }}
-                      disabled={batchTotal === 0 || isLiquidityLow || (step === 3 && !selectedFundingSource)}
+                      disabled={batchTotal === 0 || isLiquidityLow || (step === 3 && !selectedTill)}
                       className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-400 text-[#00351D] px-6 py-2.5 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 group disabled:opacity-20 disabled:grayscale text-xs md:text-sm"
                     >
                       {step === 1 ? 'Review Batch' : step === 2 ? 'Proceed to Settlement' : 'Authorize Batch'}
@@ -1875,14 +1827,153 @@ export default function BulkPay() {
             </div>
           </div>
         </section>
-        {/* Fund Account Modal — reuses the real, working modal (same one
-            Overview.jsx uses) instead of the previous bespoke wizard here,
-            which never called any real API: its "Pay Now" button called
-            setBalance(), a function that was never defined anywhere in
-            this file, and its fake "Virtual Account Transfer" / "Card
-            Top-up" options showed fabricated bank/card details. */}
+        {/* Fund Account Modal Overlay */}
         {showFundModal && (
-          <FundAccountModal method="mobile" onClose={() => setShowFundModal(false)} />
+          <div className="fixed inset-0 bg-[#0A2540]/60 backdrop-blur-md z-[110] flex items-center justify-center p-4 animate-in fade-in duration-300">
+            <div className="bg-white w-full max-w-md rounded-[32px] md:rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in duration-500 border border-white/20">
+              <div className="p-6 md:p-8">
+                <div className="flex items-center justify-between mb-8">
+                  <div>
+                    <h2 className="font-headline text-2xl text-primary tracking-tight font-bold">Fund Account</h2>
+                    <p className="text-[10px] text-on-surface-variant font-medium mt-1 opacity-60">
+                      {fundStep === 1 ? 'Select Funding Method' : fundStep === 2 ? 'Enter Details' : 'Funding Successful'}
+                    </p>
+                  </div>
+                  <button 
+                    onClick={() => { setShowFundModal(false); setFundStep(1); }}
+                    className="w-10 h-10 rounded-full bg-surface-container-low flex items-center justify-center text-primary/40 hover:text-primary transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-xl">close</span>
+                  </button>
+                </div>
+
+                {fundStep === 1 && (
+                  <div className="flex flex-col gap-3">
+                    {[
+                      { id: 'Virtual Account Transfer', label: 'Virtual Account Transfer', icon: 'account_balance', desc: 'Transfer to your dedicated USD/KES account' },
+                      { id: 'Mobile Money', label: 'Mobile Money', icon: 'smartphone', desc: 'M-Pesa, Airtel Money' },
+                      { id: 'Card Top-up', label: 'Card Top-up', icon: 'credit_card', desc: 'Visa / Mastercard' }
+                    ].map((method) => (
+                      <button
+                        key={method.id}
+                        onClick={() => { setFundDetails({...fundDetails, method: method.id}); setFundStep(2); }}
+                        className="group flex items-center gap-4 p-4 rounded-2xl border border-outline-variant/10 hover:border-emerald-500/30 hover:bg-emerald-500/[0.01] transition-all"
+                      >
+                        <div className="w-12 h-12 rounded-xl bg-surface-container-low flex items-center justify-center text-primary group-hover:bg-[#00351D] group-hover:text-white transition-all shrink-0">
+                          <span className="material-symbols-outlined text-2xl">{method.icon}</span>
+                        </div>
+                        <div className="text-left">
+                          <h4 className="font-bold text-sm text-primary">{method.label}</h4>
+                          <p className="text-[10px] text-on-surface-variant mt-0.5 opacity-60">{method.desc}</p>
+                        </div>
+                        <span className="material-symbols-outlined ml-auto text-primary/10 group-hover:text-emerald-500 transition-all">chevron_right</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {fundStep === 2 && (
+                  <div className="space-y-6 animate-in slide-in-from-right duration-500">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Amount (KES)</label>
+                      <input 
+                        type="text"
+                        value={fundDetails.amount}
+                        onChange={(e) => setFundDetails({...fundDetails, amount: e.target.value})}
+                        placeholder="e.g. 50,000"
+                        className="w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none"
+                      />
+                    </div>
+
+                    {fundDetails.method === 'Mobile Money' && (
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Phone Number</label>
+                        <input 
+                          type="text"
+                          value={fundDetails.phone}
+                          onChange={(e) => setFundDetails({...fundDetails, phone: e.target.value})}
+                          placeholder="07XX XXX XXX"
+                          className="w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none"
+                        />
+                      </div>
+                    )}
+
+                    <div className="flex gap-4 pt-4">
+                      <button 
+                        onClick={() => setFundStep(1)}
+                        className="flex-1 py-3.5 rounded-2xl border border-outline-variant/10 text-primary font-bold text-sm"
+                      >
+                        Back
+                      </button>
+                      <button 
+                        onClick={() => setFundStep(3)}
+                        className="flex-[2] py-3.5 rounded-2xl bg-[#00351D] text-white font-bold text-sm shadow-xl active:scale-[0.98]"
+                      >
+                        Next Step
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {fundStep === 3 && (
+                  <div className="animate-in zoom-in duration-500 text-center py-4">
+                    <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                      <span className="material-symbols-outlined text-4xl text-emerald-600">contactless</span>
+                    </div>
+                    <h3 className="font-headline text-xl text-primary font-bold mb-2">Confirm Funding</h3>
+                    <p className="text-sm text-on-surface-variant opacity-60 px-6">You are about to deposit</p>
+                    <div className="flex items-center justify-center gap-2 my-4">
+                      <span className="text-sm font-bold text-emerald-600">KES</span>
+                      <span className="font-headline text-4xl text-primary font-bold tracking-tighter">{fundDetails.amount || '0'}</span>
+                    </div>
+                    <p className="text-[10px] text-on-surface-variant font-black uppercase tracking-widest opacity-40">via {fundDetails.method}</p>
+
+                    <div className="flex gap-4 pt-10">
+                      <button 
+                        onClick={() => setFundStep(2)}
+                        className="flex-1 py-3.5 rounded-2xl border border-outline-variant/10 text-primary font-bold text-sm"
+                      >
+                        Back
+                      </button>
+                      <button 
+                        onClick={() => {
+                          setBalance(prev => prev + (parseFloat(fundDetails.amount) || 0));
+                          setFundStep(3);
+                          addNotification({ title: 'Account Funded', message: `KES ${fundDetails.amount} added to your balance.`, type: 'success' });
+                        }}
+                        className="flex-[2] py-3.5 rounded-2xl bg-[#00351D] text-white font-bold text-sm shadow-xl animate-bounce-slow"
+                      >
+                        Pay Now
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {fundStep === 3 && (
+                  <div className="py-12 flex flex-col items-center text-center space-y-6 animate-in zoom-in duration-700">
+                    <div className="w-24 h-24 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center relative">
+                      <div className="absolute inset-0 bg-emerald-400/20 rounded-full animate-ping"></div>
+                      <span className="material-symbols-outlined text-5xl font-black">check</span>
+                    </div>
+                    <div>
+                      <h3 className="font-headline text-2xl font-black text-primary">Funds Received!</h3>
+                      <p className="text-sm text-on-surface-variant font-medium mt-2">Your liquidity has been topped up successfully.</p>
+                      <div className="mt-6 p-4 rounded-3xl bg-emerald-50 border border-emerald-500/10 inline-block">
+                        <p className="text-[10px] text-emerald-700 font-bold uppercase tracking-widest leading-none mb-1">New Balance</p>
+                        <p className="font-headline text-2xl font-black text-emerald-800">KES {(balance + (parseFloat(fundDetails.amount) || 0)).toLocaleString()}</p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => { setShowFundModal(false); setFundStep(1); setFundDetails({...fundDetails, amount: ''}); }}
+                      className="w-full py-4 rounded-2xl bg-[#00351D] text-white font-bold text-sm transition-all shadow-xl"
+                    >
+                      Continue to Bulk Pay
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         )}
         {/* Setup PIN Modal Overlay */}
         {showPinSetupModal && (

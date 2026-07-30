@@ -109,6 +109,15 @@
     50% { transform: scale(0.9); opacity: 0.8; }
   }
 
+  .animate-wiggle {
+    animation: wiggle 2.6s ease-in-out infinite;
+  }
+
+  @keyframes wiggle {
+    0%, 100% { transform: rotate(-3deg); }
+    50% { transform: rotate(3deg); }
+  }
+
   .animate-drawer-up {
     animation: drawerUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }

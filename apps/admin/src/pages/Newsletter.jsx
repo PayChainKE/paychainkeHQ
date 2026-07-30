@@ -5,7 +5,7 @@ import api from '../api/api';
 import TablePagination from '../components/ui/TablePagination';
 import NewsletterComposer from '../components/newsletter/NewsletterComposer';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 25;
 const EMAIL_RE = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
 
 function relativeTime(iso) {
@@ -35,6 +35,7 @@ export default function Newsletter() {
   // Search / filter
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [campaignPage, setCampaignPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState('all'); // all | active | inactive
 
   // Compose modal
@@ -103,6 +104,8 @@ export default function Newsletter() {
 
   useEffect(() => { setPage(1); }, [search, statusFilter]);
   const paged = useMemo(() => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [filtered, page]);
+
+  const pagedCampaigns = useMemo(() => campaigns.slice((campaignPage - 1) * PAGE_SIZE, campaignPage * PAGE_SIZE), [campaigns, campaignPage]);
 
   // ── Actions ────────────────────────────────────────────────────────
   async function handleAdd(e) {
@@ -399,11 +402,14 @@ export default function Newsletter() {
               <p className="text-xs text-on-surface-variant/30">Click "Compose Newsletter" to reach your subscribers.</p>
             </div>
           ) : (
-            <div className="divide-y divide-outline-variant/8">
-              {campaigns.map((c, idx) => (
-                <CampaignRow key={c._id} campaign={c} index={idx} />
-              ))}
-            </div>
+            <>
+              <div className="divide-y divide-outline-variant/8">
+                {pagedCampaigns.map((c, idx) => (
+                  <CampaignRow key={c._id} campaign={c} index={(campaignPage - 1) * PAGE_SIZE + idx} />
+                ))}
+              </div>
+              <TablePagination page={campaignPage} pageSize={PAGE_SIZE} total={campaigns.length} onPage={setCampaignPage} />
+            </>
           )}
         </div>
       </div>

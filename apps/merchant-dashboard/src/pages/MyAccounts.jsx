@@ -1,12 +1,17 @@
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { formatAccountNumber } from '../utils/formatAccountNumber'
+import SettlementQrCard from '../components/ui/SettlementQrCard'
+import { useToast } from '../context/NotificationContext'
 
 export default function MyAccounts() {
   const { merchant } = useMerchantAuth()
+  const { addToast } = useToast()
   const [searchTerm, setSearchTerm] = useState('')
   const [entries, setEntries] = useState(10)
+  const [qrAccount, setQrAccount] = useState(null)
+  const qrModalContainerRef = useRef(null)
 
   const accountsData = [
     {
@@ -28,6 +33,23 @@ export default function MyAccounts() {
       status: (merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode) ? 'Active' : 'Pending'
     }
   ]
+
+  const closeQrModal = () => setQrAccount(null)
+
+  const handleDownloadQr = () => {
+    const dataUrl = qrModalContainerRef.current?.querySelector('canvas')?.toDataURL('image/png')
+    if (!dataUrl) {
+      addToast({ title: 'Download Failed', message: 'QR code was not ready — please try again.', type: 'error' })
+      return
+    }
+    const a = document.createElement('a')
+    a.style.display = 'none'
+    a.href = dataUrl
+    a.download = `PayChain-QR-${qrAccount?.accountNumber || 'account'}.png`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+  }
 
   return (
     <MerchantLayout title="My Accounts">
@@ -94,6 +116,7 @@ export default function MyAccounts() {
                     <th className="py-4 px-4 border border-slate-300 text-[10px] font-black uppercase tracking-widest text-primary/60">Name</th>
                     <th className="py-4 px-4 border border-slate-300 text-[10px] font-black uppercase tracking-widest text-primary/60">Linked Transfer Account</th>
                     <th className="py-4 px-4 border border-slate-300 text-[10px] font-black uppercase tracking-widest text-primary/60">Manager</th>
+                    <th className="py-4 px-4 border border-slate-300 text-[10px] font-black uppercase tracking-widest text-primary/60">QR Code</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-300">
@@ -110,6 +133,17 @@ export default function MyAccounts() {
                       <td className="py-5 px-4 border border-slate-300 text-sm font-bold text-primary">{account.name}</td>
                       <td className="py-5 px-4 border border-slate-300 text-xs font-medium text-on-surface-variant italic opacity-60">{account.linkedTransferAccount}</td>
                       <td className="py-5 px-4 border border-slate-300 text-sm font-bold text-primary">{account.manager}</td>
+                      <td className="py-5 px-4 border border-slate-300">
+                        <button
+                          onClick={() => setQrAccount(account)}
+                          disabled={account.status !== 'Active'}
+                          title={account.status !== 'Active' ? 'This account is still pending bank assignment' : 'Generate QR code'}
+                          className="flex items-center gap-1.5 px-3 py-2 bg-[#06201B] text-[#5EFEB3] rounded-xl text-[10px] font-black uppercase tracking-widest hover:brightness-125 active:scale-95 transition-all shadow-sm disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:brightness-100"
+                        >
+                          <span className="material-symbols-outlined text-sm">qr_code_2</span>
+                          Generate QR
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -130,6 +164,38 @@ export default function MyAccounts() {
           </div>
         </div>
       </div>
+
+      {/* Per-account QR modal */}
+      {qrAccount && (
+        <>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] animate-in fade-in duration-200" onClick={closeQrModal} />
+          <div className="fixed inset-0 z-[210] flex items-center justify-center p-4 pointer-events-none">
+            <div className="bg-[#0B0E14] rounded-[32px] shadow-2xl w-full max-w-xs pointer-events-auto overflow-hidden animate-in zoom-in-95 duration-300 p-6 relative">
+              <button
+                onClick={closeQrModal}
+                className="absolute top-4 right-4 z-30 w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
+              >
+                <span className="material-symbols-outlined text-base">close</span>
+              </button>
+
+              <SettlementQrCard
+                qrData={`${window.location.origin}/pay/account/${qrAccount.accountNumber}`}
+                businessName={qrAccount.name}
+                accountNumber={qrAccount.accountNumber}
+                containerRef={qrModalContainerRef}
+              />
+
+              <button
+                onClick={handleDownloadQr}
+                className="w-full mt-5 py-3.5 bg-[#5EFEB3] text-[#00351D] rounded-2xl text-[11px] font-black uppercase tracking-widest hover:brightness-105 active:scale-[0.98] transition-all shadow-xl flex items-center justify-center gap-2"
+              >
+                <span className="material-symbols-outlined text-base">download</span>
+                Download PNG
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </MerchantLayout>
   )
 }

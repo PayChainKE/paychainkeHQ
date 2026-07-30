@@ -12,7 +12,7 @@ const STATUS_META = {
   converted: { label: 'Converted', pill: 'bg-violet-50 text-violet-700 border-violet-200',  dot: 'bg-violet-500',  icon: 'storefront' },
 };
 const STATUS_ORDER = ['pending', 'contacted', 'approved', 'converted', 'rejected'];
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 25;
 
 const defaultFilters = {
   status: 'all',

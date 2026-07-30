@@ -4,6 +4,8 @@ import MerchantLayout from '../components/layout/MerchantLayout'
 import RevenueChart from '../components/charts/RevenueChart'
 import { formatKES, formatUSDC } from '../utils/formatCurrency'
 import { formatAccountNumber } from '../utils/formatAccountNumber'
+import { formatTxDate, formatTxTime } from '../utils/formatDate'
+import { formatPhoneDisplay } from '../utils/formatPhoneDisplay'
 import { getAmountSign, getAmountColorClassWithHover, isCreditTransaction, isDebitTransaction, isSwapTransaction } from '../utils/transactionDirection'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
@@ -317,6 +319,21 @@ export default function Overview() {
                           </div>
                         </div>
                       </button>
+
+                      <button onClick={() => { setActiveFundMethod('paybill'); setShowFundAccount(false); }} className="w-full text-left p-3 hover:bg-emerald-50/50 rounded-xl transition-all group relative overflow-hidden">
+                        <div className="flex items-center gap-3 relative z-10">
+                          <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 shadow-lg group-hover:scale-105 transition-transform">
+                            <span className="material-symbols-outlined text-lg">storefront</span>
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between mb-0.5">
+                              <p className="text-[10px] font-black uppercase tracking-widest text-[#00351D]">Paybill</p>
+                              <span className="material-symbols-outlined text-slate-300 text-xs group-hover:translate-x-1 transition-transform">arrow_forward</span>
+                            </div>
+                            <p className="text-[9px] text-slate-500 font-medium leading-tight line-clamp-1">Lipa na M-Pesa instructions</p>
+                          </div>
+                        </div>
+                      </button>
                     </div>
                   </div>
                 </>
@@ -346,6 +363,21 @@ export default function Overview() {
                               <span className="material-symbols-outlined text-slate-300 text-xs group-hover:translate-x-1 transition-transform">arrow_forward</span>
                             </div>
                             <p className="text-[9px] text-slate-500 font-medium leading-tight line-clamp-1">via M-pesa or Bank</p>
+                          </div>
+                        </div>
+                      </button>
+
+                      <button onClick={() => navigate('/request-money')} className="w-full text-left p-3 hover:bg-emerald-50/50 rounded-xl transition-all group relative overflow-hidden">
+                        <div className="flex items-center gap-3 relative z-10">
+                          <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 shadow-lg group-hover:scale-105 transition-transform">
+                            <span className="material-symbols-outlined text-lg">request_quote</span>
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between mb-0.5">
+                              <p className="text-[10px] font-black uppercase tracking-widest text-[#00351D]">Request Money</p>
+                              <span className="material-symbols-outlined text-slate-300 text-xs group-hover:translate-x-1 transition-transform">arrow_forward</span>
+                            </div>
+                            <p className="text-[9px] text-slate-500 font-medium leading-tight line-clamp-1">STK prompt or payment link</p>
                           </div>
                         </div>
                       </button>
@@ -517,8 +549,8 @@ export default function Overview() {
                             {TYPE_LABEL[tx.type] || tx.type}
                           </span>
                         </div>
-                        <p className="text-[8px] lg:text-[9px] text-on-surface-variant font-mono opacity-40 group-hover:text-white/40 group-hover:opacity-100 transition-colors truncate mt-0.5">
-                          {tx.reference}
+                        <p className="text-[8px] lg:text-[9px] text-on-surface-variant font-mono opacity-40 group-hover:text-white/40 group-hover:opacity-100 transition-colors truncate mt-0.5 tabular-nums">
+                          {[formatPhoneDisplay(tx.sender?.id || tx.recipient?.id), tx.reference].filter(Boolean).join(' · ')}
                         </p>
                       </div>
                     </div>
@@ -527,8 +559,11 @@ export default function Overview() {
                       <p className={`text-[12px] lg:text-[13px] font-black tabular-nums transition-colors leading-none mb-1 ${amtColor}`}>
                         {sign}{displayAmt}
                       </p>
-                      <p className="text-[8px] text-on-surface-variant font-bold opacity-30 tracking-widest group-hover:text-white/30 transition-colors uppercase">
-                        {new Date(tx.createdAt || tx.timestamp).toLocaleDateString('en-KE', { day: '2-digit', month: 'short' })}
+                      <p className="text-[8px] text-on-surface-variant font-bold opacity-30 tracking-widest group-hover:text-white/30 transition-colors uppercase tabular-nums">
+                        {formatTxDate(tx.createdAt || tx.timestamp)}
+                      </p>
+                      <p className="text-[8px] text-on-surface-variant font-bold opacity-30 tracking-widest group-hover:text-white/30 transition-colors tabular-nums">
+                        {formatTxTime(tx.createdAt || tx.timestamp)}
                       </p>
                     </div>
                   </div>

@@ -3,6 +3,9 @@ import { Link } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import api from '../api/api';
 import { useAuth } from '../context/AuthContext';
+import TablePagination from '../components/ui/TablePagination';
+
+const PAGE_SIZE = 25;
 
 /**
  * Revenue & Fees — admin dashboard for PayChain's internal finance team.
@@ -254,6 +257,7 @@ const Revenue = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [sweepsPage, setSweepsPage] = useState(1);
 
   const fetchRevenue = useCallback(async () => {
     setLoading(true);
@@ -311,6 +315,12 @@ const Revenue = () => {
   const channels = data?.channels || [];
   const sweeps   = data?.sweepBatches || [];
   const series   = data?.series   || [];
+
+  useEffect(() => { setSweepsPage(1); }, [range]);
+  const pagedSweeps = useMemo(
+    () => sweeps.slice((sweepsPage - 1) * PAGE_SIZE, sweepsPage * PAGE_SIZE),
+    [sweeps, sweepsPage]
+  );
 
   const filteredChannels = useMemo(() => {
     if (channelFilter === 'all') return channels;
@@ -599,7 +609,7 @@ const Revenue = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {sweeps.map((b) => {
+                    {pagedSweeps.map((b) => {
                       const s = STATUS_META[b.status] || STATUS_META['Accruing'];
                       return (
                         <tr key={b.id} className="border-b border-outline-variant/40 last:border-b-0 hover:bg-surface-container/70 transition-colors">
@@ -635,9 +645,12 @@ const Revenue = () => {
                 </table>
               </div>
             )}
+            {!loading && sweeps.length > 0 && (
+              <TablePagination page={sweepsPage} pageSize={PAGE_SIZE} total={sweeps.length} onPage={setSweepsPage} />
+            )}
           </div>
 
-          {/* Reconciliation footer — totals always reconcile to the KPIs above */}
+          {/* Reconciliation footer — totals always reconcile to the KPIs above, not just the current page */}
           {!loading && sweeps.length > 0 && (
             <div className="mt-3 flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-surface-container-lowest border border-outline-variant/40 rounded-md text-2xs">
               <span className="text-on-surface-variant">

@@ -15,6 +15,8 @@ import { createNotification } from './notificationController.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard.js';
+import { formatPhoneDisplay } from '../utils/formatPhoneDisplay.js';
+import { AUTO_INFLATION_SHIELD_ENABLED } from '../config/inflationShieldFlag.js';
 
 // ── M-PESA configuration ──────────────────────────────────────────────────────
 // MPESA_ENVIRONMENT controls which Daraja endpoint is used.
@@ -200,7 +202,7 @@ export const confirmationURL = async (req, res) => {
       reference: TransID,
       sender: {
         name: senderName || 'M-PESA CUSTOMER',
-        id: MSISDN
+        id: formatPhoneDisplay(MSISDN)
       },
       recipient: {
         name: merchant.businessName,
@@ -262,7 +264,7 @@ export const confirmationURL = async (req, res) => {
     // stale balance and silently clobber it on save(). $inc is race-free
     // regardless of how long this branch takes.
     let updatedMerchant;
-    if (merchant.stellarPublicKey) {
+    if (merchant.stellarPublicKey && AUTO_INFLATION_SHIELD_ENABLED) {
       try {
         const liveRate = await getLiveKesToUsdcRate();
         const usdcPayoutValue = (netKESAmount * liveRate).toFixed(7);
@@ -331,7 +333,7 @@ export const confirmationURL = async (req, res) => {
             ({ ref, amt, name, phone, date, time, balance }) =>
               `${ref} Payment Received. KES ${amt} received from ${name} (${phone}) on ${date} at ${time}. Your updated PayChain available balance is KES ${balance}.`,
             {
-              fixed: { ref: TransID, amt: amount.toLocaleString(), phone: MSISDN, date, time, balance: (updatedMerchant.kesBalance || 0).toLocaleString() },
+              fixed: { ref: TransID, amt: amount.toLocaleString(), phone: formatPhoneDisplay(MSISDN), date, time, balance: (updatedMerchant.kesBalance || 0).toLocaleString() },
               truncatable: [{ key: 'name', value: senderName || 'a customer', minLength: 10 }],
             }
           ).message,
@@ -411,7 +413,7 @@ export const initiateSTKPush = async (req, res) => {
               currency: 'KES',
               status: 'completed',
               reference: `SBX-${checkoutRequestId.slice(-8)}`,
-              sender: { name: 'M-PESA Sandbox', id: formattedPhone },
+              sender: { name: 'M-PESA Sandbox', id: formatPhoneDisplay(formattedPhone) },
               recipient: { name: merchant.businessName, id: 'WALLET' },
             });
             console.log(`✅ [SANDBOX] Auto-confirmed KES ${intAmount} for merchant ${merchant.paybillAccount}`);
@@ -611,8 +613,9 @@ export const stkCallback = async (req, res) => {
               currency: 'KES',
               status: 'completed',
               reference: receipt,
-              sender: { name: 'M-PESA Express', id: stkReq.phone },
+              sender: { name: 'M-PESA Express', id: formatPhoneDisplay(stkReq.phone) },
               recipient: { name: merchant.businessName, id: merchant.paybillAccount },
+              balanceAfter: updatedMerchant.kesBalance,
             });
 
             createNotification({
@@ -667,10 +670,15 @@ export const stkCallback = async (req, res) => {
             // total (which may include a surcharge that was never the
             // merchant's money) — matches merchantNetSettlement/link.amount
             // being what actually moves their balance.
+            // Safaricom's STK callback never includes the payer's registered
+            // name (unlike the C2B Confirmation payload, which does) — only
+            // their phone number, which we do have via stkReq.phone. Include
+            // it here to match the C2B merchant SMS format above.
+            const payerPhoneDisplay = formatPhoneDisplay(stkReq.phone);
             const merchantSms = merchant.phone
               ? safeSendSMS({
                   to: merchant.phone,
-                  message: `${receipt} Payment Received. KES ${link.amount.toLocaleString()} received via M-PESA (${link.invoiceId ? 'Invoice' : 'Payment Link'}) on ${date} at ${time}. Your updated PayChain available balance is KES ${(updatedMerchant.kesBalance || 0).toLocaleString()}.`,
+                  message: `${receipt} Payment Received. KES ${link.amount.toLocaleString()} received${payerPhoneDisplay ? ` from ${payerPhoneDisplay}` : ''} via M-PESA (${link.invoiceId ? 'Invoice' : 'Payment Link'}) on ${date} at ${time}. Your updated PayChain available balance is KES ${(updatedMerchant.kesBalance || 0).toLocaleString()}.`,
                 }).then((r) => { if (!r.success) console.error(`STK ${payerLabel} merchant SMS failed for ${receipt}:`, r.error); })
               : Promise.resolve();
             await Promise.all([customerSms, merchantSms]);
@@ -696,8 +704,9 @@ export const stkCallback = async (req, res) => {
             currency: 'KES',
             status: 'completed',
             reference: receipt,
-            sender: { name: 'M-PESA Express', id: stkReq.phone },
-            recipient: { name: merchant.businessName, id: 'WALLET' }
+            sender: { name: 'M-PESA Express', id: formatPhoneDisplay(stkReq.phone) },
+            recipient: { name: merchant.businessName, id: 'WALLET' },
+            balanceAfter: updatedMerchant.kesBalance,
           });
 
           createNotification({
