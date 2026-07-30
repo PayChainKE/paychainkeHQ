@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Modal, Alert, Share, Image } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Modal, Alert, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -11,6 +11,9 @@ import TopBar from '../components/layout/TopBar';
 import api from '../api/config';
 import { isCreditTransaction, isDebitTransaction } from '../utils/transactionDirection';
 import { formatAccountNumber } from '../utils/formatAccountNumber';
+import { formatTxDate, formatTxTime } from '../utils/formatDate';
+import { formatPhoneDisplay } from '../utils/formatPhoneDisplay';
+import SettlementQrCard from '../components/ui/SettlementQrCard';
 
 function formatKES(n: number | null | undefined) {
   if (n == null) return 'KES 0.00';
@@ -84,7 +87,11 @@ export default function DigitalWallet({ navigation }: any) {
   // App.jsx). Previously pointed at the marketing site, which has no such
   // route and would have 404'd on every scan.
   const qrData = `https://app.paychain.co.ke/pay/account/${merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || ''}`;
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrData)}&margin=10&bgcolor=FFFFFF&color=00351D`;
+  // Underlying react-native-svg ref, set via SettlementQrCard's qrRef prop —
+  // gives access to .toDataURL() for the PDF export below. QR is now
+  // rendered locally (react-native-qrcode-svg) instead of fetched from a
+  // remote image API, so the PayChain mark can be embedded at its center.
+  const qrSvgRef = useRef<any>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -241,16 +248,31 @@ export default function DigitalWallet({ navigation }: any) {
     Alert.alert('Link Copied', 'Payment link copied to clipboard.');
   };
 
+  const getQrDataUri = (): Promise<string | null> =>
+    new Promise((resolve) => {
+      if (!qrSvgRef.current) return resolve(null);
+      try {
+        qrSvgRef.current.toDataURL((base64: string) => resolve(base64 ? `data:image/png;base64,${base64}` : null));
+      } catch {
+        resolve(null);
+      }
+    });
+
   const exportQrPdf = async () => {
     setIsExportingPdf(true);
     try {
+      const qrImgSrc = await getQrDataUri();
+      if (!qrImgSrc) {
+        Alert.alert('Export Failed', 'The QR code was not ready — please try again.');
+        return;
+      }
       const html = `<!doctype html><html><head><meta charset="utf-8" /><style>
         body { font-family: -apple-system, Helvetica, Arial, sans-serif; background:#0b0e14; color:#fff; margin:0; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; }
         img { width:260px; height:260px; border-radius:20px; margin-bottom:24px; border:6px solid #fff; padding:12px; background:#fff; }
         h1 { font-size:20px; color:#5efeb3; margin:0 0 8px 0; text-transform:uppercase; letter-spacing:0.2em; }
         p { font-size:14px; margin:4px 0; letter-spacing:0.08em; color:#c0e5d3; }
       </style></head><body>
-        <img src="${qrUrl}" />
+        <img src="${qrImgSrc}" />
         <h1>Settlement QR</h1>
         <p>ACC: ${formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending')}</p>
         <p>MERCHANT: ${merchant?.businessName || 'Merchant'}</p>
@@ -580,15 +602,13 @@ export default function DigitalWallet({ navigation }: any) {
               <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-white text-[24px] mb-1">My QR</Text>
               <Text className="text-[#8B98A9] text-[9px] font-jakarta-extrabold uppercase tracking-[0.2em] mb-6">Professional Settlement Tool</Text>
 
-              <View className="items-center mb-6">
-                <View className="bg-white p-3 rounded-[20px] mb-4 w-[180px] h-[180px] items-center justify-center">
-                  <Image source={{ uri: qrUrl }} style={{ width: 160, height: 160, borderRadius: 12 }} />
-                </View>
-                <View className="bg-[#2775CA]/10 border border-[#2775CA]/20 rounded-md px-2.5 py-1 mb-2">
-                  <Text className="text-[#2775CA] text-[9px] font-jakarta-extrabold uppercase tracking-[0.2em]">Settlement QR</Text>
-                </View>
-                <Text className="text-white text-[14px] font-jakarta-bold tracking-widest">ACC: {formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending')}</Text>
-                <Text className="text-[#8B98A9] text-[9px] font-jakarta-bold uppercase tracking-widest mt-1">{merchant?.businessName || 'Merchant'}</Text>
+              <View className="mb-6">
+                <SettlementQrCard
+                  qrData={qrData}
+                  businessName={merchant?.businessName || 'Merchant'}
+                  accountNumber={merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending'}
+                  qrRef={(ref) => { qrSvgRef.current = ref; }}
+                />
               </View>
 
               <View className="flex-row gap-3">
@@ -699,6 +719,40 @@ export default function DigitalWallet({ navigation }: any) {
             )}
           </View>
 
+          {/* Pay via Paybill — step-by-step Lipa na M-Pesa instructions */}
+          <View className="bg-white rounded-[32px] p-6 mb-8 border border-[#eff4ef] shadow-sm shadow-[#00351d]/5">
+            <View className="flex-row items-start gap-4 mb-4">
+              <View className="w-11 h-11 rounded-2xl bg-[#e7f8ef] items-center justify-center">
+                <MaterialIcons name="storefront" size={20} color="#006c4e" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-[0.2em] text-[#707971] mb-1">Pay via Paybill</Text>
+                <Text className="font-jakarta-extrabold text-[16px] text-[#00351d] tracking-tight">Lipa na M-PESA</Text>
+                <Text className="text-[#707971] text-[11px] font-jakarta-medium mt-1 leading-relaxed">
+                  Share these steps with your customers, or use them yourself to top up.
+                </Text>
+              </View>
+            </View>
+
+            <View className="bg-[#f7faf7] rounded-2xl p-5">
+              {[
+                'Go to the Lipa na M-PESA menu',
+                'Select Paybill',
+                'Enter 880100 as the business number',
+                `Enter ${formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || '') || 'your account number'} as the account number`,
+                'Enter the amount',
+                'Enter M-PESA PIN',
+              ].map((step, i, arr) => (
+                <View key={i} className={`flex-row items-start gap-3 ${i !== arr.length - 1 ? 'mb-3' : ''}`}>
+                  <View className="w-6 h-6 rounded-full bg-[#00351d] items-center justify-center mt-0.5">
+                    <Text className="text-[#5efeb3] text-[11px] font-jakarta-extrabold">{i + 1}</Text>
+                  </View>
+                  <Text className="flex-1 text-[13px] font-jakarta-medium text-[#0c2010] leading-relaxed pt-0.5">{step}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
           {/* Recent Wallet Activity */}
           <View className="mb-4">
             <View className="flex-row items-center justify-between mb-4">
@@ -719,6 +773,7 @@ export default function DigitalWallet({ navigation }: any) {
               ) : (
                 transactions.slice(0, 5).map((tx, index, arr) => {
                   const meta = activityMeta(tx);
+                  const phoneStr = formatPhoneDisplay(tx.sender?.id || tx.recipient?.id);
                   return (
                     <View key={tx._id || index} className={`flex-row items-center py-3 px-4 ${index !== Math.min(arr.length - 1, 4) ? 'border-b border-[#eff4ef]/50' : ''}`}>
                       <View style={{ backgroundColor: meta.bg }} className="w-10 h-10 rounded-xl items-center justify-center mr-3">
@@ -727,8 +782,11 @@ export default function DigitalWallet({ navigation }: any) {
                       <View className="flex-1 min-w-0 mr-2">
                         <Text className="font-jakarta-bold text-[13px] text-[#0c2010]">{meta.label}</Text>
                         <Text className="text-[#707971] text-[10px] font-jakarta-medium mt-0.5">
-                          {new Date(tx.createdAt || tx.timestamp).toLocaleDateString('en-KE', { day: '2-digit', month: 'short' })}
+                          {formatTxDate(tx.createdAt || tx.timestamp)}, {formatTxTime(tx.createdAt || tx.timestamp)}
                         </Text>
+                        {!!phoneStr && (
+                          <Text className="text-[#707971]/70 text-[9px] font-jakarta-medium mt-0.5">{phoneStr}</Text>
+                        )}
                       </View>
                       <View className="items-end">
                         <Text className="font-jakarta-bold text-[13px] text-[#0c2010]">{meta.sign}{meta.amount}</Text>

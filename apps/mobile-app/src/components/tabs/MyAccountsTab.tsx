@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, Modal, Share } from 'react-native';
 import { MaterialIcons, Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import { formatAccountNumber } from '../../utils/formatAccountNumber';
+import SettlementQrCard from '../ui/SettlementQrCard';
 
 export default function MyAccountsTab() {
   const { merchant } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
+  const [qrAccount, setQrAccount] = useState<{ name: string; accountNumber: string } | null>(null);
 
   const accountsData = [
     {
@@ -103,12 +105,55 @@ export default function MyAccountsTab() {
                   </View>
                 </View>
 
+                <TouchableOpacity
+                  onPress={() => setQrAccount({ name: account.name, accountNumber: account.accountNumber })}
+                  disabled={account.status !== 'Active'}
+                  activeOpacity={0.85}
+                  className="flex-row items-center justify-center gap-2 mt-4 py-3.5 bg-[#00351d] rounded-2xl"
+                  style={{ opacity: account.status !== 'Active' ? 0.35 : 1 }}
+                >
+                  <MaterialIcons name="qr-code-2" size={16} color="#5efeb3" />
+                  <Text className="text-[#5efeb3] text-[11px] font-jakarta-extrabold uppercase tracking-widest">
+                    {account.status !== 'Active' ? 'Pending Bank Assignment' : 'Generate QR'}
+                  </Text>
+                </TouchableOpacity>
               </View>
             </View>
           ))}
         </View>
 
       </View>
+
+      {/* Per-account QR modal */}
+      <Modal visible={!!qrAccount} transparent animationType="fade" onRequestClose={() => setQrAccount(null)}>
+        <View className="flex-1 items-center justify-center bg-black/60 px-8">
+          <View className="w-full max-w-xs bg-[#0B0E14] rounded-[32px] p-6">
+            <TouchableOpacity
+              onPress={() => setQrAccount(null)}
+              className="absolute top-4 right-4 z-10 w-9 h-9 rounded-full bg-white/10 items-center justify-center"
+            >
+              <Feather name="x" size={16} color="#fff" />
+            </TouchableOpacity>
+
+            {qrAccount && (
+              <SettlementQrCard
+                qrData={`https://app.paychain.co.ke/pay/account/${qrAccount.accountNumber}`}
+                businessName={qrAccount.name}
+                accountNumber={qrAccount.accountNumber}
+              />
+            )}
+
+            <TouchableOpacity
+              onPress={() => qrAccount && Share.share({ message: `Scan to pay ${qrAccount.name} on PayChain: https://app.paychain.co.ke/pay/account/${qrAccount.accountNumber}` })}
+              activeOpacity={0.85}
+              className="flex-row items-center justify-center gap-2 mt-5 py-3.5 bg-[#5EFEB3] rounded-2xl"
+            >
+              <Feather name="share-2" size={16} color="#00351D" />
+              <Text className="text-[#00351D] text-[11px] font-jakarta-extrabold uppercase tracking-widest">Share</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
