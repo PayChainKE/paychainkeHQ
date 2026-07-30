@@ -67,7 +67,16 @@ export default function SendMoney() {
   }, [destination])
 
   const goNext = async () => {
-    if (step < (hasPin ? 2 : 3)) { setStep(s => s + 1); return }
+    // "Just advance, no special action" covers every step before the one
+    // that actually does something: for hasPin merchants that's every step
+    // up to (and not including) confirmStep itself; for merchants still
+    // setting up a PIN, step 3 is the PIN-save step (handled below) so the
+    // plain-advance range stops one short of confirmStep instead.
+    // hasPin=true:  confirmStep=3 -> threshold 3 (was hardcoded to 2, which
+    //   meant step 2 -> 3 never advanced at all: Continue silently did
+    //   nothing for any merchant who already had a PIN set).
+    // hasPin=false: confirmStep=4 -> threshold 3 (unchanged).
+    if (step < (hasPin ? confirmStep : confirmStep - 1)) { setStep(s => s + 1); return }
 
     // PIN setup step (first time)
     if (!hasPin && step === 3) {

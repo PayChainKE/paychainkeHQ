@@ -75,7 +75,11 @@ const Login = () => {
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-[#FDFDFC] font-body text-on-surface antialiased">
-      <div className="w-full md:w-[45%] bg-[#162723] p-8 lg:p-16 flex flex-col justify-between relative overflow-hidden min-h-[400px] md:min-h-screen shadow-editorial">
+      {/* pb-16 (mobile only, reset at md/lg) — the hero content's real height
+          on a narrow phone exceeds min-h-[400px], so justify-between leaves
+          no gap before the sign-in card's -mt-10 overlap below; without this
+          the tagline gets visually clipped by the card's rounded top edge. */}
+      <div className="w-full md:w-[45%] bg-[#162723] p-8 pb-16 md:pb-8 lg:p-16 flex flex-col justify-between relative overflow-hidden min-h-[400px] md:min-h-screen shadow-editorial">
         <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
           <div className="absolute -top-1/4 -left-1/4 w-full h-full bg-emerald-500 rounded-full blur-[120px]"></div>
           <div className="absolute -bottom-1/4 -right-1/4 w-full h-full bg-emerald-600 rounded-full blur-[120px]"></div>

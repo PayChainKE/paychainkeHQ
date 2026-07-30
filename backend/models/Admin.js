@@ -79,13 +79,17 @@ AdminSchema.pre('save', async function() {
   }
   // 12 rounds = OWASP 2024 recommendation. Existing rounds=10 hashes still
   // verify correctly via bcrypt.compare (rounds are embedded in the hash).
+  // Trimmed for the same reason matchPassword below trims the candidate —
+  // see Merchant.js's identical pre-save hook for the full rationale.
   const salt = await bcrypt.genSalt(12);
-  this.password = await bcrypt.hash(this.password, salt);
+  this.password = await bcrypt.hash(String(this.password).trim(), salt);
 });
 
-// Match password
+// Match password. Trimmed — a pasted password (e.g. from the officer
+// credentials email) can carry an invisible trailing space/newline that
+// typing the same password never produces.
 AdminSchema.methods.matchPassword = async function(enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
+  return await bcrypt.compare(String(enteredPassword).trim(), this.password);
 };
 
 const Admin = mongoose.model('Admin', AdminSchema, 'admins');

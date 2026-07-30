@@ -167,6 +167,7 @@ function DisabledState() {
   return (
     <MerchantLayout title="Cash Advance">
       <div className="px-1 lg:px-0 max-w-4xl mx-auto w-full space-y-8 lg:space-y-12">
+        <UnavailableNotice />
         <PageHeader />
         <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/10 editorial-shadow p-12 lg:p-20 flex flex-col items-center justify-center text-center">
           <div className="w-24 h-24 rounded-full bg-surface-container-low flex items-center justify-center mb-6 border border-outline-variant/20 shadow-sm">
@@ -332,7 +333,7 @@ export default function CashAdvance() {
             </div>
             <h3 className="text-2xl font-headline font-bold text-primary mb-3">Keep building your Trust Score</h3>
             <p className="text-[15px] text-on-surface-variant font-medium max-w-md mx-auto leading-relaxed opacity-80 mb-6">
-              Your Trust Score needs to reach 85 before you can get a Cash Advance. Keep transacting through your PayChain account and your score will keep going up!
+              Your Trust Score needs to reach 60 before you can get a Cash Advance. Keep transacting through your PayChain account and your score will keep going up!
             </p>
             <a href={CASH_ADVANCE_LEARN_MORE_URL} target="_blank" rel="noopener noreferrer" className="bg-[#0B0E14] text-white px-8 py-3 rounded-xl font-bold text-sm shadow-md hover:shadow-lg hover:bg-black active:scale-95 transition-all">
               Learn More
