@@ -37,8 +37,10 @@ export default function MyAccounts() {
 
   const closeQrModal = () => setQrAccount(null)
 
+  const getQrDataUrl = () => qrModalContainerRef.current?.querySelector('canvas')?.toDataURL('image/png')
+
   const handleDownloadQr = () => {
-    const dataUrl = qrModalContainerRef.current?.querySelector('canvas')?.toDataURL('image/png')
+    const dataUrl = getQrDataUrl()
     if (!dataUrl) {
       addToast({ title: 'Download Failed', message: 'QR code was not ready — please try again.', type: 'error' })
       return
@@ -50,6 +52,117 @@ export default function MyAccounts() {
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
+  }
+
+  // A physical counter sticker, not a screenshot of the dark in-app card —
+  // white background and high-contrast ink so it actually prints cleanly on
+  // a home/office printer or label stock, sized to a common small sticker
+  // (3.5in square) rather than a full page.
+  const handlePrintSticker = () => {
+    const dataUrl = getQrDataUrl()
+    if (!dataUrl) {
+      addToast({ title: 'Print Failed', message: 'QR code was not ready — please try again.', type: 'error' })
+      return
+    }
+    const businessName = qrAccount?.name || 'Merchant'
+    const acctDisplay = formatAccountNumber(qrAccount?.accountNumber)
+    const printWindow = window.open('', '', 'width=500,height=650')
+    if (!printWindow) {
+      addToast({ title: 'Print Blocked', message: 'Allow pop-ups for this site to print the sticker.', type: 'error' })
+      return
+    }
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>PayChain Payment Sticker</title>
+          <style>
+            * { box-sizing: border-box; }
+            body {
+              font-family: -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+              margin: 0;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              min-height: 100vh;
+              background: #e2e8f0;
+            }
+            .sticker {
+              width: 3.5in;
+              height: 3.5in;
+              background: #ffffff;
+              border: 3px solid #00351D;
+              border-radius: 28px;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              padding: 0.25in;
+              text-align: center;
+            }
+            .badge {
+              background: #00351D;
+              color: #5EFEB3;
+              font-size: 11px;
+              font-weight: 800;
+              letter-spacing: 0.15em;
+              text-transform: uppercase;
+              padding: 5px 14px;
+              border-radius: 999px;
+              margin-bottom: 10px;
+            }
+            h1 {
+              font-size: 16px;
+              font-weight: 800;
+              color: #00351D;
+              margin: 0 0 12px 0;
+              letter-spacing: 0.02em;
+              max-width: 90%;
+              overflow-wrap: break-word;
+            }
+            img.qr {
+              width: 1.7in;
+              height: 1.7in;
+              border: 1px solid #e5e7eb;
+              border-radius: 12px;
+              padding: 8px;
+              margin-bottom: 12px;
+            }
+            .acct {
+              font-size: 15px;
+              font-weight: 800;
+              letter-spacing: 0.08em;
+              color: #00351D;
+              font-family: 'Courier New', monospace;
+            }
+            .footer {
+              font-size: 9px;
+              font-weight: 700;
+              letter-spacing: 0.1em;
+              text-transform: uppercase;
+              color: #64748b;
+              margin-top: 10px;
+            }
+            @media print {
+              body { background: #fff; }
+              .sticker { border: 2px solid #00351D; box-shadow: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="sticker">
+            <span class="badge">Scan to Pay</span>
+            <h1>${businessName}</h1>
+            <img class="qr" src="${dataUrl}" alt="Payment QR" />
+            <span class="acct">ACC: ${acctDisplay}</span>
+            <span class="footer">M-Pesa Paybill 880100 · PayChain</span>
+          </div>
+          <script>
+            window.onload = () => { setTimeout(() => { window.print(); }, 400); };
+          </script>
+        </body>
+      </html>
+    `)
+    printWindow.document.close()
   }
 
   return (
@@ -186,13 +299,22 @@ export default function MyAccounts() {
                 containerRef={qrModalContainerRef}
               />
 
-              <button
-                onClick={handleDownloadQr}
-                className="w-full mt-5 py-3.5 bg-[#5EFEB3] text-[#00351D] rounded-2xl text-[11px] font-black uppercase tracking-widest hover:brightness-105 active:scale-[0.98] transition-all shadow-xl flex items-center justify-center gap-2"
-              >
-                <span className="material-symbols-outlined text-base">download</span>
-                Download PNG
-              </button>
+              <div className="flex gap-3 mt-5">
+                <button
+                  onClick={handleDownloadQr}
+                  className="flex-1 py-3.5 bg-[#5EFEB3] text-[#00351D] rounded-2xl text-[11px] font-black uppercase tracking-widest hover:brightness-105 active:scale-[0.98] transition-all shadow-xl flex items-center justify-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-base">download</span>
+                  Download
+                </button>
+                <button
+                  onClick={handlePrintSticker}
+                  className="flex-1 py-3.5 bg-white/10 border border-white/15 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-white/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-base">print</span>
+                  Print Sticker
+                </button>
+              </div>
             </div>
           </div>
         </>
