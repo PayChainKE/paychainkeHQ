@@ -183,7 +183,7 @@ const Queue = () => {
           {loading ? <div className="p-8 text-center text-on-surface-variant/40 text-sm">Loading queue…</div> :
             applications.length === 0 ? <div className="p-8 text-center text-on-surface-variant/40 text-sm">{error || 'No applications match this view.'}</div> :
             applications.map((app) => (
-              <QueueCard key={app._id} app={app} onOpen={() => navigate(`/applications/${app._id}`)} onClaim={() => handleClaim(app)} />
+              <QueueCard key={app._id} app={app} currentAdminId={admin?._id} onOpen={() => navigate(`/applications/${app._id}`)} onClaim={() => handleClaim(app)} />
             ))}
         </div>
 
@@ -246,10 +246,22 @@ const QueueRow = ({ app, currentAdminId, onOpen, onClaim }) => {
   );
 };
 
-const QueueCard = ({ app, onOpen, onClaim }) => {
+const QueueCard = ({ app, currentAdminId, onOpen, onClaim }) => {
   const statusStyle = STATUS_META[app.kybStatus] || STATUS_META.pending;
+  const isClaimedByMe = app.claimedBy && String(app.claimedBy._id || app.claimedBy) === String(currentAdminId);
   return (
-    <button onClick={onOpen} className="w-full text-left bg-surface-container-lowest border border-outline-variant/20 rounded-xl p-3 shadow-sm">
+    // A <button> wrapping another <button> (the Claim action below) is
+    // invalid HTML — browsers silently restructure the DOM to fix it, which
+    // makes click handling unreliable. div+role="button" gets the same
+    // whole-card-is-clickable behaviour (mouse and keyboard) without nesting
+    // interactive elements.
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } }}
+      className="w-full text-left bg-surface-container-lowest border border-outline-variant/20 rounded-xl p-3 shadow-sm cursor-pointer"
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="font-bold text-on-surface text-xs truncate">{app.businessName}</p>
@@ -259,11 +271,13 @@ const QueueCard = ({ app, onOpen, onClaim }) => {
             <span className="text-2xs text-on-surface-variant/50">{ageLabel(app.submittedAt)}</span>
           </div>
         </div>
-        {!app.claimedBy && (
+        {app.claimedBy ? (
+          <span className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 whitespace-nowrap">{isClaimedByMe ? 'Claimed by you' : 'Claimed'}</span>
+        ) : (
           <button onClick={(e) => { e.stopPropagation(); onClaim(); }} className="px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-2xs font-bold uppercase tracking-widest whitespace-nowrap">Claim</button>
         )}
       </div>
-    </button>
+    </div>
   );
 };
 
