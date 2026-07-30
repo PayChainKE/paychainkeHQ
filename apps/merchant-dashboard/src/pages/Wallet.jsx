@@ -10,6 +10,7 @@ import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useToast } from '../context/NotificationContext'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import SettlementQrCard from '../components/ui/SettlementQrCard'
+import { getAppUrl } from '../utils/appUrl'
 
 export default function Wallet() {
   const { merchant, refreshSession } = useMerchantAuth()
@@ -338,7 +339,7 @@ export default function Wallet() {
   // correction) rather than fetched from an external image API, so the
   // PayChain mark can sit in the center (imageSettings' `excavate` clears
   // the modules behind it) without breaking scannability.
-  const qrData = `${window.location.origin}/pay/account/${merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || ''}`
+  const qrData = `${getAppUrl()}/pay/account/${merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || ''}`
   // qrcode.react v3's QRCodeCanvas is a plain function component (not
   // forwardRef) — a `ref` prop on it is silently dropped. Grab the real
   // <canvas> it renders via a wrapping container instead.
@@ -441,7 +442,7 @@ export default function Wallet() {
       });
       
       if (res.data?.success) {
-        setGeneratedLink(`${window.location.origin}/pay/${res.data.linkId}`)
+        setGeneratedLink(`${getAppUrl()}/pay/${res.data.linkId}`)
         addToast({ title: 'Link Generated', message: 'Secure payment link created successfully! Expires in 48 hours.', type: 'success' })
       }
     } catch (err) {

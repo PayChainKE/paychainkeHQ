@@ -1607,7 +1607,18 @@ export default function BulkPay() {
                           }
                         }
                       }}
-                      disabled={batchTotal === 0 || isLiquidityLow || (step === 3 && !selectedTill)}
+                      disabled={
+                        step === 1
+                          // Step 1 only needs a selection — batchTotal can
+                          // legitimately be 0 here (a payee saved with no
+                          // default amount, e.g. a contractor paid a
+                          // variable amount each run). Gating on
+                          // batchTotal too would permanently lock the
+                          // merchant out of step 2, which is the page
+                          // where amounts actually get entered/edited.
+                          ? Object.values(selectedPayees).every((v) => !v)
+                          : batchTotal === 0 || isLiquidityLow || (step === 3 && !selectedTill)
+                      }
                       className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-400 text-[#00351D] px-6 py-2.5 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 group disabled:opacity-20 disabled:grayscale text-xs md:text-sm"
                     >
                       {step === 1 ? 'Review Batch' : step === 2 ? 'Proceed to Settlement' : 'Authorize Batch'}

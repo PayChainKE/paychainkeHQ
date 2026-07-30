@@ -4,6 +4,7 @@ import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { formatAccountNumber } from '../utils/formatAccountNumber'
 import SettlementQrCard from '../components/ui/SettlementQrCard'
 import { useToast } from '../context/NotificationContext'
+import { getAppUrl } from '../utils/appUrl'
 
 export default function MyAccounts() {
   const { merchant } = useMerchantAuth()
@@ -179,7 +180,7 @@ export default function MyAccounts() {
               </button>
 
               <SettlementQrCard
-                qrData={`${window.location.origin}/pay/account/${qrAccount.accountNumber}`}
+                qrData={`${getAppUrl()}/pay/account/${qrAccount.accountNumber}`}
                 businessName={qrAccount.name}
                 accountNumber={qrAccount.accountNumber}
                 containerRef={qrModalContainerRef}

@@ -218,7 +218,7 @@ export default function DigitalWallet({ navigation }: any) {
     try {
       const res = await api.post('/api/transactions/payment-link', { amount });
       if (res.data?.success) {
-        setGeneratedLink(`https://paychain.co.ke/pay/${res.data.linkId}`);
+        setGeneratedLink(`https://app.paychain.co.ke/pay/${res.data.linkId}`);
       }
     } catch (err: any) {
       Alert.alert('Generation Failed', err?.response?.data?.error || 'Failed to generate secure payment link.');
