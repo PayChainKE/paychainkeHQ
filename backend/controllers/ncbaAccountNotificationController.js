@@ -18,6 +18,7 @@ import { creditNcbaCollection, DuplicateCollectionError } from '../services/ncba
 import { NcbaTariffBoundsError } from '../config/ncbaTariffCard.js';
 import { getNcbaVirtualAccountNumber, formatAccountNumberDisplay } from '../utils/ncbaValidators.js';
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay.js';
+import { toE164Kenyan } from '../utils/notificationService.js';
 
 const respondOk = (res, detail) => res.status(200).type('application/xml').send(buildNcbaOkResult(detail));
 const respondFail = (res, detail) => res.status(200).type('application/xml').send(buildNcbaFailResult(detail));
@@ -252,13 +253,18 @@ export const handleNcbaAccountNotification = async (req, res) => {
 
     // parsedCustomer was already computed above (before the ledger write).
     // Prefer the parsed MSISDN; fall back to PhoneNr only if CustomerName
-    // didn't yield one. Either way sendSMS/toE164Kenyan fail closed and
-    // silently on anything not phone-shaped, so attempting this is safe
-    // even when both sources are unreliable.
+    // didn't yield one.
     const customerPhone = parsedCustomer.phone || rawPhoneNr;
     const customerDisplayName = parsedCustomer.name || 'a customer';
 
-    if (customerPhone) {
+    // rawPhoneNr is a known-unreliable fallback (see comment above — NCBA
+    // has sent the Account Number in this field instead of an MSISDN), so
+    // validate it actually looks like a Kenyan mobile number before
+    // attempting delivery. Otherwise this always failed with a scary
+    // "error"-level log for a data-availability gap on NCBA's side, not a
+    // real bug — this merchant did get paid, we just have no phone to
+    // confirm it to.
+    if (customerPhone && toE164Kenyan(customerPhone)) {
       // businessName is the only unbounded field here.
       safeSendSMS({
         to: customerPhone,
@@ -273,6 +279,8 @@ export const handleNcbaAccountNotification = async (req, res) => {
       }).then((result) => {
         if (!result.success) logEvent('error', 'ncba_account_notification_customer_sms_failed', { transId, error: result.error });
       });
+    } else if (customerPhone) {
+      logEvent('info', 'ncba_account_notification_customer_sms_skipped_no_phone', { transId, merchantId: merchant._id.toString() });
     }
 
     if (merchant.phone) {
