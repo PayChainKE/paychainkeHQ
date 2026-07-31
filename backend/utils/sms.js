@@ -8,6 +8,8 @@
  * never stall or crash a core banking/database flow.
  */
 import { sendAfricasTalkingSms } from './notificationService.js';
+import { formatPhoneDisplay } from './formatPhoneDisplay.js';
+import SmsLog from '../models/SmsLog.js';
 
 export const sendSMS = async (phoneNumber, message) => {
   try {
@@ -19,12 +21,34 @@ export const sendSMS = async (phoneNumber, message) => {
     // only means AT accepted the API request, not that the SMS was
     // actually queued for delivery, so that has to be checked explicitly.
     const recipient = response?.SMSMessageData?.Recipients?.[0];
-    if (recipient && recipient.status !== 'Success') {
-      console.error(`Failed to send SMS: AT rejected recipient — ${recipient.status} (code ${recipient.statusCode})`);
-      return { success: false, error: `${recipient.status} (code ${recipient.statusCode})` };
+    const messageId = recipient?.messageId || null;
+
+    // Durable record of every real send — see models/SmsLog.js for why.
+    // Skipped for the console-simulation branch (recipient.status ===
+    // 'Simulated', see notificationService.js) since there's no real AT
+    // message to trace and no messageId to log against. A DB hiccup here
+    // must never affect the actual send result below.
+    if (recipient && recipient.status !== 'Simulated') {
+      try {
+        await SmsLog.create({
+          to: formatPhoneDisplay(phoneNumber) || phoneNumber,
+          messageId,
+          atStatus: recipient.status,
+          cost: recipient.cost || null,
+          deliveryStatus: recipient.status === 'Success' ? 'queued' : 'rejected',
+          failureReason: recipient.status !== 'Success' ? `${recipient.status} (code ${recipient.statusCode})` : null,
+        });
+      } catch (logErr) {
+        console.error('Failed to persist SmsLog:', logErr?.message || logErr);
+      }
     }
 
-    return { success: true, message: 'SMS sent successfully' };
+    if (recipient && recipient.status !== 'Success') {
+      console.error(`Failed to send SMS: AT rejected recipient — ${recipient.status} (code ${recipient.statusCode})`);
+      return { success: false, error: `${recipient.status} (code ${recipient.statusCode})`, messageId };
+    }
+
+    return { success: true, message: 'SMS sent successfully', messageId };
   } catch (error) {
     console.error('Failed to send SMS:', error?.message || error);
     return { success: false, error: error?.message || 'Unknown SMS delivery error' };
