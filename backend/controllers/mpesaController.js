@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import Transaction from '../models/Transaction.js';
 import Merchant from '../models/Merchant.js';
 import { safeSendSMS, buildStrictSms } from '../utils/smsSanitizer.js';
-import { calculateMerchantFee, processSplitTransaction, splitCustomerSurcharge, getCheckoutTotal, PricingEngineError } from '../utils/pricingEngine.js';
+import { calculateMerchantFee, processSplitTransaction, splitCustomerSurcharge, getCheckoutTotal, RAW_C2B_FLAT_MARKUP_KES, PricingEngineError } from '../utils/pricingEngine.js';
 import { sendInvoicePaidReceiptEmail } from '../utils/resend.js';
 import { settleInflationShield } from '../utils/stellarHelper.js';
 import { getLiveKesToUsdcRate } from '../utils/rateEngine.js';
@@ -191,7 +191,7 @@ export const confirmationURL = async (req, res) => {
     const senderName = [FirstName, MiddleName, LastName].filter(Boolean).join(' ');
 
     // Save the real transaction
-    await Transaction.create({
+    const transaction = await Transaction.create({
       merchantId: merchant._id,
       accountNumber: merchant.paybillAccount,
       type: 'inbound',
@@ -210,14 +210,27 @@ export const confirmationURL = async (req, res) => {
       }
     });
 
-    // PayChain's own tiered merchant fee — deducted from the gross receipt
-    // before it ever reaches the merchant's balance or the Inflation Shield
-    // FX conversion below. Same lookup utils/feeCalculator.js's Transaction
-    // pre-save hook uses to stamp paychainFee on the record just created
-    // above, so the ledger and this real deduction can never disagree.
-    const merchantFee = calculateMerchantFee(amount);
+    // PayChain's own tiered merchant fee, plus a flat KES 5 markup on every
+    // C2B paybill deposit (RAW_C2B_FLAT_MARKUP_KES — see pricingEngine.js)
+    // — both deducted from the gross receipt before it ever reaches the
+    // merchant's balance or the Inflation Shield FX conversion below.
+    // Clamped so the combined fee never exceeds the gross amount itself.
+    const tieredMerchantFee = calculateMerchantFee(amount);
+    const merchantFee = Math.min(amount, Math.round((tieredMerchantFee + RAW_C2B_FLAT_MARKUP_KES) * 100) / 100);
     const netKESAmount = Math.round((amount - merchantFee) * 100) / 100;
-    console.log(`💰 M-PESA C2B fee for ${TransID}: gross KES ${amount}, PayChain fee KES ${merchantFee}, net KES ${netKESAmount}`);
+    console.log(`💰 M-PESA C2B fee for ${TransID}: gross KES ${amount}, PayChain fee KES ${merchantFee} (tiered KES ${tieredMerchantFee} + flat KES ${RAW_C2B_FLAT_MARKUP_KES}), net KES ${netKESAmount}`);
+
+    // The Transaction pre-save hook (utils/feeCalculator.js) only knows the
+    // tiered portion (it calls calculateMerchantFee the same way, on the
+    // same amount) — top up paychainFee with whatever's left of the flat
+    // markup on top (normally the full RAW_C2B_FLAT_MARKUP_KES, less only
+    // if the clamp above capped the total at the gross amount for a very
+    // small deposit), so the persisted field always matches what was
+    // actually deducted below, not just the tiered part.
+    const flatMarkupApplied = Math.round((merchantFee - tieredMerchantFee) * 100) / 100;
+    if (flatMarkupApplied > 0) {
+      await Transaction.updateOne({ _id: transaction._id }, { $inc: { paychainFee: flatMarkupApplied } });
+    }
 
     const { date, time } = formatTransactionDateTime(payload.TransTime);
 
@@ -375,12 +388,14 @@ export const initiateSTKPush = async (req, res) => {
     const intAmount = Math.ceil(Number(amount));
 
     // This endpoint is shared by two different flows: a merchant topping up
-    // their OWN wallet (no external sender, no surcharge), and "Request
-    // Money → Instant M-PESA Prompt" (the frontend sends purpose:
-    // 'request_money'), which prompts a real customer's phone and is
-    // billed PayChain's flat customer surcharge, same as Payment Links.
+    // their OWN wallet, and "Request Money → Instant M-PESA Prompt" (the
+    // frontend sends purpose: 'request_money'), which prompts a real
+    // customer's phone. Both are billed PayChain's flat customer surcharge,
+    // same as Payment Links — `kind` is kept purely for labeling/audit
+    // (self top-up vs money collected from someone else), not for deciding
+    // whether the fee applies.
     const kind = purpose === 'request_money' ? 'request_money' : 'topup';
-    const checkoutTotal = kind === 'request_money' ? getCheckoutTotal(intAmount) : intAmount;
+    const checkoutTotal = getCheckoutTotal(intAmount);
 
     // ── SANDBOX MODE: full local simulation — NO call to Safaricom ────────────
     // This prevents any real M-PESA deductions during testing. The sandbox
@@ -397,7 +412,7 @@ export const initiateSTKPush = async (req, res) => {
         merchantId,
         checkoutRequestId,
         amount: checkoutTotal,
-        baseAmount: kind === 'request_money' ? intAmount : null,
+        baseAmount: intAmount,
         kind,
         phone: formattedPhone,
         status: 'pending',
@@ -487,7 +502,7 @@ export const initiateSTKPush = async (req, res) => {
         merchantId: merchantId || null,
         checkoutRequestId: CheckoutRequestID,
         amount: checkoutTotal,
-        baseAmount: kind === 'request_money' ? intAmount : null,
+        baseAmount: intAmount,
         kind,
         phone: formattedPhone,
         status: 'pending',
@@ -700,24 +715,25 @@ export const stkCallback = async (req, res) => {
       } else {
         // Plain wallet top-up / Request Money's instant prompt /
         // pay-to-account — anything that isn't a PaymentLink/Invoice
-        // settlement. stkReq.kind distinguishes a merchant funding their
-        // OWN wallet ('topup', no surcharge — skip inflation shield since
-        // they're funding their local wallet intentionally) from an actual
-        // customer/payer being charged ('request_money' / 'pay_account'),
-        // which carries PayChain's flat customer surcharge on top of
-        // stkReq.baseAmount — same mechanism as the PaymentLink branch
-        // above, just without a merchant-side tiered fee (never applied to
-        // these flows, by design). Older STKRequest docs predating this
-        // field have kind === undefined, treated as 'topup' below — safe,
-        // since that's the zero-fee behavior they were always credited
-        // with.
+        // settlement. All three carry PayChain's flat customer surcharge on
+        // top of stkReq.baseAmount — same mechanism as the PaymentLink
+        // branch above, just without a merchant-side tiered fee (never
+        // applied to these flows, by design). A self-funding top-up is
+        // billed the fee too — the merchant is both sender and recipient
+        // there, so they simply pay it themselves. stkReq.kind is kept for
+        // labeling/audit only, not for deciding whether the fee applies.
+        // Older STKRequest docs predating this field have baseAmount ===
+        // null, which the guard below treats as "no split" — safe, since
+        // that's the zero-fee behavior they were always credited with
+        // (skip inflation shield either way since these are wallet credits,
+        // not a merchant electing to convert to USDC).
         const merchant = await Merchant.findById(stkReq.merchantId);
         if (merchant) {
           const kind = stkReq.kind || 'topup';
           let merchantCredit = stkReq.amount;
           let customerFee = 0;
 
-          if (kind !== 'topup' && stkReq.baseAmount != null) {
+          if (stkReq.baseAmount != null) {
             try {
               ({ customerFee, merchantNetSettlement: merchantCredit } =
                 splitCustomerSurcharge(stkReq.amount, stkReq.baseAmount));

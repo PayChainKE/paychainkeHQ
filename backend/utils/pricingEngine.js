@@ -74,6 +74,19 @@ export function calculateMerchantFee(grossAmount) {
   return round2(Math.min(Math.max(fee, 0), amount));
 }
 
+// Flat markup PayChain collects on every raw C2B paybill deposit
+// (mpesaController.js#confirmationURL) — a customer keying your paybill +
+// account number directly into their own M-Pesa menu picks their own
+// amount, so unlike STK Push there's no PayChain-controlled prompt to add a
+// customer-facing surcharge to (see "Dual-sided checkout model" further
+// down). This is PayChain's way of still collecting the same flat KES 5 on
+// this rail — deducted from the merchant alongside calculateMerchantFee
+// above, not billed to the payer. Same figure as
+// CUSTOMER_SURCHARGE_FLAT_KES below, kept as its own constant since the two
+// are collected through entirely different mechanisms and should be able to
+// move independently.
+export const RAW_C2B_FLAT_MARKUP_KES = 5;
+
 /**
  * The Safaricom tariff a customer pays on a standard paybill/STK transaction
  * — a pure pass-through cost PayChain never collects or deducts from the
