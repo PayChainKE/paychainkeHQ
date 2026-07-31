@@ -834,9 +834,9 @@ export const initiateB2C = async (req, res) => {
     const merchantId = req.merchant._id;
 
     // Standard Safaricom M-Pesa B2C ("Business Bouquet") tariff — the real
-    // cost Safaricom charges PayChain per B2C payout, passed through to
-    // the merchant. No PayChain markup on top yet (PAYCHAIN_B2C_MARKUP is
-    // 0 until that's decided) — see config/mpesaB2cTariffCard.js.
+    // cost Safaricom charges PayChain per B2C payout — plus PayChain's own
+    // flat KES 10 margin (PAYCHAIN_B2C_MARKUP), both passed through to the
+    // merchant — see config/mpesaB2cTariffCard.js.
     let b2cFee;
     try {
       ({ totalFee: b2cFee } = getB2cTariff(amount));

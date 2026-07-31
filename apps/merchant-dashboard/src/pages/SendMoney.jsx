@@ -11,12 +11,40 @@ import { formatKES } from '../utils/formatCurrency'
 const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
 
 const DESTINATIONS = [
-  { id: 'mpesa-primary', label: 'Primary M-PESA Number',   icon: 'phone_iphone',     fee: 0,  hint: 'Your registered phone number' },
-  { id: 'mobile',        label: 'Any M-PESA Number',        icon: 'smartphone',        fee: 0,  hint: 'Send to any Kenyan mobile number' },
-  { id: 'bank',          label: 'Bank Account',             icon: 'account_balance',   fee: 50, hint: 'Direct bank transfer' },
-  { id: 'till',          label: 'Till Number',              icon: 'point_of_sale',     fee: 50, hint: 'Pay to a Safaricom Till' },
-  { id: 'paybill',       label: 'Paybill',                  icon: 'receipt_long',      fee: 50, hint: 'Pay to a Paybill number' },
+  { id: 'mpesa-primary', label: 'Primary M-PESA Number',   icon: 'phone_iphone',     fee: null, hint: 'Your registered phone number' },
+  { id: 'mobile',        label: 'Any M-PESA Number',        icon: 'smartphone',        fee: null, hint: 'Send to any Kenyan mobile number' },
+  { id: 'bank',          label: 'Bank Account',             icon: 'account_balance',   fee: 50,   hint: 'Direct bank transfer' },
+  { id: 'till',          label: 'Till Number',              icon: 'point_of_sale',     fee: 50,   hint: 'Pay to a Safaricom Till' },
+  { id: 'paybill',       label: 'Paybill',                  icon: 'receipt_long',      fee: 50,   hint: 'Pay to a Paybill number' },
 ]
+
+// Mirrors backend/config/mpesaB2cTariffCard.js — Safaricom's real M-Pesa
+// B2C ("Business Bouquet") tariff bands, plus PayChain's flat KES 10
+// markup. That backend table is the authoritative charge; this is only an
+// estimate so the merchant sees an honest number here instead of "Free"
+// before confirming.
+const B2C_SAFARICOM_BANDS = [
+  { max: 100,     fee: 0  },
+  { max: 500,     fee: 5  },
+  { max: 1_000,   fee: 5  },
+  { max: 1_500,   fee: 5  },
+  { max: 2_500,   fee: 9  },
+  { max: 3_500,   fee: 9  },
+  { max: 5_000,   fee: 9  },
+  { max: 7_500,   fee: 11 },
+  { max: 10_000,  fee: 11 },
+  { max: 15_000,  fee: 11 },
+  { max: 20_000,  fee: 11 },
+  { max: 25_000,  fee: 13 },
+  { max: 250_000, fee: 13 },
+]
+const PAYCHAIN_B2C_MARKUP_KES = 10
+
+function estimateB2cFee(amount) {
+  if (!amount || amount <= 0) return PAYCHAIN_B2C_MARKUP_KES
+  const band = B2C_SAFARICOM_BANDS.find(b => amount <= b.max) || B2C_SAFARICOM_BANDS[B2C_SAFARICOM_BANDS.length - 1]
+  return band.fee + PAYCHAIN_B2C_MARKUP_KES
+}
 
 export default function SendMoney() {
   const navigate = useNavigate()
@@ -40,7 +68,8 @@ export default function SendMoney() {
 
   const hasPin       = !!merchant?.hasAppPin
   const selectedDest = DESTINATIONS.find(d => d.id === destination)
-  const fee          = selectedDest?.fee || 0
+  const isMobileDest = destination === 'mpesa-primary' || destination === 'mobile'
+  const fee          = isMobileDest ? estimateB2cFee(Number(amount) || 0) : (selectedDest?.fee || 0)
   const totalAmount  = Number(amount || 0) + fee
   const balance      = merchant?.kesBalance || 0
 
@@ -282,8 +311,8 @@ export default function SendMoney() {
                         <p className="text-[10px] text-slate-400 font-medium mt-0.5">{d.hint}</p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        <span className={`text-[10px] font-black uppercase tracking-widest ${d.fee === 0 ? 'text-emerald-600' : 'text-slate-400'}`}>
-                          {d.fee === 0 ? 'Free' : formatKES(d.fee)}
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                          {d.fee === null ? 'M-PESA charges apply' : formatKES(d.fee)}
                         </span>
                         {destination === d.id && (
                           <span className="material-symbols-outlined text-[#00351D] text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
@@ -305,7 +334,7 @@ export default function SendMoney() {
                 </div>
                 <div>
                   <p className="text-xs font-bold text-primary">{selectedDest?.label}</p>
-                  <p className="text-[10px] text-slate-400">Fee: {fee === 0 ? 'Free' : formatKES(fee)}</p>
+                  <p className="text-[10px] text-slate-400">Fee: {formatKES(fee)}</p>
                 </div>
               </div>
 
@@ -433,7 +462,7 @@ export default function SendMoney() {
                     ['Destination', selectedDest?.label],
                     ['Recipient',   recipientAccount],
                     ['Amount',      formatKES(amount || 0)],
-                    ['Fee',         fee === 0 ? 'Free' : formatKES(fee)],
+                    ['Fee',         formatKES(fee)],
                   ].map(([k, v]) => (
                     <div key={k} className="flex justify-between items-center px-5 py-3">
                       <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">{k}</span>

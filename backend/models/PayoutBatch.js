@@ -24,6 +24,13 @@ const payoutBatchSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    // Sum of Safaricom's B2C tariff + PayChain's flat markup actually kept
+    // across this batch's Mobile Money rows (excludes any row that failed
+    // and was refunded) — see controllers/bulkPayController.js#authorizeBatch.
+    totalB2cFees: {
+      type: Number,
+      default: 0,
+    },
     payeeCount: {
       type: Number,
       required: true,
@@ -58,6 +65,10 @@ const payoutBatchSchema = new mongoose.Schema(
           type: String,
           enum: ['pending', 'completed', 'failed'],
           default: 'pending',
+        },
+        b2cFee: {
+          type: Number,
+          default: 0,
         },
       },
     ],

@@ -7,11 +7,11 @@
 // covers the recipient's cash-out fee (an optional premium add-on, not
 // the standard tariff).
 //
-// This is a pure passthrough of Safaricom's real cost for now — PayChain's
-// own margin on top isn't decided yet, tracked here as an explicit
-// PAYCHAIN_B2C_MARKUP constant (currently 0) so adding it later is a
-// one-line change rather than a restructure. Mirrors the safaricomFee /
-// markup split already used in config/ncbaTariffCard.js.
+// PayChain's own flat KES 10 margin on top of Safaricom's real cost —
+// tracked here as an explicit PAYCHAIN_B2C_MARKUP constant so every place
+// that debits or reports a B2C fee (initiateB2C, bulk pay's Mobile Money
+// rows, the revenue dashboard) reads the same number. Mirrors the
+// safaricomFee / markup split already used in config/ncbaTariffCard.js.
 const B2C_REGISTERED_USER_BANDS = [
   { max: 49,      safaricomFee: 0  },
   { max: 100,     safaricomFee: 0  },
@@ -37,9 +37,7 @@ const B2C_REGISTERED_USER_BANDS = [
 
 export const MAX_B2C_AMOUNT = 250_000;
 
-// Not charged yet — see file header. Named and exported so it's easy to
-// find and change once PayChain's own B2C rate is decided.
-export const PAYCHAIN_B2C_MARKUP = 0;
+export const PAYCHAIN_B2C_MARKUP = 10;
 
 export class B2cTariffBoundsError extends Error {
   constructor(message) {
