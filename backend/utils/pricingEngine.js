@@ -22,6 +22,16 @@ import { safaricomFeeFor } from '../config/revenueRateCard.js';
 // calculateCustomerMpesaFee (Safaricom's cut, pass-through) with
 // calculateCustomerSurcharge (PayChain's cut, collected from the customer).
 
+// Temporarily disabled — for now PayChain charges only the flat KES 5 (the
+// customer surcharge on STK flows, RAW_C2B_FLAT_MARKUP_KES on raw C2B
+// deposits) with no tiered/percentage merchant fee on top. calculateMerchantFee
+// returns 0 while this is false, which automatically zeroes it out
+// everywhere it's used (confirmationURL, processSplitTransaction, and the
+// 'inbound' case in feeCalculator.js's Transaction pre-save hook) without
+// touching any of those call sites. Flip back to true to resume charging
+// the tiered bands below.
+const MPESA_MERCHANT_FEE_ENABLED = false;
+
 // ── Merchant fee tier matrix ─────────────────────────────────────────────
 // Placeholder bands — adjust freely as PayChain's pricing is finalized.
 // Each band is checked in order; `type` is either 'percentage' (value is a
@@ -59,6 +69,8 @@ function findBand(amount) {
  *          than the gross amount itself.
  */
 export function calculateMerchantFee(grossAmount) {
+  if (!MPESA_MERCHANT_FEE_ENABLED) return 0;
+
   const amount = Number(grossAmount);
 
   if (!Number.isFinite(amount) || amount <= 0) {
@@ -106,9 +118,14 @@ export function calculateCustomerMpesaFee(amount) {
  * controllers/revenueController.js's per-transaction fee sum — mirrors
  * config/ncbaTariffCard.js#ncbaMarkupMongoExpr. `basisExpr` is whatever
  * Mongo expression yields the per-doc gross KES basis (see KES_BASIS in
- * revenueController.js).
+ * revenueController.js). Mirrors calculateMerchantFee's
+ * MPESA_MERCHANT_FEE_ENABLED gate — literal 0 while disabled, so the
+ * dashboard's live-recomputed figure never diverges from what's actually
+ * being deducted.
  */
 export function mpesaMerchantFeeMongoExpr(basisExpr) {
+  if (!MPESA_MERCHANT_FEE_ENABLED) return 0;
+
   return {
     $switch: {
       branches: MPESA_MERCHANT_FEE_BANDS.map((b) => ({
