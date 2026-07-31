@@ -303,7 +303,7 @@ export const handleNcbaAccountNotification = async (req, res) => {
         // because merchant.phone was empty" indistinguishable from Render
         // logs alone (both produced zero output).
         if (result.success) {
-          logEvent('info', 'ncba_account_notification_sms_sent', { transId, merchantId: merchant._id.toString(), phone: merchant.phone });
+          logEvent('info', 'ncba_account_notification_sms_sent', { transId, merchantId: merchant._id.toString(), phone: formatPhoneDisplay(merchant.phone) || merchant.phone });
         } else {
           logEvent('error', 'ncba_account_notification_sms_failed', { transId, merchantId: merchant._id.toString(), error: result.error });
         }
