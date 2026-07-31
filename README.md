@@ -1,79 +1,109 @@
-# <img src="apps/merchant-dashboard/src/assets/logo2.png" alt="PayChain Logo" height="32" /> PayChainKE — The Merchant Operating System Built for Kenya
+<img src="apps/merchant-dashboard/src/assets/logo2.png" alt="PayChain" height="36" />
 
-<img src="https://img.shields.io/badge/React-18-blue?logo=react" alt="React"/> <img src="https://img.shields.io/badge/TypeScript-TS-blue?logo=typescript" alt="TypeScript"/> <img src="https://img.shields.io/badge/TailwindCSS-3-teal?logo=tailwindcss" alt="Tailwind"/> <img src="https://img.shields.io/badge/Vite-5-purple?logo=vite" alt="Vite"/> <img src="https://img.shields.io/badge/Base%20L2-Chain-6f42c1" alt="Base L2"/> <img src="https://img.shields.io/badge/M--PESA-Daraja-00BE00" alt="M-PESA Daraja"/>
+# PayChainKE
 
----
+**Verified payments and working-capital infrastructure for Kenyan merchants.**
 
-## 🎯 Executive Summary
-
-**PayChainKE** is a purpose-built, high-fidelity financial dashboard and operating system empowering Kenyan merchants to preserve value, manage commercial flows, and access instant liquidity. Built on the **"Stitch" Design System**, the platform delivers an elite "Editorial Fintech" aesthetic featuring dark-mode security vaults, glassmorphic analytics, and ultra-responsive layout flows.
-
-### Our Mission
-To eliminate financial fragmentation and the digital trust deficit holding Kenyan SMEs back — by building the most trusted, most intelligent, and most accessible merchant operating system in Kenya.
-
-### Our Vision
-A Kenya where every merchant — from the Jua Kali artisan in Gikomba to the import trader in Industrial Area — has access to verified payments, stable financial tools, and credit built on the **truth of their business**.
+<img src="https://img.shields.io/badge/status-closed%20beta-orange" alt="Status"/> <img src="https://img.shields.io/badge/license-MIT-blue" alt="License"/> <img src="https://img.shields.io/badge/node-%3E%3D18-informational" alt="Node"/> <img src="https://img.shields.io/badge/payments-M--PESA%20Daraja-00A651" alt="M-PESA"/> <img src="https://img.shields.io/badge/settlement-Base%20L2-6f42c1" alt="Base L2"/>
 
 ---
 
-## 🚀 Core Platform Modules
+## Overview
 
-The dashboard is broken down into highly specialized, real-time operational segments:
+PayChainKE gives Kenyan SMEs a single, verified account for collections, payroll, and working capital. Every inbound M‑PESA payment is confirmed directly against the Safaricom Daraja API, posted to the merchant's ledger in real time, and — where enabled — hedged into USDC on Base L2 to protect balances from KES depreciation. On top of that ledger, merchants get bulk payroll disbursement, revenue-based cash advances, and a trust score derived entirely from their own verified transaction history.
 
-### 1. 📊 Overview
-The command center. Features a Hybrid Ledger (combining KES and USDC balances), real-time Recent Transactions feeds with structured data grids, and quick-action shortcuts for daily financial orchestration.
+The platform is built for merchants who currently rely on M‑PESA statements, screenshots, and spreadsheets to run their business — replacing that with an auditable system of record.
 
-### 2. 🛡️ Inflation Shield
-Protect purchasing power automatically. The Inflation Shield is a built-in KES-to-USDC conversion engine that lets you swap vulnerable fiat balances into stable USDC on Base L2 at a flat 0.5% rate.
+## Product Suite
 
-### 3. 💸 PayChain Virtual Account (Collections)
-A comprehensive ledger of all verified inbound M-PESA payments. Every transaction is verified against the Safaricom Daraja API in under 100ms. No SMS fraud, no fake screenshots.
+| App | Path | Description |
+|---|---|---|
+| Merchant Dashboard | [`apps/merchant-dashboard`](apps/merchant-dashboard) | Primary web console for collections, bulk pay, cash advance, and account management. React + Vite. |
+| Mobile App | [`apps/mobile-app`](apps/mobile-app) | Full-parity native experience for merchants on the move. Expo + React Native + TypeScript. |
+| Admin Console | [`apps/admin`](apps/admin) | Internal operations console — reconciliation, merchant lifecycle, revenue sweeps, audit trail. |
+| Officer Portal | [`apps/officer`](apps/officer) | Field/KYC officer workflows for merchant onboarding and verification. |
+| Marketing Site | [`apps/web`](apps/web) | Public-facing site, waitlist, and product marketing. |
+| Backend API | [`backend`](backend) | Core ledger, payments, payouts, and settlement service. Node.js + Express + MongoDB. |
 
-### 4. 👥 Bulk Payments
-Saves operational time by enabling batch payments to staff and suppliers. Automatically calculates PAYE and generates audit-ready reports.
+## Core Capabilities
 
-### 5. 💳 Cash Advance
-Access liquidity against future collections with a revenue-based Cash Advance. No collateral and no paperwork—eligibility is determined by your verified transaction history.
+- **PayChain Virtual Account** — a dedicated collections account per merchant; every inbound payment is verified against Daraja before it is ever shown as settled.
+- **Inflation Shield** — optional, rate-limited automatic conversion of KES balances into USDC on Base L2, with a manual kill switch and bounded execution timeout so it never blocks payment notifications.
+- **Bulk Payments** — payroll and supplier disbursement in a single batch, gated by OTP + PIN authorization, with M‑PESA B2C and bank payout rails.
+- **Cash Advance** — revenue-based working capital, underwritten from verified transaction history rather than collateral.
+- **Trust Score** — a proprietary score computed from real, verified merchant activity; it is not self-reported.
+- **Audit Trail** — every balance-affecting event (payments, sweeps, payouts, admin actions) is logged for reconciliation.
 
-### 6. 🌟 Trust Score
-A proprietary creditworthiness measure built entirely from your verified merchant activity. The more consistently you transact, the stronger your score becomes, unlocking higher advance limits.
+## Architecture
 
----
+```text
+paychainkeHQ-2/
+├── apps/
+│   ├── merchant-dashboard/   React 18 + Vite + Tailwind CSS
+│   ├── mobile-app/           Expo + React Native + TypeScript
+│   ├── admin/                Internal ops console
+│   ├── officer/              KYC / onboarding console
+│   └── web/                  Marketing site
+├── backend/                  Express API, Mongoose models, payment/payout controllers
+└── packages/                 Shared code across apps
+```
 
-## 🛠️ How It Works
+- **Frontend**: React 18, TypeScript, Vite, Tailwind CSS.
+- **Mobile**: Expo (React Native), TypeScript.
+- **Backend**: Node.js, Express 5, MongoDB / Mongoose.
+- **Payments**: Safaricom M‑PESA Daraja API (STK Push, C2B confirmation, B2C payouts).
+- **Settlement**: Base L2 (Coinbase) for USDC conversion and immutable transaction records.
+- **Banking**: NCBA integration for bank and utility payouts.
+- **Monorepo tooling**: npm workspaces + Turborepo.
 
-1.  **Sign Up & Get Verified**: Create your account and complete digital KYC in under 24 hours to receive your verified PayChain Virtual Account.
-2.  **Start Collecting**: Receive verified inbound payments instantly. Every transaction is logged and immutable.
-3.  **Manage & Protect**: Use Bulk Pay for payroll and Inflation Shield to swap KES to USDC.
-4.  **Unlock Growth**: After 3 months of activity, automatically become eligible for revenue-based Cash Advances.
+## Security & Compliance
 
----
+- OTP + PIN dual-factor authorization on bulk payouts, backed by rate-limited, time-boxed verification tokens.
+- Strict CORS allowlisting and origin verification on all API traffic.
+- Digital KYC on merchant onboarding.
+- Immutable transaction and audit logging for every balance-affecting event.
+- Built-in KRA e-TIMS electronic tax invoicing support.
 
-## 📐 Architecture & Tech Stack
+This repository contains application and infrastructure code. It does not contain production credentials, customer data, or secrets — all environments are configured via `.env` files that are excluded from version control (see each app's `.env.example`).
 
-*   **Frontend**: React 18 with TypeScript and Vite.
-*   **Styling**: "Stitch" UI Methodology using TailwindCSS with fluid flexbox architectures and micro-interactions.
-*   **Blockchain**: Base Network (Coinbase) for USDC settlement and transaction immutability.
-*   **Infrastructure**: Safaricom M-PESA Daraja API for real-time payment verification.
-*   **Compliance**: Built-in KRA e-TIMS automatic electronic tax invoicing.
-*   **Deployment**: Strict Vercel Edge routing to prevent 404s and deliver flawless SPA navigation.
+## Getting Started
 
----
+**Prerequisites**: Node.js ≥ 18, npm ≥ 10, a MongoDB connection string.
 
-## 🗺️ Roadmap
+```bash
+# Install dependencies for every app in the workspace
+npm install
 
-*   **Q2 2026**: Closed Beta launch for hand-selected merchants in Nairobi and Juja.
-*   **Q3 2026**: Public Launch for all Kenyan merchants (Target: 5,000 SMEs).
-*   **Year 2-3**: Regional expansion to Mombasa, Kisumu, Nakuru, Uganda, and Tanzania.
-*   **Year 4-5**: Pan-African infrastructure serving 1,000,000+ merchants.
+# Run everything in dev mode
+npm run dev
 
----
+# Run a single app
+npm run dev:web
+npm run dev:backend
+```
 
-## 📜 Licensing & Contact
+Each app defines its own environment variables — copy the relevant `.env.example` (e.g. [`apps/merchant-dashboard/.env.example`](apps/merchant-dashboard/.env.example), [`backend/.env.example`](backend/.env.example)) to `.env` and fill in local values before running.
 
-Materials in this repository are provided under the MIT License unless otherwise specified.
+## Roadmap
 
-For general enquiries: `contact@paychainke.com`  
-For partnerships: `partnerships@paychain.co.ke`
+| Phase | Target |
+|---|---|
+| Closed Beta | Hand-selected merchants in Nairobi and Juja |
+| Public Launch | All Kenyan merchants (5,000 SME target) |
+| Regional Expansion | Mombasa, Kisumu, Nakuru, Uganda, Tanzania |
+| Pan-African Scale | 1,000,000+ merchants |
 
-**PayChainKE — Built to support resilient businesses and compliant operations.**
+## Contributing
+
+This is a private, closed-source product repository. External contributions are not currently accepted. Internal engineers should branch from `staging`, open a PR, and route production releases through `main`.
+
+## License
+
+Released under the [MIT License](LICENSE) unless otherwise noted in a specific package.
+
+## Contact
+
+- General enquiries: `contact@paychainke.com`
+- Partnerships: `partnerships@paychain.co.ke`
+
+**PayChainKE** — infrastructure for resilient, compliant Kenyan businesses.
