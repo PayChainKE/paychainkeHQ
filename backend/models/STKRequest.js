@@ -25,6 +25,26 @@ const stkRequestSchema = new Schema({
     type: Number,
     required: true
   },
+  // Only set on no-linkId requests where a customer surcharge applies
+  // (kind !== 'topup') — the pre-surcharge amount, i.e. `amount` minus
+  // PayChain's flat customer fee. Left null for plain top-ups and for
+  // PaymentLink/Invoice requests (those derive their base from
+  // PaymentLink.amount instead).
+  baseAmount: {
+    type: Number,
+    default: null,
+  },
+  // Only meaningful when linkId is unset — distinguishes a merchant funding
+  // their OWN wallet ('topup', no surcharge) from an actual customer/payer
+  // being charged via Request Money's instant prompt ('request_money') or
+  // the Settlement QR's open-amount pay page ('pay_account'), both of which
+  // carry PayChain's customer surcharge. Defaults to 'topup' so older rows
+  // and the plain wallet-top-up flow keep their existing zero-fee behavior.
+  kind: {
+    type: String,
+    enum: ['topup', 'request_money', 'pay_account'],
+    default: 'topup',
+  },
   phone: {
     type: String,
     required: true

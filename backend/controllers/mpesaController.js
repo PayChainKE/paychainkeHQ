@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import Transaction from '../models/Transaction.js';
 import Merchant from '../models/Merchant.js';
 import { safeSendSMS, buildStrictSms } from '../utils/smsSanitizer.js';
-import { calculateMerchantFee, processSplitTransaction, PricingEngineError } from '../utils/pricingEngine.js';
+import { calculateMerchantFee, processSplitTransaction, splitCustomerSurcharge, getCheckoutTotal, RAW_C2B_FLAT_MARKUP_KES, PricingEngineError } from '../utils/pricingEngine.js';
 import { sendInvoicePaidReceiptEmail } from '../utils/resend.js';
 import { settleInflationShield } from '../utils/stellarHelper.js';
 import { getLiveKesToUsdcRate } from '../utils/rateEngine.js';
@@ -191,7 +191,7 @@ export const confirmationURL = async (req, res) => {
     const senderName = [FirstName, MiddleName, LastName].filter(Boolean).join(' ');
 
     // Save the real transaction
-    await Transaction.create({
+    const transaction = await Transaction.create({
       merchantId: merchant._id,
       accountNumber: merchant.paybillAccount,
       type: 'inbound',
@@ -210,14 +210,27 @@ export const confirmationURL = async (req, res) => {
       }
     });
 
-    // PayChain's own tiered merchant fee — deducted from the gross receipt
-    // before it ever reaches the merchant's balance or the Inflation Shield
-    // FX conversion below. Same lookup utils/feeCalculator.js's Transaction
-    // pre-save hook uses to stamp paychainFee on the record just created
-    // above, so the ledger and this real deduction can never disagree.
-    const merchantFee = calculateMerchantFee(amount);
+    // PayChain's own tiered merchant fee, plus a flat KES 5 markup on every
+    // C2B paybill deposit (RAW_C2B_FLAT_MARKUP_KES — see pricingEngine.js)
+    // — both deducted from the gross receipt before it ever reaches the
+    // merchant's balance or the Inflation Shield FX conversion below.
+    // Clamped so the combined fee never exceeds the gross amount itself.
+    const tieredMerchantFee = calculateMerchantFee(amount);
+    const merchantFee = Math.min(amount, Math.round((tieredMerchantFee + RAW_C2B_FLAT_MARKUP_KES) * 100) / 100);
     const netKESAmount = Math.round((amount - merchantFee) * 100) / 100;
-    console.log(`💰 M-PESA C2B fee for ${TransID}: gross KES ${amount}, PayChain fee KES ${merchantFee}, net KES ${netKESAmount}`);
+    console.log(`💰 M-PESA C2B fee for ${TransID}: gross KES ${amount}, PayChain fee KES ${merchantFee} (tiered KES ${tieredMerchantFee} + flat KES ${RAW_C2B_FLAT_MARKUP_KES}), net KES ${netKESAmount}`);
+
+    // The Transaction pre-save hook (utils/feeCalculator.js) only knows the
+    // tiered portion (it calls calculateMerchantFee the same way, on the
+    // same amount) — top up paychainFee with whatever's left of the flat
+    // markup on top (normally the full RAW_C2B_FLAT_MARKUP_KES, less only
+    // if the clamp above capped the total at the gross amount for a very
+    // small deposit), so the persisted field always matches what was
+    // actually deducted below, not just the tiered part.
+    const flatMarkupApplied = Math.round((merchantFee - tieredMerchantFee) * 100) / 100;
+    if (flatMarkupApplied > 0) {
+      await Transaction.updateOne({ _id: transaction._id }, { $inc: { paychainFee: flatMarkupApplied } });
+    }
 
     const { date, time } = formatTransactionDateTime(payload.TransTime);
 
@@ -359,7 +372,7 @@ export const confirmationURL = async (req, res) => {
 
 export const initiateSTKPush = async (req, res) => {
   try {
-    const { amount, phone } = req.body;
+    const { amount, phone, purpose } = req.body;
     // Always the authenticated caller's own account — never trust a
     // client-supplied merchantId (route requires protectMerchant). Taking
     // it from req.body let any authenticated merchant credit an arbitrary
@@ -374,53 +387,52 @@ export const initiateSTKPush = async (req, res) => {
 
     const intAmount = Math.ceil(Number(amount));
 
+    // This endpoint is shared by two different flows: a merchant topping up
+    // their OWN wallet, and "Request Money → Instant M-PESA Prompt" (the
+    // frontend sends purpose: 'request_money'), which prompts a real
+    // customer's phone. Both are billed PayChain's flat customer surcharge,
+    // same as Payment Links — `kind` is kept purely for labeling/audit
+    // (self top-up vs money collected from someone else), not for deciding
+    // whether the fee applies.
+    const kind = purpose === 'request_money' ? 'request_money' : 'topup';
+    const checkoutTotal = getCheckoutTotal(intAmount);
+
     // ── SANDBOX MODE: full local simulation — NO call to Safaricom ────────────
     // This prevents any real M-PESA deductions during testing. The sandbox
-    // simulation auto-confirms after 4 seconds, exactly like the real callback.
+    // simulation auto-confirms after 4 seconds, routed through the real
+    // stkCallback handler (mirrors processPaymentLink/payToMerchantAccount's
+    // sandbox branches in transactionController.js) so it exercises the
+    // exact same fee-split/credit logic a real callback would, rather than
+    // a second hand-maintained copy of it.
     if (!isLive) {
       const checkoutRequestId = `SANDBOX-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
-      console.log(`🧪 [SANDBOX] Simulating STK Push for ${formattedPhone} KES ${intAmount} | ID: ${checkoutRequestId}`);
+      console.log(`🧪 [SANDBOX] Simulating STK Push for ${formattedPhone} KES ${checkoutTotal} | ID: ${checkoutRequestId}`);
 
       await STKRequest.create({
         merchantId,
         checkoutRequestId,
-        amount: intAmount,
+        amount: checkoutTotal,
+        baseAmount: intAmount,
+        kind,
         phone: formattedPhone,
         status: 'pending',
       });
 
-      // Auto-confirm after 4 s — simulates the Safaricom callback
-      setTimeout(async () => {
-        try {
-          const stkReq = await STKRequest.findOne({ checkoutRequestId });
-          if (!stkReq || stkReq.status !== 'pending') return;
-
-          stkReq.status = 'success';
-          stkReq.resultDesc = 'Sandbox simulation — no real money moved';
-          await stkReq.save();
-
-          const merchant = await Merchant.findById(merchantId);
-          if (merchant) {
-            merchant.kesBalance = (merchant.kesBalance || 0) + intAmount;
-            await merchant.save();
-
-            await Transaction.create({
-              merchantId: merchant._id,
-              accountNumber: merchant.paybillAccount || 'WALLET_FUND',
-              type: 'top_up',
-              amount: intAmount,
-              kesAmount: intAmount,
-              currency: 'KES',
-              status: 'completed',
-              reference: `SBX-${checkoutRequestId.slice(-8)}`,
-              sender: { name: 'M-PESA Sandbox', id: formatPhoneDisplay(formattedPhone) },
-              recipient: { name: merchant.businessName, id: 'WALLET' },
-            });
-            console.log(`✅ [SANDBOX] Auto-confirmed KES ${intAmount} for merchant ${merchant.paybillAccount}`);
-          }
-        } catch (e) {
-          console.error('❌ [SANDBOX] Auto-confirm error:', e.message);
-        }
+      setTimeout(() => {
+        const fakeReq = {
+          body: {
+            Body: {
+              stkCallback: {
+                CheckoutRequestID: checkoutRequestId,
+                ResultCode: 0,
+                ResultDesc: 'Sandbox simulation — no real money moved',
+                CallbackMetadata: { Item: [{ Name: 'MpesaReceiptNumber', Value: `SBX-${checkoutRequestId.slice(-8)}` }] },
+              },
+            },
+          },
+        };
+        const fakeRes = { status: () => ({ json: () => {} }) };
+        stkCallback(fakeReq, fakeRes).catch((e) => console.error('❌ [SANDBOX] STK top-up auto-confirm error:', e.message));
       }, 4000);
 
       return res.status(200).json({
@@ -458,7 +470,7 @@ export const initiateSTKPush = async (req, res) => {
       Password: stkPassword,
       Timestamp: timestamp,
       TransactionType: 'CustomerPayBillOnline',
-      Amount: intAmount,
+      Amount: checkoutTotal,
       PartyA: formattedPhone,
       PartyB: shortCode,
       PhoneNumber: formattedPhone,
@@ -467,7 +479,7 @@ export const initiateSTKPush = async (req, res) => {
       TransactionDesc: 'Wallet Top Up',
     };
 
-    console.log(`📲 [LIVE] STK Push → ${formattedPhone} KES ${intAmount}`);
+    console.log(`📲 [LIVE] STK Push → ${formattedPhone} KES ${checkoutTotal}`);
 
     const response = await axios.post(
       `${mpesaBaseUrl}/mpesa/stkpush/v1/processrequest`,
@@ -489,7 +501,9 @@ export const initiateSTKPush = async (req, res) => {
       await STKRequest.create({
         merchantId: merchantId || null,
         checkoutRequestId: CheckoutRequestID,
-        amount: intAmount,
+        amount: checkoutTotal,
+        baseAmount: intAmount,
+        kind,
         phone: formattedPhone,
         status: 'pending',
       });
@@ -598,13 +612,12 @@ export const stkCallback = async (req, res) => {
             // total — this is the same basis the automatic Transaction
             // pre-save hook feeds into calculateMerchantFee (see
             // utils/feeCalculator.js), so this doc's auto-stamped
-            // paychainFee always equals `merchantFee` above exactly. The
-            // customer-surcharge portion of PayChain's revenue
-            // (paychainTotalRevenue - merchantFee) isn't yet captured on a
-            // per-transaction ledger field — tracked via the structured log
-            // line above until a dedicated revenue stream/field is added
-            // once real surcharge pricing lands.
-            await Transaction.create({
+            // paychainFee starts out equal to `merchantFee` above exactly.
+            // The customer-surcharge portion is added on top immediately
+            // below via a follow-up $inc (a plain .save() would let the
+            // pre-save hook re-run and clobber it, since it re-fires on any
+            // amount/type change — an atomic update bypasses that safely).
+            const transaction = await Transaction.create({
               merchantId: merchant._id,
               accountNumber: merchant.paybillAccount || 'WALLET_FUND',
               type: 'inbound',
@@ -617,6 +630,21 @@ export const stkCallback = async (req, res) => {
               recipient: { name: merchant.businessName, id: merchant.paybillAccount },
               balanceAfter: updatedMerchant.kesBalance,
             });
+
+            if (customerFee > 0) {
+              // paychainFee is what services/revenueSweepService.js sweeps
+              // out to PayChain's own account and what the pool-balance
+              // reconciliation treats as PayChain's accrued revenue —
+              // incrementing it here (not just customerSurchargeFee) is
+              // what makes this surcharge actually become PayChain's money
+              // rather than sit unlabeled in the pooled balance.
+              // customerSurchargeFee is kept alongside so the breakdown
+              // (surcharge vs merchant fee) stays auditable per transaction.
+              await Transaction.updateOne(
+                { _id: transaction._id },
+                { $inc: { paychainFee: customerFee, customerSurchargeFee: customerFee } }
+              );
+            }
 
             createNotification({
               merchantId: merchant._id,
@@ -685,22 +713,53 @@ export const stkCallback = async (req, res) => {
           }
         }
       } else {
-        // Plain wallet top-up.
-        // (For STK top up, we skip inflation shield since they are funding their local wallet intentionally)
+        // Plain wallet top-up / Request Money's instant prompt /
+        // pay-to-account — anything that isn't a PaymentLink/Invoice
+        // settlement. All three carry PayChain's flat customer surcharge on
+        // top of stkReq.baseAmount — same mechanism as the PaymentLink
+        // branch above, just without a merchant-side tiered fee (never
+        // applied to these flows, by design). A self-funding top-up is
+        // billed the fee too — the merchant is both sender and recipient
+        // there, so they simply pay it themselves. stkReq.kind is kept for
+        // labeling/audit only, not for deciding whether the fee applies.
+        // Older STKRequest docs predating this field have baseAmount ===
+        // null, which the guard below treats as "no split" — safe, since
+        // that's the zero-fee behavior they were always credited with
+        // (skip inflation shield either way since these are wallet credits,
+        // not a merchant electing to convert to USDC).
         const merchant = await Merchant.findById(stkReq.merchantId);
         if (merchant) {
+          const kind = stkReq.kind || 'topup';
+          let merchantCredit = stkReq.amount;
+          let customerFee = 0;
+
+          if (stkReq.baseAmount != null) {
+            try {
+              ({ customerFee, merchantNetSettlement: merchantCredit } =
+                splitCustomerSurcharge(stkReq.amount, stkReq.baseAmount));
+            } catch (splitError) {
+              console.error(
+                `🚨 CRITICAL ledger split failure for ${receipt} (STK ${kind}):`,
+                splitError instanceof PricingEngineError ? splitError.message : splitError,
+                { totalReceived: stkReq.amount, baseAmount: stkReq.baseAmount }
+              );
+              merchantCredit = stkReq.amount;
+              customerFee = 0;
+            }
+          }
+
           const updatedMerchant = await Merchant.findByIdAndUpdate(
             merchant._id,
-            { $inc: { kesBalance: stkReq.amount } },
+            { $inc: { kesBalance: merchantCredit } },
             { returnDocument: 'after' }
           );
 
-          await Transaction.create({
+          const transaction = await Transaction.create({
             merchantId: merchant._id,
             accountNumber: merchant.paybillAccount || 'WALLET_FUND',
             type: 'top_up',
-            amount: stkReq.amount,
-            kesAmount: stkReq.amount,
+            amount: merchantCredit,
+            kesAmount: merchantCredit,
             currency: 'KES',
             status: 'completed',
             reference: receipt,
@@ -709,11 +768,18 @@ export const stkCallback = async (req, res) => {
             balanceAfter: updatedMerchant.kesBalance,
           });
 
+          if (customerFee > 0) {
+            await Transaction.updateOne(
+              { _id: transaction._id },
+              { $inc: { paychainFee: customerFee, customerSurchargeFee: customerFee } }
+            );
+          }
+
           createNotification({
             merchantId: merchant._id,
             kind: 'wallet',
             title: 'Wallet topped up',
-            message: `KES ${stkReq.amount.toLocaleString()} was added to your balance via M-PESA.`,
+            message: `KES ${merchantCredit.toLocaleString()} was added to your balance via M-PESA.`,
           });
 
           // Self-funded top-up — one SMS to the merchant's own registered
@@ -721,7 +787,7 @@ export const stkCallback = async (req, res) => {
           if (merchant.phone) {
             safeSendSMS({
               to: merchant.phone,
-              message: `${receipt} Confirmed. KES ${stkReq.amount.toLocaleString()} added to your PayChain wallet via M-PESA on ${date} at ${time}. Your updated available balance is KES ${(updatedMerchant.kesBalance || 0).toLocaleString()}.`,
+              message: `${receipt} Confirmed. KES ${merchantCredit.toLocaleString()} added to your PayChain wallet via M-PESA on ${date} at ${time}. Your updated available balance is KES ${(updatedMerchant.kesBalance || 0).toLocaleString()}.`,
             }).then((r) => { if (!r.success) console.error(`Wallet top-up SMS failed for merchant ${merchant._id}:`, r.error); });
           }
         }
@@ -768,9 +834,9 @@ export const initiateB2C = async (req, res) => {
     const merchantId = req.merchant._id;
 
     // Standard Safaricom M-Pesa B2C ("Business Bouquet") tariff — the real
-    // cost Safaricom charges PayChain per B2C payout, passed through to
-    // the merchant. No PayChain markup on top yet (PAYCHAIN_B2C_MARKUP is
-    // 0 until that's decided) — see config/mpesaB2cTariffCard.js.
+    // cost Safaricom charges PayChain per B2C payout — plus PayChain's own
+    // flat KES 10 margin (PAYCHAIN_B2C_MARKUP), both passed through to the
+    // merchant — see config/mpesaB2cTariffCard.js.
     let b2cFee;
     try {
       ({ totalFee: b2cFee } = getB2cTariff(amount));

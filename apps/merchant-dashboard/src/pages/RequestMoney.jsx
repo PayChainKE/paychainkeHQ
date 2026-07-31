@@ -78,7 +78,8 @@ export default function RequestMoney() {
       const pushRes = await axios.post(`${API_URL}/api/callbacks/stk-push`, {
         amount: Number(amount),
         phone,
-        merchantId: merchant._id
+        merchantId: merchant._id,
+        purpose: 'request_money'
       }, { headers: authHeaders() })
 
       const checkoutId = pushRes.data.checkoutRequestId

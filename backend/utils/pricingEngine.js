@@ -22,6 +22,16 @@ import { safaricomFeeFor } from '../config/revenueRateCard.js';
 // calculateCustomerMpesaFee (Safaricom's cut, pass-through) with
 // calculateCustomerSurcharge (PayChain's cut, collected from the customer).
 
+// Temporarily disabled — for now PayChain charges only the flat KES 5 (the
+// customer surcharge on STK flows, RAW_C2B_FLAT_MARKUP_KES on raw C2B
+// deposits) with no tiered/percentage merchant fee on top. calculateMerchantFee
+// returns 0 while this is false, which automatically zeroes it out
+// everywhere it's used (confirmationURL, processSplitTransaction, and the
+// 'inbound' case in feeCalculator.js's Transaction pre-save hook) without
+// touching any of those call sites. Flip back to true to resume charging
+// the tiered bands below.
+const MPESA_MERCHANT_FEE_ENABLED = false;
+
 // ── Merchant fee tier matrix ─────────────────────────────────────────────
 // Placeholder bands — adjust freely as PayChain's pricing is finalized.
 // Each band is checked in order; `type` is either 'percentage' (value is a
@@ -59,6 +69,8 @@ function findBand(amount) {
  *          than the gross amount itself.
  */
 export function calculateMerchantFee(grossAmount) {
+  if (!MPESA_MERCHANT_FEE_ENABLED) return 0;
+
   const amount = Number(grossAmount);
 
   if (!Number.isFinite(amount) || amount <= 0) {
@@ -73,6 +85,19 @@ export function calculateMerchantFee(grossAmount) {
   // let the deducted fee exceed the gross amount being credited.
   return round2(Math.min(Math.max(fee, 0), amount));
 }
+
+// Flat markup PayChain collects on every raw C2B paybill deposit
+// (mpesaController.js#confirmationURL) — a customer keying your paybill +
+// account number directly into their own M-Pesa menu picks their own
+// amount, so unlike STK Push there's no PayChain-controlled prompt to add a
+// customer-facing surcharge to (see "Dual-sided checkout model" further
+// down). This is PayChain's way of still collecting the same flat KES 5 on
+// this rail — deducted from the merchant alongside calculateMerchantFee
+// above, not billed to the payer. Same figure as
+// CUSTOMER_SURCHARGE_FLAT_KES below, kept as its own constant since the two
+// are collected through entirely different mechanisms and should be able to
+// move independently.
+export const RAW_C2B_FLAT_MARKUP_KES = 5;
 
 /**
  * The Safaricom tariff a customer pays on a standard paybill/STK transaction
@@ -93,9 +118,14 @@ export function calculateCustomerMpesaFee(amount) {
  * controllers/revenueController.js's per-transaction fee sum — mirrors
  * config/ncbaTariffCard.js#ncbaMarkupMongoExpr. `basisExpr` is whatever
  * Mongo expression yields the per-doc gross KES basis (see KES_BASIS in
- * revenueController.js).
+ * revenueController.js). Mirrors calculateMerchantFee's
+ * MPESA_MERCHANT_FEE_ENABLED gate — literal 0 while disabled, so the
+ * dashboard's live-recomputed figure never diverges from what's actually
+ * being deducted.
  */
 export function mpesaMerchantFeeMongoExpr(basisExpr) {
+  if (!MPESA_MERCHANT_FEE_ENABLED) return 0;
+
   return {
     $switch: {
       branches: MPESA_MERCHANT_FEE_BANDS.map((b) => ({
@@ -118,19 +148,24 @@ export class PricingEngineError extends Error {
 
 // ── Dual-sided checkout model ────────────────────────────────────────────
 // Only applies where PayChain itself sets the amount sent to Safaricom —
-// i.e. the STK Push "checkout" flow for a payment link/invoice
-// (controllers/transactionController.js#processPaymentLink →
-// controllers/mpesaController.js#stkCallback). It does NOT apply to raw
-// C2B/paybill deposits (mpesaController.js#confirmationURL): a customer
+// i.e. any STK Push PayChain triggers on a payer's behalf: payment
+// links/invoices (controllers/transactionController.js#processPaymentLink),
+// Request Money's instant prompt, and pay-to-account
+// (controllers/mpesaController.js#initiateSTKPush /
+// controllers/transactionController.js#payToMerchantAccount), all settled
+// through controllers/mpesaController.js#stkCallback. It does NOT apply to
+// raw C2B/paybill deposits (mpesaController.js#confirmationURL): a customer
 // keying an amount directly into their own M-Pesa paybill menu chooses that
 // number themselves, so there is no "checkout total" PayChain can inflate —
-// confirmationURL keeps its existing merchant-fee-only model untouched.
+// confirmationURL keeps its existing merchant-fee-only model untouched. It
+// also does not apply to a merchant topping up their own wallet with their
+// own phone — there's no external "sender" being charged in that case.
 //
-// Placeholder — 0 until pricing sheets are finalized, so wiring this into
-// the live checkout flow today has zero customer-facing financial impact.
-// Swap for a real tier/flat lookup (same shape as MPESA_MERCHANT_FEE_BANDS
-// above) once numbers are approved.
-const CUSTOMER_SURCHARGE_RATE = 0;
+// Flat KES 5 per transaction, billed to the payer on top of whatever
+// Safaricom's own tariff already charges them, and kept by PayChain as
+// revenue (not shared with the merchant). Not a percentage — a KES 10
+// transaction and a KES 10,000 transaction both carry the same flat KES 5.
+export const CUSTOMER_SURCHARGE_FLAT_KES = 5;
 
 /**
  * PayChain's own surcharge collected directly from the paying customer, on
@@ -143,9 +178,7 @@ const CUSTOMER_SURCHARGE_RATE = 0;
 export function calculateCustomerSurcharge(baseInvoiceAmount) {
   const base = Number(baseInvoiceAmount);
   if (!Number.isFinite(base) || base <= 0) return 0;
-  // TODO: replace with a real tier/flat lookup once pricing sheets land —
-  // same shape as calculateMerchantFee's band matrix above.
-  return round2(base * CUSTOMER_SURCHARGE_RATE);
+  return round2(CUSTOMER_SURCHARGE_FLAT_KES);
 }
 
 /**
@@ -219,4 +252,37 @@ export function processSplitTransaction(totalMpesaReceived, baseInvoiceAmount) {
   }
 
   return { customerFee, merchantFee, paychainTotalRevenue, merchantNetSettlement };
+}
+
+/**
+ * Same idea as processSplitTransaction, for STK flows that carry a customer
+ * surcharge but have never had a merchant-side tiered fee applied to them
+ * (Request Money's instant prompt, pay-to-account) — the merchant keeps
+ * their full base amount; only the surcharge is PayChain's.
+ *
+ * @param {number} totalMpesaReceived
+ * @param {number} baseAmount
+ * @returns {{ customerFee: number, merchantNetSettlement: number }}
+ * @throws {PricingEngineError} on invalid input, or if totalMpesaReceived is
+ *         less than baseAmount — a real customer's money is at stake here,
+ *         so a drift must halt settlement rather than silently mis-credit.
+ */
+export function splitCustomerSurcharge(totalMpesaReceived, baseAmount) {
+  const total = Number(totalMpesaReceived);
+  const base = Number(baseAmount);
+
+  if (!Number.isFinite(total) || total <= 0 || !Number.isFinite(base) || base <= 0) {
+    throw new PricingEngineError(
+      `splitCustomerSurcharge requires positive numbers — received totalMpesaReceived="${totalMpesaReceived}", baseAmount="${baseAmount}"`
+    );
+  }
+
+  const customerFee = round2(total - base);
+  if (customerFee < 0) {
+    throw new PricingEngineError(
+      `Ledger integrity failure: totalMpesaReceived (KES ${total}) is less than baseAmount (KES ${base}). Refusing to settle.`
+    );
+  }
+
+  return { customerFee, merchantNetSettlement: base };
 }

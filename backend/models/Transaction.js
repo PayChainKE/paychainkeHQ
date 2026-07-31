@@ -60,6 +60,13 @@ const transactionSchema = new mongoose.Schema({
   paychainFee:  { type: Number, default: 0 },
   safaricomFee: { type: Number, default: 0 },
   revenueStream: { type: String, default: null },
+  // The portion of paychainFee (if any) that came from PayChain's flat
+  // customer-facing surcharge rather than the merchant-side tiered fee —
+  // billed to the payer, not deducted from the merchant. Purely a
+  // breakdown/audit field; it is always included inside paychainFee itself
+  // (see utils/pricingEngine.js), so revenue sweeps and pool-balance
+  // reconciliation only ever need to read paychainFee.
+  customerSurchargeFee: { type: Number, default: 0 },
   // The merchant's KES balance immediately after this transaction was
   // applied — captured at write time from the atomic $inc's returned
   // document (never recomputed later), same "resulting balance" figure

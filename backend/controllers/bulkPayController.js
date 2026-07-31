@@ -15,6 +15,7 @@ import { createNotification } from './notificationController.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
+import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard.js';
 
 // @desc    Get all payees for a merchant
 // @route   GET /api/bulkpay/payees
@@ -336,28 +337,76 @@ export const authorizeBatch = async (req, res) => {
     }
     await resetPinAttempts(req.merchant._id);
 
-    // 1. Calculate Totals
+    // 1. Resolve/create each row's Payee up front, and calculate totals —
+    // needed before the balance debit below, since a Mobile Money row paid
+    // to a personal M-Pesa number now also owes Safaricom's own B2C tariff
+    // plus PayChain's flat markup (getB2cTariff, config/mpesaB2cTariffCard.js),
+    // same model as a standalone B2C withdrawal (initiateB2C in
+    // mpesaController.js). That has to be known and folded into the single
+    // atomic "does the merchant have enough" check below, not added
+    // afterward where a race could leave the debit short. Bank/utility rows
+    // route via NCBA, which has its own separate (currently zero-fee) model
+    // untouched by this; B2B (Paybill/Till) rows aren't priced here —
+    // Safaricom's B2B tariff isn't modeled in this codebase yet.
     let totalGross = 0;
     let totalNet = 0;
     let totalTax = 0;
-    
+    let totalB2cFee = 0;
+
     for (const row of batchRows) {
+      let payee = row.payeeMatch ? await Payee.findById(row.payeeMatch) : null;
+      if (!payee) {
+        payee = new Payee({
+          merchantId: req.merchant._id,
+          name: row.name,
+          type: row.type || 'employee',
+          paymentMethod: 'Mobile Money',
+          mobileMoneyType: 'Personal Number',
+          phone: row.phone,
+          defaultAmount: row.grossAmount,
+        });
+        await payee.save();
+      }
+      row._payee = payee;
+
       totalGross += row.grossAmount;
       totalNet += row.netAmount;
       if (row.taxDeductions) {
         totalTax += (row.taxDeductions.paye + row.taxDeductions.nssf + row.taxDeductions.shif);
       }
+
+      row.isB2cRow = payee.paymentMethod === 'Mobile Money' && payee.mobileMoneyType === 'Personal Number';
+      if (row.isB2cRow) {
+        try {
+          const tariff = getB2cTariff(row.netAmount);
+          row.b2cFee = tariff.totalFee;
+          row.b2cSafaricomFee = tariff.safaricomFee;
+          row.b2cMarkup = tariff.markup;
+        } catch (e) {
+          if (e instanceof B2cTariffBoundsError) {
+            return res.status(400).json({ message: `Payout to "${payee.name}" — ${e.message}` });
+          }
+          throw e;
+        }
+        totalB2cFee += row.b2cFee;
+      } else {
+        row.b2cFee = 0;
+      }
     }
 
+    const totalDebit = Math.round((totalNet + totalB2cFee) * 100) / 100;
+
     // 2 & 3. Atomic conditional deduct — avoids two concurrent batch
-    // submissions both passing a stale in-memory balance check.
+    // submissions both passing a stale in-memory balance check. Debits
+    // totalDebit (recipient payouts + B2C fees), not just totalNet, so the
+    // merchant needs enough balance to cover the fees too, upfront.
     const debitedMerchant = await Merchant.findOneAndUpdate(
-      { _id: merchant._id, kesBalance: { $gte: totalNet } },
-      { $inc: { kesBalance: -totalNet } },
+      { _id: merchant._id, kesBalance: { $gte: totalDebit } },
+      { $inc: { kesBalance: -totalDebit } },
       { returnDocument: 'after' }
     );
     if (!debitedMerchant) {
-      return res.status(400).json({ message: 'Insufficient funds to process this batch' });
+      return res.status(400).json({ message: 'Insufficient funds to process this batch, including the M-Pesa B2C charges' });
     }
     merchant.kesBalance = debitedMerchant.kesBalance;
 
@@ -391,26 +440,9 @@ export const authorizeBatch = async (req, res) => {
 
     let refundAmount = 0;
 
-    // 4. Process each row
+    // 4. Process each row (payee already resolved in the pass above)
     for (const row of batchRows) {
-      let payee = null;
-      if (row.payeeMatch) {
-        payee = await Payee.findById(row.payeeMatch);
-      }
-
-      // If no payee found or it's a new one, create on the fly
-      if (!payee) {
-        payee = new Payee({
-          merchantId: req.merchant._id,
-          name: row.name,
-          type: row.type || 'employee',
-          paymentMethod: 'Mobile Money',
-          mobileMoneyType: 'Personal Number',
-          phone: row.phone,
-          defaultAmount: row.grossAmount,
-        });
-        await payee.save();
-      }
+      const payee = row._payee;
 
       let darajaStatus = 'pending';
       let darajaRef = `BULK_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
@@ -418,7 +450,7 @@ export const authorizeBatch = async (req, res) => {
       if (payee.type === 'utility' && payee.utilityProvider) {
         if (!payee.accountNumber) {
           darajaStatus = 'failed';
-          refundAmount += row.netAmount;
+          refundAmount += row.netAmount + row.b2cFee;
           console.error(`❌ Bulk payout to ${payee.name} failed: no meter/account number on file for this utility payee.`);
         } else {
           try {
@@ -436,13 +468,13 @@ export const authorizeBatch = async (req, res) => {
           } catch (err) {
             console.error(`❌ NCBA BillPay rejected payout for ${payee.name}:`, err.message);
             darajaStatus = 'failed';
-            refundAmount += row.netAmount;
+            refundAmount += row.netAmount + row.b2cFee;
           }
         }
       } else if (payee.paymentMethod === 'Bank') {
         if (!payee.bankCode || !payee.accountNumber) {
           darajaStatus = 'failed';
-          refundAmount += row.netAmount;
+          refundAmount += row.netAmount + row.b2cFee;
           console.error(`❌ Bulk payout to ${payee.name} failed: no bank code on file for this payee.`);
         } else {
           try {
@@ -464,17 +496,17 @@ export const authorizeBatch = async (req, res) => {
           } catch (err) {
             console.error(`❌ NCBA PesaLink rejected payout for ${payee.name}:`, err.message);
             darajaStatus = 'failed';
-            refundAmount += row.netAmount;
+            refundAmount += row.netAmount + row.b2cFee;
           }
         }
       } else if (payee.paymentMethod === 'Mobile Money') {
         if (liveBlocked) {
           darajaStatus = 'failed';
-          refundAmount += row.netAmount;
+          refundAmount += row.netAmount + row.b2cFee;
           console.error(`❌ Bulk payout to ${payee.name} blocked: live M-PESA is not enabled (set MPESA_LIVE_ENABLED=true).`);
         } else if (!token) {
           darajaStatus = 'failed';
-          refundAmount += row.netAmount;
+          refundAmount += row.netAmount + row.b2cFee;
           console.error(`❌ Bulk payout to ${payee.name} failed: no Daraja auth token available.`);
         } else {
           try {
@@ -522,7 +554,7 @@ export const authorizeBatch = async (req, res) => {
           } catch (err) {
             console.error(`❌ Daraja API rejected payout for ${payee.name}:`, err.response?.data?.errorMessage || err.message);
             darajaStatus = 'failed';
-            refundAmount += row.netAmount;
+            refundAmount += row.netAmount + row.b2cFee;
           }
         }
       }
@@ -533,7 +565,7 @@ export const authorizeBatch = async (req, res) => {
       // services/ncbaBulkPaymentService.js's convention, rather than
       // 'bulk_pay' which earns no fee for those.
       const isNcbaRouted = payee.paymentMethod === 'Bank' || (payee.type === 'utility' && payee.utilityProvider);
-      await Transaction.create({
+      const transaction = await Transaction.create({
         merchantId: merchant._id,
         accountNumber: merchant.paybillAccount || 'WALLET_FUND',
         type: isNcbaRouted ? 'ncba_outbound' : 'bulk_pay',
@@ -546,6 +578,22 @@ export const authorizeBatch = async (req, res) => {
         recipient: { name: payee.name, id: payee.phone || payee.paybillNumber || payee.tillNumber }
       });
 
+      // The pre-save hook above stamps a generic 0.5% fee for 'bulk_pay' —
+      // replace it with the real Safaricom B2C tariff + PayChain's flat
+      // markup for rows that actually carry it (reserved from the merchant
+      // in the resolve pass above), so the persisted figures match what
+      // was really charged. Skipped for rows that failed synchronously —
+      // their fee was refunded above, so PayChain kept nothing. b2cCallback
+      // later flips status pending → completed/failed for rows still
+      // pending here; it only touches `status`, so this reconciliation
+      // isn't clobbered by that follow-up save.
+      if (row.isB2cRow && darajaStatus !== 'failed') {
+        await Transaction.updateOne(
+          { _id: transaction._id },
+          { $set: { paychainFee: row.b2cMarkup, safaricomFee: row.b2cSafaricomFee, revenueStream: 'mpesa_b2c_fee' } }
+        );
+      }
+
       transactions.push({
         payeeId: payee._id,
         name: payee.name,
@@ -556,6 +604,7 @@ export const authorizeBatch = async (req, res) => {
         accountReference: payee.phone || payee.paybillNumber || payee.tillNumber || payee.accountNumber || 'N/A',
         receiptNumber: darajaRef,
         status: darajaStatus,
+        b2cFee: darajaStatus !== 'failed' ? row.b2cFee : 0,
       });
     }
 
@@ -581,12 +630,14 @@ export const authorizeBatch = async (req, res) => {
       : 'Processed';
 
     // 5. Record Batch
+    const totalB2cFeesKept = transactions.reduce((sum, t) => sum + (t.b2cFee || 0), 0);
     const batch = new PayoutBatch({
       merchantId: req.merchant._id,
       batchReference: `BAT-${Date.now()}`,
       totalGrossAmount: totalGross,
       totalTaxDeductions: totalTax,
       totalNetAmount: totalNet,
+      totalB2cFees: totalB2cFeesKept,
       payeeCount: transactions.length,
       status: batchStatus,
       fundingSource: fundingSource || 'Main Business Account',
