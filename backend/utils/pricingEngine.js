@@ -118,19 +118,24 @@ export class PricingEngineError extends Error {
 
 // ── Dual-sided checkout model ────────────────────────────────────────────
 // Only applies where PayChain itself sets the amount sent to Safaricom —
-// i.e. the STK Push "checkout" flow for a payment link/invoice
-// (controllers/transactionController.js#processPaymentLink →
-// controllers/mpesaController.js#stkCallback). It does NOT apply to raw
-// C2B/paybill deposits (mpesaController.js#confirmationURL): a customer
+// i.e. any STK Push PayChain triggers on a payer's behalf: payment
+// links/invoices (controllers/transactionController.js#processPaymentLink),
+// Request Money's instant prompt, and pay-to-account
+// (controllers/mpesaController.js#initiateSTKPush /
+// controllers/transactionController.js#payToMerchantAccount), all settled
+// through controllers/mpesaController.js#stkCallback. It does NOT apply to
+// raw C2B/paybill deposits (mpesaController.js#confirmationURL): a customer
 // keying an amount directly into their own M-Pesa paybill menu chooses that
 // number themselves, so there is no "checkout total" PayChain can inflate —
-// confirmationURL keeps its existing merchant-fee-only model untouched.
+// confirmationURL keeps its existing merchant-fee-only model untouched. It
+// also does not apply to a merchant topping up their own wallet with their
+// own phone — there's no external "sender" being charged in that case.
 //
-// Placeholder — 0 until pricing sheets are finalized, so wiring this into
-// the live checkout flow today has zero customer-facing financial impact.
-// Swap for a real tier/flat lookup (same shape as MPESA_MERCHANT_FEE_BANDS
-// above) once numbers are approved.
-const CUSTOMER_SURCHARGE_RATE = 0;
+// Flat KES 5 per transaction, billed to the payer on top of whatever
+// Safaricom's own tariff already charges them, and kept by PayChain as
+// revenue (not shared with the merchant). Not a percentage — a KES 10
+// transaction and a KES 10,000 transaction both carry the same flat KES 5.
+export const CUSTOMER_SURCHARGE_FLAT_KES = 5;
 
 /**
  * PayChain's own surcharge collected directly from the paying customer, on
@@ -143,9 +148,7 @@ const CUSTOMER_SURCHARGE_RATE = 0;
 export function calculateCustomerSurcharge(baseInvoiceAmount) {
   const base = Number(baseInvoiceAmount);
   if (!Number.isFinite(base) || base <= 0) return 0;
-  // TODO: replace with a real tier/flat lookup once pricing sheets land —
-  // same shape as calculateMerchantFee's band matrix above.
-  return round2(base * CUSTOMER_SURCHARGE_RATE);
+  return round2(CUSTOMER_SURCHARGE_FLAT_KES);
 }
 
 /**
@@ -219,4 +222,37 @@ export function processSplitTransaction(totalMpesaReceived, baseInvoiceAmount) {
   }
 
   return { customerFee, merchantFee, paychainTotalRevenue, merchantNetSettlement };
+}
+
+/**
+ * Same idea as processSplitTransaction, for STK flows that carry a customer
+ * surcharge but have never had a merchant-side tiered fee applied to them
+ * (Request Money's instant prompt, pay-to-account) — the merchant keeps
+ * their full base amount; only the surcharge is PayChain's.
+ *
+ * @param {number} totalMpesaReceived
+ * @param {number} baseAmount
+ * @returns {{ customerFee: number, merchantNetSettlement: number }}
+ * @throws {PricingEngineError} on invalid input, or if totalMpesaReceived is
+ *         less than baseAmount — a real customer's money is at stake here,
+ *         so a drift must halt settlement rather than silently mis-credit.
+ */
+export function splitCustomerSurcharge(totalMpesaReceived, baseAmount) {
+  const total = Number(totalMpesaReceived);
+  const base = Number(baseAmount);
+
+  if (!Number.isFinite(total) || total <= 0 || !Number.isFinite(base) || base <= 0) {
+    throw new PricingEngineError(
+      `splitCustomerSurcharge requires positive numbers — received totalMpesaReceived="${totalMpesaReceived}", baseAmount="${baseAmount}"`
+    );
+  }
+
+  const customerFee = round2(total - base);
+  if (customerFee < 0) {
+    throw new PricingEngineError(
+      `Ledger integrity failure: totalMpesaReceived (KES ${total}) is less than baseAmount (KES ${base}). Refusing to settle.`
+    );
+  }
+
+  return { customerFee, merchantNetSettlement: base };
 }

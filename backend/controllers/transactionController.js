@@ -794,6 +794,8 @@ export const payToMerchantAccount = async (req, res) => {
         merchantId: merchant._id,
         checkoutRequestId,
         amount: checkoutTotal,
+        baseAmount: amount,
+        kind: 'pay_account',
         phone: formattedPhone,
         status: 'pending',
       });
@@ -868,6 +870,8 @@ export const payToMerchantAccount = async (req, res) => {
       merchantId: merchant._id,
       checkoutRequestId,
       amount: checkoutTotal,
+      baseAmount: amount,
+      kind: 'pay_account',
       phone: formattedPhone,
       status: 'pending',
     });
