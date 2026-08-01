@@ -1,16 +1,26 @@
 import { safaricomFeeFor } from './revenueRateCard.js';
+import { RAW_C2B_FLAT_MARKUP_KES } from '../utils/pricingEngine.js';
 
-// NCBA Virtual Account collection tariff — tiered banding. Replaces the
-// previous flat 1% NCBA_COLLECTION_RATE.
+// NCBA Virtual Account collection tariff.
 //
-// PayChain absorbs Safaricom's underlying cost per band and layers a fixed
-// markup on top. The two are tracked separately (mirrors the existing
-// paychainFee / safaricomFee split on Transaction):
+// PayChain absorbs Safaricom's underlying cost per band (a real cost
+// PayChain pays away, not revenue) and layers its own flat markup on top.
+// The two are tracked separately (mirrors the existing paychainFee /
+// safaricomFee split on Transaction):
 //   - `safaricomFee` = the absorbed cost component. Not PayChain revenue —
-//     it's what we pay away, we just don't pass it to the merchant.
+//     it's what we pay away, we just don't pass it to the merchant. Still
+//     tiered by amount, since that cost genuinely scales with amount.
 //   - `markup`       = what PayChain actually keeps. This is what's stamped
 //     into Transaction.paychainFee and what the admin Revenue dashboard
-//     reports as earned revenue for this stream.
+//     reports as earned revenue for this stream. Flat KES
+//     RAW_C2B_FLAT_MARKUP_KES on every collection, matching the same flat
+//     fee already charged on the direct-Safaricom C2B rail
+//     (mpesaController.js#confirmationURL) — was previously its own tiered
+//     table here (0-15 KES, i.e. literally KES 0 for amounts under 100),
+//     which silently fell out of sync when the rest of the platform moved
+//     to "flat KES 5 only" and meant this rail — the one actually used for
+//     this merchant's real paybill+account payments — kept undercharging
+//     or not charging at all.
 // The merchant is credited grossAmount minus the *combined* total — see
 // getNcbaTariffBand() below and services/ncbaLedgerService.js.
 //
@@ -20,23 +30,18 @@ import { safaricomFeeFor } from './revenueRateCard.js';
 // tier boundaries only ever live here.
 export const MAX_NCBA_COLLECTION_AMOUNT = 250_000;
 
-const NCBA_TARIFF_BANDS = [
-  { max: 100,     safaricomFee: 0,  markup: 0  },
-  { max: 500,     safaricomFee: 5,  markup: 2  },
-  { max: 1_000,   safaricomFee: 10, markup: 3  },
-  { max: 1_500,   safaricomFee: 15, markup: 4  },
-  { max: 2_500,   safaricomFee: 20, markup: 5  },
-  { max: 3_500,   safaricomFee: 25, markup: 6  },
-  { max: 5_000,   safaricomFee: 34, markup: 8  },
-  { max: 7_500,   safaricomFee: 42, markup: 10 },
-  { max: 10_000,  safaricomFee: 48, markup: 12 },
-  { max: 15_000,  safaricomFee: 57, markup: 15 },
+const NCBA_SAFARICOM_FEE_BANDS = [
+  { max: 100,     safaricomFee: 0  },
+  { max: 500,     safaricomFee: 5  },
+  { max: 1_000,   safaricomFee: 10 },
+  { max: 1_500,   safaricomFee: 15 },
+  { max: 2_500,   safaricomFee: 20 },
+  { max: 3_500,   safaricomFee: 25 },
+  { max: 5_000,   safaricomFee: 34 },
+  { max: 7_500,   safaricomFee: 42 },
+  { max: 10_000,  safaricomFee: 48 },
+  { max: 15_000,  safaricomFee: 57 },
 ];
-
-// Above KES 15,000 (up to MAX_NCBA_COLLECTION_AMOUNT): no more explicit
-// bands — fall back to the published Safaricom tariff (SAFARICOM_TARIFF,
-// already used for M-Pesa, extends to 500,000) plus a flat markup.
-const ABOVE_TOP_BAND_MARKUP = 15;
 
 export class NcbaTariffBoundsError extends Error {
   constructor(message) {
@@ -70,10 +75,10 @@ export function getNcbaTariffBand(grossAmount) {
     );
   }
 
-  const band = NCBA_TARIFF_BANDS.find((b) => amount <= b.max);
+  const band = NCBA_SAFARICOM_FEE_BANDS.find((b) => amount <= b.max);
 
   const safaricomFee = band ? band.safaricomFee : safaricomFeeFor(amount);
-  const markup        = band ? band.markup : ABOVE_TOP_BAND_MARKUP;
+  const markup        = RAW_C2B_FLAT_MARKUP_KES;
 
   return {
     safaricomFee: round2(safaricomFee),
@@ -84,22 +89,12 @@ export function getNcbaTariffBand(grossAmount) {
 
 /**
  * MongoDB aggregation expression computing the NCBA markup (PayChain
- * revenue) for the "above top band" case only needs a flat constant — the
- * Safaricom-cost component isn't part of revenue, so it never needs to be
- * expressed in Mongo (see controllers/revenueController.js, where this
- * replaces the linear `$multiply: [kesAmount, stream.rate]` for the
- * `ncba_collection_fee` stream).
+ * revenue) — now just the flat RAW_C2B_FLAT_MARKUP_KES constant for every
+ * doc, no longer banded (see the module comment above for why).
  *
- * @param {object} basisExpr - a Mongo aggregation expression yielding the KES basis for the doc.
+ * @param {object} _basisExpr - unused now that the markup is flat; kept so
+ *        call sites (controllers/revenueController.js) don't need to change.
  */
-export function ncbaMarkupMongoExpr(basisExpr) {
-  return {
-    $switch: {
-      branches: NCBA_TARIFF_BANDS.map((b) => ({
-        case: { $lte: [basisExpr, b.max] },
-        then: b.markup,
-      })),
-      default: ABOVE_TOP_BAND_MARKUP,
-    },
-  };
+export function ncbaMarkupMongoExpr(_basisExpr) {
+  return RAW_C2B_FLAT_MARKUP_KES;
 }
