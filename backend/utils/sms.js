@@ -73,7 +73,24 @@ export const sendSMS = async (phoneNumber, message) => {
 
     return { success: true, message: 'SMS sent successfully', messageId };
   } catch (error) {
-    console.error('Failed to send SMS:', error?.message || error);
-    return { success: false, error: error?.message || 'Unknown SMS delivery error' };
+    const errorMessage = error?.message || 'Unknown SMS delivery error';
+    console.error('Failed to send SMS:', errorMessage);
+    // A thrown exception here (bad phone, AT SDK/HTTP error, missing
+    // config) previously left zero trace in SmsLog — only the two
+    // "AT responded, here's what it said" paths above ever wrote a row.
+    // That made a thrown failure indistinguishable from "never attempted"
+    // when investigating from the database instead of live server logs.
+    try {
+      await SmsLog.create({
+        to: formatPhoneDisplay(phoneNumber) || phoneNumber,
+        messageId: null,
+        atStatus: null,
+        deliveryStatus: 'failed',
+        failureReason: `THREW: ${errorMessage}`.slice(0, 500),
+      });
+    } catch (logErr) {
+      console.error('Failed to persist SmsLog:', logErr?.message || logErr);
+    }
+    return { success: false, error: errorMessage };
   }
 };
