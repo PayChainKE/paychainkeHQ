@@ -2,9 +2,6 @@ import Transaction from '../models/Transaction.js';
 import RevenueSweep from '../models/RevenueSweep.js';
 import BankReconciliation from '../models/BankReconciliation.js';
 import { REVENUE_STREAMS, SAFARICOM_TARIFF } from '../config/revenueRateCard.js';
-import { ncbaMarkupMongoExpr } from '../config/ncbaTariffCard.js';
-import { mpesaMerchantFeeMongoExpr } from '../utils/pricingEngine.js';
-import { mpesaB2cMarkupMongoExpr } from '../config/mpesaB2cTariffCard.js';
 import { LIVE_DATA_CUTOFF } from '../config/liveDataCutoff.js';
 import { runRevenueSweep } from '../services/revenueSweepService.js';
 import { recordReconciliation } from '../services/reconciliationService.js';
@@ -83,30 +80,19 @@ const KES_BASIS = {
   ],
 };
 
-// Compute fee for a single doc inside the aggregation pipeline. Mirrors
-// the JS `computeStreamFee` helper for linear-rate streams; the NCBA
-// collection stream instead prices off the tiered band table (see
-// config/ncbaTariffCard.js) since it has no single rate to multiply by.
-// `basisExpr` defaults to the raw per-doc KES_BASIS expression, but callers
-// that have already materialised the basis into a field (e.g. `$_kes` via
-// $addFields) pass that alias instead so it isn't recomputed.
-function feeExpr(stream, basisExpr = KES_BASIS) {
-  if (stream.id === 'ncba_collection_fee') {
-    return ncbaMarkupMongoExpr(basisExpr);
-  }
-  if (stream.id === 'transaction_fee') {
-    return mpesaMerchantFeeMongoExpr(basisExpr);
-  }
-  if (stream.id === 'mpesa_b2c_fee') {
-    return mpesaB2cMarkupMongoExpr();
-  }
-  return {
-    $max: [
-      stream.minFee || 0,
-      { $multiply: [basisExpr, stream.rate] },
-    ],
-  };
-}
+// Every stream's actual fee — sourced from the persisted Transaction.paychainFee
+// field (the same single source of truth channelAgg/sweepAgg below already
+// use), not recomputed live from a rate card. A live recompute here used to
+// mean this file needed its own Mongo-expression twin of every fee rule
+// (flat surcharges, free-tier thresholds, tiered bands) — those inevitably
+// drifted from the real JS-side pricing logic (see pricingEngine.js /
+// ncbaTariffCard.js's $inc-after-create reconciliation pattern for surcharges
+// that a live recompute can't see at all), which is exactly why this table
+// and the per-stream KPIs were showing KES 0.00 revenue for real,
+// already-fee-charged transactions. paychainFee is stamped/reconciled once,
+// at settlement time, and is the same number the revenue sweep sums — so
+// summing it here can never diverge from what actually got charged.
+const FEE_EXPR = { $ifNull: ['$paychainFee', 0] };
 
 function streamMatch(stream, since) {
   return {
@@ -142,13 +128,13 @@ export const getRevenue = async (req, res) => {
               _id: null,
               count: { $sum: 1 },
               volume: { $sum: KES_BASIS },
-              revenue: { $sum: feeExpr(stream) },
+              revenue: { $sum: FEE_EXPR },
             },
           },
         ]),
         Transaction.aggregate([
           { $match: { ...streamMatch(stream, prevSince), createdAt: { $gte: prevSince, $lt: since } } },
-          { $group: { _id: null, revenue: { $sum: feeExpr(stream) } } },
+          { $group: { _id: null, revenue: { $sum: FEE_EXPR } } },
         ]),
       ]);
       const c = cur[0] || { count: 0, volume: 0, revenue: 0 };
@@ -187,20 +173,8 @@ export const getRevenue = async (req, res) => {
         },
       },
       {
-        // Match-and-price by joining the per-stream fee expression as a
-        // literal map. We expand each stream into a candidate and pick the
-        // one whose id matches streamId. Cheaper than $lookup. feeExpr()
-        // handles both linear-rate streams and the tiered NCBA stream.
         $addFields: {
-          _fee: {
-            $switch: {
-              branches: REVENUE_STREAMS.filter((s) => s.txTypes.length).map((s) => ({
-                case: { $eq: ['$streamId', s.id] },
-                then: feeExpr(s, '$_kes'),
-              })),
-              default: 0,
-            },
-          },
+          _fee: FEE_EXPR,
         },
       },
       {
@@ -244,15 +218,7 @@ export const getRevenue = async (req, res) => {
       {
         $addFields: {
           _kes: KES_BASIS,
-          _fee: {
-            $switch: {
-              branches: REVENUE_STREAMS.filter((s) => s.txTypes.length).map((s) => ({
-                case: { $in: ['$type', s.txTypes] },
-                then: feeExpr(s, '$_kes'),
-              })),
-              default: 0,
-            },
-          },
+          _fee: FEE_EXPR,
         },
       },
       {
