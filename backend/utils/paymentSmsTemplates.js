@@ -23,16 +23,16 @@ function maskPhoneMiddle(formatted) {
 }
 
 /**
- * @param {{ ref: string, amount: number, payerName?: string|null, payerPhone?: string|null, date: string, time: string, balance: number }} params
+ * @param {{ ref: string, amount: number, payerName?: string|null, payerPhone?: string|null, date: string, time: string, balance: number, channel?: string }} params
  * @returns {{ message: string, truncated: boolean, length: number }}
  */
-export function buildPaymentReceivedSms({ ref, amount, payerName, payerPhone, date, time, balance }) {
+export function buildPaymentReceivedSms({ ref, amount, payerName, payerPhone, date, time, balance, channel = 'M-PESA' }) {
   const maskedPhone = payerPhone ? maskPhoneMiddle(formatPhoneDisplay(payerPhone)) : null;
   return buildStrictSms(
-    ({ ref, amt, name, phone, date, time, balance }) =>
-      `${ref} Confirmed. You have received KES ${amt} from ${name}${phone ? ` ${phone}` : ''} on ${date} at ${time}. New PayChain balance is KES ${balance}.`,
+    ({ ref, amt, name, phone, channel, date, time, balance }) =>
+      `${ref} Confirmed. You have received KES ${amt} from ${name}${phone ? ` ${phone}` : ''} via ${channel} on ${date} at ${time}. New PayChain balance is KES ${balance}.`,
     {
-      fixed: { ref, amt: amount.toLocaleString(), phone: maskedPhone || '', date, time, balance: balance.toLocaleString() },
+      fixed: { ref, amt: amount.toLocaleString(), phone: maskedPhone || '', channel, date, time, balance: balance.toLocaleString() },
       truncatable: [{ key: 'name', value: payerName || 'a customer', minLength: 10 }],
     }
   );
