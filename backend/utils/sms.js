@@ -48,6 +48,29 @@ export const sendSMS = async (phoneNumber, message) => {
       return { success: false, error: `${recipient.status} (code ${recipient.statusCode})`, messageId };
     }
 
+    // AT's own docs promise Recipients always has exactly one entry per
+    // single-recipient request, but if that ever isn't true (malformed/
+    // partial response, an AT-side error shaped differently than the
+    // documented rejection format), `recipient` is undefined and this used
+    // to fall through to a false-positive "success" below — reporting a
+    // send that never actually happened, with nothing in SmsLog to show
+    // for it. Treat a missing Recipients entry as a real failure instead.
+    if (!recipient) {
+      console.error('Failed to send SMS: AT response had no Recipients entry', JSON.stringify(response));
+      try {
+        await SmsLog.create({
+          to: formatPhoneDisplay(phoneNumber) || phoneNumber,
+          messageId: null,
+          atStatus: null,
+          deliveryStatus: 'failed',
+          failureReason: 'NO_RECIPIENT_IN_AT_RESPONSE',
+        });
+      } catch (logErr) {
+        console.error('Failed to persist SmsLog:', logErr?.message || logErr);
+      }
+      return { success: false, error: 'Africa\'s Talking response had no Recipients entry' };
+    }
+
     return { success: true, message: 'SMS sent successfully', messageId };
   } catch (error) {
     console.error('Failed to send SMS:', error?.message || error);
