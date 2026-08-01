@@ -1,7 +1,13 @@
 @import "tailwindcss";
 @source "./**/*.{js,jsx}";
 
-/* Tiptap / ProseMirror editor styles */
+/* Tiptap / ProseMirror editor styles — also applied to `.rich-text-content`,
+   the plain (non-editable) class used to render the same HTML elsewhere
+   (e.g. NewsletterComposer's preview pane via dangerouslySetInnerHTML), so
+   a draft renders identically in both places. There's no
+   @tailwindcss/typography plugin installed, so the `prose` classes used
+   around this content do nothing on their own — these rules are the only
+   thing giving paragraphs/headings/lists any visual distinction at all. */
 .ProseMirror { outline: none; }
 .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
@@ -10,16 +16,18 @@
   float: left;
   height: 0;
 }
-.ProseMirror h1 { font-size: 1.75rem; font-weight: 800; margin: 0.5rem 0; }
-.ProseMirror h2 { font-size: 1.375rem; font-weight: 700; margin: 0.5rem 0; }
-.ProseMirror h3 { font-size: 1.1rem; font-weight: 600; margin: 0.4rem 0; }
-.ProseMirror p  { margin: 0.25rem 0; }
-.ProseMirror ul { list-style: disc; padding-left: 1.5rem; margin: 0.4rem 0; }
-.ProseMirror ol { list-style: decimal; padding-left: 1.5rem; margin: 0.4rem 0; }
-.ProseMirror blockquote { border-left: 3px solid #00351d; padding-left: 1rem; color: #475569; margin: 0.5rem 0; font-style: italic; }
-.ProseMirror code { background: #f1f5f9; padding: 0.1rem 0.35rem; border-radius: 4px; font-size: 0.85em; font-family: monospace; }
-.ProseMirror img { max-width: 100%; border-radius: 8px; margin: 0.5rem 0; }
-.ProseMirror a  { color: #00351d; text-decoration: underline; }
+.ProseMirror h1, .rich-text-content h1 { font-size: 1.75rem; font-weight: 800; margin: 0.5rem 0; }
+.ProseMirror h2, .rich-text-content h2 { font-size: 1.375rem; font-weight: 700; margin: 0.5rem 0; }
+.ProseMirror h3, .rich-text-content h3 { font-size: 1.1rem; font-weight: 600; margin: 0.4rem 0; }
+.ProseMirror p, .rich-text-content p  { margin: 0.25rem 0; }
+.ProseMirror ul, .rich-text-content ul { list-style: disc; padding-left: 1.5rem; margin: 0.4rem 0; }
+.ProseMirror ol, .rich-text-content ol { list-style: decimal; padding-left: 1.5rem; margin: 0.4rem 0; }
+.ProseMirror blockquote, .rich-text-content blockquote { border-left: 3px solid #00351d; padding-left: 1rem; color: #475569; margin: 0.5rem 0; font-style: italic; }
+.ProseMirror code, .rich-text-content code { background: #f1f5f9; padding: 0.1rem 0.35rem; border-radius: 4px; font-size: 0.85em; font-family: monospace; }
+.ProseMirror img, .rich-text-content img { max-width: 100%; border-radius: 8px; margin: 0.5rem 0; }
+.ProseMirror a, .rich-text-content a  { color: #00351d; text-decoration: underline; }
+.rich-text-content strong { font-weight: 700; }
+.rich-text-content em { font-style: italic; }
 
 @theme {
   --font-body: "Plus Jakarta Sans", sans-serif;

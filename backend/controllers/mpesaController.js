@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import Transaction from '../models/Transaction.js';
 import Merchant from '../models/Merchant.js';
 import { safeSendSMS, buildStrictSms } from '../utils/smsSanitizer.js';
-import { calculateMerchantFee, processSplitTransaction, splitCustomerSurcharge, getCheckoutTotal, RAW_C2B_FLAT_MARKUP_KES, PricingEngineError } from '../utils/pricingEngine.js';
+import { calculateMerchantFee, processSplitTransaction, splitCustomerSurcharge, getCheckoutTotal, calculateRawC2bMarkup, PricingEngineError } from '../utils/pricingEngine.js';
 import { sendInvoicePaidReceiptEmail } from '../utils/resend.js';
 import { settleInflationShield } from '../utils/stellarHelper.js';
 import { getLiveKesToUsdcRate } from '../utils/rateEngine.js';
@@ -17,7 +17,7 @@ import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLocked
 import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard.js';
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay.js';
 import { AUTO_INFLATION_SHIELD_ENABLED } from '../config/inflationShieldFlag.js';
-import { buildPaymentReceivedSms, buildPaymentSentSms } from '../utils/paymentSmsTemplates.js';
+import { buildPaymentReceivedSms, buildPaymentSentSms, buildCustomerPaidSms } from '../utils/paymentSmsTemplates.js';
 
 // ── M-PESA configuration ──────────────────────────────────────────────────────
 // MPESA_ENVIRONMENT controls which Daraja endpoint is used.
@@ -212,22 +212,24 @@ export const confirmationURL = async (req, res) => {
     });
 
     // PayChain's own tiered merchant fee, plus a flat KES 5 markup on every
-    // C2B paybill deposit (RAW_C2B_FLAT_MARKUP_KES — see pricingEngine.js)
-    // — both deducted from the gross receipt before it ever reaches the
-    // merchant's balance or the Inflation Shield FX conversion below.
-    // Clamped so the combined fee never exceeds the gross amount itself.
+    // C2B paybill deposit above FLAT_FEE_FREE_TIER_MAX_KES
+    // (calculateRawC2bMarkup — see pricingEngine.js) — both deducted from
+    // the gross receipt before it ever reaches the merchant's balance or
+    // the Inflation Shield FX conversion below. Clamped so the combined
+    // fee never exceeds the gross amount itself.
     const tieredMerchantFee = calculateMerchantFee(amount);
-    const merchantFee = Math.min(amount, Math.round((tieredMerchantFee + RAW_C2B_FLAT_MARKUP_KES) * 100) / 100);
+    const rawC2bMarkup = calculateRawC2bMarkup(amount);
+    const merchantFee = Math.min(amount, Math.round((tieredMerchantFee + rawC2bMarkup) * 100) / 100);
     const netKESAmount = Math.round((amount - merchantFee) * 100) / 100;
-    console.log(`💰 M-PESA C2B fee for ${TransID}: gross KES ${amount}, PayChain fee KES ${merchantFee} (tiered KES ${tieredMerchantFee} + flat KES ${RAW_C2B_FLAT_MARKUP_KES}), net KES ${netKESAmount}`);
+    console.log(`💰 M-PESA C2B fee for ${TransID}: gross KES ${amount}, PayChain fee KES ${merchantFee} (tiered KES ${tieredMerchantFee} + flat KES ${rawC2bMarkup}), net KES ${netKESAmount}`);
 
     // The Transaction pre-save hook (utils/feeCalculator.js) only knows the
     // tiered portion (it calls calculateMerchantFee the same way, on the
     // same amount) — top up paychainFee with whatever's left of the flat
-    // markup on top (normally the full RAW_C2B_FLAT_MARKUP_KES, less only
-    // if the clamp above capped the total at the gross amount for a very
-    // small deposit), so the persisted field always matches what was
-    // actually deducted below, not just the tiered part.
+    // markup on top (normally the full rawC2bMarkup, less only if the
+    // clamp above capped the total at the gross amount for a very small
+    // deposit), so the persisted field always matches what was actually
+    // deducted below, not just the tiered part.
     const flatMarkupApplied = Math.round((merchantFee - tieredMerchantFee) * 100) / 100;
     if (flatMarkupApplied > 0) {
       await Transaction.updateOne({ _id: transaction._id }, { $inc: { paychainFee: flatMarkupApplied } });
@@ -250,16 +252,14 @@ export const confirmationURL = async (req, res) => {
     const customerSms = MSISDN
       ? safeSendSMS({
           to: MSISDN,
-          // businessName is the only unbounded field here — never the
-          // reference, amount, account number, date or time.
-          message: buildStrictSms(
-            ({ ref, amt, name, acct, date, time }) =>
-              `${ref} Confirmed. KES ${amt} sent to ${name} for account ${acct} on ${date} at ${time}. Thank you for your payment.`,
-            {
-              fixed: { ref: TransID, amt: amount.toLocaleString(), acct: accountNumber, date, time },
-              truncatable: [{ key: 'name', value: merchant.businessName, minLength: 10 }],
-            }
-          ).message,
+          message: buildCustomerPaidSms({
+            ref: TransID,
+            amount,
+            businessName: merchant.businessName,
+            accountRef: accountNumber,
+            date,
+            time,
+          }).message,
         }).then((result) => {
           if (!result.success) console.error(`Customer SMS receipt failed for ${TransID}:`, result.error);
         })
@@ -683,16 +683,14 @@ export const stkCallback = async (req, res) => {
             const customerSms = stkReq.phone
               ? safeSendSMS({
                   to: stkReq.phone,
-                  // businessName is the only unbounded field — receipt,
-                  // amount, account ref, date and time are always fixed.
-                  message: buildStrictSms(
-                    ({ ref, amt, name, acct, date, time }) =>
-                      `${ref} Confirmed. KES ${amt} paid to ${name} for account ${acct} on ${date} at ${time}. Thank you for your payment.`,
-                    {
-                      fixed: { ref: receipt, amt: stkReq.amount.toLocaleString(), acct: accountRef, date, time },
-                      truncatable: [{ key: 'name', value: merchant.businessName, minLength: 10 }],
-                    }
-                  ).message,
+                  message: buildCustomerPaidSms({
+                    ref: receipt,
+                    amount: stkReq.amount,
+                    businessName: merchant.businessName,
+                    accountRef,
+                    date,
+                    time,
+                  }).message,
                 }).then((r) => { if (!r.success) console.error(`STK ${payerLabel} customer SMS failed for ${receipt}:`, r.error); })
               : Promise.resolve();
             // Merchant sees their base bill amount, not the customer's
@@ -796,6 +794,15 @@ export const stkCallback = async (req, res) => {
           // 'request_money' / 'pay_account' — a real customer paid, so this
           // uses the same professional "payment received" format as every
           // other collection rail.
+          // Sent one at a time, the second only starting once the first has
+          // fully round-tripped — NOT fired concurrently (even Promise.all
+          // starts both requests in the same tick). Confirmed live: issuing
+          // two safeSendSMS calls back to back to the *same* recipient
+          // number (merchant.phone === stkReq.phone happens whenever a
+          // merchant tests their own request-money link) reproducibly
+          // dropped one of the two messages — Africa's Talking's gateway
+          // appears to coalesce/reject near-simultaneous sends to one
+          // MSISDN. A real, if small, gap between the two calls avoids it.
           if (merchant.phone) {
             const message = kind === 'topup'
               ? `${receipt} Confirmed. KES ${merchantCredit.toLocaleString()} added to your PayChain wallet via M-PESA on ${date} at ${time}. Your updated available balance is KES ${(updatedMerchant.kesBalance || 0).toLocaleString()}.`
@@ -808,9 +815,29 @@ export const stkCallback = async (req, res) => {
                   time,
                   balance: updatedMerchant.kesBalance || 0,
                 }).message;
-            safeSendSMS({ to: merchant.phone, message }).then((r) => {
-              if (!r.success) console.error(`Wallet top-up SMS failed for merchant ${merchant._id}:`, r.error);
+            const r = await safeSendSMS({ to: merchant.phone, message });
+            if (!r.success) console.error(`Wallet top-up SMS failed for merchant ${merchant._id}:`, r.error);
+          }
+
+          // The customer/payer side of this — previously missing entirely
+          // for 'request_money' and 'pay_account': Payment Links and C2B
+          // both already confirm to the payer, this branch never did.
+          // Self-funding top-ups skip this (merchant.phone === stkReq.phone
+          // there in practice, and the merchant SMS above already IS their
+          // confirmation — a second copy would be redundant, not useful).
+          if (kind !== 'topup' && stkReq.phone) {
+            const r = await safeSendSMS({
+              to: stkReq.phone,
+              message: buildCustomerPaidSms({
+                ref: receipt,
+                amount: stkReq.amount,
+                businessName: merchant.businessName,
+                accountRef: merchant.paybillAccount,
+                date,
+                time,
+              }).message,
             });
+            if (!r.success) console.error(`STK ${kind} customer SMS failed for ${receipt}:`, r.error);
           }
         }
       }

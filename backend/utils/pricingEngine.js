@@ -100,6 +100,22 @@ export function calculateMerchantFee(grossAmount) {
 export const RAW_C2B_FLAT_MARKUP_KES = 5;
 
 /**
+ * RAW_C2B_FLAT_MARKUP_KES, but free for amounts at or below
+ * FLAT_FEE_FREE_TIER_MAX_KES (declared further down this file — same
+ * threshold every flat fee on the platform uses, so a small paybill
+ * deposit isn't charged the same flat fee as a large one).
+ *
+ * @param {number} grossAmount
+ * @returns {number} 0 or RAW_C2B_FLAT_MARKUP_KES.
+ */
+export function calculateRawC2bMarkup(grossAmount) {
+  const amount = Number(grossAmount);
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+  if (amount <= FLAT_FEE_FREE_TIER_MAX_KES) return 0;
+  return RAW_C2B_FLAT_MARKUP_KES;
+}
+
+/**
  * The Safaricom tariff a customer pays on a standard paybill/STK transaction
  * — a pure pass-through cost PayChain never collects or deducts from the
  * merchant. Delegates to the real published tariff table (SAFARICOM_TARIFF)
@@ -167,10 +183,20 @@ export class PricingEngineError extends Error {
 // transaction and a KES 10,000 transaction both carry the same flat KES 5.
 export const CUSTOMER_SURCHARGE_FLAT_KES = 5;
 
+// Amounts at or below this are exempt from every flat PayChain fee across
+// the platform — the STK customer surcharge, the raw-C2B markup, and the
+// NCBA collection markup (config/ncbaTariffCard.js, which imports
+// FLAT_FEE_FREE_TIER_MAX_KES from here rather than duplicating it). A
+// small top-up or micro-payment shouldn't carry the same flat fee as a
+// KES 10,000 one. Amounts of exactly this value or below are free;
+// anything above it carries the full flat fee.
+export const FLAT_FEE_FREE_TIER_MAX_KES = 100;
+
 /**
  * PayChain's own surcharge collected directly from the paying customer, on
  * top of the merchant's base bill — separate from calculateCustomerMpesaFee
- * (Safaricom's cut, which this is never added to or confused with).
+ * (Safaricom's cut, which this is never added to or confused with). Free
+ * for amounts at or below FLAT_FEE_FREE_TIER_MAX_KES.
  *
  * @param {number} baseInvoiceAmount
  * @returns {number} surcharge in KES, rounded to 2dp.
@@ -178,6 +204,7 @@ export const CUSTOMER_SURCHARGE_FLAT_KES = 5;
 export function calculateCustomerSurcharge(baseInvoiceAmount) {
   const base = Number(baseInvoiceAmount);
   if (!Number.isFinite(base) || base <= 0) return 0;
+  if (base <= FLAT_FEE_FREE_TIER_MAX_KES) return 0;
   return round2(CUSTOMER_SURCHARGE_FLAT_KES);
 }
 

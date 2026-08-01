@@ -186,3 +186,19 @@ export function parseNcbaCustomerField(customerName) {
   const name = str.slice(0, match.index).trim() || null;
   return { name, phone };
 }
+
+/**
+ * Last-resort MSISDN search over NCBA's free-text Narrative field — tried
+ * only when neither CustomerName nor PhoneNr yielded a usable phone (see
+ * ncbaAccountNotificationController.js). Some banks echo the payer's
+ * number into the narrative/reference text even when the dedicated fields
+ * don't carry it; costs nothing to check and never makes things worse,
+ * since it's strictly a fallback after the two more reliable sources.
+ *
+ * @param {string} text
+ * @returns {string|null}
+ */
+export function extractMsisdnFromText(text) {
+  const match = String(text ?? '').match(KENYAN_MSISDN);
+  return match ? match[1] : null;
+}

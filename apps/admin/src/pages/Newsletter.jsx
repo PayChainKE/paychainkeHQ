@@ -47,6 +47,15 @@ export default function Newsletter() {
   const [composeDone, setComposeDone] = useState(null);
   const [showPreview, setShowPreview] = useState(false);
 
+  // Draft being edited (null = new, unsaved campaign) + the content it
+  // seeds the composer's editor with when continuing one.
+  const [drafts, setDrafts] = useState([]);
+  const [draftsLoading, setDraftsLoading] = useState(true);
+  const [activeDraftId, setActiveDraftId] = useState(null);
+  const [composeInitialContent, setComposeInitialContent] = useState('');
+  const [draftStatus, setDraftStatus] = useState(null); // null | 'saving' | 'saved' | 'error'
+  const [discardDraftState, setDiscardDraftState] = useState(null); // { draft, busy } | null
+
   // Delete confirmation
   const [deleteState, setDeleteState] = useState(null);
 
@@ -73,7 +82,21 @@ export default function Newsletter() {
     }
   }, []);
 
+  const fetchDrafts = useCallback(async () => {
+    setDraftsLoading(true);
+    try {
+      const res = await api.get('/api/newsletter/drafts');
+      setDrafts(res.data?.data || []);
+    } catch {
+      // Non-critical — drafts list just stays empty/stale rather than
+      // blocking the rest of the page.
+    } finally {
+      setDraftsLoading(false);
+    }
+  }, []);
+
   useEffect(() => { fetchAll(); }, [fetchAll]);
+  useEffect(() => { fetchDrafts(); }, [fetchDrafts]);
 
   useEffect(() => {
     const h = () => fetchAll();
@@ -153,11 +176,60 @@ export default function Newsletter() {
   function openCompose() {
     setComposeSubject('');
     setComposeBody('');
+    setComposeInitialContent('');
+    setActiveDraftId(null);
+    setDraftStatus(null);
     setComposeError('');
     setComposeDone(null);
     setShowPreview(false);
     setComposeOpen(true);
   }
+
+  function continueDraft(draft) {
+    setComposeSubject(draft.subject || '');
+    setComposeBody('');
+    setComposeInitialContent(draft.body || '');
+    setActiveDraftId(draft._id);
+    setDraftStatus(null);
+    setComposeError('');
+    setComposeDone(null);
+    setShowPreview(false);
+    setComposeOpen(true);
+  }
+
+  async function saveDraft(html) {
+    setDraftStatus('saving');
+    try {
+      const res = await api.post('/api/newsletter/drafts', {
+        draftId: activeDraftId,
+        subject: composeSubject,
+        body: html,
+      });
+      setActiveDraftId(res.data?.data?._id || activeDraftId);
+      setDraftStatus('saved');
+      fetchDrafts();
+      setTimeout(() => setDraftStatus((s) => (s === 'saved' ? null : s)), 3000);
+    } catch (e) {
+      setDraftStatus('error');
+      showToast(e?.response?.data?.error || 'Could not save draft.');
+    }
+  }
+
+  function startDiscardDraft(draft) { setDiscardDraftState({ draft, busy: false }); }
+  async function confirmDiscardDraft() {
+    if (!discardDraftState) return;
+    setDiscardDraftState((s) => ({ ...s, busy: true }));
+    try {
+      await api.delete(`/api/newsletter/drafts/${discardDraftState.draft._id}`);
+      setDrafts((arr) => arr.filter((d) => d._id !== discardDraftState.draft._id));
+      if (activeDraftId === discardDraftState.draft._id) setActiveDraftId(null);
+      setDiscardDraftState(null);
+    } catch (e) {
+      showToast(e?.response?.data?.error || 'Could not discard draft.');
+      setDiscardDraftState(null);
+    }
+  }
+
   function sendCampaign(htmlBody) {
     setComposeError('');
     if (composeSubject.trim().length < 3) { setComposeError('Subject must be at least 3 characters.'); return; }
@@ -172,10 +244,13 @@ export default function Newsletter() {
         subject: composeSubject.trim(),
         body: pendingSend.htmlBody,
         htmlMode: true,   // rich HTML from the editor is passed through to Resend as-is
+        draftId: activeDraftId, // backend deletes the draft this was composed from, if any
       });
       if (res.data?.success) {
         setComposeDone(res.data);
+        setActiveDraftId(null);
         fetchAll();
+        fetchDrafts();
       } else {
         setComposeError(res.data?.error || 'Send failed.');
       }
@@ -375,6 +450,52 @@ export default function Newsletter() {
           )}
         </div>
 
+        {/* Drafts — unfinished campaigns saved for later */}
+        {(draftsLoading || drafts.length > 0) && (
+          <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 overflow-hidden shadow-editorial">
+            <div className="px-6 py-4 border-b border-outline-variant/10 flex items-center justify-between">
+              <div>
+                <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">In progress</p>
+                <h3 className="text-base font-bold text-on-surface tracking-tight">Drafts</h3>
+              </div>
+              {drafts.length > 0 && (
+                <span className="text-2xs font-bold text-on-surface-variant/40 bg-surface-container px-2.5 py-1 rounded-full">{drafts.length} saved</span>
+              )}
+            </div>
+            {draftsLoading ? (
+              <div className="p-6 space-y-3">
+                {[...Array(2)].map((_, i) => <div key={i} className="h-10 bg-surface-container animate-pulse rounded" />)}
+              </div>
+            ) : (
+              <div className="divide-y divide-outline-variant/8">
+                {drafts.map((d) => (
+                  <div key={d._id} className="px-6 py-4 flex items-center justify-between gap-4 hover:bg-secondary-container/5 transition-colors group">
+                    <button onClick={() => continueDraft(d)} className="min-w-0 flex-1 text-left">
+                      <p className="font-bold text-on-surface tracking-tight truncate text-sm">{d.subject?.trim() || '(no subject)'}</p>
+                      <p className="text-2xs text-on-surface-variant/50 truncate mt-0.5">
+                        {d.snippet || '(empty)'}
+                      </p>
+                      <p className="text-2xs text-on-surface-variant/40 mt-1">
+                        Last edited {relativeTime(d.updatedAt)}{d.updatedByEmail ? ` · ${d.updatedByEmail}` : ''}
+                      </p>
+                    </button>
+                    <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => continueDraft(d)}
+                        className="px-3 py-1.5 rounded-lg text-2xs font-bold uppercase tracking-widest text-primary hover:bg-primary/10 transition-colors">
+                        Continue
+                      </button>
+                      <button onClick={() => startDiscardDraft(d)}
+                        className="p-1.5 rounded-lg hover:bg-red-50 text-on-surface-variant/60 hover:text-red-600 transition-colors" title="Discard draft">
+                        <span className="material-symbols-outlined text-base">delete</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Past campaigns — delivery status */}
         <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 overflow-hidden shadow-editorial">
           <div className="px-6 py-4 border-b border-outline-variant/10 flex items-center justify-between">
@@ -425,12 +546,36 @@ export default function Newsletter() {
           done={composeDone}
           onSend={sendCampaign}
           onClose={() => { if (!composeBusy) { setComposeOpen(false); setComposeDone(null); } }}
+          initialContent={composeInitialContent}
+          draftStatus={draftStatus}
+          onSaveDraft={saveDraft}
         />
       )}
 
       {/* Delete confirmation */}
       {deleteState && (
         <DeleteModal state={deleteState} onClose={() => !deleteState.busy && setDeleteState(null)} onConfirm={confirmDelete} />
+      )}
+
+      {/* Discard draft confirmation */}
+      {discardDraftState && (
+        <Modal onClose={() => !discardDraftState.busy && setDiscardDraftState(null)} maxWidth="max-w-md">
+          <div className="p-7">
+            <div className="w-14 h-14 rounded-full bg-red-50 text-red-600 flex items-center justify-center mb-4">
+              <span className="material-symbols-outlined text-3xl">delete</span>
+            </div>
+            <h3 className="text-xl font-bold text-on-surface mb-1">Discard draft?</h3>
+            <p className="text-sm text-on-surface-variant mb-5">
+              Permanently delete the draft "<strong>{discardDraftState.draft.subject?.trim() || '(no subject)'}</strong>"? This cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setDiscardDraftState(null)} disabled={discardDraftState.busy} className="flex-1 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40">Cancel</button>
+              <button onClick={confirmDiscardDraft} disabled={discardDraftState.busy} className="flex-1 py-2.5 rounded-lg bg-red-600 text-white text-sm font-semibold uppercase tracking-widest hover:bg-red-700 disabled:opacity-50">
+                {discardDraftState.busy ? 'Discarding…' : 'Discard'}
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {/* Send-campaign confirmation */}
