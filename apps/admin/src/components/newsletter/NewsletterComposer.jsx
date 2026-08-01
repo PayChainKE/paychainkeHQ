@@ -341,7 +341,7 @@ export default function NewsletterComposer({
             {/* From (read-only) */}
             <div className="flex items-center gap-3 px-5 py-2.5 border-b border-outline-variant/15 bg-surface-container-lowest/30 shrink-0">
               <span className="text-2xs font-bold text-on-surface-variant/40 uppercase tracking-widest w-12 shrink-0">From</span>
-              <span className="text-xs text-on-surface font-medium">PayChain Kenya <span className="text-on-surface-variant/50">&lt;info@paychain.co.ke&gt;</span></span>
+              <span className="text-xs text-on-surface font-medium">PayChain <span className="text-on-surface-variant/50">&lt;info@paychain.co.ke&gt;</span></span>
             </div>
 
             {/* Subject */}
