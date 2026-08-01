@@ -19,6 +19,7 @@ import { NcbaTariffBoundsError } from '../config/ncbaTariffCard.js';
 import { getNcbaVirtualAccountNumber, formatAccountNumberDisplay } from '../utils/ncbaValidators.js';
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay.js';
 import { toE164Kenyan } from '../utils/notificationService.js';
+import { buildPaymentReceivedSms } from '../utils/paymentSmsTemplates.js';
 
 const respondOk = (res, detail) => res.status(200).type('application/xml').send(buildNcbaOkResult(detail));
 const respondFail = (res, detail) => res.status(200).type('application/xml').send(buildNcbaFailResult(detail));
@@ -284,19 +285,23 @@ export const handleNcbaAccountNotification = async (req, res) => {
     }
 
     if (merchant.phone) {
+      // Only pass the payer's number through if it actually validates as
+      // one — customerPhone can still be NCBA's Account Number fallback
+      // (rawPhoneNr) here, same known data-quality issue as the customer-SMS
+      // gate above. Showing that as if it were a phone number would be
+      // actively misleading, not just a cosmetic gap.
+      const validPayerPhone = customerPhone && toE164Kenyan(customerPhone) ? customerPhone : null;
       safeSendSMS({
         to: merchant.phone,
-        // customerDisplayName is the only unbounded field here (comes from
-        // NCBA's free-text CustomerName) — customerPhone is a bounded,
-        // regex-matched MSISDN or empty, safe as fixed.
-        message: buildStrictSms(
-          ({ ref, amt, name, phone, date, time, balance }) =>
-            `${ref} Payment Received. KES ${amt} from ${name}${phone ? ` (${phone})` : ''} via M-PESA on ${date} at ${time}. New balance: KES ${balance}.`,
-          {
-            fixed: { ref: transId, amt: transAmount.toLocaleString(), phone: formatPhoneDisplay(customerPhone) || '', date, time, balance: ledgerResult.merchant.kesBalance.toLocaleString() },
-            truncatable: [{ key: 'name', value: customerDisplayName, minLength: 10 }],
-          }
-        ).message,
+        message: buildPaymentReceivedSms({
+          ref: transId,
+          amount: transAmount,
+          payerName: customerDisplayName,
+          payerPhone: validPayerPhone,
+          date,
+          time,
+          balance: ledgerResult.merchant.kesBalance,
+        }).message,
       }).then((result) => {
         // Logged on both outcomes — previously only failures were logged,
         // which made "SMS silently succeeded" and "SMS was never attempted
