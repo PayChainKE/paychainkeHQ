@@ -1,5 +1,5 @@
 import { safaricomFeeFor } from './revenueRateCard.js';
-import { RAW_C2B_FLAT_MARKUP_KES } from '../utils/pricingEngine.js';
+import { calculateRawC2bMarkup, RAW_C2B_FLAT_MARKUP_KES, FLAT_FEE_FREE_TIER_MAX_KES } from '../utils/pricingEngine.js';
 
 // NCBA Virtual Account collection tariff.
 //
@@ -78,7 +78,7 @@ export function getNcbaTariffBand(grossAmount) {
   const band = NCBA_SAFARICOM_FEE_BANDS.find((b) => amount <= b.max);
 
   const safaricomFee = band ? band.safaricomFee : safaricomFeeFor(amount);
-  const markup        = RAW_C2B_FLAT_MARKUP_KES;
+  const markup        = calculateRawC2bMarkup(amount);
 
   return {
     safaricomFee: round2(safaricomFee),
@@ -89,12 +89,13 @@ export function getNcbaTariffBand(grossAmount) {
 
 /**
  * MongoDB aggregation expression computing the NCBA markup (PayChain
- * revenue) — now just the flat RAW_C2B_FLAT_MARKUP_KES constant for every
- * doc, no longer banded (see the module comment above for why).
+ * revenue) — flat RAW_C2B_FLAT_MARKUP_KES, waived for amounts at or below
+ * FLAT_FEE_FREE_TIER_MAX_KES (mirrors calculateRawC2bMarkup's JS logic).
  *
- * @param {object} _basisExpr - unused now that the markup is flat; kept so
- *        call sites (controllers/revenueController.js) don't need to change.
+ * @param {object} basisExpr - a Mongo aggregation expression yielding the KES basis for the doc.
  */
-export function ncbaMarkupMongoExpr(_basisExpr) {
-  return RAW_C2B_FLAT_MARKUP_KES;
+export function ncbaMarkupMongoExpr(basisExpr) {
+  return {
+    $cond: [{ $lte: [basisExpr, FLAT_FEE_FREE_TIER_MAX_KES] }, 0, RAW_C2B_FLAT_MARKUP_KES],
+  };
 }

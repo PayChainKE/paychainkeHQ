@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import Transaction from '../models/Transaction.js';
 import Merchant from '../models/Merchant.js';
 import { safeSendSMS, buildStrictSms } from '../utils/smsSanitizer.js';
-import { calculateMerchantFee, processSplitTransaction, splitCustomerSurcharge, getCheckoutTotal, RAW_C2B_FLAT_MARKUP_KES, PricingEngineError } from '../utils/pricingEngine.js';
+import { calculateMerchantFee, processSplitTransaction, splitCustomerSurcharge, getCheckoutTotal, calculateRawC2bMarkup, PricingEngineError } from '../utils/pricingEngine.js';
 import { sendInvoicePaidReceiptEmail } from '../utils/resend.js';
 import { settleInflationShield } from '../utils/stellarHelper.js';
 import { getLiveKesToUsdcRate } from '../utils/rateEngine.js';
@@ -212,22 +212,24 @@ export const confirmationURL = async (req, res) => {
     });
 
     // PayChain's own tiered merchant fee, plus a flat KES 5 markup on every
-    // C2B paybill deposit (RAW_C2B_FLAT_MARKUP_KES — see pricingEngine.js)
-    // — both deducted from the gross receipt before it ever reaches the
-    // merchant's balance or the Inflation Shield FX conversion below.
-    // Clamped so the combined fee never exceeds the gross amount itself.
+    // C2B paybill deposit above FLAT_FEE_FREE_TIER_MAX_KES
+    // (calculateRawC2bMarkup — see pricingEngine.js) — both deducted from
+    // the gross receipt before it ever reaches the merchant's balance or
+    // the Inflation Shield FX conversion below. Clamped so the combined
+    // fee never exceeds the gross amount itself.
     const tieredMerchantFee = calculateMerchantFee(amount);
-    const merchantFee = Math.min(amount, Math.round((tieredMerchantFee + RAW_C2B_FLAT_MARKUP_KES) * 100) / 100);
+    const rawC2bMarkup = calculateRawC2bMarkup(amount);
+    const merchantFee = Math.min(amount, Math.round((tieredMerchantFee + rawC2bMarkup) * 100) / 100);
     const netKESAmount = Math.round((amount - merchantFee) * 100) / 100;
-    console.log(`💰 M-PESA C2B fee for ${TransID}: gross KES ${amount}, PayChain fee KES ${merchantFee} (tiered KES ${tieredMerchantFee} + flat KES ${RAW_C2B_FLAT_MARKUP_KES}), net KES ${netKESAmount}`);
+    console.log(`💰 M-PESA C2B fee for ${TransID}: gross KES ${amount}, PayChain fee KES ${merchantFee} (tiered KES ${tieredMerchantFee} + flat KES ${rawC2bMarkup}), net KES ${netKESAmount}`);
 
     // The Transaction pre-save hook (utils/feeCalculator.js) only knows the
     // tiered portion (it calls calculateMerchantFee the same way, on the
     // same amount) — top up paychainFee with whatever's left of the flat
-    // markup on top (normally the full RAW_C2B_FLAT_MARKUP_KES, less only
-    // if the clamp above capped the total at the gross amount for a very
-    // small deposit), so the persisted field always matches what was
-    // actually deducted below, not just the tiered part.
+    // markup on top (normally the full rawC2bMarkup, less only if the
+    // clamp above capped the total at the gross amount for a very small
+    // deposit), so the persisted field always matches what was actually
+    // deducted below, not just the tiered part.
     const flatMarkupApplied = Math.round((merchantFee - tieredMerchantFee) * 100) / 100;
     if (flatMarkupApplied > 0) {
       await Transaction.updateOne({ _id: transaction._id }, { $inc: { paychainFee: flatMarkupApplied } });
