@@ -438,7 +438,7 @@ export default function NewsletterComposer({ subject, onSubject, activeCount, bu
                     <h2 className="text-lg font-bold text-white">{subject || '(no subject)'}</h2>
                   </div>
                   <div
-                    className="p-6 prose prose-sm max-w-none text-gray-800 leading-relaxed"
+                    className="p-6 rich-text-content text-gray-800 leading-relaxed"
                     dangerouslySetInnerHTML={{ __html: html || '<p class="text-gray-400 italic">(empty — start writing in the editor)</p>' }}
                   />
                   <div className="border-t border-gray-100 px-6 py-4 text-center">
