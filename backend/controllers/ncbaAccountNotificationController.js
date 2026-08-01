@@ -1,6 +1,6 @@
 import Merchant from '../models/Merchant.js';
 import { createNotification } from './notificationController.js';
-import { safeSendSMS, buildStrictSms } from '../utils/smsSanitizer.js';
+import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { parseSoapXmlSafely, findFirstTagValue, XmlSecurityError } from '../utils/xmlSecurity.js';
 import {
@@ -19,7 +19,7 @@ import { NcbaTariffBoundsError } from '../config/ncbaTariffCard.js';
 import { getNcbaVirtualAccountNumber, formatAccountNumberDisplay } from '../utils/ncbaValidators.js';
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay.js';
 import { toE164Kenyan } from '../utils/notificationService.js';
-import { buildPaymentReceivedSms } from '../utils/paymentSmsTemplates.js';
+import { buildPaymentReceivedSms, buildCustomerPaidSms } from '../utils/paymentSmsTemplates.js';
 
 const respondOk = (res, detail) => res.status(200).type('application/xml').send(buildNcbaOkResult(detail));
 const respondFail = (res, detail) => res.status(200).type('application/xml').send(buildNcbaFailResult(detail));
@@ -266,17 +266,16 @@ export const handleNcbaAccountNotification = async (req, res) => {
     // real bug — this merchant did get paid, we just have no phone to
     // confirm it to.
     if (customerPhone && toE164Kenyan(customerPhone)) {
-      // businessName is the only unbounded field here.
       safeSendSMS({
         to: customerPhone,
-        message: buildStrictSms(
-          ({ ref, amt, name, acct, date, time }) =>
-            `${ref} Confirmed. KES ${amt} paid to ${name} for account ${acct} on ${date} at ${time}. Thank you for your payment.`,
-          {
-            fixed: { ref: transId, amt: transAmount.toLocaleString(), acct: accountRef, date, time },
-            truncatable: [{ key: 'name', value: merchant.businessName, minLength: 10 }],
-          }
-        ).message,
+        message: buildCustomerPaidSms({
+          ref: transId,
+          amount: transAmount,
+          businessName: merchant.businessName,
+          accountRef,
+          date,
+          time,
+        }).message,
       }).then((result) => {
         if (!result.success) logEvent('error', 'ncba_account_notification_customer_sms_failed', { transId, error: result.error });
       });

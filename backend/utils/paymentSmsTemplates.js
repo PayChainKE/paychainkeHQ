@@ -62,3 +62,26 @@ export function buildPaymentSentSms({ ref, amount, recipientName, recipientPhone
     }
   );
 }
+
+/**
+ * "You paid" receipt SMS to the customer/payer — confirms where their
+ * M-Pesa payment landed. Deliberately doesn't claim to show a "New M-Pesa
+ * balance" the way the merchant-facing templates above show a PayChain
+ * balance — Safaricom already sends the payer that in their own separate
+ * SMS for every M-Pesa transaction; PayChain has no way to know that
+ * number, and fabricating one would be a real correctness problem, not a
+ * cosmetic one.
+ *
+ * @param {{ ref: string, amount: number, businessName: string, accountRef?: string|null, date: string, time: string }} params
+ * @returns {{ message: string, truncated: boolean, length: number }}
+ */
+export function buildCustomerPaidSms({ ref, amount, businessName, accountRef, date, time }) {
+  return buildStrictSms(
+    ({ ref, amt, name, acct, date, time }) =>
+      `${ref} Confirmed. KES ${amt} paid to ${name}${acct ? ` for account ${acct}` : ''} on ${date} at ${time}. Thank you for your payment.`,
+    {
+      fixed: { ref, amt: amount.toLocaleString(), acct: accountRef || '', date, time },
+      truncatable: [{ key: 'name', value: businessName || 'PayChain', minLength: 10 }],
+    }
+  );
+}

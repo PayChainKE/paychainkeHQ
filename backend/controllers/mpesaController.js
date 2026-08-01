@@ -17,7 +17,7 @@ import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLocked
 import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard.js';
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay.js';
 import { AUTO_INFLATION_SHIELD_ENABLED } from '../config/inflationShieldFlag.js';
-import { buildPaymentReceivedSms, buildPaymentSentSms } from '../utils/paymentSmsTemplates.js';
+import { buildPaymentReceivedSms, buildPaymentSentSms, buildCustomerPaidSms } from '../utils/paymentSmsTemplates.js';
 
 // ── M-PESA configuration ──────────────────────────────────────────────────────
 // MPESA_ENVIRONMENT controls which Daraja endpoint is used.
@@ -250,16 +250,14 @@ export const confirmationURL = async (req, res) => {
     const customerSms = MSISDN
       ? safeSendSMS({
           to: MSISDN,
-          // businessName is the only unbounded field here — never the
-          // reference, amount, account number, date or time.
-          message: buildStrictSms(
-            ({ ref, amt, name, acct, date, time }) =>
-              `${ref} Confirmed. KES ${amt} sent to ${name} for account ${acct} on ${date} at ${time}. Thank you for your payment.`,
-            {
-              fixed: { ref: TransID, amt: amount.toLocaleString(), acct: accountNumber, date, time },
-              truncatable: [{ key: 'name', value: merchant.businessName, minLength: 10 }],
-            }
-          ).message,
+          message: buildCustomerPaidSms({
+            ref: TransID,
+            amount,
+            businessName: merchant.businessName,
+            accountRef: accountNumber,
+            date,
+            time,
+          }).message,
         }).then((result) => {
           if (!result.success) console.error(`Customer SMS receipt failed for ${TransID}:`, result.error);
         })
@@ -683,16 +681,14 @@ export const stkCallback = async (req, res) => {
             const customerSms = stkReq.phone
               ? safeSendSMS({
                   to: stkReq.phone,
-                  // businessName is the only unbounded field — receipt,
-                  // amount, account ref, date and time are always fixed.
-                  message: buildStrictSms(
-                    ({ ref, amt, name, acct, date, time }) =>
-                      `${ref} Confirmed. KES ${amt} paid to ${name} for account ${acct} on ${date} at ${time}. Thank you for your payment.`,
-                    {
-                      fixed: { ref: receipt, amt: stkReq.amount.toLocaleString(), acct: accountRef, date, time },
-                      truncatable: [{ key: 'name', value: merchant.businessName, minLength: 10 }],
-                    }
-                  ).message,
+                  message: buildCustomerPaidSms({
+                    ref: receipt,
+                    amount: stkReq.amount,
+                    businessName: merchant.businessName,
+                    accountRef,
+                    date,
+                    time,
+                  }).message,
                 }).then((r) => { if (!r.success) console.error(`STK ${payerLabel} customer SMS failed for ${receipt}:`, r.error); })
               : Promise.resolve();
             // Merchant sees their base bill amount, not the customer's
@@ -810,6 +806,28 @@ export const stkCallback = async (req, res) => {
                 }).message;
             safeSendSMS({ to: merchant.phone, message }).then((r) => {
               if (!r.success) console.error(`Wallet top-up SMS failed for merchant ${merchant._id}:`, r.error);
+            });
+          }
+
+          // The customer/payer side of this — previously missing entirely
+          // for 'request_money' and 'pay_account': Payment Links and C2B
+          // both already confirm to the payer, this branch never did.
+          // Self-funding top-ups skip this (merchant.phone === stkReq.phone
+          // there in practice, and the merchant SMS above already IS their
+          // confirmation — a second copy would be redundant, not useful).
+          if (kind !== 'topup' && stkReq.phone) {
+            safeSendSMS({
+              to: stkReq.phone,
+              message: buildCustomerPaidSms({
+                ref: receipt,
+                amount: stkReq.amount,
+                businessName: merchant.businessName,
+                accountRef: merchant.paybillAccount,
+                date,
+                time,
+              }).message,
+            }).then((r) => {
+              if (!r.success) console.error(`STK ${kind} customer SMS failed for ${receipt}:`, r.error);
             });
           }
         }
