@@ -142,6 +142,24 @@ export function validateTransId(transId) {
 
 const KENYAN_MSISDN = /\b(254\d{9}|0\d{9})\b/;
 
+// When no MSISDN is present to anchor where the name ends (the matched
+// branch below already discards everything after it, channel code
+// included), NCBA can still append its own trailing bank-channel code —
+// e.g. "JACOB BRANDON OMUTITI 84076c2640d9". Strips a trailing
+// whitespace-separated token only if it contains at least one digit — real
+// human names don't contain digits, so this reliably catches a generated
+// code without risking a false-positive strip of a genuine short trailing
+// name token (the previously-observed all-letters "UG" channel code is
+// left alone, matching prior behavior for that case).
+function stripTrailingDigitCode(name) {
+  if (!name) return name;
+  const match = name.match(/^(.*?)\s+(\S*\d\S*)$/);
+  if (match) return match[1].trim() || null;
+  // No leading part to split off — if the whole string itself looks like a
+  // channel code (contains a digit), there's no real name here at all.
+  return /\d/.test(name) ? null : name;
+}
+
 /**
  * Best-effort split of NCBA's CustomerName field into { name, phone }.
  *
@@ -162,7 +180,7 @@ export function parseNcbaCustomerField(customerName) {
   if (!str) return { name: null, phone: null };
 
   const match = str.match(KENYAN_MSISDN);
-  if (!match) return { name: str, phone: null };
+  if (!match) return { name: stripTrailingDigitCode(str), phone: null };
 
   const phone = match[1];
   const name = str.slice(0, match.index).trim() || null;
