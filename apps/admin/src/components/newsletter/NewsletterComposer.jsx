@@ -221,7 +221,15 @@ function ImageDialog({ onConfirm, onCancel }) {
 }
 
 // ── Main composer ─────────────────────────────────────────────────────
-export default function NewsletterComposer({ subject, onSubject, activeCount, busy, error, done, onSend, onClose }) {
+// `initialContent` seeds the editor once at mount — used when continuing a
+// saved draft. Fine as mount-only: Newsletter.jsx conditionally renders
+// this component (`{composeOpen && <NewsletterComposer .../>}`), so
+// switching drafts always remounts it fresh rather than needing a
+// setContent() effect to sync a changed prop into a live editor.
+export default function NewsletterComposer({
+  subject, onSubject, activeCount, busy, error, done, onSend, onClose,
+  initialContent, draftStatus, onSaveDraft,
+}) {
   const [showPreview, setShowPreview] = useState(false);
   const [linkDialog, setLinkDialog] = useState(false);
   const [imageDialog, setImageDialog] = useState(false);
@@ -236,6 +244,7 @@ export default function NewsletterComposer({ subject, onSubject, activeCount, bu
       Color,
       Placeholder.configure({ placeholder: 'Write your newsletter here…' }),
     ],
+    content: initialContent || '',
     editorProps: {
       attributes: {
         class: 'prose prose-sm max-w-none min-h-[260px] px-5 py-4 focus:outline-none text-on-surface',
@@ -290,15 +299,29 @@ export default function NewsletterComposer({ subject, onSubject, activeCount, bu
             <span className="material-symbols-outlined text-emerald-400 text-lg">campaign</span>
             <span className="text-xs font-bold text-white">New Newsletter Campaign</span>
           </div>
-          <div className="flex items-center gap-1">
-            <button type="button" onClick={() => setShowPreview(p => !p)}
-              className={`px-3 py-1 rounded-lg text-2xs font-bold uppercase tracking-widest transition-all ${showPreview ? 'bg-white/20 text-white' : 'text-white/60 hover:bg-white/10 hover:text-white'}`}>
-              {showPreview ? 'Edit' : 'Preview'}
-            </button>
-            <button onClick={busy ? undefined : onClose} disabled={busy}
-              className="p-1 rounded-lg text-white/60 hover:bg-white/10 hover:text-white transition-colors disabled:opacity-40">
-              <span className="material-symbols-outlined text-lg">close</span>
-            </button>
+          <div className="flex items-center gap-3">
+            {draftStatus && (
+              <span className="text-2xs font-medium text-white/50 flex items-center gap-1">
+                {draftStatus === 'saving' && <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Saving draft…</>}
+                {draftStatus === 'saved' && <><span className="material-symbols-outlined text-sm text-emerald-400">check_circle</span>Draft saved</>}
+                {draftStatus === 'error' && <><span className="material-symbols-outlined text-sm text-red-400">error</span>Couldn't save draft</>}
+              </span>
+            )}
+            <div className="flex items-center gap-1">
+              <button type="button" onClick={() => onSaveDraft?.(html)} disabled={busy || draftStatus === 'saving'}
+                className="px-3 py-1 rounded-lg text-2xs font-bold uppercase tracking-widest text-white/60 hover:bg-white/10 hover:text-white transition-all disabled:opacity-40 flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-sm">save</span>
+                Save Draft
+              </button>
+              <button type="button" onClick={() => setShowPreview(p => !p)}
+                className={`px-3 py-1 rounded-lg text-2xs font-bold uppercase tracking-widest transition-all ${showPreview ? 'bg-white/20 text-white' : 'text-white/60 hover:bg-white/10 hover:text-white'}`}>
+                {showPreview ? 'Edit' : 'Preview'}
+              </button>
+              <button onClick={busy ? undefined : onClose} disabled={busy}
+                className="p-1 rounded-lg text-white/60 hover:bg-white/10 hover:text-white transition-colors disabled:opacity-40">
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
           </div>
         </div>
 

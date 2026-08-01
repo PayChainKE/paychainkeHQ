@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import Subscription from '../models/Subscription.js';
 import NewsletterCampaign from '../models/NewsletterCampaign.js';
+import NewsletterDraft from '../models/NewsletterDraft.js';
 import { sendNewsletterConfirmation, sendNewsletterEmail } from '../utils/resend.js';
 import { v2 as cloudinary } from 'cloudinary';
 
@@ -136,7 +137,7 @@ export const deleteSubscriber = async (req, res) => {
 // @access  Private (Admin)
 export const sendCampaign = async (req, res) => {
   try {
-    const { subject, body, htmlMode } = req.body || {};
+    const { subject, body, htmlMode, draftId } = req.body || {};
     if (!subject || String(subject).trim().length < 3) {
       return res.status(400).json({ error: 'Subject is required (min 3 chars).' });
     }
@@ -178,6 +179,16 @@ export const sendCampaign = async (req, res) => {
       sentBy: req.admin?._id || null,
       sentAt: new Date(),
     });
+
+    // The draft this campaign was composed from (if any) is now sent —
+    // remove it so it doesn't linger in the drafts list as if still unsent.
+    // Best-effort: a failure here must never affect the already-successful
+    // send response.
+    if (draftId && mongoose.Types.ObjectId.isValid(draftId)) {
+      NewsletterDraft.deleteOne({ _id: draftId }).catch((e) =>
+        console.error('Failed to clean up draft after send:', e.message)
+      );
+    }
 
     res.json({
       success: true,
@@ -256,6 +267,109 @@ export const getCampaigns = async (req, res) => {
     res.json({ success: true, data: list });
   } catch (error) {
     console.error('Get Campaigns Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// ── Drafts ────────────────────────────────────────────────────────────
+// Any admin can see and continue any draft — this is a small internal
+// team tool, not a multi-tenant workspace, so drafts aren't scoped to
+// the admin who started them.
+
+// @desc    List saved newsletter drafts (most recently edited first).
+//          `body` is omitted here — the list view only needs a preview
+//          snippet, not the full HTML, which can be large.
+// @route   GET /api/newsletter/drafts
+// @access  Private (Admin)
+export const listDrafts = async (req, res) => {
+  try {
+    const drafts = await NewsletterDraft.find({})
+      .sort({ updatedAt: -1 })
+      .select('subject updatedByEmail updatedAt createdAt body')
+      .lean();
+    const withSnippet = drafts.map(({ body, ...d }) => ({
+      ...d,
+      snippet: String(body || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 140),
+    }));
+    res.json({ success: true, data: withSnippet });
+  } catch (error) {
+    console.error('List Drafts Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Fetch one draft's full content, to load back into the composer.
+// @route   GET /api/newsletter/drafts/:id
+// @access  Private (Admin)
+export const getDraft = async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid id.' });
+    }
+    const draft = await NewsletterDraft.findById(req.params.id).lean();
+    if (!draft) return res.status(404).json({ error: 'Draft not found.' });
+    res.json({ success: true, data: draft });
+  } catch (error) {
+    console.error('Get Draft Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Save a draft — creates a new one, or updates an existing one
+//          when `draftId` is provided (upsert-by-id, not by content), so
+//          repeated "Save Draft" clicks on the same email update in place
+//          rather than piling up duplicates.
+// @route   POST /api/newsletter/drafts
+// @access  Private (Admin)
+export const saveDraft = async (req, res) => {
+  try {
+    const { draftId, subject, body } = req.body || {};
+    if (!String(subject || '').trim() && !String(body || '').trim()) {
+      return res.status(400).json({ error: 'Nothing to save — write a subject or body first.' });
+    }
+
+    const fields = {
+      subject: String(subject || '').trim(),
+      body: String(body || ''),
+      updatedByEmail: req.admin?.email || '',
+      updatedBy: req.admin?._id || null,
+    };
+
+    let draft;
+    if (draftId) {
+      if (!mongoose.Types.ObjectId.isValid(draftId)) {
+        return res.status(400).json({ error: 'Invalid draft id.' });
+      }
+      draft = await NewsletterDraft.findByIdAndUpdate(draftId, fields, { returnDocument: 'after', upsert: false });
+      if (!draft) return res.status(404).json({ error: 'Draft not found.' });
+    } else {
+      draft = await NewsletterDraft.create(fields);
+    }
+
+    res.json({ success: true, data: draft });
+  } catch (error) {
+    console.error('Save Draft Error:', error);
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map((v) => v.message);
+      return res.status(400).json({ error: messages.join(', ') });
+    }
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Delete a draft (discard).
+// @route   DELETE /api/newsletter/drafts/:id
+// @access  Private (Admin)
+export const deleteDraft = async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid id.' });
+    }
+    const result = await NewsletterDraft.deleteOne({ _id: req.params.id });
+    if (result.deletedCount === 0) return res.status(404).json({ error: 'Draft not found.' });
+    res.json({ success: true, message: 'Draft discarded.' });
+  } catch (error) {
+    console.error('Delete Draft Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };

@@ -10,6 +10,10 @@ import {
   sendCampaign,
   getCampaigns,
   uploadNewsletterImage,
+  listDrafts,
+  getDraft,
+  saveDraft,
+  deleteDraft,
 } from '../controllers/newsletterController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
@@ -39,10 +43,14 @@ const campaignLimiter = rateLimit({
 router.post('/', subscribe);
 router.post('/subscribe', subscribe);
 
-// Admin — keep /campaigns and /admin above /:id so Express doesn't treat
-// them as ids.
+// Admin — keep /campaigns, /admin, and /drafts above /:id so Express
+// doesn't treat them as ids.
 router.get('/', protect, getSubscribers);
 router.get('/campaigns', protect, getCampaigns);
+router.get('/drafts', protect, listDrafts);
+router.get('/drafts/:id', protect, getDraft);
+router.post('/drafts', protect, saveDraft);
+router.delete('/drafts/:id', protect, deleteDraft);
 router.post('/admin', protect, adminAddSubscriber);
 router.post('/upload-image', protect, imageUpload.single('image'), uploadNewsletterImage);
 router.post('/send', protect, campaignLimiter, sendCampaign);
