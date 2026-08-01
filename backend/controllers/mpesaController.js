@@ -792,22 +792,34 @@ export const stkCallback = async (req, res) => {
           // 'request_money' / 'pay_account' — a real customer paid, so this
           // uses the same professional "payment received" format as every
           // other collection rail.
-          if (merchant.phone) {
-            const message = kind === 'topup'
-              ? `${receipt} Confirmed. KES ${merchantCredit.toLocaleString()} added to your PayChain wallet via M-PESA on ${date} at ${time}. Your updated available balance is KES ${(updatedMerchant.kesBalance || 0).toLocaleString()}.`
-              : buildPaymentReceivedSms({
-                  ref: receipt,
-                  amount: merchantCredit,
-                  payerName: null,
-                  payerPhone: stkReq.phone,
-                  date,
-                  time,
-                  balance: updatedMerchant.kesBalance || 0,
-                }).message;
-            safeSendSMS({ to: merchant.phone, message }).then((r) => {
-              if (!r.success) console.error(`Wallet top-up SMS failed for merchant ${merchant._id}:`, r.error);
-            });
-          }
+          // Both sends below are independently awaited (Promise.all, not
+          // fire-and-forget) — two unawaited safeSendSMS calls issued back
+          // to back to the *same* recipient number (merchant.phone ===
+          // stkReq.phone happens whenever a merchant tests their own
+          // request-money link) were observed dropping one of the two
+          // messages, most likely Africa's Talking's gateway coalescing
+          // near-simultaneous sends to one MSISDN. Every other two-SMS
+          // dispatch in this file (confirmationURL, the PaymentLink branch
+          // above) already awaits both together; this branch was the one
+          // exception.
+          const merchantSms = merchant.phone
+            ? safeSendSMS({
+                to: merchant.phone,
+                message: kind === 'topup'
+                  ? `${receipt} Confirmed. KES ${merchantCredit.toLocaleString()} added to your PayChain wallet via M-PESA on ${date} at ${time}. Your updated available balance is KES ${(updatedMerchant.kesBalance || 0).toLocaleString()}.`
+                  : buildPaymentReceivedSms({
+                      ref: receipt,
+                      amount: merchantCredit,
+                      payerName: null,
+                      payerPhone: stkReq.phone,
+                      date,
+                      time,
+                      balance: updatedMerchant.kesBalance || 0,
+                    }).message,
+              }).then((r) => {
+                if (!r.success) console.error(`Wallet top-up SMS failed for merchant ${merchant._id}:`, r.error);
+              })
+            : Promise.resolve();
 
           // The customer/payer side of this — previously missing entirely
           // for 'request_money' and 'pay_account': Payment Links and C2B
@@ -815,21 +827,23 @@ export const stkCallback = async (req, res) => {
           // Self-funding top-ups skip this (merchant.phone === stkReq.phone
           // there in practice, and the merchant SMS above already IS their
           // confirmation — a second copy would be redundant, not useful).
-          if (kind !== 'topup' && stkReq.phone) {
-            safeSendSMS({
-              to: stkReq.phone,
-              message: buildCustomerPaidSms({
-                ref: receipt,
-                amount: stkReq.amount,
-                businessName: merchant.businessName,
-                accountRef: merchant.paybillAccount,
-                date,
-                time,
-              }).message,
-            }).then((r) => {
-              if (!r.success) console.error(`STK ${kind} customer SMS failed for ${receipt}:`, r.error);
-            });
-          }
+          const customerSms = kind !== 'topup' && stkReq.phone
+            ? safeSendSMS({
+                to: stkReq.phone,
+                message: buildCustomerPaidSms({
+                  ref: receipt,
+                  amount: stkReq.amount,
+                  businessName: merchant.businessName,
+                  accountRef: merchant.paybillAccount,
+                  date,
+                  time,
+                }).message,
+              }).then((r) => {
+                if (!r.success) console.error(`STK ${kind} customer SMS failed for ${receipt}:`, r.error);
+              })
+            : Promise.resolve();
+
+          await Promise.all([merchantSms, customerSms]);
         }
       }
     } else {
