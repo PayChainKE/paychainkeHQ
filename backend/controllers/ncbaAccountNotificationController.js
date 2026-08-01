@@ -6,6 +6,7 @@ import { parseSoapXmlSafely, findFirstTagValue, XmlSecurityError } from '../util
 import {
   extractMerchantCode,
   parseNcbaCustomerField,
+  extractMsisdnFromText,
   validateTransAmount,
   validateTransId,
   NcbaAccountNotificationError,
@@ -253,21 +254,28 @@ export const handleNcbaAccountNotification = async (req, res) => {
     const accountRef = formatAccountNumberDisplay(getNcbaVirtualAccountNumber(merchantCode) || merchantCode);
 
     // parsedCustomer was already computed above (before the ledger write).
-    // Prefer the parsed MSISDN; fall back to PhoneNr only if CustomerName
-    // didn't yield one.
-    const customerPhone = parsedCustomer.phone || rawPhoneNr;
+    // Three sources, in order of reliability: the parsed MSISDN from
+    // CustomerName, then PhoneNr (known-unreliable — NCBA has sent the
+    // Account Number in this field instead of a phone), then a last-resort
+    // search of the free-text Narrative field (extractMsisdnFromText) in
+    // case NCBA echoed the payer's number there instead. Each candidate is
+    // checked for VALIDITY in order, not just truthiness — a plain `||`
+    // chain would short-circuit on PhoneNr the moment it's merely present
+    // (which it almost always is, just often wrong), so the Narrative
+    // fallback would never get a chance to run even when it has a real
+    // number and PhoneNr doesn't. Reused below for both the customer
+    // receipt and the merchant's "from" line, so neither ever shows
+    // something that isn't actually a phone number. When none of the three
+    // sources yield anything valid, that's a genuine data-availability gap
+    // on NCBA's side, not a bug — this merchant did get paid, we just have
+    // no phone to confirm it to.
+    const validPayerPhone = [parsedCustomer.phone, rawPhoneNr, extractMsisdnFromText(rawNarrative)]
+      .find((candidate) => candidate && toE164Kenyan(candidate)) || null;
     const customerDisplayName = parsedCustomer.name || 'a customer';
 
-    // rawPhoneNr is a known-unreliable fallback (see comment above — NCBA
-    // has sent the Account Number in this field instead of an MSISDN), so
-    // validate it actually looks like a Kenyan mobile number before
-    // attempting delivery. Otherwise this always failed with a scary
-    // "error"-level log for a data-availability gap on NCBA's side, not a
-    // real bug — this merchant did get paid, we just have no phone to
-    // confirm it to.
-    if (customerPhone && toE164Kenyan(customerPhone)) {
+    if (validPayerPhone) {
       safeSendSMS({
-        to: customerPhone,
+        to: validPayerPhone,
         message: buildCustomerPaidSms({
           ref: transId,
           amount: transAmount,
@@ -279,17 +287,13 @@ export const handleNcbaAccountNotification = async (req, res) => {
       }).then((result) => {
         if (!result.success) logEvent('error', 'ncba_account_notification_customer_sms_failed', { transId, error: result.error });
       });
-    } else if (customerPhone) {
+    } else {
       logEvent('info', 'ncba_account_notification_customer_sms_skipped_no_phone', { transId, merchantId: merchant._id.toString() });
     }
 
     if (merchant.phone) {
-      // Only pass the payer's number through if it actually validates as
-      // one — customerPhone can still be NCBA's Account Number fallback
-      // (rawPhoneNr) here, same known data-quality issue as the customer-SMS
-      // gate above. Showing that as if it were a phone number would be
-      // actively misleading, not just a cosmetic gap.
-      const validPayerPhone = customerPhone && toE164Kenyan(customerPhone) ? customerPhone : null;
+      // validPayerPhone already resolved and validated above — reused here
+      // as-is, not recomputed.
       safeSendSMS({
         to: merchant.phone,
         message: buildPaymentReceivedSms({
