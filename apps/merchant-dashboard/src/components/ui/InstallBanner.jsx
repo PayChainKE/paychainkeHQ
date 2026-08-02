@@ -23,7 +23,7 @@ export default function InstallBanner() {
           <div className="flex items-center gap-4 px-4 py-3.5">
             {/* App icon */}
             <div className="w-12 h-12 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center shrink-0 shadow-inner">
-              <img src="/favicon.png" alt="PayChain" className="w-8 h-8 object-contain rounded-lg" />
+              <img src="/icons/icon-192.png" alt="PayChain" className="w-8 h-8 object-contain rounded-lg" />
             </div>
 
             {/* Text */}
