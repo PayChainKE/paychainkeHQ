@@ -1,6 +1,6 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
-import { generateToken, registerURLs, validationURL, confirmationURL, initiateSTKPush, stkCallback, getSTKStatus, initiateB2C, b2cCallback } from '../controllers/mpesaController.js';
+import { generateToken, registerURLs, validationURL, confirmationURL, initiateSTKPush, stkCallback, getSTKStatus, initiateB2C, initiateB2B, b2cCallback } from '../controllers/mpesaController.js';
 import { protect, protectMerchant, requireRole } from '../middleware/authMiddleware.js';
 import { timingSafeStringEqual } from '../utils/timingSafeCompare.js';
 
@@ -58,5 +58,10 @@ router.get('/stk-status/:checkoutId', protectMerchant, getSTKStatus);
 router.post('/b2c-request', protectMerchant, pinLimiter, generateToken, initiateB2C);
 router.post('/b2c-callback', verifyMpesaWebhookSecret, b2cCallback); // Public webhook
 router.post('/b2c-timeout', verifyMpesaWebhookSecret, b2cCallback); // Timeout webhook
+
+// B2B Routes (Outbound — Paybill/Till) — reconciled by the same b2c-callback
+// and b2c-timeout webhooks above (Daraja's B2B result payload has the same
+// shape as B2C's).
+router.post('/b2b-request', protectMerchant, pinLimiter, generateToken, initiateB2B);
 
 export default router;

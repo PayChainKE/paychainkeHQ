@@ -14,9 +14,21 @@ const DESTINATIONS = [
   { id: 'mpesa-primary', label: 'Primary M-PESA Number',   icon: 'phone_iphone',     fee: null, hint: 'Your registered phone number' },
   { id: 'mobile',        label: 'Any M-PESA Number',        icon: 'smartphone',        fee: null, hint: 'Send to any Kenyan mobile number' },
   { id: 'bank',          label: 'Bank Account',             icon: 'account_balance',   fee: 50,   hint: 'Direct bank transfer' },
-  { id: 'till',          label: 'Till Number',              icon: 'point_of_sale',     fee: 50,   hint: 'Pay to a Safaricom Till' },
-  { id: 'paybill',       label: 'Paybill',                  icon: 'receipt_long',      fee: 50,   hint: 'Pay to a Paybill number' },
+  { id: 'till',          label: 'Till Number',              icon: 'point_of_sale',     fee: null, hint: 'Pay to a Safaricom Till' },
+  { id: 'paybill',       label: 'Paybill',                  icon: 'receipt_long',      fee: null, hint: 'Pay to a Paybill number' },
 ]
+
+// PayChain's own flat margin on B2B (Paybill/Till) payouts — mirrors
+// backend/config/revenueRateCard.js's PAYCHAIN_TXN_RATE, the same rate
+// mpesaController.js#initiateB2B actually charges server-side. Safaricom's
+// own B2B tariff isn't modeled anywhere in this codebase (see
+// bulkPayController.js), so unlike the B2C estimate above, this is not a
+// Safaricom-cost estimate — it's PayChain's own charge, computed exactly.
+const PAYCHAIN_B2B_RATE = 0.005
+function estimateB2bFee(amount) {
+  if (!amount || amount <= 0) return 0
+  return Math.round(amount * PAYCHAIN_B2B_RATE * 100) / 100
+}
 
 // Mirrors backend/config/mpesaB2cTariffCard.js — Safaricom's real M-Pesa
 // B2C ("Business Bouquet") tariff bands, plus PayChain's flat KES 10
@@ -55,6 +67,7 @@ export default function SendMoney() {
   const [step, setStep] = useState(1)
   const [destination, setDestination]       = useState('')
   const [recipientAccount, setRecipientAccount] = useState('')
+  const [paybillAccountRef, setPaybillAccountRef] = useState('')
   const [bankCode, setBankCode]             = useState('')
   const [bankCodes, setBankCodes]           = useState([])
   const [amount, setAmount]                 = useState('')
@@ -69,7 +82,8 @@ export default function SendMoney() {
   const hasPin       = !!merchant?.hasAppPin
   const selectedDest = DESTINATIONS.find(d => d.id === destination)
   const isMobileDest = destination === 'mpesa-primary' || destination === 'mobile'
-  const fee          = isMobileDest ? estimateB2cFee(Number(amount) || 0) : (selectedDest?.fee || 0)
+  const isB2bDest     = destination === 'till' || destination === 'paybill'
+  const fee          = isMobileDest ? estimateB2cFee(Number(amount) || 0) : isB2bDest ? estimateB2bFee(Number(amount) || 0) : (selectedDest?.fee || 0)
   const totalAmount  = Number(amount || 0) + fee
   const balance      = merchant?.kesBalance || 0
 
@@ -158,10 +172,11 @@ export default function SendMoney() {
             pin,
           }, cfg())
         } else {
-          await axios.post(`${API_URL}/api/transactions/send-money`, {
-            destination: recipientAccount,
+          await axios.post(`${API_URL}/api/callbacks/b2b-request`, {
+            billType: destination, // 'till' | 'paybill'
+            partyB: recipientAccount,
+            accountReference: destination === 'paybill' ? paybillAccountRef : undefined,
             amount: Number(amount),
-            fee,
             reference: reference || `Transfer to ${recipientAccount}`,
             pin,
           }, cfg())
@@ -185,7 +200,7 @@ export default function SendMoney() {
 
   const canContinue = () => {
     if (step === 1) return !!destination
-    if (step === 2) return !!amount && Number(amount) > 0 && !!recipientAccount && (destination !== 'bank' || !!bankCode)
+    if (step === 2) return !!amount && Number(amount) > 0 && !!recipientAccount && (destination !== 'bank' || !!bankCode) && (destination !== 'paybill' || !!paybillAccountRef)
     if (!hasPin && step === 3) return newPin.length === 4 && confirmPin.length === 4
     if (step === confirmStep) return pin.length === 4
     return true
@@ -201,7 +216,12 @@ export default function SendMoney() {
           </div>
           <h2 className="font-headline text-4xl font-bold text-primary tracking-tight mb-2">Transfer Sent</h2>
           <p className="text-on-surface-variant font-medium opacity-70 mb-2">
-            {formatKES(amount)} {selectedDest?.id === 'mpesa-primary' || selectedDest?.id === 'mobile' ? 'via M-PESA' : 'via Bank Transfer'}
+            {formatKES(amount)} {
+              selectedDest?.id === 'mpesa-primary' || selectedDest?.id === 'mobile' ? 'via M-PESA'
+              : selectedDest?.id === 'bank' ? 'via Bank Transfer'
+              : selectedDest?.id === 'till' ? 'to Till'
+              : 'to Paybill'
+            }
           </p>
           <p className="text-sm font-mono text-primary/40 mb-10">→ {recipientAccount}</p>
           <div className="flex flex-col gap-3">
@@ -312,7 +332,7 @@ export default function SendMoney() {
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                          {d.fee === null ? 'M-PESA charges apply' : formatKES(d.fee)}
+                          {d.fee === null ? 'Fee shown at amount entry' : formatKES(d.fee)}
                         </span>
                         {destination === d.id && (
                           <span className="material-symbols-outlined text-[#00351D] text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
@@ -356,22 +376,39 @@ export default function SendMoney() {
 
               <div className="space-y-2">
                 <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">
-                  {destination.includes('mpesa') || destination === 'mobile' ? 'Phone Number' : 'Account / Till Number'}
+                  {destination.includes('mpesa') || destination === 'mobile' ? 'Phone Number' : destination === 'till' ? 'Till Number' : destination === 'paybill' ? 'Paybill Number' : 'Account Number'}
                 </label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-300 text-lg">
                     {destination.includes('mpesa') || destination === 'mobile' ? 'smartphone' : 'tag'}
                   </span>
                   <ValidatedInput
-                    kind={destination.includes('mpesa') || destination === 'mobile' ? 'phoneKE' : 'integer'}
+                    kind={destination.includes('mpesa') || destination === 'mobile' ? 'phoneKE' : destination === 'till' ? 'till' : destination === 'paybill' ? 'paybill' : 'integer'}
                     value={recipientAccount}
                     onChange={e => setRecipientAccount(e.target.value)}
-                    placeholder={destination.includes('mpesa') || destination === 'mobile' ? '0712 345 678' : 'Account Number'}
+                    placeholder={destination.includes('mpesa') || destination === 'mobile' ? '0712 345 678' : destination === 'till' ? 'Till Number' : 'Paybill Number'}
                     className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 pl-12 pr-4 text-primary font-bold focus:border-[#00351D] focus:ring-2 focus:ring-[#00351D]/10 outline-none transition-all"
                     required
                   />
                 </div>
               </div>
+
+              {destination === 'paybill' && (
+                <div className="space-y-2">
+                  <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Account Number</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-300 text-lg">tag</span>
+                    <ValidatedInput
+                      kind="text"
+                      value={paybillAccountRef}
+                      onChange={e => setPaybillAccountRef(e.target.value)}
+                      placeholder="Account Number"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 pl-12 pr-4 text-primary font-bold focus:border-[#00351D] focus:ring-2 focus:ring-[#00351D]/10 outline-none transition-all"
+                      required
+                    />
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Amount (KES)</label>

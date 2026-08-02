@@ -15,6 +15,7 @@ import { createNotification } from './notificationController.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard.js';
+import { PAYCHAIN_TXN_RATE } from '../config/revenueRateCard.js';
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay.js';
 import { AUTO_INFLATION_SHIELD_ENABLED } from '../config/inflationShieldFlag.js';
 import { buildPaymentReceivedSms, buildPaymentSentSms, buildCustomerPaidSms } from '../utils/paymentSmsTemplates.js';
@@ -1008,6 +1009,136 @@ export const initiateB2C = async (req, res) => {
   }
 };
 
+// @desc    Merchant-initiated single payout to another business's Paybill or
+//          Till number, via Safaricom's Daraja B2B API. Same "accepted now,
+//          confirmed later" async shape as initiateB2C above — b2cCallback
+//          below reconciles both mpesa_b2c and mpesa_b2b transactions.
+// @route   POST /api/callbacks/b2b-request
+// @access  Private (merchant)
+export const initiateB2B = async (req, res) => {
+  let debited = false;
+  let totalDebit = 0;
+  try {
+    const { billType, partyB, accountReference, amount, reference, pin } = req.body;
+    const merchantId = req.merchant._id;
+
+    if (billType !== 'paybill' && billType !== 'till') {
+      return res.status(400).json({ error: 'billType must be "paybill" or "till".' });
+    }
+    if (!partyB) {
+      return res.status(400).json({ error: `${billType === 'paybill' ? 'Paybill' : 'Till'} number is required.` });
+    }
+    if (billType === 'paybill' && !accountReference) {
+      return res.status(400).json({ error: 'Account number is required for a Paybill payment.' });
+    }
+    const numericAmount = Number(amount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      return res.status(400).json({ error: 'A valid amount is required.' });
+    }
+
+    // Safaricom's own B2B tariff isn't modeled anywhere in this codebase
+    // (see bulkPayController.js's Mobile Money branch, which charges B2B
+    // rows nothing) — this is purely PayChain's own flat margin, the same
+    // PAYCHAIN_TXN_RATE every other outbound rail charges, not a Safaricom
+    // cost pass-through. Computed once here and reused unchanged as the
+    // pre-save hook's basis (Transaction.amount) below, so the debit and
+    // the persisted paychainFee can never disagree.
+    const fee = Math.round(numericAmount * PAYCHAIN_TXN_RATE * 100) / 100;
+
+    // Safety: block live transactions unless explicitly enabled
+    if (isLive && process.env.MPESA_LIVE_ENABLED !== 'true') {
+      return res.status(503).json({ error: 'Live M-PESA payments are not yet enabled. Set MPESA_LIVE_ENABLED=true to activate.' });
+    }
+
+    if (!pin) {
+      return res.status(400).json({ error: 'Payment PIN is required.' });
+    }
+
+    const merchantWithPin = await Merchant.findById(merchantId).select('+appPin');
+    if (!merchantWithPin) return res.status(404).json({ error: 'Merchant not found' });
+    if (!merchantWithPin.appPin) {
+      return res.status(400).json({ error: 'Please set up your payment PIN first.' });
+    }
+    try {
+      await assertPinNotLocked(merchantId);
+    } catch (e) {
+      if (e instanceof PinLockedError) return res.status(429).json({ error: e.message });
+      throw e;
+    }
+    const pinMatches = await bcrypt.compare(String(pin), merchantWithPin.appPin);
+    if (!pinMatches) {
+      await recordFailedPinAttempt(merchantId);
+      return res.status(401).json({ error: 'Invalid PIN.' });
+    }
+    await resetPinAttempts(merchantId);
+
+    // Atomic conditional deduct — same race-avoidance as initiateB2C.
+    totalDebit = Math.round((numericAmount + fee) * 100) / 100;
+    const merchant = await Merchant.findOneAndUpdate(
+      { _id: merchantId, kesBalance: { $gte: totalDebit } },
+      { $inc: { kesBalance: -totalDebit } },
+      { returnDocument: 'after' }
+    );
+    if (!merchant) {
+      return res.status(400).json({ error: 'Insufficient KES balance for this transfer, including the PayChain service fee.' });
+    }
+    debited = true;
+
+    const b2cPassword = process.env.MPESA_B2C_PASSWORD || 'Safaricom999!@#';
+    const securityCredential = generateSecurityCredential(b2cPassword);
+
+    const url = `${mpesaBaseUrl}/mpesa/b2b/v1/paymentrequest`;
+
+    let b2bRes;
+    try {
+      b2bRes = await axios.post(url, {
+        Initiator: process.env.MPESA_B2C_INITIATOR || 'testapi',
+        SecurityCredential: securityCredential,
+        CommandID: billType === 'paybill' ? 'BusinessPayBill' : 'BusinessBuyGoods',
+        SenderIdentifierType: '4',
+        RecieverIdentifierType: '4',
+        Amount: numericAmount,
+        PartyA: shortCode || '600000',
+        PartyB: partyB,
+        AccountReference: accountReference || 'Settlement',
+        Remarks: reference || `Payout to ${partyB}`,
+        QueueTimeOutURL: withWebhookSecret(`${callbackBase}/api/callbacks/b2c-timeout`),
+        ResultURL: withWebhookSecret(`${callbackBase}/api/callbacks/b2c-callback`),
+      }, {
+        headers: { Authorization: `Bearer ${req.mpesaToken}` }
+      });
+    } catch (err) {
+      // Same sandbox-only simulation fallback as initiateB2C — never on live.
+      if (isLive) throw err;
+      console.warn('Daraja B2B API failed, falling back to simulation. Error:', err.response?.data?.errorMessage || err.message);
+      b2bRes = { data: { OriginatorConversationID: `SIM_B2B_${Date.now()}` } };
+    }
+
+    const tx = await Transaction.create({
+      merchantId: merchant._id,
+      accountNumber: merchant.paybillAccount || 'WALLET_FUND',
+      type: 'mpesa_b2b',
+      amount: numericAmount,
+      kesAmount: numericAmount,
+      currency: 'KES',
+      status: 'pending', // Daraja transactions are pending until callback
+      reference: b2bRes.data.OriginatorConversationID || `B2B_${Date.now()}`,
+      sender: { name: merchant.businessName, id: merchant.paybillAccount },
+      recipient: { name: reference || `${billType === 'paybill' ? 'Paybill' : 'Till'} ${partyB}`, id: partyB },
+    });
+
+    res.status(200).json({ success: true, message: 'Transfer initiated successfully via Daraja', transaction: tx });
+
+  } catch (error) {
+    console.error('❌ B2B Transfer Error:', error.response?.data || error);
+    // Refund the merchant only if the deduction actually happened.
+    if (debited && totalDebit > 0) {
+      await Merchant.findByIdAndUpdate(req.merchant._id, { $inc: { kesBalance: totalDebit } });
+    }
+    res.status(500).json({ error: error.response?.data?.errorMessage || 'Failed to initiate Daraja B2B transfer' });
+  }
+};
+
 // Daraja's B2C result payload carries a ResultParameters.ResultParameter
 // array of { Key, Value } pairs, one of which (when present) is
 // ReceiverPartyPublicName — Safaricom's own verified "254712345678 - JOHN
@@ -1080,6 +1211,11 @@ export const b2cCallback = async (req, res) => {
         if (transaction.type === 'mpesa_b2c') {
           const { totalFee } = getB2cTariff(transaction.amount);
           refundAmount += totalFee;
+        } else if (transaction.type === 'mpesa_b2b') {
+          // Same reasoning as mpesa_b2c above — initiateB2B also deducted a
+          // PayChain fee (PAYCHAIN_TXN_RATE of amount) alongside the payout
+          // itself, which needs refunding too when the transfer never lands.
+          refundAmount += Math.round(transaction.amount * PAYCHAIN_TXN_RATE * 100) / 100;
         }
         merchantForSms = await Merchant.findByIdAndUpdate(
           transaction.merchantId,
