@@ -21,6 +21,12 @@ const CONNECT_OPTS = {
   serverSelectionTimeoutMS: 12_000,
   maxPoolSize: 20,
   heartbeatFrequencyMS: 10_000,
+  // Backstop against the exact leak scheduleReconnect() below guards
+  // against structurally: if a pooled socket ever does go stale without
+  // the driver noticing (a silently-dropped connection that never fires a
+  // clean 'close'), this forces the driver to recycle it after a minute
+  // of no use rather than holding it open against Atlas indefinitely.
+  maxIdleTimeMS: 60_000,
 };
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -81,6 +87,22 @@ const scheduleReconnect = () => {
     reconnectTimer = null;
     reconnectInFlight = true;
     try {
+      // Explicitly tear down whatever's left of the previous client before
+      // opening a new one. mongoose.connect() below always opens a fresh
+      // underlying MongoClient — it does not guarantee the prior one (now
+      // sitting in a 'disconnected' state, e.g. after a mid-handshake TLS
+      // drop) gets its sockets released first. Without this, a real
+      // network blip that triggers this reconnect path leaves the old
+      // pool's connections still held against Atlas's connection count
+      // while a brand new pool opens on top — repeated over enough
+      // flaky-network reconnect cycles, that's a slow, steady connection
+      // leak with zero relation to actual traffic. Safe to call even if
+      // the connection is already fully closed (no-ops).
+      try {
+        await mongoose.connection.close();
+      } catch (closeErr) {
+        console.warn('⚠️ Error closing stale MongoDB connection before reconnect:', closeErr.message);
+      }
       await connectDB({ silent: true });
       console.log('✅ MongoDB reconnected');
     } catch (error) {
