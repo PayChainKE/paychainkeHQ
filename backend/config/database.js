@@ -12,14 +12,18 @@ mongoose.set('bufferCommands', false);
 // every 5s, and with only 5 slots total those polling requests were queuing
 // ahead of payment-webhook writes (M-Pesa confirmation, NCBA collection),
 // delaying the merchant's own SMS/notification behind a wait for a free
-// connection. Raised to 20: still a single Render instance
-// (WEB_CONCURRENCY=1) far short of Atlas M0's 500-connection cluster-wide
-// cap, so this doesn't reintroduce the SystemOverloadedError risk that
-// motivated the original cut — it just gives webhook writes enough headroom
-// to not get stuck behind polling traffic.
+// connection. Raised to 20, then temporarily dropped to 8 (2026-08-03) —
+// Atlas hit 458/500 (92%) on the free cluster despite near-zero real query
+// traffic (0.5 ops/sec), climbing even after two suspected-leak fixes
+// (deploy-time shutdown, stale-client-on-reconnect) were deployed. Root
+// cause isn't confirmed yet, so this is a safety buffer to reduce how much
+// damage any still-unknown leak can do per instance while that's
+// diagnosed — not a real fix. At today's near-zero traffic this shouldn't
+// reintroduce the original polling-contention problem; revert toward 20
+// once the real cause is found and connections have stabilized.
 const CONNECT_OPTS = {
   serverSelectionTimeoutMS: 12_000,
-  maxPoolSize: 20,
+  maxPoolSize: 8,
   heartbeatFrequencyMS: 10_000,
   // Backstop against the exact leak scheduleReconnect() below guards
   // against structurally: if a pooled socket ever does go stale without
