@@ -959,7 +959,8 @@ export const initiateB2C = async (req, res) => {
         ResultURL: withWebhookSecret(`${callbackBase}/api/callbacks/b2c-callback`),
         Occasion: 'PayChain Settlement'
       }, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 20000,
       });
     } catch (err) {
       // Only pretend-succeed in sandbox, where Daraja's own test environment
@@ -1105,7 +1106,8 @@ export const initiateB2B = async (req, res) => {
         QueueTimeOutURL: withWebhookSecret(`${callbackBase}/api/callbacks/b2c-timeout`),
         ResultURL: withWebhookSecret(`${callbackBase}/api/callbacks/b2c-callback`),
       }, {
-        headers: { Authorization: `Bearer ${req.mpesaToken}` }
+        headers: { Authorization: `Bearer ${req.mpesaToken}` },
+        timeout: 20000,
       });
     } catch (err) {
       // Same sandbox-only simulation fallback as initiateB2C — never on live.
