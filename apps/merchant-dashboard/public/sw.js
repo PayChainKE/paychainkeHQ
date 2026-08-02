@@ -1,4 +1,4 @@
-const CACHE_NAME = 'paychain-merchant-v3';
+const CACHE_NAME = 'paychain-merchant-v4';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -7,7 +7,10 @@ self.addEventListener('install', (event) => {
         '/',
         '/index.html',
         '/logo.png',
-        '/manifest.json'
+        '/manifest.json',
+        '/icons/icon-192.png',
+        '/icons/icon-512.png',
+        '/icons/apple-touch-icon.png'
       ]);
     })
   );

@@ -21,6 +21,7 @@ import PaymentPage from './pages/PaymentPage'
 import PayAccountPage from './pages/PayAccountPage'
 import InvoiceView from './pages/InvoiceView'
 import ToastHost from './components/ui/Toast'
+import InstallPrompt from './components/pwa/InstallPrompt'
 import { Analytics as VercelAnalytics } from '@vercel/analytics/react'
 
 // Branded full-page loading spinner shown while session state is resolving
@@ -97,6 +98,7 @@ export default function App(){
             <Route path="*" element={<Navigate to="/overview" replace />} />
           </Routes>
           <ToastHost />
+          <InstallPrompt />
         </NotificationProvider>
       </MerchantAuthProvider>
       <VercelAnalytics />
