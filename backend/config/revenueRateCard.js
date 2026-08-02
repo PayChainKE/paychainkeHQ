@@ -159,6 +159,18 @@ export const REVENUE_STREAMS = [
     basis: 'kes_volume',
   },
   {
+    id: 'mpesa_b2b_fee',
+    label: 'M-Pesa B2B Fee',
+    description: 'PayChain\'s flat margin on merchant payouts to another business\'s Paybill or Till (Daraja B2B). Safaricom\'s own B2B tariff isn\'t modeled here — unlike the B2C stream above, no Safaricom cost passes through; this is PayChain\'s own charge only.',
+    icon: 'point_of_sale',
+    accent: 'indigo',
+    rate: PAYCHAIN_TXN_RATE,
+    minFee: 0,
+    txTypes: ['mpesa_b2b'],
+    statuses: ['completed', 'verified'],
+    basis: 'kes_volume',
+  },
+  {
     id: 'cash_advance',
     label: 'Cash Advance Fee',
     description: 'Origination fee on PayChain Cash Advance product (merchant credit line). Pilot stage.',
