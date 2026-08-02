@@ -244,10 +244,24 @@ async function bootstrap() {
     }
   });
 
-  // Graceful shutdown — stop accepting new HTTP connections, then close the
+  // Graceful shutdown — stop accepting new HTTP connections and close the
   // Mongo connection cleanly, so a Render redeploy (SIGTERM) doesn't leave
   // stale pooled connections sitting against the connection-count limit
   // until Atlas gets around to reaping them itself.
+  //
+  // disconnectDB() used to run inside server.close()'s callback, which only
+  // fires once every open HTTP connection has fully closed — with every
+  // merchant/admin/officer dashboard tab polling every 5s (see the
+  // maxPoolSize comment in config/database.js), there's essentially always
+  // a live keep-alive connection, so that callback would almost never fire
+  // before the 9s force-exit timer won and process.exit(1) skipped
+  // disconnectDB() entirely. Confirmed live: Atlas showed 395/500
+  // connections on the free cluster despite this app never legitimately
+  // needing more than ~20 at a time — the difference was stale sockets from
+  // months of redeploys never actually closing. Running disconnectDB() in
+  // parallel with server.close() (not nested inside its callback) means the
+  // Mongo connection closes immediately regardless of lingering HTTP
+  // traffic, well within the 9s budget.
   let shuttingDown = false;
   const shutdown = (signal) => {
     if (shuttingDown) return;
@@ -262,17 +276,15 @@ async function bootstrap() {
     }, 9_000);
     forceExitTimer.unref();
 
-    server.close(async () => {
-      try {
-        await disconnectDB();
-        console.log('✅ MongoDB connection closed');
-      } catch (err) {
-        console.error('Error closing MongoDB connection:', err.message);
-      } finally {
+    server.close(); // stop accepting new connections; don't block exit on existing ones draining
+
+    disconnectDB()
+      .then(() => console.log('✅ MongoDB connection closed'))
+      .catch((err) => console.error('Error closing MongoDB connection:', err.message))
+      .finally(() => {
         clearTimeout(forceExitTimer);
         process.exit(0);
-      }
-    });
+      });
   };
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
