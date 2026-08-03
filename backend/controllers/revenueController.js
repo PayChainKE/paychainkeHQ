@@ -386,11 +386,16 @@ export const getRevenue = async (req, res) => {
 
     // ─── Sweep batches — week-by-week roll-up of accumulated PayChain
     // fees, presented as the settlement-batch log finance teams expect.
-    // Status derives from whether the week is closed (settled), the most
-    // recent finished week (pending bank clearing) or the current week
-    // (accruing). Real-world this would be a separate RevenueSweep
-    // collection; for now we derive it on the fly from fees data so the
-    // numbers exactly match the headline KPIs.
+    // Gross/Costs/Net are derived on the fly from fees data (so they always
+    // exactly match the headline KPIs), but `status` is looked up from the
+    // real services/revenueSweepService.js RevenueSweep records below — it
+    // used to be guessed purely from "is this the current/most-recently-
+    // finished week", which could show "Pending Bank Clearing" on a week
+    // whose real sweep attempt had already come back 'skipped' or 'failed'.
+    // The real sweep runs on its own "since last attempt" cadence, not
+    // aligned to calendar weeks, so a week can have zero, one, or several
+    // real attempts — matched below by whichever real attempt's periodEnd
+    // falls inside that ISO week.
     const sweepAgg = await Transaction.aggregate([
       {
         $match: {
@@ -414,7 +419,6 @@ export const getRevenue = async (req, res) => {
     ]);
 
     const now = new Date();
-    const curYr = now.getUTCFullYear();
     // ISO week of "now" — approximate to flag the current accruing week.
     const isoNow = (() => {
       const d = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
@@ -425,12 +429,43 @@ export const getRevenue = async (req, res) => {
       return { yr: d.getUTCFullYear(), wk };
     })();
 
-    const sweepBatches = sweepAgg.map((row, idx) => {
+    // Inverse of the isoNow computation above: given an ISO (year, week),
+    // return that week's real Monday 00:00:00 -> Sunday 23:59:59.999 UTC
+    // boundary, for matching real RevenueSweep attempts to the week they
+    // actually happened in.
+    function isoWeekBounds(isoYear, isoWeek) {
+      const jan4 = new Date(Date.UTC(isoYear, 0, 4));
+      const jan4Day = (jan4.getUTCDay() + 6) % 7; // 0 = Monday
+      const monday = new Date(jan4);
+      monday.setUTCDate(jan4.getUTCDate() - jan4Day + (isoWeek - 1) * 7);
+      const sunday = new Date(monday);
+      sunday.setUTCDate(monday.getUTCDate() + 6);
+      sunday.setUTCHours(23, 59, 59, 999);
+      return { start: monday, end: sunday };
+    }
+
+    // Real sweep attempts (services/revenueSweepService.js) covering this
+    // window — matched below to whichever ISO week each attempt's
+    // periodEnd actually falls in. Sorted newest-first so the first match
+    // per week is the most recent attempt, if a week had more than one.
+    const realSweeps = await RevenueSweep.find({ periodEnd: { $gte: since } })
+      .sort({ periodEnd: -1 })
+      .lean();
+
+    const sweepBatches = sweepAgg.map((row) => {
       const isCurrent = row._id.yr === isoNow.yr && row._id.wk === isoNow.wk;
-      const isMostRecentClosed = !isCurrent && idx === (sweepAgg[0]._id.yr === isoNow.yr && sweepAgg[0]._id.wk === isoNow.wk ? 1 : 0);
-      let status = 'Settled to Corporate';
-      if (isCurrent) status = 'Accruing';
-      else if (isMostRecentClosed) status = 'Pending Bank Clearing';
+      const { start: weekStart, end: weekEnd } = isoWeekBounds(row._id.yr, row._id.wk);
+      const realSweep = realSweeps.find((s) => s.periodEnd >= weekStart && s.periodEnd <= weekEnd);
+
+      let status = 'Accruing';
+      let note = null;
+      if (realSweep) {
+        status = { completed: 'Settled to Corporate', failed: 'Failed', skipped: 'Skipped' }[realSweep.status] || realSweep.status;
+        note = realSweep.status === 'completed' ? realSweep.ncbaReference : realSweep.failureReason;
+      } else if (!isCurrent) {
+        status = 'No Sweep Attempted';
+      }
+
       const id = `SWP-${row._id.yr}W${String(row._id.wk).padStart(2, '0')}`;
       const gross = Math.round(row.gross * 100) / 100;
       const costs = Math.round(row.costs * 100) / 100;
@@ -442,7 +477,8 @@ export const getRevenue = async (req, res) => {
         net: Math.round((gross - costs) * 100) / 100,
         count: row.count,
         status,
-        destination: isCurrent ? '— (held in FBO)' : CORPORATE_DESTINATION,
+        note,
+        destination: status === 'Settled to Corporate' ? CORPORATE_DESTINATION : '— (held in FBO)',
       };
     });
 

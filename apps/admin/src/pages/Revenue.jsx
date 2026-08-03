@@ -73,9 +73,18 @@ const CHANNEL_META = {
 
 const STATUS_META = {
   'Settled to Corporate':   { dot: 'bg-emerald-500',                 text: 'text-emerald-700', border: 'border-emerald-200', bg: 'bg-emerald-50' },
-  'Pending Bank Clearing':  { dot: 'bg-amber-500 animate-pulse',     text: 'text-amber-800',   border: 'border-amber-200',   bg: 'bg-amber-50'   },
   'Accruing':               { dot: 'bg-sky-500',                     text: 'text-sky-700',     border: 'border-sky-200',     bg: 'bg-sky-50'     },
   'Failed':                 { dot: 'bg-red-500',                     text: 'text-red-700',     border: 'border-red-200',     bg: 'bg-red-50'     },
+  // Real outcome of an actual sweep attempt (services/revenueSweepService.js)
+  // that ran but moved nothing — e.g. below NCBA's minimum transfer, or the
+  // destination account wasn't configured yet. Distinct from "Accruing"
+  // (nothing has been attempted yet) and from the old fake "Pending Bank
+  // Clearing" guess this replaced, which implied a transfer was queued when
+  // none actually was.
+  'Skipped':                { dot: 'bg-amber-500',                   text: 'text-amber-800',   border: 'border-amber-200',   bg: 'bg-amber-50'   },
+  // No real RevenueSweep record's periodEnd falls in this week at all —
+  // predates the real sweep system, or the automated day simply never ran.
+  'No Sweep Attempted':     { dot: 'bg-slate-400',                   text: 'text-slate-600',   border: 'border-slate-200',   bg: 'bg-slate-50'   },
 };
 
 // ── Formatters ────────────────────────────────────────────────────────
@@ -630,7 +639,10 @@ const Revenue = () => {
                             <span className="font-bold text-on-surface tabular-nums">{fmtKESPrecise(b.net)}</span>
                           </td>
                           <td className="px-3 py-3.5">
-                            <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded border ${s.border} ${s.bg} ${s.text} text-2xs font-bold uppercase tracking-wider`}>
+                            <span
+                              title={b.note || undefined}
+                              className={`inline-flex items-center gap-1.5 px-2 py-1 rounded border ${s.border} ${s.bg} ${s.text} text-2xs font-bold uppercase tracking-wider ${b.note ? 'cursor-help' : ''}`}
+                            >
                               <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
                               {b.status}
                             </span>
