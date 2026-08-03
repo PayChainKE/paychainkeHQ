@@ -1396,10 +1396,10 @@ export const sendRevenueSweepNotification = async (email, sweep) => {
     const period = `${new Date(sweep.periodStart).toLocaleDateString('en-KE', { day: 'numeric', month: 'short' })} – ${new Date(sweep.periodEnd).toLocaleDateString('en-KE', { day: 'numeric', month: 'short' })}`;
 
     const theme = {
-      completed: { accent: '#5EFEB3', dot: '#10b981', dotBg: 'rgba(16,185,129,0.18)', label: 'Sweep completed', headline: `KES ${amount} moved to your revenue account` },
-      failed:    { accent: '#fca5a5', dot: '#ef4444', dotBg: 'rgba(239,68,68,0.18)',  label: 'Sweep failed',    headline: `KES ${amount} could not be transferred` },
-      skipped:   { accent: '#fcd34d', dot: '#f59e0b', dotBg: 'rgba(245,158,11,0.18)', label: 'Sweep skipped',   headline: `No transfer this week` },
-    }[sweep.status] || { accent: '#9ca3af', dot: '#9ca3af', dotBg: 'rgba(156,163,175,0.18)', label: 'Sweep update', headline: '' };
+      completed: { accent: '#5EFEB3', dot: '#10b981', dotBg: 'rgba(16,185,129,0.18)', icon: '✓', label: 'Sweep completed', headline: `KES ${amount} moved to your revenue account` },
+      failed:    { accent: '#fca5a5', dot: '#ef4444', dotBg: 'rgba(239,68,68,0.18)',  icon: '!', label: 'Sweep failed',    headline: `KES ${amount} could not be transferred` },
+      skipped:   { accent: '#fcd34d', dot: '#f59e0b', dotBg: 'rgba(245,158,11,0.18)', icon: '!', label: 'Sweep skipped',   headline: `No transfer this week` },
+    }[sweep.status] || { accent: '#9ca3af', dot: '#9ca3af', dotBg: 'rgba(156,163,175,0.18)', icon: '!', label: 'Sweep update', headline: '' };
 
     const data = await resend.emails.send({
       from: 'PayChain <info@paychain.co.ke>',
@@ -1410,7 +1410,7 @@ export const sendRevenueSweepNotification = async (email, sweep) => {
           <div style="background: linear-gradient(135deg, #06201B 0%, #0a3029 100%); padding: 32px 32px 36px;">
             <div style="margin-bottom: 20px;">${logoImgWhite(108, 'left')}</div>
             <div style="display: inline-flex; align-items: center; gap: 10px;">
-              <span style="display: inline-block; width: 36px; height: 36px; border-radius: 999px; background: ${theme.dotBg}; text-align: center; line-height: 36px; color: ${theme.dot}; font-size: 18px; font-weight: 800;">$</span>
+              <span style="display: inline-block; width: 36px; height: 36px; border-radius: 999px; background: ${theme.dotBg}; text-align: center; line-height: 36px; color: ${theme.dot}; font-size: 18px; font-weight: 800;">${theme.icon}</span>
               <div>
                 <p style="margin: 0; color: ${theme.accent}; font-size: 11px; font-weight: 800; letter-spacing: 2.5px; text-transform: uppercase;">Revenue Sweep</p>
                 <h1 style="margin: 4px 0 0; color: #fff; font-size: 22px; font-weight: 800; letter-spacing: -0.3px;">${theme.headline}</h1>
