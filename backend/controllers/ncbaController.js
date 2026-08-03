@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import Merchant from '../models/Merchant.js';
 import { createNotification } from './notificationController.js';
-import { safeSendSMS } from '../utils/smsSanitizer.js';
+import { safeSendSMS, sendStaggeredSms } from '../utils/smsSanitizer.js';
 import { buildCustomerPaidSms, buildPaymentReceivedSms } from '../utils/paymentSmsTemplates.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
@@ -118,8 +118,14 @@ export const handleNcbaReconciliationWebhook = async (req, res) => {
     const { date, time } = formatTransactionDateTime();
     const accountRef = formatAccountNumberDisplay(getNcbaVirtualAccountNumber(merchantCode) || merchantCode);
 
+    // Staggered, not simultaneous — see sendStaggeredSms's doc comment:
+    // firing both back-to-back leaves the second one queued by Africa's
+    // Talking for minutes, confirmed on every real multi-recipient
+    // transaction sampled. Detached (not awaited) so this never delays
+    // this webhook's ack to NCBA.
+    const sends = [];
     if (customerPhone) {
-      safeSendSMS({
+      sends.push({
         to: customerPhone,
         message: buildCustomerPaidSms({
           ref: transactionReference,
@@ -129,13 +135,11 @@ export const handleNcbaReconciliationWebhook = async (req, res) => {
           date,
           time,
         }).message,
-      }).then((result) => {
-        if (!result.success) logEvent('error', 'ncba_reconciliation_customer_sms_failed', { transactionReference, error: result.error });
       });
     }
 
     if (merchant.phone) {
-      safeSendSMS({
+      sends.push({
         to: merchant.phone,
         message: buildPaymentReceivedSms({
           ref: transactionReference,
@@ -146,10 +150,20 @@ export const handleNcbaReconciliationWebhook = async (req, res) => {
           time,
           balance: ledgerResult.merchant.kesBalance || 0,
         }).message,
-      }).then((result) => {
-        if (!result.success) logEvent('error', 'ncba_reconciliation_sms_failed', { transactionReference, merchantId: merchant._id.toString(), error: result.error });
       });
     }
+
+    sendStaggeredSms(sends).then((results) => {
+      let idx = 0;
+      if (customerPhone) {
+        const result = results[idx++];
+        if (!result.success) logEvent('error', 'ncba_reconciliation_customer_sms_failed', { transactionReference, error: result.error });
+      }
+      if (merchant.phone) {
+        const result = results[idx++];
+        if (!result.success) logEvent('error', 'ncba_reconciliation_sms_failed', { transactionReference, merchantId: merchant._id.toString(), error: result.error });
+      }
+    });
 
     return accept(res, transactionReference);
   } catch (err) {

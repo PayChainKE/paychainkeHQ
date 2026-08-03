@@ -1,6 +1,6 @@
 import Merchant from '../models/Merchant.js';
 import { createNotification } from './notificationController.js';
-import { safeSendSMS } from '../utils/smsSanitizer.js';
+import { sendStaggeredSms } from '../utils/smsSanitizer.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { parseSoapXmlSafely, findFirstTagValue, XmlSecurityError } from '../utils/xmlSecurity.js';
 import {
@@ -273,8 +273,14 @@ export const handleNcbaAccountNotification = async (req, res) => {
       .find((candidate) => candidate && toE164Kenyan(candidate)) || null;
     const customerDisplayName = parsedCustomer.name || 'a customer';
 
+    // Staggered (not simultaneous) — confirmed live that firing both SMS
+    // back-to-back gets the first dispatched in under a second but leaves
+    // the second queued by Africa's Talking for minutes, every time (see
+    // sendStaggeredSms's own doc comment). Detached (not awaited) so this
+    // never delays this webhook's response to NCBA.
+    const sends = [];
     if (validPayerPhone) {
-      safeSendSMS({
+      sends.push({
         to: validPayerPhone,
         message: buildCustomerPaidSms({
           ref: transId,
@@ -284,8 +290,6 @@ export const handleNcbaAccountNotification = async (req, res) => {
           date,
           time,
         }).message,
-      }).then((result) => {
-        if (!result.success) logEvent('error', 'ncba_account_notification_customer_sms_failed', { transId, error: result.error });
       });
     } else {
       logEvent('info', 'ncba_account_notification_customer_sms_skipped_no_phone', { transId, merchantId: merchant._id.toString() });
@@ -294,7 +298,7 @@ export const handleNcbaAccountNotification = async (req, res) => {
     if (merchant.phone) {
       // validPayerPhone already resolved and validated above — reused here
       // as-is, not recomputed.
-      safeSendSMS({
+      sends.push({
         to: merchant.phone,
         message: buildPaymentReceivedSms({
           ref: transId,
@@ -305,7 +309,19 @@ export const handleNcbaAccountNotification = async (req, res) => {
           time,
           balance: ledgerResult.merchant.kesBalance,
         }).message,
-      }).then((result) => {
+      });
+    } else {
+      logEvent('warn', 'ncba_account_notification_sms_skipped_no_phone', { transId, merchantId: merchant._id.toString() });
+    }
+
+    sendStaggeredSms(sends).then((results) => {
+      let idx = 0;
+      if (validPayerPhone) {
+        const result = results[idx++];
+        if (!result.success) logEvent('error', 'ncba_account_notification_customer_sms_failed', { transId, error: result.error });
+      }
+      if (merchant.phone) {
+        const result = results[idx++];
         // Logged on both outcomes — previously only failures were logged,
         // which made "SMS silently succeeded" and "SMS was never attempted
         // because merchant.phone was empty" indistinguishable from Render
@@ -315,10 +331,8 @@ export const handleNcbaAccountNotification = async (req, res) => {
         } else {
           logEvent('error', 'ncba_account_notification_sms_failed', { transId, merchantId: merchant._id.toString(), error: result.error });
         }
-      });
-    } else {
-      logEvent('warn', 'ncba_account_notification_sms_skipped_no_phone', { transId, merchantId: merchant._id.toString() });
-    }
+      }
+    });
 
     return respondOk(res);
   } catch (err) {
