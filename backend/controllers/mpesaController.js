@@ -2,7 +2,7 @@ import axios from 'axios';
 import bcrypt from 'bcryptjs';
 import Transaction from '../models/Transaction.js';
 import Merchant from '../models/Merchant.js';
-import { safeSendSMS, buildStrictSms } from '../utils/smsSanitizer.js';
+import { safeSendSMS, sendStaggeredSms, buildStrictSms } from '../utils/smsSanitizer.js';
 import { calculateMerchantFee, processSplitTransaction, splitCustomerSurcharge, getCheckoutTotal, calculateRawC2bMarkup, PricingEngineError } from '../utils/pricingEngine.js';
 import { sendInvoicePaidReceiptEmail } from '../utils/resend.js';
 import { settleInflationShield } from '../utils/stellarHelper.js';
@@ -338,6 +338,19 @@ export const confirmationURL = async (req, res) => {
       message: `You received KES ${amount.toLocaleString()} from ${senderName || 'a customer'} via your PayChain Account Number ${merchant.paybillAccount}.`,
     });
 
+    // Explicit pause before the merchant SMS, only when a customer SMS was
+    // actually sent above too — confirmed live (2026-08-04) that firing two
+    // SMS too close together gets the second one queued by Africa's
+    // Talking for minutes (100% hit rate across every real multi-recipient
+    // transaction sampled). The Inflation Shield branch above sometimes
+    // already provides enough of a gap on its own, but the common
+    // no-Stellar-wallet path resolves in milliseconds — not enough. Safe to
+    // await here regardless: the response to Safaricom was already sent
+    // above this block (see the Promise.all comment below).
+    if (MSISDN) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+
     // Merchant transaction alert SMS — new balance here IS real data we
     // hold (updatedMerchant.kesBalance from the atomic $inc above).
     const merchantSms = merchant.phone
@@ -672,8 +685,14 @@ export const stkCallback = async (req, res) => {
               }).catch((e) => console.error('❌ Failed to send invoice-paid receipt email:', e.message));
             }
 
-            // Customer receipt + merchant alert, same pattern as the C2B
-            // confirmationURL above — never blocks, never throws. Account
+            // Customer receipt + merchant alert — staggered (see
+            // sendStaggeredSms's doc comment in utils/smsSanitizer.js) and
+            // fully DETACHED from this handler's response to Safaricom
+            // (never awaited): the africastalking SDK call has no
+            // configured timeout, so awaiting it here would expose
+            // Safaricom's own webhook ack to whatever delay AT's API has —
+            // real payment-processing risk, not just a slow SMS. Matches
+            // how the NCBA controllers already handle this. Account
             // reference mirrors M-Pesa's own "for account X" convention:
             // the invoice number if this settled an invoice, else the
             // merchant's paybill account if they have one, else the raw
@@ -681,19 +700,20 @@ export const stkCallback = async (req, res) => {
             // predating the paybillAccount field — have none).
             const payerLabel = link.invoiceId ? 'invoice' : 'payment link';
             const accountRef = paidInvoice?.invoiceNumber || merchant.paybillAccount || stkReq.linkId;
-            const customerSms = stkReq.phone
-              ? safeSendSMS({
-                  to: stkReq.phone,
-                  message: buildCustomerPaidSms({
-                    ref: receipt,
-                    amount: stkReq.amount,
-                    businessName: merchant.businessName,
-                    accountRef,
-                    date,
-                    time,
-                  }).message,
-                }).then((r) => { if (!r.success) console.error(`STK ${payerLabel} customer SMS failed for ${receipt}:`, r.error); })
-              : Promise.resolve();
+            const linkSends = [];
+            if (stkReq.phone) {
+              linkSends.push({
+                to: stkReq.phone,
+                message: buildCustomerPaidSms({
+                  ref: receipt,
+                  amount: stkReq.amount,
+                  businessName: merchant.businessName,
+                  accountRef,
+                  date,
+                  time,
+                }).message,
+              });
+            }
             // Merchant sees their base bill amount, not the customer's
             // total (which may include a surcharge that was never the
             // merchant's money) — matches merchantNetSettlement/link.amount
@@ -703,21 +723,31 @@ export const stkCallback = async (req, res) => {
             // their phone number, which we do have via stkReq.phone.
             // buildPaymentReceivedSms defaults payerName to "a customer"
             // when null.
-            const merchantSms = merchant.phone
-              ? safeSendSMS({
-                  to: merchant.phone,
-                  message: buildPaymentReceivedSms({
-                    ref: receipt,
-                    amount: link.amount,
-                    payerName: null,
-                    payerPhone: stkReq.phone,
-                    date,
-                    time,
-                    balance: updatedMerchant.kesBalance || 0,
-                  }).message,
-                }).then((r) => { if (!r.success) console.error(`STK ${payerLabel} merchant SMS failed for ${receipt}:`, r.error); })
-              : Promise.resolve();
-            await Promise.all([customerSms, merchantSms]);
+            if (merchant.phone) {
+              linkSends.push({
+                to: merchant.phone,
+                message: buildPaymentReceivedSms({
+                  ref: receipt,
+                  amount: link.amount,
+                  payerName: null,
+                  payerPhone: stkReq.phone,
+                  date,
+                  time,
+                  balance: updatedMerchant.kesBalance || 0,
+                }).message,
+              });
+            }
+            sendStaggeredSms(linkSends).then((results) => {
+              let idx = 0;
+              if (stkReq.phone) {
+                const r = results[idx++];
+                if (!r.success) console.error(`STK ${payerLabel} customer SMS failed for ${receipt}:`, r.error);
+              }
+              if (merchant.phone) {
+                const r = results[idx++];
+                if (!r.success) console.error(`STK ${payerLabel} merchant SMS failed for ${receipt}:`, r.error);
+              }
+            });
           }
         }
       } else {
@@ -795,29 +825,31 @@ export const stkCallback = async (req, res) => {
           // 'request_money' / 'pay_account' — a real customer paid, so this
           // uses the same professional "payment received" format as every
           // other collection rail.
-          // Sent one at a time, the second only starting once the first has
-          // fully round-tripped — NOT fired concurrently (even Promise.all
-          // starts both requests in the same tick). Confirmed live: issuing
-          // two safeSendSMS calls back to back to the *same* recipient
-          // number (merchant.phone === stkReq.phone happens whenever a
-          // merchant tests their own request-money link) reproducibly
-          // dropped one of the two messages — Africa's Talking's gateway
-          // appears to coalesce/reject near-simultaneous sends to one
-          // MSISDN. A real, if small, gap between the two calls avoids it.
+          // Staggered (see sendStaggeredSms's doc comment in
+          // utils/smsSanitizer.js — also covers why "same recipient" cases,
+          // like a merchant testing their own request-money link, need this
+          // too) and fully DETACHED from this handler's response to
+          // Safaricom (never awaited): the africastalking SDK call has no
+          // configured timeout, so awaiting it here would expose
+          // Safaricom's own webhook ack to whatever delay AT's API has —
+          // real payment-processing risk, not just a slow SMS. Matches how
+          // the NCBA controllers already handle this.
+          const topupSends = [];
           if (merchant.phone) {
-            const message = kind === 'topup'
-              ? `${receipt} Confirmed. KES ${merchantCredit.toLocaleString()} added to your PayChain wallet via M-PESA on ${date} at ${time}. Your updated available balance is KES ${(updatedMerchant.kesBalance || 0).toLocaleString()}.`
-              : buildPaymentReceivedSms({
-                  ref: receipt,
-                  amount: merchantCredit,
-                  payerName: null,
-                  payerPhone: stkReq.phone,
-                  date,
-                  time,
-                  balance: updatedMerchant.kesBalance || 0,
-                }).message;
-            const r = await safeSendSMS({ to: merchant.phone, message });
-            if (!r.success) console.error(`Wallet top-up SMS failed for merchant ${merchant._id}:`, r.error);
+            topupSends.push({
+              to: merchant.phone,
+              message: kind === 'topup'
+                ? `${receipt} Confirmed. KES ${merchantCredit.toLocaleString()} added to your PayChain wallet via M-PESA on ${date} at ${time}. Your updated available balance is KES ${(updatedMerchant.kesBalance || 0).toLocaleString()}.`
+                : buildPaymentReceivedSms({
+                    ref: receipt,
+                    amount: merchantCredit,
+                    payerName: null,
+                    payerPhone: stkReq.phone,
+                    date,
+                    time,
+                    balance: updatedMerchant.kesBalance || 0,
+                  }).message,
+            });
           }
 
           // The customer/payer side of this — previously missing entirely
@@ -827,7 +859,7 @@ export const stkCallback = async (req, res) => {
           // there in practice, and the merchant SMS above already IS their
           // confirmation — a second copy would be redundant, not useful).
           if (kind !== 'topup' && stkReq.phone) {
-            const r = await safeSendSMS({
+            topupSends.push({
               to: stkReq.phone,
               message: buildCustomerPaidSms({
                 ref: receipt,
@@ -838,8 +870,19 @@ export const stkCallback = async (req, res) => {
                 time,
               }).message,
             });
-            if (!r.success) console.error(`STK ${kind} customer SMS failed for ${receipt}:`, r.error);
           }
+
+          sendStaggeredSms(topupSends).then((results) => {
+            let idx = 0;
+            if (merchant.phone) {
+              const r = results[idx++];
+              if (!r.success) console.error(`Wallet top-up SMS failed for merchant ${merchant._id}:`, r.error);
+            }
+            if (kind !== 'topup' && stkReq.phone) {
+              const r = results[idx++];
+              if (!r.success) console.error(`STK ${kind} customer SMS failed for ${receipt}:`, r.error);
+            }
+          });
         }
       }
     } else {
