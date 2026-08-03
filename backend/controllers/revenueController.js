@@ -578,7 +578,11 @@ export const getRevenue = async (req, res) => {
 // @access  Private (Admin)
 export const getRevenueSweeps = async (req, res) => {
   try {
-    const sweeps = await RevenueSweep.find({}).sort('-createdAt').limit(52).lean();
+    // 52 (one/week for a year) undercounted in practice — manual "Run Sweep
+    // Now" attempts and every redeploy landing on the configured sweep day
+    // each add their own row, so a busy week alone can produce several.
+    // Client paginates this at 25/page; querying more up front is cheap.
+    const sweeps = await RevenueSweep.find({}).sort('-createdAt').limit(500).lean();
     res.json({ success: true, count: sweeps.length, data: sweeps });
   } catch (error) {
     console.error('Get Revenue Sweeps Error:', error);

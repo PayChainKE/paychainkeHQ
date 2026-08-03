@@ -128,6 +128,22 @@ const fmtPeriod = (period) => {
   if (!period?.from || !period?.to) return '—';
   return `${fmtDate(period.from)} – ${fmtDate(period.to)}`;
 };
+// Real RevenueSweep periods can start/end within the same day (several
+// attempts can happen hours apart) — fmtDate alone would collapse those
+// to an identical-looking date, so the sweep history table needs time too.
+const fmtDateTime = (iso) => {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString('en-KE', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
+
+// Raw RevenueSweep.status values, as recorded — distinct from the derived
+// STATUS_META labels below (e.g. "Settled to Corporate"), which describe a
+// whole ISO week rather than one attempt.
+const RAW_STATUS_META = {
+  completed: { dot: 'bg-emerald-500', text: 'text-emerald-700', border: 'border-emerald-200', bg: 'bg-emerald-50' },
+  skipped:   { dot: 'bg-amber-500',   text: 'text-amber-800',   border: 'border-amber-200',   bg: 'bg-amber-50'   },
+  failed:    { dot: 'bg-red-500',     text: 'text-red-700',     border: 'border-red-200',     bg: 'bg-red-50'     },
+};
 
 // ── Time-series re-bucketing — daily series → weekly / monthly. ───────
 function rebucketSeries(series, granularity) {
@@ -284,6 +300,27 @@ const Revenue = () => {
 
   useEffect(() => { fetchRevenue(); }, [fetchRevenue]);
 
+  // Real sweep history — every actual RevenueSweep attempt (see
+  // services/revenueSweepService.js), independent of `range` above since
+  // it's a full log, not a windowed revenue figure.
+  const [sweepHistory, setSweepHistory] = useState([]);
+  const [sweepHistoryLoading, setSweepHistoryLoading] = useState(true);
+  const [sweepHistoryPage, setSweepHistoryPage] = useState(1);
+
+  const fetchSweepHistory = useCallback(async () => {
+    setSweepHistoryLoading(true);
+    try {
+      const res = await api.get('/api/admin/revenue/sweeps');
+      setSweepHistory(res.data?.data || []);
+    } catch (e) {
+      setSweepHistory([]);
+    } finally {
+      setSweepHistoryLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchSweepHistory(); }, [fetchSweepHistory]);
+
   // Manual "Run Sweep Now" — POST /api/admin/revenue/sweeps/run. Distinct
   // from the `sweeps`/sweepBatches table below, which is a projected estimate
   // re-derived from transactions on every request; this actually attempts a
@@ -312,13 +349,14 @@ const Revenue = () => {
         showToast(`Sweep failed: ${sweep.failureReason || 'unknown error.'}`);
       }
       fetchRevenue();
+      fetchSweepHistory();
     } catch (e) {
       showToast(e?.response?.data?.error || 'Sweep request failed.');
     } finally {
       setSweepBusy(false);
       setSweepConfirmOpen(false);
     }
-  }, [showToast, fetchRevenue]);
+  }, [showToast, fetchRevenue, fetchSweepHistory]);
 
   const kpis     = data?.kpis     || {};
   const channels = data?.channels || [];
@@ -329,6 +367,11 @@ const Revenue = () => {
   const pagedSweeps = useMemo(
     () => sweeps.slice((sweepsPage - 1) * PAGE_SIZE, sweepsPage * PAGE_SIZE),
     [sweeps, sweepsPage]
+  );
+
+  const pagedSweepHistory = useMemo(
+    () => sweepHistory.slice((sweepHistoryPage - 1) * PAGE_SIZE, sweepHistoryPage * PAGE_SIZE),
+    [sweepHistory, sweepHistoryPage]
   );
 
   const filteredChannels = useMemo(() => {
@@ -677,6 +720,91 @@ const Revenue = () => {
               </div>
             </div>
           )}
+        </section>
+
+        {/* ── C2. Sweep History — the real RevenueSweep log ─────────── */}
+        <section>
+          <div className="flex items-end justify-between mb-4">
+            <div>
+              <h3 className="text-base font-bold text-on-surface tracking-tight font-headline">Sweep History</h3>
+              <p className="text-xs text-on-surface-variant mt-1">
+                Every real sweep attempt on record — what actually ran, not a projection. Independent of the date range above.
+              </p>
+            </div>
+          </div>
+          <div className="bg-surface-container-lowest border border-outline-variant/40 rounded-lg overflow-hidden">
+            {sweepHistoryLoading ? (
+              <div className="p-8"><Skel className="w-full h-32" /></div>
+            ) : sweepHistory.length === 0 ? (
+              <div className="p-12 text-center text-on-surface-variant text-xs">
+                No sweep attempts recorded yet.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-surface-container/70 border-b border-outline-variant/40">
+                    <tr className="text-2xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+                      <th className="text-left px-5 py-3">Ran At</th>
+                      <th className="text-left px-3 py-3">Period Covered</th>
+                      <th className="text-left px-3 py-3">Status</th>
+                      <th className="text-right px-3 py-3">Amount</th>
+                      <th className="text-right px-3 py-3">Txns</th>
+                      <th className="text-left px-3 py-3">Destination</th>
+                      <th className="text-left px-5 py-3">Reference / Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pagedSweepHistory.map((s) => {
+                      const meta = RAW_STATUS_META[s.status] || RAW_STATUS_META.skipped;
+                      const amount = s.status === 'completed' ? s.amount : s.attemptedAmount;
+                      const destination = s.destinationBankCode && s.destinationAccountNumber
+                        ? `${s.destinationBankCode} · ${s.destinationAccountNumber}`
+                        : '— not configured';
+                      return (
+                        <tr key={s._id} className="border-b border-outline-variant/40 last:border-b-0 hover:bg-surface-container/70 transition-colors">
+                          <td className="px-5 py-3.5 text-on-surface tabular-nums">
+                            {fmtDateTime(s.createdAt)}
+                          </td>
+                          <td className="px-3 py-3.5 text-on-surface-variant tabular-nums">
+                            {fmtDateTime(s.periodStart)} – {fmtDateTime(s.periodEnd)}
+                          </td>
+                          <td className="px-3 py-3.5">
+                            <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded border ${meta.border} ${meta.bg} ${meta.text} text-2xs font-bold uppercase tracking-wider`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} />
+                              {s.status}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3.5 text-right tabular-nums">
+                            <span className="font-bold text-on-surface">{fmtKESPrecise(amount)}</span>
+                            {s.status !== 'completed' && <span className="block text-2xs text-on-surface-variant normal-case">attempted</span>}
+                          </td>
+                          <td className="px-3 py-3.5 text-right tabular-nums text-on-surface-variant">
+                            {fmtNum(s.transactionCount)}
+                          </td>
+                          <td className="px-3 py-3.5 text-on-surface-variant tabular-nums">
+                            {destination}
+                          </td>
+                          <td className="px-5 py-3.5 text-on-surface-variant">
+                            {s.status === 'completed' ? (
+                              <span className="font-mono text-on-surface">
+                                {s.ncbaReference || '—'}
+                                {s.simulated && <span className="ml-1.5 text-2xs font-sans text-amber-700">(simulated)</span>}
+                              </span>
+                            ) : (
+                              <span>{s.failureReason || '—'}</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {!sweepHistoryLoading && sweepHistory.length > 0 && (
+              <TablePagination page={sweepHistoryPage} pageSize={PAGE_SIZE} total={sweepHistory.length} onPage={setSweepHistoryPage} />
+            )}
+          </div>
         </section>
 
         {/* ── Top merchants (kept from previous iteration) ─────────── */}
