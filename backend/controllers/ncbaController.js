@@ -8,12 +8,12 @@ import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLocked
 import {
   validateMerchantCode,
   validateCollectionAmount,
-  validatePhoneNumber,
   validateTransactionReference,
   getNcbaVirtualAccountNumber,
   formatAccountNumberDisplay,
   NcbaValidationError,
 } from '../utils/ncbaValidators.js';
+import { toE164Kenyan } from '../utils/notificationService.js';
 import { creditNcbaCollection, DuplicateCollectionError } from '../services/ncbaLedgerService.js';
 import { NcbaTariffBoundsError } from '../config/ncbaTariffCard.js';
 import {
@@ -62,9 +62,15 @@ export const handleNcbaReconciliationWebhook = async (req, res) => {
     const grossAmount = validateCollectionAmount(body.amount);
     const merchantCode = validateMerchantCode(body.merchantCode);
 
-    // NCBA's reconciliation push doesn't guarantee a payer MSISDN — accept
-    // one if present (still validated), otherwise proceed without it.
-    const customerPhone = body.phoneNumber != null ? validatePhoneNumber(body.phoneNumber) : null;
+    // NCBA's reconciliation push doesn't guarantee a payer MSISDN, and when
+    // it's present it isn't always actually valid (observed on the sibling
+    // account-notification webhook: this field has carried an account
+    // number instead of a phone number). Best-effort only — toE164Kenyan
+    // never throws, so a malformed/missing phone just means no customer
+    // SMS, not a rejected transaction. (Previously used validatePhoneNumber,
+    // which *threw* on anything malformed — meaning a bad phone in this one
+    // optional field could reject the whole payment credit.)
+    const customerPhone = toE164Kenyan(body.phoneNumber) || null;
 
     const merchant = await Merchant.findOne({ ncbaMerchantCode: merchantCode });
     if (!merchant) {
