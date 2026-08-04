@@ -7,6 +7,7 @@ const REASON_COPY = {
   'session-expired':  { tone: 'amber', text: 'Your session expired. Please sign in again.' },
   'account-missing':  { tone: 'red',   text: 'Your account is no longer active. Contact an admin.' },
   'session-invalid':  { tone: 'amber', text: 'Your session is no longer valid. Please sign in again.' },
+  'idle-timeout':     { tone: 'amber', text: 'You were signed out after 15 minutes of inactivity. Please sign in again.' },
 };
 
 function maskEmail(raw) {

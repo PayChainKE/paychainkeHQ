@@ -19,15 +19,25 @@ const KENYAN_COUNTIES = [
 
 export default function Login({ route }: any) {
   const { login, biometricLogin, signup, verifyOTP, forgotPassword, resetPassword,
-          isBiometricsEnabled, hasBiometricToken } = useAuth();
+          isBiometricsEnabled, hasBiometricToken, logoutReason, clearLogoutReason } = useAuth();
   const { authenticate: authenticateBiometric } = useBiometrics();
-  
+
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Idle/background auto-logout (AuthContext) sets logoutReason instead of
+  // silently dropping the merchant back here — surface it once, the same
+  // way biometricLogin's own "Session expired" message already renders.
+  useEffect(() => {
+    if (logoutReason === 'idle-timeout') {
+      setErr('You were signed out after 15 minutes of inactivity. Please sign in again.');
+      clearLogoutReason();
+    }
+  }, [logoutReason]);
 
   // Signup Flow States
   const [signupName, setSignupName] = useState('');

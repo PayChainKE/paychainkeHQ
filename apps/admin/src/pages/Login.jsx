@@ -8,6 +8,7 @@ const REASON_COPY = {
   'session-expired':  { tone: 'amber', text: 'Your session expired. Please sign in again.' },
   'account-missing':  { tone: 'red',   text: 'Your admin account is no longer active. Sign in with a current account.' },
   'session-invalid':  { tone: 'amber', text: 'Your session is no longer valid. Please sign in again.' },
+  'idle-timeout':     { tone: 'amber', text: 'You were signed out after 15 minutes of inactivity. Please sign in again.' },
 };
 
 // Mask an email for display so observers can't read it off the OTP screen.

@@ -91,11 +91,13 @@ export function MerchantAuthProvider({ children }) {
   }, [merchant?._id]);
 
   // Idle auto-logout — 15 min of no activity (any tab, any app), warned at
-  // 13 min. See hooks/useIdleTimer.js for why this shape was chosen.
+  // 13 min. See hooks/useIdleTimer.js for why this shape was chosen. Passes
+  // 'idle-timeout' through so Login can show why the merchant was signed
+  // out, instead of a silent redirect.
   const { showWarning: showIdleWarning, resetActivity: stayLoggedIn } = useIdleTimer({
     timeoutMs: IDLE_TIMEOUT_MS,
     warningMs: IDLE_WARNING_MS,
-    onIdle: logout,
+    onIdle: () => logout('idle-timeout'),
     enabled: !!merchant,
   });
 
@@ -216,13 +218,13 @@ export function MerchantAuthProvider({ children }) {
     axios.defaults.headers.common['Authorization'] = `Bearer ${jwt}`;
   }
 
-  function logout() {
+  function logout(reason) {
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(TOKEN_KEY);
     delete axios.defaults.headers.common['Authorization'];
     setMerchant(null);
     setToken(null);
-    navigate('/login');
+    navigate(reason ? `/login?reason=${reason}` : '/login');
   }
 
   return (

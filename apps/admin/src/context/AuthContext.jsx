@@ -68,19 +68,21 @@ export function AuthProvider({ children }){
     }
   }
 
-  function logout() {
+  function logout(reason) {
     localStorage.removeItem('paychain_admin_session');
     localStorage.removeItem('paychain_admin_token');
     setAdmin(null);
-    navigate('/login');
+    navigate(reason ? `/login?reason=${reason}` : '/login');
   }
 
   // Idle auto-logout — 15 min of no activity (any tab, any app), warned at
-  // 13 min. See hooks/useIdleTimer.js for why this shape was chosen.
+  // 13 min. See hooks/useIdleTimer.js for why this shape was chosen. Passes
+  // 'idle-timeout' through to Login's REASON_COPY banner so someone who
+  // walked away sees why they were signed out, instead of a silent redirect.
   const { showWarning: showIdleWarning, resetActivity: stayLoggedIn } = useIdleTimer({
     timeoutMs: IDLE_TIMEOUT_MS,
     warningMs: IDLE_WARNING_MS,
-    onIdle: logout,
+    onIdle: () => logout('idle-timeout'),
     enabled: !!admin,
   });
 

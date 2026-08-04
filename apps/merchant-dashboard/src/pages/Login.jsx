@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { useNotification } from '../context/NotificationContext'
 import mainLogo from '../assets/signin-logo.png'
@@ -47,12 +47,28 @@ export default function Login() {
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(false)
   const nav = useNavigate()
+  const location = useLocation()
 
   useEffect(() => {
     if (isAuthenticated) {
       nav('/overview')
     }
   }, [isAuthenticated, nav])
+
+  // Idle auto-logout (MerchantAuthContext) redirects here with
+  // ?reason=idle-timeout instead of silently dropping the merchant back to
+  // the login form — surface that as a toast so it's clear this was a
+  // security timeout, not an unexpected sign-out.
+  useEffect(() => {
+    const reason = new URLSearchParams(location.search).get('reason')
+    if (reason === 'idle-timeout') {
+      addNotification({
+        title: 'Signed Out',
+        message: 'You were signed out after 15 minutes of inactivity. Please sign in again.',
+      })
+      nav('/login', { replace: true })
+    }
+  }, [])
 
   // Signup Flow States
   const [signupName, setSignupName] = useState('')

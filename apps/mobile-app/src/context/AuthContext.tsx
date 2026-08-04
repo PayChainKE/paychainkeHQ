@@ -12,6 +12,15 @@ import api from '../api/config';
 // doesn't stay unlocked indefinitely.
 const REAUTH_BACKGROUND_MS = 30_000;
 
+// Full-session idle timeout — 15 min with no touch activity while the app is
+// foregrounded and unlocked, matching the web dashboards' idle-logout policy
+// (see useIdleTimer.js in the web apps). Also reused as the threshold for a
+// full logout (not just a PIN re-lock) when the app returns from background
+// after being away this long — someone leaving the phone unattended for real
+// should have to sign in again, not just re-enter a 4-digit PIN.
+const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
+const IDLE_POLL_MS = 15_000;
+
 const AuthContext = createContext<any>(null);
 
 const STORAGE_KEY        = 'paychain_merchant_session'; // merchant profile (non-sensitive)
@@ -62,7 +71,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Biometric quick-login only works when this is true (there's a credential to unlock).
   const [hasBiometricToken, setHasBiometricToken] = useState(false);
 
-  // ── Re-lock on return from background ─────────────────────────────────────
+  // Set (only) by a forced logout, so Login.tsx can show why the merchant
+  // landed back there instead of a silent bounce. Cleared once Login reads it.
+  const [logoutReason, setLogoutReason] = useState<string | null>(null);
+  function clearLogoutReason() {
+    setLogoutReason(null);
+  }
+
+  // ── Re-lock / full-logout on return from background ───────────────────────
   // Plain ref, not state — this is a timestamp bookkeeping value read only
   // inside the AppState listener itself, so there's nothing to re-render for.
   const backgroundedAtRef = useRef<number | null>(null);
@@ -78,7 +94,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const backgroundedAt = backgroundedAtRef.current;
       backgroundedAtRef.current = null;
       if (backgroundedAt === null) return;
-      if (Date.now() - backgroundedAt < REAUTH_BACKGROUND_MS) return;
+
+      const awayMs = Date.now() - backgroundedAt;
+
+      // Away long enough that this is the same "left it unattended" scenario
+      // as the foreground idle timer below — a full sign-out, not just a
+      // PIN re-lock.
+      if (awayMs >= IDLE_TIMEOUT_MS) {
+        logout('idle-timeout');
+        return;
+      }
+      if (awayMs < REAUTH_BACKGROUND_MS) return;
 
       // Only matters once the user has actually unlocked into the app with
       // a PIN set — re-locking a merchant who's still on Login/Onboarding
@@ -90,6 +116,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => subscription.remove();
   }, []);
+
+  // ── Foreground idle timeout ────────────────────────────────────────────────
+  // Any touch anywhere in the app calls recordActivity() (wired at the root
+  // in App.tsx). A ref, not state, polled on an interval — same reasoning as
+  // the background timestamp above: this fires far too often to live in
+  // React state without causing constant re-renders.
+  const lastActiveAtRef = useRef<number>(Date.now());
+  function recordActivity() {
+    lastActiveAtRef.current = Date.now();
+  }
+
+  useEffect(() => {
+    // Only run once actually unlocked into the app — no point idling out a
+    // PIN entry screen or the login form itself.
+    if (!merchant || !token || !isPinUnlocked) return;
+    lastActiveAtRef.current = Date.now();
+
+    const interval = setInterval(() => {
+      if (Date.now() - lastActiveAtRef.current >= IDLE_TIMEOUT_MS) {
+        logout('idle-timeout');
+      }
+    }, IDLE_POLL_MS);
+    return () => clearInterval(interval);
+  }, [merchant, token, isPinUnlocked]);
 
   // ── Session restore on app launch ─────────────────────────────────────────
   useEffect(() => {
@@ -297,7 +347,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  async function logout() {
+  async function logout(reason?: string) {
     try {
       await AsyncStorage.multiRemove([STORAGE_KEY, 'paychain_onboarding_complete']);
       await clearToken();
@@ -309,6 +359,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(null);
     setIsPinUnlocked(false);
     setHasBiometricToken(false);
+    if (reason) setLogoutReason(reason);
     // Note: isBiometricsEnabled and hasSetBiometrics are deliberately NOT
     // cleared here — they survive logout so the biometric button and setup
     // screen behave correctly on next login.
@@ -348,6 +399,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   function unlockApp() {
+    lastActiveAtRef.current = Date.now();
     setIsPinUnlocked(true);
   }
 
@@ -363,6 +415,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       hasSetBiometrics,
       isBiometricsEnabled,
       hasBiometricToken,
+      logoutReason,
+      clearLogoutReason,
+      recordActivity,
       completeOnboarding,
       setAppPin,
       completeBiometricSetup,
