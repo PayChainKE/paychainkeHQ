@@ -3,11 +3,60 @@ import Admin from '../models/Admin.js';
 import { sendOTP } from '../utils/resend.js';
 import generateToken from '../utils/generateToken.js';
 import { logAudit } from '../utils/auditLog.js';
+import { toE164Kenyan } from '../utils/notificationService.js';
+import { safeSendSMS } from '../utils/smsSanitizer.js';
 
 // Cryptographically generate a 6-digit OTP (avoids Math.random predictability).
 function generateOtp() {
   // crypto.randomInt is uniformly distributed and safe for credential material.
   return crypto.randomInt(0, 1_000_000).toString().padStart(6, '0');
+}
+
+// Mirrors merchantAuthController.js's maskPhone — e.g. +254712345678 →
+// +254•••••••78. Admin.phone is always stored pre-normalized (E.164), so
+// this never needs the raw-fallback branch the merchant version has.
+function maskPhone(e164) {
+  const digits = String(e164 || '').replace(/\D/g, '');
+  if (digits.length < 6) return null;
+  const start = digits.slice(0, 3);
+  const end = digits.slice(-2);
+  return `+${start}${'•'.repeat(Math.max(3, digits.length - start.length - end.length))}${end}`;
+}
+
+// Resolves the login "email" field to an actual Admin doc whether the user
+// typed their email or their phone number — same email-or-phone login the
+// merchant dashboard already supports. Returns null rather than throwing on
+// a malformed phone (never let toE164Kenyan's null accidentally become a
+// `{ phone: null }` query, which would match every admin with no phone set).
+async function findAdminByIdentifier(identifier, { withPassword = false } = {}) {
+  const isEmail = identifier.includes('@');
+  const query = isEmail
+    ? { email: identifier.toLowerCase() }
+    : { phone: toE164Kenyan(identifier) };
+  if (!isEmail && !query.phone) return null;
+  const q = Admin.findOne(query);
+  return withPassword ? q.select('+password') : q;
+}
+
+// Sends the login OTP via SMS when the admin/officer signed in with their
+// phone number, otherwise email — mirrors merchantAuthController.js's
+// dispatchOtp. Admin.phone is only ever set already-normalized (see
+// officerAccountController.js), so unlike the merchant version there's no
+// "phone present but won't normalize" fallback branch to handle.
+async function dispatchAdminOtp(admin, { viaPhone, otp }) {
+  if (viaPhone && admin.phone) {
+    const result = await safeSendSMS({
+      to: admin.phone,
+      message: `Your PayChain verification code is ${otp}. It expires in 10 minutes. Do not share this code.`,
+    });
+    if (!result.success) console.error(`SMS OTP dispatch failed for admin ${admin._id}:`, result.error);
+    return { channel: 'sms', maskedPhone: maskPhone(admin.phone) };
+  }
+  // Dispatch async; never log the OTP value.
+  sendOTP(admin.email, otp).catch((err) => {
+    console.error('OTP dispatch failed:', err?.message || err);
+  });
+  return { channel: 'email', maskedPhone: null };
 }
 
 // Constant-time string comparison to prevent timing-based code guessing.
@@ -29,10 +78,13 @@ export const login = async (req, res) => {
   }
 
   try {
+    const identifier = String(email).trim();
+    const viaPhone = !identifier.includes('@');
+
     // password is select:false on the schema; explicit opt-in for the compare.
-    const admin = await Admin.findOne({ email: email.toLowerCase().trim() }).select('+password');
+    const admin = await findAdminByIdentifier(identifier, { withPassword: true });
     if (!admin) {
-      // Same error + status as bad-password to avoid email enumeration.
+      // Same error + status as bad-password to avoid identifier enumeration.
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
@@ -44,20 +96,20 @@ export const login = async (req, res) => {
     const otp = generateOtp();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
+    const { channel, maskedPhone } = await dispatchAdminOtp(admin, { viaPhone, otp });
+
     admin.otp = otp;
     admin.otpExpires = otpExpires;
+    admin.otpChannel = channel;
     await admin.save();
-
-    // Dispatch async; never log the OTP value.
-    sendOTP(admin.email, otp).catch(err => {
-      console.error('OTP dispatch failed:', err?.message || err);
-    });
 
     res.json({
       success: true,
       mfaRequired: true,
       email: admin.email,
-      message: 'OTP sent to your email. Proceed to Stage 2.'
+      channel,
+      maskedPhone,
+      message: channel === 'sms' ? 'OTP sent via SMS. Proceed to Stage 2.' : 'OTP sent to your email. Proceed to Stage 2.',
     });
   } catch (error) {
     console.error('Login error:', error?.message || error);
@@ -166,13 +218,14 @@ export const changePassword = async (req, res) => {
 export const verifyOTP = async (req, res) => {
   const { email, otp, otpCode } = req.body;
   const submittedOtp = (otp || otpCode || '').toString().trim();
+  const identifier = String(email || '').trim();
 
-  if (!email || !submittedOtp) {
-    return res.status(400).json({ error: 'Email and verification code are required.' });
+  if (!identifier || !submittedOtp) {
+    return res.status(400).json({ error: 'Email/phone and verification code are required.' });
   }
 
   try {
-    const admin = await Admin.findOne({ email: email.toLowerCase().trim() });
+    const admin = await findAdminByIdentifier(identifier);
 
     if (!admin || !admin.otp || !admin.otpExpires) {
       // Generic error — never reveal whether the email exists or whether

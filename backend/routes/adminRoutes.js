@@ -35,7 +35,7 @@ import {
 import {
   listOfficers,
   createOfficer,
-  updateOfficerStatus,
+  updateOfficer,
   resetOfficerPassword,
   deleteOfficer,
 } from '../controllers/officerAccountController.js';
@@ -155,7 +155,7 @@ router.post('/team/:id/resend-invite',       protect, sensitiveActionLimiter, re
 // never manage their own or each other's accounts).
 router.get('/officers',                      protect, requireMutator, listOfficers);
 router.post('/officers',                     protect, requireMutator, sensitiveActionLimiter, createOfficer);
-router.patch('/officers/:id',                protect, requireMutator, updateOfficerStatus);
+router.patch('/officers/:id',                protect, requireMutator, updateOfficer);
 router.post('/officers/:id/reset-password',  protect, requireMutator, sensitiveActionLimiter, resetOfficerPassword);
 router.delete('/officers/:id',               protect, requireMutator, deleteOfficer);
 

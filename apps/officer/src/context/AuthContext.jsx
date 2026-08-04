@@ -31,7 +31,7 @@ export function AuthProvider({ children }){
       const data = response.data;
 
       if (data.mfaRequired) {
-        return { success: true, mfaRequired: true, email: data.email };
+        return { success: true, mfaRequired: true, email: data.email, channel: data.channel, maskedPhone: data.maskedPhone };
       }
 
       if (!data.success) {

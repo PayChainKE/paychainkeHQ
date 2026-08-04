@@ -5,6 +5,7 @@ import Merchant from '../models/Merchant.js';
 import { logAudit } from '../utils/auditLog.js';
 import { adminActor } from './adminController.js';
 import { sendOfficerCredentials } from '../utils/resend.js';
+import { toE164Kenyan } from '../utils/notificationService.js';
 
 // Onboarding-officer account management — admin/owner only. Deliberately a
 // separate controller from teamController.js: team members (owner/admin/
@@ -19,6 +20,7 @@ const OFFICER_LOGIN_URL = process.env.OFFICER_DASHBOARD_URL || 'https://officer.
 const safeOfficer = (a) => ({
   _id: a._id,
   email: a.email,
+  phone: a.phone,
   name: a.name,
   role: a.role,
   status: a.status,
@@ -71,6 +73,12 @@ export const createOfficer = async (req, res) => {
     if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
       return res.status(400).json({ error: 'A valid email is required.' });
     }
+    // Required — the whole point is giving the officer a phone-login/SMS-OTP
+    // option alongside email, not just an optional extra field.
+    const phone = toE164Kenyan(req.body.phone);
+    if (!phone) {
+      return res.status(400).json({ error: 'A valid Kenyan phone number is required.' });
+    }
     if (password && password.length < 10) {
       return res.status(400).json({ error: 'Password must be at least 10 characters.' });
     }
@@ -78,11 +86,18 @@ export const createOfficer = async (req, res) => {
       password = generatePassword();
     }
 
-    const exists = await Admin.findOne({ email });
-    if (exists) return res.status(409).json({ error: 'An admin or officer with that email already exists.' });
+    const exists = await Admin.findOne({ $or: [{ email }, { phone }] });
+    if (exists) {
+      return res.status(409).json({
+        error: exists.email === email
+          ? 'An admin or officer with that email already exists.'
+          : 'An admin or officer with that phone number already exists.',
+      });
+    }
 
     const officer = new Admin({
       email,
+      phone,
       name,
       role: 'officer',
       status: 'active',
@@ -107,7 +122,10 @@ export const createOfficer = async (req, res) => {
     res.status(201).json({ success: true, data: safeOfficer(officer), generatedPassword: password });
   } catch (error) {
     console.error('Create Officer Error:', error?.message || error);
-    if (error.code === 11000) return res.status(409).json({ error: 'An admin or officer with that email already exists.' });
+    if (error.code === 11000) {
+      const key = Object.keys(error.keyPattern || {})[0];
+      return res.status(409).json({ error: key === 'phone' ? 'An admin or officer with that phone number already exists.' : 'An admin or officer with that email already exists.' });
+    }
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map((v) => v.message);
       return res.status(400).json({ error: messages.join(', ') });
@@ -116,35 +134,61 @@ export const createOfficer = async (req, res) => {
   }
 };
 
-// @desc    Activate/deactivate an officer account.
+// @desc    Update an officer account — activate/deactivate, and/or set their
+//          phone number (e.g. backfilling one for an officer created before
+//          phone-login existed). At least one of status/phone required.
 // @route   PATCH /api/admin/officers/:id
 // @access  Private (Owner/Admin)
-export const updateOfficerStatus = async (req, res) => {
+export const updateOfficer = async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ error: 'Invalid id.' });
     }
     const { status } = req.body || {};
-    if (!['active', 'inactive'].includes(status)) {
+    const phoneProvided = req.body?.phone !== undefined;
+
+    if (status !== undefined && !['active', 'inactive'].includes(status)) {
       return res.status(400).json({ error: 'status must be "active" or "inactive".' });
+    }
+    if (status === undefined && !phoneProvided) {
+      return res.status(400).json({ error: 'Provide status and/or phone to update.' });
+    }
+
+    let phone;
+    if (phoneProvided) {
+      phone = toE164Kenyan(req.body.phone);
+      if (!phone) return res.status(400).json({ error: 'A valid Kenyan phone number is required.' });
+      const dupe = await Admin.findOne({ phone, _id: { $ne: req.params.id } });
+      if (dupe) return res.status(409).json({ error: 'An admin or officer with that phone number already exists.' });
     }
 
     const target = await Admin.findOne({ _id: req.params.id, role: 'officer' });
     if (!target) return res.status(404).json({ error: 'Officer not found.' });
 
-    target.status = status;
+    if (status !== undefined) target.status = status;
+    if (phoneProvided) target.phone = phone;
     await target.save();
 
-    logAudit({
-      action: status === 'active' ? 'admin.officer.reactivated' : 'admin.officer.deactivated',
-      category: 'admin', severity: 'warning',
-      message: `Officer ${target.email} set to ${status}`,
-      actor: adminActor(req.admin), req,
-    });
+    if (status !== undefined) {
+      logAudit({
+        action: status === 'active' ? 'admin.officer.reactivated' : 'admin.officer.deactivated',
+        category: 'admin', severity: 'warning',
+        message: `Officer ${target.email} set to ${status}`,
+        actor: adminActor(req.admin), req,
+      });
+    }
+    if (phoneProvided) {
+      logAudit({
+        action: 'admin.officer.phone_updated', category: 'admin', severity: 'info',
+        message: `Phone number updated for officer ${target.email}`,
+        actor: adminActor(req.admin), req,
+      });
+    }
 
     res.json({ success: true, data: safeOfficer(target) });
   } catch (error) {
-    console.error('Update Officer Status Error:', error?.message || error);
+    console.error('Update Officer Error:', error?.message || error);
+    if (error.code === 11000) return res.status(409).json({ error: 'An admin or officer with that phone number already exists.' });
     res.status(500).json({ error: 'Server Error' });
   }
 };

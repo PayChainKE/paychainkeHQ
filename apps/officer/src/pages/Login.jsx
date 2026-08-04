@@ -36,6 +36,8 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1);
   const [showPassword, setShowPassword] = useState(false);
+  const [otpChannel, setOtpChannel] = useState('email');
+  const [otpMaskedPhone, setOtpMaskedPhone] = useState('');
 
   const reasonBanner = useMemo(() => {
     const params = new URLSearchParams(location.search);
@@ -53,6 +55,8 @@ const Login = () => {
     const res = await login(email, password);
     if (res.mfaRequired) {
       setPassword('');
+      setOtpChannel(res.channel || 'email');
+      setOtpMaskedPhone(res.maskedPhone || '');
       setStep(2);
     } else if (!res.success) {
       setError(res.error);
@@ -129,7 +133,9 @@ const Login = () => {
             <p className="text-on-surface-variant font-medium mt-2 opacity-70">
               {step === 1
                 ? 'Authorized access for PayChain onboarding officers.'
-                : `We've sent a 6-digit code to ${maskEmail(email)}`}
+                : otpChannel === 'sms'
+                  ? `We've sent a 6-digit code via SMS to ${otpMaskedPhone || 'your phone'}`
+                  : `We've sent a 6-digit code to ${maskEmail(email)}`}
             </p>
           </div>
 
@@ -156,15 +162,15 @@ const Login = () => {
             {step === 1 ? (
               <>
                 <div className="space-y-2">
-                  <label className="text-2xs font-black uppercase tracking-widest text-primary/60 pl-1" htmlFor="email">Email address</label>
+                  <label className="text-2xs font-black uppercase tracking-widest text-primary/60 pl-1" htmlFor="email">Email or Phone Number</label>
                   <input
                     id="email"
                     name="officer_login_id"
                     className="w-full bg-white border border-outline-variant/15 rounded-2xl py-3.5 lg:py-4 px-5 text-lg font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@paychain.co.ke"
-                    type="email"
+                    placeholder="you@paychain.co.ke or 0712..."
+                    type="text"
                     required
                     autoComplete="off"
                     autoCorrect="off"
