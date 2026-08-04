@@ -41,6 +41,12 @@ const isChecklistComplete = (checklist) => CHECKLIST_KEYS.every((k) => checklist
 
 const QUEUE_LIST_FIELDS = 'name email phone businessName businessType submittedAt kybStatus riskTier claimedBy resubmissionCount kybDocuments';
 
+// Officers are fully isolated to merchants they personally onboarded — no
+// shared queue between officers. Admins/owners (who never hit this, since
+// onboardingOfficerId is only ever set by an officer's own createApplication
+// call) retain unrestricted visibility. Spread into any Merchant filter.
+const scopedToOfficer = (admin) => (admin?.role === 'officer' ? { onboardingOfficerId: admin._id } : {});
+
 // @desc    Officer submits a new merchant KYC application.
 // @route   POST /api/officer/applications
 // @access  Private (Officer)
@@ -135,8 +141,8 @@ export const createApplication = async (req, res) => {
   }
 };
 
-// @desc    List the KYC application queue. Whole queue is visible to every
-//          officer/admin — claiming only prevents concurrent editing.
+// @desc    List the KYC application queue. Admins/owners see the whole
+//          queue; officers only see applications they personally onboarded.
 // @route   GET /api/officer/applications?status=&riskTier=&from=&to=&page=&limit=
 // @access  Private (Owner/Admin/Officer)
 export const getQueue = async (req, res) => {
@@ -145,7 +151,7 @@ export const getQueue = async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 25));
 
-    const filter = { kybStatus: { $exists: true } };
+    const filter = { kybStatus: { $exists: true }, ...scopedToOfficer(req.admin) };
     if (status) filter.kybStatus = status;
     if (riskTier) filter.riskTier = riskTier;
     if (from || to) {
@@ -176,7 +182,9 @@ export const getQueue = async (req, res) => {
   }
 };
 
-// @desc    Top summary counts for the officer dashboard.
+// @desc    Top summary counts for the officer dashboard. Officers get counts
+//          scoped to merchants they personally onboarded; admins/owners see
+//          system-wide counts.
 // @route   GET /api/officer/metrics
 // @access  Private (Owner/Admin/Officer)
 export const getMetrics = async (req, res) => {
@@ -185,12 +193,13 @@ export const getMetrics = async (req, res) => {
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const startOfWeek = new Date(startOfToday);
     startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+    const officerScope = scopedToOfficer(req.admin);
 
     const [pending, resubmitted, approvedToday, approvedThisWeek] = await Promise.all([
-      Merchant.countDocuments({ kybStatus: 'pending' }),
-      Merchant.countDocuments({ kybStatus: { $in: ['pending', 'requires_revision'] }, resubmissionCount: { $gt: 0 } }),
-      Merchant.countDocuments({ kybStatus: 'approved', reviewedAt: { $gte: startOfToday } }),
-      Merchant.countDocuments({ kybStatus: 'approved', reviewedAt: { $gte: startOfWeek } }),
+      Merchant.countDocuments({ kybStatus: 'pending', ...officerScope }),
+      Merchant.countDocuments({ kybStatus: { $in: ['pending', 'requires_revision'] }, resubmissionCount: { $gt: 0 }, ...officerScope }),
+      Merchant.countDocuments({ kybStatus: 'approved', reviewedAt: { $gte: startOfToday }, ...officerScope }),
+      Merchant.countDocuments({ kybStatus: 'approved', reviewedAt: { $gte: startOfWeek }, ...officerScope }),
     ]);
 
     res.json({ success: true, data: { pending, resubmitted, approvedToday, approvedThisWeek } });
@@ -208,7 +217,7 @@ export const getApplication = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ error: 'Invalid id.' });
     }
-    const application = await Merchant.findOne({ _id: req.params.id, kybStatus: { $exists: true } })
+    const application = await Merchant.findOne({ _id: req.params.id, kybStatus: { $exists: true }, ...scopedToOfficer(req.admin) })
       .populate('claimedBy', 'name email')
       .populate('onboardingOfficerId', 'name email')
       .populate('reviewedBy', 'name email');
@@ -232,7 +241,7 @@ export const claimApplication = async (req, res) => {
       return res.status(400).json({ error: 'Invalid id.' });
     }
     const application = await Merchant.findOneAndUpdate(
-      { _id: req.params.id, claimedBy: null, kybStatus: { $in: ['pending', 'requires_revision'] } },
+      { _id: req.params.id, claimedBy: null, kybStatus: { $in: ['pending', 'requires_revision'] }, ...scopedToOfficer(req.admin) },
       { $set: { claimedBy: req.admin._id, claimedAt: new Date() } },
       { returnDocument: 'after' }
     );
@@ -270,7 +279,7 @@ export const updateChecklist = async (req, res) => {
     }
 
     const application = await Merchant.findOneAndUpdate(
-      { _id: req.params.id, kybStatus: { $exists: true } },
+      { _id: req.params.id, kybStatus: { $exists: true }, ...scopedToOfficer(req.admin) },
       { $set: updates },
       { returnDocument: 'after' }
     );
@@ -303,7 +312,7 @@ export const updateDocumentStatus = async (req, res) => {
     if (!['approved', 'rejected', 'pending'].includes(status)) return res.status(400).json({ error: 'status must be approved, rejected, or pending.' });
 
     const application = await Merchant.findOneAndUpdate(
-      { _id: req.params.id, kybStatus: { $exists: true }, 'kybDocuments.type': docType },
+      { _id: req.params.id, kybStatus: { $exists: true }, 'kybDocuments.type': docType, ...scopedToOfficer(req.admin) },
       { $set: { 'kybDocuments.$.status': status, 'kybDocuments.$.note': note || null } },
       { returnDocument: 'after' }
     );
@@ -336,7 +345,7 @@ export const addNote = async (req, res) => {
 
     const entry = { authorId: req.admin._id, authorName: req.admin.name || req.admin.email, note, createdAt: new Date() };
     const application = await Merchant.findOneAndUpdate(
-      { _id: req.params.id, kybStatus: { $exists: true } },
+      { _id: req.params.id, kybStatus: { $exists: true }, ...scopedToOfficer(req.admin) },
       { $push: { kybNotes: entry } },
       { returnDocument: 'after' }
     );
@@ -368,7 +377,7 @@ export const setRiskTier = async (req, res) => {
       return res.status(400).json({ error: 'riskTier must be low, medium, or high.' });
     }
 
-    const before = await Merchant.findOne({ _id: req.params.id, kybStatus: { $exists: true } }).select('riskTier');
+    const before = await Merchant.findOne({ _id: req.params.id, kybStatus: { $exists: true }, ...scopedToOfficer(req.admin) }).select('riskTier');
     if (!before) return res.status(404).json({ error: 'Application not found.' });
     const previous = before.riskTier || null;
 
@@ -399,7 +408,7 @@ export const approveApplication = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ error: 'Invalid id.' });
     }
-    const application = await Merchant.findOne({ _id: req.params.id, kybStatus: { $exists: true } });
+    const application = await Merchant.findOne({ _id: req.params.id, kybStatus: { $exists: true }, ...scopedToOfficer(req.admin) });
     if (!application) return res.status(404).json({ error: 'Application not found.' });
     if (application.kybStatus === 'approved') return res.status(400).json({ error: 'Application is already approved.' });
 
@@ -464,7 +473,7 @@ export const requestRevision = async (req, res) => {
     if (docTypes.length === 0) return res.status(400).json({ error: 'Select at least one document type that needs fixing.' });
     if (!message) return res.status(400).json({ error: 'A message for the applicant is required.' });
 
-    const application = await Merchant.findOne({ _id: req.params.id, kybStatus: { $exists: true } });
+    const application = await Merchant.findOne({ _id: req.params.id, kybStatus: { $exists: true }, ...scopedToOfficer(req.admin) });
     if (!application) return res.status(404).json({ error: 'Application not found.' });
 
     for (const doc of application.kybDocuments) {
@@ -511,7 +520,7 @@ export const rejectApplication = async (req, res) => {
     const note = String(req.body?.note || '').trim();
     if (!note) return res.status(400).json({ error: 'An internal note is required to reject an application.' });
 
-    const application = await Merchant.findOne({ _id: req.params.id, kybStatus: { $exists: true } });
+    const application = await Merchant.findOne({ _id: req.params.id, kybStatus: { $exists: true }, ...scopedToOfficer(req.admin) });
     if (!application) return res.status(404).json({ error: 'Application not found.' });
 
     application.kybStatus = 'rejected';
