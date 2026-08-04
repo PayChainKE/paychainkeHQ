@@ -23,6 +23,25 @@ const AdminSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
+  // E.164 Kenyan MSISDN (+254XXXXXXXXX). Optional for owner/admin/analyst,
+  // required for officers (enforced in officerAccountController.js, not
+  // here, since this schema is shared by every role). Lets an officer log
+  // in with their phone instead of email and receive the OTP via SMS —
+  // see authController.js's login/verifyOTP.
+  phone: {
+    type: String,
+    default: null,
+    unique: true,
+    sparse: true,
+  },
+  // Which channel the most recently-issued OTP actually went out on —
+  // mirrors Merchant.otpChannel. Purely informational bookkeeping, not
+  // used for anything security-sensitive.
+  otpChannel: {
+    type: String,
+    enum: ['email', 'sms'],
+    default: null,
+  },
   status: {
     type: String,
     enum: ['active', 'inactive', 'pending'],

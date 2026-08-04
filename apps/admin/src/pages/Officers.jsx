@@ -25,6 +25,7 @@ const Officers = () => {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
+  const [editPhoneTarget, setEditPhoneTarget] = useState(null); // officer being edited
   const [revealModal, setRevealModal] = useState(null); // { email, password, title }
   const [toast, setToast] = useState('');
   const [page, setPage] = useState(1);
@@ -170,7 +171,7 @@ const Officers = () => {
                 ) : filtered.length === 0 ? (
                   <tr><td colSpan={5} className="px-4 py-10 text-center text-on-surface-variant/40 text-sm">{error || 'No officers yet.'}</td></tr>
                 ) : pagedOfficers.map((o) => (
-                  <OfficerRow key={o._id} officer={o} canManage={canManage} onToggleStatus={() => handleToggleStatus(o)} onResetPassword={() => handleResetPassword(o)} onDelete={() => handleDelete(o)} />
+                  <OfficerRow key={o._id} officer={o} canManage={canManage} onToggleStatus={() => handleToggleStatus(o)} onResetPassword={() => handleResetPassword(o)} onDelete={() => handleDelete(o)} onEditPhone={() => setEditPhoneTarget(o)} />
                 ))}
               </tbody>
             </table>
@@ -182,7 +183,7 @@ const Officers = () => {
           {loading ? <div className="p-8 text-center text-on-surface-variant/40 text-sm">Loading officers…</div> :
             filtered.length === 0 ? <div className="p-8 text-center text-on-surface-variant/40 text-sm">{error || 'No officers yet.'}</div> :
             pagedOfficers.map((o) => (
-              <OfficerCard key={o._id} officer={o} canManage={canManage} onToggleStatus={() => handleToggleStatus(o)} onResetPassword={() => handleResetPassword(o)} onDelete={() => handleDelete(o)} />
+              <OfficerCard key={o._id} officer={o} canManage={canManage} onToggleStatus={() => handleToggleStatus(o)} onResetPassword={() => handleResetPassword(o)} onDelete={() => handleDelete(o)} onEditPhone={() => setEditPhoneTarget(o)} />
             ))}
           {!loading && filtered.length > 0 && (
             <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 shadow-editorial overflow-hidden">
@@ -206,6 +207,18 @@ const Officers = () => {
           <RevealPasswordModal {...revealModal} onClose={() => setRevealModal(null)} />
         )}
 
+        {editPhoneTarget && (
+          <EditPhoneModal
+            officer={editPhoneTarget}
+            onClose={() => setEditPhoneTarget(null)}
+            onUpdated={(phone) => {
+              setOfficers((arr) => arr.map((o) => (o._id === editPhoneTarget._id ? { ...o, phone } : o)));
+              setEditPhoneTarget(null);
+              showToast('Phone number updated.');
+            }}
+          />
+        )}
+
         {toast && (
           <div className="fixed bottom-6 right-6 z-50 bg-on-surface text-white px-4 py-2.5 rounded-xl shadow-lg text-xs font-bold animate-fadeIn">{toast}</div>
         )}
@@ -217,6 +230,7 @@ const Officers = () => {
 // ── Create modal ────────────────────────────────────────────────────
 const CreateOfficerModal = ({ onClose, onCreated }) => {
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -226,10 +240,11 @@ const CreateOfficerModal = ({ onClose, onCreated }) => {
     e.preventDefault();
     setErr('');
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) { setErr('Enter a valid email.'); return; }
+    if (!/^(?:\+?254|0)?[71]\d{8}$/.test(phone.trim().replace(/\s+/g, ''))) { setErr('Enter a valid Kenyan phone number.'); return; }
     if (password && password.length < 10) { setErr('Password must be at least 10 characters.'); return; }
     setBusy(true);
     try {
-      const res = await api.post('/api/admin/officers', { email: email.trim(), name: name.trim(), password: password || undefined });
+      const res = await api.post('/api/admin/officers', { email: email.trim(), phone: phone.trim(), name: name.trim(), password: password || undefined });
       if (res.data?.success) onCreated(res.data.data, res.data.generatedPassword);
       else setErr(res.data?.error || 'Could not create officer.');
     } catch (e2) {
@@ -248,6 +263,9 @@ const CreateOfficerModal = ({ onClose, onCreated }) => {
         <form onSubmit={submit} className="p-6 space-y-4" autoComplete="off">
           <Field label="Email" required>
             <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className={inputClass} />
+          </Field>
+          <Field label="Mobile Number" required hint="Officer can log in with this number and receive the OTP via SMS.">
+            <input type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0712 345 678" className={inputClass} />
           </Field>
           <Field label="Display Name">
             <input type="text" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} maxLength={80} />
@@ -271,6 +289,52 @@ const CreateOfficerModal = ({ onClose, onCreated }) => {
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+};
+
+// ── Edit phone modal ────────────────────────────────────────────────
+const EditPhoneModal = ({ officer, onClose, onUpdated }) => {
+  const [phone, setPhone] = useState(officer.phone || '');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  async function submit(e) {
+    e.preventDefault();
+    setErr('');
+    if (!/^(?:\+?254|0)?[71]\d{8}$/.test(phone.trim().replace(/\s+/g, ''))) { setErr('Enter a valid Kenyan phone number.'); return; }
+    setBusy(true);
+    try {
+      const res = await api.patch(`/api/admin/officers/${officer._id}`, { phone: phone.trim() });
+      if (res.data?.success) onUpdated(res.data.data.phone);
+      else setErr(res.data?.error || 'Could not update phone number.');
+    } catch (e2) {
+      setErr(e2?.response?.data?.error || 'Could not update phone number.');
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-white rounded-2xl max-w-sm w-full shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="p-6">
+          <h3 className="text-lg font-bold tracking-tight text-on-surface mb-1">Update mobile number</h3>
+          <p className="text-xs text-on-surface-variant/60 mb-4">{officer.name || officer.email} can log in with this number and receive the OTP via SMS.</p>
+          <form onSubmit={submit} className="space-y-4">
+            <Field label="Mobile Number" required>
+              <input type="tel" required autoFocus value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0712 345 678" className={inputClass} />
+            </Field>
+            {err && <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium">{err}</div>}
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-outline-variant/10">
+              <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-2xs font-bold uppercase tracking-widest text-on-surface-variant/70 hover:bg-surface-container-low transition-all">
+                Cancel
+              </button>
+              <button type="submit" disabled={busy} className="px-5 py-2 rounded-lg bg-primary text-white text-2xs font-bold uppercase tracking-widest disabled:opacity-50">
+                {busy ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );
@@ -349,7 +413,7 @@ const StatTile = ({ icon, label, value, tone, pulse }) => {
   );
 };
 
-const OfficerRow = ({ officer, canManage, onToggleStatus, onResetPassword, onDelete }) => {
+const OfficerRow = ({ officer, canManage, onToggleStatus, onResetPassword, onDelete, onEditPhone }) => {
   const statusStyle = STATUS_META[officer.status] || STATUS_META.active;
   const initials = (officer.name || officer.email).split(/\s+/).map((s) => s[0]).slice(0, 2).join('').toUpperCase();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -363,6 +427,10 @@ const OfficerRow = ({ officer, canManage, onToggleStatus, onResetPassword, onDel
           <div>
             <p className="font-bold text-on-surface tracking-tight text-xs">{officer.name || '—'}</p>
             <p className="text-2xs text-on-surface-variant/60">{officer.email}</p>
+            <button onClick={onEditPhone} disabled={!canManage} className="text-2xs text-on-surface-variant/60 hover:text-primary disabled:hover:text-on-surface-variant/60 disabled:cursor-default flex items-center gap-1">
+              {officer.phone || 'No phone set'}
+              {canManage && <span className="material-symbols-outlined text-[11px] opacity-0 group-hover:opacity-100 transition-opacity">edit</span>}
+            </button>
           </div>
         </div>
       </td>
@@ -399,7 +467,7 @@ const OfficerRow = ({ officer, canManage, onToggleStatus, onResetPassword, onDel
   );
 };
 
-const OfficerCard = ({ officer, canManage, onToggleStatus, onResetPassword, onDelete }) => {
+const OfficerCard = ({ officer, canManage, onToggleStatus, onResetPassword, onDelete, onEditPhone }) => {
   const statusStyle = STATUS_META[officer.status] || STATUS_META.active;
   const initials = (officer.name || officer.email).split(/\s+/).map((s) => s[0]).slice(0, 2).join('').toUpperCase();
   return (
@@ -411,6 +479,7 @@ const OfficerCard = ({ officer, canManage, onToggleStatus, onResetPassword, onDe
         <div className="flex-1 min-w-0">
           <p className="font-bold text-on-surface text-xs">{officer.name || '—'}</p>
           <p className="text-2xs text-on-surface-variant/60 truncate">{officer.email}</p>
+          <p className="text-2xs text-on-surface-variant/60">{officer.phone || 'No phone set'}</p>
           <div className="mt-2 flex items-center gap-1.5 flex-wrap">
             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-bold uppercase tracking-widest border ${statusStyle.pill}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${statusStyle.dot}`}></span>
@@ -419,7 +488,8 @@ const OfficerCard = ({ officer, canManage, onToggleStatus, onResetPassword, onDe
             <span className="text-2xs text-on-surface-variant/50">{officer.merchantsOnboarded || 0} onboarded</span>
           </div>
           {canManage && (
-            <div className="mt-3 flex items-center gap-3">
+            <div className="mt-3 flex items-center gap-3 flex-wrap">
+              <button onClick={onEditPhone} className="text-2xs font-bold uppercase tracking-widest text-primary">Edit Phone</button>
               <button onClick={onResetPassword} className="text-2xs font-bold uppercase tracking-widest text-primary">Reset Password</button>
               <button onClick={onToggleStatus} className="text-2xs font-bold uppercase tracking-widest text-amber-600">{officer.status === 'active' ? 'Deactivate' : 'Reactivate'}</button>
               <button onClick={onDelete} className="text-2xs font-bold uppercase tracking-widest text-red-600">Delete</button>
