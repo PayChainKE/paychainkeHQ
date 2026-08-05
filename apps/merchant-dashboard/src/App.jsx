@@ -91,8 +91,12 @@ export default function App(){
             <Route path="/support" element={<Protected><Support/></Protected>} />
             <Route path="/notifications" element={<Protected><Notifications/></Protected>} />
             <Route path="/wallet" element={<Protected><FeatureGuard featureName="digitalWallet"><Wallet/></FeatureGuard></Protected>} />
-            <Route path="/send-money" element={<Protected><FeatureGuard featureName="digitalWallet"><SendMoney/></FeatureGuard></Protected>} />
-            <Route path="/request-money" element={<Protected><FeatureGuard featureName="digitalWallet"><RequestMoney/></FeatureGuard></Protected>} />
+            {/* Send/Request Money are plain KES mobile-money features, unrelated to
+                the crypto/Stellar "digitalWallet" feature — they were previously
+                gated behind that same flag by mistake, silently breaking these
+                buttons for any merchant with digitalWallet disabled. */}
+            <Route path="/send-money" element={<Protected><SendMoney/></Protected>} />
+            <Route path="/request-money" element={<Protected><RequestMoney/></Protected>} />
             {/* Catch-all route for 404s and refreshes */}
             <Route path="*" element={<Navigate to="/overview" replace />} />
           </Routes>
