@@ -554,6 +554,17 @@ export const stkCallback = async (req, res) => {
       return res.status(200).json({ ResultCode: 0, ResultDesc: 'Accepted' });
     }
 
+    // Safaricom is known to redeliver STK callbacks (retries on a slow/
+    // ambiguous ack). Everything below this point credits a merchant's
+    // balance, so once a request has already resolved (success or failed),
+    // any further callback for the same CheckoutRequestID is a duplicate —
+    // ack it without touching the ledger again, mirroring the pending-only
+    // guard already used on the B2C side (b2cCallback below).
+    if (stkReq.status !== 'pending') {
+      console.warn(`⚠️ Duplicate STK callback for ${CheckoutRequestID} (already ${stkReq.status}) — ignoring.`);
+      return res.status(200).json({ ResultCode: 0, ResultDesc: 'Accepted' });
+    }
+
     if (ResultCode === 0) {
       // Success
       stkReq.status = 'success';
