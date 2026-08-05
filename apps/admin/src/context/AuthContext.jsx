@@ -1,10 +1,11 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/api';
-import { useIdleTimer } from '../hooks/useIdleTimer';
+import { useIdleTimer, markPersistedActive, isPersistedIdleExpired } from '../hooks/useIdleTimer';
 import SessionTimeoutModal from '../components/modals/SessionTimeoutModal';
 
 const AuthContext = createContext();
+const LAST_ACTIVE_KEY = 'paychain_admin_last_active';
 const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
 const IDLE_WARNING_MS = 2 * 60 * 1000;
 
@@ -14,6 +15,19 @@ export function AuthProvider({ children }){
   const navigate = useNavigate();
 
   useEffect(()=>{
+    // Closing the tab kills the in-tab idle timer (its clock is purely
+    // in-memory) — without this check, closing the tab mid-idle-countdown
+    // and reopening later would restore the cached session as if no time
+    // had passed, silently defeating the 15-minute idle policy the moment
+    // the tab closes. Checked before trusting the cached session.
+    if (isPersistedIdleExpired(LAST_ACTIVE_KEY, IDLE_TIMEOUT_MS)) {
+      localStorage.removeItem('paychain_admin_session');
+      localStorage.removeItem('paychain_admin_token');
+      localStorage.removeItem(LAST_ACTIVE_KEY);
+      setIsLoading(false);
+      navigate('/login?reason=idle-timeout');
+      return;
+    }
     const raw = localStorage.getItem('paychain_admin_session');
     if (raw){
       try{ setAdmin(JSON.parse(raw)); }catch(e){}
@@ -55,6 +69,7 @@ export function AuthProvider({ children }){
         setAdmin(data.admin);
         localStorage.setItem('paychain_admin_session', JSON.stringify(data.admin));
         localStorage.setItem('paychain_admin_token', data.token);
+        markPersistedActive(LAST_ACTIVE_KEY);
         return { success: true };
       }
       
@@ -71,6 +86,7 @@ export function AuthProvider({ children }){
   function logout(reason) {
     localStorage.removeItem('paychain_admin_session');
     localStorage.removeItem('paychain_admin_token');
+    localStorage.removeItem(LAST_ACTIVE_KEY);
     setAdmin(null);
     navigate(reason ? `/login?reason=${reason}` : '/login');
   }
@@ -84,6 +100,7 @@ export function AuthProvider({ children }){
     warningMs: IDLE_WARNING_MS,
     onIdle: () => logout('idle-timeout'),
     enabled: !!admin,
+    storageKey: LAST_ACTIVE_KEY,
   });
 
   return (

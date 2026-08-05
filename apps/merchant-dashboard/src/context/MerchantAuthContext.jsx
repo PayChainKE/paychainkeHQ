@@ -1,13 +1,14 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { useIdleTimer } from '../hooks/useIdleTimer';
+import { useIdleTimer, markPersistedActive, isPersistedIdleExpired } from '../hooks/useIdleTimer';
 import SessionTimeoutModal from '../components/modals/SessionTimeoutModal';
 
 const MerchantAuthContext = createContext();
 
 const STORAGE_KEY = 'paychain_merchant_session';
 const TOKEN_KEY = 'paychain_merchant_token';
+const LAST_ACTIVE_KEY = 'paychain_merchant_last_active';
 const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
 const IDLE_WARNING_MS = 2 * 60 * 1000;
 
@@ -40,6 +41,21 @@ export function MerchantAuthProvider({ children }) {
   useEffect(() => {
     const rawMerchant = localStorage.getItem(STORAGE_KEY);
     const rawToken = localStorage.getItem(TOKEN_KEY);
+
+    // Closing the tab kills the in-tab idle timer (useIdleTimer's clock is
+    // purely in-memory) — without this check, closing the tab mid-idle-
+    // countdown and reopening it later would restore the cached session as
+    // if no time had passed at all, silently defeating the 15-minute idle
+    // policy the moment the tab is closed. Checked BEFORE trusting the
+    // cached session, so a stale reopen never even flashes the dashboard.
+    if (rawMerchant && rawToken && isPersistedIdleExpired(LAST_ACTIVE_KEY, IDLE_TIMEOUT_MS)) {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(LAST_ACTIVE_KEY);
+      setIsLoading(false);
+      navigate('/login?reason=idle-timeout');
+      return;
+    }
 
     if (rawMerchant && rawToken) {
       try {
@@ -99,6 +115,7 @@ export function MerchantAuthProvider({ children }) {
     warningMs: IDLE_WARNING_MS,
     onIdle: () => logout('idle-timeout'),
     enabled: !!merchant,
+    storageKey: LAST_ACTIVE_KEY,
   });
 
   async function signup(formData) {
@@ -120,9 +137,10 @@ export function MerchantAuthProvider({ children }) {
         setToken(jwt);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
         localStorage.setItem(TOKEN_KEY, jwt);
+        markPersistedActive(LAST_ACTIVE_KEY);
         axios.defaults.headers.common['Authorization'] = `Bearer ${jwt}`;
       }
-      
+
       return {
         success: true,
         email: res.data.email,
@@ -145,8 +163,9 @@ export function MerchantAuthProvider({ children }) {
       setToken(jwt);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
       localStorage.setItem(TOKEN_KEY, jwt);
+      markPersistedActive(LAST_ACTIVE_KEY);
       axios.defaults.headers.common['Authorization'] = `Bearer ${jwt}`;
-      
+
       return { success: true };
     } catch (err) {
       return { success: false, error: err.response?.data?.error || 'OTP Verification failed' };
@@ -215,12 +234,14 @@ export function MerchantAuthProvider({ children }) {
     setToken(jwt);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
     localStorage.setItem(TOKEN_KEY, jwt);
+    markPersistedActive(LAST_ACTIVE_KEY);
     axios.defaults.headers.common['Authorization'] = `Bearer ${jwt}`;
   }
 
   function logout(reason) {
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(LAST_ACTIVE_KEY);
     delete axios.defaults.headers.common['Authorization'];
     setMerchant(null);
     setToken(null);
