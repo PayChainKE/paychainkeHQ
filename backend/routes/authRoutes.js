@@ -98,8 +98,10 @@ router.put('/password', protect, changePassword);
 router.get('/setup-password/:token', validateAdminSetupToken);
 router.post('/setup-password', adminOtpLimiter, setupPasswordWithToken);
 
-// Merchant Auth Routes
-router.post('/merchant/register', upload.single('certificate'), registerMerchant);
+// Registration is public and accepts a file upload — same abuse surface as
+// login, so it gets the same per-IP throttle (merchantLoginLimiter was
+// previously only applied to login itself, leaving this endpoint unlimited).
+router.post('/merchant/register', merchantLoginLimiter, upload.single('certificate'), registerMerchant);
 router.post('/merchant/verify-otp', merchantOtpLimiter, verifyMerchantOTP);
 router.post('/merchant/login', merchantLoginLimiter, loginMerchant);
 router.post('/merchant/resend-otp', merchantOtpLimiter, resendMerchantOTP);

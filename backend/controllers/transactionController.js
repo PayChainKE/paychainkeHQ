@@ -160,6 +160,15 @@ export const swapKesToUsdc = async (req, res) => {
       return res.status(404).json({ error: 'Merchant not found' });
     }
 
+    // Same server-side enforcement as activateWallet above — the client-side
+    // FeatureGuard alone doesn't stop a direct API call. This endpoint backs
+    // BOTH the Wallet page (digitalWallet) and Inflation Shield page
+    // (inflationShield), so only block when an admin has explicitly turned
+    // off both — turning off just one shouldn't silently break the other.
+    if (merchant.features && merchant.features.digitalWallet === false && merchant.features.inflationShield === false) {
+      return res.status(403).json({ error: 'This feature is not available on your account right now.' });
+    }
+
     if (!merchant.stellarPublicKey) {
       return res.status(400).json({ error: 'No Stellar wallet configured for this merchant' });
     }
@@ -306,6 +315,14 @@ export const activateWallet = async (req, res) => {
       return res.status(404).json({ error: 'Merchant not found' });
     }
 
+    // The frontend only hides the Wallet page behind FeatureGuard when this
+    // is false — that's UI convenience, not enforcement. Without this check
+    // any merchant could call this endpoint directly regardless of whether
+    // an admin explicitly disabled digital wallet access on their account.
+    if (merchant.features && merchant.features.digitalWallet === false) {
+      return res.status(403).json({ error: 'Digital wallet is not available on your account right now.' });
+    }
+
     if (merchant.stellarPublicKey) {
       return res.status(400).json({ error: 'Wallet is already activated' });
     }
@@ -368,11 +385,19 @@ export const sendMoney = async (req, res) => {
     if (!amount || amount <= 0) {
       return res.status(400).json({ error: 'Valid amount is required.' });
     }
+    // fee is client-supplied — a negative value would make totalDeduction
+    // negative, which passes the kesBalance >= totalDeduction check for
+    // free and then credits the merchant via $inc: { kesBalance:
+    // -totalDeduction }. Same guard as bulkPayController.js's batch rows.
+    const numericFee = Number(fee || 0);
+    if (!Number.isFinite(numericFee) || numericFee < 0) {
+      return res.status(400).json({ error: 'Invalid fee.' });
+    }
     if (!pin) {
       return res.status(400).json({ error: 'Payment PIN is required.' });
     }
 
-    const totalDeduction = Number(amount) + Number(fee || 0);
+    const totalDeduction = Number(amount) + numericFee;
 
     const merchantWithPin = await Merchant.findById(merchantId).select('+appPin');
     if (!merchantWithPin) {

@@ -954,6 +954,15 @@ export const initiateB2C = async (req, res) => {
       return res.status(503).json({ error: 'Live M-PESA payments are not yet enabled. Set MPESA_LIVE_ENABLED=true to activate.' });
     }
 
+    // Safety: never let a live payout silently fall back to Safaricom's
+    // public sandbox initiator/password ('testapi' / 'Safaricom999!@#')
+    // just because the real credentials weren't configured — fail loudly
+    // here, before any debit, rather than attempting a live B2C call that
+    // Safaricom will reject for an unclear reason downstream.
+    if (isLive && (!process.env.MPESA_B2C_INITIATOR || !process.env.MPESA_B2C_PASSWORD)) {
+      return res.status(503).json({ error: 'Live B2C initiator credentials are not configured (MPESA_B2C_INITIATOR / MPESA_B2C_PASSWORD).' });
+    }
+
     if (!pin) {
       return res.status(400).json({ error: 'Payment PIN is required.' });
     }
@@ -1103,6 +1112,15 @@ export const initiateB2B = async (req, res) => {
     // Safety: block live transactions unless explicitly enabled
     if (isLive && process.env.MPESA_LIVE_ENABLED !== 'true') {
       return res.status(503).json({ error: 'Live M-PESA payments are not yet enabled. Set MPESA_LIVE_ENABLED=true to activate.' });
+    }
+
+    // Safety: never let a live payout silently fall back to Safaricom's
+    // public sandbox initiator/password ('testapi' / 'Safaricom999!@#')
+    // just because the real credentials weren't configured — fail loudly
+    // here, before any debit, rather than attempting a live B2C call that
+    // Safaricom will reject for an unclear reason downstream.
+    if (isLive && (!process.env.MPESA_B2C_INITIATOR || !process.env.MPESA_B2C_PASSWORD)) {
+      return res.status(503).json({ error: 'Live B2C initiator credentials are not configured (MPESA_B2C_INITIATOR / MPESA_B2C_PASSWORD).' });
     }
 
     if (!pin) {

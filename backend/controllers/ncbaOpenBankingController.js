@@ -228,17 +228,16 @@ export const handleBankPayout = async (req, res) => {
 //          from the account-level SOAP notification webhook
 //          (ncbaAccountNotificationController.js).
 //
-//          NOT currently invoked: per NCBA's UAT Guide, PesaLink/EFT
-//          (the only rails this module submits today) resolve
-//          synchronously and don't accept a callbackUrl at all — unlike
-//          NCBA's bill-pay/wallet endpoints (KPLC, water, KRA, mobile
-//          wallets), which DO carry a callbackUrl and report an
-//          "accepted" response before confirming later. This route is
-//          kept in place, ready for whichever of those async rails gets
-//          wired up next — it's a harmless no-op today since nothing
-//          created by this module is ever left 'pending' for it to match.
+//          This IS the settlement path for bulk payouts: services/
+//          ncbaBulkPaymentService.js's BILLPAY/utility rows are created
+//          'pending' and only ever resolved here (PesaLink/EFT single
+//          payouts resolve synchronously in handleBankPayout above and
+//          never reach this handler in 'pending' state). Route-level auth
+//          (verifyNcbaBasicAuth in ncbaRoutes.js) is what stops anyone who
+//          can read/guess a payment reference from POSTing a fake
+//          FAILED status here to trigger a refund of a real payout.
 // @route   POST /webhooks/ncba-openbanking-callback (mounted at /api/v1 and /v1)
-// @access  Public (NCBA host-to-host)
+// @access  NCBA host-to-host only (HTTP Basic Auth via verifyNcbaBasicAuth)
 export const handlePesaLinkCallback = async (req, res) => {
   // Ack immediately — same "banks retry on non-200/slow response"
   // convention as the account-notification webhook and mpesaController's

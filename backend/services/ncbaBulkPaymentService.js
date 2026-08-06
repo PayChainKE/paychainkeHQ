@@ -1,4 +1,5 @@
 import axios from 'axios';
+import crypto from 'crypto';
 import mongoose from 'mongoose';
 import Merchant from '../models/Merchant.js';
 import Transaction from '../models/Transaction.js';
@@ -91,7 +92,13 @@ function routeUtilityPayout(item) {
 }
 
 function buildPaymentInstruction(item, index) {
-  const reference = `NCBA-BULK-${Date.now()}-${index}`;
+  // Random suffix (not just timestamp+index, which is guessable) — this
+  // reference is returned to the merchant as their receipt number, and the
+  // openbanking-callback webhook uses it to look up and resolve the
+  // matching Transaction. Route-level auth is the real protection, but a
+  // guessable reference shouldn't be the only thing standing between "read
+  // your own receipt" and "settle someone else's payout" defense-in-depth.
+  const reference = `NCBA-BULK-${Date.now()}-${index}-${crypto.randomBytes(4).toString('hex')}`;
 
   const routingFields = item.type === 'utility'
     ? routeUtilityPayout(item)
