@@ -58,6 +58,14 @@ const router = express.Router();
 // route below requires owner/admin; GET routes stay open to all roles.
 const requireMutator = requireRole('owner', 'admin');
 
+// officer is scoped to only the merchants they personally onboarded
+// (enforced inside officerController.js via scopedToOfficer) — the
+// platform-wide GET routes below are a completely separate surface that
+// `protect` alone doesn't restrict by role, so without this an officer's
+// own valid token could read every merchant's KYB detail, revenue, ledger,
+// and wallet-audit data, defeating that isolation entirely.
+const excludeOfficer = requireRole('owner', 'admin', 'analyst');
+
 // Admin Auth Routes
 router.use('/auth', authRoutes);
 
@@ -80,66 +88,66 @@ const sensitiveActionLimiter = rateLimit({
 });
 
 // Merchant Management Routes (admin-only)
-router.get('/merchants', protect, getMerchants);
+router.get('/merchants', protect, excludeOfficer, getMerchants);
 router.post('/merchants', protect, requireMutator, merchantCreateLimiter, createMerchant);
-router.get('/merchants/analytics', protect, getMerchantAnalytics);
+router.get('/merchants/analytics', protect, excludeOfficer, getMerchantAnalytics);
 // IMPORTANT: keep `/merchants/:id` AFTER `/merchants/analytics` so Express
 // matches the literal path first instead of treating "analytics" as :id.
-router.get('/merchants/:id', protect, getMerchantDetail);
+router.get('/merchants/:id', protect, excludeOfficer, getMerchantDetail);
 router.post('/merchants/:id/request-action', protect, requireMutator, sensitiveActionLimiter, requestMerchantAction);
 router.post('/merchants/:id/confirm-action', protect, requireMutator, sensitiveActionLimiter, confirmMerchantAction);
 router.post('/merchants/:id/flag', protect, requireMutator, sensitiveActionLimiter, flagMerchant);
 router.post('/merchants/:id/unflag', protect, requireMutator, sensitiveActionLimiter, unflagMerchant);
 router.patch('/merchants/:id/features', protect, requireMutator, sensitiveActionLimiter, updateMerchantFeatures);
-router.get('/merchants/:id/audit-log', protect, getMerchantAuditLog);
+router.get('/merchants/:id/audit-log', protect, excludeOfficer, getMerchantAuditLog);
 
 // Executive insights — aggregated KPIs / GTV / funnel / leaderboards.
-router.get('/insights', protect, getInsights);
+router.get('/insights', protect, excludeOfficer, getInsights);
 
 // Wallet ledger — paginated transaction trail + KPIs + asset mix + series.
-router.get('/ledger', protect, getLedger);
+router.get('/ledger', protect, excludeOfficer, getLedger);
 
 // Revenue dashboard — per-stream fee aggregation, stacked time series,
 // top fee-generating merchants, projected ARR.
-router.get('/revenue', protect, getRevenue);
+router.get('/revenue', protect, excludeOfficer, getRevenue);
 
 // Real weekly sweep history (actual PesaLink transfers of accrued fee
 // revenue to PayChain's own account) + a manual "run now" trigger.
-router.get('/revenue/sweeps', protect, getRevenueSweeps);
+router.get('/revenue/sweeps', protect, excludeOfficer, getRevenueSweeps);
 router.post('/revenue/sweeps/run', protect, requireMutator, sensitiveActionLimiter, triggerRevenueSweep);
 
 // Manual bank reconciliation — no NCBA API exists to pull the real pooled
 // account balance automatically, so an admin pastes it in periodically and
 // this flags any gap against what the ledger expects.
-router.get('/revenue/reconciliations', protect, getReconciliations);
+router.get('/revenue/reconciliations', protect, excludeOfficer, getReconciliations);
 router.post('/revenue/reconciliations', protect, requireMutator, sensitiveActionLimiter, submitReconciliation);
 
 // Stellar Wallet Audit (live Horizon cross-reference)
-router.get('/wallet-audit', protect, runWalletAudit);
+router.get('/wallet-audit', protect, excludeOfficer, runWalletAudit);
 
 // Platform-wide invoice oversight — every merchant's invoices, paginated/searchable.
-router.get('/invoices', protect, adminListInvoices);
+router.get('/invoices', protect, excludeOfficer, adminListInvoices);
 
 // Cash advance review queue — list every merchant's application, move a
 // request between pending/reviewing/approved/declined.
-router.get('/cash-advance/requests', protect, adminListCashAdvanceRequests);
+router.get('/cash-advance/requests', protect, excludeOfficer, adminListCashAdvanceRequests);
 router.patch('/cash-advance/requests/:id', protect, requireMutator, sensitiveActionLimiter, adminUpdateCashAdvanceRequest);
 
 // Bookkeeping — expense ledger + P&L summary for KRA-ready record keeping.
-router.get('/bookkeeping/summary',        protect, getBookkeepingSummary);
-router.get('/bookkeeping/expenses',       protect, listExpenses);
+router.get('/bookkeeping/summary',        protect, excludeOfficer, getBookkeepingSummary);
+router.get('/bookkeeping/expenses',       protect, excludeOfficer, listExpenses);
 router.post('/bookkeeping/expenses',      protect, requireMutator, createExpense);
 router.put('/bookkeeping/expenses/:id',   protect, requireMutator, updateExpense);
 router.delete('/bookkeeping/expenses/:id',protect, requireMutator, deleteExpense);
 
 // Compact health pulse for the sidebar widget.
-router.get('/system-status', protect, getSystemStatus);
+router.get('/system-status', protect, excludeOfficer, getSystemStatus);
 
 // Global audit log (filterable, paginated).
-router.get('/audit-log', protect, getAuditLog);
+router.get('/audit-log', protect, excludeOfficer, getAuditLog);
 
 // Call-centre / inbound communications console.
-router.get('/communications',                protect, getCommunications);
+router.get('/communications',                protect, excludeOfficer, getCommunications);
 router.patch('/communications/:id',          protect, requireMutator, updateCommunication);
 router.post('/communications/:id/notes',     protect, requireMutator, addCommunicationNote);
 router.delete('/communications/:id',         protect, requireMutator, deleteCommunication);

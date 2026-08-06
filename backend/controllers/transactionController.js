@@ -368,11 +368,19 @@ export const sendMoney = async (req, res) => {
     if (!amount || amount <= 0) {
       return res.status(400).json({ error: 'Valid amount is required.' });
     }
+    // fee is client-supplied — a negative value would make totalDeduction
+    // negative, which passes the kesBalance >= totalDeduction check for
+    // free and then credits the merchant via $inc: { kesBalance:
+    // -totalDeduction }. Same guard as bulkPayController.js's batch rows.
+    const numericFee = Number(fee || 0);
+    if (!Number.isFinite(numericFee) || numericFee < 0) {
+      return res.status(400).json({ error: 'Invalid fee.' });
+    }
     if (!pin) {
       return res.status(400).json({ error: 'Payment PIN is required.' });
     }
 
-    const totalDeduction = Number(amount) + Number(fee || 0);
+    const totalDeduction = Number(amount) + numericFee;
 
     const merchantWithPin = await Merchant.findById(merchantId).select('+appPin');
     if (!merchantWithPin) {

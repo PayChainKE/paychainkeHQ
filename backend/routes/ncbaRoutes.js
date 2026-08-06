@@ -95,11 +95,12 @@ router.post('/bulk-payments', protectMerchant, pinLimiter, handleInitiateBulkPay
 router.post('/openbanking/bank-payout', protectMerchant, pinLimiter, handleBankPayout);
 router.get('/openbanking/bank-codes', protectMerchant, getBankCodes);
 
-// Public webhook — NCBA's Open Banking per-transaction result callback. Not
-// currently invoked by anything (PesaLink/EFT resolve synchronously and
-// don't accept a callbackUrl per NCBA's UAT Guide); kept ready for
-// whichever async rail (KPLC/water/mobile wallet) gets wired up next — see
-// handlePesaLinkCallback's doc comment.
-router.post('/webhooks/ncba-openbanking-callback', handlePesaLinkCallback);
+// Public webhook — NCBA's Open Banking per-transaction result callback.
+// Bank-authenticated the same way as the reconciliation webhook above: this
+// resolves 'pending' Transaction/PayoutBatch rows created by bulk payouts
+// (see services/ncbaBulkPaymentService.js) by refunding on failure, so it
+// must not be reachable by anyone who can merely guess/read a payment
+// reference — see handlePesaLinkCallback's doc comment.
+router.post('/webhooks/ncba-openbanking-callback', verifyNcbaBasicAuth, handlePesaLinkCallback);
 
 export default router;
