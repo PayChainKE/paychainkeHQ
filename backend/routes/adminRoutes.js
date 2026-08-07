@@ -12,6 +12,7 @@ import {
   unflagMerchant,
   updateMerchantFeatures,
   getMerchantsMap,
+  geocodeSearch,
   setMerchantLocation,
   removeMerchantLocation,
   getInsights,
@@ -90,12 +91,24 @@ const sensitiveActionLimiter = rateLimit({
   message: { error: 'Too many verification attempts. Try again in 15 minutes.' },
 });
 
+// Debounced client-side typing naturally stays well under this — mainly a
+// backstop against something looping, out of courtesy to Nominatim's free
+// public instance (which this proxies to, see geocodeSearch).
+const geocodeLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many place searches. Wait a moment and try again.' },
+});
+
 // Merchant Management Routes (admin-only)
 router.get('/merchants', protect, excludeOfficer, getMerchants);
 router.post('/merchants', protect, requireMutator, merchantCreateLimiter, createMerchant);
 router.get('/merchants/analytics', protect, excludeOfficer, getMerchantAnalytics);
 // Same reason as /merchants/analytics above — literal paths before :id.
 router.get('/merchants/map', protect, excludeOfficer, getMerchantsMap);
+router.get('/geocode', protect, excludeOfficer, geocodeLimiter, geocodeSearch);
 // IMPORTANT: keep `/merchants/:id` AFTER `/merchants/analytics` so Express
 // matches the literal path first instead of treating "analytics" as :id.
 router.get('/merchants/:id', protect, excludeOfficer, getMerchantDetail);
