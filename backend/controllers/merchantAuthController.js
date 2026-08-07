@@ -568,7 +568,7 @@ export const resetPassword = async (req, res) => {
       // Legacy single-shot path (kept so older mobile builds keep working).
       const lookup = String(email).trim().toLowerCase();
       merchant = await Merchant.findOne({ email: lookup }).select('+password');
-      if (!merchant || !merchant.otp || merchant.otp !== String(otp)) {
+      if (!merchant || !merchant.otp || !timingSafeStringEqual(merchant.otp, String(otp))) {
         return res.status(401).json({ error: 'Invalid verification code.' });
       }
       if (!merchant.otpExpires || new Date() > merchant.otpExpires) {
@@ -583,6 +583,12 @@ export const resetPassword = async (req, res) => {
     merchant.otpExpires = null;
     merchant.passwordResetToken = null;
     merchant.passwordResetExpires = null;
+    // A reset is the standard remediation after a merchant suspects their
+    // account/token was compromised — bumping tokenVersion here (same
+    // mechanism as the explicit "sign out all devices" button, see
+    // signOutAllDevices below) invalidates any JWT issued before this
+    // point, not just ones the merchant happens to know about.
+    merchant.tokenVersion = (merchant.tokenVersion || 0) + 1;
     await merchant.save();
 
     // Confirmation email — paper trail + recovery path if it wasn't them.
@@ -635,6 +641,9 @@ export const changeMerchantPassword = async (req, res) => {
     }
 
     merchant.password = newPassword;
+    // Invalidate any other JWT issued before this change — see the same
+    // rationale in resetPassword above.
+    merchant.tokenVersion = (merchant.tokenVersion || 0) + 1;
     await merchant.save();
 
     logAudit({
@@ -643,7 +652,15 @@ export const changeMerchantPassword = async (req, res) => {
       merchant, req,
     });
 
-    res.json({ success: true, message: 'Password updated successfully' });
+    // The bump above just invalidated the token this very request was
+    // authenticated with — issue a fresh one so the merchant's current
+    // session keeps working without an unexpected logout, while any OTHER
+    // copy of the old token (e.g. one an attacker had) stops working.
+    res.json({
+      success: true,
+      message: 'Password updated successfully',
+      token: generateToken(merchant._id, '30d', { tokenVersion: merchant.tokenVersion || 0 }),
+    });
   } catch (error) {
     console.error('Change Password Error:', error);
     res.status(500).json({ error: 'Server Error' });

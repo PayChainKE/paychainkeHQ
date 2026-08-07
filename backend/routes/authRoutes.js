@@ -87,6 +87,19 @@ const pinLimiter = rateLimit({
   message: { error: 'Too many PIN attempts. Try again in 15 minutes.' },
 });
 
+// Per-IP limiting alone doesn't stop a distributed/IP-rotating attacker
+// from spamming one specific victim's phone/email with reset OTPs
+// (harassment, not just brute force) — keyed on the submitted identifier
+// instead of the caller's IP, stacked on top of merchantLoginLimiter below.
+const forgotPasswordAccountLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => String(req.body?.email || '').trim().toLowerCase() || 'unknown',
+  message: { error: 'Too many reset requests for this account. Try again in an hour.' },
+});
+
 // Admin Auth Routes
 router.post('/login', adminLoginLimiter, login);
 router.post('/verify-otp', adminOtpLimiter, verifyOTP);
@@ -105,7 +118,7 @@ router.post('/merchant/register', merchantLoginLimiter, upload.single('certifica
 router.post('/merchant/verify-otp', merchantOtpLimiter, verifyMerchantOTP);
 router.post('/merchant/login', merchantLoginLimiter, loginMerchant);
 router.post('/merchant/resend-otp', merchantOtpLimiter, resendMerchantOTP);
-router.post('/merchant/forgot-password',  merchantLoginLimiter, forgotPassword);
+router.post('/merchant/forgot-password',  merchantLoginLimiter, forgotPasswordAccountLimiter, forgotPassword);
 router.post('/merchant/verify-reset-otp', merchantOtpLimiter,   verifyResetOTP);
 router.post('/merchant/reset-password',   merchantOtpLimiter,   resetPassword);
 router.get('/merchant/setup-password/:token', validateSetupToken);

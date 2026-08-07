@@ -37,6 +37,12 @@ const protect = async (req, res, next) => {
     if (admin.status && admin.status !== 'active') {
       return fail(res, 403, 'ADMIN_INACTIVE', `Admin account is ${admin.status}. Contact an owner.`);
     }
+    // Tokens issued before this field existed carry no tokenVersion claim —
+    // treat that as version 0 so old sessions keep working until the first
+    // password change bumps the account forward. Mirrors protectMerchant.
+    if ((decoded.tokenVersion || 0) !== (admin.tokenVersion || 0)) {
+      return fail(res, 401, 'SESSION_REVOKED', 'This session was signed out remotely. Please sign in again.');
+    }
     req.admin = admin;
     return next();
   } catch (err) {

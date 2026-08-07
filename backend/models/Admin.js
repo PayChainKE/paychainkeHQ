@@ -91,6 +91,14 @@ const AdminSchema = new mongoose.Schema({
     select: false,
     default: null,
   },
+  // Bumped on password change — embedded in every issued JWT (see
+  // authController.js's login/verifyOtp) so a token issued before a
+  // password change stops being accepted, even though JWTs are otherwise
+  // stateless. Mirrors Merchant.tokenVersion.
+  tokenVersion: {
+    type: Number,
+    default: 0,
+  },
   // Sensitive admin actions (freeze/delete merchant, etc.) require a fresh
   // OTP that is *bound* to a specific action+target. We store the sha256 of
   // the OTP plus the action + targetId so an OTP minted for "freeze X" can

@@ -11,6 +11,7 @@ import { useToast } from '../context/NotificationContext'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import SettlementQrCard from '../components/ui/SettlementQrCard'
 import { getAppUrl } from '../utils/appUrl'
+import { escapeHtml } from '../utils/escapeHtml'
 
 export default function Wallet() {
   const { merchant, refreshSession } = useMerchantAuth()
@@ -393,8 +394,8 @@ export default function Wallet() {
             <img src="${dataUrl}" alt="Settlement QR" />
             <div class="text">
               <h1>Settlement QR</h1>
-              <p>ACC: ${formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending')}</p>
-              <p>MERCHANT: ${merchant?.businessName || 'Merchant'}</p>
+              <p>ACC: ${escapeHtml(formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending'))}</p>
+              <p>MERCHANT: ${escapeHtml(merchant?.businessName || 'Merchant')}</p>
             </div>
             <script>
               window.onload = () => { setTimeout(() => { window.print(); window.close(); }, 500); }

@@ -238,6 +238,17 @@ export function MerchantAuthProvider({ children }) {
     axios.defaults.headers.common['Authorization'] = `Bearer ${jwt}`;
   }
 
+  // Called after any endpoint that rotates the JWT server-side (e.g.
+  // change-password bumping tokenVersion, which invalidates the token this
+  // very request was authenticated with) — swaps in the new token without
+  // otherwise touching the session, so the merchant isn't unexpectedly
+  // logged out by their own security-hygiene action.
+  function updateToken(jwt) {
+    setToken(jwt);
+    localStorage.setItem(TOKEN_KEY, jwt);
+    axios.defaults.headers.common['Authorization'] = `Bearer ${jwt}`;
+  }
+
   function logout(reason) {
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(TOKEN_KEY);
@@ -256,6 +267,7 @@ export function MerchantAuthProvider({ children }) {
       isAuthenticated: !!merchant,
       login,
       loginWithPasskey,
+      updateToken,
       signup,
       verifyOTP,
       resendOTP,
