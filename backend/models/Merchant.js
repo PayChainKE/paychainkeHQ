@@ -88,6 +88,18 @@ const merchantSchema = new mongoose.Schema({
     ref: 'Admin',
     default: null,
   },
+  // Manually pin-dropped by an admin on the Merchants Map view (no
+  // geocoding — merchants don't have any address/town field to derive this
+  // from). Absent entirely for merchants nobody has placed yet, which is
+  // how the map endpoint knows to skip them rather than plotting a bogus
+  // default location.
+  mapLocation: {
+    lat: { type: Number, default: null },
+    lng: { type: Number, default: null },
+    label: { type: String, default: '', trim: true },
+    setAt: { type: Date, default: null },
+    setBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },
+  },
   // Suspicious-activity flag. Manual, set by an admin with a written reason.
   // Reversible — `unflag` clears all four fields. Separate from `status`
   // (locked) because flagging is a label/review-marker, not access denial.

@@ -11,6 +11,9 @@ import {
   flagMerchant,
   unflagMerchant,
   updateMerchantFeatures,
+  getMerchantsMap,
+  setMerchantLocation,
+  removeMerchantLocation,
   getInsights,
   getLedger,
   getSystemStatus,
@@ -91,6 +94,8 @@ const sensitiveActionLimiter = rateLimit({
 router.get('/merchants', protect, excludeOfficer, getMerchants);
 router.post('/merchants', protect, requireMutator, merchantCreateLimiter, createMerchant);
 router.get('/merchants/analytics', protect, excludeOfficer, getMerchantAnalytics);
+// Same reason as /merchants/analytics above — literal paths before :id.
+router.get('/merchants/map', protect, excludeOfficer, getMerchantsMap);
 // IMPORTANT: keep `/merchants/:id` AFTER `/merchants/analytics` so Express
 // matches the literal path first instead of treating "analytics" as :id.
 router.get('/merchants/:id', protect, excludeOfficer, getMerchantDetail);
@@ -99,6 +104,8 @@ router.post('/merchants/:id/confirm-action', protect, requireMutator, sensitiveA
 router.post('/merchants/:id/flag', protect, requireMutator, sensitiveActionLimiter, flagMerchant);
 router.post('/merchants/:id/unflag', protect, requireMutator, sensitiveActionLimiter, unflagMerchant);
 router.patch('/merchants/:id/features', protect, requireMutator, sensitiveActionLimiter, updateMerchantFeatures);
+router.patch('/merchants/:id/location', protect, requireMutator, sensitiveActionLimiter, setMerchantLocation);
+router.delete('/merchants/:id/location', protect, requireMutator, sensitiveActionLimiter, removeMerchantLocation);
 router.get('/merchants/:id/audit-log', protect, excludeOfficer, getMerchantAuditLog);
 
 // Executive insights — aggregated KPIs / GTV / funnel / leaderboards.

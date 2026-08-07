@@ -109,6 +109,12 @@
   border-top-color: var(--color-primary);
 }
 
+/* Merchants Map slide-over panel entrance (MerchantPopupCard.jsx) */
+@keyframes slide-in {
+  from { transform: translateX(24px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #c0c9c0; border-radius: 10px; }

@@ -466,6 +466,139 @@ export const unflagMerchant = async (req, res) => {
   }
 };
 
+// Loose Kenya bounding box — just a sanity check against fat-finger/typo
+// coordinates (e.g. a swapped lat/lng), not a precise border. Slightly
+// generous on every side.
+const KENYA_BOUNDS = { minLat: -5, maxLat: 6, minLng: 33, maxLng: 42 };
+
+/**
+ * Merchants Map view — only merchants an admin has manually pin-dropped a
+ * location for (see setMerchantLocation below; there's no address/town
+ * field anywhere to geocode from, so this is opt-in and manual). Returns a
+ * lightweight payload meant to be polled periodically by the map, not the
+ * full merchant record.
+ * @route   GET /api/admin/merchants/map
+ * @access  Private/Admin (owner, admin, analyst — not officer)
+ */
+export const getMerchantsMap = async (req, res) => {
+  try {
+    const merchants = await Merchant.find({ 'mapLocation.lat': { $ne: null } })
+      .select('businessName phone businessType status kybStatus mapLocation')
+      .lean();
+
+    if (merchants.length === 0) return res.json({ success: true, merchants: [] });
+
+    // Scoped to just the pinned merchants (a small subset in practice, since
+    // pins are manual) — cheap even without a date filter, unlike
+    // getMerchants' unscoped 30d/all-time aggregations above.
+    const ids = merchants.map((m) => m._id);
+    const txnAgg = await Transaction.aggregate([
+      { $match: { merchantId: { $in: ids } } },
+      { $group: { _id: '$merchantId', lastTxnAt: { $max: '$createdAt' } } },
+    ]);
+    const lastTxnByMerchant = new Map(txnAgg.map((r) => [String(r._id), r.lastTxnAt]));
+
+    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+    const result = merchants.map((m) => {
+      const lastTxnAt = lastTxnByMerchant.get(String(m._id)) || null;
+      return {
+        _id: m._id,
+        businessName: m.businessName,
+        phone: m.phone,
+        businessType: m.businessType || null,
+        status: m.status,
+        kybStatus: m.kybStatus || null,
+        location: { lat: m.mapLocation.lat, lng: m.mapLocation.lng, label: m.mapLocation.label || '' },
+        lastTxnAt,
+        activeRecently: !!(lastTxnAt && new Date(lastTxnAt).getTime() >= oneDayAgo),
+      };
+    });
+
+    res.json({ success: true, merchants: result });
+  } catch (error) {
+    console.error('Get Merchants Map Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+/**
+ * Manually pin a merchant's location on the map (no geocoding — set by an
+ * admin clicking the map, since merchants have no address/town field).
+ * @route   PATCH /api/admin/merchants/:id/location
+ * @access  Private/Admin (owner, admin)
+ */
+export const setMerchantLocation = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid merchant id.' });
+    }
+
+    const lat = Number(req.body?.lat);
+    const lng = Number(req.body?.lng);
+    const label = String(req.body?.label || '').trim().slice(0, 100);
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return res.status(400).json({ error: 'lat and lng must be numbers.' });
+    }
+    if (
+      lat < KENYA_BOUNDS.minLat || lat > KENYA_BOUNDS.maxLat ||
+      lng < KENYA_BOUNDS.minLng || lng > KENYA_BOUNDS.maxLng
+    ) {
+      return res.status(400).json({ error: 'Coordinates look like they fall outside Kenya — double-check the pin.' });
+    }
+
+    const merchant = await Merchant.findById(id);
+    if (!merchant) return res.status(404).json({ error: 'Merchant not found.' });
+
+    merchant.mapLocation = { lat, lng, label, setAt: new Date(), setBy: req.admin._id };
+    await merchant.save();
+
+    logAudit({
+      action: 'admin.merchant.location_set', category: 'admin', severity: 'info',
+      message: `Map pin set for ${merchant.businessName}${label ? ` (${label})` : ''}`,
+      merchant, actor: adminActor(req.admin), req,
+      metadata: { lat, lng, label },
+    });
+
+    res.json({ success: true, location: merchant.mapLocation });
+  } catch (error) {
+    console.error('Set Merchant Location Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+/**
+ * Remove a merchant's map pin (e.g. it was placed in the wrong spot).
+ * @route   DELETE /api/admin/merchants/:id/location
+ * @access  Private/Admin (owner, admin)
+ */
+export const removeMerchantLocation = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid merchant id.' });
+    }
+
+    const merchant = await Merchant.findById(id);
+    if (!merchant) return res.status(404).json({ error: 'Merchant not found.' });
+
+    merchant.mapLocation = { lat: null, lng: null, label: '', setAt: null, setBy: null };
+    await merchant.save();
+
+    logAudit({
+      action: 'admin.merchant.location_removed', category: 'admin', severity: 'info',
+      message: `Map pin removed for ${merchant.businessName}`,
+      merchant, actor: adminActor(req.admin), req,
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Remove Merchant Location Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
 /**
  * Update merchant features (digitalWallet, inflationShield)
  * @route   PATCH /api/admin/merchants/:id/features
