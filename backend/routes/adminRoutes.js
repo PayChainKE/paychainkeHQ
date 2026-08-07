@@ -153,11 +153,17 @@ router.post('/communications/:id/notes',     protect, requireMutator, addCommuni
 router.delete('/communications/:id',         protect, requireMutator, deleteCommunication);
 
 // Team management (owner-only mutations enforced inside the controller).
+// Mutating routes are owner-only in teamController.js itself (requireOwner
+// as the first line of each handler) — requireRole('owner') here is
+// route-level defense-in-depth so a future edit that drops/forgets that
+// controller-level check doesn't silently open these up. listTeam has no
+// such check by design (any admin can view the roster, only owners can
+// change it), so it stays at the plain requireMutator-equivalent `protect`.
 router.get('/team',                          protect, listTeam);
-router.post('/team',                         protect, sensitiveActionLimiter, inviteTeamMember);
-router.patch('/team/:id',                    protect, updateTeamMember);
-router.delete('/team/:id',                   protect, removeTeamMember);
-router.post('/team/:id/resend-invite',       protect, sensitiveActionLimiter, resendInvite);
+router.post('/team',                         protect, requireRole('owner'), sensitiveActionLimiter, inviteTeamMember);
+router.patch('/team/:id',                    protect, requireRole('owner'), updateTeamMember);
+router.delete('/team/:id',                   protect, requireRole('owner'), removeTeamMember);
+router.post('/team/:id/resend-invite',       protect, requireRole('owner'), sensitiveActionLimiter, resendInvite);
 
 // Onboarding officer account management (owner/admin only — officers can
 // never manage their own or each other's accounts).

@@ -5,6 +5,7 @@ import { formatAccountNumber } from '../utils/formatAccountNumber'
 import SettlementQrCard from '../components/ui/SettlementQrCard'
 import { useToast } from '../context/NotificationContext'
 import { getAppUrl } from '../utils/appUrl'
+import { escapeHtml } from '../utils/escapeHtml'
 
 export default function MyAccounts() {
   const { merchant } = useMerchantAuth()
@@ -64,8 +65,11 @@ export default function MyAccounts() {
       addToast({ title: 'Print Failed', message: 'QR code was not ready — please try again.', type: 'error' })
       return
     }
-    const businessName = qrAccount?.name || 'Merchant'
-    const acctDisplay = formatAccountNumber(qrAccount?.accountNumber)
+    // Escaped before going into document.write below — businessName is
+    // merchant-editable text being interpolated into raw HTML, not JSX
+    // (which would escape it automatically).
+    const businessName = escapeHtml(qrAccount?.name || 'Merchant')
+    const acctDisplay = escapeHtml(formatAccountNumber(qrAccount?.accountNumber))
     const printWindow = window.open('', '', 'width=500,height=650')
     if (!printWindow) {
       addToast({ title: 'Print Blocked', message: 'Allow pop-ups for this site to print the sticker.', type: 'error' })

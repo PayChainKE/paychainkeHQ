@@ -212,6 +212,11 @@ export const resetOfficerPassword = async (req, res) => {
     if (!target) return res.status(404).json({ error: 'Officer not found.' });
 
     target.password = password;
+    // Invalidates any session the officer already has open — the caller
+    // here is an admin acting on someone else's account (e.g. offboarding
+    // or suspected compromise), so the old token being revoked doesn't
+    // affect this request's own session.
+    target.tokenVersion = (target.tokenVersion || 0) + 1;
     await target.save();
 
     const adminName = req.admin.name || req.admin.email?.split('@')[0] || 'PayChain Admin';

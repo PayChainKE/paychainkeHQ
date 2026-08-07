@@ -46,7 +46,7 @@ function relativeTime(iso) {
 
 export default function Profile() {
   const { showAmounts } = usePrivacyMode()
-  const { merchant, logout, token } = useMerchantAuth()
+  const { merchant, logout, token, updateToken } = useMerchantAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [name, setName] = useState(merchant?.name || 'Admin')
@@ -282,6 +282,10 @@ export default function Profile() {
 
       if (res.data.success) {
         toast.push({ message: 'Password updated successfully', type: 'success' })
+        // Changing the password rotates the server-side token version, which
+        // invalidates the token this very request used — swap in the fresh
+        // one the backend returns so the session keeps working.
+        if (res.data.token) updateToken(res.data.token)
         setCurrentPassword('')
         setNewPassword('')
         setConfirmPassword('')

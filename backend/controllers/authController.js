@@ -204,9 +204,18 @@ export const changePassword = async (req, res) => {
     if (!ok) return res.status(401).json({ error: 'Current password is incorrect.' });
 
     admin.password = newPassword;
+    // Invalidates any other JWT issued before this change (including a
+    // stolen one an attacker might hold) — same mechanism as Merchant's
+    // tokenVersion. The fresh token below is minted with the new version
+    // so this request's own session keeps working.
+    admin.tokenVersion = (admin.tokenVersion || 0) + 1;
     await admin.save();
 
-    res.json({ success: true, message: 'Password updated.', token: generateToken(admin._id, '12h') });
+    res.json({
+      success: true,
+      message: 'Password updated.',
+      token: generateToken(admin._id, '12h', { tokenVersion: admin.tokenVersion }),
+    });
   } catch (error) {
     console.error('Change Password Error:', error?.message || error);
     res.status(500).json({ error: 'Server Error' });
@@ -286,7 +295,7 @@ export const verifyOTP = async (req, res) => {
         avatarUrl: admin.avatarUrl,
         lastLogin: admin.lastLogin,
       },
-      token: generateToken(admin._id, '12h')
+      token: generateToken(admin._id, '12h', { tokenVersion: admin.tokenVersion || 0 })
     });
   } catch (error) {
     console.error('Verify OTP error:', error?.message || error);
