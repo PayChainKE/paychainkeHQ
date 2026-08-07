@@ -141,7 +141,7 @@ const Merchants = () => {
       // Search
       if (q) {
         const haystack = [
-          m.businessName, m.name, m.email, m.paybillAccount,
+          m.businessName, m.name, m.email, m.paybillAccount, m.ncbaVirtualAccountNumber, m.ncbaMerchantCode,
         ].filter(Boolean).map((s) => String(s).toLowerCase());
         const phoneMatch = qPhone && normalizePhone(m.phone).includes(qPhone);
         const textMatch = haystack.some((s) => s.includes(q));
@@ -598,7 +598,7 @@ const Merchants = () => {
                       </td>
                       <td className="py-2 px-3 border-b border-outline-variant/5">
                         <span className="font-mono text-[12px] font-bold text-on-surface bg-surface-container-low px-2 py-1 rounded">
-                          {m.paybillAccount || '—'}
+                          {formatAccountNumber(m.ncbaVirtualAccountNumber || m.ncbaMerchantCode) || '—'}
                         </span>
                       </td>
                       <td className="py-2 px-3 border-b border-outline-variant/5">
