@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import L from 'leaflet';
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
 import api from '../../api/api';
 import { KENYA_CENTER, KENYA_DEFAULT_ZOOM } from './mapIcons';
+import LocationSearchBox from './LocationSearchBox';
 
 // Leaflet's default marker image paths don't resolve under Vite's bundler
 // (relative URLs baked into the leaflet package) — without this, the
@@ -38,6 +39,19 @@ function InvalidateSizeOnMount() {
   return null;
 }
 
+// MapContainer's center/zoom props only apply at initial mount — react-
+// leaflet deliberately doesn't re-center on prop changes, so jumping to a
+// searched place needs an imperative flyTo. `target` carries a `seq`
+// counter (not just lat/lng) so selecting the same result twice in a row
+// still re-triggers the fly.
+function FlyToSearchResult({ target }) {
+  const map = useMap();
+  useEffect(() => {
+    if (target) map.flyTo([target.lat, target.lng], 15);
+  }, [target, map]);
+  return null;
+}
+
 // Manual pin-drop — merchants have no address/town field to geocode from
 // (see mapLocation's comment in Merchant.js), so this is how a location
 // gets onto the map at all: an admin clicks where the business actually is.
@@ -50,6 +64,15 @@ export default function LocationPickerModal({ merchant, onClose, onSaved }) {
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [error, setError] = useState('');
+  const [flyTarget, setFlyTarget] = useState(null);
+  const flySeqRef = useRef(0);
+
+  function handleSearchSelect({ lat, lng, label: searchLabel }) {
+    setPos([lat, lng]);
+    setLabel(searchLabel);
+    flySeqRef.current += 1;
+    setFlyTarget({ lat, lng, seq: flySeqRef.current });
+  }
 
   async function save() {
     if (!pos) {
@@ -100,7 +123,11 @@ export default function LocationPickerModal({ merchant, onClose, onSaved }) {
           </button>
         </div>
 
-        <div className="h-72 w-full">
+        <div className="px-5 pt-4">
+          <LocationSearchBox onSelect={handleSearchSelect} />
+        </div>
+
+        <div className="h-72 w-full mt-3">
           <MapContainer
             center={pos || KENYA_CENTER}
             zoom={pos ? 13 : KENYA_DEFAULT_ZOOM}
@@ -111,6 +138,7 @@ export default function LocationPickerModal({ merchant, onClose, onSaved }) {
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             />
             <InvalidateSizeOnMount />
+            <FlyToSearchResult target={flyTarget} />
             <ClickToPlace onPick={setPos} />
             {pos && <Marker position={pos} icon={PICKER_ICON} />}
           </MapContainer>
@@ -119,12 +147,12 @@ export default function LocationPickerModal({ merchant, onClose, onSaved }) {
         <div className="px-5 py-4 space-y-3">
           {pos ? (
             <p className="text-[12px] text-on-surface-variant/60">
-              Click anywhere on the map to move the pin.
+              Search above, or click anywhere on the map to move the pin.
             </p>
           ) : (
             <p className="text-[12px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center gap-1.5">
               <span className="material-symbols-outlined text-[16px]">touch_app</span>
-              No pin placed yet — click anywhere on the map above.
+              No pin placed yet — search above or click anywhere on the map.
             </p>
           )}
           <div>
