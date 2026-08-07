@@ -1,4 +1,18 @@
 node_modules/
 .env
+*.local
 
 tailscale/
+
+# One-off local debug/scratch scripts (run manually against a real DB/
+# Stellar account) — never meant to ship or sit in git history. Kept on
+# disk, just no longer tracked; see the security-audit commit that added
+# this line for why.
+/check_*.js
+/debug_*.js
+/scratch_*.js
+/setup_issuer*.js
+/test_*.js
+/tmp_*.js
+/tmp_*.mjs
+/verify_*.js

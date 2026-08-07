@@ -77,6 +77,20 @@ const AdminSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
+  // Account-level OTP brute-force lockout — per-IP rate limiting
+  // (adminOtpLimiter) alone doesn't stop a distributed attacker from
+  // spreading guesses across many IPs against one account. See
+  // utils/otpLockout.js for the read/write helpers.
+  failedOtpAttempts: {
+    type: Number,
+    select: false,
+    default: 0,
+  },
+  otpLockedUntil: {
+    type: Date,
+    select: false,
+    default: null,
+  },
   // Sensitive admin actions (freeze/delete merchant, etc.) require a fresh
   // OTP that is *bound* to a specific action+target. We store the sha256 of
   // the OTP plus the action + targetId so an OTP minted for "freeze X" can

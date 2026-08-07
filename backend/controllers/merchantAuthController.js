@@ -12,6 +12,8 @@ import { getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
 import { toE164Kenyan } from '../utils/notificationService.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
+import { assertOtpNotLocked, recordFailedOtpAttempt, resetOtpAttempts, OtpLockedError } from '../utils/otpLockout.js';
+import { timingSafeStringEqual } from '../utils/timingSafeCompare.js';
 
 // Mask a phone number for safe display in the UI, e.g. +254712345678 →
 // +254•••••••78. Falls back to the raw digits if the number can't be
@@ -186,7 +188,15 @@ export const verifyMerchantOTP = async (req, res) => {
       return res.status(401).json({ error: 'Invalid request' });
     }
 
-    if (!merchant.otp || merchant.otp !== otp) {
+    try {
+      await assertOtpNotLocked(Merchant, merchant._id);
+    } catch (e) {
+      if (e instanceof OtpLockedError) return res.status(429).json({ error: e.message });
+      throw e;
+    }
+
+    if (!merchant.otp || !timingSafeStringEqual(merchant.otp, String(otp || ''))) {
+      await recordFailedOtpAttempt(Merchant, merchant._id);
       return res.status(401).json({ error: 'Invalid OTP' });
     }
 
@@ -200,6 +210,7 @@ export const verifyMerchantOTP = async (req, res) => {
     merchant.loginCount = (merchant.loginCount || 0) + 1;
     merchant.lastLogin = new Date();
     await merchant.save();
+    await resetOtpAttempts(Merchant, merchant._id);
 
     logAudit({
       action: 'merchant.login.success', category: 'auth', severity: 'success',
