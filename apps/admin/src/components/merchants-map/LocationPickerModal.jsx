@@ -1,7 +1,19 @@
-import React, { useState } from 'react';
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import React, { useState, useEffect } from 'react';
+import L from 'leaflet';
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
 import api from '../../api/api';
 import { KENYA_CENTER, KENYA_DEFAULT_ZOOM } from './mapIcons';
+
+// Leaflet's default marker image paths don't resolve under Vite's bundler
+// (relative URLs baked into the leaflet package) — without this, the
+// dropped pin renders as a broken image. A plain colored dot is enough
+// here; the fancier pin styling lives in mapIcons.js for the main map.
+const PICKER_ICON = L.divIcon({
+  className: 'pc-picker-marker',
+  html: '<div style="width:16px;height:16px;border-radius:50%;background:#00351d;border:3px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.4);"></div>',
+  iconSize: [16, 16],
+  iconAnchor: [8, 8],
+});
 
 function ClickToPlace({ onPick }) {
   useMapEvents({
@@ -9,6 +21,20 @@ function ClickToPlace({ onPick }) {
       onPick([e.latlng.lat, e.latlng.lng]);
     },
   });
+  return null;
+}
+
+// Leaflet computes its internal pixel size from the container at the
+// moment it mounts — a map mounted inside a modal that's still settling
+// its layout can end up with a stale/zero size, which silently breaks
+// click-to-coordinate translation (clicks appear to do nothing). Forcing
+// a resize check just after mount is the standard fix.
+function InvalidateSizeOnMount() {
+  const map = useMap();
+  useEffect(() => {
+    const t = setTimeout(() => map.invalidateSize(), 0);
+    return () => clearTimeout(t);
+  }, [map]);
   return null;
 }
 
@@ -84,15 +110,23 @@ export default function LocationPickerModal({ merchant, onClose, onSaved }) {
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             />
+            <InvalidateSizeOnMount />
             <ClickToPlace onPick={setPos} />
-            {pos && <Marker position={pos} />}
+            {pos && <Marker position={pos} icon={PICKER_ICON} />}
           </MapContainer>
         </div>
 
         <div className="px-5 py-4 space-y-3">
-          <p className="text-[12px] text-on-surface-variant/60">
-            Click anywhere on the map to place or move the pin.
-          </p>
+          {pos ? (
+            <p className="text-[12px] text-on-surface-variant/60">
+              Click anywhere on the map to move the pin.
+            </p>
+          ) : (
+            <p className="text-[12px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[16px]">touch_app</span>
+              No pin placed yet — click anywhere on the map above.
+            </p>
+          )}
           <div>
             <label className="text-[10.5px] font-label uppercase tracking-wide text-on-surface-variant/60">
               Area label (optional)

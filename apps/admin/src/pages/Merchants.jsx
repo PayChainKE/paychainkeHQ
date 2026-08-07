@@ -4,6 +4,7 @@ import api from '../api/api';
 import TablePagination from '../components/ui/TablePagination';
 import MerchantsMap from '../components/merchants-map/MerchantsMap';
 import LocationPickerModal from '../components/merchants-map/LocationPickerModal';
+import { formatAccountNumber } from '../utils/formatAccountNumber';
 
 const PAGE_SIZE = 20;
 
@@ -1210,8 +1211,8 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
 
             {/* Account */}
             <Section title="PayChain Account" icon="account_balance_wallet">
-              <Row label="Account Number" value={<span className="font-mono font-bold text-base text-on-surface bg-surface-container-low px-2 py-1 rounded">{m.paybillAccount || '—'}</span>} />
-              <Row label="Paybill" value={<span className="font-mono">400200</span>} />
+              <Row label="Account Number" value={<span className="font-mono font-bold text-base text-on-surface bg-surface-container-low px-2 py-1 rounded">{formatAccountNumber(m.ncbaVirtualAccountNumber || m.ncbaMerchantCode) || '—'}</span>} />
+              <Row label="Paybill" value={<span className="font-mono">880100</span>} />
               <Row label="Registration Source" value={m.registrationSource === 'mobile' ? 'Mobile App' : 'Web Dashboard'} />
               <Row label="Registered" value={fmtDate(m.createdAt)} />
               {m.invitedBy?.email && <Row label="Onboarded By" value={m.invitedBy.email} />}
