@@ -5,6 +5,7 @@ import generateToken from '../utils/generateToken.js';
 import { logAudit } from '../utils/auditLog.js';
 import { toE164Kenyan } from '../utils/notificationService.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
+import { assertOtpNotLocked, recordFailedOtpAttempt, resetOtpAttempts, OtpLockedError } from '../utils/otpLockout.js';
 
 // Cryptographically generate a 6-digit OTP (avoids Math.random predictability).
 function generateOtp() {
@@ -233,6 +234,13 @@ export const verifyOTP = async (req, res) => {
       return res.status(401).json({ error: 'Invalid or expired code.' });
     }
 
+    try {
+      await assertOtpNotLocked(Admin, admin._id);
+    } catch (e) {
+      if (e instanceof OtpLockedError) return res.status(429).json({ error: e.message });
+      throw e;
+    }
+
     // Reject expired codes BEFORE comparing — but with a generic message.
     if (new Date() > admin.otpExpires) {
       admin.otp = null;
@@ -242,6 +250,7 @@ export const verifyOTP = async (req, res) => {
     }
 
     if (!timingSafeStringEqual(admin.otp, submittedOtp)) {
+      await recordFailedOtpAttempt(Admin, admin._id);
       return res.status(401).json({ error: 'Invalid or expired code.' });
     }
 
@@ -251,6 +260,7 @@ export const verifyOTP = async (req, res) => {
     admin.lastLogin = new Date();
     admin.loginCount = (admin.loginCount || 0) + 1;
     await admin.save();
+    await resetOtpAttempts(Admin, admin._id);
 
     // Officer sign-ins are part of the same activity trail as the rest of
     // their KYC-pipeline actions (see officerController.js) — the admin

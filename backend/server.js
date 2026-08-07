@@ -2,6 +2,7 @@ import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import connectDB, { isDbReady, startBackgroundDbRetry, disconnectDB } from './config/database.js';
 import { requireDb } from './middleware/requireDb.js';
 import authRoutes from './routes/authRoutes.js';
@@ -163,6 +164,21 @@ app.get('/api/health', (req, res) => {
     db: dbReady ? 'connected' : 'disconnected',
   });
 });
+
+// App-wide backstop rate limit — every sensitive endpoint already has its
+// own tighter, purpose-built limiter (login, OTP, PIN, webhooks, etc.);
+// this just guarantees a forgotten/new endpoint is never left with
+// literally zero throttling. Generous enough not to interfere with normal
+// merchant/admin usage or the 5s wallet-balance poll — this is a safety
+// net, not the primary defense.
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 600,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please try again later.' },
+});
+app.use(globalLimiter);
 
 // All data routes require an active Mongo connection.
 app.use('/api', requireDb);

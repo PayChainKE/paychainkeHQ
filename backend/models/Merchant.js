@@ -157,6 +157,20 @@ const merchantSchema = new mongoose.Schema({
     select: false,
     default: null,
   },
+  // Same account-level lockout as the PIN fields above, but for OTP
+  // brute-forcing — per-IP rate limiting alone doesn't stop a distributed
+  // attacker from spreading guesses across many IPs against one account.
+  // See utils/otpLockout.js.
+  failedOtpAttempts: {
+    type: Number,
+    select: false,
+    default: 0,
+  },
+  otpLockedUntil: {
+    type: Date,
+    select: false,
+    default: null,
+  },
   registrationSource: {
     type: String,
     enum: ['web', 'mobile'],

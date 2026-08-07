@@ -24,13 +24,10 @@ router.post('/send-money', protectMerchant, pinLimiter, sendMoney);
 router.post('/payment-link', protectMerchant, generatePaymentLink);
 router.get('/payment-link', protectMerchant, listPaymentLinks);
 
-// Public Payment Link Routes
-router.get('/payment-link/:linkId', getPaymentLink);
-router.post('/payment-link/:linkId/pay', generateToken, processPaymentLink);
-
-// Public direct-account payment — powers the static "Settlement QR" on a
-// merchant's Wallet page (open amount, no pre-generated link), as opposed
-// to the fixed-amount PaymentLink routes above.
+// Public payment routes — unauthenticated by design (a customer paying a
+// link/QR has no PayChain account), so both get the same throttle: without
+// it, a public caller could trigger unlimited STK pushes (and SMS sends)
+// to any phone number they type in.
 const payAccountLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
@@ -38,6 +35,14 @@ const payAccountLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many payment attempts. Try again in 15 minutes.' },
 });
+
+// Public Payment Link Routes
+router.get('/payment-link/:linkId', getPaymentLink);
+router.post('/payment-link/:linkId/pay', payAccountLimiter, generateToken, processPaymentLink);
+
+// Public direct-account payment — powers the static "Settlement QR" on a
+// merchant's Wallet page (open amount, no pre-generated link), as opposed
+// to the fixed-amount PaymentLink routes above.
 router.get('/pay-account/:account', getMerchantByAccount);
 router.post('/pay-account/:account', payAccountLimiter, generateToken, payToMerchantAccount);
 
