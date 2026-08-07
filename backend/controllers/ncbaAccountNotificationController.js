@@ -292,7 +292,18 @@ export const handleNcbaAccountNotification = async (req, res) => {
         }).message,
       });
     } else {
-      logEvent('info', 'ncba_account_notification_customer_sms_skipped_no_phone', { transId, merchantId: merchant._id.toString() });
+      // Raw field values included (same convention as the 'unattributed'
+      // log above) so a skip can actually be diagnosed after the fact —
+      // previously this only recorded transId/merchantId, which confirmed
+      // *that* all three candidates failed but never *why* (empty field?
+      // garbage data? a format we don't parse yet?).
+      logEvent('info', 'ncba_account_notification_customer_sms_skipped_no_phone', {
+        transId,
+        merchantId: merchant._id.toString(),
+        rawPhoneNr,
+        rawCustomerName,
+        rawNarrative,
+      });
     }
 
     if (merchant.phone) {
