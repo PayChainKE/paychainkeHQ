@@ -466,6 +466,47 @@ export const unflagMerchant = async (req, res) => {
   }
 };
 
+/**
+ * Proxies place search to OpenStreetMap's Nominatim geocoder, for the
+ * Merchants Map location picker. Server-side because Nominatim's public
+ * instance doesn't send CORS headers (a direct browser fetch silently
+ * fails with nothing readable), and because their usage policy asks
+ * programmatic callers to identify themselves via a real User-Agent,
+ * which a browser can't set anyway.
+ * @route   GET /api/admin/geocode?q=...
+ * @access  Private/Admin (owner, admin, analyst — not officer)
+ */
+export const geocodeSearch = async (req, res) => {
+  try {
+    const q = String(req.query.q || '').trim();
+    if (q.length < 3) return res.json({ success: true, results: [] });
+
+    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&countrycodes=ke&limit=8&q=${encodeURIComponent(q)}`;
+    const nominatimRes = await fetch(url, {
+      headers: {
+        // Required by Nominatim's usage policy for non-interactive callers.
+        'User-Agent': 'PayChain-AdminDashboard/1.0 (support@paychain.co.ke)',
+        Accept: 'application/json',
+      },
+    });
+    if (!nominatimRes.ok) {
+      return res.status(502).json({ error: 'Place search is temporarily unavailable.' });
+    }
+    const data = await nominatimRes.json();
+    const results = (Array.isArray(data) ? data : []).map((r) => ({
+      place_id: r.place_id,
+      display_name: r.display_name,
+      type: r.type,
+      lat: r.lat,
+      lon: r.lon,
+    }));
+    res.json({ success: true, results });
+  } catch (error) {
+    console.error('Geocode Search Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
 // Loose Kenya bounding box — just a sanity check against fat-finger/typo
 // coordinates (e.g. a swapped lat/lng), not a precise border. Slightly
 // generous on every side.

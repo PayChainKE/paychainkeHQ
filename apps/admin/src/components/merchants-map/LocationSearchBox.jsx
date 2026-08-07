@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
+import api from '../../api/api';
 
-// OpenStreetMap's Nominatim geocoder — free, no API key, matches the
-// Leaflet/OSM choice already made for the rest of this feature. Restricted
-// to Kenya (countrycodes=ke) and debounced so a normal typing cadence
-// stays well within Nominatim's public-instance usage policy (max ~1
-// request/sec) without needing a backend proxy for what's a low-traffic,
-// single-admin-typing-at-a-time internal tool.
+// Proxied through our own backend (see adminController.js's geocodeSearch)
+// rather than calling Nominatim directly — the public instance doesn't
+// send CORS headers, so a direct browser fetch fails silently with an
+// empty result set and no visible error. Restricted to Kenya server-side.
+// Debounced so a normal typing cadence stays well under the backend's own
+// rate limit.
 const DEBOUNCE_MS = 500;
 const MIN_QUERY_LEN = 3;
 
@@ -37,13 +38,11 @@ export default function LocationSearchBox({ onSelect }) {
       const controller = new AbortController();
       abortRef.current = controller;
       try {
-        const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&countrycodes=ke&limit=8&q=${encodeURIComponent(q)}`;
-        const res = await fetch(url, { signal: controller.signal, headers: { Accept: 'application/json' } });
-        const data = await res.json();
-        setResults(Array.isArray(data) ? data : []);
+        const res = await api.get('/api/admin/geocode', { params: { q }, signal: controller.signal });
+        setResults(Array.isArray(res.data?.results) ? res.data.results : []);
         setOpen(true);
       } catch (e) {
-        if (e.name !== 'AbortError') setResults([]);
+        if (e.code !== 'ERR_CANCELED') setResults([]);
       } finally {
         setLoading(false);
       }
