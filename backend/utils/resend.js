@@ -1,6 +1,7 @@
 import { Resend } from 'resend';
 import dotenv from 'dotenv';
 import { formatAccountNumberDisplay } from './ncbaValidators.js';
+import { generateMerchantStickerPdf } from './stickerGenerator.js';
 
 dotenv.config();
 
@@ -286,7 +287,7 @@ export const sendWalletActivationEmail = async (email, name, stellarPublicKey) =
 // getNcbaVirtualAccountNumber. Null until NCBA_INSTITUTION_PREFIX is
 // configured (NCBA hasn't assigned it yet); rendered as a pending state
 // rather than a fake/placeholder number.
-export const sendWelcomeEmail = async (email, name, password, phone, paybillAccount, ncbaVirtualAccountNumber, ncbaMerchantCode) => {
+export const sendWelcomeEmail = async (email, name, password, phone, paybillAccount, ncbaVirtualAccountNumber, ncbaMerchantCode, businessName) => {
   const firstName = (name || '').split(' ')[0] || 'Merchant';
   // Full 12-digit virtual account is unavailable until NCBA assigns the
   // institution prefix — until then, customers can pay using the 8-digit
@@ -295,11 +296,35 @@ export const sendWelcomeEmail = async (email, name, password, phone, paybillAcco
   // attribution (see Merchants.jsx's "NCBA Merchant Code" admin view).
   const accountDisplay = formatAccountNumberDisplay(ncbaVirtualAccountNumber || ncbaMerchantCode || 'Pending assignment');
   const accountIsInterim = !ncbaVirtualAccountNumber && !!ncbaMerchantCode;
+
+  // The printable sticker needs the real 12-digit account number — same
+  // gating as accountIsInterim above, since the template has exactly 12
+  // digit boxes and a placeholder/interim number would misrepresent the
+  // merchant's real account. Generated best-effort: a PDF bug here should
+  // never block the credentials/paybill-info email itself from sending.
+  let stickerAttachment = null;
+  if (ncbaVirtualAccountNumber) {
+    try {
+      const pdfBytes = await generateMerchantStickerPdf({
+        businessName: businessName || name,
+        accountNumber: ncbaVirtualAccountNumber,
+      });
+      stickerAttachment = {
+        filename: 'PayChain-Paybill-Sticker.pdf',
+        content: Buffer.from(pdfBytes),
+        content_type: 'application/pdf',
+      };
+    } catch (err) {
+      console.error('❌ Failed to generate welcome-email sticker attachment:', err.message);
+    }
+  }
+
   try {
     const data = await resend.emails.send({
       from: 'PayChain <info@paychain.co.ke>',
       to: [email],
       subject: `Welcome to PayChain, ${firstName} — Your Merchant Account is Active`,
+      ...(stickerAttachment ? { attachments: [stickerAttachment] } : {}),
       html: `
 <!DOCTYPE html>
 <html lang="en">
@@ -350,6 +375,16 @@ export const sendWelcomeEmail = async (email, name, password, phone, paybillAcco
             </td>
           </tr>
         </table>
+
+        ${stickerAttachment ? `
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#ECFDF5;border:1px solid #A7F3D0;border-radius:12px;margin-bottom:24px;overflow:hidden;">
+          <tr><td style="padding:16px 20px;">
+            <p style="margin:0;font-size:13px;color:#065F46;line-height:1.6;">
+              &#128206;&nbsp; We've attached a <strong>printable paybill sticker</strong> pre-filled with your account number — download, print, and stick it at your counter so customers can pay without asking for your details.
+            </p>
+          </td></tr>
+        </table>
+        ` : ''}
 
         <!-- STEP GUIDE -->
         <table width="100%" cellpadding="0" cellspacing="0" style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:12px;margin-bottom:24px;overflow:hidden;">
@@ -578,11 +613,29 @@ export const sendAdminActionOTP = async (email, otp, actionLabel, target) => {
 export const sendMerchantInvite = async (email, name, businessName, paybillAccount, setupLink, ncbaVirtualAccountNumber, ncbaMerchantCode) => {
   const accountDisplay = formatAccountNumberDisplay(ncbaVirtualAccountNumber || ncbaMerchantCode || 'Pending assignment');
   const accountIsInterim = !ncbaVirtualAccountNumber && !!ncbaMerchantCode;
+
+  // Same gating as sendWelcomeEmail: only attach once the real 12-digit
+  // account number exists, and never let a PDF bug block the invite itself.
+  let stickerAttachment = null;
+  if (ncbaVirtualAccountNumber) {
+    try {
+      const pdfBytes = await generateMerchantStickerPdf({ businessName, accountNumber: ncbaVirtualAccountNumber });
+      stickerAttachment = {
+        filename: 'PayChain-Paybill-Sticker.pdf',
+        content: Buffer.from(pdfBytes),
+        content_type: 'application/pdf',
+      };
+    } catch (err) {
+      console.error('❌ Failed to generate invite-email sticker attachment:', err.message);
+    }
+  }
+
   try {
     const data = await resend.emails.send({
       from: 'PayChain Onboarding <info@paychain.co.ke>',
       to: [email],
       subject: 'You have been invited to PayChain — Set up your account',
+      ...(stickerAttachment ? { attachments: [stickerAttachment] } : {}),
       html: `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 16px; overflow: hidden; background: #fff;">
           <div style="background: linear-gradient(135deg, #06201B 0%, #0a3029 100%); padding: 44px 30px 46px; text-align: center; color: #fff;">
@@ -611,6 +664,12 @@ export const sendMerchantInvite = async (email, name, businessName, paybillAccou
                 ? 'Temporary account number — safe to share with customers now. It will be upgraded automatically once your bank assigns your full account.'
                 : 'Share these with your customers to receive M-PESA payments directly into your PayChain wallet.'}</p>
             </div>
+
+            ${stickerAttachment ? `
+            <div style="margin-top: 20px; padding: 16px; background: #ECFDF5; border-radius: 10px; border: 1px solid #A7F3D0;">
+              <p style="margin: 0; color: #065F46; font-size: 12px; line-height: 1.6;">&#128206; We've attached a printable paybill sticker pre-filled with your account number — download, print, and stick it at your counter.</p>
+            </div>
+            ` : ''}
 
             <div style="margin-top: 24px; padding: 16px; background: #fff7ed; border-radius: 10px; border: 1px solid #fed7aa;">
               <p style="margin: 0; color: #9a3412; font-size: 12px; line-height: 1.6;"><strong>Security:</strong> PayChain staff will never ask you for your password. If you did not expect this invitation, please ignore this email or contact support.</p>

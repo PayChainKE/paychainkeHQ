@@ -30,6 +30,7 @@
     "mongoose": "^9.4.1",
     "multer": "^2.2.0",
     "multer-storage-cloudinary": "^4.0.0",
+    "pdf-lib": "^1.17.1",
     "resend": "^6.12.2"
   },
   "devDependencies": {

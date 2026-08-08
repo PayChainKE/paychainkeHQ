@@ -16,6 +16,7 @@ import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
+import { generateMerchantStickerPdf } from '../utils/stickerGenerator.js';
 
 // Resolves either the 12-digit NCBA virtual account number or the 8-digit
 // interim merchant code (see getNcbaVirtualAccountNumber) to a merchant.
@@ -69,6 +70,32 @@ export const emailStatement = async (req, res) => {
   } catch (error) {
     console.error('❌ Error emailing statement:', error);
     res.status(500).json({ error: 'Failed to email the statement.' });
+  }
+};
+
+// @desc    Download the branded PayChain/NCBA paybill sticker (PDF), filled
+//          in with this merchant's own business name and real 12-digit
+//          account number.
+// @route   GET /api/transactions/sticker
+// @access  Private
+export const downloadSticker = async (req, res) => {
+  try {
+    const accountNumber = getNcbaVirtualAccountNumber(req.merchant.ncbaMerchantCode);
+    if (!accountNumber) {
+      return res.status(400).json({ error: 'Your bank account number is still being assigned — the sticker will be available once that\'s complete.' });
+    }
+
+    const pdfBytes = await generateMerchantStickerPdf({
+      businessName: req.merchant.businessName,
+      accountNumber,
+    });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="PayChain-Sticker-${accountNumber}.pdf"`);
+    res.send(Buffer.from(pdfBytes));
+  } catch (error) {
+    console.error('❌ Error generating sticker:', error);
+    res.status(500).json({ error: 'Failed to generate sticker.' });
   }
 };
 
