@@ -14,6 +14,7 @@ import Communication from '../models/Communication.js';
 import { sendMerchantInvite, sendAdminActionOTP } from '../utils/resend.js';
 import { logAudit } from '../utils/auditLog.js';
 import { getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
+import { generateMerchantStickerPdf, generateBulkStickerPdf } from '../utils/stickerGenerator.js';
 import { LIVE_DATA_CUTOFF } from '../config/liveDataCutoff.js';
 
 // Build an `actor` shape from req.admin so audit rows attribute admin-initiated
@@ -637,6 +638,81 @@ export const removeMerchantLocation = async (req, res) => {
   } catch (error) {
     console.error('Remove Merchant Location Error:', error);
     res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+/**
+ * Download one merchant's branded paybill sticker (PDF) — same generator
+ * as the merchant dashboard's own "Download Sticker" button and the
+ * welcome-email attachment, just reachable by an admin for any merchant
+ * rather than gated to the merchant's own account.
+ * @route   GET /api/admin/merchants/:id/sticker
+ * @access  Private/Admin (owner, admin, analyst — not officer)
+ */
+export const downloadMerchantSticker = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid merchant id.' });
+    }
+
+    const merchant = await Merchant.findById(id);
+    if (!merchant) return res.status(404).json({ error: 'Merchant not found.' });
+
+    const accountNumber = getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode);
+    if (!accountNumber) {
+      return res.status(400).json({ error: 'This merchant\'s bank account number is still being assigned — the sticker will be available once that\'s complete.' });
+    }
+
+    const pdfBytes = await generateMerchantStickerPdf({
+      businessName: merchant.businessName,
+      accountNumber,
+    });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="PayChain-Sticker-${accountNumber}.pdf"`);
+    res.send(Buffer.from(pdfBytes));
+  } catch (error) {
+    console.error('Download Merchant Sticker Error:', error);
+    res.status(500).json({ error: 'Failed to generate sticker.' });
+  }
+};
+
+/**
+ * Download every eligible merchant's sticker merged into one printable
+ * PDF (one page per merchant) — e.g. to print a batch before a round of
+ * merchant site visits. Merchants without a real 12-digit account number
+ * yet are silently skipped rather than failing the whole batch; the count
+ * skipped comes back in a response header so the frontend can surface it.
+ * @route   GET /api/admin/merchants/stickers/bulk
+ * @access  Private/Admin (owner, admin, analyst — not officer)
+ */
+export const downloadBulkStickers = async (req, res) => {
+  try {
+    const merchants = await Merchant.find({}).select('businessName ncbaMerchantCode').lean();
+
+    const eligible = merchants
+      .map((m) => ({ businessName: m.businessName, accountNumber: getNcbaVirtualAccountNumber(m.ncbaMerchantCode) }))
+      .filter((m) => !!m.accountNumber);
+
+    if (eligible.length === 0) {
+      return res.status(400).json({ error: 'No merchants have a bank account number assigned yet.' });
+    }
+
+    const pdfBytes = await generateBulkStickerPdf(eligible);
+    const skipped = merchants.length - eligible.length;
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="PayChain-Stickers-Batch-${new Date().toISOString().slice(0, 10)}.pdf"`);
+    res.setHeader('X-Stickers-Included', String(eligible.length));
+    res.setHeader('X-Stickers-Skipped', String(skipped));
+    // Content-Disposition/custom headers aren't readable cross-origin by
+    // default — explicitly exposed so the frontend can show "N skipped".
+    res.setHeader('Access-Control-Expose-Headers', 'X-Stickers-Included, X-Stickers-Skipped');
+    res.send(Buffer.from(pdfBytes));
+  } catch (error) {
+    console.error('Download Bulk Stickers Error:', error);
+    res.status(500).json({ error: 'Failed to generate sticker batch.' });
   }
 };
 
