@@ -63,8 +63,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isPinUnlocked,          setIsPinUnlocked]          = useState(false);
   const [hasSetBiometrics,       setHasSetBiometrics]       = useState(false);
 
-  // isBiometricsEnabled = the SERVER'S biometricsEnabled flag, synced on every login.
-  // This is the single source of truth across all platforms.
+  // isBiometricsEnabled = the SERVER'S mobileBiometricUnlockEnabled flag,
+  // synced on every login. This is mobile's own local Face ID/Touch ID
+  // device-unlock state — deliberately independent of the web dashboard's
+  // biometricsEnabled (which means "has a registered WebAuthn passkey", a
+  // completely different credential this app never touches).
   const [isBiometricsEnabled, setIsBiometricsEnabled] = useState(false);
 
   // hasBiometricToken = true when a JWT is stored in SecureStore (OS encrypted).
@@ -166,9 +169,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setToken(jwt);
           api.defaults.headers.common['Authorization'] = `Bearer ${jwt}`;
 
-          // Sync biometricsEnabled from the stored profile immediately,
-          // then refresh from server in the background.
-          if (parsed.biometricsEnabled) applyBiometricsEnabled(true);
+          // Sync mobileBiometricUnlockEnabled from the stored profile
+          // immediately, then refresh from server in the background.
+          if (parsed.mobileBiometricUnlockEnabled) applyBiometricsEnabled(true);
 
           api.get('/api/auth/merchant/me')
             .then(async (res) => {
@@ -176,7 +179,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 const fresh = res.data.merchant;
                 setMerchant(fresh);
                 await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
-                applyBiometricsEnabled(!!fresh.biometricsEnabled);
+                applyBiometricsEnabled(!!fresh.mobileBiometricUnlockEnabled);
               }
             })
             .catch((err) => {
@@ -194,10 +197,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // ── applyBiometricsEnabled ────────────────────────────────────────────────
-  // Syncs the server flag to all relevant local state in one place.
-  // If the server says biometrics are enabled (e.g. from web registration),
-  // we also mark hasSetBiometrics = true so the BiometricSetup screen is
-  // skipped — no need to set up again on this platform.
+  // Syncs the server's mobileBiometricUnlockEnabled flag to all relevant
+  // local state in one place. If already enabled (e.g. restored from a
+  // previous session on this device), also mark hasSetBiometrics = true so
+  // the BiometricSetup screen is skipped. Deliberately does NOT look at
+  // the web dashboard's biometricsEnabled/passkeys — registering a passkey
+  // on web gives this app no local-unlock capability at all, so it must
+  // never cause mobile's own onboarding to be silently skipped.
   function applyBiometricsEnabled(enabled: boolean) {
     setIsBiometricsEnabled(enabled);
     if (enabled) {
@@ -215,8 +221,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     api.defaults.headers.common['Authorization'] = `Bearer ${jwt}`;
     setHasBiometricToken(true);
 
-    // The server's biometricsEnabled is authoritative — sync it now.
-    applyBiometricsEnabled(!!userData.biometricsEnabled);
+    // The server's mobileBiometricUnlockEnabled is authoritative — sync it now.
+    applyBiometricsEnabled(!!userData.mobileBiometricUnlockEnabled);
   }
 
   // ── Auth functions ─────────────────────────────────────────────────────────
@@ -228,7 +234,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const fresh = res.data.merchant;
         setMerchant(fresh);
         await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
-        applyBiometricsEnabled(!!fresh.biometricsEnabled);
+        applyBiometricsEnabled(!!fresh.mobileBiometricUnlockEnabled);
       }
     } catch (err) {
       console.error('Failed to refresh session:', err);
@@ -383,12 +389,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // completeBiometricSetup — called from BiometricSetup screen after the user
   // taps "Enable" and expo-local-authentication succeeds.
   //
-  // When `enabled = true` we also tell the server so the flag is consistent
-  // across all platforms (web dashboard, mobile web, native app).
+  // When `enabled = true` we also tell the server, so mobileBiometricUnlockEnabled
+  // stays in sync if the merchant reinstalls the app or signs in on another
+  // device — this is purely mobile's own local-unlock state, unrelated to
+  // the web dashboard's WebAuthn passkeys.
   async function completeBiometricSetup(enabled: boolean) {
     if (enabled) {
       try {
-        // Sync to server so web sees biometricsEnabled = true immediately.
         await api.put('/api/auth/merchant/biometrics', { enabled: true });
       } catch (err) {
         console.warn('Failed to sync biometrics flag to server:', err);

@@ -177,6 +177,9 @@ export default function Profile() {
   const [isLoadingPasskeys, setIsLoadingPasskeys] = useState(false)
   const [confirmRemoveId, setConfirmRemoveId] = useState(null)
   const [removingId, setRemovingId] = useState(null)
+  const [renamingId, setRenamingId] = useState(null)
+  const [renameValue, setRenameValue] = useState('')
+  const [savingRenameId, setSavingRenameId] = useState(null)
   const [confirmingSignOutAll, setConfirmingSignOutAll] = useState(false)
   const [isSigningOutAll, setIsSigningOutAll] = useState(false)
 
@@ -215,6 +218,34 @@ export default function Profile() {
     } finally {
       setRemovingId(null)
       setConfirmRemoveId(null)
+    }
+  }
+
+  function startRenamePasskey(pk) {
+    setRenamingId(pk.credentialID)
+    setRenameValue(pk.label || deviceLabel(pk.platform, pk.userAgent))
+  }
+
+  async function handleRenamePasskey(credentialID) {
+    const label = renameValue.trim()
+    if (!label) {
+      setRenamingId(null)
+      return
+    }
+    setSavingRenameId(credentialID)
+    try {
+      const authToken = localStorage.getItem('paychain_merchant_token')
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+      await axios.patch(`${API_URL}/api/auth/merchant/webauthn/passkeys/${credentialID}`, { label }, {
+        headers: { Authorization: `Bearer ${authToken}` }
+      })
+      setPasskeys(prev => prev.map(p => p.credentialID === credentialID ? { ...p, label } : p))
+      toast.push({ message: 'Device renamed.', type: 'success' })
+    } catch (err) {
+      toast.push({ message: err.response?.data?.error || 'Failed to rename device', type: 'error' })
+    } finally {
+      setSavingRenameId(null)
+      setRenamingId(null)
     }
   }
 
@@ -887,7 +918,47 @@ export default function Profile() {
                           <span className="material-symbols-outlined text-lg">{deviceIcon(pk.platform, pk.userAgent)}</span>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold text-on-surface leading-snug truncate">{deviceLabel(pk.platform, pk.userAgent)}</p>
+                          {renamingId === pk.credentialID ? (
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                autoFocus
+                                value={renameValue}
+                                onChange={(e) => setRenameValue(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') handleRenamePasskey(pk.credentialID)
+                                  if (e.key === 'Escape') setRenamingId(null)
+                                }}
+                                maxLength={60}
+                                className="text-xs font-bold text-on-surface bg-surface-container-low border border-outline-variant/30 rounded-lg px-2 py-1 w-full max-w-[160px] focus:outline-none focus:border-secondary"
+                              />
+                              <button
+                                onClick={() => handleRenamePasskey(pk.credentialID)}
+                                disabled={savingRenameId === pk.credentialID}
+                                className="shrink-0 w-6 h-6 rounded-lg flex items-center justify-center text-emerald-600 hover:bg-emerald-50 transition-colors disabled:opacity-50"
+                                aria-label="Save name"
+                              >
+                                <span className="material-symbols-outlined text-[15px]">{savingRenameId === pk.credentialID ? 'progress_activity' : 'check'}</span>
+                              </button>
+                              <button
+                                onClick={() => setRenamingId(null)}
+                                disabled={savingRenameId === pk.credentialID}
+                                className="shrink-0 w-6 h-6 rounded-lg flex items-center justify-center text-on-surface-variant/40 hover:bg-surface-container-high transition-colors disabled:opacity-50"
+                                aria-label="Cancel rename"
+                              >
+                                <span className="material-symbols-outlined text-[15px]">close</span>
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => startRenamePasskey(pk)}
+                              className="flex items-center gap-1.5 max-w-full"
+                              aria-label={`Rename ${pk.label || deviceLabel(pk.platform, pk.userAgent)}`}
+                            >
+                              <p className="text-xs font-bold text-on-surface leading-snug truncate">{pk.label || deviceLabel(pk.platform, pk.userAgent)}</p>
+                              <span className="material-symbols-outlined text-[13px] text-on-surface-variant/0 group-hover:text-on-surface-variant/40 transition-colors shrink-0">edit</span>
+                            </button>
+                          )}
                           <div className="flex items-center gap-1.5 mt-1 text-[10px] text-on-surface-variant/50 font-medium">
                             <span>Registered {relativeTime(pk.createdAt)}</span>
                             {pk.lastUsed && (
@@ -921,7 +992,7 @@ export default function Profile() {
                           <button
                             onClick={() => setConfirmRemoveId(pk.credentialID)}
                             className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant/30 hover:text-red-600 hover:bg-red-50 transition-colors"
-                            aria-label={`Remove ${deviceLabel(pk.platform, pk.userAgent)}`}
+                            aria-label={`Remove ${pk.label || deviceLabel(pk.platform, pk.userAgent)}`}
                           >
                             <span className="material-symbols-outlined text-lg">close</span>
                           </button>

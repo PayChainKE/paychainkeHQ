@@ -277,7 +277,26 @@ const merchantSchema = new mongoose.Schema({
     select: false,
     default: null,
   },
+  // Authoritative for "has at least one real WebAuthn passkey registered
+  // on the web dashboard" — written ONLY by webauthnController.js (true on
+  // first passkey registration, false when the last one is deleted). Never
+  // write this from the mobile app's local Face/Touch ID toggle below —
+  // that's a completely different, device-local feature (no WebAuthn
+  // credential involved at all) and the two were previously sharing this
+  // one flag, which let a mobile-only merchant show as "biometrics
+  // enabled" on web with zero actual passkeys — the web onboarding prompt
+  // would then silently never offer to set one up, and biometric web login
+  // would have nothing to authenticate against.
   biometricsEnabled: {
+    type: Boolean,
+    default: false,
+  },
+  // Mobile app's own Face ID/Touch ID *device unlock* toggle (via
+  // expo-local-authentication) — gates re-entering the already-authenticated
+  // app locally, not a login credential. Deliberately separate from
+  // biometricsEnabled above; see that field's comment for why they were
+  // merged before and why that was wrong.
+  mobileBiometricUnlockEnabled: {
     type: Boolean,
     default: false,
   },
@@ -344,15 +363,29 @@ const merchantSchema = new mongoose.Schema({
       transports:   [String],
       userAgent:    { type: String, default: null },
       platform:     { type: String, default: null },
+      // Merchant-assigned name (e.g. "My iPhone", "Work Laptop") — falls
+      // back to the auto-derived userAgent/platform label on the frontend
+      // when unset, but a real name survives a browser/OS update changing
+      // the user-agent string, which the auto label doesn't.
+      label:        { type: String, default: null, trim: true, maxlength: 60 },
       createdAt:    { type: Date, default: Date.now },
       lastUsed:     { type: Date, default: null },
     }],
     select: false,
     default: [],
   },
-  // Temporary WebAuthn challenge stored server-side between options and verify calls.
+  // Temporary WebAuthn challenge stored server-side between options and
+  // verify calls. currentChallengeAt lets verify calls reject a stale
+  // challenge (e.g. a browser tab left open mid-flow) instead of trusting
+  // one indefinitely — defense-in-depth on top of the challenge itself
+  // already being single-use (cleared right after a successful verify).
   currentChallenge: {
     type: String,
+    select: false,
+    default: null,
+  },
+  currentChallengeAt: {
+    type: Date,
     select: false,
     default: null,
   },
