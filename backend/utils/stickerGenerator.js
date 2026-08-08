@@ -84,3 +84,28 @@ export async function generateMerchantStickerPdf({ businessName, accountNumber }
 
   return pdfDoc.save();
 }
+
+/**
+ * Merges one sticker per merchant into a single multi-page PDF — used by
+ * the admin dashboard's "Download All Stickers" bulk action, so an admin
+ * can print a whole batch (e.g. before a round of merchant site visits)
+ * in one file instead of one download per merchant. Each merchant is
+ * generated independently via generateMerchantStickerPdf (reused as-is,
+ * not reimplemented) then its single page is copied into one combined
+ * document — simpler and lower-risk than restructuring the single-sticker
+ * generator to draw multiple pages into one shared PDFDocument, and at
+ * this scale (tens of merchants, not thousands) the extra template
+ * reloads per merchant cost nothing that matters.
+ */
+export async function generateBulkStickerPdf(merchants) {
+  const combined = await PDFDocument.create();
+
+  for (const { businessName, accountNumber } of merchants) {
+    const stickerBytes = await generateMerchantStickerPdf({ businessName, accountNumber });
+    const stickerDoc = await PDFDocument.load(stickerBytes);
+    const [copiedPage] = await combined.copyPages(stickerDoc, [0]);
+    combined.addPage(copiedPage);
+  }
+
+  return combined.save();
+}

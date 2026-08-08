@@ -4,6 +4,7 @@ import api from '../api/api';
 import TablePagination from '../components/ui/TablePagination';
 import MerchantsMap from '../components/merchants-map/MerchantsMap';
 import LocationPickerModal from '../components/merchants-map/LocationPickerModal';
+import { useToast } from '../context/ToastContext';
 import { formatAccountNumber } from '../utils/formatAccountNumber';
 
 const PAGE_SIZE = 20;
@@ -79,10 +80,13 @@ function relativeTime(iso) {
 }
 
 const Merchants = () => {
+  const { showToast } = useToast();
   const [merchantsData, setMerchantsData] = useState([]);
   const [merchantStats, setMerchantStats] = useState({
     active: 0, locked: 0, dormant: 0, total: 0, kycVerified: 0, flagged: 0,
   });
+  const [downloadingStickerId, setDownloadingStickerId] = useState(null);
+  const [downloadingBulkStickers, setDownloadingBulkStickers] = useState(false);
 
   // Flag-merchant modal — { merchant, reason, busy, error }. Reuses the same
   // 2-stage pattern as the action modal but doesn't need OTP since flagging
@@ -387,6 +391,65 @@ const Merchants = () => {
   }
   function closeDetail() { setDetailMerchant(null); setDetailError(''); }
 
+  // Shared blob-download helper — sticker PDFs come back as raw binary,
+  // not JSON, so this needs responseType: 'blob' and a manual <a> click
+  // rather than the usual axios JSON handling used everywhere else on
+  // this page.
+  function saveBlobAs(blob, filename) {
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(blobUrl);
+  }
+
+  async function readBlobError(err, fallback) {
+    if (err.response?.data instanceof Blob) {
+      try {
+        const text = await err.response.data.text();
+        return JSON.parse(text)?.error || fallback;
+      } catch {
+        return fallback;
+      }
+    }
+    return err.response?.data?.error || fallback;
+  }
+
+  async function handleDownloadSticker(merchant) {
+    setDownloadingStickerId(merchant._id);
+    try {
+      const res = await api.get(`/api/admin/merchants/${merchant._id}/sticker`, { responseType: 'blob' });
+      saveBlobAs(res.data, `PayChain-Sticker-${merchant.businessName || merchant._id}.pdf`);
+    } catch (err) {
+      showToast(await readBlobError(err, 'Could not download the sticker.'), 'error');
+    } finally {
+      setDownloadingStickerId(null);
+    }
+  }
+
+  async function handleDownloadAllStickers() {
+    setDownloadingBulkStickers(true);
+    try {
+      const res = await api.get('/api/admin/merchants/stickers/bulk', { responseType: 'blob' });
+      const included = res.headers?.['x-stickers-included'];
+      const skipped = res.headers?.['x-stickers-skipped'];
+      saveBlobAs(res.data, `PayChain-Stickers-Batch-${new Date().toISOString().slice(0, 10)}.pdf`);
+      if (skipped && Number(skipped) > 0) {
+        showToast(`Downloaded ${included} stickers — ${skipped} merchant(s) skipped (no bank account assigned yet).`, 'info');
+      } else {
+        showToast(`Downloaded ${included} stickers.`);
+      }
+    } catch (err) {
+      showToast(await readBlobError(err, 'Could not download the sticker batch.'), 'error');
+    } finally {
+      setDownloadingBulkStickers(false);
+    }
+  }
+
   return (
     <Layout>
       <div className="space-y-8">
@@ -417,6 +480,15 @@ const Merchants = () => {
                 Map
               </button>
             </div>
+            <button
+              onClick={handleDownloadAllStickers}
+              disabled={downloadingBulkStickers}
+              title="Download every merchant's paybill sticker as one printable PDF"
+              className="flex-1 sm:flex-none bg-surface-container-low text-on-surface px-4 py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:bg-surface-container-high transition-all active:scale-95 font-label uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <span className={`material-symbols-outlined text-[18px] ${downloadingBulkStickers ? 'animate-spin' : ''}`}>{downloadingBulkStickers ? 'progress_activity' : 'sticky_note_2'}</span>
+              {downloadingBulkStickers ? 'Preparing...' : 'Download All Stickers'}
+            </button>
             <button
               onClick={openModal}
               className="flex-1 sm:flex-none bg-primary text-white px-5 py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:shadow-lg transition-all active:scale-95 font-label uppercase tracking-widest"
@@ -640,6 +712,13 @@ const Merchants = () => {
                             <MenuItem icon="visibility" tone="blue" onClick={() => { setOpenMenuId(null); openDetail(m._id); }}>View KYB details</MenuItem>
                             <MenuItem icon="location_on" tone="blue" onClick={() => { setOpenMenuId(null); setLocationPickerMerchant(m); }}>
                               {m.mapLocation?.lat != null ? 'Edit map location' : 'Set map location'}
+                            </MenuItem>
+                            <MenuItem
+                              icon={downloadingStickerId === m._id ? 'progress_activity' : 'sticky_note_2'}
+                              tone="blue"
+                              onClick={() => { setOpenMenuId(null); handleDownloadSticker(m); }}
+                            >
+                              Download sticker
                             </MenuItem>
                             <div className="h-px bg-outline-variant/20"></div>
                             {flagged ? (

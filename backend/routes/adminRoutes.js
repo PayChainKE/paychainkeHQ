@@ -15,6 +15,8 @@ import {
   geocodeSearch,
   setMerchantLocation,
   removeMerchantLocation,
+  downloadMerchantSticker,
+  downloadBulkStickers,
   getInsights,
   getLedger,
   getSystemStatus,
@@ -109,6 +111,8 @@ router.get('/merchants/analytics', protect, excludeOfficer, getMerchantAnalytics
 // Same reason as /merchants/analytics above — literal paths before :id.
 router.get('/merchants/map', protect, excludeOfficer, getMerchantsMap);
 router.get('/geocode', protect, excludeOfficer, geocodeLimiter, geocodeSearch);
+// Same reason again — literal path before /merchants/:id below.
+router.get('/merchants/stickers/bulk', protect, excludeOfficer, downloadBulkStickers);
 // IMPORTANT: keep `/merchants/:id` AFTER `/merchants/analytics` so Express
 // matches the literal path first instead of treating "analytics" as :id.
 router.get('/merchants/:id', protect, excludeOfficer, getMerchantDetail);
@@ -119,6 +123,7 @@ router.post('/merchants/:id/unflag', protect, requireMutator, sensitiveActionLim
 router.patch('/merchants/:id/features', protect, requireMutator, sensitiveActionLimiter, updateMerchantFeatures);
 router.patch('/merchants/:id/location', protect, requireMutator, sensitiveActionLimiter, setMerchantLocation);
 router.delete('/merchants/:id/location', protect, requireMutator, sensitiveActionLimiter, removeMerchantLocation);
+router.get('/merchants/:id/sticker', protect, excludeOfficer, downloadMerchantSticker);
 router.get('/merchants/:id/audit-log', protect, excludeOfficer, getMerchantAuditLog);
 
 // Executive insights — aggregated KPIs / GTV / funnel / leaderboards.
