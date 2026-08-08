@@ -1,6 +1,6 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
-import { getTransactions, simulateIncomingPayment, swapKesToUsdc, activateWallet, getLiveRate, sendMoney, syncWalletBalance, generatePaymentLink, listPaymentLinks, getPaymentLink, processPaymentLink, getMerchantByAccount, payToMerchantAccount, emailStatement } from '../controllers/transactionController.js';
+import { getTransactions, simulateIncomingPayment, swapKesToUsdc, activateWallet, getLiveRate, sendMoney, syncWalletBalance, generatePaymentLink, listPaymentLinks, getPaymentLink, processPaymentLink, getMerchantByAccount, payToMerchantAccount, emailStatement, downloadSticker } from '../controllers/transactionController.js';
 import { protectMerchant } from '../middleware/authMiddleware.js';
 import { generateToken } from '../controllers/mpesaController.js';
 
@@ -47,6 +47,7 @@ router.get('/pay-account/:account', getMerchantByAccount);
 router.post('/pay-account/:account', payAccountLimiter, generateToken, payToMerchantAccount);
 
 router.post('/statement/email', protectMerchant, emailStatement);
+router.get('/sticker', protectMerchant, downloadSticker);
 
 router.get('/live-rate', protectMerchant, getLiveRate);
 router.get('/', protectMerchant, getTransactions);

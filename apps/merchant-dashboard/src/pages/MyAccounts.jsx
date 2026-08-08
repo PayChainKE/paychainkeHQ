@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react'
+import axios from 'axios'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { formatAccountNumber } from '../utils/formatAccountNumber'
@@ -7,12 +8,15 @@ import { useToast } from '../context/NotificationContext'
 import { getAppUrl } from '../utils/appUrl'
 import { escapeHtml } from '../utils/escapeHtml'
 
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+
 export default function MyAccounts() {
   const { merchant } = useMerchantAuth()
   const { addToast } = useToast()
   const [searchTerm, setSearchTerm] = useState('')
   const [entries, setEntries] = useState(10)
   const [qrAccount, setQrAccount] = useState(null)
+  const [downloadingSticker, setDownloadingSticker] = useState(false)
   const qrModalContainerRef = useRef(null)
 
   const accountsData = [
@@ -169,6 +173,41 @@ export default function MyAccounts() {
     printWindow.document.close()
   }
 
+  // Downloads the official branded PayChain/NCBA paybill sticker (PDF),
+  // pre-filled server-side with this merchant's own account number and
+  // business name — a designed print asset, distinct from the QR sticker
+  // above. Fetched as a blob (not a plain <a href>) because the endpoint
+  // requires the merchant's auth token, which only an authenticated
+  // request can carry.
+  const handleDownloadSticker = async () => {
+    setDownloadingSticker(true)
+    try {
+      const res = await axios.get(`${API_URL}/api/transactions/sticker`, { responseType: 'blob' })
+      const blobUrl = URL.createObjectURL(res.data)
+      const a = document.createElement('a')
+      a.style.display = 'none'
+      a.href = blobUrl
+      a.download = `PayChain-Sticker-${merchant?.businessName || 'account'}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(blobUrl)
+    } catch (err) {
+      let message = 'Could not download the sticker — please try again.'
+      // err.response.data is a Blob here (responseType: 'blob'), so the
+      // JSON error body needs an explicit read before it's usable.
+      if (err.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text()
+          message = JSON.parse(text)?.error || message
+        } catch { /* keep default message */ }
+      }
+      addToast({ title: 'Download Failed', message, type: 'error' })
+    } finally {
+      setDownloadingSticker(false)
+    }
+  }
+
   return (
     <MerchantLayout title="My Accounts">
       <div className="px-1 lg:px-0 max-w-7xl mx-auto w-full space-y-8 lg:space-y-12">
@@ -235,6 +274,7 @@ export default function MyAccounts() {
                     <th className="py-4 px-4 border border-slate-300 text-[10px] font-black uppercase tracking-widest text-primary/60">Linked Transfer Account</th>
                     <th className="py-4 px-4 border border-slate-300 text-[10px] font-black uppercase tracking-widest text-primary/60">Manager</th>
                     <th className="py-4 px-4 border border-slate-300 text-[10px] font-black uppercase tracking-widest text-primary/60">QR Code</th>
+                    <th className="py-4 px-4 border border-slate-300 text-[10px] font-black uppercase tracking-widest text-primary/60">Paybill Sticker</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-300">
@@ -260,6 +300,17 @@ export default function MyAccounts() {
                         >
                           <span className="material-symbols-outlined text-sm">qr_code_2</span>
                           Generate QR
+                        </button>
+                      </td>
+                      <td className="py-5 px-4 border border-slate-300">
+                        <button
+                          onClick={handleDownloadSticker}
+                          disabled={account.status !== 'Active' || downloadingSticker}
+                          title={account.status !== 'Active' ? 'This account is still pending bank assignment' : 'Download paybill sticker'}
+                          className="flex items-center gap-1.5 px-3 py-2 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all shadow-sm disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:brightness-100"
+                        >
+                          <span className="material-symbols-outlined text-sm">{downloadingSticker ? 'progress_activity' : 'download'}</span>
+                          {downloadingSticker ? 'Preparing...' : 'Download Sticker'}
                         </button>
                       </td>
                     </tr>
