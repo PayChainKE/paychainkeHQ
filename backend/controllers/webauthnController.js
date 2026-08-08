@@ -9,16 +9,43 @@ import generateToken from '../utils/generateToken.js';
 import { logAudit, clipUa, detectPlatform } from '../utils/auditLog.js';
 
 // ── Relying Party (RP) Configuration ────────────────────────────────────────
-// To go live, set these env vars on Render/Vercel:
-//   WEBAUTHN_RP_NAME   = "PayChain"
-//   WEBAUTHN_RP_ID     = "paychain.co.ke"        ← bare domain, no https://
-//   WEBAUTHN_RP_ORIGIN = "https://app.paychain.co.ke"  ← full web-app origin
+// RP_ID must be exactly equal to, or a registrable domain suffix of, the
+// origin the merchant dashboard is actually served from — the browser
+// enforces this and silently fails authentication otherwise. Using the
+// specific subdomain (not the bare apex "paychain.co.ke") scopes passkeys
+// tightly to the merchant dashboard only, since admin/officer/demo don't
+// implement WebAuthn — "app.paychain.co.ke" is also a valid RP ID for the
+// "www.app.paychain.co.ke" origin (a suffix match after dropping "www."),
+// so one RP_ID default covers both real entry points in server.js's CORS
+// allowlist.
 //
-// For local dev the defaults below work with http://localhost:5173.
-// ─────────────────────────────────────────────────────────────────────────────
-const RP_NAME   = process.env.WEBAUTHN_RP_NAME   || 'PayChain';
-const RP_ID     = process.env.WEBAUTHN_RP_ID     || 'localhost';
-const RP_ORIGIN = process.env.WEBAUTHN_RP_ORIGIN || 'http://localhost:5173';
+// RP_ORIGIN accepts a comma-separated list (verified against whichever
+// origin the actual request came from) so both the www and non-www
+// variants validate without needing two separate deployments configured.
+//
+// Override via env vars on Render if these domains ever change:
+//   WEBAUTHN_RP_NAME   = "PayChain"
+//   WEBAUTHN_RP_ID     = "app.paychain.co.ke"
+//   WEBAUTHN_RP_ORIGIN = "https://app.paychain.co.ke,https://www.app.paychain.co.ke"
+//
+// Defaults below auto-switch to localhost:5173 (the merchant-dashboard
+// Vite dev server) outside production so local dev keeps working with no
+// env vars set at all.
+const isProdEnv = process.env.NODE_ENV === 'production';
+const RP_NAME   = process.env.WEBAUTHN_RP_NAME || 'PayChain';
+const RP_ID     = process.env.WEBAUTHN_RP_ID || (isProdEnv ? 'app.paychain.co.ke' : 'localhost');
+const RP_ORIGIN = process.env.WEBAUTHN_RP_ORIGIN
+  ? process.env.WEBAUTHN_RP_ORIGIN.split(',').map(o => o.trim()).filter(Boolean)
+  : (isProdEnv ? ['https://app.paychain.co.ke', 'https://www.app.paychain.co.ke'] : ['http://localhost:5173']);
+
+// A stored challenge is single-use (cleared right after a successful
+// verify) regardless of this — this is defense-in-depth against a
+// challenge sitting around unused for a long time (e.g. a browser tab
+// left open mid-flow, or a stale request replayed later).
+const CHALLENGE_TTL_MS = 5 * 60 * 1000;
+function isChallengeExpired(challengeAt) {
+  return !challengeAt || (Date.now() - new Date(challengeAt).getTime()) > CHALLENGE_TTL_MS;
+}
 
 // @desc  Begin passkey registration (merchant must already hold a valid JWT).
 // @route GET /api/auth/merchant/webauthn/register-options
@@ -51,8 +78,10 @@ export const getRegistrationOptions = async (req, res) => {
       timeout: 60_000,
     });
 
-    // Store challenge; it expires when overwritten or session ends.
-    await Merchant.findByIdAndUpdate(merchant._id, { currentChallenge: options.challenge });
+    await Merchant.findByIdAndUpdate(merchant._id, {
+      currentChallenge: options.challenge,
+      currentChallengeAt: new Date(),
+    });
 
     res.json({ success: true, options });
   } catch (err) {
@@ -66,10 +95,10 @@ export const getRegistrationOptions = async (req, res) => {
 // @access Private
 export const verifyRegistration = async (req, res) => {
   try {
-    const merchant = await Merchant.findById(req.merchant._id).select('+currentChallenge +passkeys');
+    const merchant = await Merchant.findById(req.merchant._id).select('+currentChallenge +currentChallengeAt +passkeys');
 
-    if (!merchant.currentChallenge) {
-      return res.status(400).json({ error: 'No pending registration challenge. Restart the flow.' });
+    if (!merchant.currentChallenge || isChallengeExpired(merchant.currentChallengeAt)) {
+      return res.status(400).json({ error: 'This registration attempt has expired. Please try again.' });
     }
 
     let verification;
@@ -82,8 +111,11 @@ export const verifyRegistration = async (req, res) => {
         requireUserVerification: true,
       });
     } catch (inner) {
+      // Full detail (often a raw library/DOM message, not meant for end
+      // users — e.g. exact challenge/origin mismatch internals) stays
+      // server-side only; the client gets a clean, actionable message.
       console.error('WebAuthn registration rejected:', inner.message);
-      return res.status(400).json({ error: inner.message || 'Passkey registration failed.' });
+      return res.status(400).json({ error: 'Passkey registration could not be completed. Please try again.' });
     }
 
     const { verified, registrationInfo } = verification;
@@ -107,7 +139,7 @@ export const verifyRegistration = async (req, res) => {
     };
 
     await Merchant.findByIdAndUpdate(merchant._id, {
-      $set: { currentChallenge: null, biometricsEnabled: true },
+      $set: { currentChallenge: null, currentChallengeAt: null, biometricsEnabled: true },
       $push: { passkeys: newPasskey },
     });
 
@@ -142,7 +174,7 @@ export const getLoginOptions = async (req, res) => {
         { email: identifier.toLowerCase() },
         { phone: identifier },
       ],
-    }).select('+passkeys +currentChallenge');
+    }).select('+passkeys +currentChallenge +currentChallengeAt');
 
     // Return empty options when no passkeys — never reveal whether the account exists.
     if (!merchant || !merchant.passkeys?.length) {
@@ -171,7 +203,10 @@ export const getLoginOptions = async (req, res) => {
       timeout: 60_000,
     });
 
-    await Merchant.findByIdAndUpdate(merchant._id, { currentChallenge: options.challenge });
+    await Merchant.findByIdAndUpdate(merchant._id, {
+      currentChallenge: options.challenge,
+      currentChallengeAt: new Date(),
+    });
 
     res.json({ success: true, options });
   } catch (err) {
@@ -196,10 +231,13 @@ export const verifyLogin = async (req, res) => {
         { email: identifier.toLowerCase() },
         { phone: identifier },
       ],
-    }).select('+currentChallenge +passkeys +bulkPayPin +appPin');
+    }).select('+currentChallenge +currentChallengeAt +passkeys +bulkPayPin +appPin');
 
     if (!merchant || !merchant.currentChallenge || !merchant.passkeys?.length) {
       return res.status(401).json({ error: 'No passkey found for this account.' });
+    }
+    if (isChallengeExpired(merchant.currentChallengeAt)) {
+      return res.status(401).json({ error: 'This sign-in attempt has expired. Please try again.' });
     }
 
     const passkey = merchant.passkeys.find(p => p.credentialID === authResponse.id);
@@ -226,7 +264,7 @@ export const verifyLogin = async (req, res) => {
       });
     } catch (inner) {
       console.error('WebAuthn login verification rejected:', inner.message);
-      return res.status(401).json({ error: inner.message || 'Biometric verification failed.' });
+      return res.status(401).json({ error: 'Biometric sign-in could not be verified. Please try again or sign in with your password.' });
     }
 
     const { verified, authenticationInfo } = verification;
@@ -238,6 +276,7 @@ export const verifyLogin = async (req, res) => {
     passkey.counter = authenticationInfo.newCounter;
     passkey.lastUsed = new Date();
     merchant.currentChallenge = null;
+    merchant.currentChallengeAt = null;
     merchant.loginCount = (merchant.loginCount || 0) + 1;
     merchant.lastLogin = new Date();
     await merchant.save();
@@ -270,6 +309,7 @@ export const verifyLogin = async (req, res) => {
         status:           merchant.status,
         isVerified:       merchant.isVerified,
         biometricsEnabled: merchant.biometricsEnabled,
+        mobileBiometricUnlockEnabled: merchant.mobileBiometricUnlockEnabled,
         hasAppPin:        !!merchant.appPin,
       },
     });
@@ -287,6 +327,7 @@ export const getPasskeys = async (req, res) => {
     const merchant = await Merchant.findById(req.merchant._id).select('+passkeys');
     const passkeys = (merchant.passkeys || []).map(p => ({
       credentialID: p.credentialID,
+      label:        p.label || null,
       deviceType:   p.deviceType,
       backedUp:     p.backedUp,
       transports:   p.transports,
@@ -299,6 +340,30 @@ export const getPasskeys = async (req, res) => {
   } catch (err) {
     console.error('Get passkeys error:', err);
     res.status(500).json({ error: 'Failed to fetch passkeys.' });
+  }
+};
+
+// @desc  Rename a passkey (merchant-assigned label, e.g. "My iPhone").
+// @route PATCH /api/auth/merchant/webauthn/passkeys/:credentialID
+// @access Private
+export const renamePasskey = async (req, res) => {
+  try {
+    const { credentialID } = req.params;
+    const label = String(req.body?.label ?? '').trim().slice(0, 60);
+    if (!label) return res.status(400).json({ error: 'Label cannot be empty.' });
+
+    const merchant = await Merchant.findOneAndUpdate(
+      { _id: req.merchant._id, 'passkeys.credentialID': credentialID },
+      { $set: { 'passkeys.$.label': label } },
+      { new: true },
+    ).select('+passkeys');
+
+    if (!merchant) return res.status(404).json({ error: 'Passkey not found.' });
+
+    res.json({ success: true, label });
+  } catch (err) {
+    console.error('Rename passkey error:', err);
+    res.status(500).json({ error: 'Failed to rename passkey.' });
   }
 };
 

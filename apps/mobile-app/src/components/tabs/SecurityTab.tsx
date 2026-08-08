@@ -138,16 +138,16 @@ export default function SecurityTab() {
             <View className="w-full flex-row items-center justify-between p-5 bg-black/20 rounded-2xl border border-white/5">
               <View className="flex-row items-center gap-4">
                 <View className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center">
-                  <MaterialIcons name="fingerprint" size={22} color={merchant?.biometricsEnabled ? "#5efeb3" : "#9ca3af"} />
+                  <MaterialIcons name="fingerprint" size={22} color={merchant?.mobileBiometricUnlockEnabled ? "#5efeb3" : "#9ca3af"} />
                 </View>
                 <View>
                   <Text className="text-[15px] font-jakarta-extrabold text-white">Biometric Login</Text>
                   <Text className="text-[11px] text-white/50 font-jakarta-medium mt-0.5">
-                    {merchant?.biometricsEnabled ? 'Active on this device' : 'Use Touch ID or Face ID'}
+                    {merchant?.mobileBiometricUnlockEnabled ? 'Active on this device' : 'Use Touch ID or Face ID'}
                   </Text>
                 </View>
               </View>
-              {merchant?.biometricsEnabled ? (
+              {merchant?.mobileBiometricUnlockEnabled ? (
                 <View className="bg-[#5efeb3]/20 p-2 rounded-full">
                   <MaterialIcons name="check" size={16} color="#5efeb3" />
                 </View>

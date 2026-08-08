@@ -1,7 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { startAuthentication, startRegistration } from '@simplewebauthn/browser'
-
-const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+import { checkPlatformAuthenticatorSupport, registerPasskey, loginWithPasskey } from '../hooks/useWebauthn'
 
 // Fingerprint SVG — used as the button icon.
 function FingerprintIcon({ size = 22, className = '' }) {
@@ -50,19 +48,7 @@ export function BiometricLoginButton({ email, onSuccess, onError }) {
   const [scanPhase, setScanPhase] = useState(false)
 
   useEffect(() => {
-    const check = async () => {
-      if (typeof window === 'undefined' || !window.PublicKeyCredential) {
-        setSupported(false)
-        return
-      }
-      try {
-        const ok = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
-        setSupported(ok)
-      } catch {
-        setSupported(false)
-      }
-    }
-    check()
+    checkPlatformAuthenticatorSupport().then(setSupported)
   }, [])
 
   const handleLogin = useCallback(async () => {
@@ -73,47 +59,10 @@ export function BiometricLoginButton({ email, onSuccess, onError }) {
     setLoading(true)
     setScanPhase(false)
     try {
-      // 1 — Get challenge from server
-      const optRes = await fetch(`${API_URL}/api/auth/merchant/webauthn/login-options`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim() }),
-      })
-      const optData = await optRes.json()
-      if (!optRes.ok) {
-        onError?.(optData.error || 'Failed to start biometric login.')
-        return
-      }
-
-      // 2 — Invoke the native biometric prompt
-      setScanPhase(true)
-      const authResponse = await startAuthentication({ optionsJSON: optData.options })
-      setScanPhase(false)
-
-      // 3 — Verify on the server and get JWT
-      const verifyRes = await fetch(`${API_URL}/api/auth/merchant/webauthn/verify-login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), response: authResponse }),
-      })
-      const result = await verifyRes.json()
-
-      if (!verifyRes.ok || !result.success) {
-        onError?.(result.error || 'Biometric sign-in failed.')
-        return
-      }
-
+      const result = await loginWithPasskey(email.trim(), (phase) => setScanPhase(phase === 'prompt'))
       onSuccess?.(result)
     } catch (err) {
-      setScanPhase(false)
-      // NotAllowedError = user cancelled or timed out — don't treat as error
-      if (err?.name === 'NotAllowedError') return
-      // InvalidStateError = no matching credential found
-      if (err?.name === 'InvalidStateError') {
-        onError?.('No passkey found for this device. Sign in with your password first.')
-        return
-      }
-      onError?.(err?.message || 'Biometric authentication failed. Try your password.')
+      if (!err?.silent) onError?.(err?.message || 'Biometric authentication failed. Try your password.')
     } finally {
       setLoading(false)
       setScanPhase(false)
@@ -177,19 +126,7 @@ export function BiometricRegisterButton({ token, onSuccess, onError }) {
   const [unsupportedDismissed, setUnsupportedDismissed] = useState(false)
 
   useEffect(() => {
-    const check = async () => {
-      if (typeof window === 'undefined' || !window.PublicKeyCredential) {
-        setSupported(false)
-        return
-      }
-      try {
-        const ok = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
-        setSupported(ok)
-      } catch {
-        setSupported(false)
-      }
-    }
-    check()
+    checkPlatformAuthenticatorSupport().then(setSupported)
   }, [])
 
   const handleRegister = useCallback(async () => {
@@ -197,47 +134,11 @@ export function BiometricRegisterButton({ token, onSuccess, onError }) {
     setScanPhase(false)
     setDone(false)
     try {
-      // 1 — Get registration options (requires authentication)
-      const optRes = await fetch(`${API_URL}/api/auth/merchant/webauthn/register-options`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const optData = await optRes.json()
-      if (!optRes.ok) {
-        onError?.(optData.error || 'Failed to start passkey registration.')
-        return
-      }
-
-      // 2 — Trigger the platform authenticator
-      setScanPhase(true)
-      const regResponse = await startRegistration({ optionsJSON: optData.options })
-      setScanPhase(false)
-
-      // 3 — Verify and store on the server
-      const verifyRes = await fetch(`${API_URL}/api/auth/merchant/webauthn/verify-registration`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(regResponse),
-      })
-      const result = await verifyRes.json()
-
-      if (!verifyRes.ok || !result.success) {
-        onError?.(result.error || 'Passkey registration failed.')
-        return
-      }
-
+      const result = await registerPasskey(token, (phase) => setScanPhase(phase === 'prompt'))
       setDone(true)
       onSuccess?.(result)
     } catch (err) {
-      setScanPhase(false)
-      if (err?.name === 'NotAllowedError') return
-      if (err?.name === 'InvalidStateError') {
-        onError?.('This device is already registered as a passkey.')
-        return
-      }
-      onError?.(err?.message || 'Passkey registration failed. Try again.')
+      if (!err?.silent) onError?.(err?.message || 'Passkey registration failed. Try again.')
     } finally {
       setLoading(false)
       setScanPhase(false)

@@ -259,6 +259,7 @@ export const verifyMerchantOTP = async (req, res) => {
         hasBulkPayPin: !!merchant.bulkPayPin,
         hasAppPin: !!merchant.appPin,
         biometricsEnabled: merchant.biometricsEnabled,
+        mobileBiometricUnlockEnabled: merchant.mobileBiometricUnlockEnabled,
         features: merchant.features
       },
       token: generateToken(merchant._id, '30d', { tokenVersion: merchant.tokenVersion || 0 })
@@ -860,6 +861,7 @@ export const getMerchantMe = async (req, res) => {
         hasBulkPayPin: !!merchant.bulkPayPin,
         hasAppPin: !!merchant.appPin,
         biometricsEnabled: merchant.biometricsEnabled,
+        mobileBiometricUnlockEnabled: merchant.mobileBiometricUnlockEnabled,
         features: merchant.features
       }
     });
@@ -957,7 +959,8 @@ export const updateMerchantProfile = async (req, res) => {
         settlementBankAccount: merchant.settlementBankAccount,
         hasBulkPayPin: !!merchant.bulkPayPin,
         hasAppPin: !!merchant.appPin,
-        biometricsEnabled: merchant.biometricsEnabled
+        biometricsEnabled: merchant.biometricsEnabled,
+        mobileBiometricUnlockEnabled: merchant.mobileBiometricUnlockEnabled,
       }
     });
   } catch (error) {
@@ -966,7 +969,13 @@ export const updateMerchantProfile = async (req, res) => {
   }
 };
 
-// @desc    Toggle Biometrics
+// @desc    Toggle the mobile app's local Face ID/Touch ID device-unlock
+//          (expo-local-authentication) — NOT a WebAuthn credential, just a
+//          local re-entry gate for an already-authenticated app session.
+//          Writes mobileBiometricUnlockEnabled, deliberately separate from
+//          biometricsEnabled (which means "has a real web passkey" and is
+//          only ever written by webauthnController.js) — see that field's
+//          comment on Merchant.js for why they must not share a flag.
 // @route   PUT /api/auth/merchant/biometrics
 // @access  Private (Merchant)
 export const toggleBiometrics = async (req, res) => {
@@ -976,9 +985,9 @@ export const toggleBiometrics = async (req, res) => {
       return res.status(404).json({ error: 'Merchant not found' });
     }
 
-    const wasEnabled = !!merchant.biometricsEnabled;
+    const wasEnabled = !!merchant.mobileBiometricUnlockEnabled;
     const nowEnabled = !!req.body.enabled;
-    merchant.biometricsEnabled = nowEnabled;
+    merchant.mobileBiometricUnlockEnabled = nowEnabled;
     await merchant.save();
 
     if (wasEnabled !== nowEnabled) {
@@ -986,15 +995,15 @@ export const toggleBiometrics = async (req, res) => {
         action: nowEnabled ? 'merchant.biometrics.enabled' : 'merchant.biometrics.disabled',
         category: 'security',
         severity: nowEnabled ? 'success' : 'warning',
-        message: `Biometric sign-in ${nowEnabled ? 'enabled' : 'disabled'}`,
+        message: `Mobile device-unlock ${nowEnabled ? 'enabled' : 'disabled'}`,
         merchant, req,
       });
     }
 
     res.json({
       success: true,
-      message: `Biometrics ${merchant.biometricsEnabled ? 'enabled' : 'disabled'} successfully`,
-      biometricsEnabled: merchant.biometricsEnabled
+      message: `Biometrics ${merchant.mobileBiometricUnlockEnabled ? 'enabled' : 'disabled'} successfully`,
+      mobileBiometricUnlockEnabled: merchant.mobileBiometricUnlockEnabled,
     });
   } catch (error) {
     console.error('Toggle Biometrics Error:', error);

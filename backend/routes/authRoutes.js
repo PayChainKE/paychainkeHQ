@@ -10,6 +10,7 @@ import {
   verifyLogin,
   getPasskeys,
   deletePasskey,
+  renamePasskey,
 } from '../controllers/webauthnController.js';
 import {
   registerMerchant,
@@ -143,5 +144,6 @@ router.get ('/merchant/webauthn/register-options', protectMerchant, getRegistrat
 router.post('/merchant/webauthn/verify-registration', protectMerchant, verifyRegistration);
 router.get ('/merchant/webauthn/passkeys', protectMerchant, getPasskeys);
 router.delete('/merchant/webauthn/passkeys/:credentialID', protectMerchant, deletePasskey);
+router.patch('/merchant/webauthn/passkeys/:credentialID', protectMerchant, renamePasskey);
 
 export default router;

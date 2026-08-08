@@ -1,8 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { startRegistration } from '@simplewebauthn/browser'
+import { checkPlatformAuthenticatorSupport, registerPasskey } from '../../hooks/useWebauthn'
 import { useMerchantAuth } from '../../context/MerchantAuthContext'
-
-const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
 
 // Storage key — once set the modal never shows again on this browser.
 const PROMPTED_KEY = 'paychain_biometric_setup_done'
@@ -44,16 +42,7 @@ export default function BiometricOnboardingModal() {
     if (merchant.biometricsEnabled) return
     if (localStorage.getItem(PROMPTED_KEY)) return
 
-    const check = async () => {
-      if (!window.PublicKeyCredential) return
-      try {
-        const ok = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
-        if (ok) setVisible(true)
-      } catch {
-        // Unsupported — stay hidden
-      }
-    }
-    check()
+    checkPlatformAuthenticatorSupport().then((ok) => { if (ok) setVisible(true) })
   }, [merchant])
 
   const dismiss = useCallback(() => {
@@ -65,41 +54,18 @@ export default function BiometricOnboardingModal() {
     setPhase('scanning')
     setErrMsg('')
     try {
-      // 1 — Get options
-      const optRes = await fetch(`${API_URL}/api/auth/merchant/webauthn/register-options`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const optData = await optRes.json()
-      if (!optRes.ok) throw new Error(optData.error || 'Failed to start registration.')
-
-      // 2 — Trigger native biometric prompt
-      const regResponse = await startRegistration({ optionsJSON: optData.options })
-
-      // 3 — Verify
-      const verifyRes = await fetch(`${API_URL}/api/auth/merchant/webauthn/verify-registration`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(regResponse),
-      })
-      const result = await verifyRes.json()
-      if (!verifyRes.ok || !result.success) throw new Error(result.error || 'Registration failed.')
-
+      await registerPasskey(token)
       setPhase('success')
       setTimeout(dismiss, 2000)
     } catch (err) {
-      if (err?.name === 'NotAllowedError') {
+      if (err?.silent) {
         // User cancelled the native prompt — go back to idle silently
         setPhase('idle')
         return
       }
-      if (err?.name === 'InvalidStateError') {
-        setErrMsg('This device is already registered. You can sign in with biometrics next time.')
-        setPhase('error')
-        setTimeout(dismiss, 3000)
-        return
-      }
       setErrMsg(err?.message || 'Setup failed. You can try again from Settings.')
       setPhase('error')
+      if (err?.code === 'ALREADY_REGISTERED') setTimeout(dismiss, 3000)
     }
   }, [token, dismiss])
 
