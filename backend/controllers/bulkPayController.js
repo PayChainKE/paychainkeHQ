@@ -16,6 +16,7 @@ import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard.js';
+import { DARAJA_STK_B2C_ENABLED } from './mpesaController.js';
 
 // @desc    Get all payees for a merchant
 // @route   GET /api/bulkpay/payees
@@ -508,6 +509,14 @@ export const authorizeBatch = async (req, res) => {
           darajaStatus = 'failed';
           refundAmount += row.netAmount + row.b2cFee;
           console.error(`❌ Bulk payout to ${payee.name} failed: no Daraja auth token available.`);
+        } else if (payee.mobileMoneyType === 'Personal Number' && !DARAJA_STK_B2C_ENABLED) {
+          // Same Daraja B2C rail as the standalone /b2c-request endpoint —
+          // gated off for the same reason (see DARAJA_STK_B2C_ENABLED in
+          // mpesaController.js). Paybill/Till (B2B) payees below are
+          // unaffected; only "Personal Number" payouts hit B2C.
+          darajaStatus = 'failed';
+          refundAmount += row.netAmount + row.b2cFee;
+          console.error(`❌ Bulk payout to ${payee.name} blocked: M-PESA B2C is temporarily disabled (DARAJA_STK_B2C_ENABLED).`);
         } else {
           try {
             const securityCredential = getSecurityCredential();

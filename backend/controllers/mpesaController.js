@@ -59,6 +59,17 @@ export const callbackBase = (process.env.MPESA_CALLBACK_URL || '').replace(/\/$/
 const webhookSecret = process.env.MPESA_WEBHOOK_SECRET || '';
 const withWebhookSecret = (url) => `${url}${webhookSecret ? `?key=${encodeURIComponent(webhookSecret)}` : ''}`;
 
+// Kill-switch while PayChain migrates STK Push (customer collections) and
+// B2C (merchant payouts to phone numbers) off Safaricom Daraja onto an NCBA
+// equivalent — no NCBA spec exists yet, so this defaults OFF rather than
+// leaving two live money-movement rails running unreviewed. Everything else
+// (token generation, callbacks, B2B, registerURLs) is untouched: those
+// aren't part of the migration and existing in-flight requests still need
+// their callbacks to resolve. Flip DARAJA_STK_B2C_ENABLED=true in the
+// hosting env to restore STK/B2C immediately if the NCBA side stalls —
+// no redeploy of this code required.
+export const DARAJA_STK_B2C_ENABLED = process.env.DARAJA_STK_B2C_ENABLED === 'true';
+
 
 // Generate OAuth Token for Safaricom Daraja API
 export const generateToken = async (req, res, next) => {
@@ -386,6 +397,9 @@ export const confirmationURL = async (req, res) => {
 // ================= STK PUSH (LIPA NA M-PESA ONLINE) =================
 
 export const initiateSTKPush = async (req, res) => {
+  if (!DARAJA_STK_B2C_ENABLED) {
+    return res.status(503).json({ error: 'M-PESA STK Push is temporarily unavailable while we migrate to a new payment provider. Please try again later.' });
+  }
   try {
     const { amount, phone, purpose } = req.body;
     // Always the authenticated caller's own account — never trust a
@@ -930,6 +944,9 @@ import { generateSecurityCredential } from '../utils/safaricomCrypto.js';
 // --- DARAJA B2C (OUTBOUND PAYMENTS) ---
 
 export const initiateB2C = async (req, res) => {
+  if (!DARAJA_STK_B2C_ENABLED) {
+    return res.status(503).json({ error: 'M-PESA payouts are temporarily unavailable while we migrate to a new payment provider. Please try again later.' });
+  }
   let debited = false;
   let totalDebit = 0;
   try {
