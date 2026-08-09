@@ -59,6 +59,17 @@ export const callbackBase = (process.env.MPESA_CALLBACK_URL || '').replace(/\/$/
 const webhookSecret = process.env.MPESA_WEBHOOK_SECRET || '';
 const withWebhookSecret = (url) => `${url}${webhookSecret ? `?key=${encodeURIComponent(webhookSecret)}` : ''}`;
 
+// Kill-switch while PayChain migrates STK Push (customer collections) and
+// B2C (merchant payouts to phone numbers) off Safaricom Daraja onto an NCBA
+// equivalent — no NCBA spec exists yet, so this defaults OFF rather than
+// leaving two live money-movement rails running unreviewed. Everything else
+// (token generation, callbacks, B2B, registerURLs) is untouched: those
+// aren't part of the migration and existing in-flight requests still need
+// their callbacks to resolve. Flip DARAJA_STK_B2C_ENABLED=true in the
+// hosting env to restore STK/B2C immediately if the NCBA side stalls —
+// no redeploy of this code required.
+export const DARAJA_STK_B2C_ENABLED = process.env.DARAJA_STK_B2C_ENABLED === 'true';
+
 
 // Generate OAuth Token for Safaricom Daraja API
 export const generateToken = async (req, res, next) => {
@@ -89,19 +100,35 @@ export const generateToken = async (req, res, next) => {
   }
 };
 
-// Register C2B URLs
+// Register C2B URLs. Always builds the confirmation/validation URLs itself
+// from callbackBase + the real MPESA_WEBHOOK_SECRET (same withWebhookSecret
+// helper every other Daraja callback URL in this file uses) rather than
+// trusting a caller-supplied URL — there's no legitimate reason to point
+// Safaricom's C2B callbacks anywhere other than this deployment's own
+// routes, and requiring the secret to be manually retyped into a request
+// body every time this is called is exactly the kind of manual step that
+// gets fumbled (e.g. registered with a placeholder/wrong key by mistake).
+// `shortCode` is an optional override in the body: MPESA_SHORTCODE is the
+// shared STK Push test paybill in sandbox, which Safaricom's C2B product
+// rejects outright — a *different* sandbox shortcode with C2B enabled must
+// be passed here to actually register successfully.
 export const registerURLs = async (req, res) => {
   try {
     const token = req.mpesaToken;
-    const { validationUrl, confirmationUrl } = req.body;
+    const { shortCode: shortCodeOverride } = req.body || {};
+    const targetShortCode = shortCodeOverride || shortCode;
+
+    if (!callbackBase) {
+      return res.status(500).json({ error: 'MPESA_CALLBACK_URL is not configured.' });
+    }
 
     const url = `${mpesaBaseUrl}/mpesa/c2b/v1/registerurl`;
 
     const data = {
-      ShortCode: shortCode,
+      ShortCode: targetShortCode,
       ResponseType: 'Completed',
-      ConfirmationURL: confirmationUrl,
-      ValidationURL: validationUrl
+      ConfirmationURL: withWebhookSecret(`${callbackBase}/api/callbacks/confirmation`),
+      ValidationURL: withWebhookSecret(`${callbackBase}/api/callbacks/validation`),
     };
 
     const response = await axios.post(url, data, {
@@ -110,10 +137,10 @@ export const registerURLs = async (req, res) => {
       }
     });
 
-    res.status(200).json(response.data);
+    res.status(200).json({ ...response.data, registeredShortCode: targetShortCode });
   } catch (error) {
     console.error('❌ M-PESA Register URLs Error:', error.response?.data || error.message);
-    res.status(400).json({ error: 'Failed to register M-PESA URLs' });
+    res.status(400).json({ error: error.response?.data?.errorMessage || 'Failed to register M-PESA URLs' });
   }
 };
 
@@ -279,7 +306,13 @@ export const confirmationURL = async (req, res) => {
     // stale balance and silently clobber it on save(). $inc is race-free
     // regardless of how long this branch takes.
     let updatedMerchant;
-    if (merchant.stellarPublicKey && AUTO_INFLATION_SHIELD_ENABLED) {
+    // Demo/evidence merchants (Stellar grant deliverable pipeline) always
+    // get the automatic conversion, regardless of AUTO_INFLATION_SHIELD_ENABLED
+    // — that flag exists purely to protect real merchants from this on-chain
+    // dependency sitting in their live payment path, and isDemoMerchant is
+    // never set on a real merchant (see models/Merchant.js), so this can't
+    // change behavior for anyone but the demo accounts it's built for.
+    if (merchant.stellarPublicKey && (merchant.isDemoMerchant || AUTO_INFLATION_SHIELD_ENABLED)) {
       try {
         const liveRate = await getLiveKesToUsdcRate();
         const usdcPayoutValue = (netKESAmount * liveRate).toFixed(7);
@@ -386,6 +419,9 @@ export const confirmationURL = async (req, res) => {
 // ================= STK PUSH (LIPA NA M-PESA ONLINE) =================
 
 export const initiateSTKPush = async (req, res) => {
+  if (!DARAJA_STK_B2C_ENABLED) {
+    return res.status(503).json({ error: 'M-PESA STK Push is temporarily unavailable while we migrate to a new payment provider. Please try again later.' });
+  }
   try {
     const { amount, phone, purpose } = req.body;
     // Always the authenticated caller's own account — never trust a
@@ -930,6 +966,9 @@ import { generateSecurityCredential } from '../utils/safaricomCrypto.js';
 // --- DARAJA B2C (OUTBOUND PAYMENTS) ---
 
 export const initiateB2C = async (req, res) => {
+  if (!DARAJA_STK_B2C_ENABLED) {
+    return res.status(503).json({ error: 'M-PESA payouts are temporarily unavailable while we migrate to a new payment provider. Please try again later.' });
+  }
   let debited = false;
   let totalDebit = 0;
   try {

@@ -13,9 +13,11 @@ import Contact from '../models/Contact.js';
 import Communication from '../models/Communication.js';
 import { sendMerchantInvite, sendAdminActionOTP } from '../utils/resend.js';
 import { logAudit } from '../utils/auditLog.js';
-import { getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
+import { getNcbaVirtualAccountNumber, generateRandomMerchantCode } from '../utils/ncbaValidators.js';
 import { generateMerchantStickerPdf, generateBulkStickerPdf } from '../utils/stickerGenerator.js';
 import { LIVE_DATA_CUTOFF } from '../config/liveDataCutoff.js';
+import { provisionMerchantWallet } from '../utils/stellarHelper.js';
+import { encryptKey } from '../utils/cryptoHelper.js';
 
 // Build an `actor` shape from req.admin so audit rows attribute admin-initiated
 // actions to the right operator even when the merchant is the subject.
@@ -931,7 +933,8 @@ export const getMerchantDetail = async (req, res) => {
 // @access  Private (Admin)
 export const createMerchant = async (req, res) => {
   try {
-    let { name, email, phone, businessName, kraPin, businessNumber } = req.body || {};
+    let { name, email, phone, businessName, kraPin, businessNumber, isDemoMerchant } = req.body || {};
+    isDemoMerchant = isDemoMerchant === true;
 
     if (!name || !email || !phone || !businessName) {
       return res.status(400).json({ error: 'Name, email, phone and business name are required.' });
@@ -962,7 +965,26 @@ export const createMerchant = async (req, res) => {
     // paybillAccount (the old 5-digit shared-Paybill sub-account) is
     // deliberately no longer assigned to new merchants — the live payment
     // rail is the NCBA virtual account (ncbaMerchantCode), auto-assigned by
-    // the Merchant model's pre-save hook.
+    // the Merchant model's pre-save hook. The one exception is demo/evidence
+    // merchants below: they need a paybillAccount specifically so the
+    // legacy Safaricom Daraja C2B confirmationURL webhook (which still
+    // matches BillRefNumber against this field) can find them — that's the
+    // Stellar grant deliverable's specified trigger path, separate from the
+    // NCBA rail real merchants use.
+    let demoPaybillAccount = null;
+    if (isDemoMerchant) {
+      const MAX_ATTEMPTS = 10;
+      for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+        const candidate = String(Math.floor(10000 + Math.random() * 90000));
+        if (!(await Merchant.exists({ paybillAccount: candidate }))) {
+          demoPaybillAccount = candidate;
+          break;
+        }
+      }
+      if (!demoPaybillAccount) {
+        return res.status(500).json({ error: 'Could not generate a unique demo paybill account. Try again.' });
+      }
+    }
 
     // Generate a 32-byte raw token (URL-safe) and store only its sha256.
     const rawToken = crypto.randomBytes(32).toString('hex');
@@ -981,7 +1003,34 @@ export const createMerchant = async (req, res) => {
       invitedBy: req.admin?._id || null,
       passwordResetToken: hashedToken,
       passwordResetExpires: expires,
+      isDemoMerchant,
+      paybillAccount: demoPaybillAccount,
     });
+
+    // Deliverable 1 of the Stellar grant pipeline: a demo merchant's testnet
+    // wallet is provisioned automatically right here, not via the normal
+    // opt-in activate-wallet flow real merchants use. Awaited (not
+    // fire-and-forget) so a Friendbot/Horizon failure is reported to the
+    // admin immediately rather than silently leaving the merchant walletless
+    // with no visible error — this only runs for demo merchants, an
+    // infrequent admin action, so the extra latency is an acceptable
+    // trade-off for that visibility.
+    if (isDemoMerchant) {
+      try {
+        const stellarWallet = await provisionMerchantWallet();
+        merchant.stellarPublicKey = stellarWallet.publicKey;
+        merchant.stellarEncryptedSecretKey = encryptKey(stellarWallet.secretKey);
+        await merchant.save();
+      } catch (err) {
+        console.error(`❌ Demo merchant Stellar wallet provisioning failed for ${merchant._id}:`, err.message);
+        return res.status(201).json({
+          success: true,
+          message: 'Merchant created, but Stellar wallet provisioning failed — retry via the merchant\'s Wallet page.',
+          warning: err.message,
+          data: { _id: merchant._id, email: merchant.email },
+        });
+      }
+    }
 
     const setupLink = `${MERCHANT_DASHBOARD_URL.replace(/\/$/, '')}/setup-password?token=${rawToken}`;
 
@@ -1007,6 +1056,8 @@ export const createMerchant = async (req, res) => {
         paybillAccount: merchant.paybillAccount,
         ncbaMerchantCode: merchant.ncbaMerchantCode,
         ncbaVirtualAccountNumber: getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode),
+        isDemoMerchant: merchant.isDemoMerchant,
+        stellarPublicKey: merchant.stellarPublicKey,
         createdAt: merchant.createdAt,
         isVerified: merchant.isVerified,
       },

@@ -188,6 +188,18 @@ const merchantSchema = new mongoose.Schema({
     enum: ['web', 'mobile'],
     default: 'web',
   },
+  // Set only by adminController.js's createMerchant when an admin explicitly
+  // marks a merchant as a demo/evidence account (Stellar grant deliverable
+  // pipeline) — never by self-serve signup. Two things key off this: (1) a
+  // Stellar testnet wallet is auto-provisioned at creation instead of the
+  // normal opt-in activate-wallet flow, and (2) the M-Pesa confirmationURL
+  // webhook auto-converts every incoming payment to on-chain USDC regardless
+  // of the global AUTO_INFLATION_SHIELD_ENABLED flag (see mpesaController.js)
+  // — real merchants are completely unaffected either way.
+  isDemoMerchant: {
+    type: Boolean,
+    default: false,
+  },
   // ── Onboarding-Officer KYC pipeline (unset for self-serve merchants) ──
   // kybStatus has NO default — it must stay genuinely absent on every
   // merchant created by self-serve signup or the admin direct-onboard flow,
