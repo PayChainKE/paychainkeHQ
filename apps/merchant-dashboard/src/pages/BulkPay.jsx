@@ -365,6 +365,19 @@ export default function BulkPay() {
   const totalInvoicePages = Math.max(1, Math.ceil(filteredInvoicesList.length / invoicesPerPage));
   const paginatedInvoicesList = filteredInvoicesList.slice((invoicePage - 1) * invoicesPerPage, invoicePage * invoicesPerPage);
 
+  // Per-status breakdown for the stat tiles below — draft (still being
+  // prepared), sent (awaiting the customer's payment), paid (successfully
+  // collected). Monetary totals only sum KES invoices — `currency` is a
+  // free-text field on each invoice, so adding a USD total onto a KES one
+  // would silently misreport the figure; invoices in any other currency
+  // still count toward the tile's count, just not its KES total.
+  const invoiceStats = ['draft', 'sent', 'paid'].reduce((acc, s) => {
+    const rows = invoicesList.filter(inv => inv.status === s);
+    const kesTotal = rows.filter(inv => (inv.currency || 'KES') === 'KES').reduce((sum, inv) => sum + (inv.total || 0), 0);
+    acc[s] = { count: rows.length, kesTotal };
+    return acc;
+  }, {});
+
   const invoiceSubtotal = invoiceDetails.items.reduce((sum, item) => sum + (item.qty * item.price), 0);
   const invoiceTotal = invoiceSubtotal; // Assuming no tax right now
   const invoiceHasRealItems = invoiceDetails.items.some(i => i.description.trim() || i.price > 0);
@@ -1842,27 +1855,51 @@ export default function BulkPay() {
                   </div>
                </div>
 
-               <div className="flex flex-col gap-3">
-                 <div className="p-4 rounded-[20px] bg-[#f8fafc] border border-outline-variant/5 flex items-center justify-between group hover:border-blue-500/10 transition-colors">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                        <span className="material-symbols-outlined text-[20px]">receipt_long</span>
+               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                 <div className="p-4 rounded-[20px] bg-[#f8fafc] border border-outline-variant/5 flex items-center justify-between group hover:border-amber-500/10 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                        <span className="material-symbols-outlined text-[20px]">edit_document</span>
                       </div>
-                      <div>
-                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50">Total Invoices</span>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
-                          <span className="text-[8px] font-bold text-primary opacity-60 uppercase tracking-widest">Lifetime</span>
-                        </div>
+                      <div className="min-w-0">
+                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50">Drafts</span>
+                        <p className="font-headline text-lg font-black text-primary leading-tight">{invoiceStats.draft.count}</p>
                       </div>
                     </div>
-                    <p className="font-headline text-xl font-black text-primary group-hover:scale-105 origin-right transition-transform">{invoicesList.length}</p>
+                 </div>
+                 <div className="p-4 rounded-[20px] bg-[#f8fafc] border border-outline-variant/5 flex items-center justify-between group hover:border-blue-500/10 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                        <span className="material-symbols-outlined text-[20px]">send</span>
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50">Sent • Awaiting Payment</span>
+                        <p className="font-headline text-lg font-black text-primary leading-tight">{invoiceStats.sent.count}</p>
+                        {invoiceStats.sent.kesTotal > 0 && (
+                          <p className="text-[9px] font-bold text-blue-600 opacity-70">{formatKES(invoiceStats.sent.kesTotal)}</p>
+                        )}
+                      </div>
+                    </div>
+                 </div>
+                 <div className="p-4 rounded-[20px] bg-[#f8fafc] border border-outline-variant/5 flex items-center justify-between group hover:border-emerald-500/10 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                        <span className="material-symbols-outlined text-[20px]">check_circle</span>
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50">Paid • Collected</span>
+                        <p className="font-headline text-lg font-black text-primary leading-tight">{invoiceStats.paid.count}</p>
+                        {invoiceStats.paid.kesTotal > 0 && (
+                          <p className="text-[9px] font-bold text-emerald-600 opacity-70">{formatKES(invoiceStats.paid.kesTotal)}</p>
+                        )}
+                      </div>
+                    </div>
                  </div>
                </div>
 
                {/* Recent Invoices List */}
                <div className="mt-8">
-                 <h4 className="text-xs font-black uppercase tracking-widest text-on-surface-variant opacity-50 mb-4">Recent Activity</h4>
+                 <h4 className="text-xs font-black uppercase tracking-widest text-on-surface-variant opacity-50 mb-4">Invoice History</h4>
                  <div className="flex flex-col gap-3">
                    {filteredInvoicesList.length === 0 ? (
                      <div className="p-8 rounded-[20px] bg-surface-container-lowest border border-outline-variant/10 text-center flex flex-col items-center">

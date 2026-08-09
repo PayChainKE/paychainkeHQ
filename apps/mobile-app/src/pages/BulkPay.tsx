@@ -324,6 +324,22 @@ export default function BulkPay() {
   );
   const totalInvoicePages = Math.max(1, Math.ceil(filteredInvoicesList.length / invoicesPerPage));
   const paginatedInvoicesList = filteredInvoicesList.slice((invoicePage - 1) * invoicesPerPage, invoicePage * invoicesPerPage);
+
+  // Per-status breakdown for the tracking header — draft (still being
+  // prepared), sent (awaiting the customer's payment), paid (successfully
+  // collected). Monetary totals only sum KES invoices — `currency` is a
+  // free-text field on each invoice, so adding a USD total onto a KES one
+  // would silently misreport the figure.
+  const invoiceStats = useMemo(() => {
+    const byStatus = (s: string) => invoicesList.filter(inv => inv.status === s);
+    const kesTotal = (rows: Invoice[]) => rows.filter(inv => (inv.currency || 'KES') === 'KES').reduce((sum, inv) => sum + (inv.total || 0), 0);
+    return {
+      draft: { count: byStatus('draft').length, kesTotal: kesTotal(byStatus('draft')) },
+      sent: { count: byStatus('sent').length, kesTotal: kesTotal(byStatus('sent')) },
+      paid: { count: byStatus('paid').length, kesTotal: kesTotal(byStatus('paid')) },
+    };
+  }, [invoicesList]);
+
   const invoiceSubtotal = invoiceDetails.items.reduce((sum, item) => sum + (item.qty * item.price), 0);
   const fmtInvoiceCurrency = (n: number) => `${invoiceDetails.currency} ${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -1304,9 +1320,26 @@ export default function BulkPay() {
 
             {/* Invoice Tracking */}
             <View className="bg-white rounded-[24px] p-5 border border-[#bfc9bf]/15 mb-4">
-              <View className="flex-row items-center justify-between mb-4">
-                <Text className="font-jakarta-bold text-[15px] text-[#0c2010]">Invoice Tracking</Text>
-                <Text className="font-jakarta-extrabold text-[15px] text-[#00351d]">{invoicesList.length}</Text>
+              <Text className="font-jakarta-bold text-[15px] text-[#0c2010] mb-4">Invoice Tracking</Text>
+              <View className="flex-row gap-2 mb-4">
+                <View className="flex-1 bg-[#fef3e7] rounded-2xl p-3">
+                  <Text className="text-[9px] font-jakarta-bold text-[#b87333] uppercase tracking-wider mb-1">Drafts</Text>
+                  <Text className="font-jakarta-extrabold text-[16px] text-[#0c2010]">{invoiceStats.draft.count}</Text>
+                </View>
+                <View className="flex-1 bg-[#e7f8ef] rounded-2xl p-3">
+                  <Text className="text-[9px] font-jakarta-bold text-[#006c4e] uppercase tracking-wider mb-1">Sent</Text>
+                  <Text className="font-jakarta-extrabold text-[16px] text-[#0c2010]">{invoiceStats.sent.count}</Text>
+                  {invoiceStats.sent.kesTotal > 0 && (
+                    <Text className="text-[8px] font-jakarta-bold text-[#006c4e] opacity-70 mt-0.5">{formatKES(invoiceStats.sent.kesTotal)}</Text>
+                  )}
+                </View>
+                <View className="flex-1 bg-[#dbeafe] rounded-2xl p-3">
+                  <Text className="text-[9px] font-jakarta-bold text-[#1e40af] uppercase tracking-wider mb-1">Paid</Text>
+                  <Text className="font-jakarta-extrabold text-[16px] text-[#0c2010]">{invoiceStats.paid.count}</Text>
+                  {invoiceStats.paid.kesTotal > 0 && (
+                    <Text className="text-[8px] font-jakarta-bold text-[#1e40af] opacity-70 mt-0.5">{formatKES(invoiceStats.paid.kesTotal)}</Text>
+                  )}
+                </View>
               </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-1 mb-4">
                 {(['All', 'Drafts', 'Sent', 'Paid'] as const).map(f => (
