@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { Link } from 'react-router-dom'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import { formatKES, formatUSDC } from '../utils/formatCurrency'
 import { mockMerchant } from '../mockData/merchant'
@@ -6,10 +7,23 @@ import { walletStats, walletHistory } from '../mockData/wallet'
 import { formatDateISO } from '../utils/formatDate'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useToast } from '../context/NotificationContext'
+import { useMerchantAuth } from '../context/MerchantAuthContext'
+import StellarConnectPanel from '../components/ui/StellarConnectPanel'
 
 export default function Wallet() {
   const { showAmounts } = usePrivacyMode()
   const { addToast } = useToast()
+  const { realMerchant, realLoading } = useMerchantAuth()
+  // Real Stellar data when the demo merchant is connected, mock otherwise —
+  // this card is the only part of this page tied to the grant deliverable;
+  // everything else (withdraw, top up, payment links, QR) stays mock.
+  const hasRealWallet = !!realMerchant?.stellarPublicKey
+  const displayUsdcBalance = hasRealWallet ? Number(realMerchant.usdcBalance || 0) : mockMerchant.financials.usdcBalance
+  const displayWalletAddress = hasRealWallet ? realMerchant.stellarPublicKey : mockMerchant.walletAddress
+  const displayWalletAddressShort = hasRealWallet
+    ? `${realMerchant.stellarPublicKey.slice(0, 6)}...${realMerchant.stellarPublicKey.slice(-4)}`
+    : mockMerchant.walletAddress
+  const [showStellarConnect, setShowStellarConnect] = useState(false)
   const [withdrawAmount, setWithdrawAmount] = useState('')
   const [destination, setDestination] = useState(walletStats.withdrawalDestinations[0].id)
   const [isWithdrawing, setIsWithdrawing] = useState(false)
@@ -134,42 +148,56 @@ export default function Wallet() {
             <div className="relative z-10 flex flex-col h-full justify-between">
               <div>
                 <div className="flex justify-between items-start mb-5">
-                  <span className="bg-blue-500/10 text-blue-400 px-2.5 py-1.5 rounded-full text-[8px] md:text-[9px] font-black tracking-[0.2em] uppercase border border-blue-400/20 backdrop-blur-md">Stablecoin Assets</span>
+                  {hasRealWallet ? (
+                    <span className="bg-emerald-500/10 text-emerald-400 px-2.5 py-1.5 rounded-full text-[8px] md:text-[9px] font-black tracking-[0.2em] uppercase border border-emerald-400/20 backdrop-blur-md flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 pulse"></span>
+                      Live Testnet
+                    </span>
+                  ) : (
+                    <span className="bg-blue-500/10 text-blue-400 px-2.5 py-1.5 rounded-full text-[8px] md:text-[9px] font-black tracking-[0.2em] uppercase border border-blue-400/20 backdrop-blur-md">Stablecoin Assets</span>
+                  )}
                   <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 backdrop-blur-md">
                      <span className="material-symbols-outlined text-xl text-white">account_balance_wallet</span>
                   </div>
                 </div>
                 <p className="text-white/40 text-[9px] md:text-[10px] font-bold uppercase tracking-widest mb-1">Global Settlement Balance</p>
                 <h3 className={`font-headline font-bold text-2xl md:text-3xl lg:text-4xl tracking-tighter tabular-nums mb-3 transition-all duration-300 ${!showAmounts && 'blur-xl'}`}>
-                  {formatUSDC(mockMerchant.financials.usdcBalance)}
+                  {formatUSDC(displayUsdcBalance)}
                 </h3>
-                <div 
+                <div
                   onClick={() => {
-                    navigator.clipboard.writeText(mockMerchant.fullWalletAddress)
+                    navigator.clipboard.writeText(displayWalletAddress)
                     addToast({ title: 'Address Copied', message: 'Wallet address copied to clipboard', type: 'success' })
                   }}
                   className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white/5 hover:bg-white/10 rounded-full border border-white/5 cursor-pointer transition-all active:scale-95 group mb-2"
                 >
                   <span className="text-[9px] text-white/40 font-mono tracking-wider">
                     <span className="font-bold text-white/20 mr-1 italic">Wallet:</span>
-                    {mockMerchant.walletAddress}
+                    {displayWalletAddressShort}
                   </span>
                   <span className="material-symbols-outlined text-xs text-white/20 group-hover:text-white/60 transition-colors shrink-0">content_copy</span>
                 </div>
                 <div className="flex items-center gap-2 mt-1 opacity-40">
-                  <span className="text-[7px] font-black uppercase tracking-widest text-white/60">Supported by</span>
+                  <span className="text-[7px] font-black uppercase tracking-widest text-white/60">Settled on</span>
                   <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-3 rounded-full bg-[#35D07F] border border-white/20" title="Celo Network"></div>
-                    <div className="w-3 h-3 rounded-full bg-[#0052FF] border border-white/20" title="Base Network"></div>
-                    <div className="w-3 h-3 rounded-full bg-[#8247E5] border border-white/20" title="Polygon Network"></div>
+                    <div className="w-3 h-3 rounded-full bg-black border border-white/20" title="Stellar Network"></div>
+                    <span className="text-[8px] font-bold text-white/60">Stellar</span>
                   </div>
                 </div>
+                {!hasRealWallet && !realLoading && (
+                  <button
+                    onClick={() => setShowStellarConnect((v) => !v)}
+                    className="text-[9px] font-bold uppercase tracking-widest text-emerald-400 hover:text-emerald-300 mt-2 underline underline-offset-2"
+                  >
+                    Connect real testnet wallet
+                  </button>
+                )}
               </div>
               <div className="flex items-center gap-3 mt-6">
-                <button className="flex-1 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-[10px] font-bold transition-all border border-white/10 uppercase tracking-widest flex items-center justify-center gap-1.5">
+                <Link to="/inflation-shield" className="flex-1 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-[10px] font-bold transition-all border border-white/10 uppercase tracking-widest flex items-center justify-center gap-1.5">
                   <span className="material-symbols-outlined text-xs">swap_horiz</span>
                   Swap KES
-                </button>
+                </Link>
                 <button 
                   onClick={() => setShowTopUpSelection(true)}
                   className="flex-1 py-2.5 bg-emerald-500 text-[#0A2540] hover:bg-emerald-400 rounded-xl text-[10px] font-bold transition-all shadow-xl uppercase tracking-widest flex items-center justify-center gap-1.5"
@@ -207,6 +235,12 @@ export default function Wallet() {
              </div>
           </div>
         </section>
+
+        {showStellarConnect && !hasRealWallet && (
+          <div className="animate-fade-in-up">
+            <StellarConnectPanel />
+          </div>
+        )}
 
         <div className="grid grid-cols-12 gap-8 items-start lg:items-stretch">
           {/* Withdrawal Interface */}
@@ -308,13 +342,13 @@ export default function Wallet() {
                         </div>
                         <div className="overflow-hidden">
                           <p className="text-[10px] text-on-surface-variant font-black uppercase tracking-widest opacity-40">Blockchain Settlement: <span className="text-emerald-600 italic">PayChain Wallet</span></p>
-                          <p className="text-sm font-mono text-primary font-bold tracking-wider">{mockMerchant.walletAddress}</p>
+                          <p className="text-sm font-mono text-primary font-bold tracking-wider">{displayWalletAddressShort}</p>
                         </div>
                       </div>
                       <div className="w-full md:w-auto flex flex-col items-center sm:items-end gap-2 shrink-0">
-                        <button 
+                        <button
                           onClick={() => {
-                            navigator.clipboard.writeText(mockMerchant.fullWalletAddress)
+                            navigator.clipboard.writeText(displayWalletAddress)
                             addToast({ title: 'Address Copied', message: 'Wallet address copied to clipboard', type: 'success' })
                           }}
                           className="w-full sm:w-auto px-5 py-3 bg-white border border-outline-variant/10 text-primary rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm hover:bg-emerald-50 transition-all flex items-center justify-center gap-2 self-stretch sm:self-auto"
@@ -323,12 +357,10 @@ export default function Wallet() {
                            Copy Address
                         </button>
                         <div className="flex items-center gap-2 px-2 py-1 bg-surface-container-high rounded-full border border-outline-variant/5">
-                           <span className="text-[7px] font-black uppercase tracking-widest text-primary/40 leading-none">Supported by</span>
+                           <span className="text-[7px] font-black uppercase tracking-widest text-primary/40 leading-none">Settled on</span>
                            <div className="flex items-center gap-1.5">
-                              <span className="w-2 h-2 rounded-full bg-[#35D07F]" title="Celo"></span>
-                              <span className="w-2 h-2 rounded-full bg-[#0052FF]" title="Base"></span>
-                              <span className="w-2 h-2 rounded-full bg-[#8247E5]" title="Polygon"></span>
-                              <span className="text-[8px] font-bold text-primary/60">Celo, Base, Polygon</span>
+                              <span className="w-2 h-2 rounded-full bg-black" title="Stellar"></span>
+                              <span className="text-[8px] font-bold text-primary/60">Stellar</span>
                            </div>
                         </div>
                       </div>

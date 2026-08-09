@@ -4,7 +4,6 @@ import api from '../api/api';
 import TablePagination from '../components/ui/TablePagination';
 import MerchantsMap from '../components/merchants-map/MerchantsMap';
 import LocationPickerModal from '../components/merchants-map/LocationPickerModal';
-import { useToast } from '../context/ToastContext';
 import { formatAccountNumber } from '../utils/formatAccountNumber';
 
 const PAGE_SIZE = 20;
@@ -51,6 +50,7 @@ const emptyForm = {
   businessName: '',
   kraPin: '',
   businessNumber: '',
+  isDemoMerchant: false,
 };
 
 // Human-readable activity label + colours.
@@ -80,13 +80,10 @@ function relativeTime(iso) {
 }
 
 const Merchants = () => {
-  const { showToast } = useToast();
   const [merchantsData, setMerchantsData] = useState([]);
   const [merchantStats, setMerchantStats] = useState({
     active: 0, locked: 0, dormant: 0, total: 0, kycVerified: 0, flagged: 0,
   });
-  const [downloadingStickerId, setDownloadingStickerId] = useState(null);
-  const [downloadingBulkStickers, setDownloadingBulkStickers] = useState(false);
 
   // Flag-merchant modal — { merchant, reason, busy, error }. Reuses the same
   // 2-stage pattern as the action modal but doesn't need OTP since flagging
@@ -261,6 +258,7 @@ const Merchants = () => {
         businessName: form.businessName.trim(),
         kraPin: form.kraPin.trim() || undefined,
         businessNumber: form.businessNumber.trim() || undefined,
+        isDemoMerchant: form.isDemoMerchant,
       };
       const res = await api.post('/api/admin/merchants', payload);
       if (res.data?.success) {
@@ -268,6 +266,9 @@ const Merchants = () => {
           email: res.data.data.email,
           paybillAccount: res.data.data.paybillAccount,
           businessName: res.data.data.businessName,
+          isDemoMerchant: res.data.data.isDemoMerchant,
+          stellarPublicKey: res.data.data.stellarPublicKey,
+          warning: res.data.warning,
         });
         fetchMerchants();
       } else {
@@ -391,65 +392,6 @@ const Merchants = () => {
   }
   function closeDetail() { setDetailMerchant(null); setDetailError(''); }
 
-  // Shared blob-download helper — sticker PDFs come back as raw binary,
-  // not JSON, so this needs responseType: 'blob' and a manual <a> click
-  // rather than the usual axios JSON handling used everywhere else on
-  // this page.
-  function saveBlobAs(blob, filename) {
-    const blobUrl = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.style.display = 'none';
-    a.href = blobUrl;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(blobUrl);
-  }
-
-  async function readBlobError(err, fallback) {
-    if (err.response?.data instanceof Blob) {
-      try {
-        const text = await err.response.data.text();
-        return JSON.parse(text)?.error || fallback;
-      } catch {
-        return fallback;
-      }
-    }
-    return err.response?.data?.error || fallback;
-  }
-
-  async function handleDownloadSticker(merchant) {
-    setDownloadingStickerId(merchant._id);
-    try {
-      const res = await api.get(`/api/admin/merchants/${merchant._id}/sticker`, { responseType: 'blob' });
-      saveBlobAs(res.data, `PayChain-Sticker-${merchant.businessName || merchant._id}.pdf`);
-    } catch (err) {
-      showToast(await readBlobError(err, 'Could not download the sticker.'), 'error');
-    } finally {
-      setDownloadingStickerId(null);
-    }
-  }
-
-  async function handleDownloadAllStickers() {
-    setDownloadingBulkStickers(true);
-    try {
-      const res = await api.get('/api/admin/merchants/stickers/bulk', { responseType: 'blob' });
-      const included = res.headers?.['x-stickers-included'];
-      const skipped = res.headers?.['x-stickers-skipped'];
-      saveBlobAs(res.data, `PayChain-Stickers-Batch-${new Date().toISOString().slice(0, 10)}.pdf`);
-      if (skipped && Number(skipped) > 0) {
-        showToast(`Downloaded ${included} stickers — ${skipped} merchant(s) skipped (no bank account assigned yet).`, 'info');
-      } else {
-        showToast(`Downloaded ${included} stickers.`);
-      }
-    } catch (err) {
-      showToast(await readBlobError(err, 'Could not download the sticker batch.'), 'error');
-    } finally {
-      setDownloadingBulkStickers(false);
-    }
-  }
-
   return (
     <Layout>
       <div className="space-y-8">
@@ -480,15 +422,6 @@ const Merchants = () => {
                 Map
               </button>
             </div>
-            <button
-              onClick={handleDownloadAllStickers}
-              disabled={downloadingBulkStickers}
-              title="Download every merchant's paybill sticker as one printable PDF"
-              className="flex-1 sm:flex-none bg-surface-container-low text-on-surface px-4 py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:bg-surface-container-high transition-all active:scale-95 font-label uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <span className={`material-symbols-outlined text-[18px] ${downloadingBulkStickers ? 'animate-spin' : ''}`}>{downloadingBulkStickers ? 'progress_activity' : 'sticky_note_2'}</span>
-              {downloadingBulkStickers ? 'Preparing...' : 'Download All Stickers'}
-            </button>
             <button
               onClick={openModal}
               className="flex-1 sm:flex-none bg-primary text-white px-5 py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:shadow-lg transition-all active:scale-95 font-label uppercase tracking-widest"
@@ -713,13 +646,6 @@ const Merchants = () => {
                             <MenuItem icon="location_on" tone="blue" onClick={() => { setOpenMenuId(null); setLocationPickerMerchant(m); }}>
                               {m.mapLocation?.lat != null ? 'Edit map location' : 'Set map location'}
                             </MenuItem>
-                            <MenuItem
-                              icon={downloadingStickerId === m._id ? 'progress_activity' : 'sticky_note_2'}
-                              tone="blue"
-                              onClick={() => { setOpenMenuId(null); handleDownloadSticker(m); }}
-                            >
-                              Download sticker
-                            </MenuItem>
                             <div className="h-px bg-outline-variant/20"></div>
                             {flagged ? (
                               <MenuItem icon="outlined_flag" tone="emerald" onClick={() => unflag(m)}>Clear suspicious flag</MenuItem>
@@ -788,10 +714,23 @@ const Merchants = () => {
                   <strong>{success.businessName}</strong> has been onboarded.<br/>
                   A password-setup link has been emailed to <strong>{success.email}</strong>.
                 </p>
-                <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 mb-5 inline-block">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-700 mb-1">Account Number</p>
-                  <p className="font-mono text-xl font-bold text-emerald-900">{success.paybillAccount}</p>
-                </div>
+                {success.paybillAccount && (
+                  <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 mb-3 inline-block">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-700 mb-1">Demo Account Number</p>
+                    <p className="font-mono text-xl font-bold text-emerald-900">{success.paybillAccount}</p>
+                  </div>
+                )}
+                {success.isDemoMerchant && success.stellarPublicKey && (
+                  <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 mb-5">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-blue-700 mb-1">Stellar Testnet Wallet</p>
+                    <p className="font-mono text-[11px] font-bold text-blue-900 break-all">{success.stellarPublicKey}</p>
+                  </div>
+                )}
+                {success.isDemoMerchant && success.warning && (
+                  <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 mb-5 text-[12px] text-red-700 text-left">
+                    <strong>Wallet provisioning failed:</strong> {success.warning}
+                  </div>
+                )}
                 <div className="flex gap-2 justify-center">
                   <button onClick={() => setShowModal(false)} className="px-5 py-2.5 rounded-lg bg-primary text-white text-sm font-semibold uppercase tracking-widest hover:shadow-lg active:scale-95 transition-all">Done</button>
                   <button onClick={() => { setSuccess(null); setForm(emptyForm); }} className="px-5 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low transition-all">Add Another</button>
@@ -831,9 +770,20 @@ const Merchants = () => {
                       <input type="text" value={form.businessNumber} onChange={(e) => update('businessNumber', e.target.value)} placeholder="BN-2024-12345" className={fieldClass} />
                     </Field>
                   </div>
+                  <label className="flex items-start gap-2.5 px-3 py-2.5 rounded-lg border border-outline-variant/30 hover:bg-surface-container-low cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.isDemoMerchant}
+                      onChange={(e) => update('isDemoMerchant', e.target.checked)}
+                      className="mt-0.5 w-4 h-4 accent-primary shrink-0"
+                    />
+                    <span className="text-[12px] text-on-surface">
+                      <strong>Demo merchant</strong> — auto-provisions a Stellar testnet wallet immediately (Inflation Shield / Stellar grant demo pipeline). Real merchants stay opt-in via their own Wallet page; leave unchecked for normal onboarding.
+                    </span>
+                  </label>
                   {formError && <div className="text-[13px] text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium">{formError}</div>}
                   <div className="bg-amber-50 border border-amber-100 rounded-lg px-3 py-2.5 text-[12px] text-amber-800">
-                    <strong>Note:</strong> A unique 5-digit account number will be auto-assigned. The merchant receives a secure link (24h) to set their own password.
+                    <strong>Note:</strong> The merchant receives a secure link (24h) to set their own password.
                   </div>
                   <div className="flex gap-3 pt-2">
                     <button type="button" onClick={closeModal} disabled={submitting} className="flex-1 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40 transition-all">Cancel</button>

@@ -290,7 +290,13 @@ export const confirmationURL = async (req, res) => {
     // stale balance and silently clobber it on save(). $inc is race-free
     // regardless of how long this branch takes.
     let updatedMerchant;
-    if (merchant.stellarPublicKey && AUTO_INFLATION_SHIELD_ENABLED) {
+    // Demo/evidence merchants (Stellar grant deliverable pipeline) always
+    // get the automatic conversion, regardless of AUTO_INFLATION_SHIELD_ENABLED
+    // — that flag exists purely to protect real merchants from this on-chain
+    // dependency sitting in their live payment path, and isDemoMerchant is
+    // never set on a real merchant (see models/Merchant.js), so this can't
+    // change behavior for anyone but the demo accounts it's built for.
+    if (merchant.stellarPublicKey && (merchant.isDemoMerchant || AUTO_INFLATION_SHIELD_ENABLED)) {
       try {
         const liveRate = await getLiveKesToUsdcRate();
         const usdcPayoutValue = (netKESAmount * liveRate).toFixed(7);
