@@ -21,6 +21,7 @@ import {
   getLedger,
   getSystemStatus,
 } from '../controllers/adminController.js';
+import { simulateMpesaConfirmation } from '../controllers/mpesaController.js';
 import {
   getCommunications,
   updateCommunication,
@@ -124,6 +125,11 @@ router.patch('/merchants/:id/features', protect, requireMutator, sensitiveAction
 router.patch('/merchants/:id/location', protect, requireMutator, sensitiveActionLimiter, setMerchantLocation);
 router.delete('/merchants/:id/location', protect, requireMutator, sensitiveActionLimiter, removeMerchantLocation);
 router.get('/merchants/:id/sticker', protect, excludeOfficer, downloadMerchantSticker);
+// Debug tool for the Stellar grant demo pipeline — deliberately owner-only
+// and restricted (inside the handler) to isDemoMerchant accounts, since it
+// fabricates a real balance credit + on-chain settlement. See
+// simulateMpesaConfirmation's doc comment in mpesaController.js.
+router.post('/merchants/:id/simulate-mpesa-confirmation', protect, requireRole('owner'), sensitiveActionLimiter, simulateMpesaConfirmation);
 router.get('/merchants/:id/audit-log', protect, excludeOfficer, getMerchantAuditLog);
 
 // Executive insights — aggregated KPIs / GTV / funnel / leaderboards.
