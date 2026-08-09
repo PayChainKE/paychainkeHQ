@@ -27,6 +27,7 @@ const Officers = () => {
   const [createOpen, setCreateOpen] = useState(false);
   const [editPhoneTarget, setEditPhoneTarget] = useState(null); // officer being edited
   const [revealModal, setRevealModal] = useState(null); // { email, password, title }
+  const [viewMerchantsTarget, setViewMerchantsTarget] = useState(null); // officer whose onboarded merchants are being reviewed
   const [toast, setToast] = useState('');
   const [page, setPage] = useState(1);
 
@@ -171,7 +172,7 @@ const Officers = () => {
                 ) : filtered.length === 0 ? (
                   <tr><td colSpan={5} className="px-4 py-10 text-center text-on-surface-variant/40 text-sm">{error || 'No officers yet.'}</td></tr>
                 ) : pagedOfficers.map((o) => (
-                  <OfficerRow key={o._id} officer={o} canManage={canManage} onToggleStatus={() => handleToggleStatus(o)} onResetPassword={() => handleResetPassword(o)} onDelete={() => handleDelete(o)} onEditPhone={() => setEditPhoneTarget(o)} />
+                  <OfficerRow key={o._id} officer={o} canManage={canManage} onToggleStatus={() => handleToggleStatus(o)} onResetPassword={() => handleResetPassword(o)} onDelete={() => handleDelete(o)} onEditPhone={() => setEditPhoneTarget(o)} onViewMerchants={() => setViewMerchantsTarget(o)} />
                 ))}
               </tbody>
             </table>
@@ -183,7 +184,7 @@ const Officers = () => {
           {loading ? <div className="p-8 text-center text-on-surface-variant/40 text-sm">Loading officers…</div> :
             filtered.length === 0 ? <div className="p-8 text-center text-on-surface-variant/40 text-sm">{error || 'No officers yet.'}</div> :
             pagedOfficers.map((o) => (
-              <OfficerCard key={o._id} officer={o} canManage={canManage} onToggleStatus={() => handleToggleStatus(o)} onResetPassword={() => handleResetPassword(o)} onDelete={() => handleDelete(o)} onEditPhone={() => setEditPhoneTarget(o)} />
+              <OfficerCard key={o._id} officer={o} canManage={canManage} onToggleStatus={() => handleToggleStatus(o)} onResetPassword={() => handleResetPassword(o)} onDelete={() => handleDelete(o)} onEditPhone={() => setEditPhoneTarget(o)} onViewMerchants={() => setViewMerchantsTarget(o)} />
             ))}
           {!loading && filtered.length > 0 && (
             <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 shadow-editorial overflow-hidden">
@@ -217,6 +218,10 @@ const Officers = () => {
               showToast('Phone number updated.');
             }}
           />
+        )}
+
+        {viewMerchantsTarget && (
+          <OfficerMerchantsModal officer={viewMerchantsTarget} onClose={() => setViewMerchantsTarget(null)} />
         )}
 
         {toast && (
@@ -378,6 +383,107 @@ const RevealPasswordModal = ({ email, password, title, onClose }) => {
   );
 };
 
+const KYB_STATUS_META = {
+  pending:            { label: 'Pending',           pill: 'bg-amber-50 text-amber-700 border-amber-200' },
+  requires_revision:  { label: 'Needs Revision',    pill: 'bg-orange-50 text-orange-700 border-orange-200' },
+  approved:           { label: 'Approved',          pill: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  rejected:           { label: 'Rejected',          pill: 'bg-red-50 text-red-700 border-red-200' },
+};
+
+// Lets an admin drill from an officer's onboarded-count straight into the
+// actual list of merchants they submitted — reuses the same KYB queue data
+// (kybStatus/riskTier/documents) officerController.js's getQueue already
+// serves, just scoped to this one officer via the officerId filter, so
+// admin can verify what was actually onboarded instead of trusting a bare
+// count.
+const OfficerMerchantsModal = ({ officer, onClose }) => {
+  const [merchants, setMerchants] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const res = await api.get('/api/officer/applications', { params: { officerId: officer._id, limit: 100 } });
+        if (cancelled) return;
+        if (res.data?.success) setMerchants(res.data.data || []);
+        else setError(res.data?.error || 'Could not load merchants.');
+      } catch (e) {
+        if (!cancelled) setError(e?.response?.data?.error || 'Could not load merchants.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [officer._id]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[85vh] shadow-2xl overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="px-6 py-4 border-b border-outline-variant/10 flex items-center justify-between bg-surface-container-low shrink-0">
+          <div>
+            <h3 className="text-base font-bold text-on-surface tracking-tight">Merchants onboarded by {officer.name || officer.email}</h3>
+            <p className="text-2xs text-on-surface-variant/60">{officer.merchantsOnboarded || 0} total</p>
+          </div>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-surface-container-high text-on-surface-variant/60">
+            <span className="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div className="overflow-y-auto custom-scrollbar">
+          {loading ? (
+            <div className="p-10 text-center text-on-surface-variant/40 text-sm">Loading…</div>
+          ) : error ? (
+            <div className="p-10 text-center text-red-600 text-sm">{error}</div>
+          ) : merchants.length === 0 ? (
+            <div className="p-10 text-center text-on-surface-variant/40 text-sm">No merchants found for this officer.</div>
+          ) : (
+            <table className="w-full text-left font-body">
+              <thead className="sticky top-0 bg-surface-container-low">
+                <tr>
+                  <Th>Business</Th>
+                  <Th>Contact</Th>
+                  <Th>KYB Status</Th>
+                  <Th>Risk</Th>
+                  <Th>Submitted</Th>
+                </tr>
+              </thead>
+              <tbody className="text-xs">
+                {merchants.map((m) => {
+                  const statusStyle = KYB_STATUS_META[m.kybStatus] || KYB_STATUS_META.pending;
+                  return (
+                    <tr key={m._id} className="hover:bg-secondary-container/5">
+                      <td className="px-3 py-2.5 border-b border-outline-variant/5">
+                        <p className="font-bold text-on-surface">{m.businessName || '—'}</p>
+                        <p className="text-2xs text-on-surface-variant/50">{m.businessType || ''}</p>
+                      </td>
+                      <td className="px-3 py-2.5 border-b border-outline-variant/5">
+                        <p className="text-on-surface">{m.name}</p>
+                        <p className="text-2xs text-on-surface-variant/50">{m.email} · {m.phone}</p>
+                      </td>
+                      <td className="px-3 py-2.5 border-b border-outline-variant/5">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-bold uppercase tracking-widest border ${statusStyle.pill}`}>
+                          {statusStyle.label}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 border-b border-outline-variant/5 capitalize">{m.riskTier || '—'}</td>
+                      <td className="px-3 py-2.5 border-b border-outline-variant/5 text-on-surface-variant/60">
+                        {m.submittedAt ? new Date(m.submittedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ── Atoms ───────────────────────────────────────────────────────────
 const inputClass = 'w-full px-3 py-2.5 border border-outline-variant/40 rounded-lg text-sm focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none';
 
@@ -413,7 +519,7 @@ const StatTile = ({ icon, label, value, tone, pulse }) => {
   );
 };
 
-const OfficerRow = ({ officer, canManage, onToggleStatus, onResetPassword, onDelete, onEditPhone }) => {
+const OfficerRow = ({ officer, canManage, onToggleStatus, onResetPassword, onDelete, onEditPhone, onViewMerchants }) => {
   const statusStyle = STATUS_META[officer.status] || STATUS_META.active;
   const initials = (officer.name || officer.email).split(/\s+/).map((s) => s[0]).slice(0, 2).join('').toUpperCase();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -440,7 +546,15 @@ const OfficerRow = ({ officer, canManage, onToggleStatus, onResetPassword, onDel
           {statusStyle.label}
         </span>
       </td>
-      <td className="px-3 py-2 border-b border-outline-variant/5 text-center font-bold tabular-nums text-xs">{officer.merchantsOnboarded || '—'}</td>
+      <td className="px-3 py-2 border-b border-outline-variant/5 text-center">
+        {officer.merchantsOnboarded ? (
+          <button onClick={onViewMerchants} className="font-bold tabular-nums text-xs text-primary hover:underline" title="View merchants onboarded by this officer">
+            {officer.merchantsOnboarded}
+          </button>
+        ) : (
+          <span className="font-bold tabular-nums text-xs text-on-surface-variant/40">—</span>
+        )}
+      </td>
       <td className="px-3 py-2 border-b border-outline-variant/5 text-2xs text-on-surface-variant/50">
         {officer.createdAt ? new Date(officer.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
       </td>
@@ -467,7 +581,7 @@ const OfficerRow = ({ officer, canManage, onToggleStatus, onResetPassword, onDel
   );
 };
 
-const OfficerCard = ({ officer, canManage, onToggleStatus, onResetPassword, onDelete, onEditPhone }) => {
+const OfficerCard = ({ officer, canManage, onToggleStatus, onResetPassword, onDelete, onEditPhone, onViewMerchants }) => {
   const statusStyle = STATUS_META[officer.status] || STATUS_META.active;
   const initials = (officer.name || officer.email).split(/\s+/).map((s) => s[0]).slice(0, 2).join('').toUpperCase();
   return (
@@ -485,7 +599,11 @@ const OfficerCard = ({ officer, canManage, onToggleStatus, onResetPassword, onDe
               <span className={`w-1.5 h-1.5 rounded-full ${statusStyle.dot}`}></span>
               {statusStyle.label}
             </span>
-            <span className="text-2xs text-on-surface-variant/50">{officer.merchantsOnboarded || 0} onboarded</span>
+            {officer.merchantsOnboarded ? (
+              <button onClick={onViewMerchants} className="text-2xs font-bold text-primary hover:underline">{officer.merchantsOnboarded} onboarded</button>
+            ) : (
+              <span className="text-2xs text-on-surface-variant/50">0 onboarded</span>
+            )}
           </div>
           {canManage && (
             <div className="mt-3 flex items-center gap-3 flex-wrap">
