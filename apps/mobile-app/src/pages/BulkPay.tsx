@@ -31,6 +31,7 @@ interface Payee {
   businessAccount?: string;
   tillNumber?: string;
   bankName?: string;
+  bankCode?: string;
   accountNumber?: string;
   kraPin?: string;
   idNumber?: string;
@@ -135,6 +136,21 @@ export default function BulkPay() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Bank-routed payees need a real NCBA clearing code (bankCode), not just a
+  // free-text bank name — authorizeBatch on the backend refuses to route a
+  // payout without one. Fetched lazily, once, the first time the Bank
+  // settlement method is picked in the Add Payee form.
+  const [bankCodes, setBankCodes] = useState<{ code: string; name: string }[]>([]);
+  const fetchBankCodes = useCallback(async () => {
+    if (bankCodes.length > 0) return;
+    try {
+      const res = await api.get('/api/v1/openbanking/bank-codes');
+      setBankCodes(res.data?.bankCodes || []);
+    } catch (e) {
+      console.warn('Failed to load bank codes', e);
+    }
+  }, [bankCodes.length]);
+
   const [selectedPayees, setSelectedPayees] = useState<Record<string, boolean>>({});
   const [payoutAmounts, setPayoutAmounts] = useState<Record<string, number>>({});
 
@@ -218,6 +234,7 @@ export default function BulkPay() {
     phone: '',
     accountNumber: '',
     bankName: '',
+    bankCode: '',
     paybillNumber: '',
     businessAccount: '',
     tillNumber: '',
@@ -600,6 +617,7 @@ export default function BulkPay() {
   };
 
   const openEditPayee = (p: Payee) => {
+    if (p.paymentMethod === 'Bank') fetchBankCodes();
     setNewPayee({
       name: p.name || '',
       type: p.type || 'employee',
@@ -609,6 +627,7 @@ export default function BulkPay() {
       phone: p.phone || '',
       accountNumber: p.accountNumber || '',
       bankName: p.bankName || '',
+      bankCode: p.bankCode || '',
       paybillNumber: p.paybillNumber || '',
       businessAccount: p.businessAccount || '',
       tillNumber: p.tillNumber || '',
@@ -645,7 +664,10 @@ export default function BulkPay() {
       }
     }
     if (newPayee.paymentMethod === 'Bank') {
-      if (!newPayee.bankName.trim()) return 'Bank name is required.';
+      // bankCode (not just a bank name) is what actually routes the payout
+      // through NCBA PesaLink — without it, authorizeBatch refuses to pay
+      // this payee at all and silently refunds the row.
+      if (!newPayee.bankCode) return "Select the payee's bank.";
       if (!/^\d{8,14}$/.test(newPayee.accountNumber.trim())) return 'Bank account number must be 8–14 digits.';
     }
     return null;
@@ -2006,7 +2028,7 @@ export default function BulkPay() {
                       {(['Mobile Money', 'Bank'] as PaymentMethod[]).map((m) => (
                         <TouchableOpacity
                           key={m}
-                          onPress={() => setNewPayee({ ...newPayee, paymentMethod: m })}
+                          onPress={() => { setNewPayee({ ...newPayee, paymentMethod: m }); if (m === 'Bank') fetchBankCodes(); }}
                           className={`flex-1 py-3 rounded-xl items-center ${newPayee.paymentMethod === m ? 'bg-[#00351d]' : 'bg-[#f0fdf4] border border-[#e7ece7]'}`}
                         >
                           <Text className={`font-jakarta-bold text-[12px] ${newPayee.paymentMethod === m ? 'text-white' : 'text-[#404942]'}`}>{m}</Text>
@@ -2072,13 +2094,20 @@ export default function BulkPay() {
 
                     {newPayee.paymentMethod === 'Bank' && (
                       <View>
-                        <TextInput
-                          value={newPayee.bankName}
-                          onChangeText={(t) => setNewPayee({ ...newPayee, bankName: t })}
-                          placeholder="Bank Name (e.g. KCB)"
-                          placeholderTextColor="#a1a1aa"
-                          className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-4 py-3.5 text-[#0c2010] font-jakarta-bold text-[14px] mb-2"
-                        />
+                        <View className="flex-row flex-wrap gap-1.5 mb-2">
+                          {bankCodes.length === 0 && (
+                            <Text className="text-[#707971] font-jakarta-medium text-[11px] py-2">Loading banks…</Text>
+                          )}
+                          {bankCodes.map((b) => (
+                            <TouchableOpacity
+                              key={b.code}
+                              onPress={() => setNewPayee({ ...newPayee, bankCode: b.code, bankName: b.name })}
+                              className={`px-3 py-2 rounded-lg border ${newPayee.bankCode === b.code ? 'bg-[#00351d] border-[#00351d]' : 'bg-white border-[#e7ece7]'}`}
+                            >
+                              <Text className={`font-jakarta-bold text-[11px] ${newPayee.bankCode === b.code ? 'text-white' : 'text-[#404942]'}`}>{b.name}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
                         <TextInput
                           value={newPayee.accountNumber}
                           onChangeText={(t) => setNewPayee({ ...newPayee, accountNumber: t.replace(/\D/g, '').slice(0, 14) })}

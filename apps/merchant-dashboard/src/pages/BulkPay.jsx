@@ -77,6 +77,20 @@ export default function BulkPay() {
   const [selectedPayees, setSelectedPayees] = useState({})
   const [payoutAmounts, setPayoutAmounts] = useState({})
 
+  // Bank-routed payees need a real NCBA clearing code (bankCode), not just a
+  // free-text bank name — authorizeBatch on the backend refuses to route a
+  // payout without one. Fetched lazily (same pattern as SendMoney.jsx's
+  // Bank destination picker) so payees who never touch Bank never pay for it.
+  const [bankCodes, setBankCodes] = useState([])
+  useEffect(() => {
+    if (newPayee.paymentMethod !== 'Bank' || bankCodes.length > 0) return
+    const token = localStorage.getItem('paychain_merchant_token')
+    const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+    axios.get(`${API_URL}/api/v1/openbanking/bank-codes`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => setBankCodes(res.data?.bankCodes || []))
+      .catch(e => console.error('Failed to load bank codes', e))
+  }, [newPayee.paymentMethod])
+
   const [newPayee, setNewPayee] = useState({ 
     name: '', 
     type: 'Employee', 
@@ -87,6 +101,7 @@ export default function BulkPay() {
     phone: '',
     accountNumber: '',
     bankName: '',
+    bankCode: '',
     paybillNumber: '',
     businessAccount: '',
     tillNumber: '',
@@ -130,6 +145,7 @@ export default function BulkPay() {
       phone: p.phone || '',
       accountNumber: p.accountNumber || '',
       bankName: p.bankName || '',
+      bankCode: p.bankCode || '',
       paybillNumber: p.paybillNumber || '',
       businessAccount: p.businessAccount || '',
       tillNumber: p.tillNumber || '',
@@ -192,8 +208,11 @@ export default function BulkPay() {
         }
       }
     } else if (newPayee.paymentMethod === 'Bank') {
-      if (!newPayee.bankName?.trim()) {
-        addNotification({ title: 'Invalid Format', message: 'Bank Name is required.', type: 'error' });
+      // bankCode (not just a bank name) is what actually routes the payout
+      // through NCBA PesaLink — without it, authorizeBatch refuses to pay
+      // this payee at all and silently refunds the row.
+      if (!newPayee.bankCode) {
+        addNotification({ title: 'Invalid Format', message: 'Select the payee\'s bank.', type: 'error' });
         return;
       }
       if (!/^\d{8,14}$/.test(newPayee.accountNumber?.trim())) {
@@ -274,6 +293,7 @@ export default function BulkPay() {
       phone: '',
       accountNumber: '',
       bankName: '',
+      bankCode: '',
       paybillNumber: '',
       businessAccount: '',
       tillNumber: '',
@@ -741,7 +761,11 @@ export default function BulkPay() {
 
       const processedBatch = res.data.batch;
 
-      // Transform response to match frontend receipts
+      // Transform response to match frontend receipts. `status` is carried
+      // through now — it used to be dropped here, so every receipt card
+      // rendered as "Confirmed / Settled" even for rows that actually
+      // failed (blocked/rejected by Daraja or NCBA) and were refunded back
+      // to the merchant's balance. See the status-aware rendering below.
       const newReceipts = processedBatch.transactions.map(tx => ({
         id: tx.receiptNumber,
         name: tx.name,
@@ -749,9 +773,10 @@ export default function BulkPay() {
         method: tx.method,
         phone: tx.accountReference,
         reference: processedBatch.batchReference,
-        timestamp: new Date().toLocaleString('en-KE', { 
-          day: '2-digit', month: 'short', year: 'numeric', 
-          hour: '2-digit', minute: '2-digit' 
+        status: tx.status, // 'completed' | 'pending' | 'failed'
+        timestamp: new Date().toLocaleString('en-KE', {
+          day: '2-digit', month: 'short', year: 'numeric',
+          hour: '2-digit', minute: '2-digit'
         })
       }));
 
@@ -764,10 +789,14 @@ export default function BulkPay() {
       // sidebar/Overview balance reflects this payout immediately.
       refreshSession();
 
+      const failedCount = newReceipts.filter(r => r.status === 'failed').length;
+      const allFailed = failedCount > 0 && failedCount === newReceipts.length;
       addNotification({
-        title: 'Batch Processed',
-        message: res.data.message,
-        type: 'success'
+        title: allFailed ? 'Batch Failed' : failedCount > 0 ? 'Batch Partially Processed' : 'Batch Processed',
+        message: failedCount > 0
+          ? `${failedCount} of ${newReceipts.length} payout${newReceipts.length === 1 ? '' : 's'} failed and ${failedCount === 1 ? 'was' : 'were'} refunded to your balance. ${res.data.message}`
+          : res.data.message,
+        type: allFailed ? 'error' : failedCount > 0 ? 'warning' : 'success'
       });
     } catch (error) {
       addNotification({
@@ -1160,13 +1189,19 @@ export default function BulkPay() {
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in fade-in duration-300">
                             <div className="space-y-1.5">
                               <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Bank Name</label>
-                              <ValidatedInput
-                                kind="businessName"
-                                value={newPayee.bankName}
-                                onChange={(e) => setNewPayee({...newPayee, bankName: e.target.value})}
-                                placeholder="e.g. Equity"
+                              <select
+                                value={newPayee.bankCode}
+                                onChange={(e) => {
+                                  const match = bankCodes.find(b => b.code === e.target.value)
+                                  setNewPayee({...newPayee, bankCode: e.target.value, bankName: match?.name || ''})
+                                }}
                                 className="w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 md:px-6 md:py-4 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none"
-                              />
+                              >
+                                <option value="">{bankCodes.length ? 'Select a bank' : 'Loading banks...'}</option>
+                                {bankCodes.map((b) => (
+                                  <option key={b.code} value={b.code}>{b.name}</option>
+                                ))}
+                              </select>
                             </div>
                             <div className="space-y-1.5">
                               <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Account No.</label>
@@ -1212,7 +1247,7 @@ export default function BulkPay() {
               <p className="text-[9px] md:text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] mt-1 opacity-40">Frequency: Monthly</p>
             </div>
             <button 
-              onClick={() => { setShowAddModal(true); setIsEditing(false); setNewPayee({ name: '', type: 'Employee', paymentMethod: 'Mobile Money', phone: '', accountNumber: '', bankName: '', walletAddress: '', network: 'Polygon' }); }}
+              onClick={() => { setShowAddModal(true); setIsEditing(false); setNewPayee({ name: '', type: 'Employee', paymentMethod: 'Mobile Money', phone: '', accountNumber: '', bankName: '', bankCode: '', walletAddress: '', network: 'Polygon' }); }}
               className="bg-[#00351D] text-white w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center hover:bg-emerald-950 active:scale-95 transition-all shadow-xl"
             >
               <span className="material-symbols-outlined text-lg md:text-xl">add</span>
@@ -1544,19 +1579,39 @@ export default function BulkPay() {
               )}
 
               {/* Step 4: Success & Receipts View */}
-              {step === 4 && (
+              {step === 4 && (() => {
+                const failedCount = authorizedReceipts.filter(r => r.status === 'failed').length
+                const pendingCount = authorizedReceipts.filter(r => r.status === 'pending').length
+                const allFailed = failedCount > 0 && failedCount === authorizedReceipts.length
+                return (
                 <div className="p-6 md:p-12 animate-in fade-in zoom-in duration-700">
                   <div className="flex flex-col items-center text-center mb-12">
-                    <div className="w-24 h-24 md:w-32 md:h-32 bg-emerald-500 rounded-full flex items-center justify-center mb-6 md:mb-8 shadow-2xl shadow-emerald-500/40 relative">
-                      <div className="absolute inset-0 rounded-full animate-ping bg-emerald-500/20 duration-[2000ms]"></div>
-                      <span className="material-symbols-outlined text-4xl md:text-6xl text-[#00351D] font-black">check_circle</span>
+                    <div className={`w-24 h-24 md:w-32 md:h-32 rounded-full flex items-center justify-center mb-6 md:mb-8 shadow-2xl relative ${allFailed ? 'bg-red-500 shadow-red-500/40' : failedCount > 0 ? 'bg-amber-500 shadow-amber-500/40' : 'bg-emerald-500 shadow-emerald-500/40'}`}>
+                      <div className={`absolute inset-0 rounded-full animate-ping duration-[2000ms] ${allFailed ? 'bg-red-500/20' : failedCount > 0 ? 'bg-amber-500/20' : 'bg-emerald-500/20'}`}></div>
+                      <span className="material-symbols-outlined text-4xl md:text-6xl text-[#00351D] font-black">{allFailed ? 'error' : failedCount > 0 ? 'warning' : 'check_circle'}</span>
                     </div>
-                    <h2 className="font-headline text-3xl md:text-5xl text-primary font-bold tracking-tight mb-3">Batch Authorized</h2>
-                    <p className="text-[10px] md:text-sm font-medium text-on-surface-variant opacity-60 max-w-md mx-auto italic">Disbursement workflow complete. Receipts generated for all recipients.</p>
+                    <h2 className="font-headline text-3xl md:text-5xl text-primary font-bold tracking-tight mb-3">
+                      {allFailed ? 'Batch Failed' : failedCount > 0 ? 'Batch Partially Processed' : 'Batch Authorized'}
+                    </h2>
+                    <p className="text-[10px] md:text-sm font-medium text-on-surface-variant opacity-60 max-w-md mx-auto italic">
+                      {allFailed
+                        ? 'Every payout in this batch failed and the full amount was refunded to your balance.'
+                        : failedCount > 0
+                        ? `${failedCount} of ${authorizedReceipts.length} payout${authorizedReceipts.length === 1 ? '' : 's'} failed and ${failedCount === 1 ? 'was' : 'were'} refunded to your balance.${pendingCount > 0 ? ` ${pendingCount} still awaiting confirmation.` : ''}`
+                        : pendingCount > 0
+                        ? `Submitted. ${pendingCount} payout${pendingCount === 1 ? '' : 's'} awaiting final confirmation.`
+                        : 'Disbursement workflow complete. Receipts generated for all recipients.'}
+                    </p>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar pb-10">
-                    {authorizedReceipts.map((receipt) => (
+                    {authorizedReceipts.map((receipt) => {
+                      const statusMeta = {
+                        failed:    { label: 'Failed & Refunded', dot: 'bg-red-500',   text: 'text-red-600',    footer: 'Refunded',   footerDot: 'bg-red-400',   footerText: 'text-red-700' },
+                        pending:   { label: 'Pending',           dot: 'bg-amber-400', text: 'text-amber-600',  footer: 'Processing', footerDot: 'bg-amber-400', footerText: 'text-amber-700' },
+                        completed: { label: 'Confirmed',         dot: 'bg-emerald-500', text: 'text-emerald-600', footer: 'Settled',  footerDot: 'bg-emerald-400', footerText: 'text-emerald-700' },
+                      }[receipt.status] || { label: 'Confirmed', dot: 'bg-emerald-500', text: 'text-emerald-600', footer: 'Settled', footerDot: 'bg-emerald-400', footerText: 'text-emerald-700' }
+                      return (
                       <div key={receipt.id} id={`receipt-${receipt.id}`} className="bg-white border border-outline-variant/10 rounded-[24px] sm:rounded-[32px] overflow-hidden shadow-[0_10px_40px_rgba(0,0,0,0.03)] group hover:shadow-xl transition-all duration-500 hover:-translate-y-1">
                         <div className="bg-[#00351D] p-5 md:p-6 flex flex-col gap-4">
                           <img src={paychainLogoWhite} alt="PayChain" className="h-4 object-contain" />
@@ -1581,9 +1636,9 @@ export default function BulkPay() {
                         <div className="p-5 md:p-8 space-y-5 md:space-y-6">
                           <div className="flex flex-col sm:flex-row sm:justify-between items-start sm:items-center gap-3 sm:gap-0">
                             <div className="flex items-center sm:items-start gap-4 sm:gap-0 sm:flex-col sm:mb-0 w-full justify-between sm:justify-start">
-                              <p className="text-[10px] text-emerald-600 font-extrabold uppercase tracking-widest sm:mb-1.5 flex items-center gap-1.5">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                Confirmed
+                              <p className={`text-[10px] font-extrabold uppercase tracking-widest sm:mb-1.5 flex items-center gap-1.5 ${statusMeta.text}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${statusMeta.dot}`}></span>
+                                {statusMeta.label}
                               </p>
                               <p className="text-[11px] sm:text-xs font-bold text-primary opacity-60">{receipt.timestamp}</p>
                             </div>
@@ -1610,16 +1665,18 @@ export default function BulkPay() {
                         </div>
                         <div className="px-6 py-4 bg-surface-container-low/30 border-t border-outline-variant/5 flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                             <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
-                             <span className="text-[9px] font-black text-emerald-700 uppercase tracking-widest">Settled</span>
+                             <div className={`w-2 h-2 rounded-full animate-pulse ${statusMeta.footerDot}`}></div>
+                             <span className={`text-[9px] font-black uppercase tracking-widest ${statusMeta.footerText}`}>{statusMeta.footer}</span>
                           </div>
                           <img src={paychainLogo} alt="PayChain" className="h-4 object-contain opacity-40" />
                         </div>
                       </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
-              )}
+                )
+              })()}
             </div>
           </div>
 
