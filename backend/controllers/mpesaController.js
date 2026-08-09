@@ -1039,7 +1039,10 @@ export const stkCallback = async (req, res) => {
 export const getSTKStatus = async (req, res) => {
   try {
     const { checkoutId } = req.params;
-    const stkReq = await STKRequest.findOne({ checkoutRequestId: checkoutId });
+    // Scoped to the caller's own merchant account — without this, any
+    // authenticated merchant who learns/guesses another merchant's
+    // checkoutRequestId could poll their STK request status directly.
+    const stkReq = await STKRequest.findOne({ checkoutRequestId: checkoutId, merchantId: req.merchant._id });
     if (!stkReq) return res.status(404).json({ error: 'Request not found' });
 
     res.status(200).json({ 

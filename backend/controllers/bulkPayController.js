@@ -15,6 +15,7 @@ import { createNotification } from './notificationController.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
+import { logAudit } from '../utils/auditLog.js';
 import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard.js';
 import { DARAJA_STK_B2C_ENABLED } from './mpesaController.js';
 
@@ -129,15 +130,58 @@ export const deletePayee = async (req, res) => {
 // @access  Private
 export const setBulkPayPin = async (req, res) => {
   try {
-    const { pin } = req.body;
+    const { pin, currentPin } = req.body;
     if (!pin || pin.length !== 4 || !/^\d{4}$/.test(pin)) {
       return res.status(400).json({ message: 'PIN must be exactly 4 digits' });
     }
 
+    const merchant = await Merchant.findById(req.merchant._id).select('+bulkPayPin');
+    if (!merchant) {
+      return res.status(404).json({ message: 'Merchant not found' });
+    }
+
+    // Overwriting an EXISTING bulk-pay PIN is a sensitive action — same bar
+    // as resetBulkPayPin below. Without this, a session token alone (e.g.
+    // one leaked/stolen after the merchant already set a PIN) could
+    // silently replace it and immediately unlock authorizeBatch's real
+    // payouts, defeating the PIN's whole purpose as a check beyond the
+    // session itself. First-time setup (no PIN yet) doesn't need this.
+    if (merchant.bulkPayPin) {
+      if (!currentPin) {
+        return res.status(400).json({ message: 'Enter your current Bulk Pay PIN to change it.' });
+      }
+      try {
+        await assertPinNotLocked(req.merchant._id);
+      } catch (e) {
+        if (e instanceof PinLockedError) return res.status(429).json({ message: e.message });
+        throw e;
+      }
+      const isMatch = await bcrypt.compare(String(currentPin), merchant.bulkPayPin);
+      if (!isMatch) {
+        await recordFailedPinAttempt(req.merchant._id);
+        logAudit({
+          action: 'merchant.bulk_pay_pin.change_failed', category: 'security', severity: 'warning',
+          message: 'Bulk Pay PIN change failed — wrong current PIN',
+          merchant, req,
+        });
+        return res.status(401).json({ message: 'Current PIN is incorrect.' });
+      }
+      await resetPinAttempts(req.merchant._id);
+    }
+
     const salt = await bcrypt.genSalt(12);
     const hashedPin = await bcrypt.hash(pin, salt);
+    const wasChange = !!merchant.bulkPayPin;
 
     await Merchant.findByIdAndUpdate(req.merchant._id, { bulkPayPin: hashedPin });
+
+    logAudit({
+      action: wasChange ? 'merchant.bulk_pay_pin.changed' : 'merchant.bulk_pay_pin.set',
+      category: 'security', severity: wasChange ? 'critical' : 'info',
+      message: wasChange ? 'Bulk Pay PIN changed' : 'Bulk Pay PIN set for the first time',
+      merchant, req,
+    });
+
     res.status(200).json({ message: 'Bulk Pay PIN set successfully' });
   } catch (error) {
     res.status(500).json({ message: 'Failed to set PIN', error: error.message });

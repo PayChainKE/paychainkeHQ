@@ -132,7 +132,10 @@ router.post('/merchant/sign-out-all-devices', protectMerchant, signOutAllDevices
 router.get('/merchant/me', protectMerchant, getMerchantMe);
 router.put('/merchant/profile', protectMerchant, updateMerchantProfile);
 router.put('/merchant/biometrics', protectMerchant, toggleBiometrics);
-router.post('/merchant/set-app-pin', protectMerchant, setAppPin);
+// setAppPin now also verifies the current password when a PIN already
+// exists (see merchantAuthController.js), so it needs the same throttle
+// verify-payment-pin gets below — it had none before.
+router.post('/merchant/set-app-pin', protectMerchant, pinLimiter, setAppPin);
 router.post('/merchant/verify-payment-pin', protectMerchant, pinLimiter, verifyPaymentPin);
 
 // WebAuthn / Passkey routes

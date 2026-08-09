@@ -1092,21 +1092,55 @@ export const setupPassword = async (req, res) => {
 // @access  Private (Merchant)
 export const setAppPin = async (req, res) => {
   try {
-    const { pin } = req.body;
-    if (!pin || pin.length !== 4) {
+    const { pin, currentPassword } = req.body;
+    if (!pin || String(pin).length !== 4 || !/^\d{4}$/.test(String(pin))) {
       return res.status(400).json({ error: 'A valid 4-digit PIN is required' });
     }
 
-    const merchant = await Merchant.findById(req.merchant._id).select('+appPin');
+    const merchant = await Merchant.findById(req.merchant._id).select('+appPin +password');
     if (!merchant) {
       return res.status(404).json({ error: 'Merchant not found' });
     }
 
+    // Overwriting an EXISTING PIN is a sensitive action — same re-auth bar as
+    // changePassword/updateSecurityQuestions above. Without this, a session
+    // token alone (e.g. one leaked/stolen after the merchant already set a
+    // PIN) could silently replace it and immediately unlock money movement
+    // (sendMoney/B2C/B2B all gate on this PIN), defeating its whole purpose
+    // as a check beyond the session itself. First-time setup (no PIN yet)
+    // doesn't need this — there's nothing to protect against being
+    // overwritten, and it's the only path the UI currently exposes.
+    if (merchant.appPin) {
+      if (!merchant.password) {
+        return res.status(400).json({ error: 'Your account has no password on file — contact support to change your payment PIN.' });
+      }
+      if (!currentPassword) {
+        return res.status(400).json({ error: 'Enter your current password to change your payment PIN.' });
+      }
+      const isMatch = await merchant.matchPassword(currentPassword);
+      if (!isMatch) {
+        logAudit({
+          action: 'merchant.payment_pin.change_failed', category: 'security', severity: 'warning',
+          message: 'Payment PIN change failed — wrong current password',
+          merchant, req,
+        });
+        return res.status(400).json({ error: 'Current password is incorrect.' });
+      }
+    }
+
     // Hash the 4-digit PIN using bcrypt (12 rounds = OWASP 2024 baseline).
     const salt = await bcrypt.genSalt(12);
+    const wasChange = !!merchant.appPin;
     merchant.appPin = await bcrypt.hash(pin, salt);
-    
+
     await merchant.save();
+
+    logAudit({
+      action: wasChange ? 'merchant.payment_pin.changed' : 'merchant.payment_pin.set',
+      category: 'security', severity: wasChange ? 'critical' : 'info',
+      message: wasChange ? 'Payment PIN changed' : 'Payment PIN set for the first time',
+      merchant, req,
+    });
 
     res.json({
       success: true,

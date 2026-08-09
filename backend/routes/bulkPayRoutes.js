@@ -36,7 +36,10 @@ const pinLimiter = rateLimit({
   message: { error: 'Too many PIN attempts. Try again in 15 minutes.' },
 });
 
-router.post('/set-pin', setBulkPayPin);
+// set-pin now also verifies the current PIN when one already exists (see
+// bulkPayController.js), so it carries the same brute-force exposure as
+// reset-pin and needs the same throttle — it had none before.
+router.post('/set-pin', pinLimiter, setBulkPayPin);
 router.put('/reset-pin', pinLimiter, resetBulkPayPin);
 
 // Payee routes
