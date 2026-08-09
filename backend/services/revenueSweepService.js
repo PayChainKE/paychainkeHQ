@@ -18,6 +18,34 @@ const destinationBankCode     = process.env.PAYCHAIN_REVENUE_BANK_CODE || null;
 const destinationAccountNumber = process.env.PAYCHAIN_REVENUE_ACCOUNT_NUMBER || null;
 const destinationAccountName  = process.env.PAYCHAIN_REVENUE_ACCOUNT_NAME || 'PayChain Revenue Account';
 
+// Day sweeps are meant to land on — mirrors PAYCHAIN_REVENUE_SWEEP_DAY,
+// 0=Sunday..6=Saturday, default Monday. Shared by runWeeklyRevenueSweepIfDue
+// (gates when the weekly cron actually attempts a sweep) and
+// mostRecentSweepWeekday below (anchors every sweep's displayed period to
+// a clean calendar week), so both agree on what "the sweep day" means.
+const SWEEP_WEEKDAY = Number.isInteger(Number(process.env.PAYCHAIN_REVENUE_SWEEP_DAY))
+  ? Number(process.env.PAYCHAIN_REVENUE_SWEEP_DAY)
+  : 1; // Monday
+
+// Africa/Nairobi is UTC+3 year-round (no DST) — PayChain is a Kenya-based
+// business, so "the sweep day" must mean Nairobi's calendar day, not
+// whatever day it happens to be in UTC. Those disagree for a 3-hour window
+// around midnight (e.g. 00:00–02:59 EAT is still the previous day in UTC),
+// which is exactly when a UTC-anchored boundary would silently land a
+// "Monday" sweep's period on the wrong week.
+const EAT_OFFSET_MS = 3 * 60 * 60 * 1000;
+
+// Most recent occurrence of SWEEP_WEEKDAY (today included), at Nairobi
+// (EAT) midnight — e.g. run this on a Wednesday and it returns that week's
+// Monday 00:00 EAT, expressed as the correct underlying UTC instant.
+function mostRecentSweepWeekday(from = new Date()) {
+  const nairobiShifted = new Date(from.getTime() + EAT_OFFSET_MS);
+  nairobiShifted.setUTCHours(0, 0, 0, 0); // midnight in the shifted frame == midnight EAT
+  const diff = (nairobiShifted.getUTCDay() - SWEEP_WEEKDAY + 7) % 7;
+  nairobiShifted.setUTCDate(nairobiShifted.getUTCDate() - diff);
+  return new Date(nairobiShifted.getTime() - EAT_OFFSET_MS); // back to a true UTC instant
+}
+
 function logEvent(level, event, fields) {
   const line = JSON.stringify({ level, event, ts: new Date().toISOString(), ...fields });
   if (level === 'error') console.error(line);
@@ -108,9 +136,17 @@ async function recordSweep(fields) {
 // once in the same window (e.g. a redeploy re-triggering the boot check):
 // a run with nothing new to sweep just records a 'skipped' row and moves on.
 export async function runRevenueSweep() {
-  const periodEnd = new Date();
-  const lastRow = await RevenueSweep.findOne().sort('-createdAt');
-  const periodStart = lastRow ? lastRow.periodEnd : LIVE_DATA_CUTOFF;
+  // Anchored to the calendar week (SWEEP_WEEKDAY-to-SWEEP_WEEKDAY, e.g.
+  // Monday-to-Monday) rather than "whenever the previous sweep happened to
+  // run" — a manual "Run Sweep Now" click mid-week previously chained off
+  // the last row's periodEnd, producing lopsided few-day periods instead of
+  // a normal week. Purely a display/reporting label: computeUnsweptRevenue
+  // below is a running-total calculation independent of these dates, so
+  // this doesn't change what actually gets swept, only how the period is
+  // described.
+  const periodEnd = mostRecentSweepWeekday();
+  const periodStart = new Date(periodEnd);
+  periodStart.setUTCDate(periodStart.getUTCDate() - 7);
 
   const { unswept, transactionCount } = await computeUnsweptRevenue();
   const attemptedAmount = Math.min(unswept, MAX_TRANSFER_AMOUNT);
@@ -165,11 +201,10 @@ export async function runRevenueSweep() {
 // rows; a genuine completed sweep is naturally idempotent regardless via
 // computeUnsweptRevenue, so this guard is purely about noise, not safety).
 export async function runWeeklyRevenueSweepIfDue() {
-  const targetDay = Number.isInteger(Number(process.env.PAYCHAIN_REVENUE_SWEEP_DAY))
-    ? Number(process.env.PAYCHAIN_REVENUE_SWEEP_DAY)
-    : 1; // Monday
   const now = new Date();
-  if (now.getDay() !== targetDay) return;
+  // Nairobi's calendar day, not UTC's — see EAT_OFFSET_MS above.
+  const nairobiDay = new Date(now.getTime() + EAT_OFFSET_MS).getUTCDay();
+  if (nairobiDay !== SWEEP_WEEKDAY) return;
 
   const lastRow = await RevenueSweep.findOne().sort('-createdAt');
   if (lastRow && (now.getTime() - new Date(lastRow.createdAt).getTime()) < 20 * 60 * 60 * 1000) {

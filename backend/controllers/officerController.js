@@ -147,11 +147,17 @@ export const createApplication = async (req, res) => {
 // @access  Private (Owner/Admin/Officer)
 export const getQueue = async (req, res) => {
   try {
-    const { status, riskTier, from, to, q } = req.query;
+    const { status, riskTier, from, to, q, officerId } = req.query;
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 25));
 
     const filter = { kybStatus: { $exists: true }, ...scopedToOfficer(req.admin) };
+    // Admin/owner-only drill-down (an officer is already fully scoped to
+    // themselves above, so this would be a no-op — or worse, a way to peek
+    // at another officer's queue — for them, hence gated to non-officers).
+    if (officerId && req.admin?.role !== 'officer' && mongoose.isValidObjectId(officerId)) {
+      filter.onboardingOfficerId = officerId;
+    }
     if (status) filter.kybStatus = status;
     if (riskTier) filter.riskTier = riskTier;
     if (from || to) {

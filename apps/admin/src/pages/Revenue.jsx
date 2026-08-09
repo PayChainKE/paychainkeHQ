@@ -619,6 +619,9 @@ const Revenue = () => {
               <h3 className="text-base font-bold text-on-surface tracking-tight font-headline">Revenue Sweeps &amp; Settlement Batches</h3>
               <p className="text-xs text-on-surface-variant mt-1">
                 Automated movement of accumulated fees from the PayChain FBO settlement account into the corporate operating account.
+                Only <strong>Gross Fees</strong> is the amount actually swept — <strong>Net Margin</strong> is after absorbing Safaricom's
+                pass-through cost (Processor Cuts) and can go negative on weeks dominated by free-tier transactions PayChain doesn't
+                mark up but still pays Safaricom's real cost on; that's a margin figure, not money leaving the account.
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -655,7 +658,7 @@ const Revenue = () => {
                       <th className="text-left px-3 py-3">Period</th>
                       <th className="text-right px-3 py-3">Gross Fees</th>
                       <th className="text-right px-3 py-3">Processor Cuts</th>
-                      <th className="text-right px-3 py-3">Net Swept</th>
+                      <th className="text-right px-3 py-3" title="Gross Fees minus the absorbed Safaricom pass-through cost — PayChain's retained margin, not the amount physically swept (that's Gross Fees).">Net Margin</th>
                       <th className="text-left px-3 py-3">Status</th>
                       <th className="text-left px-5 py-3">Destination</th>
                     </tr>
@@ -679,7 +682,7 @@ const Revenue = () => {
                             −{fmtKESPrecise(b.costs)}
                           </td>
                           <td className="px-3 py-3.5 text-right">
-                            <span className="font-bold text-on-surface tabular-nums">{fmtKESPrecise(b.net)}</span>
+                            <span className={`font-bold tabular-nums ${b.net < 0 ? 'text-red-600' : 'text-on-surface'}`}>{fmtKESPrecise(b.net)}</span>
                           </td>
                           <td className="px-3 py-3.5">
                             <span
@@ -714,9 +717,14 @@ const Revenue = () => {
               <div className="flex items-center gap-5 tabular-nums">
                 <span className="text-on-surface-variant">Σ Gross <span className="text-on-surface font-bold">{fmtKESPrecise(sweeps.reduce((s, b) => s + b.gross, 0))}</span></span>
                 <span className="text-on-surface-variant">Σ Cuts <span className="text-on-surface font-bold">−{fmtKESPrecise(sweeps.reduce((s, b) => s + b.costs, 0))}</span></span>
-                <span className="text-emerald-700 font-bold">
-                  Σ Net {fmtKESPrecise(sweeps.reduce((s, b) => s + b.net, 0))}
-                </span>
+                {(() => {
+                  const totalNet = sweeps.reduce((s, b) => s + b.net, 0);
+                  return (
+                    <span className={`font-bold ${totalNet < 0 ? 'text-red-600' : 'text-emerald-700'}`}>
+                      Σ Net Margin {fmtKESPrecise(totalNet)}
+                    </span>
+                  );
+                })()}
               </div>
             </div>
           )}
