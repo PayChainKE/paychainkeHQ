@@ -100,19 +100,35 @@ export const generateToken = async (req, res, next) => {
   }
 };
 
-// Register C2B URLs
+// Register C2B URLs. Always builds the confirmation/validation URLs itself
+// from callbackBase + the real MPESA_WEBHOOK_SECRET (same withWebhookSecret
+// helper every other Daraja callback URL in this file uses) rather than
+// trusting a caller-supplied URL — there's no legitimate reason to point
+// Safaricom's C2B callbacks anywhere other than this deployment's own
+// routes, and requiring the secret to be manually retyped into a request
+// body every time this is called is exactly the kind of manual step that
+// gets fumbled (e.g. registered with a placeholder/wrong key by mistake).
+// `shortCode` is an optional override in the body: MPESA_SHORTCODE is the
+// shared STK Push test paybill in sandbox, which Safaricom's C2B product
+// rejects outright — a *different* sandbox shortcode with C2B enabled must
+// be passed here to actually register successfully.
 export const registerURLs = async (req, res) => {
   try {
     const token = req.mpesaToken;
-    const { validationUrl, confirmationUrl } = req.body;
+    const { shortCode: shortCodeOverride } = req.body || {};
+    const targetShortCode = shortCodeOverride || shortCode;
+
+    if (!callbackBase) {
+      return res.status(500).json({ error: 'MPESA_CALLBACK_URL is not configured.' });
+    }
 
     const url = `${mpesaBaseUrl}/mpesa/c2b/v1/registerurl`;
 
     const data = {
-      ShortCode: shortCode,
+      ShortCode: targetShortCode,
       ResponseType: 'Completed',
-      ConfirmationURL: confirmationUrl,
-      ValidationURL: validationUrl
+      ConfirmationURL: withWebhookSecret(`${callbackBase}/api/callbacks/confirmation`),
+      ValidationURL: withWebhookSecret(`${callbackBase}/api/callbacks/validation`),
     };
 
     const response = await axios.post(url, data, {
@@ -121,10 +137,10 @@ export const registerURLs = async (req, res) => {
       }
     });
 
-    res.status(200).json(response.data);
+    res.status(200).json({ ...response.data, registeredShortCode: targetShortCode });
   } catch (error) {
     console.error('❌ M-PESA Register URLs Error:', error.response?.data || error.message);
-    res.status(400).json({ error: 'Failed to register M-PESA URLs' });
+    res.status(400).json({ error: error.response?.data?.errorMessage || 'Failed to register M-PESA URLs' });
   }
 };
 
