@@ -18,6 +18,7 @@ import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard
 import { PAYCHAIN_TXN_RATE } from '../config/revenueRateCard.js';
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay.js';
 import { AUTO_INFLATION_SHIELD_ENABLED } from '../config/inflationShieldFlag.js';
+import { logAudit } from '../utils/auditLog.js';
 import { buildPaymentReceivedSms, buildPaymentSentSms, buildCustomerPaidSms } from '../utils/paymentSmsTemplates.js';
 
 // ── M-PESA configuration ──────────────────────────────────────────────────────
@@ -154,32 +155,14 @@ export const validationURL = (req, res) => {
 };
 
 // Confirmation Webhook (Safaricom hits this when transaction completes)
-export const confirmationURL = async (req, res) => {
-  try {
-    const payload = req.body;
-    // Summary only, not the full payload — it carries customer MSISDN/name
-    // (PII) which doesn't need to sit in plaintext stdout logs.
-    console.log(`📥 M-PESA Confirmation: TransID=${payload?.TransID} Amount=${payload?.TransAmount} BillRef=${payload?.BillRefNumber}`);
-
-    /*
-      Expected Payload:
-      {
-        TransactionType: 'Pay Bill',
-        TransID: 'SGH2D8X1P',
-        TransTime: '20250622143000',
-        TransAmount: '1000.00',
-        BusinessShortCode: '400200',
-        BillRefNumber: '84729',
-        InvoiceNumber: '',
-        OrgAccountBalance: '...',
-        ThirdPartyTransID: '',
-        MSISDN: '254700000000',
-        FirstName: 'JOHN',
-        MiddleName: 'DOE',
-        LastName: ''
-      }
-    */
-
+// Shared by the live Safaricom C2B webhook (confirmationURL) below and the
+// owner-only debug endpoint (simulateMpesaConfirmation) further down —
+// both run this exact same processing, so a manually-triggered run is
+// genuine proof the production pipeline works, not a reimplementation that
+// could silently drift from what a real webhook actually does. Returns a
+// small summary (merchant, transaction, txHash if an on-chain settlement
+// happened) so the debug endpoint has something useful to show back.
+async function processMpesaC2bPayload(payload) {
     const {
       TransID,
       TransAmount,
@@ -190,30 +173,24 @@ export const confirmationURL = async (req, res) => {
       LastName
     } = payload;
 
-    // Acknowledge receipt to Safaricom immediately
-    res.status(200).json({
-      ResultCode: 0,
-      ResultDesc: 'Success'
-    });
-
     const accountNumber = BillRefNumber?.trim();
     const amount = Number(TransAmount);
-    
-    if (!accountNumber) return;
+
+    if (!accountNumber) return { skipped: 'no_account_number' };
 
     // Find the merchant by their unique Paybill Account number
     const merchant = await Merchant.findOne({ paybillAccount: accountNumber });
 
     if (!merchant) {
       console.warn(`⚠️ Received M-PESA payment for unknown account: ${accountNumber}`);
-      return;
+      return { skipped: 'unknown_account', accountNumber };
     }
 
     // Check if transaction already exists (idempotency)
     const existingTx = await Transaction.findOne({ reference: TransID });
     if (existingTx) {
       console.log(`⚠️ Transaction ${TransID} already processed.`);
-      return;
+      return { skipped: 'duplicate', accountNumber };
     }
 
     // Combine names
@@ -306,6 +283,7 @@ export const confirmationURL = async (req, res) => {
     // stale balance and silently clobber it on save(). $inc is race-free
     // regardless of how long this branch takes.
     let updatedMerchant;
+    let settlementTxHash = null;
     // Demo/evidence merchants (Stellar grant deliverable pipeline) always
     // get the automatic conversion, regardless of AUTO_INFLATION_SHIELD_ENABLED
     // — that flag exists purely to protect real merchants from this on-chain
@@ -323,6 +301,7 @@ export const confirmationURL = async (req, res) => {
         console.log(`   - Exact On-Chain Payout: ${usdcPayoutValue} USDC`);
 
         const txHash = await settleInflationShield(merchant.stellarPublicKey, usdcPayoutValue);
+        settlementTxHash = txHash;
 
         // Log the blockchain settlement transaction
         await Transaction.create({
@@ -409,10 +388,121 @@ export const confirmationURL = async (req, res) => {
     // to Safaricom above.
     await Promise.all([customerSms, merchantSms]);
 
+    return { merchant: updatedMerchant, transaction, txHash: settlementTxHash };
+}
+
+// Public webhook — Safaricom hits this when a real (or sandboxed) C2B
+// payment completes. Acks immediately, then runs the actual processing
+// (processMpesaC2bPayload above) without the response waiting on it.
+export const confirmationURL = async (req, res) => {
+  try {
+    const payload = req.body;
+    // Summary only, not the full payload — it carries customer MSISDN/name
+    // (PII) which doesn't need to sit in plaintext stdout logs.
+    console.log(`📥 M-PESA Confirmation: TransID=${payload?.TransID} Amount=${payload?.TransAmount} BillRef=${payload?.BillRefNumber}`);
+
+    /*
+      Expected Payload:
+      {
+        TransactionType: 'Pay Bill',
+        TransID: 'SGH2D8X1P',
+        TransTime: '20250622143000',
+        TransAmount: '1000.00',
+        BusinessShortCode: '400200',
+        BillRefNumber: '84729',
+        InvoiceNumber: '',
+        OrgAccountBalance: '...',
+        ThirdPartyTransID: '',
+        MSISDN: '254700000000',
+        FirstName: 'JOHN',
+        MiddleName: 'DOE',
+        LastName: ''
+      }
+    */
+
+    // Acknowledge receipt to Safaricom immediately
+    res.status(200).json({
+      ResultCode: 0,
+      ResultDesc: 'Success'
+    });
+
+    await processMpesaC2bPayload(payload);
   } catch (error) {
     console.error('❌ M-PESA Confirmation Webhook Error:', error);
     // Safaricom expects a 200 even if internal processing fails to avoid retries
     res.status(200).json({ ResultCode: 1, ResultDesc: 'Internal Failure' });
+  }
+};
+
+// @desc    Manually run the exact same confirmation pipeline as the live
+//          Safaricom webhook above, for a demo merchant — Safaricom's C2B
+//          sandbox callback delivery is well known to be unreliable/slow,
+//          so this gives a deterministic way to produce a real Stellar
+//          settlement + tx hash without waiting on it. Restricted to
+//          isDemoMerchant accounts only: this fabricates a real balance
+//          credit and (if the merchant has a wallet) a real on-chain
+//          transaction, so it must never be reachable against a real
+//          merchant's account.
+// @route   POST /api/admin/merchants/:id/simulate-mpesa-confirmation
+// @access  Private (Admin, owner only)
+export const simulateMpesaConfirmation = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { amount, senderName, senderPhone } = req.body || {};
+
+    const numericAmount = Number(amount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      return res.status(400).json({ error: 'A valid positive amount is required.' });
+    }
+
+    const merchant = await Merchant.findById(id);
+    if (!merchant) return res.status(404).json({ error: 'Merchant not found' });
+    if (!merchant.isDemoMerchant) {
+      return res.status(403).json({ error: 'This debug tool only works on demo merchants, so it can never fabricate a credit against a real merchant account.' });
+    }
+    if (!merchant.paybillAccount) {
+      return res.status(400).json({ error: 'This demo merchant has no paybillAccount assigned — cannot match it to a simulated payment.' });
+    }
+
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const transTime = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+    const nameParts = String(senderName || 'TEST SIMULATION').trim().split(/\s+/);
+
+    const payload = {
+      TransactionType: 'Pay Bill',
+      TransID: `TESTSIM${Date.now()}`,
+      TransTime: transTime,
+      TransAmount: String(numericAmount),
+      BusinessShortCode: shortCode || '',
+      BillRefNumber: merchant.paybillAccount,
+      MSISDN: senderPhone || '254700000000',
+      FirstName: nameParts[0],
+      MiddleName: '',
+      LastName: nameParts.slice(1).join(' '),
+    };
+
+    const result = await processMpesaC2bPayload(payload);
+
+    logAudit({
+      action: 'admin.mpesa.simulate_confirmation', category: 'admin', severity: 'success',
+      message: `Manually triggered M-PESA confirmation pipeline for demo merchant ${merchant.businessName} (KES ${numericAmount})`,
+      merchant,
+      actor: req.admin ? { type: 'admin', id: req.admin._id || null, email: req.admin.email || null, name: req.admin.name || req.admin.email || 'admin' } : { type: 'admin', id: null, email: null, name: 'admin' },
+      req,
+      metadata: { amount: numericAmount, transId: payload.TransID, txHash: result?.txHash || null },
+    });
+
+    res.status(200).json({
+      success: true,
+      transId: payload.TransID,
+      txHash: result?.txHash || null,
+      settled: !!result?.txHash,
+      transaction: result?.transaction || null,
+    });
+  } catch (error) {
+    console.error('❌ Simulate M-PESA Confirmation Error:', error);
+    res.status(500).json({ error: error.message || 'Simulation failed' });
   }
 };
 
