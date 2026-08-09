@@ -658,7 +658,10 @@ export default function BulkPay() {
 
   useEffect(() => {
     if (merchant) {
-      if (merchant.hasBulkPayPin === false) {
+      // Bulk pay authorizes with the same single Payment PIN used
+      // everywhere else in the app (sendMoney, B2C/B2B) — no separate
+      // bulk-pay PIN anymore.
+      if (merchant.hasAppPin === false) {
         setShowPinSetupModal(true)
       } else {
         setShowPinSetupModal(false)
@@ -674,11 +677,11 @@ export default function BulkPay() {
     try {
       const token = localStorage.getItem('paychain_merchant_token');
       const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
-      await axios.post(`${API_URL}/api/bulkpay/set-pin`, { pin: setupPin }, {
+      await axios.post(`${API_URL}/api/auth/merchant/set-app-pin`, { pin: setupPin }, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setShowPinSetupModal(false);
-      addNotification({ title: 'Success', message: 'Bulk Pay PIN set successfully.', type: 'success' });
+      addNotification({ title: 'Success', message: 'Payment PIN set successfully.', type: 'success' });
       // Ideally update auth context here, but reloading or forcing state is fine.
       window.location.reload();
     } catch (error) {
@@ -1654,7 +1657,7 @@ export default function BulkPay() {
                         } else if (step === 2) {
                           setStep(3);
                         } else {
-                          if (merchant?.hasBulkPayPin === false) {
+                          if (merchant?.hasAppPin === false) {
                             setShowPinSetupModal(true);
                           } else {
                             setOtp('');
@@ -2043,9 +2046,9 @@ export default function BulkPay() {
                     <span className="material-symbols-outlined text-3xl">password</span>
                   </div>
                   <div>
-                    <h2 className="font-headline text-2xl text-primary tracking-tight font-bold">Setup Bulk Pay PIN</h2>
+                    <h2 className="font-headline text-2xl text-primary tracking-tight font-bold">Setup Payment PIN</h2>
                     <p className="text-[10px] text-on-surface-variant font-medium mt-1 opacity-60">
-                      Create a 4-digit PIN to authorize your bulk payouts securely.
+                      Create a 4-digit PIN to authorize payments — used everywhere, including bulk payouts.
                     </p>
                   </div>
                 </div>

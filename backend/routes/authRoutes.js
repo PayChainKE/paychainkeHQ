@@ -29,6 +29,7 @@ import {
   updateMerchantProfile,
   toggleBiometrics,
   setAppPin,
+  resetAppPin,
   verifyPaymentPin,
   validateSetupToken,
   setupPassword
@@ -134,8 +135,12 @@ router.put('/merchant/profile', protectMerchant, updateMerchantProfile);
 router.put('/merchant/biometrics', protectMerchant, toggleBiometrics);
 // setAppPin now also verifies the current password when a PIN already
 // exists (see merchantAuthController.js), so it needs the same throttle
-// verify-payment-pin gets below — it had none before.
+// verify-payment-pin gets below — it had none before. This is now THE
+// single Payment PIN used to authorize every money-movement flow
+// (sendMoney, B2C/B2B, and bulk-pay batch authorization) — resetAppPin is
+// the M-Pesa/bank-style "old PIN → new PIN" change flow on top of it.
 router.post('/merchant/set-app-pin', protectMerchant, pinLimiter, setAppPin);
+router.put('/merchant/reset-app-pin', protectMerchant, pinLimiter, resetAppPin);
 router.post('/merchant/verify-payment-pin', protectMerchant, pinLimiter, verifyPaymentPin);
 
 // WebAuthn / Passkey routes

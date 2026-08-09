@@ -127,7 +127,7 @@ const BATCH_STATUS_META: Record<string, { bg: string; text: string }> = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function BulkPay() {
-  const { merchant, refreshSession } = useAuth();
+  const { merchant, refreshSession, setAppPin } = useAuth();
 
   const [activeTab, setActiveTab] = useState<'Payees' | 'Batches' | 'Invoices'>('Payees');
   const [activeFilter, setActiveFilter] = useState<Filter>('All');
@@ -559,9 +559,10 @@ export default function BulkPay() {
     }
   };
 
-  // ── Trigger PIN setup if needed ──
+  // ── Trigger PIN setup if needed ── (bulk pay authorizes with the same
+  // single Payment PIN used everywhere else in the app)
   useEffect(() => {
-    if (merchant && merchant.hasBulkPayPin === false) {
+    if (merchant && merchant.hasAppPin === false) {
       setShowPinSetup(true);
     }
   }, [merchant]);
@@ -732,13 +733,17 @@ export default function BulkPay() {
       return;
     }
     try {
-      await api.post('/api/bulkpay/set-pin', { pin: setupPin });
+      // Goes through AuthContext's setAppPin so the local device-unlock PIN
+      // (SecureStore) stays in sync with the server-side Payment PIN — the
+      // same single PIN now authorizes bulk pay batches, sendMoney, and
+      // B2C/B2B, so there's no separate bulk-pay-only PIN to set anymore.
+      await setAppPin(setupPin);
       setShowPinSetup(false);
       setSetupPin('');
       setConfirmPin('');
-      Alert.alert('PIN Set', 'Bulk Pay PIN configured successfully.');
+      Alert.alert('PIN Set', 'Payment PIN configured successfully.');
     } catch (e: any) {
-      Alert.alert('Failed', e?.response?.data?.message || 'Could not set PIN.');
+      Alert.alert('Failed', e?.response?.data?.error || e?.response?.data?.message || 'Could not set PIN.');
     }
   };
 
@@ -794,7 +799,7 @@ export default function BulkPay() {
   // ── Final authorize (fires after Security PIN step, for either source) ──
   const handleAuthorize = async () => {
     if (authPin.length !== 4) {
-      Alert.alert('Invalid PIN', 'Enter your 4-digit Bulk Pay PIN.');
+      Alert.alert('Invalid PIN', 'Enter your 4-digit Payment PIN.');
       return;
     }
     setIsAuthorizing(true);
@@ -1237,8 +1242,8 @@ export default function BulkPay() {
                     <Feather name="shield" size={16} color="#b87333" />
                   </View>
                   <View>
-                    <Text className="font-jakarta-bold text-[14px] text-[#0c2010]">Bulk Pay PIN</Text>
-                    <Text className="text-[#707971] font-jakarta-medium text-[11px]">{merchant?.hasBulkPayPin === false ? 'Not configured' : 'Configured'}</Text>
+                    <Text className="font-jakarta-bold text-[14px] text-[#0c2010]">Payment PIN</Text>
+                    <Text className="text-[#707971] font-jakarta-medium text-[11px]">{merchant?.hasAppPin === false ? 'Not configured' : 'Configured'}</Text>
                   </View>
                 </View>
                 <Feather name="chevron-right" size={18} color="#707971" />
@@ -1437,8 +1442,8 @@ export default function BulkPay() {
                 <View className="w-14 h-14 rounded-full bg-[#e7f8ef] items-center justify-center mb-3">
                   <Feather name="shield" size={22} color="#006c4e" />
                 </View>
-                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#0c2010]">Set Bulk Pay PIN</Text>
-                <Text className="text-[#707971] font-jakarta-medium text-[12px] mt-1 text-center">A 4-digit PIN is required to authorize batches.</Text>
+                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#0c2010]">Set Payment PIN</Text>
+                <Text className="text-[#707971] font-jakarta-medium text-[12px] mt-1 text-center">A 4-digit PIN is required to authorize payments, including bulk pay batches.</Text>
               </View>
               <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-2">New PIN</Text>
               <TextInput
