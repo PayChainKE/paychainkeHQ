@@ -1,5 +1,5 @@
 import express from 'express';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import {
   listInvoices,
   createInvoice,
@@ -25,7 +25,7 @@ const sendInvoiceLimiter = rateLimit({
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => String(req.merchant?._id || req.ip),
+  keyGenerator: (req) => (req.merchant?._id ? String(req.merchant._id) : ipKeyGenerator(req.ip)),
   message: { error: 'Too many invoices sent in the past hour. Try again later.' },
 });
 
