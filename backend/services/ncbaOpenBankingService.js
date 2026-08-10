@@ -35,11 +35,13 @@ const MAX_TRANSFER_AMOUNT = 999999;
 const liveCallsEnabled = process.env.NCBA_OPENBANKING_LIVE_ENABLED === 'true';
 
 // Hakikisha/Airtel Money mobile-number validation path — a prerequisite for
-// submitMobileB2wPayment below. NOT shown in the UAT Guide text provided
-// (only its request/response JSON was) — left unconfigured (blank) until
-// confirmed against NCBA's Postman collection; validateMobileWalletNumber
-// simulates whenever it's unset, same as when liveCallsEnabled is off.
-const ncbaMobileWalletValidationPath = process.env.NCBA_MOBILE_WALLET_VALIDATION_PATH || null;
+// submitMobileB2wPayment below. Not shown in the UAT Guide's text (only its
+// request/response JSON was) — confirmed instead from NCBA's own "Open
+// Banking V2 - Callback Enabled" Postman collection (the /MpesaB2WValidation
+// folder's saved request actually targets /MobileB2WValidation — the
+// collection's own folder name is just stale/mismatched). Still
+// env-overridable in case NCBA changes it.
+const ncbaMobileWalletValidationPath = process.env.NCBA_MOBILE_WALLET_VALIDATION_PATH || '/api/v1/MobileB2WValidation/validate-account';
 
 export class NcbaOpenBankingAuthError extends Error {
   constructor(message) {
@@ -307,9 +309,8 @@ export async function submitEftTransfer({
  * Validates a recipient's M-Pesa (Hakikisha) or Airtel Money number before a
  * Mobile B2W payout — required prerequisite per the UAT Guide, which
  * returns a validationId that must be echoed back on the actual payment.
- * Simulates (rather than erroring) when NCBA_MOBILE_WALLET_VALIDATION_PATH
- * is unset, since the real path isn't confirmed yet — see its config
- * comment above.
+ * Simulates whenever NCBA_OPENBANKING_LIVE_ENABLED is off, same as every
+ * other function in this file.
  *
  * @param {object} params
  * @param {'safaricom'|'airtel'} params.provider
@@ -321,7 +322,7 @@ export async function validateMobileWalletNumber({ provider, msisdn }) {
     throw new NcbaOpenBankingValidationError('provider and msisdn are required to validate a mobile wallet number');
   }
 
-  if (!liveCallsEnabled || !ncbaMobileWalletValidationPath) {
+  if (!liveCallsEnabled) {
     const result = simulate('ncba_openbanking_mobile_wallet_validate_sandbox', { provider, msisdn });
     return { validationId: `SIM-VALID-${Date.now()}`, customerName: null, ...result };
   }
