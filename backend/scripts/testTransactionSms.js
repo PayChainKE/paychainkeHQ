@@ -14,7 +14,7 @@
 // matching entry below too, otherwise this stops being a trustworthy check.
 import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
-import { buildCustomerPaidSms, buildPaymentReceivedSms, buildPaymentSentSms } from '../utils/paymentSmsTemplates.js';
+import { buildCustomerPaidSms, buildPaymentReceivedSms, buildPayoutSentSms, buildPayoutFailedSms } from '../utils/paymentSmsTemplates.js';
 
 const to = process.argv[2];
 if (!to) {
@@ -66,34 +66,41 @@ const messages = [
     }).message,
   },
   {
-    label: 'Wallet self-top-up confirmation (mpesaController.js stkCallback, kind=topup)',
+    label: 'Wallet self-top-up confirmation (mpesaController.js resolveStkOutcome, kind=topup)',
     message: `TESTREC1 Confirmed. KES 1,000 added to your PayChain wallet via M-PESA on ${date} at ${time}. Your updated available balance is KES 25,500.`,
   },
 
   // --- Payouts (merchant-facing) ---
   {
-    label: 'B2C payout succeeded (mpesaController.js b2cCallback, via buildPaymentSentSms)',
-    message: buildPaymentSentSms({
+    label: 'NCBA payout succeeded (ncbaOpenBankingController.js handlePesaLinkCallback, via buildPayoutSentSms)',
+    message: buildPayoutSentSms({
       ref: 'TFB26080TEST',
+      label: 'Payout',
       amount: 2000,
       recipientName: 'JOHN SUPPLIER',
-      recipientPhone: '0722123456',
       date,
       time,
       balance: 21490,
-      fee: 10,
     }).message,
   },
   {
-    label: 'B2C payout failed & refunded (mpesaController.js b2cCallback)',
-    message: `TFB26080FAIL Payout Failed. KES 2,000 to JOHN SUPPLIER could not be completed on ${date} at ${time} and has been refunded. Your updated PayChain available balance is KES 23,500.`,
+    label: 'NCBA payout failed & refunded (ncbaOpenBankingController.js handlePesaLinkCallback, via buildPayoutFailedSms)',
+    message: buildPayoutFailedSms({
+      ref: 'TFB26080FAIL',
+      label: 'Payout',
+      amount: 2000,
+      recipientName: 'JOHN SUPPLIER',
+      date,
+      time,
+      balance: 23500,
+    }).message,
   },
   {
     label: 'Bulk payout submission ack (bulkPayController.js)',
     message: `BAT-TEST-1 Bulk Payout Submitted. KES 45,000 to 6 recipients on ${date} at ${time}. New balance: KES 180,000.`,
   },
   {
-    label: 'Bulk payout batch resolved (mpesaController.js b2cCallback)',
+    label: 'Bulk payout batch resolved (ncbaOpenBankingController.js handlePesaLinkCallback)',
     message: `BAT-TEST-1 Bulk Payout Processed on ${date} at ${time}. 6 of 6 payout(s) completed (KES 45,000 total).`,
   },
   {

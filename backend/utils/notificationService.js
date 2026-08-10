@@ -54,8 +54,9 @@ export function toE164Kenyan(rawPhone) {
  * failure interrupt a core flow (OTP dispatch, transaction alerts) are
  * expected to wrap this in their own try/catch — see utils/sms.js.
  */
-// Live-gate parity with controllers/mpesaController.js's MPESA_LIVE_ENABLED
-// convention: going live is never inferred from a single env var alone.
+// Live-gate parity with services/ncbaOpenBankingService.js's
+// NCBA_OPENBANKING_LIVE_ENABLED convention: going live is never inferred
+// from a single env var alone.
 // AT_USERNAME being a real (non-'sandbox') username is necessary but not
 // sufficient — AT_LIVE_ENABLED must also be explicitly 'true' before a real,
 // billed SMS is allowed to hit Africa's Talking's live gateway.

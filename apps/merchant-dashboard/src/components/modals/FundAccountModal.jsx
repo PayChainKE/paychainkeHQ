@@ -251,7 +251,7 @@ export default function FundAccountModal({ method, onClose }) {
                     </button>
 
                     <p className="text-center text-[10px] text-slate-300 font-medium">
-                      Secured by Safaricom Daraja API · No PIN shared with PayChain
+                      Secured by M-PESA · No PIN shared with PayChain
                     </p>
                   </form>
                 )}

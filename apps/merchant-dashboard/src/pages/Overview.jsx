@@ -531,7 +531,7 @@ export default function Overview() {
                   ? `${(tx.usdcAmount || 0).toFixed(4)} USDC`
                   : formatKES(tx.kesAmount || tx.amount || 0)
                 const amtColor = getAmountColorClassWithHover(tx.type)
-                const TYPE_LABEL = { inbound: 'Payment In', outbound: 'Withdrawal', fx_swap: 'FX Swap', bulk_pay: 'Bulk Pay', settlement: 'Settlement', top_up: 'Top Up', withdrawal: 'Withdrawal', ncba_inbound: 'Payment In', ncba_outbound: 'Bank Transfer', mpesa_b2c: 'M-PESA Withdrawal', ncba_mobile_b2w: 'M-PESA Withdrawal' }
+                const TYPE_LABEL = { inbound: 'Payment In', outbound: 'Withdrawal', fx_swap: 'FX Swap', bulk_pay: 'Bulk Pay', settlement: 'Settlement', top_up: 'Top Up', withdrawal: 'Withdrawal', ncba_inbound: 'Payment In', ncba_outbound: 'Bank Transfer', mpesa_b2c: 'M-PESA Withdrawal', ncba_mobile_b2w: 'M-PESA Withdrawal', mpesa_b2b: 'Paybill/Till Payout', ncba_lipa_na_mpesa: 'Paybill/Till Payout' }
                 return (
                   <div key={tx._id || tx.id} className="px-4 lg:px-8 py-2.5 lg:py-3 flex items-center justify-between hover:bg-[#00351D] transition-all group cursor-pointer border-b border-slate-200 last:border-0">
                     <div className="flex items-center gap-3 flex-1 min-w-0">

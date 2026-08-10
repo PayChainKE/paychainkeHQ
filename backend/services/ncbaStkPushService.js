@@ -185,11 +185,9 @@ export async function queryStkPush({ transactionId }) {
   }
 
   if (!liveCallsEnabled) {
-    // Sandbox: resolve as SUCCESS on first poll — the caller
-    // (utils/stkPushDispatch.js's poll loop) is only exercised at all when
-    // NCBA_STK_B2C_ENABLED=true, so this mirrors the existing Daraja
-    // sandbox's "auto-confirm shortly after" behavior rather than genuinely
-    // waiting.
+    // Sandbox: resolve as SUCCESS on first poll — mirrors the poll loop's
+    // caller (mpesaController.js's pollAndResolveNcbaStkPush) expecting an
+    // "auto-confirm shortly after" behavior rather than genuinely waiting.
     simulate('ncba_stk_query_sandbox', { transactionId });
     return { status: 'SUCCESS', description: 'Sandbox simulation — no real money moved' };
   }

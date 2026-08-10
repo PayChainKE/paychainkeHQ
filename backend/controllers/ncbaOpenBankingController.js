@@ -14,6 +14,7 @@ import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { KENYAN_BANK_CODES } from '../config/kenyanBankCodes.js';
 import { getB2cTariff } from '../config/mpesaB2cTariffCard.js';
+import { PAYCHAIN_TXN_RATE } from '../config/revenueRateCard.js';
 
 export class InsufficientFundsError extends Error {
   constructor(merchantId, requested, available) {
@@ -251,8 +252,7 @@ export const handleBankPayout = async (req, res) => {
 // @access  NCBA host-to-host only (HTTP Basic Auth via verifyNcbaBasicAuth)
 export const handlePesaLinkCallback = async (req, res) => {
   // Ack immediately — same "banks retry on non-200/slow response"
-  // convention as the account-notification webhook and mpesaController's
-  // b2cCallback.
+  // convention as the account-notification webhook.
   res.status(200).json({ resultCode: '0', resultDescription: 'Accepted' });
 
   const body = req.body && typeof req.body === 'object' ? req.body : {};
@@ -292,16 +292,17 @@ export const handlePesaLinkCallback = async (req, res) => {
     let merchantForSms = null;
     if (!succeeded) {
       // The payout never landed — return the funds to the merchant's balance.
-      // For ncba_mobile_b2w specifically, PayChain's B2C-equivalent fee was
-      // ALSO deducted alongside the payout amount at initiation
-      // (mpesaController.js's initiateB2C via dispatchMobileMoneyPayout) —
-      // refunding only transaction.amount here would permanently cost the
-      // merchant that fee even though the transfer never went through.
-      // Mirrors mpesaController.js's b2cCallback handling of mpesa_b2c.
+      // For ncba_mobile_b2w/ncba_lipa_na_mpesa specifically, PayChain's own
+      // fee was ALSO deducted alongside the payout amount at initiation
+      // (mpesaController.js's initiateB2C/initiateB2B) — refunding only
+      // transaction.amount here would permanently cost the merchant that
+      // fee even though the transfer never went through.
       let refundAmount = transaction.amount;
       if (transaction.type === 'ncba_mobile_b2w') {
         const { totalFee } = getB2cTariff(transaction.amount);
         refundAmount += totalFee;
+      } else if (transaction.type === 'ncba_lipa_na_mpesa') {
+        refundAmount += Math.round(transaction.amount * PAYCHAIN_TXN_RATE * 100) / 100;
       }
       merchantForSms = await Merchant.findByIdAndUpdate(
         transaction.merchantId,
@@ -312,10 +313,11 @@ export const handlePesaLinkCallback = async (req, res) => {
       merchantForSms = await Merchant.findById(transaction.merchantId).select('phone');
     }
 
-    // This webhook now resolves both bank-account payouts (PesaLink/EFT)
-    // and Mobile B2W (M-Pesa/Airtel number) payouts — "Bank payout" wording
-    // would be wrong for the latter.
-    const payoutLabel = transaction.type === 'ncba_mobile_b2w' ? 'Payout' : 'Bank payout';
+    // This webhook now resolves bank-account payouts (PesaLink/EFT), Mobile
+    // B2W (M-Pesa/Airtel number) payouts, and Lipa na M-Pesa (Paybill/Till)
+    // payouts — "Bank payout" wording would be wrong for the latter two.
+    const isBankPayout = !['ncba_mobile_b2w', 'ncba_lipa_na_mpesa'].includes(transaction.type);
+    const payoutLabel = isBankPayout ? 'Bank payout' : 'Payout';
 
     createNotification({
       merchantId: transaction.merchantId,
@@ -340,8 +342,7 @@ export const handlePesaLinkCallback = async (req, res) => {
     // Update the matching row inside a bulk-pay batch, if this reference belongs to one.
     // Atomic per-row claim (positional $ filtered on the row's own
     // 'pending' status) plus a compare-and-swap on the aggregate status —
-    // same reasoning as the Transaction update above and
-    // mpesaController.js's b2cCallback.
+    // same reasoning as the Transaction update above.
     const batch = await PayoutBatch.findOneAndUpdate(
       { 'transactions.receiptNumber': reference, 'transactions.status': 'pending' },
       { $set: { 'transactions.$.status': succeeded ? 'completed' : 'failed' } },
@@ -356,6 +357,22 @@ export const handlePesaLinkCallback = async (req, res) => {
       else if (statuses.some((s) => s === 'failed')) newBatchStatus = 'Partial';
       if (newBatchStatus !== previousBatchStatus) {
         await PayoutBatch.updateOne({ _id: batch._id, status: previousBatchStatus }, { $set: { status: newBatchStatus } });
+      }
+
+      // Every row just settled (batch left 'Pending' for the first time) —
+      // send the one summary SMS for the whole batch here, not one per row.
+      const justResolved = previousBatchStatus === 'Pending' && newBatchStatus !== 'Pending';
+      if (justResolved) {
+        const batchMerchant = await Merchant.findById(batch.merchantId).select('phone');
+        if (batchMerchant?.phone) {
+          const succeededCount = statuses.filter((s) => s === 'completed').length;
+          const failedCount = statuses.filter((s) => s === 'failed').length;
+          const { date: batchDate, time: batchTime } = formatTransactionDateTime();
+          const batchMessage = `${batch.batchReference} Bulk Payout ${newBatchStatus} on ${batchDate} at ${batchTime}. ${succeededCount} of ${batch.transactions.length} payout(s) completed (KES ${batch.totalNetAmount.toLocaleString()} total)${failedCount > 0 ? `; ${failedCount} failed and refunded` : ''}.`;
+          safeSendSMS({ to: batchMerchant.phone, message: batchMessage }).then((r) => {
+            if (!r.success) logEvent('error', 'ncba_openbanking_batch_sms_failed', { batchId: batch._id.toString(), error: r.error });
+          });
+        }
       }
     }
 

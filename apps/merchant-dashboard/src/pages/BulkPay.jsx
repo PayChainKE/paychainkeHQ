@@ -818,7 +818,7 @@ export default function BulkPay() {
       // Transform response to match frontend receipts. `status` is carried
       // through now — it used to be dropped here, so every receipt card
       // rendered as "Confirmed / Settled" even for rows that actually
-      // failed (blocked/rejected by Daraja or NCBA) and were refunded back
+      // failed (blocked/rejected by NCBA) and were refunded back
       // to the merchant's balance. See the status-aware rendering below.
       const newReceipts = processedBatch.transactions.map(tx => ({
         id: tx.receiptNumber,

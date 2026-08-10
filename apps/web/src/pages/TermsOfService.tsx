@@ -203,7 +203,7 @@ const TermsOfService: React.FC = () => {
                 <ul className="list-disc pl-6 space-y-1">
                   <li>(a) PayChain assigns Merchants a verified PayChain Virtual Account linked to the PayChain blockchain-anchored verification system.</li>
                   <li>(b) The COLLECT service enables Merchants to receive M-PESA payments with real-time transaction verification, eliminating fake-SMS payment fraud.</li>
-                  <li>(c) We do not guarantee uninterrupted availability of COLLECT, as it depends on the availability of the Safaricom M-PESA Daraja API, which is outside our control.</li>
+                  <li>(c) We do not guarantee uninterrupted availability of COLLECT, as it depends on the availability of the M-PESA network and our banking partners' payment rails, which are outside our control.</li>
                   <li>(d) Merchants must not modify, replicate, or misrepresent their verified PayChain Virtual Account.</li>
                 </ul>
 

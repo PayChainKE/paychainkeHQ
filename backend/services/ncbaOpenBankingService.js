@@ -347,6 +347,108 @@ export async function validateMobileWalletNumber({ provider, msisdn }) {
 }
 
 /**
+ * Validates a destination Paybill or Till number before a Lipa na M-Pesa
+ * payout — "This is a prerequisite for Bill Payments" per the UAT Guide.
+ * identifierType is "4" for Paybill, "2" for Till (per the UAT Guide's own
+ * labeling). Endpoint confirmed from NCBA's "Open Banking V2 - Callback
+ * Enabled" Postman collection — not shown as a path in the UAT Guide's own
+ * text (only its request/response JSON was), same situation as
+ * validateMobileWalletNumber above.
+ *
+ * @param {object} params
+ * @param {'Paybill'|'Till'} params.paymentType
+ * @param {string} params.payBillTillNo
+ */
+export async function validateLipaNaMpesaAccount({ paymentType, payBillTillNo }) {
+  if (!paymentType || !payBillTillNo) {
+    throw new NcbaOpenBankingValidationError('paymentType and payBillTillNo are required to validate a Paybill/Till destination');
+  }
+
+  if (!liveCallsEnabled) {
+    return simulate('ncba_openbanking_lnm_validate_sandbox', { paymentType, payBillTillNo });
+  }
+
+  const identifierType = paymentType === 'Till' ? '2' : '4';
+  const result = await ncbaOpenBankingPost('/api/v1/LipaNaMpesaValidation/accountdetails', {
+    identifier: payBillTillNo,
+    identifierType,
+  });
+
+  if (result?.errorCode !== '000') {
+    throw new NcbaOpenBankingValidationError(result?.errorMessage || 'NCBA could not verify the destination Paybill/Till number');
+  }
+
+  // origanizationShortCode is NCBA's own typo, kept exactly as documented.
+  return { organizationName: result.OrganizationName || null, shortCode: result.origanizationShortCode || null };
+}
+
+/**
+ * Submits a Lipa na M-Pesa payout to a third-party Paybill or Till number —
+ * NCBA's direct replacement for Daraja B2B (BusinessPayBill/
+ * BusinessBuyGoods). Response shape (hdrRefNo/hdrTranId/resErrorCode/
+ * UnitId) matches NCBA's other "accepted into processing" rails (e.g. M-Pesa
+ * Float Purchase, explicitly documented as a 24-hour service) rather than
+ * PesaLink/EFT's synchronous resultCode shape, and the payload carries no
+ * callbackUrl field to opt out of that — so this is treated as ASYNCHRONOUS,
+ * same as submitMobileB2wPayment/BILLPAY: an immediate resErrorCode: '000'
+ * only means NCBA accepted the instruction, not that it settled. Callers
+ * should record the resulting Transaction as 'pending' and let the generic
+ * handlePesaLinkCallback (ncbaOpenBankingController.js) resolve it later,
+ * keyed by reqChnlId.
+ *
+ * @param {object} params
+ * @param {string} params.transactionId - PayChain's own reference; becomes
+ *        reqChnlId here and Transaction.reference at the call site.
+ * @param {'Paybill'|'Till'} params.paymentType
+ * @param {string} params.payBillTillNo
+ * @param {number} params.amount
+ * @param {string} [params.accountReference] - Paybill account number; not applicable to Till.
+ * @param {string} [params.recipientName]
+ * @param {string} [params.notifyMobileNumber]
+ * @param {string} [params.narration]
+ */
+export async function submitLipaNaMpesaPayment({
+  transactionId,
+  paymentType,
+  payBillTillNo,
+  amount,
+  accountReference,
+  recipientName,
+  notifyMobileNumber,
+  narration,
+}) {
+  if (!transactionId || !paymentType || !payBillTillNo || !amount) {
+    throw new NcbaOpenBankingValidationError('transactionId, paymentType, payBillTillNo and amount are required for a Lipa na M-Pesa payment');
+  }
+
+  const payload = {
+    reqTransactionReferenceNo: transactionId,
+    reqPaymentType: paymentType,
+    reqPayBillTillNo: payBillTillNo,
+    DebitAccountNumber: ncbaOpenBankingAccountNumber,
+    DebitAmount: String(amount),
+    reqCreditAmount: String(amount),
+    reqDebitAcCurrency: 'KES',
+    reqToAccountName: recipientName || 'PayChain Merchant',
+    reqMobileNumber: notifyMobileNumber || '',
+    reqPaymentDescription: narration || 'PayChain Payout',
+    reqPaybillAccount: accountReference || '',
+    Country: 'KENYA',
+    reqChnlId: transactionId,
+  };
+
+  if (!liveCallsEnabled) {
+    return simulate('ncba_openbanking_lnm_submit_sandbox', { transactionId, amount });
+  }
+
+  const result = await ncbaOpenBankingPost('/api/v1/LipaNaMpesa/lipanampesa', payload);
+  if (result?.resErrorCode !== '000') {
+    throw new NcbaOpenBankingRequestError(result?.resErrorDesc || result?.resErrorMessage || 'NCBA rejected the Lipa na M-Pesa payment');
+  }
+  return result;
+}
+
+/**
  * Submits a Mobile B2W (Bank-to-Wallet) payout to an M-Pesa or Airtel Money
  * number — NCBA's direct replacement for Daraja B2C. Per the UAT Guide this
  * is an ASYNCHRONOUS rail: a `succeeded: true` response only means NCBA

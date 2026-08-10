@@ -969,7 +969,7 @@ export const sendBatchReceiptEmail = async (email, businessName, batchRows, tota
             <h1 style="font-size: 20px; font-weight: 700; color: #111; margin: 0 0 10px 0;">Bulk Payout Successful</h1>
             <p style="font-size: 14px; line-height: 1.6; color: #555; margin: 0 0 30px 0;">
               Hello <strong>${businessName}</strong>,<br>
-              Your recent bulk payment batch has been successfully processed and settled via the Daraja network. Below is the detailed breakdown of the transaction.
+              Your recent bulk payment batch has been successfully processed. Below is the detailed breakdown of the transaction.
             </p>
 
             <!-- Summary Cards -->
@@ -1163,8 +1163,8 @@ export const sendInvoiceEmail = async ({
 };
 
 // @desc  Notify the merchant, with a receipt, the moment a customer actually
-// pays one of their invoices. Fired from mpesaController.stkCallback only on
-// ResultCode === 0 (a confirmed M-PESA payment), never on link/invoice send.
+// pays one of their invoices. Fired from mpesaController.resolveStkOutcome
+// only on a confirmed M-PESA payment, never on link/invoice send.
 export const sendInvoicePaidReceiptEmail = async ({
   to, businessName, invoiceNumber, customerName, items, currency, subtotal, total, paidAt, mpesaReceipt, payerPhone,
 }) => {

@@ -62,7 +62,7 @@ function findBand(amount) {
  * hits their available balance. Never throws — money has already left the
  * customer's M-Pesa account by the time this runs inside a webhook, so a bad
  * input here must degrade to "no fee charged" rather than abort the credit
- * entirely (see mpesaController.js's confirmationURL/stkCallback usage).
+ * entirely (see mpesaController.js's confirmationURL/resolveStkOutcome usage).
  *
  * @param {number} grossAmount
  * @returns {number} fee in KES, rounded to 2dp, never negative, never more
@@ -169,7 +169,7 @@ export class PricingEngineError extends Error {
 // Request Money's instant prompt, and pay-to-account
 // (controllers/mpesaController.js#initiateSTKPush /
 // controllers/transactionController.js#payToMerchantAccount), all settled
-// through controllers/mpesaController.js#stkCallback. It does NOT apply to
+// through controllers/mpesaController.js#resolveStkOutcome. It does NOT apply to
 // raw C2B/paybill deposits (mpesaController.js#confirmationURL): a customer
 // keying an amount directly into their own M-Pesa paybill menu chooses that
 // number themselves, so there is no "checkout total" PayChain can inflate —
@@ -229,8 +229,8 @@ export function getCheckoutTotal(baseInvoiceAmount) {
 
 /**
  * Splits a completed STK Push settlement between the merchant and PayChain.
- * Called from mpesaController.js#stkCallback once Safaricom confirms
- * payment — `totalMpesaReceived` is what Safaricom actually credited
+ * Called from mpesaController.js#resolveStkOutcome once the payment is
+ * confirmed — `totalMpesaReceived` is what was actually credited
  * (STKRequest.amount, == getCheckoutTotal's earlier output), and
  * `baseInvoiceAmount` is the original PaymentLink/Invoice amount before any
  * surcharge (PaymentLink.amount).
@@ -259,7 +259,7 @@ export function processSplitTransaction(totalMpesaReceived, baseInvoiceAmount) {
   const customerFee = round2(total - base);
 
   // Merchant Fee — reuses the same tiered band engine already wired into
-  // confirmationURL/stkCallback (calculateMerchantFee above). One
+  // confirmationURL/resolveStkOutcome (calculateMerchantFee above). One
   // merchant-fee calculation for the whole app, never a second copy.
   const merchantFee = calculateMerchantFee(base);
 
