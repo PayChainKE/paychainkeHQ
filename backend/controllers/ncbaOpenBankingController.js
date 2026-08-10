@@ -9,6 +9,7 @@ import {
 } from '../services/ncbaOpenBankingService.js';
 import { createNotification } from './notificationController.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
+import { buildPayoutSentSms, buildPayoutFailedSms } from '../utils/paymentSmsTemplates.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { KENYAN_BANK_CODES } from '../config/kenyanBankCodes.js';
@@ -198,9 +199,18 @@ export const handleBankPayout = async (req, res) => {
 
     if (updatedMerchant.phone) {
       const { date, time } = formatTransactionDateTime();
+      const { message } = buildPayoutSentSms({
+        ref: transaction.reference,
+        label: 'Bank Payout',
+        amount: Number(amount),
+        recipientName: accountName || 'your bank account',
+        date,
+        time,
+        balance: updatedMerchant.kesBalance,
+      });
       safeSendSMS({
         to: updatedMerchant.phone,
-        message: `${transaction.reference} Bank Payout Sent. KES ${Number(amount).toLocaleString()} paid to ${accountName || 'your bank account'} on ${date} at ${time}. New balance: KES ${updatedMerchant.kesBalance.toLocaleString()}.`,
+        message,
       }).then((result) => {
         if (!result.success) logEvent('error', 'ncba_openbanking_payout_sms_failed', { transactionId: transaction.reference, error: result.error });
       });
@@ -304,9 +314,9 @@ export const handlePesaLinkCallback = async (req, res) => {
     if (merchantForSms?.phone) {
       const { date, time } = formatTransactionDateTime();
       const recipientName = transaction.recipient?.name || 'the recipient';
-      const message = succeeded
-        ? `${reference} ${payoutLabel} Sent. KES ${transaction.amount.toLocaleString()} paid to ${recipientName} on ${date} at ${time}.`
-        : `${reference} ${payoutLabel} Failed. KES ${transaction.amount.toLocaleString()} to ${recipientName} could not be completed on ${date} at ${time} and has been refunded. Your updated PayChain available balance is KES ${(merchantForSms.kesBalance || 0).toLocaleString()}.`;
+      const { message } = succeeded
+        ? buildPayoutSentSms({ ref: reference, label: payoutLabel, amount: transaction.amount, recipientName, date, time })
+        : buildPayoutFailedSms({ ref: reference, label: payoutLabel, amount: transaction.amount, recipientName, date, time, balance: merchantForSms.kesBalance || 0 });
       safeSendSMS({ to: merchantForSms.phone, message }).then((r) => {
         if (!r.success) logEvent('error', 'ncba_openbanking_callback_sms_failed', { reference, error: r.error });
       });
