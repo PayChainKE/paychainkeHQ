@@ -16,7 +16,8 @@ import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard.js';
-import { DARAJA_STK_B2C_ENABLED } from './mpesaController.js';
+import { DARAJA_STK_B2C_ENABLED, NCBA_STK_B2C_ENABLED } from './mpesaController.js';
+import { validateMobileWalletNumber, submitMobileB2wPayment } from '../services/ncbaOpenBankingService.js';
 
 // @desc    Get all payees for a merchant
 // @route   GET /api/bulkpay/payees
@@ -458,7 +459,32 @@ export const authorizeBatch = async (req, res) => {
           }
         }
       } else if (payee.paymentMethod === 'Mobile Money') {
-        if (liveBlocked) {
+        if (payee.mobileMoneyType === 'Personal Number' && NCBA_STK_B2C_ENABLED) {
+          // NCBA Mobile B2W — independent of the Daraja liveBlocked/token
+          // checks below (those only gate the Daraja rail, still used here
+          // for Paybill/Till B2B payees in the same batch). Async rail, same
+          // as the Daraja B2C branch it replaces — darajaStatus stays
+          // 'pending' (its default above), resolved later via
+          // handlePesaLinkCallback (ncbaOpenBankingController.js), keyed by
+          // the reference this row is stamped with below.
+          try {
+            const transactionId = `NCBA-B2W-BULK-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+            const { validationId } = await validateMobileWalletNumber({ provider: 'safaricom', msisdn: payee.phone });
+            await submitMobileB2wPayment({
+              transactionId,
+              validationId,
+              provider: 'safaricom',
+              amount: row.netAmount,
+              recipientNumber: payee.phone,
+              narration: `Bulk Payout to ${payee.name}`,
+            });
+            darajaRef = transactionId;
+          } catch (err) {
+            console.error(`❌ NCBA Mobile B2W rejected payout for ${payee.name}:`, err.message);
+            darajaStatus = 'failed';
+            refundAmount += row.netAmount + row.b2cFee;
+          }
+        } else if (liveBlocked) {
           darajaStatus = 'failed';
           refundAmount += row.netAmount + row.b2cFee;
           console.error(`❌ Bulk payout to ${payee.name} blocked: live M-PESA is not enabled (set MPESA_LIVE_ENABLED=true).`);

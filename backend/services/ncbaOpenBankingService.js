@@ -34,6 +34,13 @@ const MAX_TRANSFER_AMOUNT = 999999;
 // fully exercisable offline before NCBA finishes IP whitelisting.
 const liveCallsEnabled = process.env.NCBA_OPENBANKING_LIVE_ENABLED === 'true';
 
+// Hakikisha/Airtel Money mobile-number validation path — a prerequisite for
+// submitMobileB2wPayment below. NOT shown in the UAT Guide text provided
+// (only its request/response JSON was) — left unconfigured (blank) until
+// confirmed against NCBA's Postman collection; validateMobileWalletNumber
+// simulates whenever it's unset, same as when liveCallsEnabled is off.
+const ncbaMobileWalletValidationPath = process.env.NCBA_MOBILE_WALLET_VALIDATION_PATH || null;
+
 export class NcbaOpenBankingAuthError extends Error {
   constructor(message) {
     super(message);
@@ -292,6 +299,105 @@ export async function submitEftTransfer({
   const result = await ncbaOpenBankingPost('/api/v1/EFTTransaction/efttransaction', payload);
   if (result?.resultCode !== '000') {
     throw new NcbaOpenBankingRequestError(result?.statusDescription || 'NCBA rejected the EFT transfer');
+  }
+  return result;
+}
+
+/**
+ * Validates a recipient's M-Pesa (Hakikisha) or Airtel Money number before a
+ * Mobile B2W payout — required prerequisite per the UAT Guide, which
+ * returns a validationId that must be echoed back on the actual payment.
+ * Simulates (rather than erroring) when NCBA_MOBILE_WALLET_VALIDATION_PATH
+ * is unset, since the real path isn't confirmed yet — see its config
+ * comment above.
+ *
+ * @param {object} params
+ * @param {'safaricom'|'airtel'} params.provider
+ * @param {string} params.msisdn - 254XXXXXXXXX
+ * @returns {{ validationId: string, customerName: string }}
+ */
+export async function validateMobileWalletNumber({ provider, msisdn }) {
+  if (!provider || !msisdn) {
+    throw new NcbaOpenBankingValidationError('provider and msisdn are required to validate a mobile wallet number');
+  }
+
+  if (!liveCallsEnabled || !ncbaMobileWalletValidationPath) {
+    const result = simulate('ncba_openbanking_mobile_wallet_validate_sandbox', { provider, msisdn });
+    return { validationId: `SIM-VALID-${Date.now()}`, customerName: null, ...result };
+  }
+
+  const result = await ncbaOpenBankingPost(ncbaMobileWalletValidationPath, { provider, msisdn });
+  if (!result?.validationId) {
+    throw new NcbaOpenBankingValidationError(result?.message || 'NCBA could not validate the destination mobile wallet number');
+  }
+
+  return { validationId: result.validationId, customerName: result.customerName || null };
+}
+
+/**
+ * Submits a Mobile B2W (Bank-to-Wallet) payout to an M-Pesa or Airtel Money
+ * number — NCBA's direct replacement for Daraja B2C. Per the UAT Guide this
+ * is an ASYNCHRONOUS rail: a `succeeded: true` response only means NCBA
+ * accepted the instruction into its processing queue (same shape as the
+ * doc's KPLC/Water/E-Citizen examples, all explicitly documented as
+ * resolving via a later callback) — unlike submitPesaLinkTransfer/
+ * submitEftTransfer above, which resolve synchronously. callbackUrl is left
+ * blank (the doc marks it optional), matching how services/
+ * ncbaBulkPaymentService.js's existing utility-payment calls already handle
+ * this — NCBA posts back to whatever webhook was registered during
+ * onboarding (the same /webhooks/ncba-openbanking-callback route this app
+ * already exposes), not a per-request URL. channelRef/reqChnlId are set to
+ * PayChain's own transactionId, so handlePesaLinkCallback (already generic
+ * — see ncbaOpenBankingController.js) can match the eventual callback back
+ * to this specific payout without any new webhook route.
+ *
+ * @param {object} params
+ * @param {string} params.transactionId - PayChain's own reference; becomes
+ *        both channelRef/reqChnlId here and Transaction.reference at the
+ *        call site, so the eventual callback can find the pending row.
+ * @param {string} params.validationId - from validateMobileWalletNumber
+ * @param {'safaricom'|'airtel'} params.provider
+ * @param {number} params.amount
+ * @param {string} params.recipientNumber - 254XXXXXXXXX
+ * @param {string} [params.senderNumber] - number to receive NCBA's own notification, optional
+ * @param {string} [params.narration]
+ */
+export async function submitMobileB2wPayment({
+  transactionId,
+  validationId,
+  provider,
+  amount,
+  recipientNumber,
+  senderNumber,
+  narration,
+}) {
+  if (!transactionId || !validationId || !provider || !amount || !recipientNumber) {
+    throw new NcbaOpenBankingValidationError('transactionId, validationId, provider, amount and recipientNumber are required for a Mobile B2W payout');
+  }
+
+  const payload = {
+    validationId,
+    provider,
+    amount: String(amount),
+    debitAccount: ncbaOpenBankingAccountNumber,
+    // UAT Guide's own field name for this ("receipientNumber") is a typo in
+    // NCBA's spec — kept exactly as documented since it's what their API
+    // actually expects.
+    receipientNumber: recipientNumber,
+    senderNumber: senderNumber || '',
+    channelRef: transactionId,
+    narration: narration || 'PayChain Payout',
+    callbackUrl: '',
+    reqChnlId: transactionId,
+  };
+
+  if (!liveCallsEnabled) {
+    return simulate('ncba_openbanking_mobile_b2w_submit_sandbox', { transactionId, amount });
+  }
+
+  const result = await ncbaOpenBankingPost('/api/v1/MobileB2WPayment/mobileb2wpayment', payload);
+  if (!result?.succeeded) {
+    throw new NcbaOpenBankingRequestError(result?.message || 'NCBA rejected the Mobile B2W payout');
   }
   return result;
 }

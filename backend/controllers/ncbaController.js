@@ -14,7 +14,7 @@ import {
   NcbaValidationError,
 } from '../utils/ncbaValidators.js';
 import { toE164Kenyan } from '../utils/notificationService.js';
-import { creditNcbaCollection, DuplicateCollectionError } from '../services/ncbaLedgerService.js';
+import { creditNcbaCollection, DuplicateCollectionError, wasAlreadySettledByStkPush } from '../services/ncbaLedgerService.js';
 import { NcbaTariffBoundsError } from '../config/ncbaTariffCard.js';
 import {
   initiateBulkPayment,
@@ -81,6 +81,16 @@ export const handleNcbaReconciliationWebhook = async (req, res) => {
     if (merchant.status !== 'active') {
       logEvent('warn', 'ncba_reconciliation_merchant_inactive', { transactionReference, merchantId: merchant._id.toString(), status: merchant.status });
       return reject(res, transactionReference, 'MERCHANT_INACTIVE', `Merchant account is ${merchant.status}`);
+    }
+
+    // See wasAlreadySettledByStkPush's doc comment (services/ncbaLedgerService.js)
+    // — this same money may have already been credited via the app-aware
+    // NCBA STK Push poll resolution, which applies a different (correct) fee
+    // split for Payment Link/Invoice/wallet-top-up flows than the generic
+    // credit below would.
+    if (await wasAlreadySettledByStkPush(merchant, grossAmount)) {
+      logEvent('info', 'ncba_reconciliation_already_settled_via_stk', { transactionReference, merchantId: merchant._id.toString(), grossAmount });
+      return accept(res, transactionReference);
     }
 
     let ledgerResult;

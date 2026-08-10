@@ -1,7 +1,30 @@
 import mongoose from 'mongoose';
 import Merchant from '../models/Merchant.js';
 import Transaction from '../models/Transaction.js';
+import STKRequest from '../models/STKRequest.js';
 import { getNcbaTariffBand } from '../config/ncbaTariffCard.js';
+
+// STK-collected money (see services/ncbaStkPushService.js) lands in the same
+// NCBA account as every other collection and settles via the app-aware
+// resolveStkOutcome() path in mpesaController.js — with the correct
+// Payment Link/Invoice/wallet-surcharge split, not the generic tiered
+// getNcbaTariffBand() split creditNcbaCollection applies below. Because it's
+// the same underlying money movement, it will very likely ALSO arrive on
+// NCBA's generic account-notification feed under an already-allowlisted
+// code (876 MPESA Transfer Credit / 883 e-MPESA Transfer — see
+// config/ncbaAccountNotificationCodes.js) — without this guard that would
+// double-credit the merchant. Both NCBA webhook controllers must call this
+// before creditNcbaCollection.
+export async function wasAlreadySettledByStkPush(merchant, grossAmount) {
+  const recentWindow = new Date(Date.now() - 10 * 60 * 1000);
+  const match = await STKRequest.findOne({
+    merchantId: merchant._id,
+    status: 'success',
+    amount: grossAmount,
+    updatedAt: { $gte: recentWindow },
+  });
+  return !!match;
+}
 
 export class DuplicateCollectionError extends Error {
   constructor(bankRef) {

@@ -15,7 +15,7 @@ import { isReconcilableTxnType } from '../config/ncbaAccountNotificationCodes.js
 import { verifyNcbaHashVal } from '../utils/ncbaHashVal.js';
 import { timingSafeStringEqual } from '../utils/timingSafeCompare.js';
 import { buildNcbaOkResult, buildNcbaFailResult } from '../utils/ncbaSoapResponses.js';
-import { creditNcbaCollection, DuplicateCollectionError } from '../services/ncbaLedgerService.js';
+import { creditNcbaCollection, DuplicateCollectionError, wasAlreadySettledByStkPush } from '../services/ncbaLedgerService.js';
 import { NcbaTariffBoundsError } from '../config/ncbaTariffCard.js';
 import { getNcbaVirtualAccountNumber, formatAccountNumberDisplay } from '../utils/ncbaValidators.js';
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay.js';
@@ -206,6 +206,16 @@ export const handleNcbaAccountNotification = async (req, res) => {
     // Parsed here (before the ledger write) so the real payer name reaches
     // the Transaction record itself, not just the merchant's SMS below.
     const parsedCustomer = parseNcbaCustomerField(rawCustomerName);
+
+    // See wasAlreadySettledByStkPush's doc comment — this same money may
+    // have already been credited via the app-aware NCBA STK Push poll
+    // resolution (mpesaController.js's resolveStkOutcome), which applies a
+    // completely different (correct) fee split for Payment Link/Invoice/
+    // wallet-top-up flows than the generic credit below would.
+    if (await wasAlreadySettledByStkPush(merchant, transAmount)) {
+      logEvent('info', 'ncba_account_notification_already_settled_via_stk', { transId, merchantId: merchant._id.toString(), transAmount });
+      return respondOk(res, 'Already settled via STK Push');
+    }
 
     let ledgerResult;
     try {
