@@ -1388,7 +1388,11 @@ export const initiateB2C = async (req, res) => {
     if (debited && totalDebit > 0) {
       await Merchant.findByIdAndUpdate(req.merchant._id, { $inc: { kesBalance: totalDebit } });
     }
-    res.status(500).json({ error: error.response?.data?.errorMessage || 'Failed to initiate Daraja B2C transfer' });
+    // This catch is shared by both the NCBA and Daraja branches above —
+    // "Daraja" in the fallback message was wrong (and actively misleading
+    // for debugging) whenever the NCBA path is the one that actually threw.
+    const fallbackMessage = NCBA_STK_B2C_ENABLED ? 'Failed to initiate NCBA transfer' : 'Failed to initiate Daraja B2C transfer';
+    res.status(500).json({ error: error.response?.data?.errorMessage || error.message || fallbackMessage });
   }
 };
 
