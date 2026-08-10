@@ -99,6 +99,12 @@ async function fetchNewToken() {
         headers: {
           'Ocp-Apim-Subscription-Key': ncbaOpenBankingSubscriptionKey,
           'Content-Type': 'application/json',
+          // NCBA's gateway has been observed blocking axios's default
+          // "axios/x.x.x" User-Agent with a generic WAF "Security Notice"
+          // even from an already-whitelisted IP — a descriptive UA is a
+          // common requirement for enterprise API gateways that reject
+          // unidentified/library-default clients outright.
+          'User-Agent': 'PayChain-Backend/1.0 (+https://paychain.co.ke)',
         },
         timeout: 15000,
       }
@@ -153,6 +159,7 @@ async function ncbaOpenBankingPost(path, body, { retrying = false } = {}) {
         Authorization: `${tokenType} ${accessToken}`,
         'Ocp-Apim-Subscription-Key': ncbaOpenBankingSubscriptionKey,
         'Content-Type': 'application/json',
+        'User-Agent': 'PayChain-Backend/1.0 (+https://paychain.co.ke)',
       },
       timeout: 20000,
     });

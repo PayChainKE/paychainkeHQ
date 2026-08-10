@@ -68,6 +68,10 @@ async function fetchNewToken() {
     // try POST instead).
     const response = await axios.get(`${ncbaStkBaseUrl}/payments/api/v1/auth/token`, {
       auth: { username: ncbaStkUsername, password: ncbaStkPassword },
+      // See the identical comment in ncbaOpenBankingService.js — NCBA's
+      // gateway has been observed blocking axios's default User-Agent
+      // outright, even from an already-whitelisted IP.
+      headers: { 'User-Agent': 'PayChain-Backend/1.0 (+https://paychain.co.ke)' },
       timeout: 15000,
     });
 
@@ -99,7 +103,11 @@ async function ncbaStkPost(path, body, { retrying = false } = {}) {
 
   try {
     const response = await axios.post(`${ncbaStkBaseUrl}${path}`, body, {
-      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'User-Agent': 'PayChain-Backend/1.0 (+https://paychain.co.ke)',
+      },
       timeout: 20000,
     });
     return response.data;
