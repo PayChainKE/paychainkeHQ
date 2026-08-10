@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Modal, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import api from '../api/config';
 import TopBar from '../components/layout/TopBar';
 import { isCreditTransaction, typeLabel as txTypeLabel } from '../utils/transactionDirection';
 import { formatTxDate, formatTxTime } from '../utils/formatDate';
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay';
+import { buildAuditReceiptHtml } from '../utils/auditReceiptHtml';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -67,6 +70,8 @@ export default function Transactions({ navigation }: any) {
   const [currentPage, setCurrentPage] = useState(1);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedTx, setSelectedTx] = useState<any | null>(null);
+  const [isGeneratingReceipt, setIsGeneratingReceipt] = useState(false);
 
   useEffect(() => {
     const fetchTransactions = async () => {
@@ -118,6 +123,29 @@ export default function Transactions({ navigation }: any) {
 
   const handleNext = () => { if (currentPage < totalPages) setCurrentPage(p => p + 1); };
   const handlePrev = () => { if (currentPage > 1) setCurrentPage(p => p - 1); };
+
+  const handleGenerateAuditReceipt = async () => {
+    if (!selectedTx) return;
+    try {
+      setIsGeneratingReceipt(true);
+      const html = buildAuditReceiptHtml(selectedTx);
+      const { uri } = await Print.printToFileAsync({ html, base64: false });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/pdf',
+          dialogTitle: 'PayChain Audit Receipt',
+          UTI: 'com.adobe.pdf',
+        });
+      } else {
+        Alert.alert('Receipt Ready', `Saved to: ${uri}`);
+      }
+    } catch (err: any) {
+      console.error('Audit receipt generation failed', err);
+      Alert.alert('Unable to generate receipt', err?.message || 'Please try again.');
+    } finally {
+      setIsGeneratingReceipt(false);
+    }
+  };
 
   // ─── Render ────────────────────────────────────────────────────────────────
   return (
@@ -237,8 +265,10 @@ export default function Transactions({ navigation }: any) {
                 const timeStr = formatTxTime(tx.createdAt || tx.timestamp);
                 const phoneStr = formatPhoneDisplay(tx.sender?.id || tx.recipient?.id);
                 return (
-                  <View
+                  <TouchableOpacity
                     key={tx._id || index}
+                    activeOpacity={0.7}
+                    onPress={() => setSelectedTx(tx)}
                     className={`flex-row items-center py-4 px-5 ${
                       index !== currentTransactions.length - 1 ? 'border-b border-[#eff4ef]/60' : ''
                     }`}
@@ -273,7 +303,7 @@ export default function Transactions({ navigation }: any) {
                         ? `${(tx.usdcAmount || 0).toLocaleString()} USDC`
                         : `${isInbound ? '+' : '-'} ${formatKES(tx.kesAmount || tx.amount || 0)}`}
                     </Text>
-                  </View>
+                  </TouchableOpacity>
                 );
               })
             )}
@@ -308,6 +338,96 @@ export default function Transactions({ navigation }: any) {
 
         </View>
       </ScrollView>
+
+      {/* ── Transaction Detail (mirrors merchant-dashboard's side-slide drawer) ── */}
+      <Modal visible={!!selectedTx} transparent animationType="slide" onRequestClose={() => setSelectedTx(null)}>
+        <View className="flex-1 justify-end bg-black/50">
+          <TouchableOpacity className="absolute inset-0" activeOpacity={1} onPress={() => setSelectedTx(null)} />
+          {selectedTx && (() => {
+            const isInbound = isCreditTransaction(selectedTx.type);
+            const isSwap = selectedTx.type === 'fx_swap';
+            const amountColor = isSwap ? '#1D4ED8' : isInbound ? '#006c4e' : '#0c2010';
+            const amountStr = isSwap
+              ? `${(selectedTx.usdcAmount || 0).toLocaleString()} USDC`
+              : `${isInbound ? '+' : '-'} ${formatKES(selectedTx.kesAmount || selectedTx.amount || 0)}`;
+            const counterpartyName = isInbound
+              ? (selectedTx.sender?.name || 'Unknown')
+              : (selectedTx.recipient?.name || selectedTx.sender?.name || 'Internal Treasury');
+            const counterpartyPhone = formatPhoneDisplay(selectedTx.sender?.id || selectedTx.recipient?.id);
+
+            return (
+              <View className="w-full max-w-lg mx-auto bg-[#162723] rounded-t-[36px] px-6 pt-4 pb-8 mt-auto max-h-[85%]">
+                <View className="items-center mb-4"><View className="w-12 h-1.5 bg-white/15 rounded-full" /></View>
+                <ScrollView showsVerticalScrollIndicator={false}>
+                  <View className="items-center mb-6">
+                    <Text className="text-white font-jakarta-extrabold text-[18px] uppercase tracking-[0.1em]">Transaction Details</Text>
+                    <Text className="text-white/40 text-[10px] font-jakarta-bold mt-3 tracking-[0.15em] uppercase">
+                      Reference ID: {selectedTx.reference}
+                    </Text>
+                  </View>
+
+                  <View className="mb-6">
+                    <Text className="text-white/40 text-[10px] font-jakarta-bold uppercase tracking-[0.15em] mb-2">Settlement</Text>
+                    <Text className="text-[30px] font-jakarta-extrabold tracking-tight" style={{ color: amountColor === '#0c2010' ? '#ffffff' : amountColor }}>
+                      {amountStr}
+                    </Text>
+                  </View>
+
+                  <View className="mb-6 pt-5 border-t border-white/10">
+                    <Text className="text-white/40 text-[10px] font-jakarta-bold uppercase tracking-[0.15em] mb-2">Network Status</Text>
+                    <View className="self-start flex-row items-center gap-2 px-3 py-1.5 rounded-full bg-[#5efeb3]/10 border border-[#5efeb3]/20">
+                      <View className="w-2 h-2 rounded-full bg-[#5efeb3]" />
+                      <Text className="text-[#5efeb3] text-[11px] font-jakarta-extrabold uppercase tracking-widest">{selectedTx.status}</Text>
+                    </View>
+                  </View>
+
+                  <View className="mb-6 pt-5 border-t border-white/10">
+                    <Text className="text-white/40 text-[10px] font-jakarta-bold uppercase tracking-[0.15em] mb-2">Counterparty</Text>
+                    <Text className="text-white font-jakarta-bold text-[16px]">{counterpartyName}</Text>
+                    {!!counterpartyPhone && (
+                      <Text className="text-white/40 text-[10px] font-jakarta-bold mt-1 uppercase tracking-widest">{counterpartyPhone}</Text>
+                    )}
+                  </View>
+
+                  <View className="mb-6 pt-5 border-t border-white/10">
+                    <Text className="text-white/40 text-[10px] font-jakarta-bold uppercase tracking-[0.15em] mb-2">Timestamp</Text>
+                    <Text className="text-white/70 text-[12px] font-jakarta-bold uppercase tracking-widest">
+                      {formatTxDate(selectedTx.createdAt || selectedTx.timestamp)} · {formatTxTime(selectedTx.createdAt || selectedTx.timestamp)}
+                    </Text>
+                  </View>
+
+                  {selectedTx.balanceAfter != null && (
+                    <View className="mb-6 pt-5 border-t border-white/10">
+                      <Text className="text-white/40 text-[10px] font-jakarta-bold uppercase tracking-[0.15em] mb-2">Balance After</Text>
+                      <Text className="text-white font-jakarta-bold text-[16px]">{formatKES(selectedTx.balanceAfter)}</Text>
+                    </View>
+                  )}
+
+                  <View className="pt-6 border-t border-white/10 items-center gap-5">
+                    <TouchableOpacity
+                      onPress={handleGenerateAuditReceipt}
+                      disabled={isGeneratingReceipt}
+                      activeOpacity={0.85}
+                      className="w-full bg-white/10 border border-white/10 rounded-2xl py-4 flex-row items-center justify-center gap-2"
+                      style={{ opacity: isGeneratingReceipt ? 0.6 : 1 }}
+                    >
+                      {isGeneratingReceipt ? <ActivityIndicator color="#5efeb3" size="small" /> : (
+                        <>
+                          <MaterialIcons name="receipt-long" size={16} color="#5efeb3" />
+                          <Text className="text-white font-jakarta-extrabold text-[11px] uppercase tracking-widest">Generate Audit Receipt</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setSelectedTx(null)} activeOpacity={0.7}>
+                      <Text className="text-white/40 font-jakarta-extrabold text-[10px] uppercase tracking-[0.15em]">Done</Text>
+                    </TouchableOpacity>
+                  </View>
+                </ScrollView>
+              </View>
+            );
+          })()}
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
