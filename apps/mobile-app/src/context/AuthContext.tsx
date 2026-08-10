@@ -376,12 +376,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setHasCompletedOnboarding(true);
   }
 
+  // This is THE single Payment PIN — it authorizes every money-movement
+  // flow server-side (sendMoney, B2C/B2B, bulk-pay batches) as well as
+  // unlocking the app locally. Previously a failed backend call was only
+  // logged and swallowed, so the local device-unlock PIN could end up set
+  // to a value the server never accepted — the merchant would unlock the
+  // app fine, then get "Invalid PIN" on every real payment. Now it rethrows
+  // so callers (PinSetup, BulkPay's setup modal) can surface the failure
+  // and the local PIN is only stored once the server has actually accepted it.
   async function setAppPin(pin: string) {
-    try {
-      await api.post('/api/auth/merchant/set-app-pin', { pin });
-    } catch (err) {
-      console.warn('Failed to sync PIN to backend:', err);
-    }
+    await api.post('/api/auth/merchant/set-app-pin', { pin });
     await storeAppPin(pin);
     setAppPinState(pin);
   }

@@ -29,6 +29,7 @@ import {
   updateMerchantProfile,
   toggleBiometrics,
   setAppPin,
+  resetAppPin,
   verifyPaymentPin,
   validateSetupToken,
   setupPassword
@@ -88,6 +89,32 @@ const pinLimiter = rateLimit({
   message: { error: 'Too many PIN attempts. Try again in 15 minutes.' },
 });
 
+// WebAuthn login is a credential-validation path just like merchantLoginLimiter
+// above — getLoginOptions doubles as an email/phone existence oracle (its
+// response shape differs for a known vs unknown identifier) and writes a
+// fresh challenge to the DB on every call, and verifyLogin lets an attacker
+// probe assertions. Neither had any dedicated throttle before, only the
+// app-wide 600/15min backstop.
+const webauthnLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many attempts. Try again in 15 minutes.' },
+});
+
+// Password-change / security-question endpoints check `currentPassword` via
+// bcrypt.compare inline (matchPassword) — the same brute-force-oracle shape
+// as pinLimiter above, just gated on a valid session instead of none. Had
+// no dedicated throttle before, only the shared 600/15min global backstop.
+const passwordChangeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many attempts. Try again in 15 minutes.' },
+});
+
 // Per-IP limiting alone doesn't stop a distributed/IP-rotating attacker
 // from spamming one specific victim's phone/email with reset OTPs
 // (harassment, not just brute force) — keyed on the submitted identifier
@@ -106,7 +133,7 @@ router.post('/login', adminLoginLimiter, login);
 router.post('/verify-otp', adminOtpLimiter, verifyOTP);
 router.get('/me', protect, getMe);
 router.put('/me', protect, updateMe);
-router.put('/password', protect, changePassword);
+router.put('/password', protect, passwordChangeLimiter, changePassword);
 
 // Admin team-member setup (public — validates the time-limited invite token).
 router.get('/setup-password/:token', validateAdminSetupToken);
@@ -124,21 +151,28 @@ router.post('/merchant/verify-reset-otp', merchantOtpLimiter,   verifyResetOTP);
 router.post('/merchant/reset-password',   merchantOtpLimiter,   resetPassword);
 router.get('/merchant/setup-password/:token', validateSetupToken);
 router.post('/merchant/setup-password', merchantOtpLimiter, setupPassword);
-router.put('/merchant/change-password', protectMerchant, changeMerchantPassword);
+router.put('/merchant/change-password', protectMerchant, passwordChangeLimiter, changeMerchantPassword);
 router.get('/merchant/security-questions', protectMerchant, getSecurityQuestions);
-router.put('/merchant/security-questions', protectMerchant, updateSecurityQuestions);
+router.put('/merchant/security-questions', protectMerchant, passwordChangeLimiter, updateSecurityQuestions);
 router.get('/merchant/security-history', protectMerchant, getSecurityHistory);
 router.post('/merchant/sign-out-all-devices', protectMerchant, signOutAllDevices);
 router.get('/merchant/me', protectMerchant, getMerchantMe);
 router.put('/merchant/profile', protectMerchant, updateMerchantProfile);
 router.put('/merchant/biometrics', protectMerchant, toggleBiometrics);
-router.post('/merchant/set-app-pin', protectMerchant, setAppPin);
+// setAppPin now also verifies the current password when a PIN already
+// exists (see merchantAuthController.js), so it needs the same throttle
+// verify-payment-pin gets below — it had none before. This is now THE
+// single Payment PIN used to authorize every money-movement flow
+// (sendMoney, B2C/B2B, and bulk-pay batch authorization) — resetAppPin is
+// the M-Pesa/bank-style "old PIN → new PIN" change flow on top of it.
+router.post('/merchant/set-app-pin', protectMerchant, pinLimiter, setAppPin);
+router.put('/merchant/reset-app-pin', protectMerchant, pinLimiter, resetAppPin);
 router.post('/merchant/verify-payment-pin', protectMerchant, pinLimiter, verifyPaymentPin);
 
 // WebAuthn / Passkey routes
 // Public — called before the user holds a JWT
-router.post('/merchant/webauthn/login-options',   getLoginOptions);
-router.post('/merchant/webauthn/verify-login',    verifyLogin);
+router.post('/merchant/webauthn/login-options',   webauthnLoginLimiter, getLoginOptions);
+router.post('/merchant/webauthn/verify-login',    webauthnLoginLimiter, verifyLogin);
 // Private — merchant must be logged in to register/manage passkeys
 router.get ('/merchant/webauthn/register-options', protectMerchant, getRegistrationOptions);
 router.post('/merchant/webauthn/verify-registration', protectMerchant, verifyRegistration);

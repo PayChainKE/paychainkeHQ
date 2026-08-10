@@ -11,6 +11,8 @@ import CashAdvance from '../pages/CashAdvance';
 import Profile from '../pages/Profile';
 import InflationShield from '../pages/InflationShield';
 import DigitalWallet from '../pages/DigitalWallet';
+import SendMoney from '../pages/SendMoney';
+import RequestMoney from '../pages/RequestMoney';
 import SupportPage from '../pages/SupportPage';
 import Notifications from '../pages/Notifications';
 import Login from '../pages/Login';
@@ -103,6 +105,16 @@ function MainTabs() {
       <Tab.Screen
         name="DigitalWallet"
         component={DigitalWallet}
+        options={{ tabBarButton: () => null, tabBarItemStyle: { flex: 0, width: 0, padding: 0 } }}
+      />
+      <Tab.Screen
+        name="SendMoney"
+        component={SendMoney}
+        options={{ tabBarButton: () => null, tabBarItemStyle: { flex: 0, width: 0, padding: 0 } }}
+      />
+      <Tab.Screen
+        name="RequestMoney"
+        component={RequestMoney}
         options={{ tabBarButton: () => null, tabBarItemStyle: { flex: 0, width: 0, padding: 0 } }}
       />
       <Tab.Screen

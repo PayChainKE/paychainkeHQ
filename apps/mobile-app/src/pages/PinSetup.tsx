@@ -45,7 +45,14 @@ export default function PinSetup() {
 
   const verifyPins = async (finalConfirmPin: string) => {
     if (pin === finalConfirmPin) {
-      await setAppPin(pin);
+      try {
+        await setAppPin(pin);
+      } catch (err: any) {
+        Alert.alert('Could not save PIN', err?.response?.data?.error || 'Please check your connection and try again.');
+        setPin('');
+        setConfirmPin('');
+        setStep('setup');
+      }
     } else {
       Alert.alert('Error', 'PINs do not match. Please try again.');
       setPin('');

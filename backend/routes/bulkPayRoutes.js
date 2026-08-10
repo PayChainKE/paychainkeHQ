@@ -1,7 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import rateLimit from 'express-rate-limit';
-import { getPayees, getPayeeById, addPayee, updatePayee, deletePayee, getBatches, getBatchById, uploadCSV, authorizeBatch, setBulkPayPin, resetBulkPayPin } from '../controllers/bulkPayController.js';
+import { getPayees, getPayeeById, addPayee, updatePayee, deletePayee, getBatches, getBatchById, uploadCSV, authorizeBatch } from '../controllers/bulkPayController.js';
 import { protectMerchant } from '../middleware/authMiddleware.js';
 import { generateToken } from '../controllers/mpesaController.js';
 
@@ -26,8 +26,9 @@ const upload = multer({
 // Protect all bulk pay routes with Merchant Auth
 router.use(protectMerchant);
 
-// bulkPayPin is a 4-digit code guarding real payouts — same brute-force
-// exposure as the payment PIN in authRoutes.js.
+// The 4-digit Payment PIN guarding authorizeBatch's real payouts is set and
+// changed via the shared endpoints in authRoutes.js (set-app-pin /
+// reset-app-pin) — there's no bulk-pay-specific PIN or PIN route anymore.
 const pinLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
@@ -35,9 +36,6 @@ const pinLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many PIN attempts. Try again in 15 minutes.' },
 });
-
-router.post('/set-pin', setBulkPayPin);
-router.put('/reset-pin', pinLimiter, resetBulkPayPin);
 
 // Payee routes
 router.route('/payees')

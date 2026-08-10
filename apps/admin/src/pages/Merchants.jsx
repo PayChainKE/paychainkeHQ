@@ -1104,7 +1104,7 @@ const Chip = ({ children, onClear }) => (
 // the admin can sight-verify the merchant's KYB submission.
 const KybDrawer = ({ merchant, loading, error, onClose }) => {
   const [updatingFeatures, setUpdatingFeatures] = React.useState(false);
-  const [features, setFeatures] = React.useState(merchant?.features || { digitalWallet: true, inflationShield: true });
+  const [features, setFeatures] = React.useState(merchant?.features || { digitalWallet: true, inflationShield: true, cashAdvanceForm: false });
 
   React.useEffect(() => {
     if (merchant?.features) {
@@ -1299,8 +1299,10 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
             {/* Security flags */}
             <Section title="Security & Access" icon="shield">
               <Row label="Dashboard Password" value={<Badge tone={m.hasPassword ? 'emerald' : 'amber'} icon={m.hasPassword ? 'check' : 'pending'}>{m.hasPassword ? 'Set' : 'Not set (pending setup)'}</Badge>} />
-              <Row label="Mobile App PIN" value={<Badge tone={m.hasAppPin ? 'emerald' : 'gray'} icon={m.hasAppPin ? 'check' : 'remove'}>{m.hasAppPin ? 'Configured' : 'Not set'}</Badge>} />
-              <Row label="Bulk Pay PIN" value={<Badge tone={m.hasBulkPayPin ? 'emerald' : 'gray'} icon={m.hasBulkPayPin ? 'check' : 'remove'}>{m.hasBulkPayPin ? 'Configured' : 'Not set'}</Badge>} />
+              {/* Single Payment PIN now authorizes every money-movement flow
+                  (sendMoney, B2C/B2B, bulk-pay batches) — there's no
+                  separate Bulk Pay PIN anymore. */}
+              <Row label="Payment PIN" value={<Badge tone={m.hasAppPin ? 'emerald' : 'gray'} icon={m.hasAppPin ? 'check' : 'remove'}>{m.hasAppPin ? 'Configured' : 'Not set'}</Badge>} />
               <Row label="Biometrics" value={<Badge tone={m.biometricsEnabled ? 'emerald' : 'gray'} icon={m.biometricsEnabled ? 'check' : 'remove'}>{m.biometricsEnabled ? 'Enabled' : 'Disabled'}</Badge>} />
             </Section>
 
@@ -1322,10 +1324,10 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
                 } 
               />
               <Row 
-                label="Inflation Shield" 
+                label="Inflation Shield"
                 value={
                   <div className="flex items-center gap-3">
-                    <button 
+                    <button
                       onClick={() => handleToggleFeature('inflationShield', !features.inflationShield)}
                       disabled={updatingFeatures}
                       className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${features.inflationShield ? 'bg-primary' : 'bg-outline-variant/40'}`}
@@ -1334,7 +1336,22 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
                     </button>
                     <span className="text-[12px] font-semibold text-on-surface-variant/80">{features.inflationShield ? 'Enabled' : 'Disabled'}</span>
                   </div>
-                } 
+                }
+              />
+              <Row
+                label="Cash Advance Application"
+                value={
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => handleToggleFeature('cashAdvanceForm', !features.cashAdvanceForm)}
+                      disabled={updatingFeatures}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${features.cashAdvanceForm ? 'bg-primary' : 'bg-outline-variant/40'}`}
+                    >
+                      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${features.cashAdvanceForm ? 'translate-x-4.5' : 'translate-x-1'}`} />
+                    </button>
+                    <span className="text-[12px] font-semibold text-on-surface-variant/80">{features.cashAdvanceForm ? 'Enabled' : 'Disabled'}</span>
+                  </div>
+                }
               />
             </Section>
           </div>

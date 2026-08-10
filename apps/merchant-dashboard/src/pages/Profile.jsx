@@ -346,7 +346,7 @@ export default function Profile() {
     try {
       const token = localStorage.getItem('paychain_merchant_token');
       const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
-      const res = await axios.put(`${API_URL}/api/bulkpay/reset-pin`, {
+      const res = await axios.put(`${API_URL}/api/auth/merchant/reset-app-pin`, {
         currentPin,
         newPin
       }, {
@@ -354,7 +354,7 @@ export default function Profile() {
       })
 
       if (res.status === 200) {
-        toast.push({ message: 'Bulk Pay PIN updated successfully', type: 'success' })
+        toast.push({ message: 'Payment PIN updated successfully', type: 'success' })
         setCurrentPin('')
         setNewPin('')
         setConfirmNewPin('')
@@ -598,10 +598,11 @@ export default function Profile() {
                         Extra layers of protection
                       </h4>
                       
-                      {/* Bulk Pay PIN Reset */}
-                      {merchant?.hasBulkPayPin && (
+                      {/* Payment PIN Reset — the single PIN used to authorize
+                          every payment, including bulk pay batches. */}
+                      {merchant?.hasAppPin && (
                         <div className="space-y-4 bg-white/5 p-5 rounded-[24px] border border-white/5">
-                          <h5 className="text-xs font-black text-white">Reset Bulk Pay PIN</h5>
+                          <h5 className="text-xs font-black text-white">Reset Payment PIN</h5>
                           <div className="space-y-3">
                             <ValidatedInput
                               kind="pin4"

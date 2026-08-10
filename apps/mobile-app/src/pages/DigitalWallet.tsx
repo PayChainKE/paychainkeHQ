@@ -57,9 +57,25 @@ export default function DigitalWallet({ navigation }: any) {
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [destination, setDestination] = useState<Destination>('bank');
   const [destinationValue, setDestinationValue] = useState('');
+  const [withdrawBankCode, setWithdrawBankCode] = useState('');
   const [withdrawPin, setWithdrawPin] = useState('');
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const selectedDest = destinations.find((d) => d.id === destination)!;
+
+  // Bank withdrawal needs a bankCode (not just a free-text account number)
+  // for the real NCBA PesaLink transfer to route — same requirement
+  // BulkPay.tsx's Bank payee form has. Fetched lazily, once, the first
+  // time Bank is picked as the withdrawal destination.
+  const [bankCodes, setBankCodes] = useState<{ code: string; name: string }[]>([]);
+  const fetchBankCodes = useCallback(async () => {
+    if (bankCodes.length > 0) return;
+    try {
+      const res = await api.get('/api/v1/openbanking/bank-codes');
+      setBankCodes(res.data?.bankCodes || []);
+    } catch (e) {
+      console.warn('Failed to load bank codes', e);
+    }
+  }, [bankCodes.length]);
 
   // Settlement settings
   const [showSettings, setShowSettings] = useState(false);
@@ -131,6 +147,13 @@ export default function DigitalWallet({ navigation }: any) {
     }
   }, [showSettings, merchant]);
 
+  // 'bank' is the default withdrawal destination — load bank codes up
+  // front rather than waiting for a tap on a destination that's already
+  // selected.
+  useEffect(() => {
+    if (destination === 'bank') fetchBankCodes();
+  }, [destination, fetchBankCodes]);
+
   const handleActivateWallet = async () => {
     setActivateError('');
     setIsActivating(true);
@@ -159,6 +182,10 @@ export default function DigitalWallet({ navigation }: any) {
       Alert.alert('Missing Account Details', 'Please enter the destination account details.');
       return;
     }
+    if (selectedDest.type === 'Bank' && !withdrawBankCode) {
+      Alert.alert('Missing Details', 'Select a destination bank to withdraw.');
+      return;
+    }
     if (withdrawPin.length !== 4) {
       Alert.alert('Missing Details', 'Enter your 4-digit payment PIN to withdraw.');
       return;
@@ -170,16 +197,23 @@ export default function DigitalWallet({ navigation }: any) {
         await api.post('/api/callbacks/b2c-request', { phone, amount, pin: withdrawPin });
         Alert.alert('Withdrawal Processing', `KES ${withdrawAmount} sent to phone. B2C transfer initiated.`);
       } else {
-        await api.post('/api/transactions/send-money', {
+        // Real NCBA PesaLink bank transfer — this used to fall through to
+        // /api/transactions/send-money, which only debits the balance and
+        // marks the row "completed" without ever moving money to the bank.
+        // Matches web's Wallet.jsx, which already routes Bank withdrawals
+        // here.
+        await api.post('/api/v1/openbanking/bank-payout', {
+          bankCode: withdrawBankCode,
+          accountNumber: destinationValue,
           amount,
-          destination,
-          reference: `Withdrawal to ${destinationValue}`,
+          narration: `Withdrawal to ${destinationValue}`,
           pin: withdrawPin,
         });
-        Alert.alert('Withdrawal Initiated', `KES ${withdrawAmount} sent to destination.`);
+        Alert.alert('Withdrawal Submitted', `KES ${withdrawAmount} sent via PesaLink.`);
       }
       setWithdrawAmount('');
       setDestinationValue('');
+      setWithdrawBankCode('');
       setWithdrawPin('');
       await refreshSession();
       fetchData();
@@ -507,7 +541,7 @@ export default function DigitalWallet({ navigation }: any) {
                 return (
                   <TouchableOpacity
                     key={dest.id}
-                    onPress={() => setDestination(dest.id)}
+                    onPress={() => { setDestination(dest.id); if (dest.type === 'Bank') fetchBankCodes(); }}
                     activeOpacity={0.85}
                     className={`flex-row items-center gap-3 p-4 rounded-2xl border ${active ? 'bg-[#00351d] border-[#00351d]' : 'bg-[#f7faf7] border-[#eff4ef]'}`}
                   >
@@ -530,6 +564,26 @@ export default function DigitalWallet({ navigation }: any) {
                 );
               })}
             </View>
+
+            {selectedDest.type === 'Bank' && (
+              <>
+                <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#00351d]/60 mb-2 ml-1">Bank</Text>
+                <View className="flex-row flex-wrap gap-1.5 mb-4">
+                  {bankCodes.length === 0 && (
+                    <Text className="text-[#707971] font-jakarta-medium text-[11px] py-2">Loading banks…</Text>
+                  )}
+                  {bankCodes.map((b) => (
+                    <TouchableOpacity
+                      key={b.code}
+                      onPress={() => setWithdrawBankCode(b.code)}
+                      className={`px-3 py-2 rounded-lg border ${withdrawBankCode === b.code ? 'bg-[#00351d] border-[#00351d]' : 'bg-[#f7faf7] border-[#eff4ef]'}`}
+                    >
+                      <Text className={`font-jakarta-bold text-[11px] ${withdrawBankCode === b.code ? 'text-white' : 'text-[#404942]'}`}>{b.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </>
+            )}
 
             <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#00351d]/60 mb-2 ml-1">
               {selectedDest.type === 'Bank' ? 'Bank Account Number' : 'M-PESA Number'}

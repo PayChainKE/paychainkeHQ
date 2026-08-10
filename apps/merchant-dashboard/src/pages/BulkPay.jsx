@@ -77,6 +77,20 @@ export default function BulkPay() {
   const [selectedPayees, setSelectedPayees] = useState({})
   const [payoutAmounts, setPayoutAmounts] = useState({})
 
+  // Bank-routed payees need a real NCBA clearing code (bankCode), not just a
+  // free-text bank name — authorizeBatch on the backend refuses to route a
+  // payout without one. Fetched lazily (same pattern as SendMoney.jsx's
+  // Bank destination picker) so payees who never touch Bank never pay for it.
+  const [bankCodes, setBankCodes] = useState([])
+  useEffect(() => {
+    if (newPayee.paymentMethod !== 'Bank' || bankCodes.length > 0) return
+    const token = localStorage.getItem('paychain_merchant_token')
+    const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+    axios.get(`${API_URL}/api/v1/openbanking/bank-codes`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => setBankCodes(res.data?.bankCodes || []))
+      .catch(e => console.error('Failed to load bank codes', e))
+  }, [newPayee.paymentMethod])
+
   const [newPayee, setNewPayee] = useState({ 
     name: '', 
     type: 'Employee', 
@@ -87,6 +101,7 @@ export default function BulkPay() {
     phone: '',
     accountNumber: '',
     bankName: '',
+    bankCode: '',
     paybillNumber: '',
     businessAccount: '',
     tillNumber: '',
@@ -130,6 +145,7 @@ export default function BulkPay() {
       phone: p.phone || '',
       accountNumber: p.accountNumber || '',
       bankName: p.bankName || '',
+      bankCode: p.bankCode || '',
       paybillNumber: p.paybillNumber || '',
       businessAccount: p.businessAccount || '',
       tillNumber: p.tillNumber || '',
@@ -192,8 +208,11 @@ export default function BulkPay() {
         }
       }
     } else if (newPayee.paymentMethod === 'Bank') {
-      if (!newPayee.bankName?.trim()) {
-        addNotification({ title: 'Invalid Format', message: 'Bank Name is required.', type: 'error' });
+      // bankCode (not just a bank name) is what actually routes the payout
+      // through NCBA PesaLink — without it, authorizeBatch refuses to pay
+      // this payee at all and silently refunds the row.
+      if (!newPayee.bankCode) {
+        addNotification({ title: 'Invalid Format', message: 'Select the payee\'s bank.', type: 'error' });
         return;
       }
       if (!/^\d{8,14}$/.test(newPayee.accountNumber?.trim())) {
@@ -274,6 +293,7 @@ export default function BulkPay() {
       phone: '',
       accountNumber: '',
       bankName: '',
+      bankCode: '',
       paybillNumber: '',
       businessAccount: '',
       tillNumber: '',
@@ -345,6 +365,19 @@ export default function BulkPay() {
   const totalInvoicePages = Math.max(1, Math.ceil(filteredInvoicesList.length / invoicesPerPage));
   const paginatedInvoicesList = filteredInvoicesList.slice((invoicePage - 1) * invoicesPerPage, invoicePage * invoicesPerPage);
 
+  // Per-status breakdown for the stat tiles below — draft (still being
+  // prepared), sent (awaiting the customer's payment), paid (successfully
+  // collected). Monetary totals only sum KES invoices — `currency` is a
+  // free-text field on each invoice, so adding a USD total onto a KES one
+  // would silently misreport the figure; invoices in any other currency
+  // still count toward the tile's count, just not its KES total.
+  const invoiceStats = ['draft', 'sent', 'paid'].reduce((acc, s) => {
+    const rows = invoicesList.filter(inv => inv.status === s);
+    const kesTotal = rows.filter(inv => (inv.currency || 'KES') === 'KES').reduce((sum, inv) => sum + (inv.total || 0), 0);
+    acc[s] = { count: rows.length, kesTotal };
+    return acc;
+  }, {});
+
   const invoiceSubtotal = invoiceDetails.items.reduce((sum, item) => sum + (item.qty * item.price), 0);
   const invoiceTotal = invoiceSubtotal; // Assuming no tax right now
   const invoiceHasRealItems = invoiceDetails.items.some(i => i.description.trim() || i.price > 0);
@@ -385,6 +418,47 @@ export default function BulkPay() {
   useEffect(() => {
     setInvoicePage(prev => Math.min(prev, totalInvoicePages));
   }, [totalInvoicePages]);
+
+  // Batch History — getBatches/getBatchById already existed on the backend
+  // but nothing in this app ever called them, so once a merchant left the
+  // post-authorize receipts screen there was no way to look up a past
+  // batch's real outcome. Mirrors the Invoice Tracking list's pattern
+  // (fetch, client-side filter/paginate, click a row for detail).
+  const [batchHistory, setBatchHistory] = useState([]);
+  const [batchHistoryFilter, setBatchHistoryFilter] = useState('All');
+  const [batchHistoryPage, setBatchHistoryPage] = useState(1);
+  const batchesPerPage = 5;
+  const [showBatchDetails, setShowBatchDetails] = useState(null);
+
+  const filteredBatchHistory = batchHistory.filter(b => batchHistoryFilter === 'All' || b.status === batchHistoryFilter);
+  const totalBatchHistoryPages = Math.max(1, Math.ceil(filteredBatchHistory.length / batchesPerPage));
+  const paginatedBatchHistory = filteredBatchHistory.slice((batchHistoryPage - 1) * batchesPerPage, batchHistoryPage * batchesPerPage);
+
+  const fetchBatchHistory = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('paychain_merchant_token');
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      const res = await axios.get(`${API_URL}/api/bulkpay/batches?limit=25`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setBatchHistory(res.data?.batches || []);
+    } catch (err) {
+      // Non-fatal — the list just shows its empty state
+    }
+  }, []);
+
+  useEffect(() => { fetchBatchHistory() }, [fetchBatchHistory]);
+
+  useEffect(() => {
+    setBatchHistoryPage(prev => Math.min(prev, totalBatchHistoryPages));
+  }, [totalBatchHistoryPages]);
+
+  const BATCH_STATUS_META = {
+    Processed: { label: 'Processed', icon: 'check_circle', tone: 'bg-emerald-50 text-emerald-600', badge: 'bg-emerald-100 text-emerald-800' },
+    Partial:   { label: 'Partial',   icon: 'warning',       tone: 'bg-amber-50 text-amber-600',   badge: 'bg-amber-100 text-amber-800' },
+    Failed:    { label: 'Failed',    icon: 'error',         tone: 'bg-red-50 text-red-600',       badge: 'bg-red-100 text-red-800' },
+    Pending:   { label: 'Pending',   icon: 'schedule',      tone: 'bg-slate-100 text-slate-500',  badge: 'bg-slate-200 text-slate-600' },
+  };
 
   const handleAddInvoiceItem = () => {
     setInvoiceDetails(prev => ({
@@ -658,7 +732,10 @@ export default function BulkPay() {
 
   useEffect(() => {
     if (merchant) {
-      if (merchant.hasBulkPayPin === false) {
+      // Bulk pay authorizes with the same single Payment PIN used
+      // everywhere else in the app (sendMoney, B2C/B2B) — no separate
+      // bulk-pay PIN anymore.
+      if (merchant.hasAppPin === false) {
         setShowPinSetupModal(true)
       } else {
         setShowPinSetupModal(false)
@@ -674,11 +751,11 @@ export default function BulkPay() {
     try {
       const token = localStorage.getItem('paychain_merchant_token');
       const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
-      await axios.post(`${API_URL}/api/bulkpay/set-pin`, { pin: setupPin }, {
+      await axios.post(`${API_URL}/api/auth/merchant/set-app-pin`, { pin: setupPin }, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setShowPinSetupModal(false);
-      addNotification({ title: 'Success', message: 'Bulk Pay PIN set successfully.', type: 'success' });
+      addNotification({ title: 'Success', message: 'Payment PIN set successfully.', type: 'success' });
       // Ideally update auth context here, but reloading or forcing state is fine.
       window.location.reload();
     } catch (error) {
@@ -738,7 +815,11 @@ export default function BulkPay() {
 
       const processedBatch = res.data.batch;
 
-      // Transform response to match frontend receipts
+      // Transform response to match frontend receipts. `status` is carried
+      // through now — it used to be dropped here, so every receipt card
+      // rendered as "Confirmed / Settled" even for rows that actually
+      // failed (blocked/rejected by Daraja or NCBA) and were refunded back
+      // to the merchant's balance. See the status-aware rendering below.
       const newReceipts = processedBatch.transactions.map(tx => ({
         id: tx.receiptNumber,
         name: tx.name,
@@ -746,9 +827,10 @@ export default function BulkPay() {
         method: tx.method,
         phone: tx.accountReference,
         reference: processedBatch.batchReference,
-        timestamp: new Date().toLocaleString('en-KE', { 
-          day: '2-digit', month: 'short', year: 'numeric', 
-          hour: '2-digit', minute: '2-digit' 
+        status: tx.status, // 'completed' | 'pending' | 'failed'
+        timestamp: new Date().toLocaleString('en-KE', {
+          day: '2-digit', month: 'short', year: 'numeric',
+          hour: '2-digit', minute: '2-digit'
         })
       }));
 
@@ -760,11 +842,16 @@ export default function BulkPay() {
       // waiting for the ambient 5s poll in MerchantAuthContext, so the
       // sidebar/Overview balance reflects this payout immediately.
       refreshSession();
+      fetchBatchHistory();
 
+      const failedCount = newReceipts.filter(r => r.status === 'failed').length;
+      const allFailed = failedCount > 0 && failedCount === newReceipts.length;
       addNotification({
-        title: 'Batch Processed',
-        message: res.data.message,
-        type: 'success'
+        title: allFailed ? 'Batch Failed' : failedCount > 0 ? 'Batch Partially Processed' : 'Batch Processed',
+        message: failedCount > 0
+          ? `${failedCount} of ${newReceipts.length} payout${newReceipts.length === 1 ? '' : 's'} failed and ${failedCount === 1 ? 'was' : 'were'} refunded to your balance. ${res.data.message}`
+          : res.data.message,
+        type: allFailed ? 'error' : failedCount > 0 ? 'warning' : 'success'
       });
     } catch (error) {
       addNotification({
@@ -1157,13 +1244,19 @@ export default function BulkPay() {
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in fade-in duration-300">
                             <div className="space-y-1.5">
                               <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Bank Name</label>
-                              <ValidatedInput
-                                kind="businessName"
-                                value={newPayee.bankName}
-                                onChange={(e) => setNewPayee({...newPayee, bankName: e.target.value})}
-                                placeholder="e.g. Equity"
+                              <select
+                                value={newPayee.bankCode}
+                                onChange={(e) => {
+                                  const match = bankCodes.find(b => b.code === e.target.value)
+                                  setNewPayee({...newPayee, bankCode: e.target.value, bankName: match?.name || ''})
+                                }}
                                 className="w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 md:px-6 md:py-4 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none"
-                              />
+                              >
+                                <option value="">{bankCodes.length ? 'Select a bank' : 'Loading banks...'}</option>
+                                {bankCodes.map((b) => (
+                                  <option key={b.code} value={b.code}>{b.name}</option>
+                                ))}
+                              </select>
                             </div>
                             <div className="space-y-1.5">
                               <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Account No.</label>
@@ -1209,7 +1302,7 @@ export default function BulkPay() {
               <p className="text-[9px] md:text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] mt-1 opacity-40">Frequency: Monthly</p>
             </div>
             <button 
-              onClick={() => { setShowAddModal(true); setIsEditing(false); setNewPayee({ name: '', type: 'Employee', paymentMethod: 'Mobile Money', phone: '', accountNumber: '', bankName: '', walletAddress: '', network: 'Polygon' }); }}
+              onClick={() => { setShowAddModal(true); setIsEditing(false); setNewPayee({ name: '', type: 'Employee', paymentMethod: 'Mobile Money', phone: '', accountNumber: '', bankName: '', bankCode: '', walletAddress: '', network: 'Polygon' }); }}
               className="bg-[#00351D] text-white w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center hover:bg-emerald-950 active:scale-95 transition-all shadow-xl"
             >
               <span className="material-symbols-outlined text-lg md:text-xl">add</span>
@@ -1541,19 +1634,39 @@ export default function BulkPay() {
               )}
 
               {/* Step 4: Success & Receipts View */}
-              {step === 4 && (
+              {step === 4 && (() => {
+                const failedCount = authorizedReceipts.filter(r => r.status === 'failed').length
+                const pendingCount = authorizedReceipts.filter(r => r.status === 'pending').length
+                const allFailed = failedCount > 0 && failedCount === authorizedReceipts.length
+                return (
                 <div className="p-6 md:p-12 animate-in fade-in zoom-in duration-700">
                   <div className="flex flex-col items-center text-center mb-12">
-                    <div className="w-24 h-24 md:w-32 md:h-32 bg-emerald-500 rounded-full flex items-center justify-center mb-6 md:mb-8 shadow-2xl shadow-emerald-500/40 relative">
-                      <div className="absolute inset-0 rounded-full animate-ping bg-emerald-500/20 duration-[2000ms]"></div>
-                      <span className="material-symbols-outlined text-4xl md:text-6xl text-[#00351D] font-black">check_circle</span>
+                    <div className={`w-24 h-24 md:w-32 md:h-32 rounded-full flex items-center justify-center mb-6 md:mb-8 shadow-2xl relative ${allFailed ? 'bg-red-500 shadow-red-500/40' : failedCount > 0 ? 'bg-amber-500 shadow-amber-500/40' : 'bg-emerald-500 shadow-emerald-500/40'}`}>
+                      <div className={`absolute inset-0 rounded-full animate-ping duration-[2000ms] ${allFailed ? 'bg-red-500/20' : failedCount > 0 ? 'bg-amber-500/20' : 'bg-emerald-500/20'}`}></div>
+                      <span className="material-symbols-outlined text-4xl md:text-6xl text-[#00351D] font-black">{allFailed ? 'error' : failedCount > 0 ? 'warning' : 'check_circle'}</span>
                     </div>
-                    <h2 className="font-headline text-3xl md:text-5xl text-primary font-bold tracking-tight mb-3">Batch Authorized</h2>
-                    <p className="text-[10px] md:text-sm font-medium text-on-surface-variant opacity-60 max-w-md mx-auto italic">Disbursement workflow complete. Receipts generated for all recipients.</p>
+                    <h2 className="font-headline text-3xl md:text-5xl text-primary font-bold tracking-tight mb-3">
+                      {allFailed ? 'Batch Failed' : failedCount > 0 ? 'Batch Partially Processed' : 'Batch Authorized'}
+                    </h2>
+                    <p className="text-[10px] md:text-sm font-medium text-on-surface-variant opacity-60 max-w-md mx-auto italic">
+                      {allFailed
+                        ? 'Every payout in this batch failed and the full amount was refunded to your balance.'
+                        : failedCount > 0
+                        ? `${failedCount} of ${authorizedReceipts.length} payout${authorizedReceipts.length === 1 ? '' : 's'} failed and ${failedCount === 1 ? 'was' : 'were'} refunded to your balance.${pendingCount > 0 ? ` ${pendingCount} still awaiting confirmation.` : ''}`
+                        : pendingCount > 0
+                        ? `Submitted. ${pendingCount} payout${pendingCount === 1 ? '' : 's'} awaiting final confirmation.`
+                        : 'Disbursement workflow complete. Receipts generated for all recipients.'}
+                    </p>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar pb-10">
-                    {authorizedReceipts.map((receipt) => (
+                    {authorizedReceipts.map((receipt) => {
+                      const statusMeta = {
+                        failed:    { label: 'Failed & Refunded', dot: 'bg-red-500',   text: 'text-red-600',    footer: 'Refunded',   footerDot: 'bg-red-400',   footerText: 'text-red-700' },
+                        pending:   { label: 'Pending',           dot: 'bg-amber-400', text: 'text-amber-600',  footer: 'Processing', footerDot: 'bg-amber-400', footerText: 'text-amber-700' },
+                        completed: { label: 'Confirmed',         dot: 'bg-emerald-500', text: 'text-emerald-600', footer: 'Settled',  footerDot: 'bg-emerald-400', footerText: 'text-emerald-700' },
+                      }[receipt.status] || { label: 'Confirmed', dot: 'bg-emerald-500', text: 'text-emerald-600', footer: 'Settled', footerDot: 'bg-emerald-400', footerText: 'text-emerald-700' }
+                      return (
                       <div key={receipt.id} id={`receipt-${receipt.id}`} className="bg-white border border-outline-variant/10 rounded-[24px] sm:rounded-[32px] overflow-hidden shadow-[0_10px_40px_rgba(0,0,0,0.03)] group hover:shadow-xl transition-all duration-500 hover:-translate-y-1">
                         <div className="bg-[#00351D] p-5 md:p-6 flex flex-col gap-4">
                           <img src={paychainLogoWhite} alt="PayChain" className="h-4 object-contain" />
@@ -1578,9 +1691,9 @@ export default function BulkPay() {
                         <div className="p-5 md:p-8 space-y-5 md:space-y-6">
                           <div className="flex flex-col sm:flex-row sm:justify-between items-start sm:items-center gap-3 sm:gap-0">
                             <div className="flex items-center sm:items-start gap-4 sm:gap-0 sm:flex-col sm:mb-0 w-full justify-between sm:justify-start">
-                              <p className="text-[10px] text-emerald-600 font-extrabold uppercase tracking-widest sm:mb-1.5 flex items-center gap-1.5">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                Confirmed
+                              <p className={`text-[10px] font-extrabold uppercase tracking-widest sm:mb-1.5 flex items-center gap-1.5 ${statusMeta.text}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${statusMeta.dot}`}></span>
+                                {statusMeta.label}
                               </p>
                               <p className="text-[11px] sm:text-xs font-bold text-primary opacity-60">{receipt.timestamp}</p>
                             </div>
@@ -1607,16 +1720,18 @@ export default function BulkPay() {
                         </div>
                         <div className="px-6 py-4 bg-surface-container-low/30 border-t border-outline-variant/5 flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                             <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
-                             <span className="text-[9px] font-black text-emerald-700 uppercase tracking-widest">Settled</span>
+                             <div className={`w-2 h-2 rounded-full animate-pulse ${statusMeta.footerDot}`}></div>
+                             <span className={`text-[9px] font-black uppercase tracking-widest ${statusMeta.footerText}`}>{statusMeta.footer}</span>
                           </div>
                           <img src={paychainLogo} alt="PayChain" className="h-4 object-contain opacity-40" />
                         </div>
                       </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
-              )}
+                )
+              })()}
             </div>
           </div>
 
@@ -1654,7 +1769,7 @@ export default function BulkPay() {
                         } else if (step === 2) {
                           setStep(3);
                         } else {
-                          if (merchant?.hasBulkPayPin === false) {
+                          if (merchant?.hasAppPin === false) {
                             setShowPinSetupModal(true);
                           } else {
                             setOtp('');
@@ -1740,27 +1855,51 @@ export default function BulkPay() {
                   </div>
                </div>
 
-               <div className="flex flex-col gap-3">
-                 <div className="p-4 rounded-[20px] bg-[#f8fafc] border border-outline-variant/5 flex items-center justify-between group hover:border-blue-500/10 transition-colors">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                        <span className="material-symbols-outlined text-[20px]">receipt_long</span>
+               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                 <div className="p-4 rounded-[20px] bg-[#f8fafc] border border-outline-variant/5 flex items-center justify-between group hover:border-amber-500/10 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                        <span className="material-symbols-outlined text-[20px]">edit_document</span>
                       </div>
-                      <div>
-                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50">Total Invoices</span>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
-                          <span className="text-[8px] font-bold text-primary opacity-60 uppercase tracking-widest">Lifetime</span>
-                        </div>
+                      <div className="min-w-0">
+                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50">Drafts</span>
+                        <p className="font-headline text-lg font-black text-primary leading-tight">{invoiceStats.draft.count}</p>
                       </div>
                     </div>
-                    <p className="font-headline text-xl font-black text-primary group-hover:scale-105 origin-right transition-transform">{invoicesList.length}</p>
+                 </div>
+                 <div className="p-4 rounded-[20px] bg-[#f8fafc] border border-outline-variant/5 flex items-center justify-between group hover:border-blue-500/10 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                        <span className="material-symbols-outlined text-[20px]">send</span>
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50">Sent • Awaiting Payment</span>
+                        <p className="font-headline text-lg font-black text-primary leading-tight">{invoiceStats.sent.count}</p>
+                        {invoiceStats.sent.kesTotal > 0 && (
+                          <p className="text-[9px] font-bold text-blue-600 opacity-70">{formatKES(invoiceStats.sent.kesTotal)}</p>
+                        )}
+                      </div>
+                    </div>
+                 </div>
+                 <div className="p-4 rounded-[20px] bg-[#f8fafc] border border-outline-variant/5 flex items-center justify-between group hover:border-emerald-500/10 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                        <span className="material-symbols-outlined text-[20px]">check_circle</span>
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50">Paid • Collected</span>
+                        <p className="font-headline text-lg font-black text-primary leading-tight">{invoiceStats.paid.count}</p>
+                        {invoiceStats.paid.kesTotal > 0 && (
+                          <p className="text-[9px] font-bold text-emerald-600 opacity-70">{formatKES(invoiceStats.paid.kesTotal)}</p>
+                        )}
+                      </div>
+                    </div>
                  </div>
                </div>
 
                {/* Recent Invoices List */}
                <div className="mt-8">
-                 <h4 className="text-xs font-black uppercase tracking-widest text-on-surface-variant opacity-50 mb-4">Recent Activity</h4>
+                 <h4 className="text-xs font-black uppercase tracking-widest text-on-surface-variant opacity-50 mb-4">Invoice History</h4>
                  <div className="flex flex-col gap-3">
                    {filteredInvoicesList.length === 0 ? (
                      <div className="p-8 rounded-[20px] bg-surface-container-lowest border border-outline-variant/10 text-center flex flex-col items-center">
@@ -1882,6 +2021,103 @@ export default function BulkPay() {
                  )}
                </div>
 
+            </div>
+          </div>
+
+          {/* Batch History — real outcomes for every past bulk-pay run. */}
+          <div className="md:px-0">
+            <div className="bg-white rounded-[32px] overflow-hidden shadow-[0_20px_80px_rgba(0,0,0,0.06)] border border-outline-variant/10 p-6 md:p-8">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                <div>
+                  <h3 className="font-headline text-xl text-primary tracking-tight font-bold">Batch History</h3>
+                  <p className="text-[10px] text-on-surface-variant font-medium mt-1 opacity-60 italic">Every bulk-pay batch you've authorized, with real per-payout outcomes.</p>
+                </div>
+                <div className="flex gap-2 p-1.5 bg-surface-container-lowest border border-outline-variant/5 rounded-xl self-start md:self-auto overflow-x-auto no-scrollbar">
+                  {['All', 'Processed', 'Partial', 'Failed', 'Pending'].map(f => (
+                    <button
+                      key={f}
+                      onClick={() => { setBatchHistoryFilter(f); setBatchHistoryPage(1); }}
+                      className={`px-4 py-2 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all shrink-0 ${
+                        batchHistoryFilter === f
+                          ? 'bg-white text-primary shadow-[0_2px_10px_rgba(0,0,0,0.04)] border border-outline-variant/5'
+                          : 'text-on-surface-variant/60 hover:text-primary'
+                      }`}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                {paginatedBatchHistory.length === 0 ? (
+                  <div className="p-8 rounded-[20px] bg-surface-container-lowest border border-outline-variant/10 text-center flex flex-col items-center">
+                    <span className="material-symbols-outlined text-4xl text-on-surface-variant/40 mb-3">receipt_long</span>
+                    <p className="text-sm font-bold text-primary mb-1">No batches yet</p>
+                    <p className="text-xs text-on-surface-variant opacity-70">Authorize your first bulk-pay batch above and it'll show up here.</p>
+                  </div>
+                ) : paginatedBatchHistory.map(b => {
+                  const meta = BATCH_STATUS_META[b.status] || BATCH_STATUS_META.Pending;
+                  const failedRows = (b.transactions || []).filter(t => t.status === 'failed').length;
+                  return (
+                    <div
+                      key={b._id}
+                      onClick={() => setShowBatchDetails(b)}
+                      className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-[20px] bg-surface-container-lowest border border-outline-variant/10 shadow-sm hover:border-emerald-500/20 transition-all group gap-4 cursor-pointer"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${meta.tone}`}>
+                          <span className="material-symbols-outlined text-[18px]">{meta.icon}</span>
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-primary">{b.batchReference}</p>
+                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                            <p className="text-[10px] text-on-surface-variant font-medium opacity-60">{b.payeeCount} recipient{b.payeeCount === 1 ? '' : 's'} • {new Date(b.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                            <div className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-widest ${meta.badge}`}>
+                              {meta.label}
+                            </div>
+                            {failedRows > 0 && (
+                              <span className="text-[9px] font-bold text-red-600">{failedRows} refunded</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between sm:gap-3 pl-14 sm:pl-0">
+                        <div className="text-left sm:text-right">
+                          <p className="text-xs font-bold text-primary">{formatKES(b.totalNetAmount)}</p>
+                          <p className="text-[9px] text-on-surface-variant font-medium opacity-50 italic uppercase tracking-widest">Net paid out</p>
+                        </div>
+                        <span className="material-symbols-outlined text-on-surface-variant/40 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all">chevron_right</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {filteredBatchHistory.length > batchesPerPage && (
+                <div className="mt-6 flex items-center justify-between">
+                  <p className="text-[10px] font-bold text-on-surface-variant opacity-60">
+                    Showing {paginatedBatchHistory.length} of {filteredBatchHistory.length}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setBatchHistoryPage(prev => Math.max(1, prev - 1))}
+                      disabled={batchHistoryPage === 1}
+                      className="w-8 h-8 rounded-full flex items-center justify-center bg-surface-container-lowest border border-outline-variant/10 text-primary shadow-sm hover:bg-primary hover:text-white disabled:opacity-20 disabled:hover:bg-surface-container-lowest disabled:hover:text-primary transition-all"
+                    >
+                      <span className="material-symbols-outlined text-lg">chevron_left</span>
+                    </button>
+                    <span className="text-[10px] font-bold text-primary px-1">{batchHistoryPage} / {totalBatchHistoryPages}</span>
+                    <button
+                      onClick={() => setBatchHistoryPage(prev => Math.min(totalBatchHistoryPages, prev + 1))}
+                      disabled={batchHistoryPage >= totalBatchHistoryPages}
+                      className="w-8 h-8 rounded-full flex items-center justify-center bg-surface-container-lowest border border-outline-variant/10 text-primary shadow-sm hover:bg-primary hover:text-white disabled:opacity-20 disabled:hover:bg-surface-container-lowest disabled:hover:text-primary transition-all"
+                    >
+                      <span className="material-symbols-outlined text-lg">chevron_right</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </section>
@@ -2043,9 +2279,9 @@ export default function BulkPay() {
                     <span className="material-symbols-outlined text-3xl">password</span>
                   </div>
                   <div>
-                    <h2 className="font-headline text-2xl text-primary tracking-tight font-bold">Setup Bulk Pay PIN</h2>
+                    <h2 className="font-headline text-2xl text-primary tracking-tight font-bold">Setup Payment PIN</h2>
                     <p className="text-[10px] text-on-surface-variant font-medium mt-1 opacity-60">
-                      Create a 4-digit PIN to authorize your bulk payouts securely.
+                      Create a 4-digit PIN to authorize payments — used everywhere, including bulk payouts.
                     </p>
                   </div>
                 </div>
@@ -2517,7 +2753,7 @@ export default function BulkPay() {
                    </p>
                 </div>
 
-                <button 
+                <button
                   onClick={handleCopyLink}
                   className="w-full py-3.5 rounded-2xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold text-sm transition-all"
                 >
@@ -2527,6 +2763,83 @@ export default function BulkPay() {
             </div>
           </div>
         )}
+
+        {/* Batch Details Modal — real per-payout outcome for a past batch. */}
+        {showBatchDetails && (() => {
+          const meta = BATCH_STATUS_META[showBatchDetails.status] || BATCH_STATUS_META.Pending;
+          const rowMeta = {
+            failed:    { label: 'Failed & Refunded', dot: 'bg-red-500',     text: 'text-red-600' },
+            pending:   { label: 'Pending',            dot: 'bg-amber-400',   text: 'text-amber-600' },
+            completed: { label: 'Confirmed',          dot: 'bg-emerald-500', text: 'text-emerald-600' },
+          };
+          return (
+          <div className="fixed inset-0 bg-[#0A2540]/60 backdrop-blur-md z-[110] flex items-center justify-center p-4 animate-in fade-in duration-300">
+            <div className="bg-white w-full max-w-2xl rounded-[32px] md:rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in duration-500 border border-white/20 max-h-[85vh] flex flex-col">
+              <div className="p-6 md:p-8 border-b border-outline-variant/10 flex items-start justify-between gap-4 shrink-0">
+                <div className="flex items-center gap-4">
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${meta.tone}`}>
+                    <span className="material-symbols-outlined text-[22px]">{meta.icon}</span>
+                  </div>
+                  <div>
+                    <h2 className="font-headline text-xl text-primary tracking-tight font-bold">{showBatchDetails.batchReference}</h2>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <p className="text-[10px] text-on-surface-variant font-medium opacity-60">
+                        {new Date(showBatchDetails.createdAt).toLocaleString('en-KE', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                      <div className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-widest ${meta.badge}`}>{meta.label}</div>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowBatchDetails(null)}
+                  className="w-8 h-8 rounded-full bg-surface-container-low flex items-center justify-center text-primary/40 hover:text-primary transition-colors shrink-0"
+                >
+                  <span className="material-symbols-outlined text-sm">close</span>
+                </button>
+              </div>
+
+              <div className="p-6 md:p-8 grid grid-cols-3 gap-4 border-b border-outline-variant/10 shrink-0">
+                <div>
+                  <p className="text-[9px] text-on-surface-variant font-black uppercase tracking-widest opacity-40 mb-1">Net Paid Out</p>
+                  <p className="font-headline text-lg text-primary font-bold">{formatKES(showBatchDetails.totalNetAmount)}</p>
+                </div>
+                <div>
+                  <p className="text-[9px] text-on-surface-variant font-black uppercase tracking-widest opacity-40 mb-1">Recipients</p>
+                  <p className="font-headline text-lg text-primary font-bold">{showBatchDetails.payeeCount}</p>
+                </div>
+                <div>
+                  <p className="text-[9px] text-on-surface-variant font-black uppercase tracking-widest opacity-40 mb-1">Funding Source</p>
+                  <p className="text-xs font-bold text-primary truncate">{showBatchDetails.fundingSource || 'Main Business Account'}</p>
+                </div>
+              </div>
+
+              <div className="p-6 md:p-8 overflow-y-auto custom-scrollbar flex-1">
+                <h4 className="text-xs font-black uppercase tracking-widest text-on-surface-variant opacity-50 mb-4">Payouts</h4>
+                <div className="flex flex-col gap-3">
+                  {(showBatchDetails.transactions || []).map((t, idx) => {
+                    const rm = rowMeta[t.status] || rowMeta.pending;
+                    return (
+                      <div key={t.receiptNumber || idx} className="flex items-center justify-between p-4 rounded-2xl bg-surface-container-lowest border border-outline-variant/10 gap-4">
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-primary truncate">{t.name}</p>
+                          <p className="text-[10px] text-on-surface-variant font-medium opacity-60 truncate">{t.accountReference} • via {t.method}</p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-xs font-bold text-primary">{formatKES(t.amount)}</p>
+                          <p className={`text-[9px] font-extrabold uppercase tracking-widest flex items-center justify-end gap-1.5 mt-0.5 ${rm.text}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${rm.dot}`}></span>
+                            {rm.label}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+          )
+        })()}
       </div>
 
       </div>

@@ -231,7 +231,7 @@ export const verifyLogin = async (req, res) => {
         { email: identifier.toLowerCase() },
         { phone: identifier },
       ],
-    }).select('+currentChallenge +currentChallengeAt +passkeys +bulkPayPin +appPin');
+    }).select('+currentChallenge +currentChallengeAt +passkeys +appPin');
 
     if (!merchant || !merchant.currentChallenge || !merchant.passkeys?.length) {
       return res.status(401).json({ error: 'No passkey found for this account.' });

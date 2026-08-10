@@ -182,7 +182,7 @@ export const registerMerchant = async (req, res) => {
 export const verifyMerchantOTP = async (req, res) => {
   try {
     const { email, otp } = req.body || {};
-    const merchant = await Merchant.findOne({ email }).select('+password +bulkPayPin');
+    const merchant = await Merchant.findOne({ email }).select('+password');
 
     if (!merchant) {
       return res.status(401).json({ error: 'Invalid request' });
@@ -256,7 +256,6 @@ export const verifyMerchantOTP = async (req, res) => {
         settlementBankName: merchant.settlementBankName,
         settlementBankAccount: merchant.settlementBankAccount,
         settlementBankCode: merchant.settlementBankCode,
-        hasBulkPayPin: !!merchant.bulkPayPin,
         hasAppPin: !!merchant.appPin,
         biometricsEnabled: merchant.biometricsEnabled,
         mobileBiometricUnlockEnabled: merchant.mobileBiometricUnlockEnabled,
@@ -292,7 +291,7 @@ export const loginMerchant = async (req, res) => {
         { email: loginIdentifier },
         { phone: { $in: phoneVariations } }
       ]
-    }).select('+password +bulkPayPin');
+    }).select('+password');
     
     if (!merchant) {
       logAudit({
@@ -810,7 +809,7 @@ export const signOutAllDevices = async (req, res) => {
 // @access  Private (Merchant)
 export const getMerchantMe = async (req, res) => {
   try {
-    const merchant = await Merchant.findById(req.merchant._id).select('+bulkPayPin +appPin');
+    const merchant = await Merchant.findById(req.merchant._id).select('+appPin');
     if (!merchant) {
       return res.status(404).json({ error: 'Merchant not found' });
     }
@@ -858,7 +857,6 @@ export const getMerchantMe = async (req, res) => {
         settlementBankName: merchant.settlementBankName,
         settlementBankAccount: merchant.settlementBankAccount,
         settlementBankCode: merchant.settlementBankCode,
-        hasBulkPayPin: !!merchant.bulkPayPin,
         hasAppPin: !!merchant.appPin,
         biometricsEnabled: merchant.biometricsEnabled,
         mobileBiometricUnlockEnabled: merchant.mobileBiometricUnlockEnabled,
@@ -876,7 +874,7 @@ export const getMerchantMe = async (req, res) => {
 // @access  Private (Merchant)
 export const updateMerchantProfile = async (req, res) => {
   try {
-    const merchant = await Merchant.findById(req.merchant._id).select('+bulkPayPin');
+    const merchant = await Merchant.findById(req.merchant._id);
     if (!merchant) {
       return res.status(404).json({ error: 'Merchant not found' });
     }
@@ -957,7 +955,6 @@ export const updateMerchantProfile = async (req, res) => {
         isKRAVerified: merchant.isKRAVerified,
         settlementMobile: merchant.settlementMobile,
         settlementBankAccount: merchant.settlementBankAccount,
-        hasBulkPayPin: !!merchant.bulkPayPin,
         hasAppPin: !!merchant.appPin,
         biometricsEnabled: merchant.biometricsEnabled,
         mobileBiometricUnlockEnabled: merchant.mobileBiometricUnlockEnabled,
@@ -1092,21 +1089,55 @@ export const setupPassword = async (req, res) => {
 // @access  Private (Merchant)
 export const setAppPin = async (req, res) => {
   try {
-    const { pin } = req.body;
-    if (!pin || pin.length !== 4) {
+    const { pin, currentPassword } = req.body;
+    if (!pin || String(pin).length !== 4 || !/^\d{4}$/.test(String(pin))) {
       return res.status(400).json({ error: 'A valid 4-digit PIN is required' });
     }
 
-    const merchant = await Merchant.findById(req.merchant._id).select('+appPin');
+    const merchant = await Merchant.findById(req.merchant._id).select('+appPin +password');
     if (!merchant) {
       return res.status(404).json({ error: 'Merchant not found' });
     }
 
+    // Overwriting an EXISTING PIN is a sensitive action — same re-auth bar as
+    // changePassword/updateSecurityQuestions above. Without this, a session
+    // token alone (e.g. one leaked/stolen after the merchant already set a
+    // PIN) could silently replace it and immediately unlock money movement
+    // (sendMoney/B2C/B2B all gate on this PIN), defeating its whole purpose
+    // as a check beyond the session itself. First-time setup (no PIN yet)
+    // doesn't need this — there's nothing to protect against being
+    // overwritten, and it's the only path the UI currently exposes.
+    if (merchant.appPin) {
+      if (!merchant.password) {
+        return res.status(400).json({ error: 'Your account has no password on file — contact support to change your payment PIN.' });
+      }
+      if (!currentPassword) {
+        return res.status(400).json({ error: 'Enter your current password to change your payment PIN.' });
+      }
+      const isMatch = await merchant.matchPassword(currentPassword);
+      if (!isMatch) {
+        logAudit({
+          action: 'merchant.payment_pin.change_failed', category: 'security', severity: 'warning',
+          message: 'Payment PIN change failed — wrong current password',
+          merchant, req,
+        });
+        return res.status(400).json({ error: 'Current password is incorrect.' });
+      }
+    }
+
     // Hash the 4-digit PIN using bcrypt (12 rounds = OWASP 2024 baseline).
     const salt = await bcrypt.genSalt(12);
+    const wasChange = !!merchant.appPin;
     merchant.appPin = await bcrypt.hash(pin, salt);
-    
+
     await merchant.save();
+
+    logAudit({
+      action: wasChange ? 'merchant.payment_pin.changed' : 'merchant.payment_pin.set',
+      category: 'security', severity: wasChange ? 'critical' : 'info',
+      message: wasChange ? 'Payment PIN changed' : 'Payment PIN set for the first time',
+      merchant, req,
+    });
 
     res.json({
       success: true,
@@ -1115,6 +1146,62 @@ export const setAppPin = async (req, res) => {
     });
   } catch (error) {
     console.error('Set App PIN Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Change an existing Payment PIN — the M-Pesa/bank-style "enter your
+//          old PIN, then your new PIN" flow, as opposed to setAppPin's
+//          password-gated overwrite (kept as a defense-in-depth fallback).
+//          This is now THE single PIN used to authorise every payment
+//          (sendMoney, B2C/B2B, and bulk-pay batch authorization all check
+//          the same appPin) — there is no separate "Bulk Pay PIN" anymore.
+// @route   PUT /api/auth/merchant/reset-app-pin
+// @access  Private (Merchant)
+export const resetAppPin = async (req, res) => {
+  try {
+    const { currentPin, newPin } = req.body || {};
+    if (!currentPin || !newPin || String(newPin).length !== 4 || !/^\d{4}$/.test(String(newPin))) {
+      return res.status(400).json({ error: 'Invalid PIN provided. New PIN must be exactly 4 digits.' });
+    }
+
+    const merchant = await Merchant.findById(req.merchant._id).select('+appPin');
+    if (!merchant || !merchant.appPin) {
+      return res.status(400).json({ error: 'No existing PIN found to reset.' });
+    }
+
+    try {
+      await assertPinNotLocked(merchant._id);
+    } catch (e) {
+      if (e instanceof PinLockedError) return res.status(429).json({ error: e.message });
+      throw e;
+    }
+
+    const isMatch = await bcrypt.compare(String(currentPin), merchant.appPin);
+    if (!isMatch) {
+      await recordFailedPinAttempt(merchant._id);
+      logAudit({
+        action: 'merchant.payment_pin.change_failed', category: 'security', severity: 'warning',
+        message: 'Payment PIN change failed — wrong current PIN',
+        merchant, req,
+      });
+      return res.status(401).json({ error: 'Current PIN is incorrect.' });
+    }
+    await resetPinAttempts(merchant._id);
+
+    const salt = await bcrypt.genSalt(12);
+    merchant.appPin = await bcrypt.hash(String(newPin), salt);
+    await merchant.save();
+
+    logAudit({
+      action: 'merchant.payment_pin.changed', category: 'security', severity: 'critical',
+      message: 'Payment PIN changed',
+      merchant, req,
+    });
+
+    res.status(200).json({ success: true, message: 'Payment PIN updated successfully.' });
+  } catch (error) {
+    console.error('Reset App PIN Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };

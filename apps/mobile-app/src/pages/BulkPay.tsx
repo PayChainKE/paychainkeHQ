@@ -14,6 +14,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api/config';
 import TopBar from '../components/layout/TopBar';
 import { formatAccountNumber } from '../utils/formatAccountNumber';
+import { formatPhoneDisplay } from '../utils/formatPhoneDisplay';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type PayeeType = 'employee' | 'supplier' | 'utility' | 'contractor';
@@ -31,6 +32,7 @@ interface Payee {
   businessAccount?: string;
   tillNumber?: string;
   bankName?: string;
+  bankCode?: string;
   accountNumber?: string;
   kraPin?: string;
   idNumber?: string;
@@ -127,13 +129,28 @@ const BATCH_STATUS_META: Record<string, { bg: string; text: string }> = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function BulkPay() {
-  const { merchant, refreshSession } = useAuth();
+  const { merchant, refreshSession, setAppPin } = useAuth();
 
   const [activeTab, setActiveTab] = useState<'Payees' | 'Batches' | 'Invoices'>('Payees');
   const [activeFilter, setActiveFilter] = useState<Filter>('All');
   const [payeesList, setPayeesList] = useState<Payee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Bank-routed payees need a real NCBA clearing code (bankCode), not just a
+  // free-text bank name — authorizeBatch on the backend refuses to route a
+  // payout without one. Fetched lazily, once, the first time the Bank
+  // settlement method is picked in the Add Payee form.
+  const [bankCodes, setBankCodes] = useState<{ code: string; name: string }[]>([]);
+  const fetchBankCodes = useCallback(async () => {
+    if (bankCodes.length > 0) return;
+    try {
+      const res = await api.get('/api/v1/openbanking/bank-codes');
+      setBankCodes(res.data?.bankCodes || []);
+    } catch (e) {
+      console.warn('Failed to load bank codes', e);
+    }
+  }, [bankCodes.length]);
 
   const [selectedPayees, setSelectedPayees] = useState<Record<string, boolean>>({});
   const [payoutAmounts, setPayoutAmounts] = useState<Record<string, number>>({});
@@ -155,11 +172,16 @@ export default function BulkPay() {
   const [selectedFundingSource, setSelectedFundingSource] = useState(false);
 
   // Security verification (OTP-then-PIN), matches the dashboard's two-step
-  // "Verification" modal. The OTP step is not backend-verified on the
-  // dashboard either — the real check is the PIN, enforced server-side in
-  // authorizeBatch. Kept here for exact behavioral parity.
+  // "Verification" modal. Real SMS-OTP check (merchantSmsAuthController.js's
+  // send-otp/verify-otp, the same endpoints merchant login 2FA uses) — this
+  // used to just require 4+ digits typed with no backend call at all, so no
+  // OTP was ever actually sent or checked. Matches the dashboard fix.
   const [securityStep, setSecurityStep] = useState<1 | 2>(1);
   const [securityOtp, setSecurityOtp] = useState('');
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [otpError, setOtpError] = useState('');
+  const [otpResendCooldown, setOtpResendCooldown] = useState(0);
 
   // Which batch is pending authorization — set right before opening the
   // Funding Source Select -> Security flow, consumed once the PIN is confirmed.
@@ -218,6 +240,7 @@ export default function BulkPay() {
     phone: '',
     accountNumber: '',
     bankName: '',
+    bankCode: '',
     paybillNumber: '',
     businessAccount: '',
     tillNumber: '',
@@ -307,6 +330,22 @@ export default function BulkPay() {
   );
   const totalInvoicePages = Math.max(1, Math.ceil(filteredInvoicesList.length / invoicesPerPage));
   const paginatedInvoicesList = filteredInvoicesList.slice((invoicePage - 1) * invoicesPerPage, invoicePage * invoicesPerPage);
+
+  // Per-status breakdown for the tracking header — draft (still being
+  // prepared), sent (awaiting the customer's payment), paid (successfully
+  // collected). Monetary totals only sum KES invoices — `currency` is a
+  // free-text field on each invoice, so adding a USD total onto a KES one
+  // would silently misreport the figure.
+  const invoiceStats = useMemo(() => {
+    const byStatus = (s: string) => invoicesList.filter(inv => inv.status === s);
+    const kesTotal = (rows: Invoice[]) => rows.filter(inv => (inv.currency || 'KES') === 'KES').reduce((sum, inv) => sum + (inv.total || 0), 0);
+    return {
+      draft: { count: byStatus('draft').length, kesTotal: kesTotal(byStatus('draft')) },
+      sent: { count: byStatus('sent').length, kesTotal: kesTotal(byStatus('sent')) },
+      paid: { count: byStatus('paid').length, kesTotal: kesTotal(byStatus('paid')) },
+    };
+  }, [invoicesList]);
+
   const invoiceSubtotal = invoiceDetails.items.reduce((sum, item) => sum + (item.qty * item.price), 0);
   const fmtInvoiceCurrency = (n: number) => `${invoiceDetails.currency} ${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -559,9 +598,10 @@ export default function BulkPay() {
     }
   };
 
-  // ── Trigger PIN setup if needed ──
+  // ── Trigger PIN setup if needed ── (bulk pay authorizes with the same
+  // single Payment PIN used everywhere else in the app)
   useEffect(() => {
-    if (merchant && merchant.hasBulkPayPin === false) {
+    if (merchant && merchant.hasAppPin === false) {
       setShowPinSetup(true);
     }
   }, [merchant]);
@@ -599,6 +639,7 @@ export default function BulkPay() {
   };
 
   const openEditPayee = (p: Payee) => {
+    if (p.paymentMethod === 'Bank') fetchBankCodes();
     setNewPayee({
       name: p.name || '',
       type: p.type || 'employee',
@@ -608,6 +649,7 @@ export default function BulkPay() {
       phone: p.phone || '',
       accountNumber: p.accountNumber || '',
       bankName: p.bankName || '',
+      bankCode: p.bankCode || '',
       paybillNumber: p.paybillNumber || '',
       businessAccount: p.businessAccount || '',
       tillNumber: p.tillNumber || '',
@@ -644,7 +686,10 @@ export default function BulkPay() {
       }
     }
     if (newPayee.paymentMethod === 'Bank') {
-      if (!newPayee.bankName.trim()) return 'Bank name is required.';
+      // bankCode (not just a bank name) is what actually routes the payout
+      // through NCBA PesaLink — without it, authorizeBatch refuses to pay
+      // this payee at all and silently refunds the row.
+      if (!newPayee.bankCode) return "Select the payee's bank.";
       if (!/^\d{8,14}$/.test(newPayee.accountNumber.trim())) return 'Bank account number must be 8–14 digits.';
     }
     return null;
@@ -732,13 +777,17 @@ export default function BulkPay() {
       return;
     }
     try {
-      await api.post('/api/bulkpay/set-pin', { pin: setupPin });
+      // Goes through AuthContext's setAppPin so the local device-unlock PIN
+      // (SecureStore) stays in sync with the server-side Payment PIN — the
+      // same single PIN now authorizes bulk pay batches, sendMoney, and
+      // B2C/B2B, so there's no separate bulk-pay-only PIN to set anymore.
+      await setAppPin(setupPin);
       setShowPinSetup(false);
       setSetupPin('');
       setConfirmPin('');
-      Alert.alert('PIN Set', 'Bulk Pay PIN configured successfully.');
+      Alert.alert('PIN Set', 'Payment PIN configured successfully.');
     } catch (e: any) {
-      Alert.alert('Failed', e?.response?.data?.message || 'Could not set PIN.');
+      Alert.alert('Failed', e?.response?.data?.error || e?.response?.data?.message || 'Could not set PIN.');
     }
   };
 
@@ -775,18 +824,58 @@ export default function BulkPay() {
     setShowFundingSourceSelect(true);
   };
 
+  const sendBulkPayOtp = useCallback(async () => {
+    if (!merchant?.phone) {
+      setOtpError('No phone number is on file for this account. Add one in Profile first.');
+      return;
+    }
+    setIsSendingOtp(true);
+    setOtpError('');
+    try {
+      await api.post('/api/auth/merchant/sms/send-otp', { phone: merchant.phone });
+      setOtpResendCooldown(30);
+    } catch (e: any) {
+      setOtpError(e?.response?.data?.error || 'Could not send the verification code. Try again.');
+    } finally {
+      setIsSendingOtp(false);
+    }
+  }, [merchant?.phone]);
+
+  useEffect(() => {
+    if (otpResendCooldown <= 0) return;
+    const t = setTimeout(() => setOtpResendCooldown((s) => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [otpResendCooldown]);
+
+  const verifyBulkPayOtp = async () => {
+    setIsVerifyingOtp(true);
+    setOtpError('');
+    try {
+      await api.post('/api/auth/merchant/sms/verify-otp', { phone: merchant?.phone, otp: securityOtp });
+      setSecurityStep(2);
+    } catch (e: any) {
+      setOtpError(e?.response?.data?.error || 'Invalid or expired code.');
+      setSecurityOtp('');
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  };
+
   const confirmFundingSourceAndVerify = () => {
     setShowFundingSourceSelect(false);
     setSecurityStep(1);
     setSecurityOtp('');
+    setOtpError('');
     setAuthPin('');
     setShowSecurity(true);
+    sendBulkPayOtp();
   };
 
   const cancelSecurity = () => {
     setShowSecurity(false);
     setSecurityStep(1);
     setSecurityOtp('');
+    setOtpError('');
     setAuthPin('');
     setPendingBatch(null);
   };
@@ -794,7 +883,7 @@ export default function BulkPay() {
   // ── Final authorize (fires after Security PIN step, for either source) ──
   const handleAuthorize = async () => {
     if (authPin.length !== 4) {
-      Alert.alert('Invalid PIN', 'Enter your 4-digit Bulk Pay PIN.');
+      Alert.alert('Invalid PIN', 'Enter your 4-digit Payment PIN.');
       return;
     }
     setIsAuthorizing(true);
@@ -1237,8 +1326,8 @@ export default function BulkPay() {
                     <Feather name="shield" size={16} color="#b87333" />
                   </View>
                   <View>
-                    <Text className="font-jakarta-bold text-[14px] text-[#0c2010]">Bulk Pay PIN</Text>
-                    <Text className="text-[#707971] font-jakarta-medium text-[11px]">{merchant?.hasBulkPayPin === false ? 'Not configured' : 'Configured'}</Text>
+                    <Text className="font-jakarta-bold text-[14px] text-[#0c2010]">Payment PIN</Text>
+                    <Text className="text-[#707971] font-jakarta-medium text-[11px]">{merchant?.hasAppPin === false ? 'Not configured' : 'Configured'}</Text>
                   </View>
                 </View>
                 <Feather name="chevron-right" size={18} color="#707971" />
@@ -1277,9 +1366,26 @@ export default function BulkPay() {
 
             {/* Invoice Tracking */}
             <View className="bg-white rounded-[24px] p-5 border border-[#bfc9bf]/15 mb-4">
-              <View className="flex-row items-center justify-between mb-4">
-                <Text className="font-jakarta-bold text-[15px] text-[#0c2010]">Invoice Tracking</Text>
-                <Text className="font-jakarta-extrabold text-[15px] text-[#00351d]">{invoicesList.length}</Text>
+              <Text className="font-jakarta-bold text-[15px] text-[#0c2010] mb-4">Invoice Tracking</Text>
+              <View className="flex-row gap-2 mb-4">
+                <View className="flex-1 bg-[#fef3e7] rounded-2xl p-3">
+                  <Text className="text-[9px] font-jakarta-bold text-[#b87333] uppercase tracking-wider mb-1">Drafts</Text>
+                  <Text className="font-jakarta-extrabold text-[16px] text-[#0c2010]">{invoiceStats.draft.count}</Text>
+                </View>
+                <View className="flex-1 bg-[#e7f8ef] rounded-2xl p-3">
+                  <Text className="text-[9px] font-jakarta-bold text-[#006c4e] uppercase tracking-wider mb-1">Sent</Text>
+                  <Text className="font-jakarta-extrabold text-[16px] text-[#0c2010]">{invoiceStats.sent.count}</Text>
+                  {invoiceStats.sent.kesTotal > 0 && (
+                    <Text className="text-[8px] font-jakarta-bold text-[#006c4e] opacity-70 mt-0.5">{formatKES(invoiceStats.sent.kesTotal)}</Text>
+                  )}
+                </View>
+                <View className="flex-1 bg-[#dbeafe] rounded-2xl p-3">
+                  <Text className="text-[9px] font-jakarta-bold text-[#1e40af] uppercase tracking-wider mb-1">Paid</Text>
+                  <Text className="font-jakarta-extrabold text-[16px] text-[#0c2010]">{invoiceStats.paid.count}</Text>
+                  {invoiceStats.paid.kesTotal > 0 && (
+                    <Text className="text-[8px] font-jakarta-bold text-[#1e40af] opacity-70 mt-0.5">{formatKES(invoiceStats.paid.kesTotal)}</Text>
+                  )}
+                </View>
               </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-1 mb-4">
                 {(['All', 'Drafts', 'Sent', 'Paid'] as const).map(f => (
@@ -1437,8 +1543,8 @@ export default function BulkPay() {
                 <View className="w-14 h-14 rounded-full bg-[#e7f8ef] items-center justify-center mb-3">
                   <Feather name="shield" size={22} color="#006c4e" />
                 </View>
-                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#0c2010]">Set Bulk Pay PIN</Text>
-                <Text className="text-[#707971] font-jakarta-medium text-[12px] mt-1 text-center">A 4-digit PIN is required to authorize batches.</Text>
+                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#0c2010]">Set Payment PIN</Text>
+                <Text className="text-[#707971] font-jakarta-medium text-[12px] mt-1 text-center">A 4-digit PIN is required to authorize payments, including bulk pay batches.</Text>
               </View>
               <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-2">New PIN</Text>
               <TextInput
@@ -1655,25 +1761,41 @@ export default function BulkPay() {
                     <View className="w-16 h-16 rounded-full bg-[#dbeafe] items-center justify-center mb-4">
                       <Feather name="message-square" size={26} color="#1e40af" />
                     </View>
-                    <Text className="font-jakarta-bold text-[#0c2010] text-[14px]">Enter OTP Sent to {merchant?.phone || '07XX XXX XXX'}</Text>
+                    <Text className="font-jakarta-bold text-[#0c2010] text-[14px] text-center">
+                      {isSendingOtp ? 'Sending code…' : `Enter OTP Sent to ${formatPhoneDisplay(merchant?.phone) || '07XX XXX XXX'}`}
+                    </Text>
                   </View>
                   <TextInput
                     value={securityOtp}
-                    onChangeText={(t) => setSecurityOtp(t.replace(/\D/g, '').slice(0, 6))}
+                    onChangeText={(t) => { setSecurityOtp(t.replace(/\D/g, '').slice(0, 6)); setOtpError(''); }}
                     keyboardType="numeric"
                     maxLength={6}
-                    className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-5 py-4 text-[#0c2010] font-jakarta-bold text-[20px] tracking-[0.5em] text-center mb-6"
+                    className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-5 py-4 text-[#0c2010] font-jakarta-bold text-[20px] tracking-[0.5em] text-center mb-3"
                     placeholder="••••••"
                     placeholderTextColor="#a1a1aa"
                     autoFocus
                   />
+                  {otpError ? (
+                    <Text className="text-red-600 font-jakarta-bold text-[12px] text-center mb-3">{otpError}</Text>
+                  ) : null}
                   <TouchableOpacity
-                    onPress={() => setSecurityStep(2)}
-                    disabled={securityOtp.length < 4}
-                    className="w-full bg-[#e7f8ef] h-[56px] rounded-full items-center justify-center"
-                    style={{ opacity: securityOtp.length < 4 ? 0.5 : 1 }}
+                    onPress={verifyBulkPayOtp}
+                    disabled={securityOtp.length < 4 || isVerifyingOtp || isSendingOtp}
+                    className="w-full bg-[#e7f8ef] h-[56px] rounded-full items-center justify-center flex-row gap-2 mb-3"
+                    style={{ opacity: securityOtp.length < 4 || isVerifyingOtp || isSendingOtp ? 0.5 : 1 }}
                   >
-                    <Text className="text-[#006c4e] font-jakarta-bold text-[15px]">Verify OTP</Text>
+                    {isVerifyingOtp ? <ActivityIndicator color="#006c4e" /> : (
+                      <Text className="text-[#006c4e] font-jakarta-bold text-[15px]">Verify OTP</Text>
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={sendBulkPayOtp}
+                    disabled={isSendingOtp || otpResendCooldown > 0}
+                    className="items-center"
+                  >
+                    <Text className="text-[#707971] font-jakarta-bold text-[11px]" style={{ opacity: isSendingOtp || otpResendCooldown > 0 ? 0.5 : 1 }}>
+                      {otpResendCooldown > 0 ? `Resend code in ${otpResendCooldown}s` : 'Resend code'}
+                    </Text>
                   </TouchableOpacity>
                 </>
               ) : (
@@ -2001,7 +2123,7 @@ export default function BulkPay() {
                       {(['Mobile Money', 'Bank'] as PaymentMethod[]).map((m) => (
                         <TouchableOpacity
                           key={m}
-                          onPress={() => setNewPayee({ ...newPayee, paymentMethod: m })}
+                          onPress={() => { setNewPayee({ ...newPayee, paymentMethod: m }); if (m === 'Bank') fetchBankCodes(); }}
                           className={`flex-1 py-3 rounded-xl items-center ${newPayee.paymentMethod === m ? 'bg-[#00351d]' : 'bg-[#f0fdf4] border border-[#e7ece7]'}`}
                         >
                           <Text className={`font-jakarta-bold text-[12px] ${newPayee.paymentMethod === m ? 'text-white' : 'text-[#404942]'}`}>{m}</Text>
@@ -2067,13 +2189,20 @@ export default function BulkPay() {
 
                     {newPayee.paymentMethod === 'Bank' && (
                       <View>
-                        <TextInput
-                          value={newPayee.bankName}
-                          onChangeText={(t) => setNewPayee({ ...newPayee, bankName: t })}
-                          placeholder="Bank Name (e.g. KCB)"
-                          placeholderTextColor="#a1a1aa"
-                          className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-4 py-3.5 text-[#0c2010] font-jakarta-bold text-[14px] mb-2"
-                        />
+                        <View className="flex-row flex-wrap gap-1.5 mb-2">
+                          {bankCodes.length === 0 && (
+                            <Text className="text-[#707971] font-jakarta-medium text-[11px] py-2">Loading banks…</Text>
+                          )}
+                          {bankCodes.map((b) => (
+                            <TouchableOpacity
+                              key={b.code}
+                              onPress={() => setNewPayee({ ...newPayee, bankCode: b.code, bankName: b.name })}
+                              className={`px-3 py-2 rounded-lg border ${newPayee.bankCode === b.code ? 'bg-[#00351d] border-[#00351d]' : 'bg-white border-[#e7ece7]'}`}
+                            >
+                              <Text className={`font-jakarta-bold text-[11px] ${newPayee.bankCode === b.code ? 'text-white' : 'text-[#404942]'}`}>{b.name}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
                         <TextInput
                           value={newPayee.accountNumber}
                           onChangeText={(t) => setNewPayee({ ...newPayee, accountNumber: t.replace(/\D/g, '').slice(0, 14) })}

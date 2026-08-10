@@ -340,6 +340,30 @@ export default function Dashboard({ navigation }: any) {
             </View>
           </View>
 
+          {/* Send / Request Money */}
+          <View className="px-6 flex-row gap-3 mb-8">
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => navigation?.navigate('SendMoney')}
+              className="flex-1 bg-white rounded-2xl border border-[#bfc9bf]/10 shadow-sm p-4 flex-row items-center gap-3"
+            >
+              <View className="w-10 h-10 rounded-xl bg-[#eff4ef] items-center justify-center">
+                <MaterialIcons name="north-east" size={18} color="#00351d" />
+              </View>
+              <Text className="text-[12px] font-jakarta-bold text-[#0c2010] uppercase tracking-wide">Send Money</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => navigation?.navigate('RequestMoney')}
+              className="flex-1 bg-white rounded-2xl border border-[#bfc9bf]/10 shadow-sm p-4 flex-row items-center gap-3"
+            >
+              <View className="w-10 h-10 rounded-xl bg-[#eff4ef] items-center justify-center">
+                <MaterialIcons name="south-west" size={18} color="#00351d" />
+              </View>
+              <Text className="text-[12px] font-jakarta-bold text-[#0c2010] uppercase tracking-wide">Request Money</Text>
+            </TouchableOpacity>
+          </View>
+
           {/* Digital Ledgers */}
           <View className="mb-8">
               <View className="px-6 flex-row items-center justify-between mb-4">

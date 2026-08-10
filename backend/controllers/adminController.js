@@ -786,7 +786,7 @@ export const getMerchantDetail = async (req, res) => {
     }
 
     const merchant = await Merchant.findById(id)
-      .select('+password +bulkPayPin +appPin +stellarEncryptedSecretKey +passwordResetExpires')
+      .select('+password +appPin +stellarEncryptedSecretKey +passwordResetExpires')
       .populate('lockedBy', 'email')
       .populate('invitedBy', 'email')
       .populate('flaggedBy', 'email')
@@ -889,8 +889,10 @@ export const getMerchantDetail = async (req, res) => {
         kesBalance: merchant.kesBalance,
         // Security flags (boolean, never the secret)
         hasPassword: !!merchant.password,
+        // The single Payment PIN, used for every money-movement flow
+        // including bulk-pay authorization — there's no separate bulk-pay
+        // PIN anymore.
         hasAppPin: !!merchant.appPin,
-        hasBulkPayPin: !!merchant.bulkPayPin,
         hasStellarKey: !!merchant.stellarEncryptedSecretKey,
         biometricsEnabled: merchant.biometricsEnabled,
         // Activity

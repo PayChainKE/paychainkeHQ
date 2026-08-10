@@ -8,7 +8,10 @@ import { useMerchantAuth } from '../../context/MerchantAuthContext'
 // everything else in this app stays the polished mock walkthrough. Real
 // login always requires OTP (no bypass, by design), so this is a real
 // two-stage form, not a fake one.
-export default function StellarConnectPanel() {
+export default function StellarConnectPanel({
+  title = 'Connect the demo Stellar wallet',
+  subtitle = 'This page shows a real, verifiable Stellar testnet wallet — sign in to the demo merchant account to load it.',
+}) {
   const { realLogin, realVerifyOtp } = useMerchantAuth()
   const [stage, setStage] = useState('creds')
   const [email, setEmail] = useState('')
@@ -43,9 +46,9 @@ export default function StellarConnectPanel() {
       <div className="w-12 h-12 rounded-2xl bg-[#0A2540] text-white flex items-center justify-center mx-auto mb-4">
         <span className="material-symbols-outlined text-xl">account_balance_wallet</span>
       </div>
-      <h3 className="font-headline text-lg text-primary mb-1">Connect the demo Stellar wallet</h3>
+      <h3 className="font-headline text-lg text-primary mb-1">{title}</h3>
       <p className="text-[12px] text-on-surface-variant mb-6 leading-relaxed">
-        This page shows a real, verifiable Stellar testnet wallet — sign in to the demo merchant account to load it.
+        {subtitle}
       </p>
 
       {stage === 'creds' ? (

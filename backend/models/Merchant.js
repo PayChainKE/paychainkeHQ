@@ -145,6 +145,12 @@ const merchantSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
+  // Deprecated — bulk pay used to be guarded by its own separate PIN.
+  // Nothing writes or checks this field anymore; every money-movement flow
+  // (including bulk-pay authorization) now shares the single `appPin`
+  // below, same as an M-Pesa or bank card PIN confirms every transaction.
+  // Kept only so any legacy hash already on a document isn't silently
+  // dropped by a schema change.
   bulkPayPin: {
     type: String,
     select: false,
