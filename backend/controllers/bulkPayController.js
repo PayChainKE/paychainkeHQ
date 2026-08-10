@@ -305,7 +305,14 @@ export const authorizeBatch = async (req, res) => {
     let totalB2cFee = 0;
 
     for (const row of batchRows) {
-      let payee = row.payeeMatch ? await Payee.findById(row.payeeMatch) : null;
+      // payeeMatch is a client-supplied Payee _id round-tripped from the
+      // upload-csv preview — without the merchantId scope here, a merchant
+      // could authorize a payout against another merchant's Payee record
+      // just by guessing/enumerating its _id, redirecting funds to (and
+      // leaking the PII of) a payee they were never given.
+      let payee = row.payeeMatch
+        ? await Payee.findOne({ _id: row.payeeMatch, merchantId: req.merchant._id })
+        : null;
       if (!payee) {
         payee = new Payee({
           merchantId: req.merchant._id,

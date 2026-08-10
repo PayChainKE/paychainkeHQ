@@ -213,9 +213,13 @@ export const uploadNewsletterImage = async (req, res) => {
       return res.status(400).json({ error: 'No image file provided.' });
     }
 
-    const allowedMime = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
+    // SVG deliberately excluded here (mirrors routes/newsletterRoutes.js's
+    // multer fileFilter) — it can carry inline <script>/onload payloads and
+    // isn't guaranteed to be rasterized by the transformation below if the
+    // Cloudinary URL is ever opened directly rather than rendered as <img>.
+    const allowedMime = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
     if (!allowedMime.includes(req.file.mimetype)) {
-      return res.status(400).json({ error: 'Unsupported file type. Use JPG, PNG, GIF, WebP or SVG.' });
+      return res.status(400).json({ error: 'Unsupported file type. Use JPG, PNG, GIF or WebP.' });
     }
 
     // Upload to Cloudinary via a stream from the in-memory buffer.
