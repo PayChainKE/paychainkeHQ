@@ -15,7 +15,7 @@ import { getCheckoutTotal } from '../utils/pricingEngine.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
-import { getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
+import { getNcbaVirtualAccountNumber, validatePhoneNumber, NcbaValidationError } from '../utils/ncbaValidators.js';
 import { generateMerchantStickerPdf } from '../utils/stickerGenerator.js';
 
 // Resolves either the 12-digit NCBA virtual account number or the 8-digit
@@ -662,9 +662,17 @@ export const processPaymentLink = async (req, res) => {
       return res.status(400).json({ error: 'Payment link is invalid or expired.' });
     }
 
-    let formattedPhone = String(phone || '').trim();
-    if (formattedPhone.startsWith('0')) formattedPhone = '254' + formattedPhone.slice(1);
-    if (formattedPhone.startsWith('+')) formattedPhone = formattedPhone.slice(1);
+    // Public route — validate strictly rather than best-effort normalise,
+    // since anyone on the internet can hit this (rate-limited, but not
+    // otherwise authenticated) and this number becomes both the STK
+    // destination and the stored transaction counterparty.
+    let formattedPhone;
+    try {
+      formattedPhone = validatePhoneNumber(phone);
+    } catch (e) {
+      if (e instanceof NcbaValidationError) return res.status(400).json({ error: 'Enter a valid Kenyan phone number.' });
+      throw e;
+    }
 
     // Checkout initializer: the amount actually prompted on the customer's
     // handset — base bill + PayChain's customer surcharge (currently 0
@@ -843,9 +851,15 @@ export const payToMerchantAccount = async (req, res) => {
       return res.status(400).json({ error: 'Enter a valid amount.' });
     }
 
-    let formattedPhone = String(req.body.phone || '').trim();
-    if (formattedPhone.startsWith('0')) formattedPhone = '254' + formattedPhone.slice(1);
-    if (formattedPhone.startsWith('+')) formattedPhone = formattedPhone.slice(1);
+    // Public route — same reasoning as processPaymentLink above: validate
+    // strictly rather than best-effort normalise.
+    let formattedPhone;
+    try {
+      formattedPhone = validatePhoneNumber(req.body.phone);
+    } catch (e) {
+      if (e instanceof NcbaValidationError) return res.status(400).json({ error: 'Enter a valid Kenyan phone number.' });
+      throw e;
+    }
 
     const checkoutTotal = getCheckoutTotal(amount);
 

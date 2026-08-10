@@ -22,6 +22,7 @@ import { logAudit } from '../utils/auditLog.js';
 import { buildPaymentReceivedSms, buildPaymentSentSms, buildCustomerPaidSms } from '../utils/paymentSmsTemplates.js';
 import { initiateStkPush as ncbaInitiateStkPush, queryStkPush as ncbaQueryStkPush } from '../services/ncbaStkPushService.js';
 import { validateMobileWalletNumber as ncbaValidateMobileWalletNumber, submitMobileB2wPayment as ncbaSubmitMobileB2wPayment } from '../services/ncbaOpenBankingService.js';
+import { validatePhoneNumber, NcbaValidationError } from '../utils/ncbaValidators.js';
 
 // ── M-PESA configuration ──────────────────────────────────────────────────────
 // MPESA_ENVIRONMENT controls which Daraja endpoint is used.
@@ -545,10 +546,16 @@ export const initiateSTKPush = async (req, res) => {
     const merchantId = req.merchant._id;
     const token = req.mpesaToken;
 
-    // Normalise phone to 254XXXXXXXXX
-    let formattedPhone = String(phone).replace(/\s+/g, '');
-    if (formattedPhone.startsWith('+')) formattedPhone = formattedPhone.slice(1);
-    if (formattedPhone.startsWith('0')) formattedPhone = '254' + formattedPhone.slice(1);
+    // Normalise + validate to 254XXXXXXXXX — rejects malformed numbers here
+    // rather than letting them reach Safaricom/NCBA or get stored as the
+    // transaction's counterparty.
+    let formattedPhone;
+    try {
+      formattedPhone = validatePhoneNumber(phone);
+    } catch (e) {
+      if (e instanceof NcbaValidationError) return res.status(400).json({ error: 'Enter a valid Kenyan phone number.' });
+      throw e;
+    }
 
     const intAmount = Math.ceil(Number(amount));
 
@@ -717,19 +724,29 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
   // account-notification webhook can both observe the same underlying
   // transaction). Everything below this point credits a merchant's balance,
   // so once a request has already resolved (success or failed), any further
-  // resolution for the same checkoutRequestId is a duplicate — no-op,
-  // mirroring the pending-only guard already used on the B2C side
-  // (b2cCallback below).
-  if (stkReq.status !== 'pending') {
-    console.warn(`⚠️ Duplicate STK resolution for ${stkReq.checkoutRequestId} (already ${stkReq.status}) — ignoring.`);
+  // resolution for the same checkoutRequestId is a duplicate — no-op.
+  //
+  // This MUST be an atomic claim, not a read-then-write: a plain
+  // `if (stkReq.status !== 'pending') return;` followed by a separate
+  // `.save()` later is a TOCTOU race — two concurrent redeliveries (exactly
+  // the scenario described above) could both read 'pending' before either
+  // write, both pass the guard, and both credit the merchant. The
+  // status:'pending' filter in this findOneAndUpdate is what actually makes
+  // only one caller ever win the transition; everyone else gets null back
+  // and returns without touching the ledger.
+  const claimed = await STKRequest.findOneAndUpdate(
+    { _id: stkReq._id, status: 'pending' },
+    { $set: { status: succeeded ? 'success' : 'failed', resultDesc } },
+    { returnDocument: 'after' }
+  );
+  if (!claimed) {
+    console.warn(`⚠️ Duplicate STK resolution for ${stkReq.checkoutRequestId} (already resolved) — ignoring.`);
     return;
   }
+  stkReq.status = claimed.status;
+  stkReq.resultDesc = claimed.resultDesc;
 
   if (succeeded) {
-      stkReq.status = 'success';
-      stkReq.resultDesc = resultDesc;
-      await stkReq.save();
-
       const { date, time } = formatTransactionDateTime(transTime);
 
       if (stkReq.linkId) {
@@ -1052,12 +1069,10 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
           });
         }
       }
-  } else {
-    // Cancelled or Failed — leave the PaymentLink 'active' so the customer can retry.
-    stkReq.status = 'failed';
-    stkReq.resultDesc = resultDesc;
-    await stkReq.save();
   }
+  // Cancelled/failed case: the atomic claim above already persisted
+  // status: 'failed' — the PaymentLink itself is deliberately left
+  // 'active' so the customer can retry.
 }
 
 export const stkCallback = async (req, res) => {
@@ -1210,8 +1225,22 @@ export const initiateB2C = async (req, res) => {
   let totalDebit = 0;
   try {
     const token = req.mpesaToken;
-    const { phone, amount, destination, pin } = req.body;
+    const { amount, destination, pin } = req.body;
     const merchantId = req.merchant._id;
+
+    // Validated/normalised to 254XXXXXXXXX before it ever reaches a payment
+    // provider, gets stored as Transaction.recipient.id, or is used as an
+    // SMS destination — previously this field went straight through
+    // unvalidated, unlike every other money-movement destination in this
+    // codebase (see ncbaValidators.js's own doc comment on this exact
+    // function).
+    let phone;
+    try {
+      phone = validatePhoneNumber(req.body.phone);
+    } catch (e) {
+      if (e instanceof NcbaValidationError) return res.status(400).json({ error: 'Enter a valid Kenyan phone number.' });
+      throw e;
+    }
 
     // Standard Safaricom M-Pesa B2C ("Business Bouquet") tariff — the real
     // cost Safaricom charges PayChain per B2C payout — plus PayChain's own
@@ -1568,34 +1597,48 @@ export const b2cCallback = async (req, res) => {
     const result = req.body?.Result;
     if (!result) return;
 
-    const reference = result.OriginatorConversationID || result.ConversationID;
-    if (!reference) return;
+    const rawReference = result.OriginatorConversationID || result.ConversationID;
+    // Reject anything that isn't a plain string before it ever reaches a
+    // Mongo query filter below — a body-derived object here (e.g. an
+    // {"$ne": null}-shaped value, whether from a compromised sender or a
+    // parsing quirk) would otherwise be interpreted as a query operator
+    // instead of an equality match, potentially matching an arbitrary
+    // pending transaction rather than the one this callback is actually
+    // about.
+    if (typeof rawReference !== 'string' || !rawReference) return;
+    const reference = rawReference;
 
     const succeeded = result.ResultCode === 0;
+    // Reconcile the merchant's self-typed recipient label with Safaricom's
+    // own verified name for who the payout actually reached — covers both
+    // single B2C sends and bulk-pay Mobile Money rows, which both resolve
+    // through this same callback. Never overwrite a good label with
+    // nothing: only applied when Daraja actually included the field.
+    const receiverName = succeeded ? extractReceiverName(result) : null;
 
-    // Update the ledger entry this callback confirms (single B2C transfer or a bulk-pay row)
-    const transaction = await Transaction.findOne({ reference });
+    // Atomic claim on the pending->resolved transition — same reasoning as
+    // resolveStkOutcome's identical fix: Safaricom redelivers on a slow/
+    // ambiguous ack, and this exact handler is ALSO wired as the
+    // b2c-timeout webhook (routes/mpesaRoutes.js), so two deliveries
+    // landing close together is a real scenario. A plain
+    // `if (transaction.status === 'pending')` read followed by a separate
+    // `.save()` is a TOCTOU race that could double-refund a failed payout —
+    // handing the merchant their money back twice. The status:'pending'
+    // filter here is what makes only one caller ever win the transition.
+    const setFields = { status: succeeded ? 'completed' : 'failed' };
+    if (receiverName) setFields['recipient.name'] = receiverName;
+    const transaction = await Transaction.findOneAndUpdate(
+      { reference, status: 'pending' },
+      { $set: setFields },
+      { returnDocument: 'after' }
+    );
     // Bulk-pay rows get ONE summary SMS when the whole batch resolves
     // (below), not one per row — texting the merchant once per supplier in
     // a multi-payee batch would be spam. Single B2C withdrawals get an
     // immediate SMS since there's no batch to summarize.
     const isBulkPayRow = transaction?.type === 'bulk_pay';
 
-    if (transaction && transaction.status === 'pending') {
-      transaction.status = succeeded ? 'completed' : 'failed';
-      // Reconcile the merchant's self-typed recipient label with Safaricom's
-      // own verified name for who the payout actually reached — covers both
-      // single B2C sends and bulk-pay Mobile Money rows, which both resolve
-      // through this same callback. Never overwrite a good label with
-      // nothing: only applied when Daraja actually included the field.
-      if (succeeded) {
-        const receiverName = extractReceiverName(result);
-        if (receiverName) {
-          transaction.recipient.name = receiverName;
-        }
-      }
-      await transaction.save();
-
+    if (transaction) {
       let merchantForSms = null;
       if (!succeeded) {
         // The payout never landed — return the funds to the merchant's
@@ -1661,35 +1704,44 @@ export const b2cCallback = async (req, res) => {
       }
     }
 
-    // Update the matching row inside a bulk-pay batch, if this reference belongs to one
-    const batch = await PayoutBatch.findOne({ 'transactions.receiptNumber': reference });
+    // Update the matching row inside a bulk-pay batch, if this reference belongs to one.
+    // Same atomic-claim reasoning as the Transaction update above — the
+    // positional $ operator, filtered on the row's own 'pending' status,
+    // means only one concurrent redelivery ever flips this specific row;
+    // the batch-level aggregate `status` below is then a compare-and-swap
+    // keyed off the previous status this same call observed, rather than a
+    // blind overwrite, so two different rows in the same batch resolving
+    // near-simultaneously can't stomp each other's aggregate update either.
+    const batch = await PayoutBatch.findOneAndUpdate(
+      { 'transactions.receiptNumber': reference, 'transactions.status': 'pending' },
+      { $set: { 'transactions.$.status': succeeded ? 'completed' : 'failed' } },
+      { returnDocument: 'after' }
+    );
     if (batch) {
-      const row = batch.transactions.find((t) => t.receiptNumber === reference);
-      if (row && row.status === 'pending') {
-        const previousBatchStatus = batch.status;
-        row.status = succeeded ? 'completed' : 'failed';
+      const previousBatchStatus = batch.status;
+      const statuses = batch.transactions.map((t) => t.status);
+      let newBatchStatus = previousBatchStatus;
+      if (statuses.every((s) => s === 'completed')) newBatchStatus = 'Processed';
+      else if (statuses.some((s) => s === 'pending')) newBatchStatus = 'Pending';
+      else if (statuses.some((s) => s === 'failed')) newBatchStatus = 'Partial';
 
-        const statuses = batch.transactions.map((t) => t.status);
-        if (statuses.every((s) => s === 'completed')) batch.status = 'Processed';
-        else if (statuses.some((s) => s === 'pending')) batch.status = 'Pending';
-        else if (statuses.some((s) => s === 'failed')) batch.status = 'Partial';
+      if (newBatchStatus !== previousBatchStatus) {
+        await PayoutBatch.updateOne({ _id: batch._id, status: previousBatchStatus }, { $set: { status: newBatchStatus } });
+      }
 
-        await batch.save();
-
-        // Every row just settled (batch left 'Pending' for the first time)
-        // — send the one summary SMS for the whole batch here.
-        const justResolved = previousBatchStatus === 'Pending' && batch.status !== 'Pending';
-        if (justResolved) {
-          const merchant = await Merchant.findById(batch.merchantId).select('phone');
-          if (merchant?.phone) {
-            const succeededCount = statuses.filter((s) => s === 'completed').length;
-            const failedCount = statuses.filter((s) => s === 'failed').length;
-            const { date, time } = formatTransactionDateTime();
-            const message = `${batch.batchReference} Bulk Payout ${batch.status} on ${date} at ${time}. ${succeededCount} of ${batch.transactions.length} payout(s) completed (KES ${batch.totalNetAmount.toLocaleString()} total)${failedCount > 0 ? `; ${failedCount} failed and refunded` : ''}.`;
-            safeSendSMS({ to: merchant.phone, message }).then((r) => {
-              if (!r.success) console.error(`Bulk payout batch SMS failed for merchant ${batch.merchantId}:`, r.error);
-            });
-          }
+      // Every row just settled (batch left 'Pending' for the first time)
+      // — send the one summary SMS for the whole batch here.
+      const justResolved = previousBatchStatus === 'Pending' && newBatchStatus !== 'Pending';
+      if (justResolved) {
+        const merchant = await Merchant.findById(batch.merchantId).select('phone');
+        if (merchant?.phone) {
+          const succeededCount = statuses.filter((s) => s === 'completed').length;
+          const failedCount = statuses.filter((s) => s === 'failed').length;
+          const { date, time } = formatTransactionDateTime();
+          const message = `${batch.batchReference} Bulk Payout ${newBatchStatus} on ${date} at ${time}. ${succeededCount} of ${batch.transactions.length} payout(s) completed (KES ${batch.totalNetAmount.toLocaleString()} total)${failedCount > 0 ? `; ${failedCount} failed and refunded` : ''}.`;
+          safeSendSMS({ to: merchant.phone, message }).then((r) => {
+            if (!r.success) console.error(`Bulk payout batch SMS failed for merchant ${batch.merchantId}:`, r.error);
+          });
         }
       }
     }

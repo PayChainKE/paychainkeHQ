@@ -256,23 +256,38 @@ export const handlePesaLinkCallback = async (req, res) => {
   res.status(200).json({ resultCode: '0', resultDescription: 'Accepted' });
 
   const body = req.body && typeof req.body === 'object' ? req.body : {};
-  const reference = body.TransactionID || body.transactionId || body.reference;
-  if (!reference) {
+  const rawReference = body.TransactionID || body.transactionId || body.reference;
+  // Reject anything that isn't a plain string before it ever reaches a Mongo
+  // query filter below — a body-derived object here (e.g. an
+  // {"$ne": null}-shaped value) would otherwise be interpreted as a query
+  // operator instead of an equality match, matching an arbitrary pending
+  // transaction rather than the one this callback is actually about. Route
+  // auth (verifyNcbaBasicAuth) is the primary control here, but this is
+  // cheap defense-in-depth against a leaked/misused credential.
+  if (typeof rawReference !== 'string' || !rawReference) {
     logEvent('warn', 'ncba_openbanking_callback_missing_reference', { body });
     return;
   }
+  const reference = rawReference;
 
   try {
     const succeeded = ['SUCCESS', 'COMPLETED', '0'].includes(String(body.Status || body.status || '').toUpperCase());
 
-    const transaction = await Transaction.findOne({ reference });
-    if (!transaction || transaction.status !== 'pending') {
+    // Atomic claim on the pending->resolved transition — a plain
+    // `if (transaction.status === 'pending')` read followed by a separate
+    // `.save()` is a TOCTOU race: two redeliveries of the same callback
+    // (NCBA retries, like every other bank webhook) could both read
+    // 'pending' before either write, double-refunding a failed payout. The
+    // status:'pending' filter here is what makes only one caller ever win.
+    const transaction = await Transaction.findOneAndUpdate(
+      { reference, status: 'pending' },
+      { $set: { status: succeeded ? 'completed' : 'failed' } },
+      { returnDocument: 'after' }
+    );
+    if (!transaction) {
       logEvent('info', 'ncba_openbanking_callback_no_pending_match', { reference });
       return;
     }
-
-    transaction.status = succeeded ? 'completed' : 'failed';
-    await transaction.save();
 
     let merchantForSms = null;
     if (!succeeded) {
@@ -323,16 +338,24 @@ export const handlePesaLinkCallback = async (req, res) => {
     }
 
     // Update the matching row inside a bulk-pay batch, if this reference belongs to one.
-    const batch = await PayoutBatch.findOne({ 'transactions.receiptNumber': reference });
+    // Atomic per-row claim (positional $ filtered on the row's own
+    // 'pending' status) plus a compare-and-swap on the aggregate status —
+    // same reasoning as the Transaction update above and
+    // mpesaController.js's b2cCallback.
+    const batch = await PayoutBatch.findOneAndUpdate(
+      { 'transactions.receiptNumber': reference, 'transactions.status': 'pending' },
+      { $set: { 'transactions.$.status': succeeded ? 'completed' : 'failed' } },
+      { returnDocument: 'after' }
+    );
     if (batch) {
-      const row = batch.transactions.find((t) => t.receiptNumber === reference);
-      if (row && row.status === 'pending') {
-        row.status = succeeded ? 'completed' : 'failed';
-        const statuses = batch.transactions.map((t) => t.status);
-        if (statuses.every((s) => s === 'completed')) batch.status = 'Processed';
-        else if (statuses.some((s) => s === 'pending')) batch.status = 'Pending';
-        else if (statuses.some((s) => s === 'failed')) batch.status = 'Partial';
-        await batch.save();
+      const previousBatchStatus = batch.status;
+      const statuses = batch.transactions.map((t) => t.status);
+      let newBatchStatus = previousBatchStatus;
+      if (statuses.every((s) => s === 'completed')) newBatchStatus = 'Processed';
+      else if (statuses.some((s) => s === 'pending')) newBatchStatus = 'Pending';
+      else if (statuses.some((s) => s === 'failed')) newBatchStatus = 'Partial';
+      if (newBatchStatus !== previousBatchStatus) {
+        await PayoutBatch.updateOne({ _id: batch._id, status: previousBatchStatus }, { $set: { status: newBatchStatus } });
       }
     }
 
