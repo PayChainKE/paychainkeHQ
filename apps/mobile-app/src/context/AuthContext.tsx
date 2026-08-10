@@ -225,6 +225,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     applyBiometricsEnabled(!!userData.mobileBiometricUnlockEnabled);
   }
 
+  // Swaps in a freshly-issued JWT without touching merchant/session data —
+  // for flows like change-password, which bump the server's tokenVersion
+  // (invalidating the token the very request was authenticated with) and
+  // return a new one so the current session keeps working.
+  async function updateToken(jwt: string) {
+    setToken(jwt);
+    await storeToken(jwt);
+    api.defaults.headers.common['Authorization'] = `Bearer ${jwt}`;
+  }
+
   // ── Auth functions ─────────────────────────────────────────────────────────
 
   async function refreshSession() {
@@ -442,6 +452,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       resetPassword,
       logout,
       refreshSession,
+      updateToken,
     }}>
       {children}
     </AuthContext.Provider>

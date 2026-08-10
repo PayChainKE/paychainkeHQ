@@ -81,6 +81,7 @@ export default function DigitalWallet({ navigation }: any) {
   const [showSettings, setShowSettings] = useState(false);
   const [settleBankName, setSettleBankName] = useState('');
   const [settleBankAccount, setSettleBankAccount] = useState('');
+  const [settleBankCode, setSettleBankCode] = useState('');
   const [settleMobile, setSettleMobile] = useState('');
   const [isSavingSettings, setIsSavingSettings] = useState(false);
 
@@ -143,9 +144,11 @@ export default function DigitalWallet({ navigation }: any) {
     if (showSettings && merchant) {
       setSettleBankName(merchant.settlementBankName || '');
       setSettleBankAccount(merchant.settlementBankAccount || '');
+      setSettleBankCode(merchant.settlementBankCode || '');
       setSettleMobile(merchant.settlementMobile || '');
+      fetchBankCodes();
     }
-  }, [showSettings, merchant]);
+  }, [showSettings, merchant, fetchBankCodes]);
 
   // 'bank' is the default withdrawal destination — load bank codes up
   // front rather than waiting for a tap on a destination that's already
@@ -230,6 +233,7 @@ export default function DigitalWallet({ navigation }: any) {
       await api.put('/api/auth/merchant/profile', {
         settlementBankName: settleBankName,
         settlementBankAccount: settleBankAccount,
+        settlementBankCode: settleBankCode,
         settlementMobile: settleMobile,
       });
       await refreshSession();
@@ -746,6 +750,10 @@ export default function DigitalWallet({ navigation }: any) {
                 </Text>
               </View>
             </View>
+            <View className="flex-row items-center justify-between bg-[#f7faf7] rounded-2xl px-5 py-3.5 mb-3">
+              <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#707971]">Bank</Text>
+              <Text className="font-jakarta-bold text-[13px] text-[#00351d]">NCBA Bank Kenya PLC</Text>
+            </View>
             {/* Full NCBA virtual account is null until NCBA assigns the
                 institution prefix — falls back to the 8-digit merchant
                 code, already safe to use (matched inside NCBA's Narrative
@@ -804,6 +812,23 @@ export default function DigitalWallet({ navigation }: any) {
                   <Text className="flex-1 text-[13px] font-jakarta-medium text-[#0c2010] leading-relaxed pt-0.5">{step}</Text>
                 </View>
               ))}
+            </View>
+
+            <View className="flex-row items-center justify-between bg-[#f7faf7] rounded-2xl px-5 py-4 mt-4">
+              <View>
+                <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#707971] mb-1">Business Number</Text>
+                <Text className="font-jakarta-bold text-[15px] text-[#00351d]">880100</Text>
+              </View>
+              <TouchableOpacity
+                onPress={async () => {
+                  await Clipboard.setStringAsync('880100');
+                  Alert.alert('Copied', 'Paybill business number copied to clipboard.');
+                }}
+                activeOpacity={0.85}
+                className="p-2.5 bg-[#006c4e] rounded-xl"
+              >
+                <Feather name="copy" size={15} color="#fff" />
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -880,14 +905,21 @@ export default function DigitalWallet({ navigation }: any) {
                 <Feather name="briefcase" size={15} color="#059669" />
                 <Text className="font-jakarta-bold text-[16px] text-[#00351d]">Bank Account</Text>
               </View>
-              <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#00351d]/60 mb-2 ml-1">Bank Name</Text>
-              <TextInput
-                value={settleBankName}
-                onChangeText={setSettleBankName}
-                placeholder="e.g. KCB Bank"
-                placeholderTextColor="#a1a1aa"
-                className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-5 py-4 text-[15px] font-jakarta-bold text-[#00351d] mb-4"
-              />
+              <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#00351d]/60 mb-2 ml-1">Bank (for PesaLink/EFT payouts)</Text>
+              <View className="flex-row flex-wrap gap-1.5 mb-4">
+                {bankCodes.length === 0 && (
+                  <Text className="text-[#707971] font-jakarta-medium text-[11px] py-2">Loading banks…</Text>
+                )}
+                {bankCodes.map((b) => (
+                  <TouchableOpacity
+                    key={b.code}
+                    onPress={() => { setSettleBankCode(b.code); setSettleBankName(b.name); }}
+                    className={`px-3 py-2 rounded-lg border ${settleBankCode === b.code ? 'bg-[#00351d] border-[#00351d]' : 'bg-[#f7faf7] border-[#eff4ef]'}`}
+                  >
+                    <Text className={`font-jakarta-bold text-[11px] ${settleBankCode === b.code ? 'text-white' : 'text-[#404942]'}`}>{b.name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
               <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#00351d]/60 mb-2 ml-1">Account Number</Text>
               <TextInput
                 value={settleBankAccount}
