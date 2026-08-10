@@ -825,7 +825,13 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
               currency: 'KES',
               status: 'completed',
               reference: receipt,
-              sender: { name: 'M-PESA Express', id: formatPhoneDisplay(stkReq.phone) },
+              // Unlike C2B (processMpesaC2bPayload above), Safaricom's STK
+              // Push callback never includes the payer's registered name —
+              // only their phone number. That's the one real sender detail
+              // available, so it's the sender identity here too, same as a
+              // real M-Pesa confirmation SMS falls back to showing the
+              // number when it has no name to show.
+              sender: { name: formatPhoneDisplay(stkReq.phone), id: formatPhoneDisplay(stkReq.phone) },
               recipient: { name: merchant.businessName, id: merchant.paybillAccount },
               balanceAfter: updatedMerchant.kesBalance,
             });
@@ -985,7 +991,10 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
             currency: 'KES',
             status: 'completed',
             reference: receipt,
-            sender: { name: 'M-PESA Express', id: formatPhoneDisplay(stkReq.phone) },
+            // See the identical comment on the PaymentLink branch above —
+            // Safaricom's STK Push callback has no payer-name field, only a
+            // phone number, so that's the sender identity here too.
+            sender: { name: formatPhoneDisplay(stkReq.phone), id: formatPhoneDisplay(stkReq.phone) },
             recipient: { name: merchant.businessName, id: 'WALLET' },
             balanceAfter: updatedMerchant.kesBalance,
           });
