@@ -21,7 +21,7 @@ export function buildPaymentReceivedSms({ ref, amount, payerName, payerPhone, da
       `${ref} Confirmed. You have received KES ${amt} from ${name}${phone ? ` ${phone}` : ''} via ${channel} on ${date} at ${time}. New PayChain balance is KES ${balance}.`,
     {
       fixed: { ref, amt: amount.toLocaleString(), phone: phone || '', channel, date, time, balance: balance.toLocaleString() },
-      truncatable: [{ key: 'name', value: payerName || 'a customer', minLength: 10 }],
+      truncatable: [{ key: 'name', value: payerName || 'a customer', minLength: 6 }],
     }
   );
 }
@@ -69,7 +69,7 @@ export function buildCustomerPaidSms({ ref, amount, businessName, accountRef, da
       `${ref} Confirmed. KES ${amt} paid to ${name}${acct ? ` for account ${acct}` : ''} on ${date} at ${time}. Thank you for your payment.`,
     {
       fixed: { ref, amt: amount.toLocaleString(), acct: accountRef || '', date, time },
-      truncatable: [{ key: 'name', value: businessName || 'PayChain', minLength: 10 }],
+      truncatable: [{ key: 'name', value: businessName || 'PayChain', minLength: 5 }],
     }
   );
 }
