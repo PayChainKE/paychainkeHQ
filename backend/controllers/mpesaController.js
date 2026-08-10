@@ -1161,7 +1161,7 @@ export function pollAndResolveNcbaStkPush(checkoutRequestId, transactionId) {
 export async function initiateAndTrackNcbaStk({ merchantId, phone, checkoutTotal, extra = {} }) {
   const merchant = await Merchant.findById(merchantId).select('paybillAccount');
   if (!merchant?.paybillAccount) {
-    throw new Error('This merchant has no PayChain Account Number assigned yet — cannot route an NCBA STK Push.');
+    throw new Error('This merchant has no PayChain Account Number assigned yet — cannot process this payment request.');
   }
 
   const { transactionId } = await ncbaInitiateStkPush({ phone, amount: checkoutTotal, accountNo: merchant.paybillAccount });
@@ -1286,7 +1286,7 @@ export const initiateB2C = async (req, res) => {
     // services/ncbaOpenBankingService.js's NCBA_OPENBANKING_LIVE_ENABLED
     // gate) ───────────────────────────────────────────────────────────────
     if (NCBA_STK_B2C_ENABLED) {
-      const transactionId = `NCBA-B2W-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+      const transactionId = `PAYOUT-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
       // Daraja B2C only ever targeted Safaricom-registered numbers — the
       // existing UI has no provider picker, so 'safaricom' preserves
       // identical behavior. Airtel Money support just needs a provider
@@ -1317,7 +1317,7 @@ export const initiateB2C = async (req, res) => {
         recipient: { name: destination, id: phone },
       });
 
-      return res.status(200).json({ success: true, message: 'Transfer initiated successfully via NCBA', transaction: tx });
+      return res.status(200).json({ success: true, message: 'Transfer initiated successfully', transaction: tx });
     }
 
     // 1. Security Credential Generation
@@ -1391,7 +1391,7 @@ export const initiateB2C = async (req, res) => {
     // This catch is shared by both the NCBA and Daraja branches above —
     // "Daraja" in the fallback message was wrong (and actively misleading
     // for debugging) whenever the NCBA path is the one that actually threw.
-    const fallbackMessage = NCBA_STK_B2C_ENABLED ? 'Failed to initiate NCBA transfer' : 'Failed to initiate Daraja B2C transfer';
+    const fallbackMessage = NCBA_STK_B2C_ENABLED ? 'Failed to initiate transfer' : 'Failed to initiate Daraja B2C transfer';
     res.status(500).json({ error: error.response?.data?.errorMessage || error.message || fallbackMessage });
   }
 };

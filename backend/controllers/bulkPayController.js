@@ -468,7 +468,7 @@ export const authorizeBatch = async (req, res) => {
           // handlePesaLinkCallback (ncbaOpenBankingController.js), keyed by
           // the reference this row is stamped with below.
           try {
-            const transactionId = `NCBA-B2W-BULK-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+            const transactionId = `PAYOUT-BULK-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
             const { validationId } = await validateMobileWalletNumber({ provider: 'safaricom', msisdn: payee.phone });
             await submitMobileB2wPayment({
               transactionId,

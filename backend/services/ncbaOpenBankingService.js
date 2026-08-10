@@ -88,7 +88,7 @@ let tokenExpiresAt = 0;
 
 async function fetchNewToken() {
   if (!ncbaOpenBankingUserId || !ncbaOpenBankingPassword || !ncbaOpenBankingSubscriptionKey) {
-    throw new NcbaOpenBankingAuthError('NCBA Open Banking is not fully configured (NCBA_OPENBANKING_USER_ID / _PASSWORD / _SUBSCRIPTION_KEY missing)');
+    throw new NcbaOpenBankingAuthError('Open Banking is not fully configured. Please contact support.');
   }
 
   try {
@@ -112,7 +112,7 @@ async function fetchNewToken() {
 
     const { accessToken, tokenType } = response.data || {};
     if (!accessToken || !tokenType) {
-      throw new NcbaOpenBankingAuthError('NCBA Open Banking token response missing accessToken/tokenType');
+      throw new NcbaOpenBankingAuthError('Open Banking token response was invalid.');
     }
 
     cachedToken = accessToken;
@@ -122,8 +122,10 @@ async function fetchNewToken() {
     return { accessToken, tokenType };
   } catch (err) {
     if (err instanceof NcbaOpenBankingAuthError) throw err;
+    // Full upstream error detail goes to the server log only — never bake a
+    // raw upstream response body into a message that reaches the client.
     logEvent('error', 'ncba_openbanking_token_fetch_failed', { error: unwrapAxiosError(err) });
-    throw new NcbaOpenBankingAuthError(`Failed to obtain NCBA Open Banking access token: ${unwrapAxiosError(err)}`);
+    throw new NcbaOpenBankingAuthError('Failed to obtain an Open Banking access token.');
   }
 }
 
@@ -148,7 +150,7 @@ async function ncbaOpenBankingPost(path, body, { retrying = false } = {}) {
   // here — a blank value would silently ride along as `undefined` in the
   // request body instead of failing clearly before ever reaching NCBA.
   if (!ncbaOpenBankingAccountNumber) {
-    throw new NcbaOpenBankingAuthError('NCBA Open Banking is not fully configured (NCBA_OPENBANKING_ACCOUNT_NUMBER missing)');
+    throw new NcbaOpenBankingAuthError('Open Banking is not fully configured. Please contact support.');
   }
 
   const { accessToken, tokenType } = await getAccessToken();
@@ -169,8 +171,10 @@ async function ncbaOpenBankingPost(path, body, { retrying = false } = {}) {
       await getAccessToken({ forceRefresh: true });
       return ncbaOpenBankingPost(path, body, { retrying: true });
     }
+    // Full upstream error detail goes to the server log only — never bake a
+    // raw upstream response body into a message that reaches the client.
     logEvent('error', 'ncba_openbanking_request_failed', { path, error: unwrapAxiosError(err) });
-    throw new NcbaOpenBankingRequestError(unwrapAxiosError(err));
+    throw new NcbaOpenBankingRequestError('Open Banking request failed. Please try again.');
   }
 }
 
@@ -336,7 +340,7 @@ export async function validateMobileWalletNumber({ provider, msisdn }) {
 
   const result = await ncbaOpenBankingPost(ncbaMobileWalletValidationPath, { provider, msisdn });
   if (!result?.validationId) {
-    throw new NcbaOpenBankingValidationError(result?.message || 'NCBA could not validate the destination mobile wallet number');
+    throw new NcbaOpenBankingValidationError(result?.message || 'Could not validate the destination mobile number.');
   }
 
   return { validationId: result.validationId, customerName: result.customerName || null };
@@ -405,7 +409,7 @@ export async function submitMobileB2wPayment({
 
   const result = await ncbaOpenBankingPost('/api/v1/MobileB2WPayment/mobileb2wpayment', payload);
   if (!result?.succeeded) {
-    throw new NcbaOpenBankingRequestError(result?.message || 'NCBA rejected the Mobile B2W payout');
+    throw new NcbaOpenBankingRequestError(result?.message || 'The payout could not be completed. Please try again.');
   }
   return result;
 }
