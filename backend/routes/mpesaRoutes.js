@@ -1,6 +1,6 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
-import { generateToken, registerURLs, validationURL, confirmationURL, initiateSTKPush, stkCallback, getSTKStatus, initiateB2C, initiateB2B, b2cCallback } from '../controllers/mpesaController.js';
+import { generateToken, generateTokenUnlessNcba, registerURLs, validationURL, confirmationURL, initiateSTKPush, stkCallback, getSTKStatus, initiateB2C, initiateB2B, b2cCallback } from '../controllers/mpesaController.js';
 import { protect, protectMerchant, requireRole } from '../middleware/authMiddleware.js';
 import { timingSafeStringEqual } from '../utils/timingSafeCompare.js';
 
@@ -49,13 +49,15 @@ router.post('/register-urls', protect, requireRole('owner'), generateToken, regi
 router.post('/validation', verifyMpesaWebhookSecret, validationURL);
 router.post('/confirmation', verifyMpesaWebhookSecret, confirmationURL);
 
-// STK Push Routes (Inbound)
-router.post('/stk-push', protectMerchant, generateToken, initiateSTKPush);
+// STK Push Routes (Inbound) — generateTokenUnlessNcba skips the Daraja
+// OAuth fetch entirely once NCBA_STK_B2C_ENABLED is on (see its doc comment
+// in mpesaController.js).
+router.post('/stk-push', protectMerchant, generateTokenUnlessNcba, initiateSTKPush);
 router.post('/stk-callback', verifyMpesaWebhookSecret, stkCallback); // Public webhook for Safaricom
 router.get('/stk-status/:checkoutId', protectMerchant, getSTKStatus);
 
 // B2C Routes (Outbound)
-router.post('/b2c-request', protectMerchant, pinLimiter, generateToken, initiateB2C);
+router.post('/b2c-request', protectMerchant, pinLimiter, generateTokenUnlessNcba, initiateB2C);
 router.post('/b2c-callback', verifyMpesaWebhookSecret, b2cCallback); // Public webhook
 router.post('/b2c-timeout', verifyMpesaWebhookSecret, b2cCallback); // Timeout webhook
 

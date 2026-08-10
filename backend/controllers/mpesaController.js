@@ -20,6 +20,8 @@ import { formatPhoneDisplay } from '../utils/formatPhoneDisplay.js';
 import { AUTO_INFLATION_SHIELD_ENABLED } from '../config/inflationShieldFlag.js';
 import { logAudit } from '../utils/auditLog.js';
 import { buildPaymentReceivedSms, buildPaymentSentSms, buildCustomerPaidSms } from '../utils/paymentSmsTemplates.js';
+import { initiateStkPush as ncbaInitiateStkPush, queryStkPush as ncbaQueryStkPush } from '../services/ncbaStkPushService.js';
+import { validateMobileWalletNumber as ncbaValidateMobileWalletNumber, submitMobileB2wPayment as ncbaSubmitMobileB2wPayment } from '../services/ncbaOpenBankingService.js';
 
 // ── M-PESA configuration ──────────────────────────────────────────────────────
 // MPESA_ENVIRONMENT controls which Daraja endpoint is used.
@@ -71,6 +73,15 @@ const withWebhookSecret = (url) => `${url}${webhookSecret ? `?key=${encodeURICom
 // no redeploy of this code required.
 export const DARAJA_STK_B2C_ENABLED = process.env.DARAJA_STK_B2C_ENABLED === 'true';
 
+// Migration switch: when true, STK Push (collections) and B2C/Mobile B2W
+// (payouts to phone numbers) route to NCBA instead of Daraja — see
+// services/ncbaStkPushService.js and services/ncbaOpenBankingService.js's
+// submitMobileB2wPayment. Checked BEFORE DARAJA_STK_B2C_ENABLED everywhere
+// both are consulted, so flipping this on is what actually cuts traffic
+// over; DARAJA_STK_B2C_ENABLED alone still restores Daraja immediately if
+// NCBA needs to be turned back off.
+export const NCBA_STK_B2C_ENABLED = process.env.NCBA_STK_B2C_ENABLED === 'true';
+
 
 // Generate OAuth Token for Safaricom Daraja API
 export const generateToken = async (req, res, next) => {
@@ -99,6 +110,19 @@ export const generateToken = async (req, res, next) => {
       detail,
     });
   }
+};
+
+// Skips the Daraja OAuth token fetch entirely when NCBA is the active
+// provider for STK Push/B2C — generateToken would otherwise fail these
+// requests with "M-PESA is not configured" once Daraja consumer key/secret
+// are eventually left unset. Used in place of generateToken only for the
+// four STK/B2C route handlers that branch on NCBA_STK_B2C_ENABLED
+// (stk-push, b2c-request, payment-link pay, pay-account) — B2B and the
+// webhook/register-urls routes always need a real Daraja token regardless
+// of this flag, so they keep using generateToken directly.
+export const generateTokenUnlessNcba = (req, res, next) => {
+  if (NCBA_STK_B2C_ENABLED) return next();
+  return generateToken(req, res, next);
 };
 
 // Register C2B URLs. Always builds the confirmation/validation URLs itself
@@ -509,7 +533,7 @@ export const simulateMpesaConfirmation = async (req, res) => {
 // ================= STK PUSH (LIPA NA M-PESA ONLINE) =================
 
 export const initiateSTKPush = async (req, res) => {
-  if (!DARAJA_STK_B2C_ENABLED) {
+  if (!NCBA_STK_B2C_ENABLED && !DARAJA_STK_B2C_ENABLED) {
     return res.status(503).json({ error: 'M-PESA STK Push is temporarily unavailable while we migrate to a new payment provider. Please try again later.' });
   }
   try {
@@ -538,7 +562,23 @@ export const initiateSTKPush = async (req, res) => {
     const kind = purpose === 'request_money' ? 'request_money' : 'topup';
     const checkoutTotal = getCheckoutTotal(intAmount);
 
-    // ── SANDBOX MODE: full local simulation — NO call to Safaricom ────────────
+    // ── NCBA MODE: real STK Push via NCBA's paybill 880100 (or simulated —
+    // see services/ncbaStkPushService.js's NCBA_STK_LIVE_ENABLED gate) ──────
+    if (NCBA_STK_B2C_ENABLED) {
+      const checkoutRequestId = await initiateAndTrackNcbaStk({
+        merchantId,
+        phone: formattedPhone,
+        checkoutTotal,
+        extra: { baseAmount: intAmount, kind },
+      });
+      return res.status(200).json({
+        success: true,
+        checkoutRequestId,
+        message: 'STK Push sent — check your phone for the M-PESA prompt.',
+      });
+    }
+
+    // ── SANDBOX MODE (Daraja): full local simulation — NO call to Safaricom ──
     // This prevents any real M-PESA deductions during testing. The sandbox
     // simulation auto-confirms after 4 seconds, routed through the real
     // stkCallback handler (mirrors processPaymentLink/payToMerchantAccount's
@@ -665,42 +705,32 @@ export const initiateSTKPush = async (req, res) => {
   }
 };
 
-export const stkCallback = async (req, res) => {
-  try {
-    const payload = req.body.Body.stkCallback;
-    const { CheckoutRequestID, ResultCode, ResultDesc, CallbackMetadata } = payload;
-    // Summary only, not the full payload — CallbackMetadata carries the
-    // customer's phone number (PII) which doesn't need to sit in plaintext
-    // stdout logs.
-    console.log(`📥 STK Push Callback: CheckoutRequestID=${CheckoutRequestID} ResultCode=${ResultCode} ResultDesc=${ResultDesc}`);
-    
-    const stkReq = await STKRequest.findOne({ checkoutRequestId: CheckoutRequestID });
-    if (!stkReq) {
-      console.warn('⚠️ Received STK callback for unknown request:', CheckoutRequestID);
-      return res.status(200).json({ ResultCode: 0, ResultDesc: 'Accepted' });
-    }
+// Shared by the real Daraja stkCallback webhook (below) and the NCBA poll
+// loop (pollAndResolveNcbaStkPush, further below) — both learn a resolved
+// outcome through completely different mechanisms (a pushed webhook vs a
+// polled query), but from here on the settlement logic (Payment Link split,
+// invoice paid, wallet credit, surcharge split, SMS) must be identical
+// regardless of which rail confirmed it, not a second hand-maintained copy.
+export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc, transTime }) {
+  // Both Safaricom and NCBA can redeliver a confirmation (Safaricom retries
+  // on a slow/ambiguous ack; NCBA's poll and the separate generic
+  // account-notification webhook can both observe the same underlying
+  // transaction). Everything below this point credits a merchant's balance,
+  // so once a request has already resolved (success or failed), any further
+  // resolution for the same checkoutRequestId is a duplicate — no-op,
+  // mirroring the pending-only guard already used on the B2C side
+  // (b2cCallback below).
+  if (stkReq.status !== 'pending') {
+    console.warn(`⚠️ Duplicate STK resolution for ${stkReq.checkoutRequestId} (already ${stkReq.status}) — ignoring.`);
+    return;
+  }
 
-    // Safaricom is known to redeliver STK callbacks (retries on a slow/
-    // ambiguous ack). Everything below this point credits a merchant's
-    // balance, so once a request has already resolved (success or failed),
-    // any further callback for the same CheckoutRequestID is a duplicate —
-    // ack it without touching the ledger again, mirroring the pending-only
-    // guard already used on the B2C side (b2cCallback below).
-    if (stkReq.status !== 'pending') {
-      console.warn(`⚠️ Duplicate STK callback for ${CheckoutRequestID} (already ${stkReq.status}) — ignoring.`);
-      return res.status(200).json({ ResultCode: 0, ResultDesc: 'Accepted' });
-    }
-
-    if (ResultCode === 0) {
-      // Success
+  if (succeeded) {
       stkReq.status = 'success';
-      stkReq.resultDesc = ResultDesc;
+      stkReq.resultDesc = resultDesc;
       await stkReq.save();
 
-      const receiptItem = CallbackMetadata?.Item.find(i => i.Name === 'MpesaReceiptNumber');
-      const receipt = receiptItem ? receiptItem.Value : CheckoutRequestID;
-      const transDateItem = CallbackMetadata?.Item.find(i => i.Name === 'TransactionDate');
-      const { date, time } = formatTransactionDateTime(transDateItem?.Value);
+      const { date, time } = formatTransactionDateTime(transTime);
 
       if (stkReq.linkId) {
         // Settling a PaymentLink (optionally backing an Invoice) — this is
@@ -1022,12 +1052,39 @@ export const stkCallback = async (req, res) => {
           });
         }
       }
-    } else {
-      // Cancelled or Failed — leave the PaymentLink 'active' so the customer can retry.
-      stkReq.status = 'failed';
-      stkReq.resultDesc = ResultDesc;
-      await stkReq.save();
+  } else {
+    // Cancelled or Failed — leave the PaymentLink 'active' so the customer can retry.
+    stkReq.status = 'failed';
+    stkReq.resultDesc = resultDesc;
+    await stkReq.save();
+  }
+}
+
+export const stkCallback = async (req, res) => {
+  try {
+    const payload = req.body.Body.stkCallback;
+    const { CheckoutRequestID, ResultCode, ResultDesc, CallbackMetadata } = payload;
+    // Summary only, not the full payload — CallbackMetadata carries the
+    // customer's phone number (PII) which doesn't need to sit in plaintext
+    // stdout logs.
+    console.log(`📥 STK Push Callback: CheckoutRequestID=${CheckoutRequestID} ResultCode=${ResultCode} ResultDesc=${ResultDesc}`);
+
+    const stkReq = await STKRequest.findOne({ checkoutRequestId: CheckoutRequestID });
+    if (!stkReq) {
+      console.warn('⚠️ Received STK callback for unknown request:', CheckoutRequestID);
+      return res.status(200).json({ ResultCode: 0, ResultDesc: 'Accepted' });
     }
+
+    const receiptItem = CallbackMetadata?.Item.find(i => i.Name === 'MpesaReceiptNumber');
+    const receipt = receiptItem ? receiptItem.Value : CheckoutRequestID;
+    const transDateItem = CallbackMetadata?.Item.find(i => i.Name === 'TransactionDate');
+
+    await resolveStkOutcome(stkReq, {
+      succeeded: ResultCode === 0,
+      receipt,
+      resultDesc: ResultDesc,
+      transTime: transDateItem?.Value,
+    });
 
     res.status(200).json({ ResultCode: 0, ResultDesc: 'Accepted' });
   } catch (error) {
@@ -1035,6 +1092,93 @@ export const stkCallback = async (req, res) => {
     res.status(200).json({ ResultCode: 1, ResultDesc: 'Internal Error' });
   }
 };
+
+// ── NCBA STK Push resolution (poll-based) ───────────────────────────────────
+// NCBA's STK Push API documents no confirmation webhook payload — only a
+// Query endpoint. Rather than depend on an unconfirmed IPN shape, the
+// outcome is learned by polling shortly after the prompt is sent, then fed
+// through the exact same resolveStkOutcome() a real Safaricom callback uses.
+const NCBA_STK_POLL_INTERVAL_MS = 4000;
+const NCBA_STK_POLL_MAX_ATTEMPTS = 30; // ~2 minutes — typical STK prompt validity window
+
+// Fire-and-forget: intentionally not awaited by callers, mirroring how every
+// other webhook-driven settlement in this codebase (Daraja's own callbacks,
+// the NCBA reconciliation webhooks) never blocks the HTTP response that
+// triggered it on the eventual settlement.
+export function pollAndResolveNcbaStkPush(checkoutRequestId, transactionId) {
+  let attempts = 0;
+
+  const poll = async () => {
+    attempts += 1;
+    try {
+      const { status, description } = await ncbaQueryStkPush({ transactionId });
+      if (status === 'SUCCESS' || status === 'FAILED') {
+        const stkReq = await STKRequest.findOne({ checkoutRequestId });
+        if (!stkReq) {
+          console.warn('⚠️ NCBA STK poll resolved for unknown request:', checkoutRequestId);
+          return;
+        }
+        await resolveStkOutcome(stkReq, {
+          succeeded: status === 'SUCCESS',
+          receipt: transactionId,
+          resultDesc: description || status,
+        });
+        return;
+      }
+    } catch (err) {
+      // Transient query failure — keep polling rather than failing the
+      // whole request early; a genuinely stuck request still resolves via
+      // the timeout branch below.
+      console.error(`❌ NCBA STK poll error for ${checkoutRequestId}:`, err.message);
+    }
+
+    if (attempts >= NCBA_STK_POLL_MAX_ATTEMPTS) {
+      const stkReq = await STKRequest.findOne({ checkoutRequestId });
+      if (stkReq && stkReq.status === 'pending') {
+        await resolveStkOutcome(stkReq, {
+          succeeded: false,
+          receipt: transactionId,
+          resultDesc: 'Timed out waiting for customer response',
+        });
+      }
+      return;
+    }
+
+    setTimeout(poll, NCBA_STK_POLL_INTERVAL_MS);
+  };
+
+  setTimeout(poll, NCBA_STK_POLL_INTERVAL_MS);
+}
+
+// Shared by every real STK-initiation call site (this file's initiateSTKPush,
+// plus transactionController.js's processPaymentLink and payToMerchantAccount)
+// once NCBA_STK_B2C_ENABLED is on — creates the same STKRequest shape those
+// call sites already build for Daraja, keyed by NCBA's own TransactionID
+// instead of Safaricom's CheckoutRequestID, and starts the poll loop above.
+// `extra` carries whatever call-site-specific fields apply (linkId, or
+// baseAmount+kind) — merged in exactly as each call site already does for
+// its Daraja STKRequest.create() today.
+export async function initiateAndTrackNcbaStk({ merchantId, phone, checkoutTotal, extra = {} }) {
+  const merchant = await Merchant.findById(merchantId).select('paybillAccount');
+  if (!merchant?.paybillAccount) {
+    throw new Error('This merchant has no PayChain Account Number assigned yet — cannot route an NCBA STK Push.');
+  }
+
+  const { transactionId } = await ncbaInitiateStkPush({ phone, amount: checkoutTotal, accountNo: merchant.paybillAccount });
+
+  await STKRequest.create({
+    merchantId,
+    checkoutRequestId: transactionId,
+    amount: checkoutTotal,
+    phone,
+    status: 'pending',
+    ...extra,
+  });
+
+  pollAndResolveNcbaStkPush(transactionId, transactionId);
+
+  return transactionId;
+}
 
 export const getSTKStatus = async (req, res) => {
   try {
@@ -1059,7 +1203,7 @@ import { generateSecurityCredential } from '../utils/safaricomCrypto.js';
 // --- DARAJA B2C (OUTBOUND PAYMENTS) ---
 
 export const initiateB2C = async (req, res) => {
-  if (!DARAJA_STK_B2C_ENABLED) {
+  if (!NCBA_STK_B2C_ENABLED && !DARAJA_STK_B2C_ENABLED) {
     return res.status(503).json({ error: 'M-PESA payouts are temporarily unavailable while we migrate to a new payment provider. Please try again later.' });
   }
   let debited = false;
@@ -1081,18 +1225,23 @@ export const initiateB2C = async (req, res) => {
       throw e;
     }
 
-    // Safety: block live transactions unless explicitly enabled
-    if (isLive && process.env.MPESA_LIVE_ENABLED !== 'true') {
-      return res.status(503).json({ error: 'Live M-PESA payments are not yet enabled. Set MPESA_LIVE_ENABLED=true to activate.' });
-    }
+    // Daraja-specific safety gates — irrelevant once NCBA is the active
+    // provider (its own liveCallsEnabled/credential checks live in
+    // services/ncbaOpenBankingService.js instead).
+    if (!NCBA_STK_B2C_ENABLED) {
+      // Safety: block live transactions unless explicitly enabled
+      if (isLive && process.env.MPESA_LIVE_ENABLED !== 'true') {
+        return res.status(503).json({ error: 'Live M-PESA payments are not yet enabled. Set MPESA_LIVE_ENABLED=true to activate.' });
+      }
 
-    // Safety: never let a live payout silently fall back to Safaricom's
-    // public sandbox initiator/password ('testapi' / 'Safaricom999!@#')
-    // just because the real credentials weren't configured — fail loudly
-    // here, before any debit, rather than attempting a live B2C call that
-    // Safaricom will reject for an unclear reason downstream.
-    if (isLive && (!process.env.MPESA_B2C_INITIATOR || !process.env.MPESA_B2C_PASSWORD)) {
-      return res.status(503).json({ error: 'Live B2C initiator credentials are not configured (MPESA_B2C_INITIATOR / MPESA_B2C_PASSWORD).' });
+      // Safety: never let a live payout silently fall back to Safaricom's
+      // public sandbox initiator/password ('testapi' / 'Safaricom999!@#')
+      // just because the real credentials weren't configured — fail loudly
+      // here, before any debit, rather than attempting a live B2C call that
+      // Safaricom will reject for an unclear reason downstream.
+      if (isLive && (!process.env.MPESA_B2C_INITIATOR || !process.env.MPESA_B2C_PASSWORD)) {
+        return res.status(503).json({ error: 'Live B2C initiator credentials are not configured (MPESA_B2C_INITIATOR / MPESA_B2C_PASSWORD).' });
+      }
     }
 
     if (!pin) {
@@ -1132,6 +1281,44 @@ export const initiateB2C = async (req, res) => {
       return res.status(400).json({ error: 'Insufficient KES balance for this transfer, including the M-Pesa B2C charge' });
     }
     debited = true;
+
+    // ── NCBA MODE: Mobile B2W payout (or simulated — see
+    // services/ncbaOpenBankingService.js's NCBA_OPENBANKING_LIVE_ENABLED
+    // gate) ───────────────────────────────────────────────────────────────
+    if (NCBA_STK_B2C_ENABLED) {
+      const transactionId = `NCBA-B2W-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+      // Daraja B2C only ever targeted Safaricom-registered numbers — the
+      // existing UI has no provider picker, so 'safaricom' preserves
+      // identical behavior. Airtel Money support just needs a provider
+      // field threaded through from the frontend later.
+      const { validationId } = await ncbaValidateMobileWalletNumber({ provider: 'safaricom', msisdn: phone });
+      await ncbaSubmitMobileB2wPayment({
+        transactionId,
+        validationId,
+        provider: 'safaricom',
+        amount,
+        recipientNumber: phone,
+        narration: `Withdrawal to ${destination}`,
+      });
+
+      // type: 'ncba_mobile_b2w' (not 'mpesa_b2c') — see utils/feeCalculator.js
+      // for the matching fee branch and ncbaOpenBankingController.js's
+      // handlePesaLinkCallback for how this resolves from 'pending'.
+      const tx = await Transaction.create({
+        merchantId: merchant._id,
+        accountNumber: merchant.paybillAccount || 'WALLET_FUND',
+        type: 'ncba_mobile_b2w',
+        amount: amount,
+        kesAmount: amount,
+        currency: 'KES',
+        status: 'pending',
+        reference: transactionId,
+        sender: { name: merchant.businessName, id: merchant.paybillAccount },
+        recipient: { name: destination, id: phone },
+      });
+
+      return res.status(200).json({ success: true, message: 'Transfer initiated successfully via NCBA', transaction: tx });
+    }
 
     // 1. Security Credential Generation
     const b2cPassword = process.env.MPESA_B2C_PASSWORD || 'Safaricom999!@#';

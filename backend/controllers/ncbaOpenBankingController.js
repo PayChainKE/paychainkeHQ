@@ -12,6 +12,7 @@ import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { KENYAN_BANK_CODES } from '../config/kenyanBankCodes.js';
+import { getB2cTariff } from '../config/mpesaB2cTariffCard.js';
 
 export class InsufficientFundsError extends Error {
   constructor(merchantId, requested, available) {
@@ -266,30 +267,46 @@ export const handlePesaLinkCallback = async (req, res) => {
     let merchantForSms = null;
     if (!succeeded) {
       // The payout never landed — return the funds to the merchant's balance.
+      // For ncba_mobile_b2w specifically, PayChain's B2C-equivalent fee was
+      // ALSO deducted alongside the payout amount at initiation
+      // (mpesaController.js's initiateB2C via dispatchMobileMoneyPayout) —
+      // refunding only transaction.amount here would permanently cost the
+      // merchant that fee even though the transfer never went through.
+      // Mirrors mpesaController.js's b2cCallback handling of mpesa_b2c.
+      let refundAmount = transaction.amount;
+      if (transaction.type === 'ncba_mobile_b2w') {
+        const { totalFee } = getB2cTariff(transaction.amount);
+        refundAmount += totalFee;
+      }
       merchantForSms = await Merchant.findByIdAndUpdate(
         transaction.merchantId,
-        { $inc: { kesBalance: transaction.amount } },
+        { $inc: { kesBalance: refundAmount } },
         { returnDocument: 'after' }
       );
     } else {
       merchantForSms = await Merchant.findById(transaction.merchantId).select('phone');
     }
 
+    // This webhook now resolves both bank-account payouts (PesaLink/EFT)
+    // and Mobile B2W (M-Pesa/Airtel number) payouts — "Bank payout" wording
+    // would be wrong for the latter.
+    const payoutLabel = transaction.type === 'ncba_mobile_b2w' ? 'Payout' : 'Bank payout';
+
     createNotification({
       merchantId: transaction.merchantId,
       kind: 'payment',
-      title: succeeded ? 'Bank payout completed' : 'Bank payout failed',
+      title: succeeded ? `${payoutLabel} completed` : `${payoutLabel} failed`,
       message: succeeded
         ? `KES ${transaction.amount.toLocaleString()} was successfully sent to ${transaction.recipient?.name || 'the recipient'}.`
-        : `KES ${transaction.amount.toLocaleString()} bank payout to ${transaction.recipient?.name || 'the recipient'} failed and was refunded to your balance.`,
+        : `KES ${transaction.amount.toLocaleString()} ${payoutLabel.toLowerCase()} to ${transaction.recipient?.name || 'the recipient'} failed and was refunded to your balance.`,
     }).catch((e) => logEvent('error', 'ncba_openbanking_callback_notification_failed', { reference, error: e.message }));
 
     if (merchantForSms?.phone) {
       const { date, time } = formatTransactionDateTime();
       const recipientName = transaction.recipient?.name || 'the recipient';
       const message = succeeded
-        ? `${reference} Bank Payout Sent. KES ${transaction.amount.toLocaleString()} paid to ${recipientName} on ${date} at ${time}.`
-        : `${reference} Bank Payout Failed. KES ${transaction.amount.toLocaleString()} to ${recipientName} could not be completed on ${date} at ${time} and has been refunded. Your updated PayChain available balance is KES ${(merchantForSms.kesBalance || 0).toLocaleString()}.`;
+        ? `${reference} ${payoutLabel} Sent. KES ${transaction.amount.toLocaleString()} paid to ${recipientName} on ${date} at ${time}.`
+        : `${reference} ${payoutLabel} Failed. KES ${transaction.amount.toLocaleString()} to ${recipientName} could not be completed on ${date} at ${time} and has been refunded. Your updated PayChain available balance is KES ${(merchantForSms.kesBalance || 0).toLocaleString()}.`;
       safeSendSMS({ to: merchantForSms.phone, message }).then((r) => {
         if (!r.success) logEvent('error', 'ncba_openbanking_callback_sms_failed', { reference, error: r.error });
       });

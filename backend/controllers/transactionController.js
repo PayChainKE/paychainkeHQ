@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import axios from 'axios';
 import bcrypt from 'bcryptjs';
 import STKRequest from '../models/STKRequest.js';
-import { isLive, mpesaBaseUrl, shortCode, passkey, callbackBase, stkCallback } from './mpesaController.js';
+import { isLive, mpesaBaseUrl, shortCode, passkey, callbackBase, stkCallback, NCBA_STK_B2C_ENABLED, initiateAndTrackNcbaStk } from './mpesaController.js';
 import { settleInflationShield, provisionMerchantWallet, getWalletBalance, swapUsdcToKesOnChain } from '../utils/stellarHelper.js';
 import { encryptKey } from '../utils/cryptoHelper.js';
 import { getLiveKesToUsdcRate } from '../utils/rateEngine.js';
@@ -675,7 +675,19 @@ export const processPaymentLink = async (req, res) => {
     // plus link.amount (the base) once Safaricom confirms.
     const checkoutTotal = getCheckoutTotal(link.amount);
 
-    // ── SANDBOX MODE: local simulation, no real Safaricom call ──────────────
+    // ── NCBA MODE: real STK Push via NCBA's paybill 880100 (or simulated —
+    // see services/ncbaStkPushService.js's NCBA_STK_LIVE_ENABLED gate) ──────
+    if (NCBA_STK_B2C_ENABLED) {
+      const checkoutRequestId = await initiateAndTrackNcbaStk({
+        merchantId: link.merchantId._id,
+        phone: formattedPhone,
+        checkoutTotal,
+        extra: { linkId: link.linkId },
+      });
+      return res.status(200).json({ success: true, checkoutRequestId, message: 'STK Push sent to phone' });
+    }
+
+    // ── SANDBOX MODE (Daraja): local simulation, no real Safaricom call ─────
     // Mirrors mpesaController.js#initiateSTKPush's sandbox branch — no live
     // money at risk, and no dependency on Safaricom's sandbox-specific
     // shortcode/passkey pairing (which differ from this deploy's real
@@ -837,7 +849,19 @@ export const payToMerchantAccount = async (req, res) => {
 
     const checkoutTotal = getCheckoutTotal(amount);
 
-    // ── SANDBOX MODE — mirrors processPaymentLink's sandbox branch exactly. ──
+    // ── NCBA MODE: real STK Push via NCBA's paybill 880100 (or simulated —
+    // see services/ncbaStkPushService.js's NCBA_STK_LIVE_ENABLED gate) ──────
+    if (NCBA_STK_B2C_ENABLED) {
+      const checkoutRequestId = await initiateAndTrackNcbaStk({
+        merchantId: merchant._id,
+        phone: formattedPhone,
+        checkoutTotal,
+        extra: { baseAmount: amount, kind: 'pay_account' },
+      });
+      return res.status(200).json({ success: true, checkoutRequestId, message: 'STK Push sent to phone' });
+    }
+
+    // ── SANDBOX MODE (Daraja) — mirrors processPaymentLink's sandbox branch exactly. ──
     if (!isLive) {
       const checkoutRequestId = `SANDBOX-ACCT-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
       console.log(`🧪 [SANDBOX] Simulating direct-account STK Push for ${formattedPhone} KES ${checkoutTotal} → merchant ${merchant._id}`);
