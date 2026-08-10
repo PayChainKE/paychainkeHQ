@@ -1,15 +1,46 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, Modal, Share } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, Modal, Share, Alert } from 'react-native';
 import { MaterialIcons, Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { File, Directory, Paths } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import * as SecureStore from 'expo-secure-store';
 import { useAuth } from '../../context/AuthContext';
 import { formatAccountNumber } from '../../utils/formatAccountNumber';
 import SettlementQrCard from '../ui/SettlementQrCard';
+import api from '../../api/config';
 
 export default function MyAccountsTab() {
   const { merchant } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [qrAccount, setQrAccount] = useState<{ name: string; accountNumber: string } | null>(null);
+  const [downloadingSticker, setDownloadingSticker] = useState(false);
+
+  // Downloads the official branded PayChain/NCBA paybill sticker (PDF),
+  // pre-filled server-side with this merchant's own account number and
+  // business name — matches merchant-dashboard's MyAccounts.jsx. The
+  // endpoint requires the merchant's auth token, so it's a real
+  // authenticated download (headers passed to downloadFileAsync), not a
+  // plain link.
+  const handleDownloadSticker = async () => {
+    setDownloadingSticker(true);
+    try {
+      const token = await SecureStore.getItemAsync('paychain_merchant_token');
+      const url = `${api.defaults.baseURL}/api/transactions/sticker`;
+      const destination = new Directory(Paths.cache);
+      const file = await File.downloadFileAsync(url, destination, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        idempotent: true,
+      });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(file.uri, { mimeType: 'application/pdf', dialogTitle: 'PayChain Paybill Sticker' });
+      }
+    } catch (err) {
+      Alert.alert('Download Failed', 'Could not download the sticker — please try again.');
+    } finally {
+      setDownloadingSticker(false);
+    }
+  };
 
   const accountsData = [
     {
@@ -115,6 +146,19 @@ export default function MyAccountsTab() {
                   <MaterialIcons name="qr-code-2" size={16} color="#5efeb3" />
                   <Text className="text-[#5efeb3] text-[11px] font-jakarta-extrabold uppercase tracking-widest">
                     {account.status !== 'Active' ? 'Pending Bank Assignment' : 'Generate QR'}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={handleDownloadSticker}
+                  disabled={account.status !== 'Active' || downloadingSticker}
+                  activeOpacity={0.85}
+                  className="flex-row items-center justify-center gap-2 mt-2.5 py-3.5 bg-white border border-[#00351d]/15 rounded-2xl"
+                  style={{ opacity: account.status !== 'Active' ? 0.35 : 1 }}
+                >
+                  <MaterialIcons name={downloadingSticker ? 'hourglass-empty' : 'download'} size={16} color="#00351d" />
+                  <Text className="text-[#00351d] text-[11px] font-jakarta-extrabold uppercase tracking-widest">
+                    {downloadingSticker ? 'Preparing…' : 'Download Sticker'}
                   </Text>
                 </TouchableOpacity>
               </View>

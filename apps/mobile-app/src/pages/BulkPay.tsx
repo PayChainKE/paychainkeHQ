@@ -14,6 +14,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api/config';
 import TopBar from '../components/layout/TopBar';
 import { formatAccountNumber } from '../utils/formatAccountNumber';
+import { formatPhoneDisplay } from '../utils/formatPhoneDisplay';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type PayeeType = 'employee' | 'supplier' | 'utility' | 'contractor';
@@ -171,11 +172,16 @@ export default function BulkPay() {
   const [selectedFundingSource, setSelectedFundingSource] = useState(false);
 
   // Security verification (OTP-then-PIN), matches the dashboard's two-step
-  // "Verification" modal. The OTP step is not backend-verified on the
-  // dashboard either — the real check is the PIN, enforced server-side in
-  // authorizeBatch. Kept here for exact behavioral parity.
+  // "Verification" modal. Real SMS-OTP check (merchantSmsAuthController.js's
+  // send-otp/verify-otp, the same endpoints merchant login 2FA uses) — this
+  // used to just require 4+ digits typed with no backend call at all, so no
+  // OTP was ever actually sent or checked. Matches the dashboard fix.
   const [securityStep, setSecurityStep] = useState<1 | 2>(1);
   const [securityOtp, setSecurityOtp] = useState('');
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [otpError, setOtpError] = useState('');
+  const [otpResendCooldown, setOtpResendCooldown] = useState(0);
 
   // Which batch is pending authorization — set right before opening the
   // Funding Source Select -> Security flow, consumed once the PIN is confirmed.
@@ -818,18 +824,58 @@ export default function BulkPay() {
     setShowFundingSourceSelect(true);
   };
 
+  const sendBulkPayOtp = useCallback(async () => {
+    if (!merchant?.phone) {
+      setOtpError('No phone number is on file for this account. Add one in Profile first.');
+      return;
+    }
+    setIsSendingOtp(true);
+    setOtpError('');
+    try {
+      await api.post('/api/auth/merchant/sms/send-otp', { phone: merchant.phone });
+      setOtpResendCooldown(30);
+    } catch (e: any) {
+      setOtpError(e?.response?.data?.error || 'Could not send the verification code. Try again.');
+    } finally {
+      setIsSendingOtp(false);
+    }
+  }, [merchant?.phone]);
+
+  useEffect(() => {
+    if (otpResendCooldown <= 0) return;
+    const t = setTimeout(() => setOtpResendCooldown((s) => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [otpResendCooldown]);
+
+  const verifyBulkPayOtp = async () => {
+    setIsVerifyingOtp(true);
+    setOtpError('');
+    try {
+      await api.post('/api/auth/merchant/sms/verify-otp', { phone: merchant?.phone, otp: securityOtp });
+      setSecurityStep(2);
+    } catch (e: any) {
+      setOtpError(e?.response?.data?.error || 'Invalid or expired code.');
+      setSecurityOtp('');
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  };
+
   const confirmFundingSourceAndVerify = () => {
     setShowFundingSourceSelect(false);
     setSecurityStep(1);
     setSecurityOtp('');
+    setOtpError('');
     setAuthPin('');
     setShowSecurity(true);
+    sendBulkPayOtp();
   };
 
   const cancelSecurity = () => {
     setShowSecurity(false);
     setSecurityStep(1);
     setSecurityOtp('');
+    setOtpError('');
     setAuthPin('');
     setPendingBatch(null);
   };
@@ -1715,25 +1761,41 @@ export default function BulkPay() {
                     <View className="w-16 h-16 rounded-full bg-[#dbeafe] items-center justify-center mb-4">
                       <Feather name="message-square" size={26} color="#1e40af" />
                     </View>
-                    <Text className="font-jakarta-bold text-[#0c2010] text-[14px]">Enter OTP Sent to {merchant?.phone || '07XX XXX XXX'}</Text>
+                    <Text className="font-jakarta-bold text-[#0c2010] text-[14px] text-center">
+                      {isSendingOtp ? 'Sending code…' : `Enter OTP Sent to ${formatPhoneDisplay(merchant?.phone) || '07XX XXX XXX'}`}
+                    </Text>
                   </View>
                   <TextInput
                     value={securityOtp}
-                    onChangeText={(t) => setSecurityOtp(t.replace(/\D/g, '').slice(0, 6))}
+                    onChangeText={(t) => { setSecurityOtp(t.replace(/\D/g, '').slice(0, 6)); setOtpError(''); }}
                     keyboardType="numeric"
                     maxLength={6}
-                    className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-5 py-4 text-[#0c2010] font-jakarta-bold text-[20px] tracking-[0.5em] text-center mb-6"
+                    className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-5 py-4 text-[#0c2010] font-jakarta-bold text-[20px] tracking-[0.5em] text-center mb-3"
                     placeholder="••••••"
                     placeholderTextColor="#a1a1aa"
                     autoFocus
                   />
+                  {otpError ? (
+                    <Text className="text-red-600 font-jakarta-bold text-[12px] text-center mb-3">{otpError}</Text>
+                  ) : null}
                   <TouchableOpacity
-                    onPress={() => setSecurityStep(2)}
-                    disabled={securityOtp.length < 4}
-                    className="w-full bg-[#e7f8ef] h-[56px] rounded-full items-center justify-center"
-                    style={{ opacity: securityOtp.length < 4 ? 0.5 : 1 }}
+                    onPress={verifyBulkPayOtp}
+                    disabled={securityOtp.length < 4 || isVerifyingOtp || isSendingOtp}
+                    className="w-full bg-[#e7f8ef] h-[56px] rounded-full items-center justify-center flex-row gap-2 mb-3"
+                    style={{ opacity: securityOtp.length < 4 || isVerifyingOtp || isSendingOtp ? 0.5 : 1 }}
                   >
-                    <Text className="text-[#006c4e] font-jakarta-bold text-[15px]">Verify OTP</Text>
+                    {isVerifyingOtp ? <ActivityIndicator color="#006c4e" /> : (
+                      <Text className="text-[#006c4e] font-jakarta-bold text-[15px]">Verify OTP</Text>
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={sendBulkPayOtp}
+                    disabled={isSendingOtp || otpResendCooldown > 0}
+                    className="items-center"
+                  >
+                    <Text className="text-[#707971] font-jakarta-bold text-[11px]" style={{ opacity: isSendingOtp || otpResendCooldown > 0 ? 0.5 : 1 }}>
+                      {otpResendCooldown > 0 ? `Resend code in ${otpResendCooldown}s` : 'Resend code'}
+                    </Text>
                   </TouchableOpacity>
                 </>
               ) : (
