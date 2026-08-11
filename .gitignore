@@ -24,3 +24,6 @@ dist-ssr
 *.sw?
 .vercel
 .env*.local
+
+# Bank integration reference docs — contains real UAT credentials, never commit
+/API documents/
