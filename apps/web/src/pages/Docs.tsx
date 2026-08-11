@@ -21,7 +21,7 @@ const docSections = [
     title: 'Webhook Integration',
     description: 'Configure M-Pesa callbacks to route through payChainKE.',
     items: [
-      'Daraja API setup',
+      'M-Pesa API setup',
       'Callback URL configuration',
       'Signature verification',
       'Error handling',

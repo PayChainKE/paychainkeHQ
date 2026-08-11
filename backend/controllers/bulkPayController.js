@@ -3,10 +3,8 @@ import PayoutBatch from '../models/PayoutBatch.js';
 import Merchant from '../models/Merchant.js';
 import Transaction from '../models/Transaction.js';
 import { calculatePAYE } from '../utils/kraCalculator.js';
-import { generateSecurityCredential } from '../utils/safaricomCrypto.js';
 import { submitNcbaBankTransfer } from './ncbaOpenBankingController.js';
 import { submitNcbaUtilityPayment } from '../services/ncbaBulkPaymentService.js';
-import axios from 'axios';
 import csv from 'csv-parser';
 import fs from 'fs';
 import bcrypt from 'bcryptjs';
@@ -16,8 +14,7 @@ import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard.js';
-import { DARAJA_STK_B2C_ENABLED, NCBA_STK_B2C_ENABLED } from './mpesaController.js';
-import { validateMobileWalletNumber, submitMobileB2wPayment } from '../services/ncbaOpenBankingService.js';
+import { validateMobileWalletNumber, submitMobileB2wPayment, validateLipaNaMpesaAccount, submitLipaNaMpesaPayment } from '../services/ncbaOpenBankingService.js';
 
 // @desc    Get all payees for a merchant
 // @route   GET /api/bulkpay/payees
@@ -240,8 +237,7 @@ export const uploadCSV = async (req, res) => {
 export const authorizeBatch = async (req, res) => {
   try {
     const { batchRows, fundingSource, pin } = req.body;
-    const token = req.mpesaToken; // Assuming protectMerchant + generateToken middleware
-    
+
     if (!pin) {
       return res.status(400).json({ message: 'Bulk Pay PIN is required to authorize the batch' });
     }
@@ -370,45 +366,18 @@ export const authorizeBatch = async (req, res) => {
     merchant.kesBalance = debitedMerchant.kesBalance;
 
     const transactions = [];
-    const b2cPassword = process.env.MPESA_B2C_PASSWORD || 'Safaricom999!@#';
-    // Lazily computed and cached inside the Mobile Money branch below, not
-    // upfront — the balance has already been atomically deducted by this
-    // point, and this function throws when Safaricom's B2C certificate
-    // isn't configured (see utils/safaricomCrypto.js). Generating it here
-    // would let that throw escape to the outer catch, which never refunds
-    // the deduction — treating a missing/invalid credential the same as
-    // any other per-row Daraja failure (below) keeps the refund path intact.
-    let cachedSecurityCredential = null;
-    let securityCredentialError = null;
-    const getSecurityCredential = () => {
-      if (cachedSecurityCredential) return cachedSecurityCredential;
-      if (securityCredentialError) throw securityCredentialError;
-      try {
-        cachedSecurityCredential = generateSecurityCredential(b2cPassword);
-        return cachedSecurityCredential;
-      } catch (err) {
-        securityCredentialError = err;
-        throw err;
-      }
-    };
-
-    const mpesaEnv = (process.env.MPESA_ENVIRONMENT || 'sandbox').toLowerCase();
-    const isLiveMpesa = mpesaEnv === 'live';
-    const liveBlocked = isLiveMpesa && process.env.MPESA_LIVE_ENABLED !== 'true';
-    const callbackBase = (process.env.MPESA_CALLBACK_URL || '').replace(/\/$/, '');
-
     let refundAmount = 0;
 
     // 4. Process each row (payee already resolved in the pass above)
     for (const row of batchRows) {
       const payee = row._payee;
 
-      let darajaStatus = 'pending';
-      let darajaRef = `BULK_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+      let payoutStatus = 'pending';
+      let payoutRef = `BULK_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
       if (payee.type === 'utility' && payee.utilityProvider) {
         if (!payee.accountNumber) {
-          darajaStatus = 'failed';
+          payoutStatus = 'failed';
           refundAmount += row.netAmount + row.b2cFee;
           console.error(`❌ Bulk payout to ${payee.name} failed: no meter/account number on file for this utility payee.`);
         } else {
@@ -422,17 +391,17 @@ export const authorizeBatch = async (req, res) => {
             // Unlike PesaLink/EFT below, NCBA's Bulk H2H "BILLPAY" rail is
             // asynchronous — a successful submission only means NCBA
             // accepted the instruction, not that the bill is paid yet.
-            // darajaStatus stays 'pending' (its default above).
-            darajaRef = transactionId;
+            // payoutStatus stays 'pending' (its default above).
+            payoutRef = transactionId;
           } catch (err) {
             console.error(`❌ NCBA BillPay rejected payout for ${payee.name}:`, err.message);
-            darajaStatus = 'failed';
+            payoutStatus = 'failed';
             refundAmount += row.netAmount + row.b2cFee;
           }
         }
       } else if (payee.paymentMethod === 'Bank') {
         if (!payee.bankCode || !payee.accountNumber) {
-          darajaStatus = 'failed';
+          payoutStatus = 'failed';
           refundAmount += row.netAmount + row.b2cFee;
           console.error(`❌ Bulk payout to ${payee.name} failed: no bank code on file for this payee.`);
         } else {
@@ -445,109 +414,64 @@ export const authorizeBatch = async (req, res) => {
               amount: row.netAmount,
               narration: `Bulk Payout to ${payee.name}`,
             });
-            // Unlike the Mobile Money branch below (which only gets an
-            // "accepted" ack here and confirms completion later via
-            // Daraja's b2c-callback), NCBA PesaLink resolves synchronously
+            // Unlike the Mobile Money branches below (which only get an
+            // "accepted" ack here and confirm completion later via
+            // handlePesaLinkCallback), NCBA PesaLink resolves synchronously
             // — submitNcbaBankTransfer already throws on rejection, so
             // reaching this line means the transfer succeeded.
-            darajaRef = transactionId;
-            darajaStatus = 'completed';
+            payoutRef = transactionId;
+            payoutStatus = 'completed';
           } catch (err) {
             console.error(`❌ NCBA PesaLink rejected payout for ${payee.name}:`, err.message);
-            darajaStatus = 'failed';
+            payoutStatus = 'failed';
             refundAmount += row.netAmount + row.b2cFee;
           }
         }
+      } else if (payee.paymentMethod === 'Mobile Money' && payee.mobileMoneyType === 'Personal Number') {
+        // NCBA Mobile B2W. Async rail — payoutStatus stays 'pending' (its
+        // default above), resolved later via handlePesaLinkCallback
+        // (ncbaOpenBankingController.js), keyed by the reference this row is
+        // stamped with below.
+        try {
+          const transactionId = `PAYOUT-BULK-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+          const { validationId } = await validateMobileWalletNumber({ provider: 'safaricom', msisdn: payee.phone });
+          await submitMobileB2wPayment({
+            transactionId,
+            validationId,
+            provider: 'safaricom',
+            amount: row.netAmount,
+            recipientNumber: payee.phone,
+            narration: `Bulk Payout to ${payee.name}`,
+          });
+          payoutRef = transactionId;
+        } catch (err) {
+          console.error(`❌ NCBA Mobile B2W rejected payout for ${payee.name}:`, err.message);
+          payoutStatus = 'failed';
+          refundAmount += row.netAmount + row.b2cFee;
+        }
       } else if (payee.paymentMethod === 'Mobile Money') {
-        if (payee.mobileMoneyType === 'Personal Number' && NCBA_STK_B2C_ENABLED) {
-          // NCBA Mobile B2W — independent of the Daraja liveBlocked/token
-          // checks below (those only gate the Daraja rail, still used here
-          // for Paybill/Till B2B payees in the same batch). Async rail, same
-          // as the Daraja B2C branch it replaces — darajaStatus stays
-          // 'pending' (its default above), resolved later via
-          // handlePesaLinkCallback (ncbaOpenBankingController.js), keyed by
-          // the reference this row is stamped with below.
-          try {
-            const transactionId = `NCBA-B2W-BULK-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-            const { validationId } = await validateMobileWalletNumber({ provider: 'safaricom', msisdn: payee.phone });
-            await submitMobileB2wPayment({
-              transactionId,
-              validationId,
-              provider: 'safaricom',
-              amount: row.netAmount,
-              recipientNumber: payee.phone,
-              narration: `Bulk Payout to ${payee.name}`,
-            });
-            darajaRef = transactionId;
-          } catch (err) {
-            console.error(`❌ NCBA Mobile B2W rejected payout for ${payee.name}:`, err.message);
-            darajaStatus = 'failed';
-            refundAmount += row.netAmount + row.b2cFee;
-          }
-        } else if (liveBlocked) {
-          darajaStatus = 'failed';
+        // Paybill/Till, via NCBA's Lipa na M-Pesa Payment API — NCBA's
+        // replacement for Daraja B2B. Same async shape as Mobile B2W above.
+        try {
+          const paymentType = payee.mobileMoneyType === 'Paybill' ? 'Paybill' : 'Till';
+          const payBillTillNo = payee.paybillNumber || payee.tillNumber;
+          const transactionId = `PAYOUT-BULK-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+          const destination = await validateLipaNaMpesaAccount({ paymentType, payBillTillNo });
+          await submitLipaNaMpesaPayment({
+            transactionId,
+            paymentType,
+            payBillTillNo,
+            amount: row.netAmount,
+            accountReference: paymentType === 'Paybill' ? payee.businessAccount : undefined,
+            recipientName: destination.organizationName || payee.name,
+            notifyMobileNumber: merchant.phone,
+            narration: `Bulk Payout to ${payee.name}`,
+          });
+          payoutRef = transactionId;
+        } catch (err) {
+          console.error(`❌ NCBA Lipa na M-Pesa rejected payout for ${payee.name}:`, err.message);
+          payoutStatus = 'failed';
           refundAmount += row.netAmount + row.b2cFee;
-          console.error(`❌ Bulk payout to ${payee.name} blocked: live M-PESA is not enabled (set MPESA_LIVE_ENABLED=true).`);
-        } else if (!token) {
-          darajaStatus = 'failed';
-          refundAmount += row.netAmount + row.b2cFee;
-          console.error(`❌ Bulk payout to ${payee.name} failed: no Daraja auth token available.`);
-        } else if (payee.mobileMoneyType === 'Personal Number' && !DARAJA_STK_B2C_ENABLED) {
-          // Same Daraja B2C rail as the standalone /b2c-request endpoint —
-          // gated off for the same reason (see DARAJA_STK_B2C_ENABLED in
-          // mpesaController.js). Paybill/Till (B2B) payees below are
-          // unaffected; only "Personal Number" payouts hit B2C.
-          darajaStatus = 'failed';
-          refundAmount += row.netAmount + row.b2cFee;
-          console.error(`❌ Bulk payout to ${payee.name} blocked: M-PESA B2C is temporarily disabled (DARAJA_STK_B2C_ENABLED).`);
-        } else {
-          try {
-            const securityCredential = getSecurityCredential();
-
-            const mpesaBaseUrl = isLiveMpesa ? 'https://api.safaricom.co.ke' : 'https://sandbox.safaricom.co.ke';
-            const isB2C = payee.mobileMoneyType === 'Personal Number';
-            const url = isB2C
-              ? `${mpesaBaseUrl}/mpesa/b2c/v1/paymentrequest`
-              : `${mpesaBaseUrl}/mpesa/b2b/v1/paymentrequest`;
-
-            const payload = isB2C ? {
-              InitiatorName: process.env.MPESA_B2C_INITIATOR || 'testapi',
-              SecurityCredential: securityCredential,
-              CommandID: 'BusinessPayment',
-              Amount: row.netAmount,
-              PartyA: process.env.MPESA_SHORTCODE || '600000',
-              PartyB: payee.phone,
-              Remarks: `Bulk Payout to ${payee.name}`,
-              QueueTimeOutURL: callbackBase ? `${callbackBase}/api/callbacks/b2c-timeout` : 'https://sandbox.paychain.co.ke/api/callbacks/b2c-timeout',
-              ResultURL: callbackBase ? `${callbackBase}/api/callbacks/b2c-callback` : 'https://sandbox.paychain.co.ke/api/callbacks/b2c-callback',
-              Occasion: 'PayChain Settlement'
-            } : {
-              // B2B Payload
-              Initiator: process.env.MPESA_B2C_INITIATOR || 'testapi',
-              SecurityCredential: securityCredential,
-              CommandID: payee.mobileMoneyType === 'Paybill' ? 'BusinessPayBill' : 'BusinessBuyGoods',
-              SenderIdentifierType: '4',
-              RecieverIdentifierType: '4',
-              Amount: row.netAmount,
-              PartyA: process.env.MPESA_SHORTCODE || '600000',
-              PartyB: payee.paybillNumber || payee.tillNumber,
-              AccountReference: payee.businessAccount || 'Settlement',
-              Remarks: `Bulk B2B Payout to ${payee.name}`,
-              QueueTimeOutURL: callbackBase ? `${callbackBase}/api/callbacks/b2c-timeout` : 'https://sandbox.paychain.co.ke/api/callbacks/b2c-timeout',
-              ResultURL: callbackBase ? `${callbackBase}/api/callbacks/b2c-callback` : 'https://sandbox.paychain.co.ke/api/callbacks/b2c-callback',
-            };
-
-            const mpesaRes = await axios.post(url, payload, {
-              headers: { Authorization: `Bearer ${token}` }
-            });
-            // Daraja only accepted the request — real completion is confirmed
-            // asynchronously via the b2c-callback webhook.
-            darajaRef = mpesaRes.data.OriginatorConversationID || darajaRef;
-          } catch (err) {
-            console.error(`❌ Daraja API rejected payout for ${payee.name}:`, err.response?.data?.errorMessage || err.message);
-            darajaStatus = 'failed';
-            refundAmount += row.netAmount + row.b2cFee;
-          }
         }
       }
 
@@ -564,8 +488,8 @@ export const authorizeBatch = async (req, res) => {
         amount: row.netAmount,
         kesAmount: row.netAmount,
         currency: 'KES',
-        status: darajaStatus,
-        reference: darajaRef,
+        status: payoutStatus,
+        reference: payoutRef,
         sender: { name: merchant.businessName, id: merchant.paybillAccount },
         recipient: { name: payee.name, id: payee.phone || payee.paybillNumber || payee.tillNumber }
       });
@@ -575,11 +499,11 @@ export const authorizeBatch = async (req, res) => {
       // markup for rows that actually carry it (reserved from the merchant
       // in the resolve pass above), so the persisted figures match what
       // was really charged. Skipped for rows that failed synchronously —
-      // their fee was refunded above, so PayChain kept nothing. b2cCallback
-      // later flips status pending → completed/failed for rows still
-      // pending here; it only touches `status`, so this reconciliation
-      // isn't clobbered by that follow-up save.
-      if (row.isB2cRow && darajaStatus !== 'failed') {
+      // their fee was refunded above, so PayChain kept nothing.
+      // handlePesaLinkCallback later flips status pending → completed/failed
+      // for rows still pending here; it only touches `status`, so this
+      // reconciliation isn't clobbered by that follow-up save.
+      if (row.isB2cRow && payoutStatus !== 'failed') {
         await Transaction.updateOne(
           { _id: transaction._id },
           { $set: { paychainFee: row.b2cMarkup, safaricomFee: row.b2cSafaricomFee, revenueStream: 'mpesa_b2c_fee' } }
@@ -594,9 +518,9 @@ export const authorizeBatch = async (req, res) => {
         taxDeductions: row.taxDeductions || { paye: 0, nssf: 0, shif: 0 },
         method: payee.paymentMethod,
         accountReference: payee.phone || payee.paybillNumber || payee.tillNumber || payee.accountNumber || 'N/A',
-        receiptNumber: darajaRef,
-        status: darajaStatus,
-        b2cFee: darajaStatus !== 'failed' ? row.b2cFee : 0,
+        receiptNumber: payoutRef,
+        status: payoutStatus,
+        b2cFee: payoutStatus !== 'failed' ? row.b2cFee : 0,
       });
     }
 
@@ -610,8 +534,9 @@ export const authorizeBatch = async (req, res) => {
       merchant.kesBalance = refundedMerchant.kesBalance;
     }
 
-    // Batch status reflects reality: rows still 'pending' await the Daraja
-    // callback, which will flip the batch to Processed/Partial once resolved.
+    // Batch status reflects reality: rows still 'pending' await
+    // handlePesaLinkCallback, which will flip the batch to
+    // Processed/Partial once resolved.
     const rowStatuses = transactions.map((t) => t.status);
     const batchStatus = rowStatuses.every((s) => s === 'failed')
       ? 'Failed'
@@ -646,8 +571,8 @@ export const authorizeBatch = async (req, res) => {
     });
 
     // Non-blocking — a pending row here still gets its own resolution SMS
-    // later from b2cCallback once Daraja confirms it, same as a standalone
-    // B2C payout. This one is just the submission acknowledgment.
+    // later from handlePesaLinkCallback once NCBA confirms it, same as a
+    // standalone B2C payout. This one is just the submission acknowledgment.
     if (merchant.phone) {
       const failedCount = rowStatuses.filter((s) => s === 'failed').length;
       const { date, time } = formatTransactionDateTime();
@@ -672,7 +597,7 @@ export const authorizeBatch = async (req, res) => {
     }
 
     res.status(200).json({
-      message: 'Batch authorized and processed successfully via Daraja M-PESA.',
+      message: 'Batch authorized and processed successfully.',
       batch: savedBatch,
     });
 

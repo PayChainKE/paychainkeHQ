@@ -265,7 +265,7 @@ export default function About(): JSX.Element {
                 <div className="about__timeline-content">
                   <div className="about__timeline-title">Build (Now → Q2 2026)</div>
                   <div className="about__timeline-badge">In Progress</div>
-                  <p>Engineering underway. M-PESA Daraja API integration in development. Base Network blockchain rails configured. Merchant dashboard UI being built. CBK licensing initiated.</p>
+                  <p>Engineering underway. M-PESA integration live via NCBA Bank. Base Network blockchain rails configured. Merchant dashboard UI being built. CBK licensing initiated.</p>
                 </div>
               </li>
 

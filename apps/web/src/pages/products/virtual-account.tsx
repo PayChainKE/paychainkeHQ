@@ -15,7 +15,7 @@ import {
 import Breadcrumbs from '@/components/Breadcrumbs';
 
 const features = [
-  { title: 'Verified Inbound Payments', icon: ShieldCheck, desc: 'Every payment verified against Safaricom Daraja API before confirmation. Fake screenshots are impossible.' },
+  { title: 'Verified Inbound Payments', icon: ShieldCheck, desc: 'Every payment verified through our NCBA Bank integration before confirmation. Fake screenshots are impossible.' },
   { title: 'Real-Time Dashboard Confirmation', icon: Activity, desc: 'The moment a customer pays, it appears on your dashboard with amount, timestamp, phone number, and reference.' },
   { title: 'Immutable Transaction Ledger', icon: Database, desc: 'Every payment logged on blockchain rails — a permanent, tamper-proof record that builds your Trust Score.' },
   { title: 'Aggregator-Backed Virtual Account', icon: Building2, desc: 'Registered through a licensed payment aggregator — institutional credibility behind every transaction.' },
@@ -30,7 +30,7 @@ const steps = [
 ];
 
 const comparisonRows = [
-  ['Payment verification', 'SMS confirmation', 'Daraja API + blockchain'],
+  ['Payment verification', 'SMS confirmation', 'NCBA Bank integration + blockchain'],
   ['Fraud protection', 'None', 'Real-time fraud elimination'],
   ['Transaction records', 'SMS inbox', 'Immutable digital ledger'],
   ['Business credit building', 'No', 'Yes — automatic Trust Score'],
@@ -92,7 +92,7 @@ const VirtualAccount: React.FC = () => {
                 </motion.div>
                 <div className="space-y-2">
                   {[
-                    { label: 'Daraja API', ok: true },
+                    { label: 'M-PESA verified', ok: true },
                     { label: 'On-chain record', ok: true },
                     { label: 'Trust Score updated', ok: true },
                   ].map((row, i) => (
@@ -135,7 +135,7 @@ const VirtualAccount: React.FC = () => {
             <motion.div initial={{ opacity: 0, x: -20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.6 }}>
               <h3 className="text-3xl font-bold text-gray-900 mb-6">One Account. Two Rails. Zero Fraud.</h3>
               <p className="text-lg text-gray-600 leading-relaxed">
-                The PayChain Virtual Account operates across both M-PESA infrastructure and blockchain rails simultaneously — giving you the familiarity of M-PESA with the security of blockchain confirmation. Every inbound payment is confirmed on the Safaricom Daraja API in real time, logged on-chain for a tamper-proof record, instantly visible on your dashboard, and automatically added to your Trust Score.
+                The PayChain Virtual Account operates across both M-PESA infrastructure and blockchain rails simultaneously — giving you the familiarity of M-PESA with the security of blockchain confirmation. Every inbound payment is confirmed through our NCBA Bank integration in real time, logged on-chain for a tamper-proof record, instantly visible on your dashboard, and automatically added to your Trust Score.
               </p>
             </motion.div>
 

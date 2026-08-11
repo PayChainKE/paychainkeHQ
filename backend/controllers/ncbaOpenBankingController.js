@@ -9,10 +9,12 @@ import {
 } from '../services/ncbaOpenBankingService.js';
 import { createNotification } from './notificationController.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
+import { buildPayoutSentSms, buildPayoutFailedSms } from '../utils/paymentSmsTemplates.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { KENYAN_BANK_CODES } from '../config/kenyanBankCodes.js';
 import { getB2cTariff } from '../config/mpesaB2cTariffCard.js';
+import { PAYCHAIN_TXN_RATE } from '../config/revenueRateCard.js';
 
 export class InsufficientFundsError extends Error {
   constructor(merchantId, requested, available) {
@@ -198,9 +200,18 @@ export const handleBankPayout = async (req, res) => {
 
     if (updatedMerchant.phone) {
       const { date, time } = formatTransactionDateTime();
+      const { message } = buildPayoutSentSms({
+        ref: transaction.reference,
+        label: 'Bank Payout',
+        amount: Number(amount),
+        recipientName: accountName || 'your bank account',
+        date,
+        time,
+        balance: updatedMerchant.kesBalance,
+      });
       safeSendSMS({
         to: updatedMerchant.phone,
-        message: `${transaction.reference} Bank Payout Sent. KES ${Number(amount).toLocaleString()} paid to ${accountName || 'your bank account'} on ${date} at ${time}. New balance: KES ${updatedMerchant.kesBalance.toLocaleString()}.`,
+        message,
       }).then((result) => {
         if (!result.success) logEvent('error', 'ncba_openbanking_payout_sms_failed', { transactionId: transaction.reference, error: result.error });
       });
@@ -241,42 +252,57 @@ export const handleBankPayout = async (req, res) => {
 // @access  NCBA host-to-host only (HTTP Basic Auth via verifyNcbaBasicAuth)
 export const handlePesaLinkCallback = async (req, res) => {
   // Ack immediately — same "banks retry on non-200/slow response"
-  // convention as the account-notification webhook and mpesaController's
-  // b2cCallback.
+  // convention as the account-notification webhook.
   res.status(200).json({ resultCode: '0', resultDescription: 'Accepted' });
 
   const body = req.body && typeof req.body === 'object' ? req.body : {};
-  const reference = body.TransactionID || body.transactionId || body.reference;
-  if (!reference) {
+  const rawReference = body.TransactionID || body.transactionId || body.reference;
+  // Reject anything that isn't a plain string before it ever reaches a Mongo
+  // query filter below — a body-derived object here (e.g. an
+  // {"$ne": null}-shaped value) would otherwise be interpreted as a query
+  // operator instead of an equality match, matching an arbitrary pending
+  // transaction rather than the one this callback is actually about. Route
+  // auth (verifyNcbaBasicAuth) is the primary control here, but this is
+  // cheap defense-in-depth against a leaked/misused credential.
+  if (typeof rawReference !== 'string' || !rawReference) {
     logEvent('warn', 'ncba_openbanking_callback_missing_reference', { body });
     return;
   }
+  const reference = rawReference;
 
   try {
     const succeeded = ['SUCCESS', 'COMPLETED', '0'].includes(String(body.Status || body.status || '').toUpperCase());
 
-    const transaction = await Transaction.findOne({ reference });
-    if (!transaction || transaction.status !== 'pending') {
+    // Atomic claim on the pending->resolved transition — a plain
+    // `if (transaction.status === 'pending')` read followed by a separate
+    // `.save()` is a TOCTOU race: two redeliveries of the same callback
+    // (NCBA retries, like every other bank webhook) could both read
+    // 'pending' before either write, double-refunding a failed payout. The
+    // status:'pending' filter here is what makes only one caller ever win.
+    const transaction = await Transaction.findOneAndUpdate(
+      { reference, status: 'pending' },
+      { $set: { status: succeeded ? 'completed' : 'failed' } },
+      { returnDocument: 'after' }
+    );
+    if (!transaction) {
       logEvent('info', 'ncba_openbanking_callback_no_pending_match', { reference });
       return;
     }
 
-    transaction.status = succeeded ? 'completed' : 'failed';
-    await transaction.save();
-
     let merchantForSms = null;
     if (!succeeded) {
       // The payout never landed — return the funds to the merchant's balance.
-      // For ncba_mobile_b2w specifically, PayChain's B2C-equivalent fee was
-      // ALSO deducted alongside the payout amount at initiation
-      // (mpesaController.js's initiateB2C via dispatchMobileMoneyPayout) —
-      // refunding only transaction.amount here would permanently cost the
-      // merchant that fee even though the transfer never went through.
-      // Mirrors mpesaController.js's b2cCallback handling of mpesa_b2c.
+      // For ncba_mobile_b2w/ncba_lipa_na_mpesa specifically, PayChain's own
+      // fee was ALSO deducted alongside the payout amount at initiation
+      // (mpesaController.js's initiateB2C/initiateB2B) — refunding only
+      // transaction.amount here would permanently cost the merchant that
+      // fee even though the transfer never went through.
       let refundAmount = transaction.amount;
       if (transaction.type === 'ncba_mobile_b2w') {
         const { totalFee } = getB2cTariff(transaction.amount);
         refundAmount += totalFee;
+      } else if (transaction.type === 'ncba_lipa_na_mpesa') {
+        refundAmount += Math.round(transaction.amount * PAYCHAIN_TXN_RATE * 100) / 100;
       }
       merchantForSms = await Merchant.findByIdAndUpdate(
         transaction.merchantId,
@@ -287,10 +313,11 @@ export const handlePesaLinkCallback = async (req, res) => {
       merchantForSms = await Merchant.findById(transaction.merchantId).select('phone');
     }
 
-    // This webhook now resolves both bank-account payouts (PesaLink/EFT)
-    // and Mobile B2W (M-Pesa/Airtel number) payouts — "Bank payout" wording
-    // would be wrong for the latter.
-    const payoutLabel = transaction.type === 'ncba_mobile_b2w' ? 'Payout' : 'Bank payout';
+    // This webhook now resolves bank-account payouts (PesaLink/EFT), Mobile
+    // B2W (M-Pesa/Airtel number) payouts, and Lipa na M-Pesa (Paybill/Till)
+    // payouts — "Bank payout" wording would be wrong for the latter two.
+    const isBankPayout = !['ncba_mobile_b2w', 'ncba_lipa_na_mpesa'].includes(transaction.type);
+    const payoutLabel = isBankPayout ? 'Bank payout' : 'Payout';
 
     createNotification({
       merchantId: transaction.merchantId,
@@ -304,25 +331,48 @@ export const handlePesaLinkCallback = async (req, res) => {
     if (merchantForSms?.phone) {
       const { date, time } = formatTransactionDateTime();
       const recipientName = transaction.recipient?.name || 'the recipient';
-      const message = succeeded
-        ? `${reference} ${payoutLabel} Sent. KES ${transaction.amount.toLocaleString()} paid to ${recipientName} on ${date} at ${time}.`
-        : `${reference} ${payoutLabel} Failed. KES ${transaction.amount.toLocaleString()} to ${recipientName} could not be completed on ${date} at ${time} and has been refunded. Your updated PayChain available balance is KES ${(merchantForSms.kesBalance || 0).toLocaleString()}.`;
+      const { message } = succeeded
+        ? buildPayoutSentSms({ ref: reference, label: payoutLabel, amount: transaction.amount, recipientName, date, time })
+        : buildPayoutFailedSms({ ref: reference, label: payoutLabel, amount: transaction.amount, recipientName, date, time, balance: merchantForSms.kesBalance || 0 });
       safeSendSMS({ to: merchantForSms.phone, message }).then((r) => {
         if (!r.success) logEvent('error', 'ncba_openbanking_callback_sms_failed', { reference, error: r.error });
       });
     }
 
     // Update the matching row inside a bulk-pay batch, if this reference belongs to one.
-    const batch = await PayoutBatch.findOne({ 'transactions.receiptNumber': reference });
+    // Atomic per-row claim (positional $ filtered on the row's own
+    // 'pending' status) plus a compare-and-swap on the aggregate status —
+    // same reasoning as the Transaction update above.
+    const batch = await PayoutBatch.findOneAndUpdate(
+      { 'transactions.receiptNumber': reference, 'transactions.status': 'pending' },
+      { $set: { 'transactions.$.status': succeeded ? 'completed' : 'failed' } },
+      { returnDocument: 'after' }
+    );
     if (batch) {
-      const row = batch.transactions.find((t) => t.receiptNumber === reference);
-      if (row && row.status === 'pending') {
-        row.status = succeeded ? 'completed' : 'failed';
-        const statuses = batch.transactions.map((t) => t.status);
-        if (statuses.every((s) => s === 'completed')) batch.status = 'Processed';
-        else if (statuses.some((s) => s === 'pending')) batch.status = 'Pending';
-        else if (statuses.some((s) => s === 'failed')) batch.status = 'Partial';
-        await batch.save();
+      const previousBatchStatus = batch.status;
+      const statuses = batch.transactions.map((t) => t.status);
+      let newBatchStatus = previousBatchStatus;
+      if (statuses.every((s) => s === 'completed')) newBatchStatus = 'Processed';
+      else if (statuses.some((s) => s === 'pending')) newBatchStatus = 'Pending';
+      else if (statuses.some((s) => s === 'failed')) newBatchStatus = 'Partial';
+      if (newBatchStatus !== previousBatchStatus) {
+        await PayoutBatch.updateOne({ _id: batch._id, status: previousBatchStatus }, { $set: { status: newBatchStatus } });
+      }
+
+      // Every row just settled (batch left 'Pending' for the first time) —
+      // send the one summary SMS for the whole batch here, not one per row.
+      const justResolved = previousBatchStatus === 'Pending' && newBatchStatus !== 'Pending';
+      if (justResolved) {
+        const batchMerchant = await Merchant.findById(batch.merchantId).select('phone');
+        if (batchMerchant?.phone) {
+          const succeededCount = statuses.filter((s) => s === 'completed').length;
+          const failedCount = statuses.filter((s) => s === 'failed').length;
+          const { date: batchDate, time: batchTime } = formatTransactionDateTime();
+          const batchMessage = `${batch.batchReference} Bulk Payout ${newBatchStatus} on ${batchDate} at ${batchTime}. ${succeededCount} of ${batch.transactions.length} payout(s) completed (KES ${batch.totalNetAmount.toLocaleString()} total)${failedCount > 0 ? `; ${failedCount} failed and refunded` : ''}.`;
+          safeSendSMS({ to: batchMerchant.phone, message: batchMessage }).then((r) => {
+            if (!r.success) logEvent('error', 'ncba_openbanking_batch_sms_failed', { batchId: batch._id.toString(), error: r.error });
+          });
+        }
       }
     }
 

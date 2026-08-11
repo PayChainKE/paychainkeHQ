@@ -1,16 +1,35 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { MaterialIcons, Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ValidatedTextInput } from '../../components/ValidatedTextInput';
 import { useAuth } from '../../context/AuthContext';
+import api from '../../api/config';
 
 export default function SettingsTab() {
-  const { merchant, logout } = useAuth();
+  const { merchant, logout, refreshSession } = useAuth();
   const [kraPin, setKraPin] = useState(merchant?.kraPin || '');
   const [businessNumber, setBusinessNumber] = useState(merchant?.businessNumber || '');
   const [kraPinLocked, setKraPinLocked] = useState(!!merchant?.kraPin);
   const [businessNumberLocked, setBusinessNumberLocked] = useState(!!merchant?.businessNumber);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  async function handleProfileSave() {
+    setIsSavingProfile(true);
+    try {
+      const res = await api.put('/api/auth/merchant/profile', { kraPin, businessNumber });
+      if (res.data.success) {
+        Alert.alert('Success', 'Profile updated successfully.');
+        await refreshSession();
+        setKraPinLocked(!!kraPin);
+        setBusinessNumberLocked(!!businessNumber);
+      }
+    } catch (err: any) {
+      Alert.alert('Failed to update profile', err.response?.data?.error || 'Please try again.');
+    } finally {
+      setIsSavingProfile(false);
+    }
+  }
 
   return (
     <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
@@ -108,9 +127,20 @@ export default function SettingsTab() {
 
             </View>
 
-            <TouchableOpacity className="w-full bg-[#00351d] py-4 rounded-2xl mt-8 flex-row items-center justify-center gap-2 shadow-lg shadow-[#00351d]/30 active:opacity-80">
-              <MaterialIcons name="sync" size={20} color="white" />
-              <Text className="text-white font-jakarta-extrabold text-[13px] uppercase tracking-widest">Update Profile Data</Text>
+            <TouchableOpacity
+              onPress={handleProfileSave}
+              disabled={isSavingProfile}
+              className="w-full bg-[#00351d] py-4 rounded-2xl mt-8 flex-row items-center justify-center gap-2 shadow-lg shadow-[#00351d]/30 active:opacity-80"
+              style={isSavingProfile ? { opacity: 0.6 } : undefined}
+            >
+              {isSavingProfile ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <>
+                  <MaterialIcons name="sync" size={20} color="white" />
+                  <Text className="text-white font-jakarta-extrabold text-[13px] uppercase tracking-widest">Update Profile Data</Text>
+                </>
+              )}
             </TouchableOpacity>
           </View>
         </View>

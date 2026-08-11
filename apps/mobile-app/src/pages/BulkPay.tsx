@@ -1022,7 +1022,7 @@ export default function BulkPay() {
         <thead><tr><th class="num">#</th><th>Recipient</th><th>Receipt</th><th class="amount">Amount</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      <div class="footer">Computer-generated batch report. Each receipt is settled via Safaricom Daraja API and recorded on the PayChain ledger.</div>
+      <div class="footer">Computer-generated batch report. Each receipt is settled via M-PESA / NCBA Bank and recorded on the PayChain ledger.</div>
     </body></html>`;
     try {
       const { uri } = await Print.printToFileAsync({ html, base64: false });

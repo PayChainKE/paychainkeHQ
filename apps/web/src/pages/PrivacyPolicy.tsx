@@ -248,7 +248,7 @@ const PrivacyPolicy: React.FC = () => {
                 </p>
                 <p><strong>(c) From third parties:</strong> including:</p>
                 <ul className="list-disc pl-6 space-y-1">
-                  <li>Safaricom (M-PESA Daraja API): transaction confirmations and mobile number data;</li>
+                  <li>Safaricom / NCBA Bank (M-PESA integration): transaction confirmations and mobile number data;</li>
                   <li>IPRS (Integrated Population Registration Service) / KRA: identity and PIN verification;</li>
                   <li>Credit Reference Bureaus (CRBs) licensed by the CBK: where relevant to GROW credit assessments;</li>
                   <li>Blockchain networks: on-chain transaction data for PROTECT;</li>
@@ -353,7 +353,7 @@ const PrivacyPolicy: React.FC = () => {
                 </p>
                 <ul className="list-disc pl-6 space-y-1">
                   <li>Cloud infrastructure providers (e.g., AWS / GCP)</li>
-                  <li>M-PESA / Safaricom (Daraja API integration)</li>
+                  <li>M-PESA / Safaricom / NCBA Bank (payment integration)</li>
                   <li>USDC / Circle (stablecoin services)</li>
                   <li>KYC/AML verification providers</li>
                   <li>Email and communication service providers</li>

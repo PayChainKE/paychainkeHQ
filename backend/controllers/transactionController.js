@@ -2,10 +2,8 @@ import Transaction from '../models/Transaction.js';
 import Merchant from '../models/Merchant.js';
 import PaymentLink from '../models/PaymentLink.js';
 import crypto from 'crypto';
-import axios from 'axios';
 import bcrypt from 'bcryptjs';
-import STKRequest from '../models/STKRequest.js';
-import { isLive, mpesaBaseUrl, shortCode, passkey, callbackBase, stkCallback, NCBA_STK_B2C_ENABLED, initiateAndTrackNcbaStk } from './mpesaController.js';
+import { initiateAndTrackNcbaStk } from './mpesaController.js';
 import { settleInflationShield, provisionMerchantWallet, getWalletBalance, swapUsdcToKesOnChain } from '../utils/stellarHelper.js';
 import { encryptKey } from '../utils/cryptoHelper.js';
 import { getLiveKesToUsdcRate } from '../utils/rateEngine.js';
@@ -15,7 +13,7 @@ import { getCheckoutTotal } from '../utils/pricingEngine.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
-import { getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
+import { getNcbaVirtualAccountNumber, validatePhoneNumber, NcbaValidationError } from '../utils/ncbaValidators.js';
 import { generateMerchantStickerPdf } from '../utils/stickerGenerator.js';
 
 // Resolves either the 12-digit NCBA virtual account number or the 8-digit
@@ -662,133 +660,35 @@ export const processPaymentLink = async (req, res) => {
       return res.status(400).json({ error: 'Payment link is invalid or expired.' });
     }
 
-    let formattedPhone = String(phone || '').trim();
-    if (formattedPhone.startsWith('0')) formattedPhone = '254' + formattedPhone.slice(1);
-    if (formattedPhone.startsWith('+')) formattedPhone = formattedPhone.slice(1);
+    // Public route — validate strictly rather than best-effort normalise,
+    // since anyone on the internet can hit this (rate-limited, but not
+    // otherwise authenticated) and this number becomes both the STK
+    // destination and the stored transaction counterparty.
+    let formattedPhone;
+    try {
+      formattedPhone = validatePhoneNumber(phone);
+    } catch (e) {
+      if (e instanceof NcbaValidationError) return res.status(400).json({ error: 'Enter a valid Kenyan phone number.' });
+      throw e;
+    }
 
     // Checkout initializer: the amount actually prompted on the customer's
     // handset — base bill + PayChain's customer surcharge (currently 0
     // until pricing sheets are finalized, see utils/pricingEngine.js).
     // Computed once, up front, so what the customer sees and approves on
     // their phone already includes any surcharge — never added silently
-    // after the fact. stkCallback re-derives the split from this same total
-    // plus link.amount (the base) once Safaricom confirms.
+    // after the fact. resolveStkOutcome re-derives the split from this same
+    // total plus link.amount (the base) once the payment is confirmed.
     const checkoutTotal = getCheckoutTotal(link.amount);
 
-    // ── NCBA MODE: real STK Push via NCBA's paybill 880100 (or simulated —
-    // see services/ncbaStkPushService.js's NCBA_STK_LIVE_ENABLED gate) ──────
-    if (NCBA_STK_B2C_ENABLED) {
-      const checkoutRequestId = await initiateAndTrackNcbaStk({
-        merchantId: link.merchantId._id,
-        phone: formattedPhone,
-        checkoutTotal,
-        extra: { linkId: link.linkId },
-      });
-      return res.status(200).json({ success: true, checkoutRequestId, message: 'STK Push sent to phone' });
-    }
-
-    // ── SANDBOX MODE (Daraja): local simulation, no real Safaricom call ─────
-    // Mirrors mpesaController.js#initiateSTKPush's sandbox branch — no live
-    // money at risk, and no dependency on Safaricom's sandbox-specific
-    // shortcode/passkey pairing (which differ from this deploy's real
-    // MPESA_SHORTCODE/MPESA_PASSKEY, reserved for live use only). The
-    // simulated confirmation is fed through the real stkCallback handler
-    // (by linkId) so it exercises the exact same completion logic — link/
-    // invoice status, ledger credit, notifications, SMS — as a real payment
-    // would, rather than a second hand-maintained copy of that logic.
-    if (!isLive) {
-      const checkoutRequestId = `SANDBOX-LINK-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
-      console.log(`🧪 [SANDBOX] Simulating Payment Link STK Push for ${formattedPhone} KES ${checkoutTotal} (base KES ${link.amount}) | Link: ${linkId}`);
-
-      await STKRequest.create({
-        merchantId: link.merchantId._id,
-        checkoutRequestId,
-        linkId: link.linkId,
-        amount: checkoutTotal,
-        phone: formattedPhone,
-        status: 'pending',
-      });
-
-      setTimeout(() => {
-        const fakeReq = {
-          body: {
-            Body: {
-              stkCallback: {
-                CheckoutRequestID: checkoutRequestId,
-                ResultCode: 0,
-                ResultDesc: 'Sandbox simulation — no real money moved',
-                CallbackMetadata: { Item: [{ Name: 'MpesaReceiptNumber', Value: `SBXLINK-${checkoutRequestId.slice(-8)}` }] },
-              },
-            },
-          },
-        };
-        const fakeRes = { status: () => ({ json: () => {} }) };
-        stkCallback(fakeReq, fakeRes).catch((e) => console.error('❌ [SANDBOX] Payment link auto-confirm error:', e.message));
-      }, 4000);
-
-      return res.status(200).json({
-        success: true,
-        checkoutRequestId,
-        message: '[Sandbox] STK simulated — funds will confirm in ~4 seconds. No real money moved.',
-      });
-    }
-
-    // ── LIVE MODE ─────────────────────────────────────────────────────────
-    if (process.env.MPESA_LIVE_ENABLED !== 'true') {
-      return res.status(503).json({ error: 'Live M-PESA payments are not enabled. Set MPESA_LIVE_ENABLED=true to activate.' });
-    }
-    if (!shortCode || !passkey) {
-      return res.status(500).json({ error: 'STK Push not fully configured (MPESA_SHORTCODE / MPESA_PASSKEY missing).' });
-    }
-    if (!callbackBase) {
-      return res.status(500).json({ error: 'MPESA_CALLBACK_URL is not set.' });
-    }
-
-    const token = req.mpesaToken; // From generateToken middleware — same mpesaBaseUrl this call targets
-
-    const date = new Date();
-    const timestamp = date.getFullYear() +
-      ('0' + (date.getMonth() + 1)).slice(-2) +
-      ('0' + date.getDate()).slice(-2) +
-      ('0' + date.getHours()).slice(-2) +
-      ('0' + date.getMinutes()).slice(-2) +
-      ('0' + date.getSeconds()).slice(-2);
-
-    const password = Buffer.from(`${shortCode}${passkey}${timestamp}`).toString('base64');
-
-    const data = {
-      BusinessShortCode: shortCode,
-      Password: password,
-      Timestamp: timestamp,
-      TransactionType: 'CustomerPayBillOnline',
-      Amount: checkoutTotal,
-      PartyA: formattedPhone,
-      PartyB: shortCode,
-      PhoneNumber: formattedPhone,
-      CallBackURL: `${callbackBase}/api/callbacks/stk-callback`,
-      AccountReference: `Link ${linkId}`,
-      TransactionDesc: 'Payment Link Settlement'
-    };
-
-    const response = await axios.post(`${mpesaBaseUrl}/mpesa/stkpush/v1/processrequest`, data, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-
-    const checkoutRequestId = response.data.CheckoutRequestID;
-    await STKRequest.create({
+    // Real STK Push via NCBA's paybill 880100 (or simulated — see
+    // services/ncbaStkPushService.js's NCBA_STK_LIVE_ENABLED gate).
+    const checkoutRequestId = await initiateAndTrackNcbaStk({
       merchantId: link.merchantId._id,
-      checkoutRequestId,
-      linkId: link.linkId,
-      amount: checkoutTotal,
       phone: formattedPhone,
-      status: 'pending'
+      checkoutTotal,
+      extra: { linkId: link.linkId },
     });
-
-    // Do NOT mark the link/invoice paid here — the customer has only just
-    // received the STK prompt and may still cancel or fail to enter their
-    // PIN. The real Safaricom confirmation lands on stkCallback, which
-    // resolves this STKRequest by linkId and flips status there.
-
     res.status(200).json({ success: true, checkoutRequestId, message: 'STK Push sent to phone' });
 
   } catch (error) {
@@ -825,9 +725,9 @@ export const getMerchantByAccount = async (req, res) => {
 // @desc    Pay an arbitrary amount directly to a merchant's PayChain Account
 //          number — the open-amount counterpart to processPaymentLink above
 //          (which settles one specific, pre-set-amount link). Reuses the
-//          exact same STKRequest + stkCallback machinery: creating the
-//          STKRequest with no linkId routes the confirmation through
-//          stkCallback's plain-wallet-top-up branch, crediting this
+//          exact same STKRequest machinery: creating the STKRequest with no
+//          linkId routes the eventual resolution through
+//          resolveStkOutcome's plain-wallet-top-up branch, crediting this
 //          merchant directly — no new completion-handling logic needed.
 // @route   POST /api/transactions/pay-account/:account
 // @access  Public
@@ -843,115 +743,26 @@ export const payToMerchantAccount = async (req, res) => {
       return res.status(400).json({ error: 'Enter a valid amount.' });
     }
 
-    let formattedPhone = String(req.body.phone || '').trim();
-    if (formattedPhone.startsWith('0')) formattedPhone = '254' + formattedPhone.slice(1);
-    if (formattedPhone.startsWith('+')) formattedPhone = formattedPhone.slice(1);
+    // Public route — same reasoning as processPaymentLink above: validate
+    // strictly rather than best-effort normalise.
+    let formattedPhone;
+    try {
+      formattedPhone = validatePhoneNumber(req.body.phone);
+    } catch (e) {
+      if (e instanceof NcbaValidationError) return res.status(400).json({ error: 'Enter a valid Kenyan phone number.' });
+      throw e;
+    }
 
     const checkoutTotal = getCheckoutTotal(amount);
 
-    // ── NCBA MODE: real STK Push via NCBA's paybill 880100 (or simulated —
-    // see services/ncbaStkPushService.js's NCBA_STK_LIVE_ENABLED gate) ──────
-    if (NCBA_STK_B2C_ENABLED) {
-      const checkoutRequestId = await initiateAndTrackNcbaStk({
-        merchantId: merchant._id,
-        phone: formattedPhone,
-        checkoutTotal,
-        extra: { baseAmount: amount, kind: 'pay_account' },
-      });
-      return res.status(200).json({ success: true, checkoutRequestId, message: 'STK Push sent to phone' });
-    }
-
-    // ── SANDBOX MODE (Daraja) — mirrors processPaymentLink's sandbox branch exactly. ──
-    if (!isLive) {
-      const checkoutRequestId = `SANDBOX-ACCT-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
-      console.log(`🧪 [SANDBOX] Simulating direct-account STK Push for ${formattedPhone} KES ${checkoutTotal} → merchant ${merchant._id}`);
-
-      await STKRequest.create({
-        merchantId: merchant._id,
-        checkoutRequestId,
-        amount: checkoutTotal,
-        baseAmount: amount,
-        kind: 'pay_account',
-        phone: formattedPhone,
-        status: 'pending',
-      });
-
-      setTimeout(() => {
-        const fakeReq = {
-          body: {
-            Body: {
-              stkCallback: {
-                CheckoutRequestID: checkoutRequestId,
-                ResultCode: 0,
-                ResultDesc: 'Sandbox simulation — no real money moved',
-                CallbackMetadata: { Item: [{ Name: 'MpesaReceiptNumber', Value: `SBXACCT-${checkoutRequestId.slice(-8)}` }] },
-              },
-            },
-          },
-        };
-        const fakeRes = { status: () => ({ json: () => {} }) };
-        stkCallback(fakeReq, fakeRes).catch((e) => console.error('❌ [SANDBOX] Direct-account auto-confirm error:', e.message));
-      }, 4000);
-
-      return res.status(200).json({
-        success: true,
-        checkoutRequestId,
-        message: '[Sandbox] STK simulated — funds will confirm in ~4 seconds. No real money moved.',
-      });
-    }
-
-    // ── LIVE MODE ─────────────────────────────────────────────────────────
-    if (process.env.MPESA_LIVE_ENABLED !== 'true') {
-      return res.status(503).json({ error: 'Live M-PESA payments are not enabled. Set MPESA_LIVE_ENABLED=true to activate.' });
-    }
-    if (!shortCode || !passkey) {
-      return res.status(500).json({ error: 'STK Push not fully configured (MPESA_SHORTCODE / MPESA_PASSKEY missing).' });
-    }
-    if (!callbackBase) {
-      return res.status(500).json({ error: 'MPESA_CALLBACK_URL is not set.' });
-    }
-
-    const token = req.mpesaToken;
-
-    const date = new Date();
-    const timestamp = date.getFullYear() +
-      ('0' + (date.getMonth() + 1)).slice(-2) +
-      ('0' + date.getDate()).slice(-2) +
-      ('0' + date.getHours()).slice(-2) +
-      ('0' + date.getMinutes()).slice(-2) +
-      ('0' + date.getSeconds()).slice(-2);
-
-    const password = Buffer.from(`${shortCode}${passkey}${timestamp}`).toString('base64');
-
-    const data = {
-      BusinessShortCode: shortCode,
-      Password: password,
-      Timestamp: timestamp,
-      TransactionType: 'CustomerPayBillOnline',
-      Amount: checkoutTotal,
-      PartyA: formattedPhone,
-      PartyB: shortCode,
-      PhoneNumber: formattedPhone,
-      CallBackURL: `${callbackBase}/api/callbacks/stk-callback`,
-      AccountReference: `Acct ${req.params.account}`,
-      TransactionDesc: 'Direct Account Payment',
-    };
-
-    const response = await axios.post(`${mpesaBaseUrl}/mpesa/stkpush/v1/processrequest`, data, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-
-    const checkoutRequestId = response.data.CheckoutRequestID;
-    await STKRequest.create({
+    // Real STK Push via NCBA's paybill 880100 (or simulated — see
+    // services/ncbaStkPushService.js's NCBA_STK_LIVE_ENABLED gate).
+    const checkoutRequestId = await initiateAndTrackNcbaStk({
       merchantId: merchant._id,
-      checkoutRequestId,
-      amount: checkoutTotal,
-      baseAmount: amount,
-      kind: 'pay_account',
       phone: formattedPhone,
-      status: 'pending',
+      checkoutTotal,
+      extra: { baseAmount: amount, kind: 'pay_account' },
     });
-
     res.status(200).json({ success: true, checkoutRequestId, message: 'STK Push sent to phone' });
 
   } catch (error) {

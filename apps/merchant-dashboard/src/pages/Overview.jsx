@@ -531,7 +531,7 @@ export default function Overview() {
                   ? `${(tx.usdcAmount || 0).toFixed(4)} USDC`
                   : formatKES(tx.kesAmount || tx.amount || 0)
                 const amtColor = getAmountColorClassWithHover(tx.type)
-                const TYPE_LABEL = { inbound: 'Payment In', outbound: 'Withdrawal', fx_swap: 'FX Swap', bulk_pay: 'Bulk Pay', settlement: 'Settlement', top_up: 'Top Up', withdrawal: 'Withdrawal', ncba_inbound: 'Payment In', ncba_outbound: 'Bank Transfer', mpesa_b2c: 'M-PESA Withdrawal' }
+                const TYPE_LABEL = { inbound: 'Payment In', outbound: 'Withdrawal', fx_swap: 'FX Swap', bulk_pay: 'Bulk Pay', settlement: 'Settlement', top_up: 'Top Up', withdrawal: 'Withdrawal', ncba_inbound: 'Payment In', ncba_outbound: 'Bank Transfer', mpesa_b2c: 'M-PESA Withdrawal', ncba_mobile_b2w: 'M-PESA Withdrawal', mpesa_b2b: 'Paybill/Till Payout', ncba_lipa_na_mpesa: 'Paybill/Till Payout' }
                 return (
                   <div key={tx._id || tx.id} className="px-4 lg:px-8 py-2.5 lg:py-3 flex items-center justify-between hover:bg-[#00351D] transition-all group cursor-pointer border-b border-slate-200 last:border-0">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -582,11 +582,20 @@ export default function Overview() {
             <div className="w-16 h-16 bg-surface-container-low rounded-full flex items-center justify-center mx-auto mb-4">
               <span className="material-symbols-outlined text-3xl text-emerald-600/50">account_balance_wallet</span>
             </div>
-            <h4 className="font-headline text-xl font-bold text-primary mb-2">Unlock Cash Advances</h4>
-            <p className="text-sm text-on-surface-variant mb-6">Process payments through your Paybill to build your Trust Score and unlock instant liquidity.</p>
-            <a href="https://www.paychain.co.ke/products/cash-advance" target="_blank" rel="noopener noreferrer" className="block w-full py-3 bg-[#00351D] text-white rounded-xl text-[11px] font-bold hover:brightness-110 transition-all shadow-lg uppercase tracking-widest text-center">
-              Learn More
-            </a>
+            <h4 className="font-headline text-xl font-bold text-primary mb-2">
+              {trustData?.eligibleForAdvance ? 'Cash Advance Available' : 'Unlock Cash Advances'}
+            </h4>
+            <p className="text-sm text-on-surface-variant mb-6">
+              {trustData?.eligibleForAdvance
+                ? `Trust Score ${trustData?.current || 0}/100 — you're eligible to apply for instant liquidity.`
+                : 'Process payments through your Paybill to build your Trust Score and unlock instant liquidity.'}
+            </p>
+            <button
+              onClick={() => navigate('/cash-advance')}
+              className="block w-full py-3 bg-[#00351D] text-white rounded-xl text-[11px] font-bold hover:brightness-110 transition-all shadow-lg uppercase tracking-widest text-center"
+            >
+              {trustData?.eligibleForAdvance ? 'Apply Now' : 'View Cash Advance'}
+            </button>
           </section>
 
           <section className="bg-[#E6FFFA] p-6 rounded-2xl border border-emerald-100 shadow-sm flex items-start gap-4">

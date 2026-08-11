@@ -2,7 +2,6 @@ import express from 'express';
 import rateLimit from 'express-rate-limit';
 import { getTransactions, simulateIncomingPayment, swapKesToUsdc, activateWallet, getLiveRate, sendMoney, syncWalletBalance, generatePaymentLink, listPaymentLinks, getPaymentLink, processPaymentLink, getMerchantByAccount, payToMerchantAccount, emailStatement, downloadSticker } from '../controllers/transactionController.js';
 import { protectMerchant } from '../middleware/authMiddleware.js';
-import { generateTokenUnlessNcba } from '../controllers/mpesaController.js';
 
 const router = express.Router();
 
@@ -38,13 +37,13 @@ const payAccountLimiter = rateLimit({
 
 // Public Payment Link Routes
 router.get('/payment-link/:linkId', getPaymentLink);
-router.post('/payment-link/:linkId/pay', payAccountLimiter, generateTokenUnlessNcba, processPaymentLink);
+router.post('/payment-link/:linkId/pay', payAccountLimiter, processPaymentLink);
 
 // Public direct-account payment — powers the static "Settlement QR" on a
 // merchant's Wallet page (open amount, no pre-generated link), as opposed
 // to the fixed-amount PaymentLink routes above.
 router.get('/pay-account/:account', getMerchantByAccount);
-router.post('/pay-account/:account', payAccountLimiter, generateTokenUnlessNcba, payToMerchantAccount);
+router.post('/pay-account/:account', payAccountLimiter, payToMerchantAccount);
 
 router.post('/statement/email', protectMerchant, emailStatement);
 router.get('/sticker', protectMerchant, downloadSticker);

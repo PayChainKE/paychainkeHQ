@@ -57,7 +57,7 @@ let tokenExpiresAt = 0;
 
 async function fetchNewToken() {
   if (!ncbaStkUsername || !ncbaStkPassword) {
-    throw new NcbaStkAuthError('NCBA STK Push is not fully configured (NCBA_STK_USERNAME / _PASSWORD missing, and no NCBA_OPENBANKING_USER_ID / _PASSWORD fallback set)');
+    throw new NcbaStkAuthError('STK Push is not fully configured. Please contact support.');
   }
 
   try {
@@ -77,7 +77,7 @@ async function fetchNewToken() {
 
     const { access_token: accessToken, expires_in: expiresIn } = response.data || {};
     if (!accessToken) {
-      throw new NcbaStkAuthError('NCBA STK token response missing access_token');
+      throw new NcbaStkAuthError('STK token response was invalid.');
     }
 
     cachedToken = accessToken;
@@ -86,8 +86,11 @@ async function fetchNewToken() {
     return accessToken;
   } catch (err) {
     if (err instanceof NcbaStkAuthError) throw err;
+    // Full upstream error detail goes to the server log only — never bake
+    // a raw upstream response body into a message that reaches the client
+    // (see the identical fix in ncbaOpenBankingService.js's fetchNewToken).
     logEvent('error', 'ncba_stk_token_fetch_failed', { error: unwrapAxiosError(err) });
-    throw new NcbaStkAuthError(`Failed to obtain NCBA STK access token: ${unwrapAxiosError(err)}`);
+    throw new NcbaStkAuthError('Failed to obtain an STK Push access token.');
   }
 }
 
@@ -116,8 +119,10 @@ async function ncbaStkPost(path, body, { retrying = false } = {}) {
       await getAccessToken({ forceRefresh: true });
       return ncbaStkPost(path, body, { retrying: true });
     }
+    // Full upstream error detail goes to the server log only — never bake a
+    // raw upstream response body into a message that reaches the client.
     logEvent('error', 'ncba_stk_request_failed', { path, error: unwrapAxiosError(err) });
-    throw new NcbaStkRequestError(unwrapAxiosError(err));
+    throw new NcbaStkRequestError('STK Push request failed. Please try again.');
   }
 }
 
@@ -140,11 +145,11 @@ async function ncbaStkPost(path, body, { retrying = false } = {}) {
  */
 export async function initiateStkPush({ phone, amount, accountNo }) {
   if (!phone || !amount || !accountNo) {
-    throw new NcbaStkRequestError('phone, amount and accountNo are required to initiate an NCBA STK Push');
+    throw new NcbaStkRequestError('phone, amount and accountNo are required to initiate an STK Push');
   }
 
   if (!liveCallsEnabled) {
-    const fakeId = `SIM-NCBA-STK-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const fakeId = `SIM-STK-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
     simulate('ncba_stk_initiate_sandbox', { phone, amount, accountNo });
     return { transactionId: fakeId, referenceId: fakeId };
   }
@@ -159,7 +164,7 @@ export async function initiateStkPush({ phone, amount, accountNo }) {
   });
 
   if (!result?.TransactionID) {
-    throw new NcbaStkRequestError(result?.StatusDescription || 'NCBA rejected the STK Push');
+    throw new NcbaStkRequestError(result?.StatusDescription || 'The STK Push request was rejected. Please try again.');
   }
 
   return { transactionId: result.TransactionID, referenceId: result.ReferenceID || result.TransactionID };
@@ -176,15 +181,13 @@ export async function initiateStkPush({ phone, amount, accountNo }) {
  */
 export async function queryStkPush({ transactionId }) {
   if (!transactionId) {
-    throw new NcbaStkRequestError('transactionId is required to query an NCBA STK Push');
+    throw new NcbaStkRequestError('transactionId is required to query an STK Push');
   }
 
   if (!liveCallsEnabled) {
-    // Sandbox: resolve as SUCCESS on first poll — the caller
-    // (utils/stkPushDispatch.js's poll loop) is only exercised at all when
-    // NCBA_STK_B2C_ENABLED=true, so this mirrors the existing Daraja
-    // sandbox's "auto-confirm shortly after" behavior rather than genuinely
-    // waiting.
+    // Sandbox: resolve as SUCCESS on first poll — mirrors the poll loop's
+    // caller (mpesaController.js's pollAndResolveNcbaStkPush) expecting an
+    // "auto-confirm shortly after" behavior rather than genuinely waiting.
     simulate('ncba_stk_query_sandbox', { transactionId });
     return { status: 'SUCCESS', description: 'Sandbox simulation — no real money moved' };
   }

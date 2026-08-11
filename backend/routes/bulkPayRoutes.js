@@ -3,7 +3,6 @@ import multer from 'multer';
 import rateLimit from 'express-rate-limit';
 import { getPayees, getPayeeById, addPayee, updatePayee, deletePayee, getBatches, getBatchById, uploadCSV, authorizeBatch } from '../controllers/bulkPayController.js';
 import { protectMerchant } from '../middleware/authMiddleware.js';
-import { generateToken } from '../controllers/mpesaController.js';
 
 const router = express.Router();
 
@@ -56,6 +55,6 @@ router.route('/batches/:id')
 
 // CSV and Authorization
 router.post('/upload-csv', upload.single('file'), uploadCSV);
-router.post('/authorize', pinLimiter, generateToken, authorizeBatch);
+router.post('/authorize', pinLimiter, authorizeBatch);
 
 export default router;

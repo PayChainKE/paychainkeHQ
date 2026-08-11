@@ -21,7 +21,7 @@ export function buildPaymentReceivedSms({ ref, amount, payerName, payerPhone, da
       `${ref} Confirmed. You have received KES ${amt} from ${name}${phone ? ` ${phone}` : ''} via ${channel} on ${date} at ${time}. New PayChain balance is KES ${balance}.`,
     {
       fixed: { ref, amt: amount.toLocaleString(), phone: phone || '', channel, date, time, balance: balance.toLocaleString() },
-      truncatable: [{ key: 'name', value: payerName || 'a customer', minLength: 10 }],
+      truncatable: [{ key: 'name', value: payerName || 'a customer', minLength: 6 }],
     }
   );
 }
@@ -69,7 +69,56 @@ export function buildCustomerPaidSms({ ref, amount, businessName, accountRef, da
       `${ref} Confirmed. KES ${amt} paid to ${name}${acct ? ` for account ${acct}` : ''} on ${date} at ${time}. Thank you for your payment.`,
     {
       fixed: { ref, amt: amount.toLocaleString(), acct: accountRef || '', date, time },
-      truncatable: [{ key: 'name', value: businessName || 'PayChain', minLength: 10 }],
+      truncatable: [{ key: 'name', value: businessName || 'PayChain', minLength: 5 }],
+    }
+  );
+}
+
+/**
+ * Merchant-facing "your payout landed" SMS for NCBA bank/mobile-wallet
+ * payouts (controllers/ncbaOpenBankingController.js's handlePesaLinkCallback)
+ * — replaces a raw inline template that had no length protection, unlike
+ * every other SMS in this file. Matters more here than for Daraja's
+ * templates above: `ref` is NCBA's own generated transaction id (e.g.
+ * `NCBA-B2W-1786394243290-TIU7N`, ~28 chars — much longer than a Daraja
+ * M-Pesa receipt code) and `recipientName` is the merchant's own free-typed
+ * withdrawal destination label, both of which can push the message over one
+ * GSM-7 segment on their own.
+ *
+ * `balance` is optional — handleBankPayout knows the new balance
+ * synchronously and shows it; handlePesaLinkCallback's async success path
+ * historically didn't, so it stays omitted unless passed.
+ *
+ * @param {{ ref: string, label: string, amount: number, recipientName?: string|null, date: string, time: string, balance?: number|null }} params
+ * @returns {{ message: string, truncated: boolean, length: number }}
+ */
+export function buildPayoutSentSms({ ref, label, amount, recipientName, date, time, balance }) {
+  const showBalance = typeof balance === 'number' && Number.isFinite(balance);
+  return buildStrictSms(
+    ({ ref, label, amt, name, date, time, balanceLine }) =>
+      `${ref} ${label} Sent. KES ${amt} paid to ${name} on ${date} at ${time}.${balanceLine}`,
+    {
+      fixed: { ref, label, amt: amount.toLocaleString(), date, time, balanceLine: showBalance ? ` New balance: KES ${balance.toLocaleString()}.` : '' },
+      truncatable: [{ key: 'name', value: recipientName || 'the recipient', minLength: 6 }],
+    }
+  );
+}
+
+/**
+ * Merchant-facing "your payout failed and was refunded" SMS — see
+ * buildPayoutSentSms's doc comment for why this needs real truncation
+ * headroom, unlike the raw template it replaces.
+ *
+ * @param {{ ref: string, label: string, amount: number, recipientName?: string|null, date: string, time: string, balance: number }} params
+ * @returns {{ message: string, truncated: boolean, length: number }}
+ */
+export function buildPayoutFailedSms({ ref, label, amount, recipientName, date, time, balance }) {
+  return buildStrictSms(
+    ({ ref, label, amt, name, date, time, balance }) =>
+      `${ref} ${label} Failed. KES ${amt} to ${name} could not be completed on ${date} at ${time} and has been refunded. Your updated PayChain available balance is KES ${balance}.`,
+    {
+      fixed: { ref, label, amt: amount.toLocaleString(), date, time, balance: balance.toLocaleString() },
+      truncatable: [{ key: 'name', value: recipientName || 'the recipient', minLength: 6 }],
     }
   );
 }

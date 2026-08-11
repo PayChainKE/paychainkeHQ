@@ -57,9 +57,9 @@ export function calculateFees(type, kesAmount) {
   }
 
   // NCBA Mobile B2W payouts (initiateB2C in mpesaController.js, and Bulk
-  // Pay's "Mobile Money → Personal Number" rows, once NCBA_STK_B2C_ENABLED)
-  // — NCBA's replacement for Daraja B2C. NCBA hasn't published a Mobile B2W
-  // cost schedule anywhere seen in this codebase, so this reuses
+  // Pay's "Mobile Money → Personal Number" rows) — NCBA's replacement for
+  // Daraja B2C. NCBA hasn't published a Mobile B2W cost schedule anywhere
+  // seen in this codebase, so this reuses
   // getB2cTariff's numbers as a placeholder inherited from the Daraja era —
   // NOT a claim that NCBA's real cost matches Safaricom's B2C tariff. Kept
   // as its own type (not folded into 'mpesa_b2c') so this distinction is

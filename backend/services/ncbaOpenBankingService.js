@@ -88,7 +88,7 @@ let tokenExpiresAt = 0;
 
 async function fetchNewToken() {
   if (!ncbaOpenBankingUserId || !ncbaOpenBankingPassword || !ncbaOpenBankingSubscriptionKey) {
-    throw new NcbaOpenBankingAuthError('NCBA Open Banking is not fully configured (NCBA_OPENBANKING_USER_ID / _PASSWORD / _SUBSCRIPTION_KEY missing)');
+    throw new NcbaOpenBankingAuthError('Open Banking is not fully configured. Please contact support.');
   }
 
   try {
@@ -112,7 +112,7 @@ async function fetchNewToken() {
 
     const { accessToken, tokenType } = response.data || {};
     if (!accessToken || !tokenType) {
-      throw new NcbaOpenBankingAuthError('NCBA Open Banking token response missing accessToken/tokenType');
+      throw new NcbaOpenBankingAuthError('Open Banking token response was invalid.');
     }
 
     cachedToken = accessToken;
@@ -122,8 +122,10 @@ async function fetchNewToken() {
     return { accessToken, tokenType };
   } catch (err) {
     if (err instanceof NcbaOpenBankingAuthError) throw err;
+    // Full upstream error detail goes to the server log only — never bake a
+    // raw upstream response body into a message that reaches the client.
     logEvent('error', 'ncba_openbanking_token_fetch_failed', { error: unwrapAxiosError(err) });
-    throw new NcbaOpenBankingAuthError(`Failed to obtain NCBA Open Banking access token: ${unwrapAxiosError(err)}`);
+    throw new NcbaOpenBankingAuthError('Failed to obtain an Open Banking access token.');
   }
 }
 
@@ -148,7 +150,7 @@ async function ncbaOpenBankingPost(path, body, { retrying = false } = {}) {
   // here — a blank value would silently ride along as `undefined` in the
   // request body instead of failing clearly before ever reaching NCBA.
   if (!ncbaOpenBankingAccountNumber) {
-    throw new NcbaOpenBankingAuthError('NCBA Open Banking is not fully configured (NCBA_OPENBANKING_ACCOUNT_NUMBER missing)');
+    throw new NcbaOpenBankingAuthError('Open Banking is not fully configured. Please contact support.');
   }
 
   const { accessToken, tokenType } = await getAccessToken();
@@ -169,8 +171,10 @@ async function ncbaOpenBankingPost(path, body, { retrying = false } = {}) {
       await getAccessToken({ forceRefresh: true });
       return ncbaOpenBankingPost(path, body, { retrying: true });
     }
+    // Full upstream error detail goes to the server log only — never bake a
+    // raw upstream response body into a message that reaches the client.
     logEvent('error', 'ncba_openbanking_request_failed', { path, error: unwrapAxiosError(err) });
-    throw new NcbaOpenBankingRequestError(unwrapAxiosError(err));
+    throw new NcbaOpenBankingRequestError('Open Banking request failed. Please try again.');
   }
 }
 
@@ -336,10 +340,112 @@ export async function validateMobileWalletNumber({ provider, msisdn }) {
 
   const result = await ncbaOpenBankingPost(ncbaMobileWalletValidationPath, { provider, msisdn });
   if (!result?.validationId) {
-    throw new NcbaOpenBankingValidationError(result?.message || 'NCBA could not validate the destination mobile wallet number');
+    throw new NcbaOpenBankingValidationError(result?.message || 'Could not validate the destination mobile number.');
   }
 
   return { validationId: result.validationId, customerName: result.customerName || null };
+}
+
+/**
+ * Validates a destination Paybill or Till number before a Lipa na M-Pesa
+ * payout — "This is a prerequisite for Bill Payments" per the UAT Guide.
+ * identifierType is "4" for Paybill, "2" for Till (per the UAT Guide's own
+ * labeling). Endpoint confirmed from NCBA's "Open Banking V2 - Callback
+ * Enabled" Postman collection — not shown as a path in the UAT Guide's own
+ * text (only its request/response JSON was), same situation as
+ * validateMobileWalletNumber above.
+ *
+ * @param {object} params
+ * @param {'Paybill'|'Till'} params.paymentType
+ * @param {string} params.payBillTillNo
+ */
+export async function validateLipaNaMpesaAccount({ paymentType, payBillTillNo }) {
+  if (!paymentType || !payBillTillNo) {
+    throw new NcbaOpenBankingValidationError('paymentType and payBillTillNo are required to validate a Paybill/Till destination');
+  }
+
+  if (!liveCallsEnabled) {
+    return simulate('ncba_openbanking_lnm_validate_sandbox', { paymentType, payBillTillNo });
+  }
+
+  const identifierType = paymentType === 'Till' ? '2' : '4';
+  const result = await ncbaOpenBankingPost('/api/v1/LipaNaMpesaValidation/accountdetails', {
+    identifier: payBillTillNo,
+    identifierType,
+  });
+
+  if (result?.errorCode !== '000') {
+    throw new NcbaOpenBankingValidationError(result?.errorMessage || 'NCBA could not verify the destination Paybill/Till number');
+  }
+
+  // origanizationShortCode is NCBA's own typo, kept exactly as documented.
+  return { organizationName: result.OrganizationName || null, shortCode: result.origanizationShortCode || null };
+}
+
+/**
+ * Submits a Lipa na M-Pesa payout to a third-party Paybill or Till number —
+ * NCBA's direct replacement for Daraja B2B (BusinessPayBill/
+ * BusinessBuyGoods). Response shape (hdrRefNo/hdrTranId/resErrorCode/
+ * UnitId) matches NCBA's other "accepted into processing" rails (e.g. M-Pesa
+ * Float Purchase, explicitly documented as a 24-hour service) rather than
+ * PesaLink/EFT's synchronous resultCode shape, and the payload carries no
+ * callbackUrl field to opt out of that — so this is treated as ASYNCHRONOUS,
+ * same as submitMobileB2wPayment/BILLPAY: an immediate resErrorCode: '000'
+ * only means NCBA accepted the instruction, not that it settled. Callers
+ * should record the resulting Transaction as 'pending' and let the generic
+ * handlePesaLinkCallback (ncbaOpenBankingController.js) resolve it later,
+ * keyed by reqChnlId.
+ *
+ * @param {object} params
+ * @param {string} params.transactionId - PayChain's own reference; becomes
+ *        reqChnlId here and Transaction.reference at the call site.
+ * @param {'Paybill'|'Till'} params.paymentType
+ * @param {string} params.payBillTillNo
+ * @param {number} params.amount
+ * @param {string} [params.accountReference] - Paybill account number; not applicable to Till.
+ * @param {string} [params.recipientName]
+ * @param {string} [params.notifyMobileNumber]
+ * @param {string} [params.narration]
+ */
+export async function submitLipaNaMpesaPayment({
+  transactionId,
+  paymentType,
+  payBillTillNo,
+  amount,
+  accountReference,
+  recipientName,
+  notifyMobileNumber,
+  narration,
+}) {
+  if (!transactionId || !paymentType || !payBillTillNo || !amount) {
+    throw new NcbaOpenBankingValidationError('transactionId, paymentType, payBillTillNo and amount are required for a Lipa na M-Pesa payment');
+  }
+
+  const payload = {
+    reqTransactionReferenceNo: transactionId,
+    reqPaymentType: paymentType,
+    reqPayBillTillNo: payBillTillNo,
+    DebitAccountNumber: ncbaOpenBankingAccountNumber,
+    DebitAmount: String(amount),
+    reqCreditAmount: String(amount),
+    reqDebitAcCurrency: 'KES',
+    reqToAccountName: recipientName || 'PayChain Merchant',
+    reqMobileNumber: notifyMobileNumber || '',
+    reqPaymentDescription: narration || 'PayChain Payout',
+    reqPaybillAccount: accountReference || '',
+    Country: 'KENYA',
+    reqChnlId: transactionId,
+  };
+
+  if (!liveCallsEnabled) {
+    return simulate('ncba_openbanking_lnm_submit_sandbox', { transactionId, amount });
+  }
+
+  const result = await ncbaOpenBankingPost('/api/v1/LipaNaMpesa/lipanampesa', payload);
+  if (result?.resErrorCode !== '000') {
+    throw new NcbaOpenBankingRequestError(result?.resErrorDesc || result?.resErrorMessage || 'NCBA rejected the Lipa na M-Pesa payment');
+  }
+  return result;
 }
 
 /**
@@ -405,7 +511,7 @@ export async function submitMobileB2wPayment({
 
   const result = await ncbaOpenBankingPost('/api/v1/MobileB2WPayment/mobileb2wpayment', payload);
   if (!result?.succeeded) {
-    throw new NcbaOpenBankingRequestError(result?.message || 'NCBA rejected the Mobile B2W payout');
+    throw new NcbaOpenBankingRequestError(result?.message || 'The payout could not be completed. Please try again.');
   }
   return result;
 }
