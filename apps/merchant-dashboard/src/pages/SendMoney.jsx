@@ -327,7 +327,7 @@ export default function SendMoney() {
                         <span className="material-symbols-outlined text-lg">{d.icon}</span>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-bold truncate transition-colors ${destination === d.id ? 'text-[#00351D]' : 'text-primary'}`}>{d.label}</p>
+                        <p className={`text-sm font-bold leading-snug transition-colors ${destination === d.id ? 'text-[#00351D]' : 'text-primary'}`}>{d.label}</p>
                         <p className="text-[10px] text-slate-400 font-medium mt-0.5">{d.hint}</p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
@@ -497,13 +497,16 @@ export default function SendMoney() {
                 <div className="divide-y divide-slate-100">
                   {[
                     ['Destination', selectedDest?.label],
+                    ...(destination === 'bank' ? [['Bank', bankCodes.find(b => b.code === bankCode)?.name || bankCode]] : []),
                     ['Recipient',   recipientAccount],
+                    ...(destination === 'paybill' ? [['Account Number', paybillAccountRef]] : []),
                     ['Amount',      formatKES(amount || 0)],
                     ['Fee',         formatKES(fee)],
+                    ...(reference ? [['Reference', reference]] : []),
                   ].map(([k, v]) => (
-                    <div key={k} className="flex justify-between items-center px-5 py-3">
-                      <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">{k}</span>
-                      <span className="text-sm font-bold text-primary">{v}</span>
+                    <div key={k} className="flex justify-between items-start gap-4 px-5 py-3">
+                      <span className="text-xs text-slate-400 font-bold uppercase tracking-wider shrink-0 pt-0.5">{k}</span>
+                      <span className="text-sm font-bold text-primary text-right break-words">{v}</span>
                     </div>
                   ))}
                   <div className="flex justify-between items-center px-5 py-4 bg-emerald-50">

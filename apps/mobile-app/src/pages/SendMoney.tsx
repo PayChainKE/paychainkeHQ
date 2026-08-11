@@ -413,15 +413,18 @@ export default function SendMoney({ navigation }: any) {
                 <View className="px-5 py-3 bg-[#00351d]">
                   <Text className="text-[10px] font-jakarta-extrabold text-[#5efeb3] uppercase tracking-widest">Transfer Summary</Text>
                 </View>
-                {[
+                {([
                   ['Destination', selectedDest?.label || ''],
+                  ...(destination === 'bank' ? [['Bank', bankCodes.find((b) => b.code === bankCode)?.name || bankCode]] : []),
                   ['Recipient', recipientAccount],
+                  ...(destination === 'paybill' ? [['Account Number', paybillAccountRef]] : []),
                   ['Amount', formatKES(Number(amount) || 0)],
                   ['Fee', formatKES(fee)],
-                ].map(([k, v]) => (
-                  <View key={k} className="flex-row justify-between items-center px-5 py-3 border-b border-[#eff4ef]">
-                    <Text className="text-[11px] text-[#707971] font-jakarta-bold uppercase tracking-wider">{k}</Text>
-                    <Text className="text-[13px] font-jakarta-bold text-[#0c2010]">{v}</Text>
+                  ...(reference ? [['Reference', reference]] : []),
+                ] as [string, string][]).map(([k, v]) => (
+                  <View key={k} className="flex-row justify-between items-start gap-4 px-5 py-3 border-b border-[#eff4ef]">
+                    <Text className="text-[11px] text-[#707971] font-jakarta-bold uppercase tracking-wider shrink-0">{k}</Text>
+                    <Text className="text-[13px] font-jakarta-bold text-[#0c2010] text-right flex-shrink flex-1" numberOfLines={0}>{v}</Text>
                   </View>
                 ))}
                 <View className="flex-row justify-between items-center px-5 py-4 bg-[#e7f8ef]">

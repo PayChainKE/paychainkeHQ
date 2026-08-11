@@ -15,7 +15,11 @@ export const KENYAN_BANK_CODES = [
   // guess this file carried, which didn't match the "00"-prefix pattern
   // above and was never verified against NCBA's own documentation).
   { code: '07000', name: 'NCBA Bank' },
-  { code: 'KCBLKENX', name: 'KCB Bank (SWIFT — appears as a RTGS BeneficiaryBankBIC example, not confirmed for PesaLink)' },
+  // Code is KCB's SWIFT BIC (confirmed as an RTGS BeneficiaryBankBIC example
+  // in NCBA's docs) — not yet confirmed valid for the local PesaLink/EFT
+  // rail, which expects a "00"-prefixed CBK clearing code like the two
+  // above. Flagged here rather than in the display name.
+  { code: 'KCBLKENX', name: 'KCB Bank' },
 ];
 
 export function isKnownBankCode(code) {
