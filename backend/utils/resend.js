@@ -941,9 +941,9 @@ export const sendBatchReceiptEmail = async (email, businessName, batchRows, tota
     const rowHTML = batchRows.map((row, index) => `
       <tr style="background-color: ${index % 2 === 0 ? '#f8f9fa' : '#ffffff'}; border-bottom: 1px solid #e9ecef;">
         <td style="padding: 12px 15px; color: #333; font-size: 13px;">${row.name}</td>
-        <td style="padding: 12px 15px; color: #555; font-size: 13px;">${row.phone || row.paybillNumber || 'N/A'}</td>
-        <td style="padding: 12px 15px; color: #555; font-size: 13px;">${row.type || 'Standard'}</td>
-        <td style="padding: 12px 15px; color: #111; font-weight: 600; font-size: 13px; text-align: right;">KES ${row.netAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td style="padding: 12px 15px; color: #555; font-size: 13px;">${row.accountReference || 'N/A'}</td>
+        <td style="padding: 12px 15px; color: #555; font-size: 13px;">${row.method || 'Standard'}</td>
+        <td style="padding: 12px 15px; color: #111; font-weight: 600; font-size: 13px; text-align: right;">KES ${Number(row.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
       </tr>
     `).join('');
 
