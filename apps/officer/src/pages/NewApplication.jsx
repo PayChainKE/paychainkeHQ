@@ -14,6 +14,7 @@ const NewApplication = () => {
   const navigate = useNavigate();
   const [form, setForm] = useState({ name: '', email: '', phone: '', businessName: '', businessType: '', kraPin: '', businessNumber: '' });
   const [files, setFiles] = useState({});
+  const [businessPhotos, setBusinessPhotos] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -28,6 +29,7 @@ const NewApplication = () => {
       const data = new FormData();
       Object.entries(form).forEach(([k, v]) => { if (v) data.append(k, v); });
       Object.entries(files).forEach(([k, f]) => { if (f) data.append(k, f); });
+      businessPhotos.forEach((f) => data.append('business_photos', f));
 
       const res = await api.post('/api/officer/applications', data, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -86,6 +88,12 @@ const NewApplication = () => {
                 <DocUploadField key={d.key} label={d.label} file={files[d.key]} onChange={(f) => setFile(d.key, f)} />
               ))}
             </div>
+          </div>
+
+          <div className="border-t border-outline-variant/10 pt-5">
+            <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 mb-1">Proof of Business Existence</p>
+            <p className="text-2xs text-on-surface-variant/50 mb-3">Optional. If the business has a physical location, take a few photos of the shop/premises — used only for admin due diligence, no approval is gated on it.</p>
+            <BusinessPhotosField photos={businessPhotos} onChange={setBusinessPhotos} />
           </div>
 
           {error && <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium">{error}</div>}
@@ -149,6 +157,86 @@ const DocUploadField = ({ label, file, onChange }) => {
         className="hidden"
       />
       <p className="text-2xs text-on-surface-variant/60 mt-1.5 truncate">{file ? file.name : 'No document selected yet'}</p>
+    </div>
+  );
+};
+
+// Multi-photo picker for the optional business-premises evidence field.
+// "Take Photo" opens the device camera directly (mobile browsers); tapping
+// it repeatedly appends another shot. "Upload" accepts a multi-select from
+// the file picker for officers working off pre-taken photos.
+const BusinessPhotosField = ({ photos, onChange }) => {
+  const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
+  const MAX_PHOTOS = 6;
+
+  function addFiles(fileList) {
+    const incoming = Array.from(fileList || []);
+    if (incoming.length === 0) return;
+    onChange([...photos, ...incoming].slice(0, MAX_PHOTOS));
+  }
+  function removeAt(index) {
+    onChange(photos.filter((_, i) => i !== index));
+  }
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 flex-wrap">
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={photos.length >= MAX_PHOTOS}
+          className="px-3 py-2 rounded-lg bg-primary/10 text-primary text-2xs font-bold uppercase tracking-widest flex items-center gap-1.5 hover:bg-primary/20 transition-all disabled:opacity-40"
+        >
+          <span className="material-symbols-outlined text-sm">upload_file</span>
+          Upload
+        </button>
+        <button
+          type="button"
+          onClick={() => cameraInputRef.current?.click()}
+          disabled={photos.length >= MAX_PHOTOS}
+          className="px-3 py-2 rounded-lg bg-primary/10 text-primary text-2xs font-bold uppercase tracking-widest flex items-center gap-1.5 hover:bg-primary/20 transition-all disabled:opacity-40"
+        >
+          <span className="material-symbols-outlined text-sm">photo_camera</span>
+          Take Photo
+        </button>
+        <span className="text-2xs text-on-surface-variant/50">{photos.length}/{MAX_PHOTOS}</span>
+      </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/png"
+        multiple
+        onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }}
+        className="hidden"
+      />
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }}
+        className="hidden"
+      />
+      {photos.length === 0 ? (
+        <p className="text-2xs text-on-surface-variant/60 mt-1.5">No photos added — optional, skip if not applicable</p>
+      ) : (
+        <div className="mt-2 grid grid-cols-3 sm:grid-cols-4 gap-2">
+          {photos.map((f, i) => (
+            <div key={i} className="relative group">
+              <img src={URL.createObjectURL(f)} alt={`Business photo ${i + 1}`} className="w-full h-16 object-cover rounded-lg border border-outline-variant/40" />
+              <button
+                type="button"
+                onClick={() => removeAt(i)}
+                title="Remove"
+                className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-600 text-white flex items-center justify-center shadow"
+              >
+                <span className="material-symbols-outlined text-[12px]">close</span>
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

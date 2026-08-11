@@ -202,6 +202,21 @@ const Workstation = () => {
         </div>
 
         <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl p-6 shadow-editorial">
+          <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-3">Business Premises Photos</p>
+          {(app.businessPhotos?.length ?? 0) === 0 ? (
+            <p className="text-xs text-on-surface-variant/50">No photos uploaded — optional, not required for approval.</p>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {app.businessPhotos.map((p, i) => (
+                <a key={i} href={p.url} target="_blank" rel="noreferrer" className="block aspect-square rounded-lg overflow-hidden border border-outline-variant/20 hover:opacity-80 transition-opacity">
+                  <img src={p.url} alt={`Business photo ${i + 1}`} className="w-full h-full object-cover" />
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl p-6 shadow-editorial">
           <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-3">Verification Checklist</p>
           <div className="space-y-2.5">
             {CHECKLIST_ITEMS.map((c) => (

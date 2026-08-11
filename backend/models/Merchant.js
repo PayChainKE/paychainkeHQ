@@ -231,6 +231,17 @@ const merchantSchema = new mongoose.Schema({
     }],
     default: [],
   },
+  // Optional evidence an onboarding officer photographs on-site (e.g. the
+  // shopfront) as due-diligence proof the business physically exists.
+  // Unlike kybDocuments these aren't a required checklist item and carry no
+  // approve/reject workflow — they're supplementary, admin-reviewed only.
+  businessPhotos: {
+    type: [{
+      url: { type: String, required: true },
+      uploadedAt: { type: Date, default: Date.now },
+    }],
+    default: [],
+  },
   kybChecklist: {
     legalNameMatch: { type: Boolean, default: false },
     ubosIdentified: { type: Boolean, default: false },
