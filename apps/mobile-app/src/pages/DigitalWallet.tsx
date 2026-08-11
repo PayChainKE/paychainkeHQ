@@ -395,6 +395,32 @@ export default function DigitalWallet({ navigation }: any) {
     };
   };
 
+  // Admin-controlled (Merchants.jsx's "Feature Access" panel), hidden by
+  // default for new signups. Placed after every hook above (never before —
+  // an early return earlier in this component would violate rules of
+  // hooks) as the defense-in-depth backstop for anyone who lands here
+  // directly (deep link, stale cached nav state) — the Dashboard cards
+  // that link here are already hidden when this is false.
+  if (merchant?.features?.digitalWallet === false) {
+    return (
+      <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
+        <TopBar title="Digital Wallet" subtitle="Global settlement, local liquidity" />
+        <View className="flex-1 items-center justify-center px-8">
+          <View className="w-16 h-16 rounded-2xl bg-[#eff4ef] items-center justify-center mb-6">
+            <Feather name="lock" size={26} color="#707971" />
+          </View>
+          <Text className="font-jakarta-extrabold text-[18px] text-[#0c2010] text-center mb-2">Not available yet</Text>
+          <Text className="text-[#707971] text-[13px] text-center leading-relaxed mb-8">
+            Digital Wallet isn't enabled for your account yet. Contact PayChain support if you'd like access.
+          </Text>
+          <TouchableOpacity onPress={() => navigation?.goBack()} activeOpacity={0.85} className="px-8 py-3.5 bg-[#00351d] rounded-2xl">
+            <Text className="text-white text-[12px] font-jakarta-extrabold uppercase tracking-widest">Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
       <TopBar title="Digital Wallet" subtitle="Global settlement, local liquidity" />

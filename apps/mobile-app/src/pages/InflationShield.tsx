@@ -119,6 +119,32 @@ export default function InflationShield({ navigation }: any) {
 
   const Header = () => <TopBar title="Inflation Shield" subtitle="Money Hub" />;
 
+  // ── Hard gate: not enabled for this merchant ────────────────────────────
+  // Admin-controlled (Merchants.jsx's "Feature Access" panel), hidden by
+  // default for new signups. The Dashboard quick-action that links here is
+  // already hidden when this is false — this is the defense-in-depth
+  // backstop for anyone who still lands here directly (deep link, stale
+  // cached nav state), matching the web app's route-level FeatureGuard.
+  if (merchant?.features?.inflationShield === false) {
+    return (
+      <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
+        <Header />
+        <View className="flex-1 items-center justify-center px-8">
+          <View className="w-16 h-16 rounded-2xl bg-[#eff4ef] items-center justify-center mb-6">
+            <MaterialIcons name="lock-outline" size={28} color="#707971" />
+          </View>
+          <Text className="font-jakarta-extrabold text-[18px] text-[#0c2010] text-center mb-2">Not available yet</Text>
+          <Text className="text-[#707971] text-[13px] text-center leading-relaxed mb-8">
+            Inflation Shield isn't enabled for your account yet. Contact PayChain support if you'd like access.
+          </Text>
+          <TouchableOpacity onPress={() => navigation?.goBack()} activeOpacity={0.85} className="px-8 py-3.5 bg-[#00351d] rounded-2xl">
+            <Text className="text-white text-[12px] font-jakarta-extrabold uppercase tracking-widest">Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   // ── Hard gate: no Stellar wallet yet ────────────────────────────────────
   if (!walletActivated) {
     return (

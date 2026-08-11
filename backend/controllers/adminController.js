@@ -742,9 +742,14 @@ export const updateMerchantFeatures = async (req, res) => {
       return res.status(404).json({ error: 'Merchant not found' });
     }
 
-    // Initialize if it doesn't exist
+    // Initialize if it doesn't exist — matches the schema's own defaults
+    // (models/Merchant.js). Was { ...: true, ...: true, cashAdvanceForm:
+    // true } — contradicted the schema's own cashAdvanceForm default of
+    // false (a compliance-driven "off until licensing confirmed" setting),
+    // so an admin toggling any one flag on a merchant with no features
+    // subdocument yet would silently enable cash advance as a side effect.
     if (!merchant.features) {
-      merchant.features = { digitalWallet: true, inflationShield: true, cashAdvanceForm: true };
+      merchant.features = { digitalWallet: false, inflationShield: false, cashAdvanceForm: false };
     }
 
     if (digitalWallet !== undefined) {
@@ -882,8 +887,16 @@ export const getMerchantDetail = async (req, res) => {
         flaggedAt: merchant.flaggedAt,
         flaggedBy: merchant.flaggedBy ? { email: merchant.flaggedBy.email } : null,
         riskSignals,
-        // Feature access toggles (falls back to all-enabled for older docs)
-        features: merchant.features || { digitalWallet: true, inflationShield: true, cashAdvanceForm: true },
+        // Feature access toggles. digitalWallet/inflationShield fall back to
+        // enabled (not the current schema default of false) deliberately —
+        // this mirrors how the merchant-facing frontend's own `!== false`
+        // checks already treat a genuinely missing features subdocument (a
+        // pre-existing merchant from before this field existed) as visible,
+        // so the admin panel doesn't show a toggle as "off" while that
+        // merchant can actually still see the feature. cashAdvanceForm has
+        // no such history — its schema default has always been false — so
+        // it falls back to false here to match, not true.
+        features: merchant.features || { digitalWallet: true, inflationShield: true, cashAdvanceForm: false },
         // Settlement
         settlementMobile: merchant.settlementMobile,
         settlementBankName: merchant.settlementBankName,

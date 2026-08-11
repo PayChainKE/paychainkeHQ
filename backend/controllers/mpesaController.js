@@ -285,7 +285,16 @@ async function processMpesaC2bPayload(payload) {
     // dependency sitting in their live payment path, and isDemoMerchant is
     // never set on a real merchant (see models/Merchant.js), so this can't
     // change behavior for anyone but the demo accounts it's built for.
-    if (merchant.stellarPublicKey && (merchant.isDemoMerchant || AUTO_INFLATION_SHIELD_ENABLED)) {
+    //
+    // For real merchants, also requires merchant.features.inflationShield —
+    // "hidden until an admin enables it" (2026-08-11) has to mean the
+    // automatic conversion doesn't silently run in the background either,
+    // not just that the UI is hidden. !== false (not === true) so this
+    // can't change behavior for any merchant who already had the feature on
+    // before this per-merchant gate existed — only merchants whose flag is
+    // explicitly false (new signups, or one an admin explicitly turned off)
+    // are affected.
+    if (merchant.stellarPublicKey && (merchant.isDemoMerchant || (AUTO_INFLATION_SHIELD_ENABLED && merchant.features?.inflationShield !== false))) {
       try {
         const liveRate = await getLiveKesToUsdcRate();
         const usdcPayoutValue = (netKESAmount * liveRate).toFixed(7);

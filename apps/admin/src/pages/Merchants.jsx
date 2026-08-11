@@ -50,7 +50,6 @@ const emptyForm = {
   businessName: '',
   kraPin: '',
   businessNumber: '',
-  isDemoMerchant: false,
 };
 
 // Human-readable activity label + colours.
@@ -258,7 +257,6 @@ const Merchants = () => {
         businessName: form.businessName.trim(),
         kraPin: form.kraPin.trim() || undefined,
         businessNumber: form.businessNumber.trim() || undefined,
-        isDemoMerchant: form.isDemoMerchant,
       };
       const res = await api.post('/api/admin/merchants', payload);
       if (res.data?.success) {
@@ -266,9 +264,6 @@ const Merchants = () => {
           email: res.data.data.email,
           paybillAccount: res.data.data.paybillAccount,
           businessName: res.data.data.businessName,
-          isDemoMerchant: res.data.data.isDemoMerchant,
-          stellarPublicKey: res.data.data.stellarPublicKey,
-          warning: res.data.warning,
         });
         fetchMerchants();
       } else {
@@ -714,23 +709,10 @@ const Merchants = () => {
                   <strong>{success.businessName}</strong> has been onboarded.<br/>
                   A password-setup link has been emailed to <strong>{success.email}</strong>.
                 </p>
-                {success.paybillAccount && (
-                  <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 mb-3 inline-block">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-700 mb-1">Demo Account Number</p>
-                    <p className="font-mono text-xl font-bold text-emerald-900">{success.paybillAccount}</p>
-                  </div>
-                )}
-                {success.isDemoMerchant && success.stellarPublicKey && (
-                  <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 mb-5">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-blue-700 mb-1">Stellar Testnet Wallet</p>
-                    <p className="font-mono text-[11px] font-bold text-blue-900 break-all">{success.stellarPublicKey}</p>
-                  </div>
-                )}
-                {success.isDemoMerchant && success.warning && (
-                  <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 mb-5 text-[12px] text-red-700 text-left">
-                    <strong>Wallet provisioning failed:</strong> {success.warning}
-                  </div>
-                )}
+                <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 mb-5 inline-block">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-700 mb-1">Account Number</p>
+                  <p className="font-mono text-xl font-bold text-emerald-900">{success.paybillAccount}</p>
+                </div>
                 <div className="flex gap-2 justify-center">
                   <button onClick={() => setShowModal(false)} className="px-5 py-2.5 rounded-lg bg-primary text-white text-sm font-semibold uppercase tracking-widest hover:shadow-lg active:scale-95 transition-all">Done</button>
                   <button onClick={() => { setSuccess(null); setForm(emptyForm); }} className="px-5 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low transition-all">Add Another</button>
@@ -770,20 +752,9 @@ const Merchants = () => {
                       <input type="text" value={form.businessNumber} onChange={(e) => update('businessNumber', e.target.value)} placeholder="BN-2024-12345" className={fieldClass} />
                     </Field>
                   </div>
-                  <label className="flex items-start gap-2.5 px-3 py-2.5 rounded-lg border border-outline-variant/30 hover:bg-surface-container-low cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={form.isDemoMerchant}
-                      onChange={(e) => update('isDemoMerchant', e.target.checked)}
-                      className="mt-0.5 w-4 h-4 accent-primary shrink-0"
-                    />
-                    <span className="text-[12px] text-on-surface">
-                      <strong>Demo merchant</strong> — auto-provisions a Stellar testnet wallet immediately (Inflation Shield / Stellar grant demo pipeline). Real merchants stay opt-in via their own Wallet page; leave unchecked for normal onboarding.
-                    </span>
-                  </label>
                   {formError && <div className="text-[13px] text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium">{formError}</div>}
                   <div className="bg-amber-50 border border-amber-100 rounded-lg px-3 py-2.5 text-[12px] text-amber-800">
-                    <strong>Note:</strong> The merchant receives a secure link (24h) to set their own password.
+                    <strong>Note:</strong> A unique 5-digit account number will be auto-assigned. The merchant receives a secure link (24h) to set their own password.
                   </div>
                   <div className="flex gap-3 pt-2">
                     <button type="button" onClick={closeModal} disabled={submitting} className="flex-1 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40 transition-all">Cancel</button>
@@ -1104,7 +1075,12 @@ const Chip = ({ children, onClear }) => (
 // the admin can sight-verify the merchant's KYB submission.
 const KybDrawer = ({ merchant, loading, error, onClose }) => {
   const [updatingFeatures, setUpdatingFeatures] = React.useState(false);
-  const [features, setFeatures] = React.useState(merchant?.features || { digitalWallet: true, inflationShield: true, cashAdvanceForm: false });
+  // Transient placeholder only, shown for the split second before the
+  // useEffect below syncs from the real merchant.features (which the
+  // backend always resolves to a concrete object, see
+  // adminController.js#getMerchantDetail) — matches the current schema
+  // default (false) rather than the old default, since this never persists.
+  const [features, setFeatures] = React.useState(merchant?.features || { digitalWallet: false, inflationShield: false });
 
   React.useEffect(() => {
     if (merchant?.features) {
@@ -1299,10 +1275,8 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
             {/* Security flags */}
             <Section title="Security & Access" icon="shield">
               <Row label="Dashboard Password" value={<Badge tone={m.hasPassword ? 'emerald' : 'amber'} icon={m.hasPassword ? 'check' : 'pending'}>{m.hasPassword ? 'Set' : 'Not set (pending setup)'}</Badge>} />
-              {/* Single Payment PIN now authorizes every money-movement flow
-                  (sendMoney, B2C/B2B, bulk-pay batches) — there's no
-                  separate Bulk Pay PIN anymore. */}
-              <Row label="Payment PIN" value={<Badge tone={m.hasAppPin ? 'emerald' : 'gray'} icon={m.hasAppPin ? 'check' : 'remove'}>{m.hasAppPin ? 'Configured' : 'Not set'}</Badge>} />
+              <Row label="Mobile App PIN" value={<Badge tone={m.hasAppPin ? 'emerald' : 'gray'} icon={m.hasAppPin ? 'check' : 'remove'}>{m.hasAppPin ? 'Configured' : 'Not set'}</Badge>} />
+              <Row label="Bulk Pay PIN" value={<Badge tone={m.hasBulkPayPin ? 'emerald' : 'gray'} icon={m.hasBulkPayPin ? 'check' : 'remove'}>{m.hasBulkPayPin ? 'Configured' : 'Not set'}</Badge>} />
               <Row label="Biometrics" value={<Badge tone={m.biometricsEnabled ? 'emerald' : 'gray'} icon={m.biometricsEnabled ? 'check' : 'remove'}>{m.biometricsEnabled ? 'Enabled' : 'Disabled'}</Badge>} />
             </Section>
 
@@ -1324,10 +1298,10 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
                 } 
               />
               <Row 
-                label="Inflation Shield"
+                label="Inflation Shield" 
                 value={
                   <div className="flex items-center gap-3">
-                    <button
+                    <button 
                       onClick={() => handleToggleFeature('inflationShield', !features.inflationShield)}
                       disabled={updatingFeatures}
                       className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${features.inflationShield ? 'bg-primary' : 'bg-outline-variant/40'}`}
@@ -1336,22 +1310,7 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
                     </button>
                     <span className="text-[12px] font-semibold text-on-surface-variant/80">{features.inflationShield ? 'Enabled' : 'Disabled'}</span>
                   </div>
-                }
-              />
-              <Row
-                label="Cash Advance Application"
-                value={
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => handleToggleFeature('cashAdvanceForm', !features.cashAdvanceForm)}
-                      disabled={updatingFeatures}
-                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${features.cashAdvanceForm ? 'bg-primary' : 'bg-outline-variant/40'}`}
-                    >
-                      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${features.cashAdvanceForm ? 'translate-x-4.5' : 'translate-x-1'}`} />
-                    </button>
-                    <span className="text-[12px] font-semibold text-on-surface-variant/80">{features.cashAdvanceForm ? 'Enabled' : 'Disabled'}</span>
-                  </div>
-                }
+                } 
               />
             </Section>
           </div>
