@@ -336,23 +336,29 @@ export default function Wallet() {
     }
   }
 
-  // QR Logic — rendered locally via qrcode.react (level="H" = ~30% error
-  // correction) rather than fetched from an external image API, so the
-  // PayChain mark can sit in the center (imageSettings' `excavate` clears
-  // the modules behind it) without breaking scannability.
-  const qrData = `${getAppUrl()}/pay/account/${merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || ''}`
-  // qrcode.react v3's QRCodeCanvas is a plain function component (not
-  // forwardRef) — a `ref` prop on it is silently dropped. Grab the real
-  // <canvas> it renders via a wrapping container instead.
-  const qrContainerRef = React.useRef(null)
+  // QR Logic — a real NCBA Dynamic QR Code (scannable directly in M-PESA),
+  // fetched once on mount. Was rendered client-side via qrcode.react,
+  // encoding a link to PayChain's own /pay/account/:id page — replaced so
+  // there's one QR mechanism in the app (same NCBA API Request Money's
+  // "Scan to Pay QR" uses), not two.
+  const [qrCodeDataUri, setQrCodeDataUri] = useState('')
 
-  const getQrDataUrl = () => qrContainerRef.current?.querySelector('canvas')?.toDataURL('image/png')
+  useEffect(() => {
+    if (!merchant?.ncbaMerchantCode) return
+    const token = localStorage.getItem('paychain_merchant_token')
+    const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+    axios.get(`${API_URL}/api/callbacks/account-qr`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((res) => setQrCodeDataUri(res.data?.qrCodeDataUri || ''))
+      .catch((e) => console.error('Failed to load account QR', e))
+  }, [merchant?.ncbaMerchantCode])
+
+  const getQrDataUrl = () => qrCodeDataUri
 
   const handleDownload = async () => {
     setIsDownloading(true)
     try {
       const dataUrl = getQrDataUrl();
-      if (!dataUrl) throw new Error('QR canvas not ready');
+      if (!dataUrl) throw new Error('QR not ready');
       const a = document.createElement('a');
       a.style.display = 'none';
       a.href = dataUrl;
@@ -408,20 +414,24 @@ export default function Wallet() {
     }, 800)
   }
 
+  // No more URL to share (the QR is a real M-PESA-scannable code, not a
+  // link to a PayChain page) — sharing/copying the account details as text
+  // instead, which is what actually still lets someone pay manually.
+  const accountShareText = `Pay ${merchant?.businessName || 'this business'} via PayChain — Account: ${formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending')}`
+
   const handleShare = async () => {
     if (navigator.share) {
       try {
         await navigator.share({
           title: `Pay ${merchant?.businessName || 'Merchant'}`,
-          text: `Scan to pay ${merchant?.businessName || 'Merchant'} on PayChain`,
-          url: qrData
+          text: accountShareText,
         })
       } catch (err) {
         console.error('Share failed:', err)
       }
     } else {
-      navigator.clipboard.writeText(qrData)
-      addToast({ title: 'Link Copied', message: 'Payment link copied to clipboard.', type: 'success' })
+      navigator.clipboard.writeText(accountShareText)
+      addToast({ title: 'Copied', message: 'Account details copied to clipboard.', type: 'success' })
     }
   }
 
@@ -868,16 +878,16 @@ export default function Wallet() {
                   </div>
 
                   <div className="space-y-2">
-                    <button 
+                    <button
                       onClick={() => {
-                        navigator.clipboard.writeText(qrData)
-                        addToast({ title: 'Link Copied', message: 'Payment link copied to clipboard.', type: 'success' })
+                        navigator.clipboard.writeText(accountShareText)
+                        addToast({ title: 'Copied', message: 'Account details copied to clipboard.', type: 'success' })
                       }}
                       className="w-full py-4 bg-[#131722] text-[#8B98A9] rounded-2xl text-[10px] font-black transition-all shadow-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-amber-500 hover:text-white group border border-[#1E2532] text-center px-2 hover:border-amber-500"
                     >
                       <span className="material-symbols-outlined text-base">content_copy</span>
                     </button>
-                    <p className="text-[8px] text-center font-black uppercase text-[#8B98A9] tracking-widest">Copy Link</p>
+                    <p className="text-[8px] text-center font-black uppercase text-[#8B98A9] tracking-widest">Copy Details</p>
                   </div>
                 </div>
               </div>
@@ -885,10 +895,9 @@ export default function Wallet() {
               {/* QR Code Container — premium bezel: gradient ring + corner brackets around the settlement QR */}
               <div className="w-full md:w-56 shrink-0 flex justify-center self-start md:self-center mt-2 md:mt-0">
                 <SettlementQrCard
-                  qrData={qrData}
+                  qrCodeDataUri={qrCodeDataUri}
                   businessName={merchant?.businessName || 'Merchant'}
                   accountNumber={merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending'}
-                  containerRef={qrContainerRef}
                 />
               </div>
             </div>

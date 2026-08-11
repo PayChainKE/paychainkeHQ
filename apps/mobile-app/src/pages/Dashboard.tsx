@@ -195,6 +195,11 @@ export default function Dashboard({ navigation }: any) {
   const monthOverMonthPct = lastMonthTotal > 0 ? ((monthTotal - lastMonthTotal) / lastMonthTotal) * 100 : null;
 
   const walletActivated = !!merchant?.stellarPublicKey;
+  // Admin-controlled per-merchant visibility (Merchants.jsx's "Feature
+  // Access" panel) — hidden by default for new signups now, matches the
+  // web dashboard's MerchantSidebar.jsx/Overview.jsx gating.
+  const digitalWalletEnabled = merchant?.features?.digitalWallet !== false;
+  const inflationShieldEnabled = merchant?.features?.inflationShield !== false;
   const usdcBalance = merchant?.usdcBalance || 0;
   const usdcInKes = liveRate != null ? usdcBalance * liveRate : null;
 
@@ -304,14 +309,16 @@ export default function Dashboard({ navigation }: any) {
               <Text className="text-[11px] font-jakarta-bold text-[#0c2010] uppercase tracking-widest">Pay</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity className="items-center" activeOpacity={0.8} onPress={() => navigation?.navigate('InflationShield')}>
-              <View className="w-[72px] h-[72px] rounded-full bg-white shadow-lg shadow-black/10 items-center justify-center mb-2.5">
-                <View className="w-12 h-12 rounded-full bg-[#83f5c6] items-center justify-center">
-                  <MaterialIcons name="swap-horiz" size={24} color="#00351d" />
+            {inflationShieldEnabled && (
+              <TouchableOpacity className="items-center" activeOpacity={0.8} onPress={() => navigation?.navigate('InflationShield')}>
+                <View className="w-[72px] h-[72px] rounded-full bg-white shadow-lg shadow-black/10 items-center justify-center mb-2.5">
+                  <View className="w-12 h-12 rounded-full bg-[#83f5c6] items-center justify-center">
+                    <MaterialIcons name="swap-horiz" size={24} color="#00351d" />
+                  </View>
                 </View>
-              </View>
-              <Text className="text-[11px] font-jakarta-bold text-[#0c2010] uppercase tracking-widest">Swap</Text>
-            </TouchableOpacity>
+                <Text className="text-[11px] font-jakarta-bold text-[#0c2010] uppercase tracking-widest">Swap</Text>
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity className="items-center" activeOpacity={0.8} onPress={() => navigation?.navigate('Advance')}>
               <View className="w-[72px] h-[72px] rounded-full bg-white shadow-lg shadow-black/10 items-center justify-center mb-2.5">
@@ -364,7 +371,8 @@ export default function Dashboard({ navigation }: any) {
             </TouchableOpacity>
           </View>
 
-          {/* Digital Ledgers */}
+          {/* Digital Ledgers — admin-controlled, hidden by default for new signups */}
+          {digitalWalletEnabled && (
           <View className="mb-8">
               <View className="px-6 flex-row items-center justify-between mb-4">
                 <Text className="text-lg font-jakarta-bold text-[#0c2010]">Digital Ledgers</Text>
@@ -457,6 +465,7 @@ export default function Dashboard({ navigation }: any) {
                 )}
               </ScrollView>
           </View>
+          )}
 
           {/* This Month Performance */}
           <View className="px-6 mb-8">

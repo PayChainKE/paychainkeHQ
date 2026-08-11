@@ -13,6 +13,11 @@ dist-ssr
 *.local
 *.tsbuildinfo
 
+# Turborepo build cache — was previously tracked in git (63MB of .tar.zst
+# cache blobs, none of which need to survive a clone); this rule stops it
+# from happening again after the untrack below.
+.turbo
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -28,3 +33,5 @@ dist-ssr
 
 # Bank integration reference docs — contains real UAT credentials, never commit
 /API documents/
+/PayChain Tarrif/
+/apps/Paychain Paybill Sticker..pdf

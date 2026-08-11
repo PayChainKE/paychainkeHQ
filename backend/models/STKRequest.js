@@ -36,18 +36,35 @@ const stkRequestSchema = new Schema({
   },
   // Only meaningful when linkId is unset — distinguishes a merchant funding
   // their OWN wallet ('topup', no surcharge) from an actual customer/payer
-  // being charged via Request Money's instant prompt ('request_money') or
-  // the Settlement QR's open-amount pay page ('pay_account'), both of which
-  // carry PayChain's customer surcharge. Defaults to 'topup' so older rows
-  // and the plain wallet-top-up flow keep their existing zero-fee behavior.
+  // being charged via Request Money's instant prompt ('request_money'),
+  // the Settlement QR's open-amount pay page ('pay_account'), or an NCBA
+  // Dynamic QR Code scan ('qr') — all three carry PayChain's customer
+  // surcharge. Defaults to 'topup' so older rows and the plain wallet-top-up
+  // flow keep their existing zero-fee behavior.
   kind: {
     type: String,
-    enum: ['topup', 'request_money', 'pay_account'],
+    enum: ['topup', 'request_money', 'pay_account', 'qr'],
     default: 'topup',
   },
+  // 'stk' (default): a push prompt was sent, resolved by polling NCBA's STK
+  // Query endpoint (pollAndResolveNcbaStkPush). 'qr': a Dynamic QR Code was
+  // generated instead — NCBA's QR API returns no transaction ID to poll, so
+  // these are resolved directly off the account-notification webhook (see
+  // controllers/ncbaAccountNotificationController.js) matching by
+  // merchantId + amount instead.
+  channel: {
+    type: String,
+    enum: ['stk', 'qr'],
+    default: 'stk',
+  },
+  // Required for 'stk' (the number the prompt was pushed to); unknown at
+  // creation time for 'qr' (the payer scans a code — we only learn who paid
+  // from NCBA's account-notification callback, which doesn't feed back onto
+  // this record).
   phone: {
     type: String,
-    required: true
+    required: false,
+    default: null,
   },
   status: {
     type: String,

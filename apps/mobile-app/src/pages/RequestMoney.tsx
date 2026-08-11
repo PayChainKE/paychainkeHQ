@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, Share } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, Share, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -8,12 +8,21 @@ import { ValidatedTextInput } from '../components/ValidatedTextInput';
 import TopBar from '../components/layout/TopBar';
 import api from '../api/config';
 
-type OptionId = 'mpesa' | 'link';
+type OptionId = 'mpesa' | 'link' | 'qr';
 
-const OPTIONS: Array<{ id: OptionId; title: string; description: string; icon: keyof typeof Feather.glyphMap; tag: string }> = [
+// 'qr' renders via MaterialIcons ('qr-code-2', same glyph MyAccountsTab.tsx
+// already uses) instead of Feather — Feather has no QR icon, so `icon` is
+// loosely typed here and each render site picks the right icon set by id.
+const OPTIONS: Array<{ id: OptionId; title: string; description: string; icon: string; tag: string }> = [
   { id: 'mpesa', title: 'Instant M-PESA Prompt', description: 'Send a payment prompt to their M-PESA phone', icon: 'smartphone', tag: 'Most Popular' },
   { id: 'link', title: 'Payment Link', description: 'Create a shareable payment link', icon: 'link', tag: 'Versatile' },
+  { id: 'qr', title: 'Scan to Pay QR', description: 'Show a QR code for them to scan in M-PESA', icon: 'qr-code-2', tag: 'In Person' },
 ];
+
+function OptionIcon({ id, icon, size, color }: { id: OptionId; icon: string; size: number; color: string }) {
+  if (id === 'qr') return <MaterialIcons name="qr-code-2" size={size} color={color} />;
+  return <Feather name={icon as keyof typeof Feather.glyphMap} size={size} color={color} />;
+}
 
 export default function RequestMoney({ navigation }: any) {
   const { merchant, refreshSession } = useAuth();
@@ -26,6 +35,8 @@ export default function RequestMoney({ navigation }: any) {
   const [statusText, setStatusText] = useState('');
   const [generatedLink, setGeneratedLink] = useState('');
   const [copied, setCopied] = useState(false);
+  const [qrCodeDataUri, setQrCodeDataUri] = useState('');
+  const [qrPaid, setQrPaid] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
@@ -36,6 +47,8 @@ export default function RequestMoney({ navigation }: any) {
     setGeneratedLink('');
     setStatusText('');
     setCopied(false);
+    setQrCodeDataUri('');
+    setQrPaid(false);
   };
 
   const handleSelect = (id: OptionId) => {
@@ -122,9 +135,51 @@ export default function RequestMoney({ navigation }: any) {
     }
   };
 
+  const generateQr = async () => {
+    if (!amount || Number(amount) <= 0) {
+      Alert.alert('Invalid Amount', 'Please enter a valid amount.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const res = await api.post('/api/callbacks/generate-qr', { amount: Number(amount) });
+      setQrCodeDataUri(res.data.qrCodeDataUri);
+      setStep(3);
+
+      // Same poll shape as sendMpesaPrompt, reusing the same stk-status
+      // endpoint — a QR request is tracked the same way an STK one is, just
+      // via a PayChain-generated reference instead of NCBA's own
+      // transaction ID. Doesn't block navigation — the QR is already shown.
+      const checkoutId = res.data.reference;
+      let attempts = 0;
+      const maxAttempts = 100; // 100 * 3s = 5min — a counter QR may sit unscanned longer than a push prompt
+      pollRef.current = setInterval(async () => {
+        attempts++;
+        try {
+          const statusRes = await api.get(`/api/callbacks/stk-status/${checkoutId}`);
+          if (statusRes.data.status === 'success') {
+            if (pollRef.current) clearInterval(pollRef.current);
+            await refreshSession();
+            setQrPaid(true);
+          } else if (statusRes.data.status === 'failed' || attempts >= maxAttempts) {
+            if (pollRef.current) clearInterval(pollRef.current);
+          }
+        } catch (e) {
+          console.error('QR status poll error', e);
+        }
+      }, 3000);
+    } catch (err: any) {
+      Alert.alert('Generation Failed', err?.response?.data?.error || 'Failed to generate QR code.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handlePrimaryAction = () => {
     if (selectedOption === 'mpesa') return sendMpesaPrompt();
     if (selectedOption === 'link') return createPaymentLink();
+    if (selectedOption === 'qr') return generateQr();
   };
 
   const copyLink = async () => {
@@ -167,7 +222,7 @@ export default function RequestMoney({ navigation }: any) {
                 >
                   <View className="flex-row items-center justify-between mb-4">
                     <View className="w-12 h-12 rounded-2xl bg-[#00351d] items-center justify-center">
-                      <Feather name={opt.icon} size={20} color="#5efeb3" />
+                      <OptionIcon id={opt.id} icon={opt.icon} size={20} color="#5efeb3" />
                     </View>
                     <View className="bg-[#f7faf7] px-3 py-1.5 rounded-full">
                       <Text className="text-[9px] font-jakarta-extrabold uppercase tracking-[0.15em] text-[#707971]">{opt.tag}</Text>
@@ -191,11 +246,13 @@ export default function RequestMoney({ navigation }: any) {
             <View>
               <View className="items-center mb-8">
                 <View className="w-16 h-16 rounded-2xl bg-[#00351d] items-center justify-center mb-4">
-                  <Feather name={selected.icon} size={26} color="#5efeb3" />
+                  <OptionIcon id={selected.id} icon={selected.icon} size={26} color="#5efeb3" />
                 </View>
                 <Text className="text-[13px] text-[#707971] font-jakarta-medium text-center leading-relaxed px-4">
                   {selected.id === 'mpesa'
                     ? "We'll send an M-PESA prompt to this number for them to complete."
+                    : selected.id === 'qr'
+                    ? "Set an amount and we'll generate a QR code for them to scan and pay in M-PESA."
                     : "Set an amount and we'll generate a secure, shareable link."}
                 </Text>
               </View>
@@ -227,13 +284,38 @@ export default function RequestMoney({ navigation }: any) {
           )}
 
           {/* Step 3 — Result */}
-          {step === 3 && selected && (
+          {step === 3 && selected && selected.id === 'qr' && !qrPaid && (
+            <View className="items-center pt-4">
+              <View className="bg-white border border-[#eff4ef] rounded-[28px] p-4 mb-6 shadow-sm shadow-[#00351d]/5">
+                <Image source={{ uri: qrCodeDataUri }} style={{ width: 224, height: 224 }} resizeMode="contain" />
+              </View>
+              <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#00351d] mb-2 text-center">Show This to Your Customer</Text>
+              <Text className="text-[13px] text-[#707971] font-jakarta-medium text-center leading-relaxed px-4 mb-2">
+                They scan this in their M-PESA app to pay KES {Number(amount).toLocaleString()}. This updates automatically once paid.
+              </Text>
+              <Text className="text-[11px] text-[#a1a1aa] font-jakarta-medium text-center mb-5">Long-press the code to save it</Text>
+              <View className="flex-row items-center gap-2 mb-8">
+                <ActivityIndicator color="#006c4e" size="small" />
+                <Text className="text-[11px] font-jakarta-extrabold uppercase tracking-widest text-[#006c4e]">Waiting for payment...</Text>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => navigation?.navigate('Home')}
+                activeOpacity={0.9}
+                className="w-full bg-[#00351d] py-4 rounded-2xl items-center justify-center shadow-lg shadow-[#00351d]/20"
+              >
+                <Text className="text-white font-jakarta-extrabold text-[12px] uppercase tracking-widest">Back to Dashboard</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {step === 3 && selected && (selected.id !== 'qr' || qrPaid) && (
             <View className="items-center pt-4">
               <View className="w-20 h-20 rounded-full bg-[#e7f8ef] items-center justify-center mb-6 border-4 border-[#d5f3e4]">
                 <Feather name="check-circle" size={36} color="#006c4e" />
               </View>
 
-              {selected.id === 'mpesa' ? (
+              {selected.id === 'mpesa' || selected.id === 'qr' ? (
                 <>
                   <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#00351d] mb-2 text-center">Payment Received</Text>
                   <Text className="text-[13px] text-[#707971] font-jakarta-medium text-center leading-relaxed px-4 mb-8">
@@ -299,7 +381,7 @@ export default function RequestMoney({ navigation }: any) {
               </>
             ) : (
               <Text className={`font-jakarta-extrabold text-[12px] uppercase tracking-widest ${!amount || (selectedOption === 'mpesa' && !phone) ? 'text-[#a1a1aa]' : 'text-white'}`}>
-                {selectedOption === 'mpesa' ? 'Send Prompt' : 'Generate Link'}
+                {selectedOption === 'mpesa' ? 'Send Prompt' : selectedOption === 'qr' ? 'Generate QR Code' : 'Generate Link'}
               </Text>
             )}
           </TouchableOpacity>

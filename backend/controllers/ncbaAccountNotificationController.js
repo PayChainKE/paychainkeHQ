@@ -16,6 +16,8 @@ import { verifyNcbaHashVal } from '../utils/ncbaHashVal.js';
 import { timingSafeStringEqual } from '../utils/timingSafeCompare.js';
 import { buildNcbaOkResult, buildNcbaFailResult } from '../utils/ncbaSoapResponses.js';
 import { creditNcbaCollection, DuplicateCollectionError, wasAlreadySettledByStkPush } from '../services/ncbaLedgerService.js';
+import { resolveStkOutcome } from './mpesaController.js';
+import STKRequest from '../models/STKRequest.js';
 import { NcbaTariffBoundsError } from '../config/ncbaTariffCard.js';
 import { getNcbaVirtualAccountNumber, formatAccountNumberDisplay } from '../utils/ncbaValidators.js';
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay.js';
@@ -215,6 +217,31 @@ export const handleNcbaAccountNotification = async (req, res) => {
     if (await wasAlreadySettledByStkPush(merchant, transAmount)) {
       logEvent('info', 'ncba_account_notification_already_settled_via_stk', { transId, merchantId: merchant._id.toString(), transAmount });
       return respondOk(res, 'Already settled via STK Push');
+    }
+
+    // Dynamic QR Code collections have no NCBA transaction ID to poll
+    // against (unlike STK), so unlike wasAlreadySettledByStkPush above —
+    // which only catches an *already-resolved* STK request racing this
+    // webhook — a QR request is resolved right here, on first sight of the
+    // matching payment. Settles through the same dual-sided-checkout split
+    // STK uses (resolveStkOutcome), rather than falling through to the
+    // generic full-amount credit below, which doesn't know part of this
+    // money is PayChain's own surcharge, not the merchant's.
+    const pendingQrRequest = await STKRequest.findOne({
+      merchantId: merchant._id,
+      channel: 'qr',
+      status: 'pending',
+      amount: transAmount,
+    });
+    if (pendingQrRequest) {
+      await resolveStkOutcome(pendingQrRequest, {
+        succeeded: true,
+        receipt: transId,
+        resultDesc: 'Paid via NCBA Dynamic QR Code',
+        transTime: rawTransTime,
+      });
+      logEvent('info', 'ncba_account_notification_resolved_via_qr', { transId, merchantId: merchant._id.toString(), transAmount });
+      return respondOk(res, 'Settled via QR code');
     }
 
     let ledgerResult;

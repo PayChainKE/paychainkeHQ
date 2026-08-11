@@ -338,13 +338,18 @@ const merchantSchema = new mongoose.Schema({
     default: 0,
   },
   features: {
+    // Both default to off as of 2026-08-11 — every new merchant signs up
+    // without Digital Wallet or Inflation Shield visible at all, until an
+    // admin explicitly turns it on for that merchant (Merchants.jsx's
+    // "Feature Access" panel → PATCH /api/admin/merchants/:id/features).
+    // Same pattern cashAdvanceForm already used below.
     digitalWallet: {
       type: Boolean,
-      default: true
+      default: false
     },
     inflationShield: {
       type: Boolean,
-      default: true
+      default: false
     },
     // Defaults to off — Cash Advance is a credit product that likely falls
     // under CBK's Digital Credit Providers Regulations, 2022, and licensing
