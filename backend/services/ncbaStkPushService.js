@@ -3,14 +3,15 @@ import axios from 'axios';
 // ── NCBA STK Push configuration ─────────────────────────────────────────────
 // Separate host and credentials from services/ncbaOpenBankingService.js —
 // NCBA's STK Push & Dynamic QR Code API (used for customer collections via
-// paybill 880100) runs on c2bapis.ncbagroup.com, not the Open Banking
-// gateway. Per Rose Soy's onboarding email, the Open Banking UAT userID/
-// password work against this host too, so NCBA_STK_USERNAME/_PASSWORD fall
-// back to the Open Banking credentials when left unset.
+// PayChain's dedicated NCBA Till short code, issued by NCBA on 2026-08-11)
+// runs on c2bapis.ncbagroup.com, not the Open Banking gateway. Per Rose
+// Soy's onboarding email, the Open Banking UAT userID/password work against
+// this host too, so NCBA_STK_USERNAME/_PASSWORD fall back to the Open
+// Banking credentials when left unset.
 const ncbaStkBaseUrl = (process.env.NCBA_STK_BASE_URL || 'https://c2bapis.ncbagroup.com').replace(/\/$/, '');
 const ncbaStkUsername = process.env.NCBA_STK_USERNAME || process.env.NCBA_OPENBANKING_USER_ID;
 const ncbaStkPassword = process.env.NCBA_STK_PASSWORD || process.env.NCBA_OPENBANKING_PASSWORD;
-export const NCBA_STK_PAYBILL = process.env.NCBA_STK_PAYBILL || '880100';
+export const NCBA_STK_PAYBILL = process.env.NCBA_STK_PAYBILL || '889066';
 
 // Real network calls to NCBA (UAT or live) only happen when this is
 // explicitly 'true' — mirrors ncbaOpenBankingService.js's liveCallsEnabled,
@@ -127,19 +128,20 @@ async function ncbaStkPost(path, body, { retrying = false } = {}) {
 }
 
 /**
- * Sends an STK Push prompt to a customer's phone via NCBA's paybill 880100.
- * A response with TransactionID === null means NCBA rejected the push
- * outright (e.g. bad number) — throws immediately, same as Daraja's
- * ResponseCode !== '0' check. A non-null TransactionID means the prompt was
- * sent; the actual pay/cancel outcome must be learned via queryStkPush below
- * (this endpoint never tells you whether the customer entered their PIN).
+ * Sends an STK Push prompt to a customer's phone via PayChain's NCBA Till
+ * short code (NCBA_STK_PAYBILL — NCBA's STK API still names this field
+ * PayBillNo even though it's a Till). A response with TransactionID === null
+ * means NCBA rejected the push outright (e.g. bad number) — throws
+ * immediately, same as Daraja's ResponseCode !== '0' check. A non-null
+ * TransactionID means the prompt was sent; the actual pay/cancel outcome
+ * must be learned via queryStkPush below (this endpoint never tells you
+ * whether the customer entered their PIN).
  *
  * @param {object} params
  * @param {string} params.phone - 254XXXXXXXXX
  * @param {number} params.amount
- * @param {string} params.accountNo - merchant's paybillAccount (the same
- *        reference customers already enter manually for paybill 880100
- *        deposits, reconciled by the existing NCBA account-notification
+ * @param {string} params.accountNo - merchant's own virtual account
+ *        reference, reconciled by the existing NCBA account-notification
  *        webhooks).
  * @returns {{ transactionId: string, referenceId: string }}
  */
