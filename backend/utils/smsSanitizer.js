@@ -140,7 +140,22 @@ export function buildStrictSms(templateFunc, data, maxLength = SINGLE_SEGMENT_LI
     const overBy = message.length - maxLength;
     const ellipsis = '...';
     const targetLength = Math.max(field.minLength, current.length - overBy - ellipsis.length);
-    field.current = current.slice(0, targetLength).trimEnd() + ellipsis;
+    const next = current.slice(0, targetLength).trimEnd() + ellipsis;
+
+    // Once a field has already been truncated down near its floor, slicing
+    // an already-ellipsized string can reproduce the exact same string on
+    // every subsequent pass (e.g. "Paybil..." sliced to 6 chars + "..." is
+    // "Paybil..." again) — an infinite loop that never shrinks the message
+    // and never advances fieldIndex. If this pass made no real progress,
+    // move on to the next field instead of retrying forever. A message that
+    // still exceeds maxLength after every field is exhausted falls through
+    // to safeSendSMS's own hard-truncate backstop.
+    if (next.length >= current.length) {
+      fieldIndex += 1;
+      continue;
+    }
+
+    field.current = next;
     truncated = true;
     message = compile();
   }
