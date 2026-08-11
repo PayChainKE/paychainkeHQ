@@ -1,7 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import rateLimit from 'express-rate-limit';
-import { getPayees, getPayeeById, addPayee, updatePayee, deletePayee, getBatches, getBatchById, uploadCSV, authorizeBatch, validateKplcMeter, validateNcwscMeter } from '../controllers/bulkPayController.js';
+import { getPayees, getPayeeById, addPayee, updatePayee, deletePayee, getBatches, getBatchById, uploadCSV, authorizeBatch, validateKplcMeter, validateNcwscMeter, validateKplcPrepaidMeter } from '../controllers/bulkPayController.js';
 import { protectMerchant } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -53,6 +53,7 @@ router.route('/payees')
   .post(addPayee);
 
 router.post('/validate-kplc-meter', utilityValidationLimiter, validateKplcMeter);
+router.post('/validate-kplc-prepaid-meter', utilityValidationLimiter, validateKplcPrepaidMeter);
 router.post('/validate-ncwsc-meter', utilityValidationLimiter, validateNcwscMeter);
 
 router.route('/payees/:id')

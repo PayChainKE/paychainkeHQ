@@ -208,6 +208,18 @@ export const REVENUE_STREAMS = [
     basis: 'kes_volume',
   },
   {
+    id: 'ncba_kplc_prepaid_fee',
+    label: 'NCBA KPLC Prepaid Token Fee',
+    description: 'PayChain\'s flat margin on Bulk Pay KPLC (Kenya Power) prepaid electricity token purchases, via NCBA\'s Open Banking KPLC Prepaid Transaction API. Distinct from ncba_kplc_fee (postpaid bill payments) — NCBA treats prepaid and postpaid as separate products.',
+    icon: 'bolt',
+    accent: 'amber',
+    rate: PAYCHAIN_TXN_RATE,
+    minFee: 0,
+    txTypes: ['ncba_kplc_prepaid'],
+    statuses: ['completed', 'verified'],
+    basis: 'kes_volume',
+  },
+  {
     id: 'ncba_ncwsc_fee',
     label: 'NCBA NCWSC Bill Payment Fee',
     description: 'PayChain\'s flat margin on Bulk Pay Nairobi Water (NCWSC) bill payments, via NCBA\'s Open Banking NWSC Payment API. NCBA hasn\'t published a cost schedule for this rail, so no NCBA cost passes through; this is PayChain\'s own charge only.',

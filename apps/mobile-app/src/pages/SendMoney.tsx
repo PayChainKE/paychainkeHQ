@@ -68,7 +68,11 @@ export default function SendMoney({ navigation }: any) {
   const [paybillAccountRef, setPaybillAccountRef] = useState('');
   const [bankCode, setBankCode] = useState('');
   const [bankCodes, setBankCodes] = useState<{ code: string; name: string }[]>([]);
-  const [bankRail, setBankRail] = useState<'pesalink' | 'eft'>('pesalink');
+  const [bankRail, setBankRail] = useState<'pesalink' | 'eft' | 'rtgs'>('pesalink');
+  // RTGS-only fields — see dashboard SendMoney.jsx's equivalent comment.
+  const [beneficiaryCountry, setBeneficiaryCountry] = useState('KE');
+  const [beneficiaryAddress, setBeneficiaryAddress] = useState('');
+  const [purposeCode, setPurposeCode] = useState('MSC');
   const [amount, setAmount] = useState('');
   const [reference, setReference] = useState('');
   const [pin, setPin] = useState('');
@@ -107,6 +111,7 @@ export default function SendMoney({ navigation }: any) {
         Number(amount) > 0 &&
         !!recipientAccount &&
         (destination !== 'bank' || !!bankCode) &&
+        (destination !== 'bank' || bankRail !== 'rtgs' || !!beneficiaryCountry) &&
         (destination !== 'paybill' || !!paybillAccountRef)
       );
     }
@@ -167,6 +172,7 @@ export default function SendMoney({ navigation }: any) {
             narration: reference || `Transfer to ${recipientAccount}`,
             pin,
             rail: bankRail,
+            ...(bankRail === 'rtgs' ? { beneficiaryCountry, beneficiaryAddress: beneficiaryAddress || undefined, purposeCode } : {}),
           });
         } else {
           await api.post('/api/callbacks/b2b-request', {
@@ -292,6 +298,32 @@ export default function SendMoney({ navigation }: any) {
 
               {destination === 'bank' && (
                 <View className="mb-5">
+                  <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#00351d]/60 mb-2 ml-1">Transfer Speed</Text>
+                  <View className="flex-row gap-2">
+                    {([
+                      { id: 'pesalink', title: 'Instant', hint: 'PesaLink · 24/7' },
+                      { id: 'eft', title: 'Next Business Day', hint: 'EFT · Mon–Fri' },
+                      { id: 'rtgs', title: 'International', hint: 'RTGS · ~3 hrs' },
+                    ] as const).map((opt) => {
+                      const active = bankRail === opt.id;
+                      return (
+                        <TouchableOpacity
+                          key={opt.id}
+                          onPress={() => { setBankRail(opt.id); setBankCode(''); }}
+                          activeOpacity={0.85}
+                          className={`flex-1 p-3 rounded-2xl border-2 ${active ? 'border-[#00351d] bg-[#f0fdf4]' : 'border-[#eff4ef] bg-white'}`}
+                        >
+                          <Text className={`text-[12px] font-jakarta-bold ${active ? 'text-[#00351d]' : 'text-[#0c2010]'}`}>{opt.title}</Text>
+                          <Text className="text-[9px] text-[#707971] font-jakarta-medium mt-0.5">{opt.hint}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+
+              {destination === 'bank' && bankRail !== 'rtgs' && (
+                <View className="mb-5">
                   <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#00351d]/60 mb-2 ml-1">Bank</Text>
                   <View className="flex-row flex-wrap gap-1.5">
                     {bankCodes.length === 0 && (
@@ -310,28 +342,59 @@ export default function SendMoney({ navigation }: any) {
                 </View>
               )}
 
-              {destination === 'bank' && (
-                <View className="mb-5">
-                  <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#00351d]/60 mb-2 ml-1">Transfer Speed</Text>
-                  <View className="flex-row gap-2.5">
+              {destination === 'bank' && bankRail === 'rtgs' && (
+                <View className="mb-5 p-4 rounded-2xl bg-[#f7faf7] border border-[#eff4ef]">
+                  <Text className="text-[11px] text-[#707971] font-jakarta-medium leading-relaxed mb-3">
+                    RTGS sends to banks outside PesaLink/EFT's network, including other East African countries. Settles same business day, ~3 hours. KES only for now.
+                  </Text>
+                  <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#00351d]/60 mb-2">Beneficiary Bank SWIFT Code</Text>
+                  <TextInput
+                    value={bankCode}
+                    onChangeText={(t) => setBankCode(t.toUpperCase())}
+                    autoCapitalize="characters"
+                    placeholder="e.g. KCBLKENX"
+                    placeholderTextColor="#a1a1aa"
+                    className="bg-white border border-[#eff4ef] rounded-2xl px-4 py-3.5 text-[#00351d] font-jakarta-bold text-[14px] mb-3"
+                  />
+                  <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#00351d]/60 mb-2">Beneficiary Country</Text>
+                  <View className="flex-row flex-wrap gap-1.5 mb-3">
                     {([
-                      { id: 'pesalink', title: 'Instant', hint: 'PesaLink · 24/7' },
-                      { id: 'eft', title: 'Next Business Day', hint: 'EFT · Mon–Fri' },
-                    ] as const).map((opt) => {
-                      const active = bankRail === opt.id;
-                      return (
-                        <TouchableOpacity
-                          key={opt.id}
-                          onPress={() => setBankRail(opt.id)}
-                          activeOpacity={0.85}
-                          className={`flex-1 p-3.5 rounded-2xl border-2 ${active ? 'border-[#00351d] bg-[#f0fdf4]' : 'border-[#eff4ef] bg-white'}`}
-                        >
-                          <Text className={`text-[13px] font-jakarta-bold ${active ? 'text-[#00351d]' : 'text-[#0c2010]'}`}>{opt.title}</Text>
-                          <Text className="text-[10px] text-[#707971] font-jakarta-medium mt-0.5">{opt.hint}</Text>
-                        </TouchableOpacity>
-                      );
-                    })}
+                      { code: 'KE', label: 'Kenya' },
+                      { code: 'UG', label: 'Uganda' },
+                      { code: 'TZ', label: 'Tanzania' },
+                      { code: 'RW', label: 'Rwanda' },
+                    ]).map((c) => (
+                      <TouchableOpacity
+                        key={c.code}
+                        onPress={() => setBeneficiaryCountry(c.code)}
+                        className={`px-3 py-2 rounded-lg border ${beneficiaryCountry === c.code ? 'bg-[#00351d] border-[#00351d]' : 'bg-white border-[#eff4ef]'}`}
+                      >
+                        <Text className={`font-jakarta-bold text-[11px] ${beneficiaryCountry === c.code ? 'text-white' : 'text-[#404942]'}`}>{c.label}</Text>
+                      </TouchableOpacity>
+                    ))}
                   </View>
+                  <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#00351d]/60 mb-2">
+                    Beneficiary Address <Text className="text-[#a1a1aa] normal-case">(optional)</Text>
+                  </Text>
+                  <TextInput
+                    value={beneficiaryAddress}
+                    onChangeText={setBeneficiaryAddress}
+                    placeholder="e.g. Nairobi"
+                    placeholderTextColor="#a1a1aa"
+                    className="bg-white border border-[#eff4ef] rounded-2xl px-4 py-3.5 text-[#00351d] font-jakarta-medium text-[14px] mb-3"
+                  />
+                  <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#00351d]/60 mb-2">Purpose of Payment Code</Text>
+                  <TextInput
+                    value={purposeCode}
+                    onChangeText={(t) => setPurposeCode(t.toUpperCase())}
+                    autoCapitalize="characters"
+                    placeholder="MSC"
+                    placeholderTextColor="#a1a1aa"
+                    className="bg-white border border-[#eff4ef] rounded-2xl px-4 py-3.5 text-[#00351d] font-jakarta-bold text-[14px]"
+                  />
+                  <Text className="text-[10px] text-[#707971] font-jakarta-medium mt-2">
+                    NCBA hasn't published the full code list yet — "MSC" (Miscellaneous) is their own confirmed default. Confirm the correct code with NCBA if this payment needs a specific one.
+                  </Text>
                 </View>
               )}
 
@@ -442,8 +505,10 @@ export default function SendMoney({ navigation }: any) {
                 </View>
                 {([
                   ['Destination', selectedDest?.label || ''],
-                  ...(destination === 'bank' ? [['Bank', bankCodes.find((b) => b.code === bankCode)?.name || bankCode]] : []),
-                  ...(destination === 'bank' ? [['Transfer Speed', bankRail === 'eft' ? 'Next Business Day (EFT)' : 'Instant (PesaLink)']] : []),
+                  ...(destination === 'bank' && bankRail !== 'rtgs' ? [['Bank', bankCodes.find((b) => b.code === bankCode)?.name || bankCode]] : []),
+                  ...(destination === 'bank' && bankRail === 'rtgs' ? [['Beneficiary Bank BIC', bankCode]] : []),
+                  ...(destination === 'bank' ? [['Transfer Speed', bankRail === 'eft' ? 'Next Business Day (EFT)' : bankRail === 'rtgs' ? 'International (RTGS)' : 'Instant (PesaLink)']] : []),
+                  ...(destination === 'bank' && bankRail === 'rtgs' ? [['Beneficiary Country', ({ KE: 'Kenya', UG: 'Uganda', TZ: 'Tanzania', RW: 'Rwanda' } as Record<string, string>)[beneficiaryCountry] || beneficiaryCountry]] : []),
                   ['Recipient', recipientAccount],
                   ...(destination === 'paybill' ? [['Account Number', paybillAccountRef]] : []),
                   ['Amount', formatKES(Number(amount) || 0)],

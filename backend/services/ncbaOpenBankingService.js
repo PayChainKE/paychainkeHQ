@@ -370,6 +370,93 @@ export async function submitEftTransfer({
   return result;
 }
 
+// NCBA's own sample requests (both the plain and IMT RTGS Postman examples)
+// use "MSC" as PurposeCode — the UAT Guide itself says the full code list
+// is "to be shared during onboarding", so this is the one confirmed-valid
+// value available until that list arrives. Used only as a fallback default
+// — always pass a real purposeCode once NCBA supplies the actual list.
+const RTGS_DEFAULT_PURPOSE_CODE = 'MSC';
+
+/**
+ * Submits an RTGS transfer — NCBA's cross-border/multi-currency local bank
+ * rail, distinct from PesaLink/EFT in three ways: BeneficiaryBankBIC here
+ * is a real SWIFT BIC (not a "00"-prefixed CBK clearing code), it supports
+ * KE/UG/TZ/RW beneficiaries in KES/USD/GBP/EUR/TZS/UGX/RWF (not KES-only,
+ * Kenya-only), and it has no minimum-amount-bounded maximum (per the UAT
+ * Guide: "Minimum payments of KES 50 ... with no maximum CAP" — so, unlike
+ * PesaLink/EFT, assertTransferAmountInBounds is NOT applied here). No RTGS-
+ * specific account-validation endpoint is documented anywhere in the UAT
+ * Guide or Postman collection (unlike PesaLink/LNM/KPLC/NCWSC, which each
+ * have one) — this is submit-only, no pre-flight validation call.
+ *
+ * Per the UAT Guide, RTGS resolves synchronously (T+3 hours is the bank's
+ * own settlement window, not this API call — the resultCode IS the final
+ * submission result, matching PesaLink/EFT's response shape, not the
+ * "accepted into processing" shape of the async rails).
+ *
+ * @param {object} params
+ * @param {string} params.transactionId
+ * @param {string} params.beneficiaryAccountNumber
+ * @param {string} params.beneficiaryBankBic - real SWIFT BIC, not a CBK clearing code
+ * @param {string} params.beneficiaryName
+ * @param {string} params.beneficiaryCountry - KE/UG/TZ/RW
+ * @param {string} [params.beneficiaryAddress]
+ * @param {number} params.amount
+ * @param {string} [params.creditCurrency='KES'] - KES/USD/GBP/EUR/TZS/UGX/RWF
+ * @param {string} [params.debitCurrency='KES']
+ * @param {string} [params.narration]
+ * @param {string} [params.purposeCode] - defaults to RTGS_DEFAULT_PURPOSE_CODE
+ * @param {string} [params.senderCountry='KE']
+ */
+export async function submitRtgsTransfer({
+  transactionId,
+  beneficiaryAccountNumber,
+  beneficiaryBankBic,
+  beneficiaryName,
+  beneficiaryCountry,
+  beneficiaryAddress,
+  amount,
+  creditCurrency = 'KES',
+  debitCurrency = 'KES',
+  narration,
+  purposeCode,
+  senderCountry = 'KE',
+}) {
+  if (!transactionId || !beneficiaryAccountNumber || !beneficiaryBankBic || !beneficiaryCountry || !amount) {
+    throw new NcbaOpenBankingValidationError('transactionId, beneficiaryAccountNumber, beneficiaryBankBic, beneficiaryCountry and amount are required for an RTGS transfer');
+  }
+  if (Number(amount) < MIN_TRANSFER_AMOUNT) {
+    throw new NcbaOpenBankingValidationError(`Amount must be at least KES ${MIN_TRANSFER_AMOUNT} (NCBA RTGS minimum) — RTGS has no maximum cap`);
+  }
+
+  const payload = {
+    BeneficiaryAccountNumber: beneficiaryAccountNumber,
+    BeneficiaryBankBIC: beneficiaryBankBic,
+    BeneficiaryCountry: beneficiaryCountry,
+    BeneficiaryName: beneficiaryName,
+    BeneficiaryAddress: beneficiaryAddress || '',
+    CreditAmount: Math.round(Number(amount)).toFixed(2),
+    DebitCurrency: debitCurrency,
+    CreditCurrency: creditCurrency,
+    Narration: narration || 'PayChain Payout',
+    SenderAccountNumber: ncbaOpenBankingAccountNumber,
+    SenderCIF: ncbaOpenBankingSenderCif,
+    SenderCountry: senderCountry,
+    PurposeCode: purposeCode || RTGS_DEFAULT_PURPOSE_CODE,
+    TransactionID: transactionId,
+  };
+
+  if (!liveCallsEnabled) {
+    return simulate('ncba_openbanking_rtgs_submit_sandbox', { transactionId, amount });
+  }
+
+  const result = await ncbaOpenBankingPost('/api/v1/RTGSPayment/RTGSPayment', payload);
+  if (result?.resultCode !== '000') {
+    throw new NcbaOpenBankingRequestError(result?.statusDescription || 'NCBA rejected the RTGS transfer');
+  }
+  return result;
+}
+
 /**
  * Validates a recipient's M-Pesa (Hakikisha) or Airtel Money number before a
  * Mobile B2W payout — required prerequisite per the UAT Guide, which
@@ -502,6 +589,97 @@ export async function submitKplcPayment({
   const result = await ncbaOpenBankingPost('/api/v1/KPLCPayment/kplcpayment', payload);
   if (!result?.succeeded) {
     throw new NcbaOpenBankingRequestError(result?.data?.message || result?.message || 'NCBA rejected the KPLC payment');
+  }
+  return result;
+}
+
+/**
+ * Validates a KPLC PREPAID meter — a genuinely different NCBA product from
+ * validateKplcAccount above (which is postpaid-only): same request/response
+ * shape, but resolves to a different account type ("Kplc Prepaid" vs "Kplc
+ * Postpaid" in serviceName) and the amount paid on the follow-up purchase
+ * is a token amount, not a bill balance. Kept as a distinct pair of
+ * functions (not a `type` flag on the postpaid ones) since NCBA itself
+ * treats them as separate endpoints/products.
+ *
+ * @param {object} params
+ * @param {string} params.meterNumber
+ * @param {string} params.msisdn - mobile number to receive the token, 254XXXXXXXXX
+ */
+export async function validateKplcPrepaidAccount({ meterNumber, msisdn }) {
+  if (!meterNumber || !msisdn) {
+    throw new NcbaOpenBankingValidationError('meterNumber and msisdn are required to validate a KPLC prepaid account');
+  }
+
+  if (!liveCallsEnabled) {
+    const result = simulate('ncba_openbanking_kplc_prepaid_validate_sandbox', { meterNumber, msisdn });
+    return { validationId: `SIM-VALID-${Date.now()}`, meterNumber, customerName: 'Simulated KPLC Prepaid Customer', serviceName: 'Kplc Prepaid', balance: 0, ...result };
+  }
+
+  const result = await ncbaOpenBankingPost('/api/v1/KPLCPrepaidValidation/kplcPrepaidValidation', { meterNumber, msisdn });
+  if (!result?.succeeded || !result?.validationId) {
+    throw new NcbaOpenBankingValidationError(result?.message || 'Could not verify this KPLC prepaid meter number');
+  }
+
+  return {
+    validationId: result.validationId,
+    meterNumber: result.meterNumber || meterNumber,
+    customerName: result.customerName || null,
+    serviceName: result.serviceName || null,
+    balance: typeof result.balance === 'number' ? result.balance : null,
+  };
+}
+
+/**
+ * Purchases a KPLC prepaid token — sends the token to msisdn via SMS from
+ * KPLC's side (not something PayChain generates or displays), same
+ * "accepted into processing" async shape as submitKplcPayment. `amount`
+ * here is the token purchase amount, not a bill balance being paid down.
+ *
+ * @param {object} params
+ * @param {string} params.transactionId - becomes channelRef/reqChnlId and Transaction.reference
+ * @param {string} params.validationId - from validateKplcPrepaidAccount
+ * @param {string} params.customerName
+ * @param {string} params.meterNumber
+ * @param {string} params.msisdn - mobile number to receive the token
+ * @param {number} params.amount - token purchase amount
+ * @param {string} [params.narration]
+ * @param {string} [params.debitAccount] - defaults to PayChain's own NCBA account
+ */
+export async function submitKplcPrepaidPayment({
+  transactionId,
+  validationId,
+  customerName,
+  meterNumber,
+  msisdn,
+  amount,
+  narration,
+  debitAccount,
+}) {
+  if (!transactionId || !validationId || !meterNumber || !amount) {
+    throw new NcbaOpenBankingValidationError('transactionId, validationId, meterNumber and amount are required for a KPLC prepaid token purchase');
+  }
+
+  const payload = {
+    validationId,
+    customerName: customerName || 'PayChain Merchant',
+    meterNumber,
+    msisdn: msisdn || '',
+    channelRef: transactionId,
+    amount: String(amount),
+    reason: narration || 'KPLC PAYMENT',
+    accountNumber: debitAccount || ncbaOpenBankingAccountNumber,
+    callbackUrl: '',
+    reqChnlId: transactionId,
+  };
+
+  if (!liveCallsEnabled) {
+    return simulate('ncba_openbanking_kplc_prepaid_submit_sandbox', { transactionId, amount });
+  }
+
+  const result = await ncbaOpenBankingPost('/api/v1/KPLCPrepaidTransaction/kplcPrepaidTransaction', payload);
+  if (!result?.succeeded) {
+    throw new NcbaOpenBankingRequestError(result?.data?.message || result?.message || 'NCBA rejected the KPLC prepaid token purchase');
   }
   return result;
 }

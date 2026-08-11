@@ -14,7 +14,7 @@ import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard.js';
-import { validateMobileWalletNumber, submitMobileB2wPayment, validateLipaNaMpesaAccount, submitLipaNaMpesaPayment, validateKplcAccount, submitKplcPayment, validateNcwscAccount, submitNcwscPayment, NcbaOpenBankingValidationError } from '../services/ncbaOpenBankingService.js';
+import { validateMobileWalletNumber, submitMobileB2wPayment, validateLipaNaMpesaAccount, submitLipaNaMpesaPayment, validateKplcAccount, submitKplcPayment, validateKplcPrepaidAccount, submitKplcPrepaidPayment, validateNcwscAccount, submitNcwscPayment, NcbaOpenBankingValidationError } from '../services/ncbaOpenBankingService.js';
 
 // @desc    Get all payees for a merchant
 // @route   GET /api/bulkpay/payees
@@ -177,6 +177,33 @@ export const validateNcwscMeter = async (req, res) => {
       return res.status(400).json({ message: err.message });
     }
     res.status(502).json({ message: 'Failed to verify NCWSC meter number. Please try again.' });
+  }
+};
+
+// @desc    Verify a KPLC PREPAID meter number before saving a Utility
+//          payee — separate from validateKplcMeter above since NCBA treats
+//          postpaid and prepaid as distinct products with their own
+//          validate/pay endpoint pairs.
+// @route   POST /api/bulkpay/validate-kplc-prepaid-meter
+// @access  Private (merchant)
+export const validateKplcPrepaidMeter = async (req, res) => {
+  try {
+    const { meterNumber, msisdn } = req.body;
+    if (!meterNumber || !msisdn) {
+      return res.status(400).json({ message: 'meterNumber and msisdn are required.' });
+    }
+    const result = await validateKplcPrepaidAccount({ meterNumber, msisdn });
+    res.json({
+      meterNumber: result.meterNumber,
+      customerName: result.customerName,
+      serviceName: result.serviceName,
+      balance: result.balance,
+    });
+  } catch (err) {
+    if (err instanceof NcbaOpenBankingValidationError) {
+      return res.status(400).json({ message: err.message });
+    }
+    res.status(502).json({ message: 'Failed to verify KPLC prepaid meter number. Please try again.' });
   }
 };
 
@@ -467,6 +494,36 @@ export const authorizeBatch = async (req, res) => {
             refundAmount += row.netAmount + row.b2cFee;
           }
         }
+      } else if (payee.type === 'utility' && payee.utilityProvider === 'KPLC_PREPAID') {
+        // KPLC prepaid token purchase — a genuinely different NCBA product
+        // from postpaid above (own validate/pay endpoint pair), not just a
+        // flag. Same accountNumber/phone convention.
+        if (!payee.accountNumber || !payee.phone) {
+          payoutStatus = 'failed';
+          refundAmount += row.netAmount + row.b2cFee;
+          console.error(`❌ Bulk payout to ${payee.name} failed: meter number or notification phone missing for this KPLC prepaid payee.`);
+        } else {
+          try {
+            const transactionId = `PAYOUT-KPLCPP-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+            const validation = await validateKplcPrepaidAccount({ meterNumber: payee.accountNumber, msisdn: payee.phone });
+            await submitKplcPrepaidPayment({
+              transactionId,
+              validationId: validation.validationId,
+              customerName: validation.customerName || payee.name,
+              meterNumber: payee.accountNumber,
+              msisdn: payee.phone,
+              amount: row.netAmount,
+              narration: `Bulk Payout to ${payee.name}`,
+            });
+            // Async rail — payoutStatus stays 'pending' (its default
+            // above), resolved later via handlePesaLinkCallback.
+            payoutRef = transactionId;
+          } catch (err) {
+            console.error(`❌ NCBA KPLC prepaid token purchase rejected for ${payee.name}:`, err.message);
+            payoutStatus = 'failed';
+            refundAmount += row.netAmount + row.b2cFee;
+          }
+        }
       } else if (payee.type === 'utility' && payee.utilityProvider === 'WATER') {
         // Nairobi Water (NCWSC) goes through NCBA's Open Banking NWSC
         // Payment API (confirmed endpoints, validate-then-pay), not the
@@ -600,21 +657,22 @@ export const authorizeBatch = async (req, res) => {
         }
       }
 
-      // Record standard Transaction ledger entry. KPLC and NCWSC rows get
-      // their own types ('ncba_kplc'/'ncba_ncwsc', fee-mapped to their own
-      // revenue streams) so the webhook and dashboard can tell them apart
-      // from bank payouts; Bank rows (and any future utilityProvider not
-      // yet on a dedicated rail) share 'ncba_outbound' (fee-mapped to
-      // ncba_disbursement_fee in revenueRateCard.js), matching
-      // services/ncbaBulkPaymentService.js's convention, rather than
-      // 'bulk_pay' which earns no fee for those.
+      // Record standard Transaction ledger entry. KPLC (postpaid/prepaid)
+      // and NCWSC rows get their own types ('ncba_kplc'/'ncba_kplc_prepaid'/
+      // 'ncba_ncwsc', each fee-mapped to their own revenue stream) so the
+      // webhook and dashboard can tell them apart from bank payouts; Bank
+      // rows (and any future utilityProvider not yet on a dedicated rail)
+      // share 'ncba_outbound' (fee-mapped to ncba_disbursement_fee in
+      // revenueRateCard.js), matching services/ncbaBulkPaymentService.js's
+      // convention, rather than 'bulk_pay' which earns no fee for those.
       const isKplcRow = payee.type === 'utility' && payee.utilityProvider === 'KPLC';
+      const isKplcPrepaidRow = payee.type === 'utility' && payee.utilityProvider === 'KPLC_PREPAID';
       const isNcwscRow = payee.type === 'utility' && payee.utilityProvider === 'WATER';
       const isNcbaRouted = payee.paymentMethod === 'Bank' || (payee.type === 'utility' && payee.utilityProvider);
       const transaction = await Transaction.create({
         merchantId: merchant._id,
         accountNumber: merchant.paybillAccount || 'WALLET_FUND',
-        type: isKplcRow ? 'ncba_kplc' : isNcwscRow ? 'ncba_ncwsc' : (isNcbaRouted ? 'ncba_outbound' : 'bulk_pay'),
+        type: isKplcRow ? 'ncba_kplc' : isKplcPrepaidRow ? 'ncba_kplc_prepaid' : isNcwscRow ? 'ncba_ncwsc' : (isNcbaRouted ? 'ncba_outbound' : 'bulk_pay'),
         amount: row.netAmount,
         kesAmount: row.netAmount,
         currency: 'KES',

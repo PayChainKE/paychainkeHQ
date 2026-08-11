@@ -71,6 +71,15 @@ export default function SendMoney() {
   const [bankCode, setBankCode]             = useState('')
   const [bankCodes, setBankCodes]           = useState([])
   const [bankRail, setBankRail]             = useState('pesalink')
+  // RTGS-only fields — cross-border/multi-currency rail, KES-only for now
+  // (see backend submitNcbaBankTransfer's doc comment on why non-KES is
+  // blocked until real FX conversion exists). bankCode doubles as the
+  // SWIFT BIC for this rail (see the Step 2 destination-bank input, which
+  // switches from a <select> of CBK clearing codes to a free-text SWIFT
+  // field when bankRail === 'rtgs').
+  const [beneficiaryCountry, setBeneficiaryCountry] = useState('KE')
+  const [beneficiaryAddress, setBeneficiaryAddress] = useState('')
+  const [purposeCode, setPurposeCode]       = useState('MSC')
   const [amount, setAmount]                 = useState('')
   const [reference, setReference]           = useState('')
   const [pin, setPin]                       = useState('')
@@ -172,6 +181,7 @@ export default function SendMoney() {
             narration: reference || `Transfer to ${recipientAccount}`,
             pin,
             rail: bankRail,
+            ...(bankRail === 'rtgs' ? { beneficiaryCountry, beneficiaryAddress: beneficiaryAddress || undefined, purposeCode } : {}),
           }, cfg())
         } else {
           await axios.post(`${API_URL}/api/callbacks/b2b-request`, {
@@ -202,7 +212,7 @@ export default function SendMoney() {
 
   const canContinue = () => {
     if (step === 1) return !!destination
-    if (step === 2) return !!amount && Number(amount) > 0 && !!recipientAccount && (destination !== 'bank' || !!bankCode) && (destination !== 'paybill' || !!paybillAccountRef)
+    if (step === 2) return !!amount && Number(amount) > 0 && !!recipientAccount && (destination !== 'bank' || !!bankCode) && (destination !== 'bank' || bankRail !== 'rtgs' || !!beneficiaryCountry) && (destination !== 'paybill' || !!paybillAccountRef)
     if (!hasPin && step === 3) return newPin.length === 4 && confirmPin.length === 4
     if (step === confirmStep) return pin.length === 4
     return true
@@ -362,6 +372,33 @@ export default function SendMoney() {
 
               {destination === 'bank' && (
                 <div className="space-y-2">
+                  <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Transfer Speed</label>
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { id: 'pesalink', title: 'Instant', hint: 'PesaLink · 24/7' },
+                      { id: 'eft',      title: 'Next Business Day', hint: 'EFT · Mon–Fri' },
+                      { id: 'rtgs',     title: 'International', hint: 'RTGS · ~3 hrs' },
+                    ].map(opt => (
+                      <button
+                        type="button"
+                        key={opt.id}
+                        onClick={() => { setBankRail(opt.id); setBankCode('') }}
+                        className={`p-3.5 rounded-2xl border-2 text-left transition-all ${
+                          bankRail === opt.id
+                            ? 'border-[#00351D] bg-[#f0fdf4]'
+                            : 'border-slate-100 hover:border-emerald-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        <p className={`text-sm font-bold ${bankRail === opt.id ? 'text-[#00351D]' : 'text-primary'}`}>{opt.title}</p>
+                        <p className="text-[10px] text-slate-400 font-medium mt-0.5">{opt.hint}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {destination === 'bank' && bankRail !== 'rtgs' && (
+                <div className="space-y-2">
                   <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Bank</label>
                   <select
                     value={bankCode}
@@ -376,28 +413,54 @@ export default function SendMoney() {
                 </div>
               )}
 
-              {destination === 'bank' && (
-                <div className="space-y-2">
-                  <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Transfer Speed</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {[
-                      { id: 'pesalink', title: 'Instant', hint: 'PesaLink · 24/7' },
-                      { id: 'eft',      title: 'Next Business Day', hint: 'EFT · Mon–Fri' },
-                    ].map(opt => (
-                      <button
-                        type="button"
-                        key={opt.id}
-                        onClick={() => setBankRail(opt.id)}
-                        className={`p-3.5 rounded-2xl border-2 text-left transition-all ${
-                          bankRail === opt.id
-                            ? 'border-[#00351D] bg-[#f0fdf4]'
-                            : 'border-slate-100 hover:border-emerald-200 hover:bg-slate-50'
-                        }`}
-                      >
-                        <p className={`text-sm font-bold ${bankRail === opt.id ? 'text-[#00351D]' : 'text-primary'}`}>{opt.title}</p>
-                        <p className="text-[10px] text-slate-400 font-medium mt-0.5">{opt.hint}</p>
-                      </button>
-                    ))}
+              {destination === 'bank' && bankRail === 'rtgs' && (
+                <div className="space-y-4 p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                  <p className="text-[10px] text-slate-400 font-medium leading-relaxed">
+                    RTGS sends to banks outside PesaLink/EFT's network, including other East African countries. Settles same business day, ~3 hours. KES only for now.
+                  </p>
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Beneficiary Bank SWIFT Code</label>
+                    <ValidatedInput
+                      kind="text"
+                      value={bankCode}
+                      onChange={e => setBankCode(e.target.value.toUpperCase())}
+                      placeholder="e.g. KCBLKENX"
+                      className="w-full bg-white border border-slate-200 rounded-2xl py-4 px-4 text-primary font-bold uppercase focus:border-[#00351D] focus:ring-2 focus:ring-[#00351D]/10 outline-none transition-all"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Beneficiary Country</label>
+                    <select
+                      value={beneficiaryCountry}
+                      onChange={e => setBeneficiaryCountry(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-2xl py-4 px-4 text-primary font-bold focus:border-[#00351D] focus:ring-2 focus:ring-[#00351D]/10 outline-none transition-all"
+                    >
+                      <option value="KE">Kenya</option>
+                      <option value="UG">Uganda</option>
+                      <option value="TZ">Tanzania</option>
+                      <option value="RW">Rwanda</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Beneficiary Address <span className="text-slate-300 font-medium normal-case">(optional)</span></label>
+                    <input
+                      type="text"
+                      value={beneficiaryAddress}
+                      onChange={e => setBeneficiaryAddress(e.target.value)}
+                      placeholder="e.g. Nairobi"
+                      className="w-full bg-white border border-slate-200 rounded-2xl py-4 px-4 text-primary font-medium focus:border-[#00351D] focus:ring-2 focus:ring-[#00351D]/10 outline-none transition-all"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Purpose of Payment Code</label>
+                    <input
+                      type="text"
+                      value={purposeCode}
+                      onChange={e => setPurposeCode(e.target.value.toUpperCase())}
+                      placeholder="MSC"
+                      className="w-full bg-white border border-slate-200 rounded-2xl py-4 px-4 text-primary font-bold uppercase focus:border-[#00351D] focus:ring-2 focus:ring-[#00351D]/10 outline-none transition-all"
+                    />
+                    <p className="text-[10px] text-slate-400 font-medium">NCBA hasn't published the full code list yet — "MSC" (Miscellaneous) is their own confirmed default. Confirm the correct code with NCBA if this payment needs a specific one.</p>
                   </div>
                 </div>
               )}
@@ -525,8 +588,10 @@ export default function SendMoney() {
                 <div className="divide-y divide-slate-100">
                   {[
                     ['Destination', selectedDest?.label],
-                    ...(destination === 'bank' ? [['Bank', bankCodes.find(b => b.code === bankCode)?.name || bankCode]] : []),
-                    ...(destination === 'bank' ? [['Transfer Speed', bankRail === 'eft' ? 'Next Business Day (EFT)' : 'Instant (PesaLink)']] : []),
+                    ...(destination === 'bank' && bankRail !== 'rtgs' ? [['Bank', bankCodes.find(b => b.code === bankCode)?.name || bankCode]] : []),
+                    ...(destination === 'bank' && bankRail === 'rtgs' ? [['Beneficiary Bank BIC', bankCode]] : []),
+                    ...(destination === 'bank' ? [['Transfer Speed', bankRail === 'eft' ? 'Next Business Day (EFT)' : bankRail === 'rtgs' ? 'International (RTGS)' : 'Instant (PesaLink)']] : []),
+                    ...(destination === 'bank' && bankRail === 'rtgs' ? [['Beneficiary Country', { KE: 'Kenya', UG: 'Uganda', TZ: 'Tanzania', RW: 'Rwanda' }[beneficiaryCountry] || beneficiaryCountry]] : []),
                     ['Recipient',   recipientAccount],
                     ...(destination === 'paybill' ? [['Account Number', paybillAccountRef]] : []),
                     ['Amount',      formatKES(amount || 0)],

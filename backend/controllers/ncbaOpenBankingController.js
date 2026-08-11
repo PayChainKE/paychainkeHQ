@@ -6,6 +6,7 @@ import {
   validatePesaLinkAccount,
   submitPesaLinkTransfer,
   submitEftTransfer,
+  submitRtgsTransfer,
   NcbaOpenBankingValidationError,
 } from '../services/ncbaOpenBankingService.js';
 import { createNotification } from './notificationController.js';
@@ -32,63 +33,115 @@ function logEvent(level, event, fields) {
 }
 
 /**
- * Validates the destination and submits a bank transfer via either of
- * NCBA's two local-bank rails. Pure submit-only helper — does NOT touch
- * Merchant balance or create a Transaction record, so it's safe to call
- * from contexts that already manage their own balance reservation
+ * Validates the destination and submits a bank transfer via any of NCBA's
+ * three local/cross-border bank rails. Pure submit-only helper — does NOT
+ * touch Merchant balance or create a Transaction record, so it's safe to
+ * call from contexts that already manage their own balance reservation
  * (bulkPayController.authorizeBatch's Bank branch reserves the whole
  * batch's total upfront, one level above this per-row call).
  *
- * @param {'pesalink'|'eft'} [rail='pesalink'] - 'pesalink' settles
- *        immediately, 24/7/365; 'eft' settles next business day (T+1),
- *        Mon-Fri only. Per the UAT Guide both share the same request/
- *        response shape and KES 50-999,999 bounds — only settlement timing
- *        differs.
+ * @param {'pesalink'|'eft'|'rtgs'} [rail='pesalink'] - 'pesalink' settles
+ *        immediately, 24/7/365, Kenya/KES only; 'eft' settles next business
+ *        day (T+1), Mon-Fri only, Kenya/KES only; 'rtgs' settles T+3 hours
+ *        same business day, supports KE/UG/TZ/RW beneficiaries in seven
+ *        currencies, and has no maximum amount cap (only pesalink/eft are
+ *        bounded at KES 999,999).
+ * @param {string} [beneficiaryCountry] - required for rail:'rtgs' (KE/UG/TZ/RW)
+ * @param {string} [beneficiaryAddress] - used for rail:'rtgs' only
+ * @param {string} [creditCurrency] - used for rail:'rtgs' only, defaults 'KES'
+ * @param {string} [debitCurrency] - used for rail:'rtgs' only, defaults 'KES'
+ * @param {string} [purposeCode] - used for rail:'rtgs' only; NCBA's Purpose
+ *        of Payment code list is "to be shared during onboarding" per the
+ *        UAT Guide, so this falls back to their own sample value ('MSC')
+ *        when not provided — see submitRtgsTransfer.
  *
- * The account-validation call (validatePesaLinkAccount) is reused for both
- * rails: NCBA's UAT Guide documents only one "Request for Account Number
- * Validation" endpoint, positioned ahead of the PesaLink section but
+ * The account-validation call (validatePesaLinkAccount) is reused for
+ * pesalink/eft: NCBA's UAT Guide documents only one "Request for Account
+ * Number Validation" endpoint, positioned ahead of the PesaLink section but
  * generic over bankCode/accountNumber — there is no separate EFT-specific
  * validation call documented, and skipping validation entirely for EFT
- * would leave that rail with no typo protection at all.
+ * would leave that rail with no typo protection at all. RTGS has no
+ * documented validation endpoint at all (its BeneficiaryBankBIC is a real
+ * SWIFT code, not a CBK clearing code validatePesaLinkAccount understands),
+ * so rail:'rtgs' skips this pre-flight check entirely — submission is the
+ * only available correctness check for that rail today.
  *
- * Per NCBA's UAT Guide, both rails resolve synchronously — if this resolves
- * at all, the transfer succeeded (submitPesaLinkTransfer/submitEftTransfer
- * throw on a non-'000' resultCode, unlike M-Pesa's B2C/bulk-pay rails,
- * which only ever report "accepted" here and confirm completion later via
- * a callback).
+ * Per NCBA's UAT Guide, all three rails resolve synchronously — if this
+ * resolves at all, the transfer succeeded (submitPesaLinkTransfer/
+ * submitEftTransfer/submitRtgsTransfer throw on a non-'000' resultCode,
+ * unlike M-Pesa's B2C/bulk-pay rails, which only ever report "accepted"
+ * here and confirm completion later via a callback).
  *
  * Throws NcbaOpenBankingValidationError on bad input or a failed
  * destination-account validation, or NcbaOpenBankingRequestError on a
  * synchronous rejection from NCBA.
  */
-export async function submitNcbaBankTransfer({ businessName, bankCode, accountNumber, accountName, amount, narration, rail = 'pesalink' }) {
+export async function submitNcbaBankTransfer({
+  businessName, bankCode, accountNumber, accountName, amount, narration,
+  rail = 'pesalink', beneficiaryCountry, beneficiaryAddress, creditCurrency, debitCurrency, purposeCode,
+}) {
   const numericAmount = Number(amount);
   if (!bankCode || !accountNumber || !Number.isFinite(numericAmount) || numericAmount <= 0) {
     throw new NcbaOpenBankingValidationError('bankCode, accountNumber and a positive amount are required for a bank payout');
   }
-  if (rail !== 'pesalink' && rail !== 'eft') {
-    throw new NcbaOpenBankingValidationError('rail must be either "pesalink" or "eft"');
+  if (!['pesalink', 'eft', 'rtgs'].includes(rail)) {
+    throw new NcbaOpenBankingValidationError('rail must be "pesalink", "eft" or "rtgs"');
+  }
+  if (rail === 'rtgs' && !beneficiaryCountry) {
+    throw new NcbaOpenBankingValidationError('beneficiaryCountry is required for an RTGS transfer');
+  }
+  // Merchant balance is held and debited purely in KES (Merchant.kesBalance)
+  // — RTGS itself supports settling in USD/GBP/EUR/TZS/UGX/RWF, but nothing
+  // in this codebase converts a non-KES CreditAmount back into how much KES
+  // to actually deduct from the merchant's wallet. Allowing a non-KES
+  // currency through here would silently debit the wrong amount (e.g.
+  // deduct "500" KES from the wallet for a transfer that actually sent 500
+  // USD). Locked to KES-only until real FX conversion is built for this
+  // rail specifically.
+  if (rail === 'rtgs' && ((creditCurrency && creditCurrency !== 'KES') || (debitCurrency && debitCurrency !== 'KES'))) {
+    throw new NcbaOpenBankingValidationError('Multi-currency RTGS transfers are not yet supported — creditCurrency and debitCurrency must be KES until FX conversion is added.');
   }
 
-  // Fail fast on a bad destination account before touching balance.
-  await validatePesaLinkAccount({
-    bankCode,
-    accountNumber,
-    debitAccount: process.env.NCBA_OPENBANKING_ACCOUNT_NUMBER,
-  });
+  // Fail fast on a bad destination account before touching balance — not
+  // possible for RTGS, which has no documented validation endpoint (see
+  // doc comment above).
+  if (rail !== 'rtgs') {
+    await validatePesaLinkAccount({
+      bankCode,
+      accountNumber,
+      debitAccount: process.env.NCBA_OPENBANKING_ACCOUNT_NUMBER,
+    });
+  }
 
-  const transactionId = `NCBA-${rail === 'eft' ? 'EFT' : 'PL'}-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+  const railPrefix = { pesalink: 'PL', eft: 'EFT', rtgs: 'RTGS' }[rail];
+  const transactionId = `NCBA-${railPrefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 
-  const submit = rail === 'eft' ? submitEftTransfer : submitPesaLinkTransfer;
-  const hostResponse = await submit({
-    transactionId,
-    beneficiaryAccountNumber: accountNumber,
-    beneficiaryBankCode: bankCode,
-    beneficiaryName: accountName || 'PayChain Payout',
-    amount: numericAmount,
-    narration: narration || `PayChain Payout - ${businessName || 'Merchant'}`,
-  });
+  let hostResponse;
+  if (rail === 'rtgs') {
+    hostResponse = await submitRtgsTransfer({
+      transactionId,
+      beneficiaryAccountNumber: accountNumber,
+      beneficiaryBankBic: bankCode,
+      beneficiaryName: accountName || 'PayChain Payout',
+      beneficiaryCountry,
+      beneficiaryAddress,
+      amount: numericAmount,
+      creditCurrency,
+      debitCurrency,
+      narration: narration || `PayChain Payout - ${businessName || 'Merchant'}`,
+      purposeCode,
+    });
+  } else {
+    const submit = rail === 'eft' ? submitEftTransfer : submitPesaLinkTransfer;
+    hostResponse = await submit({
+      transactionId,
+      beneficiaryAccountNumber: accountNumber,
+      beneficiaryBankCode: bankCode,
+      beneficiaryName: accountName || 'PayChain Payout',
+      amount: numericAmount,
+      narration: narration || `PayChain Payout - ${businessName || 'Merchant'}`,
+    });
+  }
 
   return { transactionId, hostResponse, rail };
 }
@@ -102,7 +155,10 @@ export async function submitNcbaBankTransfer({ businessName, bankCode, accountNu
  * whatever ncbaOpenBankingService throws on a submission failure (after
  * refunding the reservation).
  */
-export async function executeNcbaBankPayout({ merchantId, bankCode, accountNumber, accountName, amount, narration, rail = 'pesalink' }) {
+export async function executeNcbaBankPayout({
+  merchantId, bankCode, accountNumber, accountName, amount, narration,
+  rail = 'pesalink', beneficiaryCountry, beneficiaryAddress, creditCurrency, debitCurrency, purposeCode,
+}) {
   const numericAmount = Number(amount);
 
   // Fail fast on a bad destination account before touching balance —
@@ -111,8 +167,11 @@ export async function executeNcbaBankPayout({ merchantId, bankCode, accountNumbe
   if (!bankCode || !accountNumber || !Number.isFinite(numericAmount) || numericAmount <= 0) {
     throw new NcbaOpenBankingValidationError('bankCode, accountNumber and a positive amount are required for a bank payout');
   }
-  if (rail !== 'pesalink' && rail !== 'eft') {
-    throw new NcbaOpenBankingValidationError('rail must be either "pesalink" or "eft"');
+  if (!['pesalink', 'eft', 'rtgs'].includes(rail)) {
+    throw new NcbaOpenBankingValidationError('rail must be "pesalink", "eft" or "rtgs"');
+  }
+  if (rail === 'rtgs' && !beneficiaryCountry) {
+    throw new NcbaOpenBankingValidationError('beneficiaryCountry is required for an RTGS transfer');
   }
 
   // Atomically reserve funds — the $gte guard means this either fully
@@ -135,6 +194,7 @@ export async function executeNcbaBankPayout({ merchantId, bankCode, accountNumbe
   try {
     ({ transactionId, hostResponse } = await submitNcbaBankTransfer({
       businessName: reservedMerchant.businessName, bankCode, accountNumber, accountName, amount: numericAmount, narration, rail,
+      beneficiaryCountry, beneficiaryAddress, creditCurrency, debitCurrency, purposeCode,
     }));
   } catch (err) {
     // Submission never reached (or was rejected outright by) NCBA — refund
@@ -174,20 +234,28 @@ export const getBankCodes = (req, res) => {
 };
 
 // @desc    Merchant-initiated single withdrawal to a bank account via NCBA
-//          PesaLink (immediate) or EFT (next business day)
+//          PesaLink (immediate), EFT (next business day), or RTGS
+//          (cross-border/multi-currency, KES-only for now — see
+//          submitNcbaBankTransfer's doc comment)
 // @route   POST /openbanking/bank-payout (mounted at /api/v1 and /v1)
 // @access  Private (merchant)
 export const handleBankPayout = async (req, res) => {
   const merchantId = req.merchant._id;
-  const { bankCode, accountNumber, accountName, amount, narration, pin, rail: requestedRail } = req.body;
-  const rail = requestedRail === 'eft' ? 'eft' : 'pesalink';
+  const {
+    bankCode, accountNumber, accountName, amount, narration, pin, rail: requestedRail,
+    beneficiaryCountry, beneficiaryAddress, purposeCode,
+  } = req.body;
+  const rail = ['eft', 'rtgs'].includes(requestedRail) ? requestedRail : 'pesalink';
 
   try {
     if (!pin || String(pin).length !== 4) {
       return res.status(400).json({ error: 'A valid 4-digit payment PIN is required.' });
     }
-    if (requestedRail && requestedRail !== 'pesalink' && requestedRail !== 'eft') {
-      return res.status(400).json({ error: 'rail must be either "pesalink" or "eft".' });
+    if (requestedRail && !['pesalink', 'eft', 'rtgs'].includes(requestedRail)) {
+      return res.status(400).json({ error: 'rail must be "pesalink", "eft" or "rtgs".' });
+    }
+    if (rail === 'rtgs' && !beneficiaryCountry) {
+      return res.status(400).json({ error: 'beneficiaryCountry is required for an RTGS transfer.' });
     }
 
     // PIN checked inline, within this same request that executes the
@@ -217,22 +285,27 @@ export const handleBankPayout = async (req, res) => {
 
     const { transaction, hostResponse, merchant: updatedMerchant } = await executeNcbaBankPayout({
       merchantId, bankCode, accountNumber, accountName, amount, narration, rail,
+      beneficiaryCountry, beneficiaryAddress, purposeCode,
     });
 
+    const RAIL_NOTIFICATION_MESSAGE = {
+      eft: `KES ${Number(amount).toLocaleString()} was sent to your bank account via EFT. It settles by the next business day.`,
+      rtgs: `KES ${Number(amount).toLocaleString()} was sent to your bank account via RTGS. It settles within a few hours.`,
+      pesalink: `KES ${Number(amount).toLocaleString()} was sent to your bank account via PesaLink.`,
+    };
     createNotification({
       merchantId,
       kind: 'payment',
       title: 'Bank payout completed',
-      message: rail === 'eft'
-        ? `KES ${Number(amount).toLocaleString()} was sent to your bank account via EFT. It settles by the next business day.`
-        : `KES ${Number(amount).toLocaleString()} was sent to your bank account via PesaLink.`,
+      message: RAIL_NOTIFICATION_MESSAGE[rail],
     }).catch((e) => logEvent('error', 'ncba_openbanking_payout_notification_failed', { transactionId: transaction.reference, error: e.message }));
 
     if (updatedMerchant.phone) {
       const { date, time } = formatTransactionDateTime();
+      const RAIL_SMS_LABEL = { eft: 'Bank Payout (EFT)', rtgs: 'Bank Payout (RTGS)', pesalink: 'Bank Payout' };
       const { message } = buildPayoutSentSms({
         ref: transaction.reference,
-        label: rail === 'eft' ? 'Bank Payout (EFT)' : 'Bank Payout',
+        label: RAIL_SMS_LABEL[rail],
         amount: Number(amount),
         recipientName: accountName || 'your bank account',
         date,
@@ -247,11 +320,14 @@ export const handleBankPayout = async (req, res) => {
       });
     }
 
+    const RAIL_RESPONSE_MESSAGE = {
+      eft: 'Bank transfer submitted via NCBA EFT. It settles by the next business day.',
+      rtgs: 'Bank transfer submitted via NCBA RTGS. It settles within a few hours.',
+      pesalink: 'Bank transfer completed via NCBA PesaLink.',
+    };
     res.status(200).json({
       success: true,
-      message: rail === 'eft'
-        ? 'Bank transfer submitted via NCBA EFT. It settles by the next business day.'
-        : 'Bank transfer completed via NCBA PesaLink.',
+      message: RAIL_RESPONSE_MESSAGE[rail],
       transaction,
       newBalance: updatedMerchant.kesBalance,
       hostResponse,
@@ -353,7 +429,7 @@ export const handlePesaLinkCallback = async (req, res) => {
     // bulkPayController.js) never reach this webhook in 'pending' state, so
     // in practice every 'ncba_outbound' row that does land here is a real
     // bank payout, not a mislabeled one.
-    const NON_BANK_TYPE_LABELS = { ncba_kplc: 'KPLC bill payment', ncba_ncwsc: 'NCWSC bill payment' };
+    const NON_BANK_TYPE_LABELS = { ncba_kplc: 'KPLC bill payment', ncba_kplc_prepaid: 'KPLC prepaid token purchase', ncba_ncwsc: 'NCWSC bill payment' };
     const isBankPayout = !['ncba_mobile_b2w', 'ncba_lipa_na_mpesa', ...Object.keys(NON_BANK_TYPE_LABELS)].includes(transaction.type);
     const payoutLabel = isBankPayout ? 'Bank payout' : (NON_BANK_TYPE_LABELS[transaction.type] || 'Payout');
 

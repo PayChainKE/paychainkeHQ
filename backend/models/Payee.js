@@ -38,12 +38,16 @@ const payeeSchema = new mongoose.Schema(
     // paymentMethod === 'Bank'.
     bankCode: String,
 
-    // Utility-payee routing (type: 'utility') — which biller NCBA's Bulk
-    // H2H payload should target. accountNumber above doubles as the
-    // KPLC meter number / water account number for these payees.
+    // Utility-payee routing (type: 'utility') — which biller/rail NCBA
+    // should target. accountNumber above doubles as the meter number for
+    // all of these. 'KPLC' is postpaid (pays down an existing bill
+    // balance); 'KPLC_PREPAID' is a genuinely different NCBA product (buys
+    // an electricity token, sent to the meter's registered phone) — kept
+    // as its own value rather than a flag on 'KPLC' since NCBA itself
+    // treats them as separate validate/pay endpoint pairs.
     utilityProvider: {
       type: String,
-      enum: ['KPLC', 'WATER', null],
+      enum: ['KPLC', 'KPLC_PREPAID', 'WATER', null],
       default: null,
     },
 
