@@ -1,7 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import rateLimit from 'express-rate-limit';
-import { getPayees, getPayeeById, addPayee, updatePayee, deletePayee, getBatches, getBatchById, uploadCSV, authorizeBatch } from '../controllers/bulkPayController.js';
+import { getPayees, getPayeeById, addPayee, updatePayee, deletePayee, getBatches, getBatchById, uploadCSV, authorizeBatch, validateKplcMeter } from '../controllers/bulkPayController.js';
 import { protectMerchant } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -36,10 +36,23 @@ const pinLimiter = rateLimit({
   message: { error: 'Too many PIN attempts. Try again in 15 minutes.' },
 });
 
+// External NCBA lookup — same abuse-prevention posture as pinLimiter above,
+// just not PIN-specific (guards against a merchant hammering NCBA's KPLC
+// validation endpoint via repeated Add-Payee attempts).
+const kplcValidationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many meter lookups. Try again in 15 minutes.' },
+});
+
 // Payee routes
 router.route('/payees')
   .get(getPayees)
   .post(addPayee);
+
+router.post('/validate-kplc-meter', kplcValidationLimiter, validateKplcMeter);
 
 router.route('/payees/:id')
   .get(getPayeeById)

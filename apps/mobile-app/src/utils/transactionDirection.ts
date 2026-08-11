@@ -58,6 +58,7 @@ const TYPE_LABELS: Record<string, string> = {
   ncba_mobile_b2w: 'M-PESA Withdrawal',
   mpesa_b2b: 'Paybill/Till Payout',
   ncba_lipa_na_mpesa: 'Paybill/Till Payout',
+  ncba_kplc: 'KPLC Bill Payment',
 };
 
 export function typeLabel(type: TxType): string {

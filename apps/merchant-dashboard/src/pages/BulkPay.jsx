@@ -91,10 +91,11 @@ export default function BulkPay() {
       .catch(e => console.error('Failed to load bank codes', e))
   }, [newPayee.paymentMethod])
 
-  const [newPayee, setNewPayee] = useState({ 
-    name: '', 
-    type: 'Employee', 
+  const [newPayee, setNewPayee] = useState({
+    name: '',
+    type: 'Employee',
     utilityType: 'Electricity',
+    utilityProvider: '',
     paymentMethod: 'Mobile Money',
     mobileMoneyType: 'Personal Number',
     amount: '',
@@ -112,6 +113,15 @@ export default function BulkPay() {
     etimsInvoiceNumber: '',
     cuNumber: ''
   })
+
+  // KPLC meter verification — pure UX confirmation before saving a payee
+  // (shows the merchant the real account holder name + balance due so a
+  // typo'd meter number is caught early). Deliberately not persisted: the
+  // validationId NCBA returns here is not reused at payment time — the
+  // backend re-validates immediately before every actual payout, since a
+  // saved payee might not be paid for weeks (see backend's validateKplcMeter
+  // doc comment).
+  const [kplcCheck, setKplcCheck] = useState({ status: 'idle', customerName: '', serviceName: '', balance: null, error: '' })
 
   // Filter payees based on active tab
   const filteredPayees = payeesList.filter(p => {
@@ -139,6 +149,8 @@ export default function BulkPay() {
     setNewPayee({
       name: p.name,
       type: p.type.charAt(0).toUpperCase() + p.type.slice(1),
+      utilityType: p.utilityProvider === 'KPLC' ? 'Electricity' : 'Water',
+      utilityProvider: p.utilityProvider || '',
       paymentMethod: p.paymentMethod || 'Mobile Money',
       mobileMoneyType: p.mobileMoneyType || 'Personal Number',
       amount: (p.salary || p.amount || 0).toString(),
@@ -156,6 +168,7 @@ export default function BulkPay() {
       etimsInvoiceNumber: p.etimsInvoiceNumber || '',
       cuNumber: p.cuNumber || ''
     });
+    setKplcCheck({ status: 'idle', customerName: '', serviceName: '', balance: null, error: '' });
     setEditingId(p.id);
     setIsEditing(true);
     setAddStep(2);
@@ -179,14 +192,55 @@ export default function BulkPay() {
     }
   };
 
+  const handleVerifyKplcMeter = async () => {
+    if (!/^\d{5,15}$/.test(newPayee.accountNumber?.trim() || '')) {
+      addNotification({ title: 'Invalid Format', message: 'Enter a valid numeric KPLC meter number.', type: 'error' });
+      return;
+    }
+    if (!isValidPhoneKE(newPayee.phone)) {
+      addNotification({ title: 'Invalid Format', message: 'Enter a valid Kenyan phone number for bill notifications.', type: 'error' });
+      return;
+    }
+    setKplcCheck({ status: 'loading', customerName: '', serviceName: '', balance: null, error: '' });
+    try {
+      const token = localStorage.getItem('paychain_merchant_token')
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+      const res = await axios.post(`${API_URL}/api/bulkpay/validate-kplc-meter`, {
+        meterNumber: newPayee.accountNumber.trim(),
+        msisdn: newPayee.phone,
+      }, { headers: { Authorization: `Bearer ${token}` } })
+      setKplcCheck({
+        status: 'success',
+        customerName: res.data?.customerName || '',
+        serviceName: res.data?.serviceName || '',
+        balance: typeof res.data?.balance === 'number' ? res.data.balance : null,
+        error: '',
+      });
+    } catch (error) {
+      setKplcCheck({ status: 'error', customerName: '', serviceName: '', balance: null, error: error.response?.data?.message || 'Could not verify this meter number.' });
+    }
+  };
+
   const handleSavePayee = async () => {
     if (!newPayee.name) {
       addNotification({ title: 'Missing Info', message: 'Recipient name is required.', type: 'error' });
       return;
     }
 
-    // Professional Settlement Format Validation
-    if (newPayee.paymentMethod === 'Mobile Money') {
+    // KPLC payees route through NCBA's dedicated KPLC rail, not a Mobile
+    // Money/Bank settlement method — accountNumber/phone here mean meter
+    // number/notification msisdn, validated against the same shape the
+    // backend's authorizeBatch will actually pay against.
+    if (newPayee.type === 'Utility' && newPayee.utilityProvider === 'KPLC') {
+      if (!/^\d{5,15}$/.test(newPayee.accountNumber?.trim() || '')) {
+        addNotification({ title: 'Invalid Format', message: 'Enter a valid numeric KPLC meter number.', type: 'error' });
+        return;
+      }
+      if (!isValidPhoneKE(newPayee.phone)) {
+        addNotification({ title: 'Invalid Format', message: 'Enter a valid Kenyan phone number for bill notifications.', type: 'error' });
+        return;
+      }
+    } else if (newPayee.paymentMethod === 'Mobile Money') {
       if (newPayee.mobileMoneyType === 'Personal Number') {
         if (!isValidPhoneKE(newPayee.phone)) {
           addNotification({ title: 'Invalid Format', message: 'Please enter a valid Kenyan phone number (07..., 01..., +2547..., +2541...).', type: 'error' });
@@ -283,10 +337,12 @@ export default function BulkPay() {
       });
     }
 
-    setNewPayee({ 
-      name: '', 
-      type: 'Employee', 
+    setKplcCheck({ status: 'idle', customerName: '', serviceName: '', balance: null, error: '' });
+    setNewPayee({
+      name: '',
+      type: 'Employee',
       utilityType: 'Electricity',
+      utilityProvider: '',
       paymentMethod: 'Mobile Money',
       mobileMoneyType: 'Personal Number',
       amount: '',
@@ -818,7 +874,7 @@ export default function BulkPay() {
       // Transform response to match frontend receipts. `status` is carried
       // through now — it used to be dropped here, so every receipt card
       // rendered as "Confirmed / Settled" even for rows that actually
-      // failed (blocked/rejected by NCBA) and were refunded back
+      // failed (blocked/rejected by Daraja or NCBA) and were refunded back
       // to the merchant's balance. See the status-aware rendering below.
       const newReceipts = processedBatch.transactions.map(tx => ({
         id: tx.receiptNumber,
@@ -1073,17 +1129,84 @@ export default function BulkPay() {
                             {['Water', 'Electricity', 'Rent', 'Internet'].map((u) => (
                               <button
                                 key={u}
-                                onClick={() => setNewPayee({...newPayee, utilityType: u})}
-                                className={`py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${
-                                  newPayee.utilityType === u 
-                                    ? 'bg-[#00351D] text-white border-[#00351D]' 
+                                onClick={() => {
+                                  setKplcCheck({ status: 'idle', customerName: '', serviceName: '', balance: null, error: '' });
+                                  setNewPayee({...newPayee, utilityType: u, utilityProvider: u === 'Electricity' ? 'KPLC' : ''})
+                                }}
+                                className={`py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border flex flex-col items-center justify-center gap-1.5 ${
+                                  newPayee.utilityType === u
+                                    ? 'bg-[#00351D] text-white border-[#00351D]'
                                     : 'bg-surface-container-low/50 text-on-surface-variant/40 border-outline-variant/5 hover:border-emerald-500/30'
                                 }`}
                               >
-                                {u}
+                                {u === 'Electricity' && (
+                                  <span className="bg-white rounded-md px-1.5 py-1">
+                                    <img src="/utilities%20logo/kplc.png" alt="KPLC" className="h-3.5 w-auto object-contain" />
+                                  </span>
+                                )}
+                                {u === 'Electricity' ? 'Electricity (KPLC)' : u}
                               </button>
                             ))}
                           </div>
+                        </div>
+                      )}
+
+                      {newPayee.utilityProvider === 'KPLC' && (
+                        <div className="space-y-4 pt-4 animate-in fade-in duration-500 bg-amber-50/40 p-4 rounded-2xl border border-amber-500/10">
+                          <h4 className="text-[10px] text-amber-700 font-black uppercase tracking-widest mb-2 flex items-center gap-2">
+                            <img src="/utilities%20logo/kplc.png" alt="KPLC" className="h-4 w-auto object-contain" />
+                            KPLC Postpaid Details
+                          </h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Meter Number</label>
+                              <ValidatedInput
+                                kind="integer"
+                                value={newPayee.accountNumber}
+                                onChange={(e) => { setKplcCheck({ status: 'idle', customerName: '', serviceName: '', balance: null, error: '' }); setNewPayee({...newPayee, accountNumber: e.target.value}) }}
+                                placeholder="e.g. 107803292"
+                                className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-amber-500/50"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Notification Number</label>
+                              <ValidatedInput
+                                kind="phoneKE"
+                                value={newPayee.phone}
+                                onChange={(e) => { setKplcCheck({ status: 'idle', customerName: '', serviceName: '', balance: null, error: '' }); setNewPayee({...newPayee, phone: e.target.value}) }}
+                                placeholder="07XX XXX XXX"
+                                className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-amber-500/50"
+                              />
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={handleVerifyKplcMeter}
+                            disabled={kplcCheck.status === 'loading'}
+                            className="w-full py-3 rounded-xl bg-amber-600 text-white font-black text-[10px] uppercase tracking-widest hover:bg-amber-700 transition-all disabled:opacity-50"
+                          >
+                            {kplcCheck.status === 'loading' ? 'Verifying…' : 'Verify Meter'}
+                          </button>
+
+                          {kplcCheck.status === 'success' && (
+                            <div className="flex items-start gap-3 bg-white border border-emerald-500/20 rounded-xl px-4 py-3">
+                              <span className="material-symbols-outlined text-emerald-600 text-[18px]" style={{fontVariationSettings: "'FILL' 1"}}>check_circle</span>
+                              <div className="min-w-0">
+                                <p className="text-sm font-bold text-primary truncate">{kplcCheck.customerName || 'Meter verified'}</p>
+                                <p className="text-[11px] text-on-surface-variant font-medium opacity-70">
+                                  {kplcCheck.serviceName || 'Kplc Postpaid'}
+                                  {typeof kplcCheck.balance === 'number' ? ` · Balance due: KES ${kplcCheck.balance.toLocaleString()}` : ''}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                          {kplcCheck.status === 'error' && (
+                            <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                              <span className="material-symbols-outlined text-red-500 text-[16px]">error_outline</span>
+                              <p className="text-xs font-bold text-red-700">{kplcCheck.error}</p>
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -1149,6 +1272,7 @@ export default function BulkPay() {
                         />
                       </div>
 
+                      {newPayee.utilityProvider !== 'KPLC' && (
                       <div className="space-y-4 pt-4">
                         <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Settlement Method</label>
                         <div className="flex gap-2 p-1.5 bg-surface-container-low/50 rounded-2xl border border-outline-variant/5">
@@ -1165,7 +1289,9 @@ export default function BulkPay() {
                           ))}
                         </div>
                       </div>
+                      )}
 
+                      {newPayee.utilityProvider !== 'KPLC' && (
                       <div className="pt-4 transition-all">
                         {newPayee.paymentMethod === 'Mobile Money' && (
                           <div className="space-y-6 animate-in fade-in duration-300">
@@ -1271,6 +1397,7 @@ export default function BulkPay() {
                           </div>
                         )}
                       </div>
+                      )}
                     </div>
 
                     <div className="flex gap-4 pt-4">

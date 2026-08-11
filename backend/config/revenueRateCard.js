@@ -196,6 +196,18 @@ export const REVENUE_STREAMS = [
     basis: 'kes_volume',
   },
   {
+    id: 'ncba_kplc_fee',
+    label: 'NCBA KPLC Bill Payment Fee',
+    description: 'PayChain\'s flat margin on Bulk Pay KPLC (Kenya Power) postpaid bill payments, via NCBA\'s Open Banking KPLC Payment API. NCBA hasn\'t published a cost schedule for this rail, so no NCBA cost passes through; this is PayChain\'s own charge only, distinct from the generic ncba_disbursement_fee stream used by bank and other utility (WATER) bulk payouts.',
+    icon: 'bolt',
+    accent: 'amber',
+    rate: PAYCHAIN_TXN_RATE,
+    minFee: 0,
+    txTypes: ['ncba_kplc'],
+    statuses: ['completed', 'verified'],
+    basis: 'kes_volume',
+  },
+  {
     id: 'cash_advance',
     label: 'Cash Advance Fee',
     description: 'Origination fee on PayChain Cash Advance product (merchant credit line). Pilot stage.',

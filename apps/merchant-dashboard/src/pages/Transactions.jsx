@@ -553,6 +553,7 @@ export default function Transactions() {
     ncba_mobile_b2w: 'M-PESA Withdrawal',
     mpesa_b2b:    'Paybill/Till Payout',
     ncba_lipa_na_mpesa: 'Paybill/Till Payout',
+    ncba_kplc:    'KPLC Bill Payment',
   }
   const TX_COLOR = {
     inbound:      'bg-emerald-500/10 text-emerald-700',
@@ -568,6 +569,7 @@ export default function Transactions() {
     ncba_mobile_b2w: 'bg-rose-500/10 text-rose-700',
     mpesa_b2b:    'bg-indigo-500/10 text-indigo-700',
     ncba_lipa_na_mpesa: 'bg-indigo-500/10 text-indigo-700',
+    ncba_kplc:    'bg-amber-500/10 text-amber-700',
   }
   const txLabel = (type) => TX_LABEL[type] || type.replace(/_/g,' ')
   const txColor = (type) => TX_COLOR[type] || 'bg-slate-500/10 text-slate-700'

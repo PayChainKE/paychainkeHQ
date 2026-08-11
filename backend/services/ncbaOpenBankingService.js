@@ -349,6 +349,112 @@ export async function validateMobileWalletNumber({ provider, msisdn }) {
 }
 
 /**
+ * Validates a KPLC (Kenya Power) postpaid account before a bill payment —
+ * "This is a validation service to check the account/meter number validity
+ * and confirm balance due" per the UAT Guide. Returns a validationId that
+ * must be echoed back on the actual payment (same validate-then-pay shape
+ * as validateMobileWalletNumber/validateLipaNaMpesaAccount above). Endpoint
+ * confirmed from NCBA's "Open Banking V2 - Callback Enabled" Postman
+ * collection (not shown as a path in the UAT Guide's own text, only its
+ * request/response JSON was — same situation as the other validate calls
+ * in this file).
+ *
+ * @param {object} params
+ * @param {string} params.meterNumber - numeric KPLC meter number
+ * @param {string} params.msisdn - phone number under the bill, 254XXXXXXXXX
+ */
+export async function validateKplcAccount({ meterNumber, msisdn }) {
+  if (!meterNumber || !msisdn) {
+    throw new NcbaOpenBankingValidationError('meterNumber and msisdn are required to validate a KPLC account');
+  }
+
+  if (!liveCallsEnabled) {
+    const result = simulate('ncba_openbanking_kplc_validate_sandbox', { meterNumber, msisdn });
+    return { validationId: `SIM-VALID-${Date.now()}`, meterNumber, customerName: 'Simulated KPLC Customer', serviceName: 'Kplc Postpaid', balance: 0, ...result };
+  }
+
+  const result = await ncbaOpenBankingPost('/api/v1/KPLCValidation/kplcvalidation', { meterNumber, msisdn });
+  if (!result?.succeeded || !result?.validationId) {
+    throw new NcbaOpenBankingValidationError(result?.message || 'Could not verify this KPLC meter number');
+  }
+
+  return {
+    validationId: result.validationId,
+    meterNumber: result.meterNumber || meterNumber,
+    customerName: result.customerName || null,
+    serviceName: result.serviceName || null,
+    balance: typeof result.balance === 'number' ? result.balance : null,
+  };
+}
+
+/**
+ * Submits a KPLC postpaid bill payment — NCBA's Open Banking KPLC rail,
+ * distinct from (and more specific than) the generic BILLPAY payload used
+ * by services/ncbaBulkPaymentService.js's Host-to-Host bulk channel. Per
+ * the UAT Guide's own Payment Rules ("Payments processed with generated
+ * validation ID only"), a fresh validationId from validateKplcAccount is
+ * required on every payment — callers should validate immediately before
+ * submitting, not reuse an old validationId (same pattern already used for
+ * Mobile B2W/Lipa na M-Pesa in bulkPayController.js).
+ *
+ * Response shape (`data.id`/`data.bankRef`/`succeeded`) matches NCBA's
+ * other "accepted into processing" rails (Mobile B2W, Lipa na M-Pesa) —
+ * `succeeded: true` only means NCBA accepted the instruction, not that the
+ * bill is paid yet. Callers should record the resulting Transaction as
+ * 'pending' and let the generic handlePesaLinkCallback
+ * (ncbaOpenBankingController.js) resolve it later, keyed by reqChnlId.
+ *
+ * @param {object} params
+ * @param {string} params.transactionId - PayChain's own reference; becomes
+ *        both channelRef/reqChnlId here and Transaction.reference at the
+ *        call site.
+ * @param {string} params.validationId - from validateKplcAccount
+ * @param {string} params.customerName - meter holder name
+ * @param {string} params.meterNumber
+ * @param {string} params.msisdn - mobile number for notifications
+ * @param {number} params.amount
+ * @param {string} [params.narration]
+ * @param {string} [params.debitAccount] - defaults to PayChain's own NCBA account
+ */
+export async function submitKplcPayment({
+  transactionId,
+  validationId,
+  customerName,
+  meterNumber,
+  msisdn,
+  amount,
+  narration,
+  debitAccount,
+}) {
+  if (!transactionId || !validationId || !meterNumber || !amount) {
+    throw new NcbaOpenBankingValidationError('transactionId, validationId, meterNumber and amount are required for a KPLC payment');
+  }
+
+  const payload = {
+    validationId,
+    customerName: customerName || 'PayChain Merchant',
+    meterNumber,
+    msisdn: msisdn || '',
+    channelRef: transactionId,
+    amount: String(amount),
+    callbackUrl: '',
+    reason: narration || 'KPLC PAYMENT',
+    accountNumber: debitAccount || ncbaOpenBankingAccountNumber,
+    reqChnlId: transactionId,
+  };
+
+  if (!liveCallsEnabled) {
+    return simulate('ncba_openbanking_kplc_submit_sandbox', { transactionId, amount });
+  }
+
+  const result = await ncbaOpenBankingPost('/api/v1/KPLCPayment/kplcpayment', payload);
+  if (!result?.succeeded) {
+    throw new NcbaOpenBankingRequestError(result?.data?.message || result?.message || 'NCBA rejected the KPLC payment');
+  }
+  return result;
+}
+
+/**
  * Validates a destination Paybill or Till number before a Lipa na M-Pesa
  * payout — "This is a prerequisite for Bill Payments" per the UAT Guide.
  * identifierType is "4" for Paybill, "2" for Till (per the UAT Guide's own
