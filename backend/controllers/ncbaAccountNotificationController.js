@@ -250,7 +250,7 @@ export const handleNcbaAccountNotification = async (req, res) => {
       merchantId: merchant._id,
       kind: 'payment',
       title: 'Payment received',
-      message: `You received KES ${transAmount.toLocaleString()} via NCBA. Ref: ${transId}.`,
+      message: `You received KES ${transAmount.toLocaleString()} via your PayChain Virtual Account. Ref: ${transId}.`,
     }).catch((e) => logEvent('error', 'ncba_account_notification_notification_failed', { transId, error: e.message }));
 
     // Non-blocking customer + merchant SMS — sendSMS never throws (see

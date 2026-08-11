@@ -119,7 +119,7 @@ export const handleNcbaReconciliationWebhook = async (req, res) => {
       merchantId: merchant._id,
       kind: 'payment',
       title: 'Payment received',
-      message: `You received KES ${grossAmount.toLocaleString()} via NCBA Virtual Account. Ref: ${transactionReference}.`,
+      message: `You received KES ${grossAmount.toLocaleString()} via your PayChain Virtual Account. Ref: ${transactionReference}.`,
     }).catch((e) => logEvent('error', 'ncba_reconciliation_notification_failed', { transactionReference, error: e.message }));
 
     // Non-blocking customer + merchant SMS — sendSMS never throws (see
@@ -232,14 +232,14 @@ export const handleInitiateBulkPayment = async (req, res) => {
       const { date, time } = formatTransactionDateTime();
       safeSendSMS({
         to: result.merchant.phone,
-        message: `${result.batch.batchReference} NCBA Bulk Payout Submitted. KES ${result.totalAmount.toLocaleString()} to ${payoutItems.length} recipient${payoutItems.length === 1 ? '' : 's'} on ${date} at ${time}. New balance: KES ${result.merchant.kesBalance.toLocaleString()}.`,
+        message: `${result.batch.batchReference} Bulk Payout Submitted. KES ${result.totalAmount.toLocaleString()} to ${payoutItems.length} recipient${payoutItems.length === 1 ? '' : 's'} on ${date} at ${time}. New balance: KES ${result.merchant.kesBalance.toLocaleString()}.`,
       }).then((r) => {
-        if (!r.success) console.error(`NCBA bulk payment SMS failed for merchant ${req.merchant._id}:`, r.error);
+        if (!r.success) console.error(`Bulk payment SMS failed for merchant ${req.merchant._id}:`, r.error);
       });
     }
 
     res.status(200).json({
-      message: 'NCBA bulk payment batch submitted successfully.',
+      message: 'Bulk payment batch submitted successfully.',
       batch: result.batch,
       hostResponse: result.hostResponse,
     });

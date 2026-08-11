@@ -15,6 +15,7 @@ import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard.js';
 import { validateMobileWalletNumber, submitMobileB2wPayment, validateLipaNaMpesaAccount, submitLipaNaMpesaPayment, validateKplcAccount, submitKplcPayment, validateKplcPrepaidAccount, submitKplcPrepaidPayment, validateNcwscAccount, submitNcwscPayment, NcbaOpenBankingValidationError } from '../services/ncbaOpenBankingService.js';
+import { buildPayoutSentSms } from '../utils/paymentSmsTemplates.js';
 
 // @desc    Get all payees for a merchant
 // @route   GET /api/bulkpay/payees
@@ -600,9 +601,28 @@ export const authorizeBatch = async (req, res) => {
             // "accepted" ack here and confirm completion later via
             // handlePesaLinkCallback), NCBA PesaLink resolves synchronously
             // — submitNcbaBankTransfer already throws on rejection, so
-            // reaching this line means the transfer succeeded.
+            // reaching this line means the transfer succeeded. Send this
+            // row's own completion SMS now rather than waiting for the
+            // batch-level summary SMS below, since that one only says
+            // "N recipients" and never confirms this specific payout —
+            // the same per-row confirmation an async row gets later from
+            // handlePesaLinkCallback once NCBA resolves it.
             payoutRef = transactionId;
             payoutStatus = 'completed';
+            if (merchant.phone) {
+              const { date: rowDate, time: rowTime } = formatTransactionDateTime();
+              const { message: rowSmsMessage } = buildPayoutSentSms({
+                ref: payoutRef,
+                label: 'Bank Payout',
+                amount: row.netAmount,
+                recipientName: payee.name,
+                date: rowDate,
+                time: rowTime,
+              });
+              safeSendSMS({ to: merchant.phone, message: rowSmsMessage }).then((result) => {
+                if (!result.success) console.error(`Bulk bank payout row SMS failed for merchant ${merchant._id}:`, result.error);
+              });
+            }
           } catch (err) {
             console.error(`❌ NCBA PesaLink rejected payout for ${payee.name}:`, err.message);
             payoutStatus = 'failed';

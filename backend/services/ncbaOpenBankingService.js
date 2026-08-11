@@ -187,7 +187,7 @@ function assertTransferAmountInBounds(amount) {
   const numeric = Number(amount);
   if (numeric < MIN_TRANSFER_AMOUNT || numeric > MAX_TRANSFER_AMOUNT) {
     throw new NcbaOpenBankingValidationError(
-      `Amount must be between KES ${MIN_TRANSFER_AMOUNT} and KES ${MAX_TRANSFER_AMOUNT.toLocaleString()} (NCBA PesaLink/EFT limits)`
+      `Amount must be between KES ${MIN_TRANSFER_AMOUNT} and KES ${MAX_TRANSFER_AMOUNT.toLocaleString()} (PesaLink/EFT limits)`
     );
   }
 }
@@ -217,7 +217,7 @@ export async function validatePesaLinkAccount({ bankCode, accountNumber, debitAc
   });
 
   if (result?.StatusCode !== '00') {
-    throw new NcbaOpenBankingValidationError(result?.StatusMessage || 'NCBA could not verify the destination bank account');
+    throw new NcbaOpenBankingValidationError(result?.StatusMessage || 'Could not verify the destination bank account');
   }
 
   return result;
@@ -261,7 +261,7 @@ export async function validatePesaLinkMobileNumber({ phoneNumber, debitAccount }
 
   const bankRows = result?.bankList?.bank;
   if (!result?.destName || !Array.isArray(bankRows) || bankRows.length === 0) {
-    throw new NcbaOpenBankingValidationError('NCBA could not find a PesaLink-registered bank for this mobile number');
+    throw new NcbaOpenBankingValidationError('Could not find a PesaLink-registered bank for this mobile number');
   }
 
   return {
@@ -318,7 +318,7 @@ export async function submitPesaLinkTransfer({
 
   const result = await ncbaOpenBankingPost('/api/v1/PesaLinkTransaction/pesaLinktransaction', payload);
   if (result?.resultCode !== '000') {
-    throw new NcbaOpenBankingRequestError(result?.statusDescription || 'NCBA rejected the PesaLink transfer');
+    throw new NcbaOpenBankingRequestError(result?.statusDescription || 'This PesaLink transfer was rejected');
   }
   return result;
 }
@@ -365,7 +365,7 @@ export async function submitEftTransfer({
 
   const result = await ncbaOpenBankingPost('/api/v1/EFTTransaction/efttransaction', payload);
   if (result?.resultCode !== '000') {
-    throw new NcbaOpenBankingRequestError(result?.statusDescription || 'NCBA rejected the EFT transfer');
+    throw new NcbaOpenBankingRequestError(result?.statusDescription || 'This EFT transfer was rejected');
   }
   return result;
 }
@@ -426,7 +426,7 @@ export async function submitRtgsTransfer({
     throw new NcbaOpenBankingValidationError('transactionId, beneficiaryAccountNumber, beneficiaryBankBic, beneficiaryCountry and amount are required for an RTGS transfer');
   }
   if (Number(amount) < MIN_TRANSFER_AMOUNT) {
-    throw new NcbaOpenBankingValidationError(`Amount must be at least KES ${MIN_TRANSFER_AMOUNT} (NCBA RTGS minimum) — RTGS has no maximum cap`);
+    throw new NcbaOpenBankingValidationError(`Amount must be at least KES ${MIN_TRANSFER_AMOUNT} (RTGS minimum) — RTGS has no maximum cap`);
   }
 
   const payload = {
@@ -452,7 +452,7 @@ export async function submitRtgsTransfer({
 
   const result = await ncbaOpenBankingPost('/api/v1/RTGSPayment/RTGSPayment', payload);
   if (result?.resultCode !== '000') {
-    throw new NcbaOpenBankingRequestError(result?.statusDescription || 'NCBA rejected the RTGS transfer');
+    throw new NcbaOpenBankingRequestError(result?.statusDescription || 'This RTGS transfer was rejected');
   }
   return result;
 }
@@ -588,7 +588,7 @@ export async function submitKplcPayment({
 
   const result = await ncbaOpenBankingPost('/api/v1/KPLCPayment/kplcpayment', payload);
   if (!result?.succeeded) {
-    throw new NcbaOpenBankingRequestError(result?.data?.message || result?.message || 'NCBA rejected the KPLC payment');
+    throw new NcbaOpenBankingRequestError(result?.data?.message || result?.message || 'This KPLC payment was rejected');
   }
   return result;
 }
@@ -679,7 +679,7 @@ export async function submitKplcPrepaidPayment({
 
   const result = await ncbaOpenBankingPost('/api/v1/KPLCPrepaidTransaction/kplcPrepaidTransaction', payload);
   if (!result?.succeeded) {
-    throw new NcbaOpenBankingRequestError(result?.data?.message || result?.message || 'NCBA rejected the KPLC prepaid token purchase');
+    throw new NcbaOpenBankingRequestError(result?.data?.message || result?.message || 'This KPLC prepaid token purchase was rejected');
   }
   return result;
 }
@@ -780,7 +780,7 @@ export async function submitNcwscPayment({
 
   const result = await ncbaOpenBankingPost('/api/v1/NWSCPayment/NWSCPayment', payload);
   if (!result?.succeeded) {
-    throw new NcbaOpenBankingRequestError(result?.data?.message || result?.message || 'NCBA rejected the NCWSC payment');
+    throw new NcbaOpenBankingRequestError(result?.data?.message || result?.message || 'This NCWSC payment was rejected');
   }
   return result;
 }
@@ -814,7 +814,7 @@ export async function validateLipaNaMpesaAccount({ paymentType, payBillTillNo })
   });
 
   if (result?.errorCode !== '000') {
-    throw new NcbaOpenBankingValidationError(result?.errorMessage || 'NCBA could not verify the destination Paybill/Till number');
+    throw new NcbaOpenBankingValidationError(result?.errorMessage || 'Could not verify the destination Paybill/Till number');
   }
 
   // origanizationShortCode is NCBA's own typo, kept exactly as documented.
@@ -882,7 +882,7 @@ export async function submitLipaNaMpesaPayment({
 
   const result = await ncbaOpenBankingPost('/api/v1/LipaNaMpesa/lipanampesa', payload);
   if (result?.resErrorCode !== '000') {
-    throw new NcbaOpenBankingRequestError(result?.resErrorDesc || result?.resErrorMessage || 'NCBA rejected the Lipa na M-Pesa payment');
+    throw new NcbaOpenBankingRequestError(result?.resErrorDesc || result?.resErrorMessage || 'This Lipa na M-Pesa payment was rejected');
   }
   return result;
 }

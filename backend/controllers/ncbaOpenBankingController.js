@@ -321,9 +321,9 @@ export const handleBankPayout = async (req, res) => {
     }
 
     const RAIL_RESPONSE_MESSAGE = {
-      eft: 'Bank transfer submitted via NCBA EFT. It settles by the next business day.',
-      rtgs: 'Bank transfer submitted via NCBA RTGS. It settles within a few hours.',
-      pesalink: 'Bank transfer completed via NCBA PesaLink.',
+      eft: 'Bank transfer submitted via EFT. It settles by the next business day.',
+      rtgs: 'Bank transfer submitted via RTGS. It settles within a few hours.',
+      pesalink: 'Bank transfer completed via PesaLink.',
     };
     res.status(200).json({
       success: true,

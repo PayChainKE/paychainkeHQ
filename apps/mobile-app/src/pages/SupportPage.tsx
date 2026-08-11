@@ -115,7 +115,7 @@ export default function SupportPage({ navigation }: any) {
               />
               <FAQItem
                 question="Is my money safe?"
-                answer="Your funds move through NCBA's own virtual account rails, and your password and PIN are hashed — never stored or logged in plain text, not even our own team can read them."
+                answer="Your funds move through PayChain's own secured virtual account rails, and your password and PIN are hashed — never stored or logged in plain text, not even our own team can read them."
               />
               <FAQItem
                 question="How to increase my Trust Score?"

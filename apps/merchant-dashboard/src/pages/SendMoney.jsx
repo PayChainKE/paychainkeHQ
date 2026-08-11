@@ -460,7 +460,7 @@ export default function SendMoney() {
                       placeholder="MSC"
                       className="w-full bg-white border border-slate-200 rounded-2xl py-4 px-4 text-primary font-bold uppercase focus:border-[#00351D] focus:ring-2 focus:ring-[#00351D]/10 outline-none transition-all"
                     />
-                    <p className="text-[10px] text-slate-400 font-medium">NCBA hasn't published the full code list yet — "MSC" (Miscellaneous) is their own confirmed default. Confirm the correct code with NCBA if this payment needs a specific one.</p>
+                    <p className="text-[10px] text-slate-400 font-medium">"MSC" (Miscellaneous) works for most transfers. If your receiving bank asks for a specific purpose code, enter it here.</p>
                   </div>
                 </div>
               )}
