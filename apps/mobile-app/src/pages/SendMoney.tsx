@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { ValidatedTextInput } from '../components/ValidatedTextInput';
 import TopBar from '../components/layout/TopBar';
 import api from '../api/config';
+import { formatPhoneDisplay } from '../utils/formatPhoneDisplay';
 
 function formatKES(n: number | null | undefined) {
   if (n == null) return 'KES 0.00';
@@ -488,7 +489,7 @@ export default function SendMoney({ navigation }: any) {
               {destination === 'mpesa-primary' ? (
                 <View className="flex-row items-center bg-[#eff4ef] border border-[#e7ece7] rounded-2xl px-5 py-4 mb-5">
                   <Feather name="lock" size={14} color="#707971" style={{ marginRight: 8 }} />
-                  <Text className="text-[15px] font-jakarta-bold text-[#00351d]">{recipientAccount || merchant?.phone || 'Not on file'}</Text>
+                  <Text className="text-[15px] font-jakarta-bold text-[#00351d]">{formatPhoneDisplay(recipientAccount || merchant?.phone) || 'Not on file'}</Text>
                 </View>
               ) : (
                 <ValidatedTextInput
@@ -621,7 +622,7 @@ export default function SendMoney({ navigation }: any) {
                   ...(destination === 'bank' ? [['Transfer Speed', bankRail === 'eft' ? 'Next Business Day (EFT)' : bankRail === 'rtgs' ? 'International (RTGS)' : 'Instant (PesaLink)']] : []),
                   ...(destination === 'bank' && bankRail === 'rtgs' ? [['Beneficiary Country', ({ KE: 'Kenya', UG: 'Uganda', TZ: 'Tanzania', RW: 'Rwanda' } as Record<string, string>)[beneficiaryCountry] || beneficiaryCountry]] : []),
                   ...(isMobileDest ? [['Network', provider === 'airtel' ? 'Airtel Money' : 'M-PESA']] : []),
-                  ['Recipient', recipientAccount],
+                  ['Recipient', formatPhoneDisplay(recipientAccount)],
                   ...(destination === 'paybill' ? [['Account Number', paybillAccountRef]] : []),
                   ['Amount', formatKES(Number(amount) || 0)],
                   ['Fee', formatKES(fee)],

@@ -7,6 +7,7 @@ import { ValidatedInput } from '../components/ValidatedInput'
 import PinBoxes from '../components/PinBoxes'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { formatKES } from '../utils/formatCurrency'
+import { formatPhoneDisplay } from '../utils/formatPhoneDisplay'
 
 const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
 
@@ -558,7 +559,7 @@ export default function SendMoney() {
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-300 text-lg">lock</span>
                     <div className="w-full bg-slate-100 border border-slate-200 rounded-2xl py-4 pl-12 pr-4 text-primary font-bold">
-                      {recipientAccount || merchant?.phone || 'Not on file'}
+                      {formatPhoneDisplay(recipientAccount || merchant?.phone) || 'Not on file'}
                     </div>
                   </div>
                 ) : (
@@ -710,7 +711,7 @@ export default function SendMoney() {
                     ...(destination === 'bank' ? [['Transfer Speed', bankRail === 'eft' ? 'Next Business Day (EFT)' : bankRail === 'rtgs' ? 'International (RTGS)' : 'Instant (PesaLink)']] : []),
                     ...(destination === 'bank' && bankRail === 'rtgs' ? [['Beneficiary Country', { KE: 'Kenya', UG: 'Uganda', TZ: 'Tanzania', RW: 'Rwanda' }[beneficiaryCountry] || beneficiaryCountry]] : []),
                     ...(isMobileDest ? [['Network', provider === 'airtel' ? 'Airtel Money' : 'M-PESA']] : []),
-                    ['Recipient',   recipientAccount],
+                    ['Recipient',   formatPhoneDisplay(recipientAccount)],
                     ...(destination === 'paybill' ? [['Account Number', paybillAccountRef]] : []),
                     ['Amount',      formatKES(amount || 0)],
                     ['Fee',         formatKES(fee)],
