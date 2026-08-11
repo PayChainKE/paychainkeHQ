@@ -15,6 +15,7 @@ import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { claimPayoutSubmission, DuplicateSubmissionError } from '../utils/idempotencyGuard.js';
 import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard.js';
+import { validatePhoneNumber } from '../utils/ncbaValidators.js';
 import { validateMobileWalletNumber, submitMobileB2wPayment, validateLipaNaMpesaAccount, submitLipaNaMpesaPayment, validateKplcAccount, submitKplcPayment, validateKplcPrepaidAccount, submitKplcPrepaidPayment, validateNcwscAccount, submitNcwscPayment, NcbaOpenBankingValidationError } from '../services/ncbaOpenBankingService.js';
 import { buildPayoutSentSms } from '../utils/paymentSmsTemplates.js';
 
@@ -476,6 +477,17 @@ export const authorizeBatch = async (req, res) => {
       let payoutStatus = 'pending';
       let payoutRef = `BULK_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
+      // Payee.phone is stored/entered in the standard local format
+      // (0XXXXXXXXX) — NCBA's Open Banking validate/pay calls (KPLC, NCWSC,
+      // Mobile B2W below) reject an msisdn that starts with 0, requiring
+      // 254XXXXXXXXX instead. Normalize once here; left as raw on failure so
+      // each branch's own try/catch surfaces a clear per-row rejection
+      // instead of throwing before payoutStatus bookkeeping is set up.
+      let ncbaMsisdn = payee.phone;
+      if (payee.phone) {
+        try { ncbaMsisdn = validatePhoneNumber(payee.phone); } catch { /* left as raw; NCBA will reject and the branch below records the failure */ }
+      }
+
       if (payee.type === 'utility' && payee.utilityProvider === 'KPLC') {
         // KPLC goes through NCBA's Open Banking KPLC Payment API (confirmed
         // endpoints, validate-then-pay), not the generic Bulk H2H BILLPAY
@@ -491,13 +503,13 @@ export const authorizeBatch = async (req, res) => {
             // Fresh validationId required at payment time — see
             // validateKplcMeter's doc comment for why an Add-Payee-time one
             // can't be reused here.
-            const validation = await validateKplcAccount({ meterNumber: payee.accountNumber, msisdn: payee.phone });
+            const validation = await validateKplcAccount({ meterNumber: payee.accountNumber, msisdn: ncbaMsisdn });
             await submitKplcPayment({
               transactionId,
               validationId: validation.validationId,
               customerName: validation.customerName || payee.name,
               meterNumber: payee.accountNumber,
-              msisdn: payee.phone,
+              msisdn: ncbaMsisdn,
               amount: row.netAmount,
               narration: `Bulk Payout to ${payee.name}`,
             });
@@ -521,13 +533,13 @@ export const authorizeBatch = async (req, res) => {
         } else {
           try {
             const transactionId = `PAYOUT-KPLCPP-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-            const validation = await validateKplcPrepaidAccount({ meterNumber: payee.accountNumber, msisdn: payee.phone });
+            const validation = await validateKplcPrepaidAccount({ meterNumber: payee.accountNumber, msisdn: ncbaMsisdn });
             await submitKplcPrepaidPayment({
               transactionId,
               validationId: validation.validationId,
               customerName: validation.customerName || payee.name,
               meterNumber: payee.accountNumber,
-              msisdn: payee.phone,
+              msisdn: ncbaMsisdn,
               amount: row.netAmount,
               narration: `Bulk Payout to ${payee.name}`,
             });
@@ -554,13 +566,13 @@ export const authorizeBatch = async (req, res) => {
             const transactionId = `PAYOUT-NCWSC-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
             // Fresh validationId required at payment time — see
             // validateNcwscMeter's doc comment.
-            const validation = await validateNcwscAccount({ meterNumber: payee.accountNumber, msisdn: payee.phone });
+            const validation = await validateNcwscAccount({ meterNumber: payee.accountNumber, msisdn: ncbaMsisdn });
             await submitNcwscPayment({
               transactionId,
               validationId: validation.validationId,
               customerName: validation.customerName || payee.name,
               meterNumber: payee.accountNumber,
-              msisdn: payee.phone,
+              msisdn: ncbaMsisdn,
               amount: row.netAmount,
               narration: `Bulk Payout to ${payee.name}`,
             });
@@ -652,13 +664,13 @@ export const authorizeBatch = async (req, res) => {
         try {
           const network = payee.mobileNetwork === 'airtel' ? 'airtel' : 'safaricom';
           const transactionId = `PAYOUT-BULK-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-          const { validationId } = await validateMobileWalletNumber({ provider: network, msisdn: payee.phone });
+          const { validationId } = await validateMobileWalletNumber({ provider: network, msisdn: ncbaMsisdn });
           await submitMobileB2wPayment({
             transactionId,
             validationId,
             provider: network,
             amount: row.netAmount,
-            recipientNumber: payee.phone,
+            recipientNumber: ncbaMsisdn,
             narration: `Bulk Payout to ${payee.name}`,
           });
           payoutRef = transactionId;

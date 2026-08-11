@@ -550,13 +550,25 @@ export default function BulkPay() {
     const element = document.getElementById('invoice-pdf-pane');
     if (element) {
       try {
+        // Capture the live preview at whatever pixel size it renders at, but
+        // always place it on a real, fixed A4 page (210x297mm) rather than
+        // sizing the PDF page itself off element.clientWidth/clientHeight —
+        // that previously made the "PDF" whatever arbitrary size the pane
+        // happened to render at, not actually A4.
         const dataUrl = await domtoimage.toPng(element, { bgcolor: '#ffffff' });
-        const pdf = new jsPDF({
-          orientation: 'portrait',
-          unit: 'px',
-          format: [element.clientWidth, element.clientHeight]
-        });
-        pdf.addImage(dataUrl, 'PNG', 0, 0, element.clientWidth, element.clientHeight);
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        const pageWidth = 210;
+        const pageHeight = 297;
+        const img = pdf.getImageProperties(dataUrl);
+        const imgRatio = img.height / img.width;
+        let renderWidth = pageWidth;
+        let renderHeight = pageWidth * imgRatio;
+        if (renderHeight > pageHeight) {
+          renderHeight = pageHeight;
+          renderWidth = pageHeight / imgRatio;
+        }
+        const offsetX = (pageWidth - renderWidth) / 2;
+        pdf.addImage(dataUrl, 'PNG', offsetX, 0, renderWidth, renderHeight);
         pdf.save(`Invoice_${invoiceDetails.invoiceNumber || 'Draft'}.pdf`);
         addNotification({ title: 'Download Complete', message: `Invoice saved successfully.`, type: 'success' });
       } catch (err) {
@@ -1056,21 +1068,23 @@ export default function BulkPay() {
         {/* Add/Edit Payee Modal Overlay */}
         {showAddModal && (
           <div className="fixed inset-0 bg-[#0A2540]/60 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
-            <div className="bg-white w-full max-w-xl rounded-[32px] md:rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in duration-500 border border-white/20">
-              <div className="p-6 md:p-10">
+            <div className="bg-white w-full max-w-xl max-h-[90vh] rounded-[32px] md:rounded-[40px] shadow-2xl animate-in zoom-in duration-500 border border-white/20 flex flex-col overflow-hidden">
+              <div className="p-6 md:p-10 pb-0 shrink-0">
                 <div className="flex items-center justify-between mb-6 md:mb-10">
                   <div>
                     <h2 className="font-headline text-2xl md:text-3xl text-primary tracking-tight font-bold">{isEditing ? 'Edit Recipient' : 'Add New Recipient'}</h2>
                     <p className="text-[10px] md:text-xs text-on-surface-variant font-medium mt-1 opacity-60 italic">Step {addStep} of 2: {addStep === 1 ? 'Category Selection' : 'Payment Details'}</p>
                   </div>
-                  <button 
+                  <button
                     onClick={() => { setShowAddModal(false); setAddStep(1); setIsEditing(false); }}
                     className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-surface-container-low flex items-center justify-center text-primary/40 hover:text-primary transition-colors"
                   >
                     <span className="material-symbols-outlined text-xl">close</span>
                   </button>
                 </div>
+              </div>
 
+              <div className="px-6 md:px-10 pb-6 md:pb-10 overflow-y-auto custom-scrollbar">
                 {addStep === 1 ? (
                   <div className="flex flex-col gap-3">
                     {[
@@ -1152,8 +1166,8 @@ export default function BulkPay() {
                                   }`}
                                 >
                                   {logo && (
-                                    <span className="bg-white rounded-md px-1.5 py-1">
-                                      <img src={logo} alt={u} className="h-3.5 w-auto object-contain" />
+                                    <span className="bg-white rounded-lg px-2.5 py-2 shadow-sm">
+                                      <img src={logo} alt={u} className="h-7 w-auto object-contain" />
                                     </span>
                                   )}
                                   {u === 'Electricity' ? 'Electricity (KPLC)' : u === 'Water' ? 'Water (NCWSC)' : u}
@@ -1217,12 +1231,14 @@ export default function BulkPay() {
                             }
                         return (
                           <div className={`space-y-4 pt-4 animate-in fade-in duration-500 p-4 rounded-2xl border ${theme.panel}`}>
-                            <div>
-                              <h4 className={`text-[10px] font-black uppercase tracking-widest mb-1 flex items-center gap-2 ${theme.heading}`}>
-                                <img src={logo} alt={newPayee.utilityProvider} className="h-4 w-auto object-contain" />
-                                {billerLabel}
-                              </h4>
-                              {billerDesc && <p className="text-[10px] text-on-surface-variant/60 font-medium">{billerDesc}</p>}
+                            <div className="flex items-center gap-3 mb-1">
+                              <span className="bg-white rounded-lg px-2.5 py-2 shadow-sm shrink-0">
+                                <img src={logo} alt={newPayee.utilityProvider} className="h-7 w-auto object-contain" />
+                              </span>
+                              <div>
+                                <h4 className={`text-[10px] font-black uppercase tracking-widest ${theme.heading}`}>{billerLabel}</h4>
+                                {billerDesc && <p className="text-[10px] text-on-surface-variant/60 font-medium mt-0.5">{billerDesc}</p>}
+                              </div>
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                               <div className="space-y-1.5">
