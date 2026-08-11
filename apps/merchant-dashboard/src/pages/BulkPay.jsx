@@ -77,20 +77,6 @@ export default function BulkPay() {
   const [selectedPayees, setSelectedPayees] = useState({})
   const [payoutAmounts, setPayoutAmounts] = useState({})
 
-  // Bank-routed payees need a real NCBA clearing code (bankCode), not just a
-  // free-text bank name — authorizeBatch on the backend refuses to route a
-  // payout without one. Fetched lazily (same pattern as SendMoney.jsx's
-  // Bank destination picker) so payees who never touch Bank never pay for it.
-  const [bankCodes, setBankCodes] = useState([])
-  useEffect(() => {
-    if (newPayee.paymentMethod !== 'Bank' || bankCodes.length > 0) return
-    const token = localStorage.getItem('paychain_merchant_token')
-    const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
-    axios.get(`${API_URL}/api/v1/openbanking/bank-codes`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(res => setBankCodes(res.data?.bankCodes || []))
-      .catch(e => console.error('Failed to load bank codes', e))
-  }, [newPayee.paymentMethod])
-
   const [newPayee, setNewPayee] = useState({
     name: '',
     type: 'Employee',
@@ -114,6 +100,20 @@ export default function BulkPay() {
     etimsInvoiceNumber: '',
     cuNumber: ''
   })
+
+  // Bank-routed payees need a real NCBA clearing code (bankCode), not just a
+  // free-text bank name — authorizeBatch on the backend refuses to route a
+  // payout without one. Fetched lazily (same pattern as SendMoney.jsx's
+  // Bank destination picker) so payees who never touch Bank never pay for it.
+  const [bankCodes, setBankCodes] = useState([])
+  useEffect(() => {
+    if (newPayee.paymentMethod !== 'Bank' || bankCodes.length > 0) return
+    const token = localStorage.getItem('paychain_merchant_token')
+    const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+    axios.get(`${API_URL}/api/v1/openbanking/bank-codes`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => setBankCodes(res.data?.bankCodes || []))
+      .catch(e => console.error('Failed to load bank codes', e))
+  }, [newPayee.paymentMethod])
 
   // Utility meter verification (KPLC/NCWSC) — pure UX confirmation before
   // saving a payee (shows the merchant the real account holder name +

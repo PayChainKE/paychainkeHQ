@@ -40,8 +40,21 @@ function logEvent(level, event, fields) {
   else console.log(line);
 }
 
+// err.message has been observed empty on Render for some network-level
+// failures — always include status/code/name too so a failure is
+// diagnosable from the log alone (see identical fix in
+// ncbaOpenBankingService.js's unwrapAxiosError).
 function unwrapAxiosError(err) {
-  return err.response?.data ? JSON.stringify(err.response.data) : err.message;
+  const detail = {
+    message: err.message || undefined,
+    code: err.code,
+    name: err.name,
+    status: err.response?.status,
+    statusText: err.response?.statusText,
+    data: err.response?.data,
+  };
+  Object.keys(detail).forEach((k) => detail[k] === undefined && delete detail[k]);
+  return JSON.stringify(detail);
 }
 
 function simulate(event, payload) {
