@@ -78,6 +78,10 @@ const transactionSchema = new mongoose.Schema({
   // (immediate, 24/7/365), EFT (T+1, business days only), or RTGS (T+3
   // hours, cross-border/multi-currency). Null for every other transaction type.
   settlementRail: { type: String, enum: ['pesalink', 'eft', 'rtgs', null], default: null },
+  // Which mobile money network the recipient's wallet is on — only
+  // meaningful for 'ncba_mobile_b2w' payouts, which can target either
+  // Safaricom M-Pesa or Airtel Money. Null for every other transaction type.
+  mobileNetwork: { type: String, enum: ['safaricom', 'airtel', null], default: null },
 }, {
   timestamps: true
 });

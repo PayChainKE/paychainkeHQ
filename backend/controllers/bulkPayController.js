@@ -13,6 +13,7 @@ import { createNotification } from './notificationController.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
+import { claimPayoutSubmission, DuplicateSubmissionError } from '../utils/idempotencyGuard.js';
 import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard.js';
 import { validateMobileWalletNumber, submitMobileB2wPayment, validateLipaNaMpesaAccount, submitLipaNaMpesaPayment, validateKplcAccount, submitKplcPayment, validateKplcPrepaidAccount, submitKplcPrepaidPayment, validateNcwscAccount, submitNcwscPayment, NcbaOpenBankingValidationError } from '../services/ncbaOpenBankingService.js';
 import { buildPayoutSentSms } from '../utils/paymentSmsTemplates.js';
@@ -35,7 +36,7 @@ export const getPayees = async (req, res) => {
 export const addPayee = async (req, res) => {
   try {
     const {
-      name, type, paymentMethod, mobileMoneyType, phone, paybillNumber,
+      name, type, paymentMethod, mobileMoneyType, mobileNetwork, phone, paybillNumber,
       businessAccount, tillNumber, bankName, accountNumber, bankCode, utilityProvider,
       kraPin, idNumber, nssfNumber, shifNumber, etimsInvoiceNumber, cuNumber, defaultAmount
     } = req.body;
@@ -53,7 +54,7 @@ export const addPayee = async (req, res) => {
 
     const payee = new Payee({
       merchantId: req.merchant._id,
-      name, type, paymentMethod, mobileMoneyType, phone, paybillNumber,
+      name, type, paymentMethod, mobileMoneyType, mobileNetwork, phone, paybillNumber,
       businessAccount, tillNumber, bankName, accountNumber, bankCode, utilityProvider,
       kraPin, idNumber, nssfNumber, shifNumber, etimsInvoiceNumber, cuNumber, defaultAmount
     });
@@ -71,7 +72,7 @@ export const addPayee = async (req, res) => {
 export const updatePayee = async (req, res) => {
   try {
     const {
-      name, type, paymentMethod, mobileMoneyType, phone, paybillNumber,
+      name, type, paymentMethod, mobileMoneyType, mobileNetwork, phone, paybillNumber,
       businessAccount, tillNumber, bankName, accountNumber, bankCode, utilityProvider,
       kraPin, idNumber, nssfNumber, shifNumber, etimsInvoiceNumber, cuNumber, defaultAmount
     } = req.body;
@@ -93,7 +94,7 @@ export const updatePayee = async (req, res) => {
     const updatedPayee = await Payee.findByIdAndUpdate(
       req.params.id,
       {
-        name, type, paymentMethod, mobileMoneyType, phone, paybillNumber,
+        name, type, paymentMethod, mobileMoneyType, mobileNetwork, phone, paybillNumber,
         businessAccount, tillNumber, bankName, accountNumber, bankCode, utilityProvider,
         kraPin, idNumber, nssfNumber, shifNumber, etimsInvoiceNumber, cuNumber, defaultAmount,
         updatedAt: new Date()
@@ -116,7 +117,7 @@ export const deletePayee = async (req, res) => {
     if (!payee) {
       return res.status(404).json({ message: 'Payee not found' });
     }
-    await Payee.deleteOne({ _id: req.params.id });
+    await Payee.deleteOne({ _id: req.params.id, merchantId: req.merchant._id });
     res.status(200).json({ message: 'Payee removed successfully' });
   } catch (error) {
     res.status(500).json({ message: 'Failed to delete payee', error: error.message });
@@ -370,6 +371,20 @@ export const authorizeBatch = async (req, res) => {
       return res.status(401).json({ message: 'Invalid PIN' });
     }
     await resetPinAttempts(req.merchant._id);
+
+    // Correct PIN alone doesn't stop a double-click or a client retrying a
+    // slow/timed-out request from submitting the exact same batch twice —
+    // reject an identical batch (same payees + amounts, in the same order)
+    // landing within a short window of the last one.
+    try {
+      await claimPayoutSubmission(
+        req.merchant._id,
+        ['bulk-authorize', ...batchRows.map((r) => `${r.payeeId || r.name}:${r.netAmount}`)]
+      );
+    } catch (e) {
+      if (e instanceof DuplicateSubmissionError) return res.status(409).json({ message: e.message });
+      throw e;
+    }
 
     // 1. Resolve/create each row's Payee up front, and calculate totals —
     // needed before the balance debit below, since a Mobile Money row paid
@@ -635,12 +650,13 @@ export const authorizeBatch = async (req, res) => {
         // (ncbaOpenBankingController.js), keyed by the reference this row is
         // stamped with below.
         try {
+          const network = payee.mobileNetwork === 'airtel' ? 'airtel' : 'safaricom';
           const transactionId = `PAYOUT-BULK-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-          const { validationId } = await validateMobileWalletNumber({ provider: 'safaricom', msisdn: payee.phone });
+          const { validationId } = await validateMobileWalletNumber({ provider: network, msisdn: payee.phone });
           await submitMobileB2wPayment({
             transactionId,
             validationId,
-            provider: 'safaricom',
+            provider: network,
             amount: row.netAmount,
             recipientNumber: payee.phone,
             narration: `Bulk Payout to ${payee.name}`,
@@ -699,7 +715,10 @@ export const authorizeBatch = async (req, res) => {
         status: payoutStatus,
         reference: payoutRef,
         sender: { name: merchant.businessName, id: merchant.paybillAccount },
-        recipient: { name: payee.name, id: (payee.type === 'utility' && payee.utilityProvider) ? payee.accountNumber : (payee.phone || payee.paybillNumber || payee.tillNumber) }
+        recipient: { name: payee.name, id: (payee.type === 'utility' && payee.utilityProvider) ? payee.accountNumber : (payee.phone || payee.paybillNumber || payee.tillNumber) },
+        mobileNetwork: (payee.paymentMethod === 'Mobile Money' && payee.mobileMoneyType === 'Personal Number')
+          ? (payee.mobileNetwork === 'airtel' ? 'airtel' : 'safaricom')
+          : null,
       });
 
       // The pre-save hook above stamps a generic 0.5% fee for 'bulk_pay' —

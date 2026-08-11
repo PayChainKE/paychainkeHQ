@@ -423,7 +423,7 @@ export default function Transactions() {
     doc.line(L, footerY - 4, R, footerY - 4)
     doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(140, 150, 145)
     doc.text('This is a computer-generated statement and requires no signature. For support: support@paychain.co.ke | +254 743 283 782', W / 2, footerY, { align: 'center' })
-    doc.text(`© ${now.getFullYear()} PayChain Kenya Limited  •  Ref: ${statementId}  •  Page 1 of ${doc.internal.getNumberOfPages()}`, W / 2, footerY + 5, { align: 'center' })
+    doc.text(`© ${now.getFullYear()} Paychain Ltd  •  Ref: ${statementId}  •  Page 1 of ${doc.internal.getNumberOfPages()}`, W / 2, footerY + 5, { align: 'center' })
 
     const filename = `PayChain_Statement_${now.toISOString().slice(0,10)}.pdf`
     doc.save(filename)
@@ -550,7 +550,7 @@ export default function Transactions() {
     ncba_inbound: 'Payment In',
     ncba_outbound:'Bank Transfer',
     mpesa_b2c:    'M-PESA Withdrawal',
-    ncba_mobile_b2w: 'M-PESA Withdrawal',
+    ncba_mobile_b2w: 'Mobile Money Withdrawal',
     mpesa_b2b:    'Paybill/Till Payout',
     ncba_lipa_na_mpesa: 'Paybill/Till Payout',
     ncba_kplc:    'KPLC Bill Payment',

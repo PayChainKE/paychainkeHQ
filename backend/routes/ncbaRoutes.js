@@ -2,7 +2,7 @@ import express from 'express';
 import rateLimit from 'express-rate-limit';
 import { handleNcbaReconciliationWebhook, handleInitiateBulkPayment } from '../controllers/ncbaController.js';
 import { handleNcbaAccountNotification } from '../controllers/ncbaAccountNotificationController.js';
-import { handleBankPayout, handlePesaLinkCallback, getBankCodes } from '../controllers/ncbaOpenBankingController.js';
+import { handleBankPayout, handlePesaLinkCallback, getBankCodes, handlePesaLinkPhoneLookup } from '../controllers/ncbaOpenBankingController.js';
 import { protectMerchant } from '../middleware/authMiddleware.js';
 import { timingSafeStringEqual } from '../utils/timingSafeCompare.js';
 
@@ -94,6 +94,17 @@ router.post('/bulk-payments', protectMerchant, pinLimiter, handleInitiateBulkPay
 // Banking's PesaLink rail — see controllers/ncbaOpenBankingController.js.
 router.post('/openbanking/bank-payout', protectMerchant, pinLimiter, handleBankPayout);
 router.get('/openbanking/bank-codes', protectMerchant, getBankCodes);
+
+// Phone-number-to-bank lookup ahead of a PesaLink/EFT transfer — same abuse
+// posture as pinLimiter above (an external NCBA lookup, not PIN-specific).
+const pesalinkLookupLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many lookups. Try again in 15 minutes.' },
+});
+router.post('/openbanking/pesalink-lookup-phone', protectMerchant, pesalinkLookupLimiter, handlePesaLinkPhoneLookup);
 
 // Public webhook — NCBA's Open Banking per-transaction result callback.
 // Bank-authenticated the same way as the reconciliation webhook above: this

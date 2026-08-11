@@ -80,6 +80,17 @@ export default function SendMoney() {
   const [beneficiaryCountry, setBeneficiaryCountry] = useState('KE')
   const [beneficiaryAddress, setBeneficiaryAddress] = useState('')
   const [purposeCode, setPurposeCode]       = useState('MSC')
+  // Which mobile wallet network to pay into — only shown/used for the
+  // 'mpesa-primary'/'mobile' destinations (NCBA Mobile B2W supports both).
+  const [provider, setProvider]             = useState('safaricom')
+  // Optional "look up by phone number" convenience for the Bank/PesaLink
+  // destination — NCBA's mobile-number validation only ever returns a bank
+  // identity + the holder's name, never an account number, so this can only
+  // pre-fill the Bank dropdown and give a name to cross-check; the merchant
+  // still has to type the real account number themselves.
+  const [showPhoneLookup, setShowPhoneLookup] = useState(false)
+  const [lookupPhone, setLookupPhone]       = useState('')
+  const [phoneLookup, setPhoneLookup]       = useState({ status: 'idle', destName: '', banks: [], error: '' })
   const [amount, setAmount]                 = useState('')
   const [reference, setReference]           = useState('')
   const [pin, setPin]                       = useState('')
@@ -118,6 +129,22 @@ export default function SendMoney() {
       .then(res => setBankCodes(res.data?.bankCodes || []))
       .catch(e => console.error('Failed to load bank codes', e))
   }, [destination])
+
+  const handlePhoneLookup = async () => {
+    if (!lookupPhone) return
+    setPhoneLookup({ status: 'loading', destName: '', banks: [], error: '' })
+    try {
+      const res = await axios.post(`${API_URL}/api/v1/openbanking/pesalink-lookup-phone`, { phoneNumber: lookupPhone }, cfg())
+      const { destName, banks } = res.data
+      setPhoneLookup({ status: 'success', destName, banks, error: '' })
+      // Auto-select when there's exactly one match — otherwise leave it to
+      // the merchant to pick from the list rendered below.
+      if (banks.length === 1) setBankCode(banks[0].bankCode)
+      if (!reference) setReference(destName)
+    } catch (e) {
+      setPhoneLookup({ status: 'error', destName: '', banks: [], error: e.response?.data?.error || 'Could not look up this number.' })
+    }
+  }
 
   const goNext = async () => {
     // "Just advance, no special action" covers every step before the one
@@ -171,6 +198,7 @@ export default function SendMoney() {
             fee,
             reference,
             pin,
+            provider,
           }, cfg())
         } else if (destination === 'bank') {
           await axios.post(`${API_URL}/api/v1/openbanking/bank-payout`, {
@@ -344,7 +372,7 @@ export default function SendMoney() {
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                          {d.fee === null ? 'Fee shown at amount entry' : formatKES(d.fee)}
+                          {d.fee === null ? 'Varies' : formatKES(d.fee)}
                         </span>
                         {destination === d.id && (
                           <span className="material-symbols-outlined text-[#00351D] text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
@@ -398,7 +426,64 @@ export default function SendMoney() {
               )}
 
               {destination === 'bank' && bankRail !== 'rtgs' && (
-                <div className="space-y-2">
+                <div className="space-y-3">
+                  {!showPhoneLookup ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowPhoneLookup(true)}
+                      className="text-xs font-bold text-[#00351D] underline underline-offset-2"
+                    >
+                      Know their phone number instead?
+                    </button>
+                  ) : (
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-3">
+                      <p className="text-[10px] text-slate-400 font-medium leading-relaxed">
+                        We'll look up which bank this number is registered with for PesaLink. This only confirms the bank and holder's name — you'll still need to enter and confirm the actual account number with them.
+                      </p>
+                      <div className="flex gap-2">
+                        <ValidatedInput
+                          kind="phoneKE"
+                          value={lookupPhone}
+                          onChange={e => setLookupPhone(e.target.value)}
+                          placeholder="0712 345 678"
+                          className="flex-1 bg-white border border-slate-200 rounded-2xl py-3 px-4 text-sm text-primary font-bold focus:border-[#00351D] focus:ring-2 focus:ring-[#00351D]/10 outline-none transition-all"
+                        />
+                        <button
+                          type="button"
+                          onClick={handlePhoneLookup}
+                          disabled={!lookupPhone || phoneLookup.status === 'loading'}
+                          className="px-4 rounded-2xl bg-[#00351D] text-white text-xs font-bold disabled:opacity-40"
+                        >
+                          {phoneLookup.status === 'loading' ? 'Looking up…' : 'Look Up'}
+                        </button>
+                      </div>
+                      {phoneLookup.status === 'success' && (
+                        <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-100">
+                          <p className="text-xs font-bold text-emerald-800">{phoneLookup.destName}</p>
+                          {phoneLookup.banks.length > 1 ? (
+                            <div className="flex flex-wrap gap-1.5 mt-2">
+                              {phoneLookup.banks.map(b => (
+                                <button
+                                  key={b.bankCode}
+                                  type="button"
+                                  onClick={() => setBankCode(b.bankCode)}
+                                  className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border ${bankCode === b.bankCode ? 'bg-[#00351D] text-white border-[#00351D]' : 'bg-white text-primary border-slate-200'}`}
+                                >
+                                  {b.bankName}
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-[11px] text-emerald-700 mt-1">Registered with {phoneLookup.banks[0]?.bankName} — bank selection filled in below.</p>
+                          )}
+                        </div>
+                      )}
+                      {phoneLookup.status === 'error' && (
+                        <p className="text-[11px] text-red-600 font-bold">{phoneLookup.error}</p>
+                      )}
+                    </div>
+                  )}
+
                   <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Bank</label>
                   <select
                     value={bankCode}
@@ -467,22 +552,54 @@ export default function SendMoney() {
 
               <div className="space-y-2">
                 <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">
-                  {destination.includes('mpesa') || destination === 'mobile' ? 'Phone Number' : destination === 'till' ? 'Till Number' : destination === 'paybill' ? 'Paybill Number' : 'Account Number'}
+                  {destination === 'mpesa-primary' ? 'Your Registered Number' : destination === 'mobile' ? 'Phone Number' : destination === 'till' ? 'Till Number' : destination === 'paybill' ? 'Paybill Number' : 'Account Number'}
                 </label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-300 text-lg">
-                    {destination.includes('mpesa') || destination === 'mobile' ? 'smartphone' : 'tag'}
-                  </span>
-                  <ValidatedInput
-                    kind={destination.includes('mpesa') || destination === 'mobile' ? 'phoneKE' : destination === 'till' ? 'till' : destination === 'paybill' ? 'paybill' : 'integer'}
-                    value={recipientAccount}
-                    onChange={e => setRecipientAccount(e.target.value)}
-                    placeholder={destination.includes('mpesa') || destination === 'mobile' ? '0712 345 678' : destination === 'till' ? 'Till Number' : 'Paybill Number'}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 pl-12 pr-4 text-primary font-bold focus:border-[#00351D] focus:ring-2 focus:ring-[#00351D]/10 outline-none transition-all"
-                    required
-                  />
-                </div>
+                {destination === 'mpesa-primary' ? (
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-300 text-lg">lock</span>
+                    <div className="w-full bg-slate-100 border border-slate-200 rounded-2xl py-4 pl-12 pr-4 text-primary font-bold">
+                      {recipientAccount || merchant?.phone || 'Not on file'}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-300 text-lg">
+                      {destination === 'mobile' ? 'smartphone' : 'tag'}
+                    </span>
+                    <ValidatedInput
+                      kind={destination === 'mobile' ? 'phoneKE' : destination === 'till' ? 'till' : destination === 'paybill' ? 'paybill' : 'integer'}
+                      value={recipientAccount}
+                      onChange={e => setRecipientAccount(e.target.value)}
+                      placeholder={destination === 'mobile' ? '0712 345 678' : destination === 'till' ? 'Till Number' : destination === 'paybill' ? 'Paybill Number' : 'Account Number'}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 pl-12 pr-4 text-primary font-bold focus:border-[#00351D] focus:ring-2 focus:ring-[#00351D]/10 outline-none transition-all"
+                      required
+                    />
+                  </div>
+                )}
               </div>
+
+              {isMobileDest && (
+                <div className="space-y-2">
+                  <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Network</label>
+                  <div className="flex gap-2 p-1.5 bg-slate-50 rounded-2xl border border-slate-100">
+                    {[
+                      { id: 'safaricom', label: 'M-PESA' },
+                      { id: 'airtel', label: 'Airtel Money' },
+                    ].map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setProvider(opt.id)}
+                        className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                          provider === opt.id ? 'bg-[#00351D] text-white' : 'text-slate-500'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {destination === 'paybill' && (
                 <div className="space-y-2">
@@ -592,6 +709,7 @@ export default function SendMoney() {
                     ...(destination === 'bank' && bankRail === 'rtgs' ? [['Beneficiary Bank BIC', bankCode]] : []),
                     ...(destination === 'bank' ? [['Transfer Speed', bankRail === 'eft' ? 'Next Business Day (EFT)' : bankRail === 'rtgs' ? 'International (RTGS)' : 'Instant (PesaLink)']] : []),
                     ...(destination === 'bank' && bankRail === 'rtgs' ? [['Beneficiary Country', { KE: 'Kenya', UG: 'Uganda', TZ: 'Tanzania', RW: 'Rwanda' }[beneficiaryCountry] || beneficiaryCountry]] : []),
+                    ...(isMobileDest ? [['Network', provider === 'airtel' ? 'Airtel Money' : 'M-PESA']] : []),
                     ['Recipient',   recipientAccount],
                     ...(destination === 'paybill' ? [['Account Number', paybillAccountRef]] : []),
                     ['Amount',      formatKES(amount || 0)],
