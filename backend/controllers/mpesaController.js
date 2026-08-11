@@ -23,7 +23,7 @@ import { logAudit } from '../utils/auditLog.js';
 import { buildPaymentReceivedSms, buildCustomerPaidSms } from '../utils/paymentSmsTemplates.js';
 import { initiateStkPush as ncbaInitiateStkPush, queryStkPush as ncbaQueryStkPush } from '../services/ncbaStkPushService.js';
 import { validateMobileWalletNumber as ncbaValidateMobileWalletNumber, submitMobileB2wPayment as ncbaSubmitMobileB2wPayment, validateLipaNaMpesaAccount as ncbaValidateLnmAccount, submitLipaNaMpesaPayment as ncbaSubmitLnmPayment, NcbaOpenBankingValidationError } from '../services/ncbaOpenBankingService.js';
-import { validatePhoneNumber, NcbaValidationError } from '../utils/ncbaValidators.js';
+import { validatePhoneNumber, NcbaValidationError, getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
 
 // ── M-PESA configuration ──────────────────────────────────────────────────────
 // MPESA_ENVIRONMENT controls which Daraja endpoint is used.
@@ -988,12 +988,22 @@ export function pollAndResolveNcbaStkPush(checkoutRequestId, transactionId) {
 // TransactionID, and starts the poll loop above. `extra` carries whatever
 // call-site-specific fields apply (linkId, or baseAmount+kind).
 export async function initiateAndTrackNcbaStk({ merchantId, phone, checkoutTotal, extra = {} }) {
-  const merchant = await Merchant.findById(merchantId).select('paybillAccount');
-  if (!merchant?.paybillAccount) {
-    throw new Error('This merchant has no PayChain Account Number assigned yet — cannot process this payment request.');
+  const merchant = await Merchant.findById(merchantId).select('ncbaMerchantCode');
+  if (!merchant?.ncbaMerchantCode) {
+    throw new Error('This merchant has no NCBA virtual account assigned yet — cannot process this payment request.');
   }
 
-  const { transactionId } = await ncbaInitiateStkPush({ phone, amount: checkoutTotal, accountNo: merchant.paybillAccount });
+  // Must be the merchant's real NCBA virtual account (or its bare
+  // ncbaMerchantCode pre-go-live), NOT paybillAccount (a separate 5-char
+  // Daraja-era sub-account number, same conflation bug fixed everywhere
+  // else in this file) — NCBA's account-notification webhook attributes
+  // incoming money back to a merchant by regex-matching this code inside
+  // the Narrative/CustomerName text it sends (see extractMerchantCode in
+  // utils/ncbaAccountNotificationValidators.js). Passing paybillAccount here
+  // meant every STK collection landed unattributed — confirmed via a real
+  // 5 KES UAT test that came back with `ncba_account_notification_unattributed`.
+  const ncbaAccountNo = getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode) || merchant.ncbaMerchantCode;
+  const { transactionId } = await ncbaInitiateStkPush({ phone, amount: checkoutTotal, accountNo: ncbaAccountNo });
 
   await STKRequest.create({
     merchantId,

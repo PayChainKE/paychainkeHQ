@@ -24,6 +24,16 @@ const ncbaOpenBankingAccountNumber  = process.env.NCBA_OPENBANKING_ACCOUNT_NUMBE
 // on PesaLink/EFT payment payloads, separate from the account number itself.
 const ncbaOpenBankingSenderCif      = process.env.NCBA_OPENBANKING_SENDER_CIF;
 
+// Mobile B2W's "senderNumber" ("mobile number to receive the notification"
+// per the UAT Guide) — despite being undocumented as required, NCBA's live
+// API rejects the payload with a 422 ("SenderMsisdn is required and must be
+// 9 to 15 digits and must not start with 0") when it's blank. Every sample
+// in NCBA's own UAT Guide/Postman collection uses one fixed 254-prefixed
+// number regardless of recipient, so this is PayChain's own business
+// number, not something derived per-transaction — confirmed a real payout
+// batch failed 100% of rows with this exact error until it's set.
+const ncbaOpenBankingSenderMsisdn   = process.env.NCBA_OPENBANKING_SENDER_MSISDN;
+
 // Per the UAT Guide's Payment Rules for both PesaLink and EFT: "Minimum
 // payments of KES. 50 ... and a maximum of KES. 999,999".
 const MIN_TRANSFER_AMOUNT = 50;
@@ -925,7 +935,7 @@ export async function submitLipaNaMpesaPayment({
  * @param {'safaricom'|'airtel'} params.provider
  * @param {number} params.amount
  * @param {string} params.recipientNumber - 254XXXXXXXXX
- * @param {string} [params.senderNumber] - number to receive NCBA's own notification, optional
+ * @param {string} [params.senderNumber] - number to receive NCBA's own notification; despite the doc's phrasing, NCBA's live API requires this (falls back to NCBA_OPENBANKING_SENDER_MSISDN, format 254XXXXXXXXX)
  * @param {string} [params.narration]
  */
 export async function submitMobileB2wPayment({
@@ -941,6 +951,11 @@ export async function submitMobileB2wPayment({
     throw new NcbaOpenBankingValidationError('transactionId, validationId, provider, amount and recipientNumber are required for a Mobile B2W payout');
   }
 
+  const resolvedSenderNumber = senderNumber || ncbaOpenBankingSenderMsisdn;
+  if (liveCallsEnabled && !resolvedSenderNumber) {
+    throw new NcbaOpenBankingValidationError('NCBA_OPENBANKING_SENDER_MSISDN is not configured — NCBA rejects Mobile B2W payouts without a senderNumber');
+  }
+
   const payload = {
     validationId,
     provider,
@@ -950,7 +965,7 @@ export async function submitMobileB2wPayment({
     // NCBA's spec — kept exactly as documented since it's what their API
     // actually expects.
     receipientNumber: recipientNumber,
-    senderNumber: senderNumber || '',
+    senderNumber: resolvedSenderNumber || '',
     channelRef: transactionId,
     narration: narration || 'PayChain Payout',
     callbackUrl: '',
