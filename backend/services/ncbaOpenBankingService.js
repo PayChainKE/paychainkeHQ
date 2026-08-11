@@ -71,8 +71,21 @@ function logEvent(level, event, fields) {
   else console.log(line);
 }
 
+// err.message has been observed empty on Render for some network-level
+// failures (e.g. an aggregate connection error) — a bare `err.message` gave
+// zero signal when that happened (logged as ""). Always include status/
+// code/name alongside it so a failure is diagnosable from the log alone.
 function unwrapAxiosError(err) {
-  return err.response?.data ? JSON.stringify(err.response.data) : err.message;
+  const detail = {
+    message: err.message || undefined,
+    code: err.code,
+    name: err.name,
+    status: err.response?.status,
+    statusText: err.response?.statusText,
+    data: err.response?.data,
+  };
+  Object.keys(detail).forEach((k) => detail[k] === undefined && delete detail[k]);
+  return JSON.stringify(detail);
 }
 
 // Module-scope token cache — NCBA's Auth/generate-token flow has no
