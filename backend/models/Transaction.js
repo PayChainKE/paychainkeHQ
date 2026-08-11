@@ -13,7 +13,7 @@ const transactionSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['inbound', 'outbound', 'bulk_pay', 'settlement', 'fx_swap', 'top_up', 'withdrawal', 'ncba_inbound', 'ncba_outbound', 'mpesa_b2c', 'mpesa_b2b', 'ncba_mobile_b2w', 'ncba_lipa_na_mpesa'],
+    enum: ['inbound', 'outbound', 'bulk_pay', 'settlement', 'fx_swap', 'top_up', 'withdrawal', 'ncba_inbound', 'ncba_outbound', 'mpesa_b2c', 'mpesa_b2b', 'ncba_mobile_b2w', 'ncba_lipa_na_mpesa', 'ncba_kplc', 'ncba_kplc_prepaid', 'ncba_ncwsc'],
     required: true
   },
   amount: {
@@ -73,6 +73,11 @@ const transactionSchema = new mongoose.Schema({
   // M-Pesa's own SMS shows. Optional/null on transaction types that don't
   // stamp it yet — never back-computed from other rows.
   balanceAfter: { type: Number, default: null },
+  // Which NCBA local/cross-border bank rail settled this transfer — only
+  // meaningful for 'ncba_outbound' bank payouts, which can go via PesaLink
+  // (immediate, 24/7/365), EFT (T+1, business days only), or RTGS (T+3
+  // hours, cross-border/multi-currency). Null for every other transaction type.
+  settlementRail: { type: String, enum: ['pesalink', 'eft', 'rtgs', null], default: null },
 }, {
   timestamps: true
 });

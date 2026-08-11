@@ -91,10 +91,11 @@ export default function BulkPay() {
       .catch(e => console.error('Failed to load bank codes', e))
   }, [newPayee.paymentMethod])
 
-  const [newPayee, setNewPayee] = useState({ 
-    name: '', 
-    type: 'Employee', 
+  const [newPayee, setNewPayee] = useState({
+    name: '',
+    type: 'Employee',
     utilityType: 'Electricity',
+    utilityProvider: '',
     paymentMethod: 'Mobile Money',
     mobileMoneyType: 'Personal Number',
     amount: '',
@@ -112,6 +113,17 @@ export default function BulkPay() {
     etimsInvoiceNumber: '',
     cuNumber: ''
   })
+
+  // Utility meter verification (KPLC/NCWSC) — pure UX confirmation before
+  // saving a payee (shows the merchant the real account holder name +
+  // balance due so a typo'd meter number is caught early). Deliberately
+  // not persisted: the validationId NCBA returns here is not reused at
+  // payment time — the backend re-validates immediately before every
+  // actual payout, since a saved payee might not be paid for weeks (see
+  // backend's validateKplcMeter/validateNcwscMeter doc comments).
+  const [utilityCheck, setUtilityCheck] = useState({ status: 'idle', customerName: '', serviceName: '', balance: null, error: '' })
+  const resetUtilityCheck = () => setUtilityCheck({ status: 'idle', customerName: '', serviceName: '', balance: null, error: '' })
+  const DEDICATED_RAIL_UTILITIES = ['KPLC', 'KPLC_PREPAID', 'WATER']
 
   // Filter payees based on active tab
   const filteredPayees = payeesList.filter(p => {
@@ -139,6 +151,8 @@ export default function BulkPay() {
     setNewPayee({
       name: p.name,
       type: p.type.charAt(0).toUpperCase() + p.type.slice(1),
+      utilityType: (p.utilityProvider === 'KPLC' || p.utilityProvider === 'KPLC_PREPAID') ? 'Electricity' : p.utilityProvider === 'WATER' ? 'Water' : 'Electricity',
+      utilityProvider: p.utilityProvider || '',
       paymentMethod: p.paymentMethod || 'Mobile Money',
       mobileMoneyType: p.mobileMoneyType || 'Personal Number',
       amount: (p.salary || p.amount || 0).toString(),
@@ -156,6 +170,7 @@ export default function BulkPay() {
       etimsInvoiceNumber: p.etimsInvoiceNumber || '',
       cuNumber: p.cuNumber || ''
     });
+    resetUtilityCheck();
     setEditingId(p.id);
     setIsEditing(true);
     setAddStep(2);
@@ -179,14 +194,58 @@ export default function BulkPay() {
     }
   };
 
+  const UTILITY_VALIDATE_ENDPOINT = { KPLC: 'validate-kplc-meter', KPLC_PREPAID: 'validate-kplc-prepaid-meter', WATER: 'validate-ncwsc-meter' }
+  const handleVerifyUtilityMeter = async () => {
+    if (!/^\d{5,15}$/.test(newPayee.accountNumber?.trim() || '')) {
+      addNotification({ title: 'Invalid Format', message: 'Enter a valid numeric meter number.', type: 'error' });
+      return;
+    }
+    if (!isValidPhoneKE(newPayee.phone)) {
+      addNotification({ title: 'Invalid Format', message: 'Enter a valid Kenyan phone number for bill notifications.', type: 'error' });
+      return;
+    }
+    const endpoint = UTILITY_VALIDATE_ENDPOINT[newPayee.utilityProvider]
+    if (!endpoint) return;
+    setUtilityCheck({ status: 'loading', customerName: '', serviceName: '', balance: null, error: '' });
+    try {
+      const token = localStorage.getItem('paychain_merchant_token')
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+      const res = await axios.post(`${API_URL}/api/bulkpay/${endpoint}`, {
+        meterNumber: newPayee.accountNumber.trim(),
+        msisdn: newPayee.phone,
+      }, { headers: { Authorization: `Bearer ${token}` } })
+      setUtilityCheck({
+        status: 'success',
+        customerName: res.data?.customerName || '',
+        serviceName: res.data?.serviceName || '',
+        balance: typeof res.data?.balance === 'number' ? res.data.balance : null,
+        error: '',
+      });
+    } catch (error) {
+      setUtilityCheck({ status: 'error', customerName: '', serviceName: '', balance: null, error: error.response?.data?.message || 'Could not verify this meter number.' });
+    }
+  };
+
   const handleSavePayee = async () => {
     if (!newPayee.name) {
       addNotification({ title: 'Missing Info', message: 'Recipient name is required.', type: 'error' });
       return;
     }
 
-    // Professional Settlement Format Validation
-    if (newPayee.paymentMethod === 'Mobile Money') {
+    // KPLC/NCWSC payees route through NCBA's dedicated biller rails, not a
+    // Mobile Money/Bank settlement method — accountNumber/phone here mean
+    // meter number/notification msisdn, validated against the same shape
+    // the backend's authorizeBatch will actually pay against.
+    if (newPayee.type === 'Utility' && DEDICATED_RAIL_UTILITIES.includes(newPayee.utilityProvider)) {
+      if (!/^\d{5,15}$/.test(newPayee.accountNumber?.trim() || '')) {
+        addNotification({ title: 'Invalid Format', message: 'Enter a valid numeric meter number.', type: 'error' });
+        return;
+      }
+      if (!isValidPhoneKE(newPayee.phone)) {
+        addNotification({ title: 'Invalid Format', message: 'Enter a valid Kenyan phone number for bill notifications.', type: 'error' });
+        return;
+      }
+    } else if (newPayee.paymentMethod === 'Mobile Money') {
       if (newPayee.mobileMoneyType === 'Personal Number') {
         if (!isValidPhoneKE(newPayee.phone)) {
           addNotification({ title: 'Invalid Format', message: 'Please enter a valid Kenyan phone number (07..., 01..., +2547..., +2541...).', type: 'error' });
@@ -283,10 +342,12 @@ export default function BulkPay() {
       });
     }
 
-    setNewPayee({ 
-      name: '', 
-      type: 'Employee', 
+    resetUtilityCheck();
+    setNewPayee({
+      name: '',
+      type: 'Employee',
       utilityType: 'Electricity',
+      utilityProvider: '',
       paymentMethod: 'Mobile Money',
       mobileMoneyType: 'Personal Number',
       amount: '',
@@ -818,7 +879,7 @@ export default function BulkPay() {
       // Transform response to match frontend receipts. `status` is carried
       // through now — it used to be dropped here, so every receipt card
       // rendered as "Confirmed / Settled" even for rows that actually
-      // failed (blocked/rejected by NCBA) and were refunded back
+      // failed (blocked/rejected by Daraja or NCBA) and were refunded back
       // to the merchant's balance. See the status-aware rendering below.
       const newReceipts = processedBatch.transactions.map(tx => ({
         id: tx.receiptNumber,
@@ -1070,22 +1131,149 @@ export default function BulkPay() {
                         <div className="space-y-4 pt-4 animate-in fade-in duration-500">
                           <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Utility Type</label>
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                            {['Water', 'Electricity', 'Rent', 'Internet'].map((u) => (
+                            {['Water', 'Electricity', 'Rent', 'Internet'].map((u) => {
+                              const logo = u === 'Electricity' ? '/utilities%20logo/kplc.png' : u === 'Water' ? '/utilities%20logo/ncwsc.png' : null
+                              return (
+                                <button
+                                  key={u}
+                                  onClick={() => {
+                                    resetUtilityCheck();
+                                    // Default Electricity to Postpaid — the account-type toggle
+                                    // below lets the merchant switch to Prepaid.
+                                    setNewPayee({...newPayee, utilityType: u, utilityProvider: u === 'Electricity' ? 'KPLC' : u === 'Water' ? 'WATER' : ''})
+                                  }}
+                                  className={`py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border flex flex-col items-center justify-center gap-1.5 ${
+                                    newPayee.utilityType === u
+                                      ? 'bg-[#00351D] text-white border-[#00351D]'
+                                      : 'bg-surface-container-low/50 text-on-surface-variant/40 border-outline-variant/5 hover:border-emerald-500/30'
+                                  }`}
+                                >
+                                  {logo && (
+                                    <span className="bg-white rounded-md px-1.5 py-1">
+                                      <img src={logo} alt={u} className="h-3.5 w-auto object-contain" />
+                                    </span>
+                                  )}
+                                  {u === 'Electricity' ? 'Electricity (KPLC)' : u === 'Water' ? 'Water (NCWSC)' : u}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {newPayee.utilityType === 'Electricity' && (
+                        <div className="space-y-2 pt-2 animate-in fade-in duration-500">
+                          <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Account Type</label>
+                          <div className="flex gap-2 p-1.5 bg-surface-container-low/50 rounded-2xl border border-outline-variant/5">
+                            {[
+                              { id: 'KPLC', label: 'Postpaid', desc: 'Pay down your existing bill' },
+                              { id: 'KPLC_PREPAID', label: 'Prepaid', desc: 'Buy an electricity token' },
+                            ].map((opt) => (
                               <button
-                                key={u}
-                                onClick={() => setNewPayee({...newPayee, utilityType: u})}
-                                className={`py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${
-                                  newPayee.utilityType === u 
-                                    ? 'bg-[#00351D] text-white border-[#00351D]' 
-                                    : 'bg-surface-container-low/50 text-on-surface-variant/40 border-outline-variant/5 hover:border-emerald-500/30'
+                                key={opt.id}
+                                type="button"
+                                onClick={() => { resetUtilityCheck(); setNewPayee({...newPayee, utilityProvider: opt.id}) }}
+                                className={`flex-1 py-2.5 rounded-xl text-center transition-all ${
+                                  newPayee.utilityProvider === opt.id ? 'bg-white shadow-lg' : 'hover:bg-white/50'
                                 }`}
                               >
-                                {u}
+                                <p className={`text-[10px] font-black uppercase tracking-widest ${newPayee.utilityProvider === opt.id ? 'text-primary' : 'text-on-surface-variant/40'}`}>{opt.label}</p>
+                                <p className="text-[9px] text-on-surface-variant/50 font-medium mt-0.5">{opt.desc}</p>
                               </button>
                             ))}
                           </div>
                         </div>
                       )}
+
+                      {DEDICATED_RAIL_UTILITIES.includes(newPayee.utilityProvider) && (() => {
+                        const isKplc = newPayee.utilityProvider === 'KPLC' || newPayee.utilityProvider === 'KPLC_PREPAID'
+                        const isPrepaid = newPayee.utilityProvider === 'KPLC_PREPAID'
+                        const logo = isKplc ? '/utilities%20logo/kplc.png' : '/utilities%20logo/ncwsc.png'
+                        const billerLabel = isPrepaid ? 'KPLC Prepaid Details' : isKplc ? 'KPLC Postpaid Details' : 'NCWSC (Nairobi Water) Details'
+                        const billerDesc = isPrepaid
+                          ? 'The amount below buys a token — sent by KPLC as an SMS to the notification number.'
+                          : isKplc
+                            ? 'The amount below pays down the balance on this meter\'s existing bill.'
+                            : null
+                        // Tailwind's JIT scanner needs full literal class
+                        // strings, not `${accent}`-interpolated ones — so
+                        // each biller's palette is spelled out completely
+                        // rather than built from a shared variable.
+                        const theme = isKplc
+                          ? {
+                              panel: 'bg-amber-50/40 border-amber-500/10',
+                              heading: 'text-amber-700',
+                              input: 'focus:border-amber-500/50',
+                              button: 'bg-amber-600 hover:bg-amber-700',
+                            }
+                          : {
+                              panel: 'bg-sky-50/40 border-sky-500/10',
+                              heading: 'text-sky-700',
+                              input: 'focus:border-sky-500/50',
+                              button: 'bg-sky-600 hover:bg-sky-700',
+                            }
+                        return (
+                          <div className={`space-y-4 pt-4 animate-in fade-in duration-500 p-4 rounded-2xl border ${theme.panel}`}>
+                            <div>
+                              <h4 className={`text-[10px] font-black uppercase tracking-widest mb-1 flex items-center gap-2 ${theme.heading}`}>
+                                <img src={logo} alt={newPayee.utilityProvider} className="h-4 w-auto object-contain" />
+                                {billerLabel}
+                              </h4>
+                              {billerDesc && <p className="text-[10px] text-on-surface-variant/60 font-medium">{billerDesc}</p>}
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <div className="space-y-1.5">
+                                <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Meter Number</label>
+                                <ValidatedInput
+                                  kind="integer"
+                                  value={newPayee.accountNumber}
+                                  onChange={(e) => { resetUtilityCheck(); setNewPayee({...newPayee, accountNumber: e.target.value}) }}
+                                  placeholder={isKplc ? 'e.g. 107803292' : 'e.g. 5069344'}
+                                  className={`w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 ${theme.input}`}
+                                />
+                              </div>
+                              <div className="space-y-1.5">
+                                <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Notification Number</label>
+                                <ValidatedInput
+                                  kind="phoneKE"
+                                  value={newPayee.phone}
+                                  onChange={(e) => { resetUtilityCheck(); setNewPayee({...newPayee, phone: e.target.value}) }}
+                                  placeholder="07XX XXX XXX"
+                                  className={`w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 ${theme.input}`}
+                                />
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={handleVerifyUtilityMeter}
+                              disabled={utilityCheck.status === 'loading'}
+                              className={`w-full py-3 rounded-xl text-white font-black text-[10px] uppercase tracking-widest transition-all disabled:opacity-50 ${theme.button}`}
+                            >
+                              {utilityCheck.status === 'loading' ? 'Verifying…' : 'Verify Meter'}
+                            </button>
+
+                            {utilityCheck.status === 'success' && (
+                              <div className="flex items-start gap-3 bg-white border border-emerald-500/20 rounded-xl px-4 py-3">
+                                <span className="material-symbols-outlined text-emerald-600 text-[18px]" style={{fontVariationSettings: "'FILL' 1"}}>check_circle</span>
+                                <div className="min-w-0">
+                                  <p className="text-sm font-bold text-primary truncate">{utilityCheck.customerName || 'Meter verified'}</p>
+                                  <p className="text-[11px] text-on-surface-variant font-medium opacity-70">
+                                    {utilityCheck.serviceName || (isPrepaid ? 'Kplc Prepaid' : isKplc ? 'Kplc Postpaid' : 'Nairobi Water')}
+                                    {typeof utilityCheck.balance === 'number' ? ` · Balance due: KES ${utilityCheck.balance.toLocaleString()}` : ''}
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+                            {utilityCheck.status === 'error' && (
+                              <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                                <span className="material-symbols-outlined text-red-500 text-[16px]">error_outline</span>
+                                <p className="text-xs font-bold text-red-700">{utilityCheck.error}</p>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })()}
 
                       {newPayee.type === 'Employee' && (
                         <div className="space-y-4 pt-4 animate-in fade-in duration-500 bg-emerald-50/30 p-4 rounded-2xl border border-emerald-500/10">
@@ -1149,6 +1337,7 @@ export default function BulkPay() {
                         />
                       </div>
 
+                      {newPayee.utilityProvider !== 'KPLC' && (
                       <div className="space-y-4 pt-4">
                         <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Settlement Method</label>
                         <div className="flex gap-2 p-1.5 bg-surface-container-low/50 rounded-2xl border border-outline-variant/5">
@@ -1165,7 +1354,9 @@ export default function BulkPay() {
                           ))}
                         </div>
                       </div>
+                      )}
 
+                      {newPayee.utilityProvider !== 'KPLC' && (
                       <div className="pt-4 transition-all">
                         {newPayee.paymentMethod === 'Mobile Money' && (
                           <div className="space-y-6 animate-in fade-in duration-300">
@@ -1271,6 +1462,7 @@ export default function BulkPay() {
                           </div>
                         )}
                       </div>
+                      )}
                     </div>
 
                     <div className="flex gap-4 pt-4">

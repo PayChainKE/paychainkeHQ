@@ -187,7 +187,7 @@ function assertTransferAmountInBounds(amount) {
   const numeric = Number(amount);
   if (numeric < MIN_TRANSFER_AMOUNT || numeric > MAX_TRANSFER_AMOUNT) {
     throw new NcbaOpenBankingValidationError(
-      `Amount must be between KES ${MIN_TRANSFER_AMOUNT} and KES ${MAX_TRANSFER_AMOUNT.toLocaleString()} (NCBA PesaLink/EFT limits)`
+      `Amount must be between KES ${MIN_TRANSFER_AMOUNT} and KES ${MAX_TRANSFER_AMOUNT.toLocaleString()} (PesaLink/EFT limits)`
     );
   }
 }
@@ -217,10 +217,62 @@ export async function validatePesaLinkAccount({ bankCode, accountNumber, debitAc
   });
 
   if (result?.StatusCode !== '00') {
-    throw new NcbaOpenBankingValidationError(result?.StatusMessage || 'NCBA could not verify the destination bank account');
+    throw new NcbaOpenBankingValidationError(result?.StatusMessage || 'Could not verify the destination bank account');
   }
 
   return result;
+}
+
+/**
+ * Looks up which bank(s) a phone number is registered to on PesaLink —
+ * lets a sender pay "to a phone number" without already knowing the
+ * recipient's bank/account number, by resolving PesaLink's own registered
+ * default bank for that number. Endpoint confirmed from NCBA's "Open
+ * Banking V2 - Callback Enabled" Postman collection (not shown as a path
+ * in the UAT Guide's own text, only its request/response JSON was — same
+ * situation as every other validate call in this file).
+ *
+ * Response carries a `bankList` of every bank the number is registered
+ * with (each with its own `sortCode`, usable directly as a PesaLink
+ * BeneficiaryBankBIC), with `def: true` marking the one PesaLink treats as
+ * the default. Not yet wired into any payout flow in this codebase — added
+ * so it's available the next time a "pay by phone number" bank-transfer
+ * flow is built, without needing to re-derive the request/response shape.
+ *
+ * @param {object} params
+ * @param {string} params.phoneNumber - 254XXXXXXXXX
+ * @param {string} [params.debitAccount] - defaults to PayChain's own NCBA account
+ * @returns {{ destName: string, banks: Array<{ bankName: string, sortCode: string, isDefault: boolean, lookupBankName: string }> }}
+ */
+export async function validatePesaLinkMobileNumber({ phoneNumber, debitAccount }) {
+  if (!phoneNumber) {
+    throw new NcbaOpenBankingValidationError('phoneNumber is required to validate a PesaLink-registered mobile number');
+  }
+
+  if (!liveCallsEnabled) {
+    const result = simulate('ncba_openbanking_pesalink_validate_phone_sandbox', { phoneNumber });
+    return { destName: 'Simulated PesaLink Customer', banks: [{ bankName: 'NCBABANK', sortCode: '07000', isDefault: true, lookupBankName: 'Simulated PesaLink Customer' }], ...result };
+  }
+
+  const result = await ncbaOpenBankingPost('/api/v1/PesalinkValidation/validate-phone', {
+    phoneNumber,
+    debitAccount: debitAccount || ncbaOpenBankingAccountNumber,
+  });
+
+  const bankRows = result?.bankList?.bank;
+  if (!result?.destName || !Array.isArray(bankRows) || bankRows.length === 0) {
+    throw new NcbaOpenBankingValidationError('Could not find a PesaLink-registered bank for this mobile number');
+  }
+
+  return {
+    destName: result.destName,
+    banks: bankRows.map((b) => ({
+      bankName: b.bankName,
+      sortCode: b.sortCode,
+      isDefault: !!b.def,
+      lookupBankName: b.lookupBankName,
+    })),
+  };
 }
 
 /**
@@ -266,17 +318,19 @@ export async function submitPesaLinkTransfer({
 
   const result = await ncbaOpenBankingPost('/api/v1/PesaLinkTransaction/pesaLinktransaction', payload);
   if (result?.resultCode !== '000') {
-    throw new NcbaOpenBankingRequestError(result?.statusDescription || 'NCBA rejected the PesaLink transfer');
+    throw new NcbaOpenBankingRequestError(result?.statusDescription || 'This PesaLink transfer was rejected');
   }
   return result;
 }
 
 /**
- * EFT transfer wrapper — implemented alongside PesaLink for completeness
- * (same shape, thin wrapper, same synchronous-response behaviour) but not
- * yet routed to by any payout business logic. PesaLink (real-time) covers
- * this phase's need; EFT (T+1, per the UAT Guide) is available for a future
- * amount-threshold decision.
+ * Submits an EFT transfer — NCBA's next-business-day local bank rail,
+ * routed to from ncbaOpenBankingController.js#submitNcbaBankTransfer
+ * whenever the caller picks rail: 'eft' instead of the default 'pesalink'.
+ * Same request/response shape and amount bounds as PesaLink (per the UAT
+ * Guide, both are KES 50–999,999) and also resolves synchronously — the
+ * only real difference NCBA documents is settlement timing (PesaLink:
+ * immediate, 24/7/365; EFT: T+1, business days only).
  */
 export async function submitEftTransfer({
   transactionId,
@@ -311,7 +365,94 @@ export async function submitEftTransfer({
 
   const result = await ncbaOpenBankingPost('/api/v1/EFTTransaction/efttransaction', payload);
   if (result?.resultCode !== '000') {
-    throw new NcbaOpenBankingRequestError(result?.statusDescription || 'NCBA rejected the EFT transfer');
+    throw new NcbaOpenBankingRequestError(result?.statusDescription || 'This EFT transfer was rejected');
+  }
+  return result;
+}
+
+// NCBA's own sample requests (both the plain and IMT RTGS Postman examples)
+// use "MSC" as PurposeCode — the UAT Guide itself says the full code list
+// is "to be shared during onboarding", so this is the one confirmed-valid
+// value available until that list arrives. Used only as a fallback default
+// — always pass a real purposeCode once NCBA supplies the actual list.
+const RTGS_DEFAULT_PURPOSE_CODE = 'MSC';
+
+/**
+ * Submits an RTGS transfer — NCBA's cross-border/multi-currency local bank
+ * rail, distinct from PesaLink/EFT in three ways: BeneficiaryBankBIC here
+ * is a real SWIFT BIC (not a "00"-prefixed CBK clearing code), it supports
+ * KE/UG/TZ/RW beneficiaries in KES/USD/GBP/EUR/TZS/UGX/RWF (not KES-only,
+ * Kenya-only), and it has no minimum-amount-bounded maximum (per the UAT
+ * Guide: "Minimum payments of KES 50 ... with no maximum CAP" — so, unlike
+ * PesaLink/EFT, assertTransferAmountInBounds is NOT applied here). No RTGS-
+ * specific account-validation endpoint is documented anywhere in the UAT
+ * Guide or Postman collection (unlike PesaLink/LNM/KPLC/NCWSC, which each
+ * have one) — this is submit-only, no pre-flight validation call.
+ *
+ * Per the UAT Guide, RTGS resolves synchronously (T+3 hours is the bank's
+ * own settlement window, not this API call — the resultCode IS the final
+ * submission result, matching PesaLink/EFT's response shape, not the
+ * "accepted into processing" shape of the async rails).
+ *
+ * @param {object} params
+ * @param {string} params.transactionId
+ * @param {string} params.beneficiaryAccountNumber
+ * @param {string} params.beneficiaryBankBic - real SWIFT BIC, not a CBK clearing code
+ * @param {string} params.beneficiaryName
+ * @param {string} params.beneficiaryCountry - KE/UG/TZ/RW
+ * @param {string} [params.beneficiaryAddress]
+ * @param {number} params.amount
+ * @param {string} [params.creditCurrency='KES'] - KES/USD/GBP/EUR/TZS/UGX/RWF
+ * @param {string} [params.debitCurrency='KES']
+ * @param {string} [params.narration]
+ * @param {string} [params.purposeCode] - defaults to RTGS_DEFAULT_PURPOSE_CODE
+ * @param {string} [params.senderCountry='KE']
+ */
+export async function submitRtgsTransfer({
+  transactionId,
+  beneficiaryAccountNumber,
+  beneficiaryBankBic,
+  beneficiaryName,
+  beneficiaryCountry,
+  beneficiaryAddress,
+  amount,
+  creditCurrency = 'KES',
+  debitCurrency = 'KES',
+  narration,
+  purposeCode,
+  senderCountry = 'KE',
+}) {
+  if (!transactionId || !beneficiaryAccountNumber || !beneficiaryBankBic || !beneficiaryCountry || !amount) {
+    throw new NcbaOpenBankingValidationError('transactionId, beneficiaryAccountNumber, beneficiaryBankBic, beneficiaryCountry and amount are required for an RTGS transfer');
+  }
+  if (Number(amount) < MIN_TRANSFER_AMOUNT) {
+    throw new NcbaOpenBankingValidationError(`Amount must be at least KES ${MIN_TRANSFER_AMOUNT} (RTGS minimum) — RTGS has no maximum cap`);
+  }
+
+  const payload = {
+    BeneficiaryAccountNumber: beneficiaryAccountNumber,
+    BeneficiaryBankBIC: beneficiaryBankBic,
+    BeneficiaryCountry: beneficiaryCountry,
+    BeneficiaryName: beneficiaryName,
+    BeneficiaryAddress: beneficiaryAddress || '',
+    CreditAmount: Math.round(Number(amount)).toFixed(2),
+    DebitCurrency: debitCurrency,
+    CreditCurrency: creditCurrency,
+    Narration: narration || 'PayChain Payout',
+    SenderAccountNumber: ncbaOpenBankingAccountNumber,
+    SenderCIF: ncbaOpenBankingSenderCif,
+    SenderCountry: senderCountry,
+    PurposeCode: purposeCode || RTGS_DEFAULT_PURPOSE_CODE,
+    TransactionID: transactionId,
+  };
+
+  if (!liveCallsEnabled) {
+    return simulate('ncba_openbanking_rtgs_submit_sandbox', { transactionId, amount });
+  }
+
+  const result = await ncbaOpenBankingPost('/api/v1/RTGSPayment/RTGSPayment', payload);
+  if (result?.resultCode !== '000') {
+    throw new NcbaOpenBankingRequestError(result?.statusDescription || 'This RTGS transfer was rejected');
   }
   return result;
 }
@@ -347,6 +488,304 @@ export async function validateMobileWalletNumber({ provider, msisdn }) {
 }
 
 /**
+ * Validates a KPLC (Kenya Power) postpaid account before a bill payment —
+ * "This is a validation service to check the account/meter number validity
+ * and confirm balance due" per the UAT Guide. Returns a validationId that
+ * must be echoed back on the actual payment (same validate-then-pay shape
+ * as validateMobileWalletNumber/validateLipaNaMpesaAccount above). Endpoint
+ * confirmed from NCBA's "Open Banking V2 - Callback Enabled" Postman
+ * collection (not shown as a path in the UAT Guide's own text, only its
+ * request/response JSON was — same situation as the other validate calls
+ * in this file).
+ *
+ * @param {object} params
+ * @param {string} params.meterNumber - numeric KPLC meter number
+ * @param {string} params.msisdn - phone number under the bill, 254XXXXXXXXX
+ */
+export async function validateKplcAccount({ meterNumber, msisdn }) {
+  if (!meterNumber || !msisdn) {
+    throw new NcbaOpenBankingValidationError('meterNumber and msisdn are required to validate a KPLC account');
+  }
+
+  if (!liveCallsEnabled) {
+    const result = simulate('ncba_openbanking_kplc_validate_sandbox', { meterNumber, msisdn });
+    return { validationId: `SIM-VALID-${Date.now()}`, meterNumber, customerName: 'Simulated KPLC Customer', serviceName: 'Kplc Postpaid', balance: 0, ...result };
+  }
+
+  const result = await ncbaOpenBankingPost('/api/v1/KPLCValidation/kplcvalidation', { meterNumber, msisdn });
+  if (!result?.succeeded || !result?.validationId) {
+    throw new NcbaOpenBankingValidationError(result?.message || 'Could not verify this KPLC meter number');
+  }
+
+  return {
+    validationId: result.validationId,
+    meterNumber: result.meterNumber || meterNumber,
+    customerName: result.customerName || null,
+    serviceName: result.serviceName || null,
+    balance: typeof result.balance === 'number' ? result.balance : null,
+  };
+}
+
+/**
+ * Submits a KPLC postpaid bill payment — NCBA's Open Banking KPLC rail,
+ * distinct from (and more specific than) the generic BILLPAY payload used
+ * by services/ncbaBulkPaymentService.js's Host-to-Host bulk channel. Per
+ * the UAT Guide's own Payment Rules ("Payments processed with generated
+ * validation ID only"), a fresh validationId from validateKplcAccount is
+ * required on every payment — callers should validate immediately before
+ * submitting, not reuse an old validationId (same pattern already used for
+ * Mobile B2W/Lipa na M-Pesa in bulkPayController.js).
+ *
+ * Response shape (`data.id`/`data.bankRef`/`succeeded`) matches NCBA's
+ * other "accepted into processing" rails (Mobile B2W, Lipa na M-Pesa) —
+ * `succeeded: true` only means NCBA accepted the instruction, not that the
+ * bill is paid yet. Callers should record the resulting Transaction as
+ * 'pending' and let the generic handlePesaLinkCallback
+ * (ncbaOpenBankingController.js) resolve it later, keyed by reqChnlId.
+ *
+ * @param {object} params
+ * @param {string} params.transactionId - PayChain's own reference; becomes
+ *        both channelRef/reqChnlId here and Transaction.reference at the
+ *        call site.
+ * @param {string} params.validationId - from validateKplcAccount
+ * @param {string} params.customerName - meter holder name
+ * @param {string} params.meterNumber
+ * @param {string} params.msisdn - mobile number for notifications
+ * @param {number} params.amount
+ * @param {string} [params.narration]
+ * @param {string} [params.debitAccount] - defaults to PayChain's own NCBA account
+ */
+export async function submitKplcPayment({
+  transactionId,
+  validationId,
+  customerName,
+  meterNumber,
+  msisdn,
+  amount,
+  narration,
+  debitAccount,
+}) {
+  if (!transactionId || !validationId || !meterNumber || !amount) {
+    throw new NcbaOpenBankingValidationError('transactionId, validationId, meterNumber and amount are required for a KPLC payment');
+  }
+
+  const payload = {
+    validationId,
+    customerName: customerName || 'PayChain Merchant',
+    meterNumber,
+    msisdn: msisdn || '',
+    channelRef: transactionId,
+    amount: String(amount),
+    callbackUrl: '',
+    reason: narration || 'KPLC PAYMENT',
+    accountNumber: debitAccount || ncbaOpenBankingAccountNumber,
+    reqChnlId: transactionId,
+  };
+
+  if (!liveCallsEnabled) {
+    return simulate('ncba_openbanking_kplc_submit_sandbox', { transactionId, amount });
+  }
+
+  const result = await ncbaOpenBankingPost('/api/v1/KPLCPayment/kplcpayment', payload);
+  if (!result?.succeeded) {
+    throw new NcbaOpenBankingRequestError(result?.data?.message || result?.message || 'This KPLC payment was rejected');
+  }
+  return result;
+}
+
+/**
+ * Validates a KPLC PREPAID meter — a genuinely different NCBA product from
+ * validateKplcAccount above (which is postpaid-only): same request/response
+ * shape, but resolves to a different account type ("Kplc Prepaid" vs "Kplc
+ * Postpaid" in serviceName) and the amount paid on the follow-up purchase
+ * is a token amount, not a bill balance. Kept as a distinct pair of
+ * functions (not a `type` flag on the postpaid ones) since NCBA itself
+ * treats them as separate endpoints/products.
+ *
+ * @param {object} params
+ * @param {string} params.meterNumber
+ * @param {string} params.msisdn - mobile number to receive the token, 254XXXXXXXXX
+ */
+export async function validateKplcPrepaidAccount({ meterNumber, msisdn }) {
+  if (!meterNumber || !msisdn) {
+    throw new NcbaOpenBankingValidationError('meterNumber and msisdn are required to validate a KPLC prepaid account');
+  }
+
+  if (!liveCallsEnabled) {
+    const result = simulate('ncba_openbanking_kplc_prepaid_validate_sandbox', { meterNumber, msisdn });
+    return { validationId: `SIM-VALID-${Date.now()}`, meterNumber, customerName: 'Simulated KPLC Prepaid Customer', serviceName: 'Kplc Prepaid', balance: 0, ...result };
+  }
+
+  const result = await ncbaOpenBankingPost('/api/v1/KPLCPrepaidValidation/kplcPrepaidValidation', { meterNumber, msisdn });
+  if (!result?.succeeded || !result?.validationId) {
+    throw new NcbaOpenBankingValidationError(result?.message || 'Could not verify this KPLC prepaid meter number');
+  }
+
+  return {
+    validationId: result.validationId,
+    meterNumber: result.meterNumber || meterNumber,
+    customerName: result.customerName || null,
+    serviceName: result.serviceName || null,
+    balance: typeof result.balance === 'number' ? result.balance : null,
+  };
+}
+
+/**
+ * Purchases a KPLC prepaid token — sends the token to msisdn via SMS from
+ * KPLC's side (not something PayChain generates or displays), same
+ * "accepted into processing" async shape as submitKplcPayment. `amount`
+ * here is the token purchase amount, not a bill balance being paid down.
+ *
+ * @param {object} params
+ * @param {string} params.transactionId - becomes channelRef/reqChnlId and Transaction.reference
+ * @param {string} params.validationId - from validateKplcPrepaidAccount
+ * @param {string} params.customerName
+ * @param {string} params.meterNumber
+ * @param {string} params.msisdn - mobile number to receive the token
+ * @param {number} params.amount - token purchase amount
+ * @param {string} [params.narration]
+ * @param {string} [params.debitAccount] - defaults to PayChain's own NCBA account
+ */
+export async function submitKplcPrepaidPayment({
+  transactionId,
+  validationId,
+  customerName,
+  meterNumber,
+  msisdn,
+  amount,
+  narration,
+  debitAccount,
+}) {
+  if (!transactionId || !validationId || !meterNumber || !amount) {
+    throw new NcbaOpenBankingValidationError('transactionId, validationId, meterNumber and amount are required for a KPLC prepaid token purchase');
+  }
+
+  const payload = {
+    validationId,
+    customerName: customerName || 'PayChain Merchant',
+    meterNumber,
+    msisdn: msisdn || '',
+    channelRef: transactionId,
+    amount: String(amount),
+    reason: narration || 'KPLC PAYMENT',
+    accountNumber: debitAccount || ncbaOpenBankingAccountNumber,
+    callbackUrl: '',
+    reqChnlId: transactionId,
+  };
+
+  if (!liveCallsEnabled) {
+    return simulate('ncba_openbanking_kplc_prepaid_submit_sandbox', { transactionId, amount });
+  }
+
+  const result = await ncbaOpenBankingPost('/api/v1/KPLCPrepaidTransaction/kplcPrepaidTransaction', payload);
+  if (!result?.succeeded) {
+    throw new NcbaOpenBankingRequestError(result?.data?.message || result?.message || 'This KPLC prepaid token purchase was rejected');
+  }
+  return result;
+}
+
+/**
+ * Validates a Nairobi City Water & Sewerage Company (NCWSC) account before a
+ * bill payment — same validate-then-pay shape as validateKplcAccount, just
+ * a different biller. Endpoints confirmed from NCBA's "Open Banking V2 -
+ * Callback Enabled" Postman collection, which spells the biller "NSWC"/
+ * "NWSC" in its own path segments (inconsistent with the "NCWSC" name NCBA
+ * uses in prose) — kept exactly as documented since that's what NCBA's
+ * gateway actually routes on.
+ *
+ * @param {object} params
+ * @param {string} params.meterNumber - numeric NCWSC meter number
+ * @param {string} params.msisdn - phone number under the bill, 254XXXXXXXXX
+ */
+export async function validateNcwscAccount({ meterNumber, msisdn }) {
+  if (!meterNumber || !msisdn) {
+    throw new NcbaOpenBankingValidationError('meterNumber and msisdn are required to validate an NCWSC account');
+  }
+
+  if (!liveCallsEnabled) {
+    const result = simulate('ncba_openbanking_ncwsc_validate_sandbox', { meterNumber, msisdn });
+    return { validationId: `SIM-VALID-${Date.now()}`, meterNumber, customerName: 'Simulated NCWSC Customer', serviceName: 'Nairobi Water', balance: 0, ...result };
+  }
+
+  const result = await ncbaOpenBankingPost('/api/v1/NSWCValidation/nairobiwatervalidation', { meterNumber, msisdn });
+  if (!result?.succeeded || !result?.validationId) {
+    throw new NcbaOpenBankingValidationError(result?.message || 'Could not verify this NCWSC meter number');
+  }
+
+  return {
+    validationId: result.validationId,
+    meterNumber: result.meterNumber || meterNumber,
+    customerName: result.customerName || null,
+    serviceName: result.serviceName || null,
+    balance: typeof result.balance === 'number' ? result.balance : null,
+  };
+}
+
+/**
+ * Submits a Nairobi Water (NCWSC) bill payment — NCBA's Open Banking NWSC
+ * rail. Same "accepted into processing, confirmed later via callback"
+ * shape as submitKplcPayment — see that function's doc comment. A fresh
+ * validationId from validateNcwscAccount is required on every payment,
+ * same reasoning as KPLC.
+ *
+ * NCBA's own saved Postman example for this endpoint doesn't include a
+ * reqChnlId field (only channelRef) — included here anyway for
+ * consistency with every other async NCBA rail in this file, since an
+ * extra unrecognized field costs nothing and every other rail's actual
+ * callback resolution (already proven working for Mobile B2W/Lipa na
+ * M-Pesa/KPLC) keys off whatever reference handlePesaLinkCallback
+ * receives, not a specific request-payload field name.
+ *
+ * @param {object} params
+ * @param {string} params.transactionId - PayChain's own reference; becomes
+ *        channelRef/reqChnlId here and Transaction.reference at the call site.
+ * @param {string} params.validationId - from validateNcwscAccount
+ * @param {string} params.customerName - meter holder name
+ * @param {string} params.meterNumber
+ * @param {string} params.msisdn - mobile number for notifications
+ * @param {number} params.amount
+ * @param {string} [params.narration]
+ * @param {string} [params.debitAccount] - defaults to PayChain's own NCBA account
+ */
+export async function submitNcwscPayment({
+  transactionId,
+  validationId,
+  customerName,
+  meterNumber,
+  msisdn,
+  amount,
+  narration,
+  debitAccount,
+}) {
+  if (!transactionId || !validationId || !meterNumber || !amount) {
+    throw new NcbaOpenBankingValidationError('transactionId, validationId, meterNumber and amount are required for an NCWSC payment');
+  }
+
+  const payload = {
+    validationId,
+    customerName: customerName || 'PayChain Merchant',
+    meterNumber,
+    msisdn: msisdn || '',
+    channelRef: transactionId,
+    amount: String(amount),
+    callbackUrl: '',
+    reason: narration || 'NW PAYMENT REQUEST',
+    accountNumber: debitAccount || ncbaOpenBankingAccountNumber,
+    reqChnlId: transactionId,
+  };
+
+  if (!liveCallsEnabled) {
+    return simulate('ncba_openbanking_ncwsc_submit_sandbox', { transactionId, amount });
+  }
+
+  const result = await ncbaOpenBankingPost('/api/v1/NWSCPayment/NWSCPayment', payload);
+  if (!result?.succeeded) {
+    throw new NcbaOpenBankingRequestError(result?.data?.message || result?.message || 'This NCWSC payment was rejected');
+  }
+  return result;
+}
+
+/**
  * Validates a destination Paybill or Till number before a Lipa na M-Pesa
  * payout — "This is a prerequisite for Bill Payments" per the UAT Guide.
  * identifierType is "4" for Paybill, "2" for Till (per the UAT Guide's own
@@ -375,7 +814,7 @@ export async function validateLipaNaMpesaAccount({ paymentType, payBillTillNo })
   });
 
   if (result?.errorCode !== '000') {
-    throw new NcbaOpenBankingValidationError(result?.errorMessage || 'NCBA could not verify the destination Paybill/Till number');
+    throw new NcbaOpenBankingValidationError(result?.errorMessage || 'Could not verify the destination Paybill/Till number');
   }
 
   // origanizationShortCode is NCBA's own typo, kept exactly as documented.
@@ -443,7 +882,7 @@ export async function submitLipaNaMpesaPayment({
 
   const result = await ncbaOpenBankingPost('/api/v1/LipaNaMpesa/lipanampesa', payload);
   if (result?.resErrorCode !== '000') {
-    throw new NcbaOpenBankingRequestError(result?.resErrorDesc || result?.resErrorMessage || 'NCBA rejected the Lipa na M-Pesa payment');
+    throw new NcbaOpenBankingRequestError(result?.resErrorDesc || result?.resErrorMessage || 'This Lipa na M-Pesa payment was rejected');
   }
   return result;
 }

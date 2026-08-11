@@ -752,7 +752,7 @@ export default function DigitalWallet({ navigation }: any) {
             </View>
             <View className="flex-row items-center justify-between bg-[#f7faf7] rounded-2xl px-5 py-3.5 mb-3">
               <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#707971]">Bank</Text>
-              <Text className="font-jakarta-bold text-[13px] text-[#00351d]">NCBA Bank Kenya PLC</Text>
+              <Text className="font-jakarta-bold text-[13px] text-[#00351d]">PayChain Settlement Account</Text>
             </View>
             {/* Full NCBA virtual account is null until NCBA assigns the
                 institution prefix — falls back to the 8-digit merchant

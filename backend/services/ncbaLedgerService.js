@@ -97,7 +97,7 @@ export async function creditNcbaCollection({ merchant, grossAmount, bankRef, cus
               currency: 'KES',
               status: 'completed',
               reference: bankRef,
-              sender: { name: customerName || 'NCBA Virtual Account Customer', id: customerPhone },
+              sender: { name: customerName || 'PayChain Virtual Account Customer', id: customerPhone },
               recipient: { name: merchant.businessName, id: merchant.ncbaMerchantCode },
               // paychainFee/safaricomFee/revenueStream are auto-stamped by
               // the Transaction pre-save hook via calculateFees(), which

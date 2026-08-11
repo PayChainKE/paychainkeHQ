@@ -272,7 +272,7 @@ export default function FundAccountModal({ method, onClose }) {
                   </p>
                 </div>
                 {[
-                  ['Bank', 'NCBA Bank Kenya PLC'],
+                  ['Bank', 'PayChain Settlement Account'],
                   // NCBA's real M-Pesa Paybill business number — this is how a
                   // customer actually sends money into the NCBA account number
                   // below via M-Pesa (Lipa na M-Pesa > Pay Bill > 880100 >
