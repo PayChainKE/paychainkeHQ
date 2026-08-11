@@ -14,7 +14,7 @@ import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard.js';
-import { validateMobileWalletNumber, submitMobileB2wPayment, validateLipaNaMpesaAccount, submitLipaNaMpesaPayment, validateKplcAccount, submitKplcPayment, NcbaOpenBankingValidationError } from '../services/ncbaOpenBankingService.js';
+import { validateMobileWalletNumber, submitMobileB2wPayment, validateLipaNaMpesaAccount, submitLipaNaMpesaPayment, validateKplcAccount, submitKplcPayment, validateNcwscAccount, submitNcwscPayment, NcbaOpenBankingValidationError } from '../services/ncbaOpenBankingService.js';
 
 // @desc    Get all payees for a merchant
 // @route   GET /api/bulkpay/payees
@@ -151,6 +151,32 @@ export const validateKplcMeter = async (req, res) => {
       return res.status(400).json({ message: err.message });
     }
     res.status(502).json({ message: 'Failed to verify KPLC meter number. Please try again.' });
+  }
+};
+
+// @desc    Verify an NCWSC (Nairobi Water) meter number + confirm balance
+//          due before saving a Utility/Water payee. Same "don't return the
+//          validationId" reasoning as validateKplcMeter above.
+// @route   POST /api/bulkpay/validate-ncwsc-meter
+// @access  Private (merchant)
+export const validateNcwscMeter = async (req, res) => {
+  try {
+    const { meterNumber, msisdn } = req.body;
+    if (!meterNumber || !msisdn) {
+      return res.status(400).json({ message: 'meterNumber and msisdn are required.' });
+    }
+    const result = await validateNcwscAccount({ meterNumber, msisdn });
+    res.json({
+      meterNumber: result.meterNumber,
+      customerName: result.customerName,
+      serviceName: result.serviceName,
+      balance: result.balance,
+    });
+  } catch (err) {
+    if (err instanceof NcbaOpenBankingValidationError) {
+      return res.status(400).json({ message: err.message });
+    }
+    res.status(502).json({ message: 'Failed to verify NCWSC meter number. Please try again.' });
   }
 };
 
@@ -441,6 +467,39 @@ export const authorizeBatch = async (req, res) => {
             refundAmount += row.netAmount + row.b2cFee;
           }
         }
+      } else if (payee.type === 'utility' && payee.utilityProvider === 'WATER') {
+        // Nairobi Water (NCWSC) goes through NCBA's Open Banking NWSC
+        // Payment API (confirmed endpoints, validate-then-pay), not the
+        // generic Bulk H2H BILLPAY rail below — same convention as KPLC
+        // above (accountNumber = meter number, phone = notification msisdn).
+        if (!payee.accountNumber || !payee.phone) {
+          payoutStatus = 'failed';
+          refundAmount += row.netAmount + row.b2cFee;
+          console.error(`❌ Bulk payout to ${payee.name} failed: meter number or notification phone missing for this NCWSC payee.`);
+        } else {
+          try {
+            const transactionId = `PAYOUT-NCWSC-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+            // Fresh validationId required at payment time — see
+            // validateNcwscMeter's doc comment.
+            const validation = await validateNcwscAccount({ meterNumber: payee.accountNumber, msisdn: payee.phone });
+            await submitNcwscPayment({
+              transactionId,
+              validationId: validation.validationId,
+              customerName: validation.customerName || payee.name,
+              meterNumber: payee.accountNumber,
+              msisdn: payee.phone,
+              amount: row.netAmount,
+              narration: `Bulk Payout to ${payee.name}`,
+            });
+            // Async rail — payoutStatus stays 'pending' (its default
+            // above), resolved later via handlePesaLinkCallback.
+            payoutRef = transactionId;
+          } catch (err) {
+            console.error(`❌ NCBA NCWSC payment rejected for ${payee.name}:`, err.message);
+            payoutStatus = 'failed';
+            refundAmount += row.netAmount + row.b2cFee;
+          }
+        }
       } else if (payee.type === 'utility' && payee.utilityProvider) {
         if (!payee.accountNumber) {
           payoutStatus = 'failed';
@@ -541,19 +600,21 @@ export const authorizeBatch = async (req, res) => {
         }
       }
 
-      // Record standard Transaction ledger entry. KPLC rows get their own
-      // 'ncba_kplc' type (fee-mapped to ncba_kplc_fee) so the webhook and
-      // dashboard can tell them apart from bank payouts; other utility
-      // (WATER) and Bank rows share 'ncba_outbound' (fee-mapped to
+      // Record standard Transaction ledger entry. KPLC and NCWSC rows get
+      // their own types ('ncba_kplc'/'ncba_ncwsc', fee-mapped to their own
+      // revenue streams) so the webhook and dashboard can tell them apart
+      // from bank payouts; Bank rows (and any future utilityProvider not
+      // yet on a dedicated rail) share 'ncba_outbound' (fee-mapped to
       // ncba_disbursement_fee in revenueRateCard.js), matching
       // services/ncbaBulkPaymentService.js's convention, rather than
       // 'bulk_pay' which earns no fee for those.
       const isKplcRow = payee.type === 'utility' && payee.utilityProvider === 'KPLC';
+      const isNcwscRow = payee.type === 'utility' && payee.utilityProvider === 'WATER';
       const isNcbaRouted = payee.paymentMethod === 'Bank' || (payee.type === 'utility' && payee.utilityProvider);
       const transaction = await Transaction.create({
         merchantId: merchant._id,
         accountNumber: merchant.paybillAccount || 'WALLET_FUND',
-        type: isKplcRow ? 'ncba_kplc' : (isNcbaRouted ? 'ncba_outbound' : 'bulk_pay'),
+        type: isKplcRow ? 'ncba_kplc' : isNcwscRow ? 'ncba_ncwsc' : (isNcbaRouted ? 'ncba_outbound' : 'bulk_pay'),
         amount: row.netAmount,
         kesAmount: row.netAmount,
         currency: 'KES',

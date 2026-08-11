@@ -1,7 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import rateLimit from 'express-rate-limit';
-import { getPayees, getPayeeById, addPayee, updatePayee, deletePayee, getBatches, getBatchById, uploadCSV, authorizeBatch, validateKplcMeter } from '../controllers/bulkPayController.js';
+import { getPayees, getPayeeById, addPayee, updatePayee, deletePayee, getBatches, getBatchById, uploadCSV, authorizeBatch, validateKplcMeter, validateNcwscMeter } from '../controllers/bulkPayController.js';
 import { protectMerchant } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -37,9 +37,9 @@ const pinLimiter = rateLimit({
 });
 
 // External NCBA lookup — same abuse-prevention posture as pinLimiter above,
-// just not PIN-specific (guards against a merchant hammering NCBA's KPLC
-// validation endpoint via repeated Add-Payee attempts).
-const kplcValidationLimiter = rateLimit({
+// just not PIN-specific (guards against a merchant hammering NCBA's biller
+// validation endpoints via repeated Add-Payee attempts).
+const utilityValidationLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
   standardHeaders: true,
@@ -52,7 +52,8 @@ router.route('/payees')
   .get(getPayees)
   .post(addPayee);
 
-router.post('/validate-kplc-meter', kplcValidationLimiter, validateKplcMeter);
+router.post('/validate-kplc-meter', utilityValidationLimiter, validateKplcMeter);
+router.post('/validate-ncwsc-meter', utilityValidationLimiter, validateNcwscMeter);
 
 router.route('/payees/:id')
   .get(getPayeeById)

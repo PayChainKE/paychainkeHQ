@@ -224,6 +224,58 @@ export async function validatePesaLinkAccount({ bankCode, accountNumber, debitAc
 }
 
 /**
+ * Looks up which bank(s) a phone number is registered to on PesaLink —
+ * lets a sender pay "to a phone number" without already knowing the
+ * recipient's bank/account number, by resolving PesaLink's own registered
+ * default bank for that number. Endpoint confirmed from NCBA's "Open
+ * Banking V2 - Callback Enabled" Postman collection (not shown as a path
+ * in the UAT Guide's own text, only its request/response JSON was — same
+ * situation as every other validate call in this file).
+ *
+ * Response carries a `bankList` of every bank the number is registered
+ * with (each with its own `sortCode`, usable directly as a PesaLink
+ * BeneficiaryBankBIC), with `def: true` marking the one PesaLink treats as
+ * the default. Not yet wired into any payout flow in this codebase — added
+ * so it's available the next time a "pay by phone number" bank-transfer
+ * flow is built, without needing to re-derive the request/response shape.
+ *
+ * @param {object} params
+ * @param {string} params.phoneNumber - 254XXXXXXXXX
+ * @param {string} [params.debitAccount] - defaults to PayChain's own NCBA account
+ * @returns {{ destName: string, banks: Array<{ bankName: string, sortCode: string, isDefault: boolean, lookupBankName: string }> }}
+ */
+export async function validatePesaLinkMobileNumber({ phoneNumber, debitAccount }) {
+  if (!phoneNumber) {
+    throw new NcbaOpenBankingValidationError('phoneNumber is required to validate a PesaLink-registered mobile number');
+  }
+
+  if (!liveCallsEnabled) {
+    const result = simulate('ncba_openbanking_pesalink_validate_phone_sandbox', { phoneNumber });
+    return { destName: 'Simulated PesaLink Customer', banks: [{ bankName: 'NCBABANK', sortCode: '07000', isDefault: true, lookupBankName: 'Simulated PesaLink Customer' }], ...result };
+  }
+
+  const result = await ncbaOpenBankingPost('/api/v1/PesalinkValidation/validate-phone', {
+    phoneNumber,
+    debitAccount: debitAccount || ncbaOpenBankingAccountNumber,
+  });
+
+  const bankRows = result?.bankList?.bank;
+  if (!result?.destName || !Array.isArray(bankRows) || bankRows.length === 0) {
+    throw new NcbaOpenBankingValidationError('NCBA could not find a PesaLink-registered bank for this mobile number');
+  }
+
+  return {
+    destName: result.destName,
+    banks: bankRows.map((b) => ({
+      bankName: b.bankName,
+      sortCode: b.sortCode,
+      isDefault: !!b.def,
+      lookupBankName: b.lookupBankName,
+    })),
+  };
+}
+
+/**
  * Submits a real-time PesaLink transfer.
  *
  * Per NCBA's UAT Guide, PesaLink/EFT payments do NOT accept a callbackUrl —
@@ -450,6 +502,107 @@ export async function submitKplcPayment({
   const result = await ncbaOpenBankingPost('/api/v1/KPLCPayment/kplcpayment', payload);
   if (!result?.succeeded) {
     throw new NcbaOpenBankingRequestError(result?.data?.message || result?.message || 'NCBA rejected the KPLC payment');
+  }
+  return result;
+}
+
+/**
+ * Validates a Nairobi City Water & Sewerage Company (NCWSC) account before a
+ * bill payment — same validate-then-pay shape as validateKplcAccount, just
+ * a different biller. Endpoints confirmed from NCBA's "Open Banking V2 -
+ * Callback Enabled" Postman collection, which spells the biller "NSWC"/
+ * "NWSC" in its own path segments (inconsistent with the "NCWSC" name NCBA
+ * uses in prose) — kept exactly as documented since that's what NCBA's
+ * gateway actually routes on.
+ *
+ * @param {object} params
+ * @param {string} params.meterNumber - numeric NCWSC meter number
+ * @param {string} params.msisdn - phone number under the bill, 254XXXXXXXXX
+ */
+export async function validateNcwscAccount({ meterNumber, msisdn }) {
+  if (!meterNumber || !msisdn) {
+    throw new NcbaOpenBankingValidationError('meterNumber and msisdn are required to validate an NCWSC account');
+  }
+
+  if (!liveCallsEnabled) {
+    const result = simulate('ncba_openbanking_ncwsc_validate_sandbox', { meterNumber, msisdn });
+    return { validationId: `SIM-VALID-${Date.now()}`, meterNumber, customerName: 'Simulated NCWSC Customer', serviceName: 'Nairobi Water', balance: 0, ...result };
+  }
+
+  const result = await ncbaOpenBankingPost('/api/v1/NSWCValidation/nairobiwatervalidation', { meterNumber, msisdn });
+  if (!result?.succeeded || !result?.validationId) {
+    throw new NcbaOpenBankingValidationError(result?.message || 'Could not verify this NCWSC meter number');
+  }
+
+  return {
+    validationId: result.validationId,
+    meterNumber: result.meterNumber || meterNumber,
+    customerName: result.customerName || null,
+    serviceName: result.serviceName || null,
+    balance: typeof result.balance === 'number' ? result.balance : null,
+  };
+}
+
+/**
+ * Submits a Nairobi Water (NCWSC) bill payment — NCBA's Open Banking NWSC
+ * rail. Same "accepted into processing, confirmed later via callback"
+ * shape as submitKplcPayment — see that function's doc comment. A fresh
+ * validationId from validateNcwscAccount is required on every payment,
+ * same reasoning as KPLC.
+ *
+ * NCBA's own saved Postman example for this endpoint doesn't include a
+ * reqChnlId field (only channelRef) — included here anyway for
+ * consistency with every other async NCBA rail in this file, since an
+ * extra unrecognized field costs nothing and every other rail's actual
+ * callback resolution (already proven working for Mobile B2W/Lipa na
+ * M-Pesa/KPLC) keys off whatever reference handlePesaLinkCallback
+ * receives, not a specific request-payload field name.
+ *
+ * @param {object} params
+ * @param {string} params.transactionId - PayChain's own reference; becomes
+ *        channelRef/reqChnlId here and Transaction.reference at the call site.
+ * @param {string} params.validationId - from validateNcwscAccount
+ * @param {string} params.customerName - meter holder name
+ * @param {string} params.meterNumber
+ * @param {string} params.msisdn - mobile number for notifications
+ * @param {number} params.amount
+ * @param {string} [params.narration]
+ * @param {string} [params.debitAccount] - defaults to PayChain's own NCBA account
+ */
+export async function submitNcwscPayment({
+  transactionId,
+  validationId,
+  customerName,
+  meterNumber,
+  msisdn,
+  amount,
+  narration,
+  debitAccount,
+}) {
+  if (!transactionId || !validationId || !meterNumber || !amount) {
+    throw new NcbaOpenBankingValidationError('transactionId, validationId, meterNumber and amount are required for an NCWSC payment');
+  }
+
+  const payload = {
+    validationId,
+    customerName: customerName || 'PayChain Merchant',
+    meterNumber,
+    msisdn: msisdn || '',
+    channelRef: transactionId,
+    amount: String(amount),
+    callbackUrl: '',
+    reason: narration || 'NW PAYMENT REQUEST',
+    accountNumber: debitAccount || ncbaOpenBankingAccountNumber,
+    reqChnlId: transactionId,
+  };
+
+  if (!liveCallsEnabled) {
+    return simulate('ncba_openbanking_ncwsc_submit_sandbox', { transactionId, amount });
+  }
+
+  const result = await ncbaOpenBankingPost('/api/v1/NWSCPayment/NWSCPayment', payload);
+  if (!result?.succeeded) {
+    throw new NcbaOpenBankingRequestError(result?.data?.message || result?.message || 'NCBA rejected the NCWSC payment');
   }
   return result;
 }

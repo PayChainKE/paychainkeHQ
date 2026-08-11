@@ -347,13 +347,15 @@ export const handlePesaLinkCallback = async (req, res) => {
 
     // This webhook now resolves bank-account payouts (PesaLink/EFT), Mobile
     // B2W (M-Pesa/Airtel number) payouts, Lipa na M-Pesa (Paybill/Till)
-    // payouts, and KPLC bill payments — "Bank payout" wording would be
-    // wrong for the latter three. Note bulk-pay's Bank-routed rows (PesaLink
-    // synchronous branch in bulkPayController.js) never reach this webhook
-    // in 'pending' state, so in practice every 'ncba_outbound' row that
-    // does land here is a real bank payout, not a mislabeled one.
-    const isBankPayout = !['ncba_mobile_b2w', 'ncba_lipa_na_mpesa', 'ncba_kplc'].includes(transaction.type);
-    const payoutLabel = isBankPayout ? 'Bank payout' : transaction.type === 'ncba_kplc' ? 'KPLC bill payment' : 'Payout';
+    // payouts, KPLC bill payments, and NCWSC (Nairobi Water) bill payments
+    // — "Bank payout" wording would be wrong for all but the first. Note
+    // bulk-pay's Bank-routed rows (PesaLink synchronous branch in
+    // bulkPayController.js) never reach this webhook in 'pending' state, so
+    // in practice every 'ncba_outbound' row that does land here is a real
+    // bank payout, not a mislabeled one.
+    const NON_BANK_TYPE_LABELS = { ncba_kplc: 'KPLC bill payment', ncba_ncwsc: 'NCWSC bill payment' };
+    const isBankPayout = !['ncba_mobile_b2w', 'ncba_lipa_na_mpesa', ...Object.keys(NON_BANK_TYPE_LABELS)].includes(transaction.type);
+    const payoutLabel = isBankPayout ? 'Bank payout' : (NON_BANK_TYPE_LABELS[transaction.type] || 'Payout');
 
     createNotification({
       merchantId: transaction.merchantId,

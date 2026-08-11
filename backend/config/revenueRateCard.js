@@ -208,6 +208,18 @@ export const REVENUE_STREAMS = [
     basis: 'kes_volume',
   },
   {
+    id: 'ncba_ncwsc_fee',
+    label: 'NCBA NCWSC Bill Payment Fee',
+    description: 'PayChain\'s flat margin on Bulk Pay Nairobi Water (NCWSC) bill payments, via NCBA\'s Open Banking NWSC Payment API. NCBA hasn\'t published a cost schedule for this rail, so no NCBA cost passes through; this is PayChain\'s own charge only.',
+    icon: 'water_drop',
+    accent: 'sky',
+    rate: PAYCHAIN_TXN_RATE,
+    minFee: 0,
+    txTypes: ['ncba_ncwsc'],
+    statuses: ['completed', 'verified'],
+    basis: 'kes_volume',
+  },
+  {
     id: 'cash_advance',
     label: 'Cash Advance Fee',
     description: 'Origination fee on PayChain Cash Advance product (merchant credit line). Pilot stage.',
