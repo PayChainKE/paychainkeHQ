@@ -550,13 +550,25 @@ export default function BulkPay() {
     const element = document.getElementById('invoice-pdf-pane');
     if (element) {
       try {
+        // Capture the live preview at whatever pixel size it renders at, but
+        // always place it on a real, fixed A4 page (210x297mm) rather than
+        // sizing the PDF page itself off element.clientWidth/clientHeight —
+        // that previously made the "PDF" whatever arbitrary size the pane
+        // happened to render at, not actually A4.
         const dataUrl = await domtoimage.toPng(element, { bgcolor: '#ffffff' });
-        const pdf = new jsPDF({
-          orientation: 'portrait',
-          unit: 'px',
-          format: [element.clientWidth, element.clientHeight]
-        });
-        pdf.addImage(dataUrl, 'PNG', 0, 0, element.clientWidth, element.clientHeight);
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        const pageWidth = 210;
+        const pageHeight = 297;
+        const img = pdf.getImageProperties(dataUrl);
+        const imgRatio = img.height / img.width;
+        let renderWidth = pageWidth;
+        let renderHeight = pageWidth * imgRatio;
+        if (renderHeight > pageHeight) {
+          renderHeight = pageHeight;
+          renderWidth = pageHeight / imgRatio;
+        }
+        const offsetX = (pageWidth - renderWidth) / 2;
+        pdf.addImage(dataUrl, 'PNG', offsetX, 0, renderWidth, renderHeight);
         pdf.save(`Invoice_${invoiceDetails.invoiceNumber || 'Draft'}.pdf`);
         addNotification({ title: 'Download Complete', message: `Invoice saved successfully.`, type: 'success' });
       } catch (err) {

@@ -10,6 +10,7 @@ import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Clipboard from 'expo-clipboard';
 import { ValidatedTextInput } from '../components/ValidatedTextInput';
+import { InlineDatePicker } from '../components/InlineDatePicker';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/config';
 import TopBar from '../components/layout/TopBar';
@@ -544,59 +545,107 @@ export default function BulkPay() {
   const downloadInvoicePDF = async () => {
     const esc = (s: any) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const businessName = esc(merchant?.businessName || 'Merchant');
-    const itemRows = invoiceDetails.items.map(item => `
-      <tr>
+    const initials = esc((merchant?.businessName || 'M').trim().slice(0, 2).toUpperCase());
+    const statusMeta: Record<string, { label: string; bg: string; text: string }> = {
+      draft: { label: 'DRAFT', bg: '#fef3e7', text: '#b87333' },
+      sent: { label: 'SENT', bg: '#e7f8ef', text: '#006c4e' },
+      paid: { label: 'PAID', bg: '#dbeafe', text: '#1e40af' },
+      void: { label: 'VOID', bg: '#f1f5f9', text: '#64748b' },
+    };
+    const status = statusMeta[invoiceDetails.status] || statusMeta.draft;
+    const fmtDate = (iso: string) => {
+      const d = new Date(iso);
+      return isNaN(d.getTime()) ? esc(iso) : d.toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' });
+    };
+    const itemRows = invoiceDetails.items.map((item, i) => `
+      <tr style="background:${i % 2 === 0 ? '#fbfdfb' : '#ffffff'};">
         <td>${esc(item.description || '—')}</td>
         <td class="num">${item.qty}</td>
         <td class="amount">${fmtInvoiceCurrency(item.price)}</td>
         <td class="amount">${fmtInvoiceCurrency(item.qty * item.price)}</td>
       </tr>`).join('');
-    const html = `<!doctype html><html><head><meta charset="utf-8"/><title>Invoice</title><style>
-      @page { size: A4; margin: 24mm 16mm; }
-      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; color:#0c2010; margin:0; }
-      .header { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #0b4d2e; padding-bottom:16px; margin-bottom:22px; }
-      .brand-name { font-size:18px; font-weight:700; color:#0b4d2e; }
-      .brand-sub { font-size:10px; color:#707971; text-transform:uppercase; letter-spacing:1.5px; margin-top:2px; }
+    const html = `<!doctype html><html><head><meta charset="utf-8"/><title>Invoice ${esc(invoiceDetails.invoiceNumber || '')}</title><style>
+      @page { size: A4; margin: 20mm 18mm; }
+      * { box-sizing: border-box; }
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; color:#0c2010; margin:0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .header { display:flex; justify-content:space-between; align-items:flex-start; padding-bottom:20px; margin-bottom:26px; border-bottom:3px solid #00351d; }
+      .brand { display:flex; align-items:center; gap:12px; }
+      .logo { width:44px; height:44px; border-radius:12px; background:linear-gradient(135deg, #00351d, #1D9E75); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:16px; letter-spacing:0.5px; flex-shrink:0; }
+      .brand-name { font-size:17px; font-weight:800; color:#00351d; }
+      .brand-sub { font-size:9px; color:#707971; text-transform:uppercase; letter-spacing:1.8px; margin-top:2px; font-weight:700; }
       .doc-title { text-align:right; }
-      .doc-title h1 { margin:0; font-size:20px; color:#0c2010; font-weight:600; }
-      .doc-title .meta { font-size:10px; color:#707971; margin-top:4px; }
-      .meta-grid { display:grid; grid-template-columns: repeat(2, 1fr); gap:16px; margin-bottom:24px; }
-      .meta-grid .label { font-size:9px; color:#707971; text-transform:uppercase; letter-spacing:1.2px; margin-bottom:4px; }
-      .meta-grid .value { font-size:12px; color:#0c2010; font-weight:600; }
-      table { width:100%; border-collapse:collapse; font-size:11px; margin-bottom: 24px; }
-      thead th { text-align:left; padding:10px 8px; background:#f7faf7; color:#404942; font-weight:700; font-size:9px; text-transform:uppercase; letter-spacing:1px; border-bottom:1px solid #e7ece7; }
+      .doc-title h1 { margin:0 0 6px; font-size:22px; color:#0c2010; font-weight:800; letter-spacing:-0.3px; }
+      .status-badge { display:inline-block; font-size:9px; font-weight:800; letter-spacing:1.2px; padding:4px 10px; border-radius:999px; background:${status.bg}; color:${status.text}; }
+      .meta-grid { display:flex; justify-content:space-between; gap:24px; margin-bottom:28px; }
+      .meta-block .label { font-size:9px; color:#a1a1aa; text-transform:uppercase; letter-spacing:1.4px; margin-bottom:6px; font-weight:700; }
+      .meta-block .name { font-size:13px; color:#0c2010; font-weight:800; margin-bottom:2px; }
+      .meta-block .line { font-size:11px; color:#707971; line-height:1.5; }
+      .dates { text-align:right; }
+      .dates .row { font-size:11px; color:#707971; margin-bottom:4px; }
+      .dates .row b { color:#0c2010; font-weight:700; }
+      table { width:100%; border-collapse:collapse; font-size:11px; margin-bottom:4px; }
+      thead th { text-align:left; padding:11px 10px; background:#00351d; color:#e7f8ef; font-weight:700; font-size:9px; text-transform:uppercase; letter-spacing:1px; }
+      thead th:first-child { border-radius:8px 0 0 0; }
+      thead th:last-child { border-radius:0 8px 0 0; }
       thead th.num, thead th.amount { text-align:right; }
-      tbody td { padding:10px 8px; border-bottom:1px solid #eff4ef; }
-      tbody td.num, tbody td.amount { text-align:right; }
-      .totals { display:flex; justify-content:flex-end; }
-      .totals .row { display:flex; justify-content:space-between; width:220px; padding:6px 0; font-size:12px; }
-      .totals .row.total { font-weight:700; font-size:16px; border-top:1px solid #e7ece7; margin-top:4px; padding-top:10px; }
-      .notes { margin-top: 24px; font-size: 10px; color: #707971; white-space: pre-wrap; }
+      tbody td { padding:11px 10px; border-bottom:1px solid #eff4ef; color:#404942; }
+      tbody td.num, tbody td.amount { text-align:right; font-variant-numeric: tabular-nums; }
+      .totals { display:flex; justify-content:flex-end; margin-top:16px; }
+      .totals .box { width:240px; }
+      .totals .row { display:flex; justify-content:space-between; padding:7px 0; font-size:12px; color:#707971; }
+      .totals .row.total { font-weight:800; font-size:17px; color:#00351d; border-top:2px solid #00351d; margin-top:4px; padding-top:12px; }
+      .notes { margin-top:32px; padding:16px 18px; background:#f7faf7; border-radius:10px; border:1px solid #eff4ef; }
+      .notes .label { font-size:9px; color:#a1a1aa; text-transform:uppercase; letter-spacing:1.2px; font-weight:700; margin-bottom:6px; }
+      .notes .body { font-size:10.5px; color:#404942; white-space:pre-wrap; line-height:1.6; }
+      .footer { margin-top:40px; padding-top:16px; border-top:1px solid #eff4ef; text-align:center; }
+      .footer p { margin:0; font-size:9px; color:#a1a1aa; line-height:1.6; }
     </style></head><body>
       <div class="header">
-        <div><div class="brand-name">${businessName}</div><div class="brand-sub">PayChain · Invoice</div></div>
+        <div class="brand">
+          <div class="logo">${initials}</div>
+          <div><div class="brand-name">${businessName}</div><div class="brand-sub">Invoice</div></div>
+        </div>
         <div class="doc-title">
-          <h1>Invoice ${invoiceDetails.invoiceNumber ? `#${invoiceDetails.invoiceNumber}` : ''}</h1>
-          <div class="meta">Issued ${invoiceDetails.issueDate}</div>
-          ${invoiceDetails.dueDate ? `<div class="meta">Due ${invoiceDetails.dueDate}</div>` : ''}
+          <h1>#${esc(invoiceDetails.invoiceNumber || '—')}</h1>
+          <span class="status-badge">${status.label}</span>
         </div>
       </div>
       <div class="meta-grid">
-        <div><div class="label">Bill To</div><div class="value">${esc(invoiceDetails.customer.name || '—')}</div><div class="value">${esc(invoiceDetails.customer.email || '')}</div><div class="value">${esc(invoiceDetails.customer.address || '')}</div></div>
+        <div class="meta-block">
+          <div class="label">Bill To</div>
+          <div class="name">${esc(invoiceDetails.customer.name || '—')}</div>
+          ${invoiceDetails.customer.email ? `<div class="line">${esc(invoiceDetails.customer.email)}</div>` : ''}
+          ${invoiceDetails.customer.phone ? `<div class="line">${esc(formatPhoneDisplay(invoiceDetails.customer.phone))}</div>` : ''}
+          ${invoiceDetails.customer.address ? `<div class="line">${esc(invoiceDetails.customer.address)}</div>` : ''}
+        </div>
+        <div class="dates">
+          <div class="row">Issued <b>${fmtDate(invoiceDetails.issueDate)}</b></div>
+          ${invoiceDetails.dueDate ? `<div class="row">Due <b>${fmtDate(invoiceDetails.dueDate)}</b></div>` : ''}
+          ${invoiceDetails.recurring ? `<div class="row">Recurring <b>Yes</b></div>` : ''}
+        </div>
       </div>
       <table>
         <thead><tr><th>Description</th><th class="num">Qty</th><th class="amount">Price</th><th class="amount">Amount</th></tr></thead>
         <tbody>${itemRows}</tbody>
       </table>
       <div class="totals">
-        <div class="row total"><span>Total</span><span>${fmtInvoiceCurrency(invoiceSubtotal)}</span></div>
+        <div class="box">
+          <div class="row"><span>Subtotal</span><span>${fmtInvoiceCurrency(invoiceSubtotal)}</span></div>
+          <div class="row total"><span>Total Due</span><span>${fmtInvoiceCurrency(invoiceSubtotal)}</span></div>
+        </div>
       </div>
-      ${invoiceDetails.notes ? `<div class="notes">${esc(invoiceDetails.notes)}</div>` : ''}
+      ${invoiceDetails.notes ? `<div class="notes"><div class="label">Notes &amp; Terms</div><div class="body">${esc(invoiceDetails.notes)}</div></div>` : ''}
+      <div class="footer">
+        <p>This invoice was issued by ${businessName} via PayChain, and is a computer-generated document.</p>
+        <p>support@paychain.co.ke &nbsp;·&nbsp; www.paychain.co.ke</p>
+      </div>
     </body></html>`;
     try {
-      const { uri } = await Print.printToFileAsync({ html, base64: false });
+      // A4 in points at 72dpi (595 x 842) — passed explicitly since the
+      // @page CSS size alone isn't reliably honored by expo-print on Android.
+      const { uri } = await Print.printToFileAsync({ html, base64: false, width: 595, height: 842 });
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: 'Invoice', UTI: 'com.adobe.pdf' });
+        await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: `Invoice ${invoiceDetails.invoiceNumber || ''}`, UTI: 'com.adobe.pdf' });
       } else {
         Alert.alert('Saved', uri);
       }
@@ -2506,14 +2555,31 @@ export default function BulkPay() {
             <View className="w-full max-w-lg mx-auto bg-white rounded-t-[36px] pt-4 mt-auto" style={{ maxHeight: '92%' }}>
               <View className="items-center mb-2"><View className="w-12 h-1.5 bg-[#e7ece7] rounded-full" /></View>
 
-              <View className="flex-row items-center justify-between px-6 mb-4">
-                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[22px] text-[#0c2010]">
-                  {invoiceDetails.invoiceNumber ? `Invoice #${invoiceDetails.invoiceNumber}` : 'Create Invoice'}
-                </Text>
+              <View className="flex-row items-center justify-between px-6 mb-1">
+                <View className="flex-row items-center gap-2.5 flex-1">
+                  <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[22px] text-[#0c2010]">
+                    {invoiceDetails.invoiceNumber ? `Invoice #${invoiceDetails.invoiceNumber}` : 'Create Invoice'}
+                  </Text>
+                  {invoiceDetails.invoiceNumber && (() => {
+                    const badgeMeta: Record<string, { label: string; bg: string; text: string }> = {
+                      draft: { label: 'Draft', bg: '#fef3e7', text: '#b87333' },
+                      sent: { label: 'Sent', bg: '#e7f8ef', text: '#006c4e' },
+                      paid: { label: 'Paid', bg: '#dbeafe', text: '#1e40af' },
+                      void: { label: 'Void', bg: '#f1f5f9', text: '#64748b' },
+                    };
+                    const b = badgeMeta[invoiceDetails.status] || badgeMeta.draft;
+                    return (
+                      <View className="px-2.5 py-1 rounded-full" style={{ backgroundColor: b.bg }}>
+                        <Text className="text-[9px] font-jakarta-extrabold uppercase tracking-wider" style={{ color: b.text }}>{b.label}</Text>
+                      </View>
+                    );
+                  })()}
+                </View>
                 <TouchableOpacity onPress={() => setShowInvoiceEditor(false)} className="w-9 h-9 rounded-full bg-[#f7faf7] items-center justify-center">
                   <Feather name="x" size={16} color="#0c2010" />
                 </TouchableOpacity>
               </View>
+              <Text className="text-[10px] font-jakarta-medium text-[#707971] px-6 mb-4">From {merchant?.businessName || 'your business'}</Text>
 
               <ScrollView className="px-6" showsVerticalScrollIndicator={false}>
                 <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#707971] mb-4">Customer</Text>
@@ -2564,22 +2630,20 @@ export default function BulkPay() {
 
                 <View className="flex-row gap-4 mb-6">
                   <View className="flex-1">
-                    <Text className="text-[9px] font-jakarta-bold uppercase tracking-widest text-[#707971] mb-1.5 ml-1">Issue Date</Text>
-                    <TextInput
+                    <InlineDatePicker
+                      label="Issue Date"
                       value={invoiceDetails.issueDate}
-                      onChangeText={(t) => setInvoiceDetails(prev => ({ ...prev, issueDate: t }))}
-                      placeholder="YYYY-MM-DD"
-                      className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-4 py-3 text-[13px] font-jakarta-bold text-[#0c2010]"
+                      onChange={(iso) => setInvoiceDetails(prev => ({ ...prev, issueDate: iso }))}
                     />
                   </View>
                   <View className="flex-1">
-                    <Text className="text-[9px] font-jakarta-bold uppercase tracking-widest text-[#707971] mb-1.5 ml-1">Due Date</Text>
-                    <TextInput
+                    <InlineDatePicker
+                      label="Due Date"
                       value={invoiceDetails.dueDate}
-                      onChangeText={(t) => setInvoiceDetails(prev => ({ ...prev, dueDate: t }))}
+                      onChange={(iso) => setInvoiceDetails(prev => ({ ...prev, dueDate: iso }))}
                       placeholder="Optional"
-                      placeholderTextColor="#a1a1aa"
-                      className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-4 py-3 text-[13px] font-jakarta-bold text-[#0c2010]"
+                      minDate={invoiceDetails.issueDate}
+                      clearable
                     />
                   </View>
                 </View>
