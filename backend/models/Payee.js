@@ -27,6 +27,16 @@ const payeeSchema = new mongoose.Schema(
       type: String,
       enum: ['Personal Number', 'Paybill', 'Buy Goods'],
     },
+    // Which mobile money network this payee's wallet is on — only
+    // meaningful when mobileMoneyType === 'Personal Number' (Paybill/Buy
+    // Goods payees always resolve through Lipa na M-Pesa regardless of
+    // network). Defaults to 'safaricom' since that's the only network this
+    // app supported before Airtel Money B2W was wired up.
+    mobileNetwork: {
+      type: String,
+      enum: ['safaricom', 'airtel'],
+      default: 'safaricom',
+    },
     phone: String,
     paybillNumber: String,
     businessAccount: String,

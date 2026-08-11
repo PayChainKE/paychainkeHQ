@@ -14,6 +14,7 @@ import Invoice from '../models/Invoice.js';
 import { createNotification } from './notificationController.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
+import { claimPayoutSubmission, DuplicateSubmissionError } from '../utils/idempotencyGuard.js';
 import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard.js';
 import { PAYCHAIN_TXN_RATE } from '../config/revenueRateCard.js';
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay.js';
@@ -534,7 +535,7 @@ export const initiateSTKPush = async (req, res) => {
     const kind = purpose === 'request_money' ? 'request_money' : 'topup';
     const checkoutTotal = getCheckoutTotal(intAmount);
 
-    // Real STK Push via NCBA's paybill 880100 (or simulated — see
+    // Real STK Push via NCBA's Till short code 889066 (or simulated — see
     // services/ncbaStkPushService.js's NCBA_STK_LIVE_ENABLED gate).
     const checkoutRequestId = await initiateAndTrackNcbaStk({
       merchantId,
@@ -1034,6 +1035,7 @@ export const initiateB2C = async (req, res) => {
   try {
     const { amount, destination, pin } = req.body;
     const merchantId = req.merchant._id;
+    const provider = req.body.provider === 'airtel' ? 'airtel' : 'safaricom';
 
     // Validated/normalised to 254XXXXXXXXX before it ever reaches a payment
     // provider, gets stored as Transaction.recipient.id, or is used as an
@@ -1085,6 +1087,18 @@ export const initiateB2C = async (req, res) => {
     }
     await resetPinAttempts(merchantId);
 
+    // Correct PIN alone doesn't stop a double-click or a client retrying a
+    // slow/timed-out request from submitting the exact same withdrawal
+    // twice — reject an identical (merchant, phone, amount) submission
+    // landing within a short window of the last one, before any balance
+    // change happens.
+    try {
+      await claimPayoutSubmission(merchantId, ['b2c', phone, amount]);
+    } catch (e) {
+      if (e instanceof DuplicateSubmissionError) return res.status(409).json({ error: e.message });
+      throw e;
+    }
+
     // Atomic conditional deduct — avoids two concurrent B2C requests both
     // passing a stale in-memory balance check and over-withdrawing. Amount
     // sent to NCBA stays the raw `amount` — the fee is PayChain's own
@@ -1103,15 +1117,11 @@ export const initiateB2C = async (req, res) => {
     // Mobile B2W payout via NCBA (or simulated — see
     // services/ncbaOpenBankingService.js's NCBA_OPENBANKING_LIVE_ENABLED gate).
     const transactionId = `PAYOUT-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
-    // Daraja B2C only ever targeted Safaricom-registered numbers — the
-    // existing UI has no provider picker, so 'safaricom' preserves
-    // identical behavior. Airtel Money support just needs a provider
-    // field threaded through from the frontend later.
-    const { validationId } = await ncbaValidateMobileWalletNumber({ provider: 'safaricom', msisdn: phone });
+    const { validationId } = await ncbaValidateMobileWalletNumber({ provider, msisdn: phone });
     await ncbaSubmitMobileB2wPayment({
       transactionId,
       validationId,
-      provider: 'safaricom',
+      provider,
       amount,
       recipientNumber: phone,
       narration: `Withdrawal to ${destination}`,
@@ -1131,6 +1141,7 @@ export const initiateB2C = async (req, res) => {
       reference: transactionId,
       sender: { name: merchant.businessName, id: merchant.paybillAccount },
       recipient: { name: destination, id: phone },
+      mobileNetwork: provider,
     });
 
     res.status(200).json({ success: true, message: 'Transfer initiated successfully', transaction: tx });
@@ -1221,6 +1232,14 @@ export const initiateB2B = async (req, res) => {
       return res.status(401).json({ error: 'Invalid PIN.' });
     }
     await resetPinAttempts(merchantId);
+
+    // Same double-submission guard as initiateB2C above.
+    try {
+      await claimPayoutSubmission(merchantId, ['b2b', billType, partyB, accountReference, numericAmount]);
+    } catch (e) {
+      if (e instanceof DuplicateSubmissionError) return res.status(409).json({ error: e.message });
+      throw e;
+    }
 
     // Atomic conditional deduct — same race-avoidance as initiateB2C.
     totalDebit = Math.round((numericAmount + fee) * 100) / 100;

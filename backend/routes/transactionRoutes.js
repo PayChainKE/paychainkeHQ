@@ -35,14 +35,30 @@ const payAccountLimiter = rateLimit({
   message: { error: 'Too many payment attempts. Try again in 15 minutes.' },
 });
 
+// Both GET lookups below were unthrottled — a public caller could brute-force
+// them to enumerate the merchant directory (ncbaMerchantCode is sequential
+// and only 8 digits) or scan for live payment links (linkId is a random but
+// only 32-bit token). Neither leaks anything beyond a business name/amount,
+// but bulk-scraping the whole merchant list is exactly what a rate limit on
+// a public read endpoint exists to prevent. Slightly more generous than
+// payAccountLimiter since legitimate typo/retry browsing is more common
+// here than on the actual payment attempt.
+const lookupLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 40,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many lookup attempts. Try again in 15 minutes.' },
+});
+
 // Public Payment Link Routes
-router.get('/payment-link/:linkId', getPaymentLink);
+router.get('/payment-link/:linkId', lookupLimiter, getPaymentLink);
 router.post('/payment-link/:linkId/pay', payAccountLimiter, processPaymentLink);
 
 // Public direct-account payment — powers the static "Settlement QR" on a
 // merchant's Wallet page (open amount, no pre-generated link), as opposed
 // to the fixed-amount PaymentLink routes above.
-router.get('/pay-account/:account', getMerchantByAccount);
+router.get('/pay-account/:account', lookupLimiter, getMerchantByAccount);
 router.post('/pay-account/:account', payAccountLimiter, payToMerchantAccount);
 
 router.post('/statement/email', protectMerchant, emailStatement);

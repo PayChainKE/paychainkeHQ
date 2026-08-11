@@ -4,6 +4,7 @@ import Transaction from '../models/Transaction.js';
 import PayoutBatch from '../models/PayoutBatch.js';
 import {
   validatePesaLinkAccount,
+  validatePesaLinkMobileNumber,
   submitPesaLinkTransfer,
   submitEftTransfer,
   submitRtgsTransfer,
@@ -14,6 +15,7 @@ import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { buildPayoutSentSms, buildPayoutFailedSms } from '../utils/paymentSmsTemplates.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
+import { claimPayoutSubmission, DuplicateSubmissionError } from '../utils/idempotencyGuard.js';
 import { KENYAN_BANK_CODES } from '../config/kenyanBankCodes.js';
 import { getB2cTariff } from '../config/mpesaB2cTariffCard.js';
 import { PAYCHAIN_TXN_RATE } from '../config/revenueRateCard.js';
@@ -233,6 +235,50 @@ export const getBankCodes = (req, res) => {
   res.json({ bankCodes: KENYAN_BANK_CODES });
 };
 
+// @desc    Look up which bank(s) a phone number is registered with for
+//          PesaLink, plus the account holder's name — a convenience for a
+//          merchant who knows a payee's phone number but not their bank,
+//          used in Send Money before a PesaLink/EFT bank transfer.
+//          IMPORTANT: NCBA's mobile-number validation only ever returns a
+//          bank identity (sortCode/bankName) and the holder's name — never
+//          an account number, so this can only pre-fill the bank selection
+//          and a name to cross-check against; the merchant still has to
+//          type the real account number themselves and confirm it with
+//          the recipient directly.
+// @route   POST /openbanking/pesalink-lookup-phone (mounted at /api/v1 and /v1)
+// @access  Private (merchant)
+export const handlePesaLinkPhoneLookup = async (req, res) => {
+  try {
+    const { phoneNumber } = req.body;
+    if (!phoneNumber) {
+      return res.status(400).json({ error: 'phoneNumber is required.' });
+    }
+
+    const result = await validatePesaLinkMobileNumber({ phoneNumber });
+
+    // Match each returned sortCode against our own bank-code list so the
+    // frontend can auto-select an entry in the same dropdown getBankCodes
+    // above powers, rather than showing NCBA's raw bankName (which doesn't
+    // necessarily match our list's naming).
+    const banks = result.banks.map((b) => {
+      const match = KENYAN_BANK_CODES.find((k) => k.code === b.sortCode);
+      return {
+        bankCode: b.sortCode,
+        bankName: match?.name || b.bankName || b.lookupBankName,
+        isDefault: b.isDefault,
+      };
+    });
+
+    res.json({ destName: result.destName, banks });
+  } catch (err) {
+    if (err instanceof NcbaOpenBankingValidationError) {
+      return res.status(404).json({ error: err.message });
+    }
+    console.error('❌ PesaLink phone lookup error:', err.message);
+    res.status(500).json({ error: 'Could not look up this phone number. Please try again.' });
+  }
+};
+
 // @desc    Merchant-initiated single withdrawal to a bank account via NCBA
 //          PesaLink (immediate), EFT (next business day), or RTGS
 //          (cross-border/multi-currency, KES-only for now — see
@@ -282,6 +328,17 @@ export const handleBankPayout = async (req, res) => {
       return res.status(401).json({ error: 'Incorrect PIN. Please try again.' });
     }
     await resetPinAttempts(merchantId);
+
+    // Correct PIN alone doesn't stop a double-click or a client retrying a
+    // slow/timed-out request from submitting the exact same real transfer
+    // twice — this rejects an identical (merchant, rail, destination,
+    // amount) submission landing within a short window of the last one.
+    try {
+      await claimPayoutSubmission(merchantId, ['bank-payout', rail, bankCode, accountNumber, amount]);
+    } catch (e) {
+      if (e instanceof DuplicateSubmissionError) return res.status(409).json({ error: e.message });
+      throw e;
+    }
 
     const { transaction, hostResponse, merchant: updatedMerchant } = await executeNcbaBankPayout({
       merchantId, bankCode, accountNumber, accountName, amount, narration, rail,

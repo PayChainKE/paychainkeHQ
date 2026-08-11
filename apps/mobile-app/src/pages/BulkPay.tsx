@@ -20,6 +20,7 @@ import { formatPhoneDisplay } from '../utils/formatPhoneDisplay';
 type PayeeType = 'employee' | 'supplier' | 'utility' | 'contractor';
 type PaymentMethod = 'Mobile Money' | 'Bank';
 type MobileMoneyType = 'Personal Number' | 'Paybill' | 'Buy Goods';
+type MobileNetwork = 'safaricom' | 'airtel';
 
 interface Payee {
   _id: string;
@@ -27,6 +28,7 @@ interface Payee {
   type: PayeeType;
   paymentMethod?: PaymentMethod;
   mobileMoneyType?: MobileMoneyType;
+  mobileNetwork?: MobileNetwork;
   phone?: string;
   paybillNumber?: string;
   businessAccount?: string;
@@ -239,6 +241,7 @@ export default function BulkPay() {
     utilityProvider: '',
     paymentMethod: 'Mobile Money' as PaymentMethod,
     mobileMoneyType: 'Personal Number' as MobileMoneyType,
+    mobileNetwork: 'safaricom' as MobileNetwork,
     amount: '',
     phone: '',
     accountNumber: '',
@@ -690,6 +693,7 @@ export default function BulkPay() {
       utilityProvider: p.utilityProvider || '',
       paymentMethod: (p.paymentMethod as PaymentMethod) || 'Mobile Money',
       mobileMoneyType: (p.mobileMoneyType as MobileMoneyType) || 'Personal Number',
+      mobileNetwork: (p.mobileNetwork as MobileNetwork) || 'safaricom',
       amount: p.defaultAmount ? String(p.defaultAmount) : '',
       phone: p.phone || '',
       accountNumber: p.accountNumber || '',
@@ -2385,14 +2389,27 @@ export default function BulkPay() {
                           ))}
                         </View>
                         {newPayee.mobileMoneyType === 'Personal Number' && (
-                          <TextInput
-                            value={newPayee.phone}
-                            onChangeText={(t) => setNewPayee({ ...newPayee, phone: t.replace(/\D/g, '').slice(0, 12) })}
-                            keyboardType="phone-pad"
-                            placeholder="07XX XXX XXX"
-                            placeholderTextColor="#a1a1aa"
-                            className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-4 py-3.5 text-[#0c2010] font-jakarta-bold text-[14px] mb-2"
-                          />
+                          <View className="mb-2">
+                            <TextInput
+                              value={newPayee.phone}
+                              onChangeText={(t) => setNewPayee({ ...newPayee, phone: t.replace(/\D/g, '').slice(0, 12) })}
+                              keyboardType="phone-pad"
+                              placeholder="07XX XXX XXX"
+                              placeholderTextColor="#a1a1aa"
+                              className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-4 py-3.5 text-[#0c2010] font-jakarta-bold text-[14px] mb-2"
+                            />
+                            <View className="flex-row gap-1.5">
+                              {(['safaricom', 'airtel'] as MobileNetwork[]).map((net) => (
+                                <TouchableOpacity
+                                  key={net}
+                                  onPress={() => setNewPayee({ ...newPayee, mobileNetwork: net })}
+                                  className={`flex-1 py-2.5 rounded-lg items-center border ${newPayee.mobileNetwork === net ? 'bg-[#00351d] border-[#00351d]' : 'bg-white border-[#e7ece7]'}`}
+                                >
+                                  <Text className={`font-jakarta-bold text-[11px] ${newPayee.mobileNetwork === net ? 'text-white' : 'text-[#707971]'}`}>{net === 'airtel' ? 'Airtel Money' : 'M-PESA'}</Text>
+                                </TouchableOpacity>
+                              ))}
+                            </View>
+                          </View>
                         )}
                         {newPayee.mobileMoneyType === 'Paybill' && (
                           <View className="flex-row gap-2 mb-2">

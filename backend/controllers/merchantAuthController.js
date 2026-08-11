@@ -106,7 +106,7 @@ export const registerMerchant = async (req, res) => {
     }
 
     const certificateUrl = certificateFile ? certificateFile.path : null;
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = crypto.randomInt(100000, 1000000).toString();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
     // paybillAccount (the old 5-digit shared-Paybill sub-account) is
     // deliberately no longer assigned to new merchants — the live payment
@@ -335,7 +335,7 @@ export const loginMerchant = async (req, res) => {
     // (same check used above to build phoneVariations) — in that case the
     // OTP goes out over SMS instead of email.
     const viaPhone = !loginIdentifier.includes('@');
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = crypto.randomInt(100000, 1000000).toString();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
 
     // Dispatch first (it may fall back from sms to email internally), then
@@ -378,7 +378,7 @@ export const resendMerchantOTP = async (req, res) => {
       return res.status(401).json({ error: 'Invalid request' });
     }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = crypto.randomInt(100000, 1000000).toString();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
 
     // Repeat whichever channel the merchant's currently-pending OTP was sent

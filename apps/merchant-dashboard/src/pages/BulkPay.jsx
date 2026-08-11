@@ -98,6 +98,7 @@ export default function BulkPay() {
     utilityProvider: '',
     paymentMethod: 'Mobile Money',
     mobileMoneyType: 'Personal Number',
+    mobileNetwork: 'safaricom',
     amount: '',
     phone: '',
     accountNumber: '',
@@ -155,6 +156,7 @@ export default function BulkPay() {
       utilityProvider: p.utilityProvider || '',
       paymentMethod: p.paymentMethod || 'Mobile Money',
       mobileMoneyType: p.mobileMoneyType || 'Personal Number',
+      mobileNetwork: p.mobileNetwork || 'safaricom',
       amount: (p.salary || p.amount || 0).toString(),
       phone: p.phone || '',
       accountNumber: p.accountNumber || '',
@@ -350,6 +352,7 @@ export default function BulkPay() {
       utilityProvider: '',
       paymentMethod: 'Mobile Money',
       mobileMoneyType: 'Personal Number',
+      mobileNetwork: 'safaricom',
       amount: '',
       phone: '',
       accountNumber: '',
@@ -1380,15 +1383,33 @@ export default function BulkPay() {
                             </div>
 
                             {newPayee.mobileMoneyType === 'Personal Number' && (
-                              <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-300">
-                                <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">M-PESA Number</label>
-                                <ValidatedInput
-                                  kind="phoneKE"
-                                  value={newPayee.phone}
-                                  onChange={(e) => setNewPayee({...newPayee, phone: e.target.value})}
-                                  placeholder="07XX XXX XXX"
-                                  className="w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 md:px-6 md:py-4 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none"
-                                />
+                              <div className="space-y-3 animate-in slide-in-from-top-2 duration-300">
+                                <div className="space-y-1.5">
+                                  <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Mobile Money Number</label>
+                                  <ValidatedInput
+                                    kind="phoneKE"
+                                    value={newPayee.phone}
+                                    onChange={(e) => setNewPayee({...newPayee, phone: e.target.value})}
+                                    placeholder="07XX XXX XXX"
+                                    className="w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 md:px-6 md:py-4 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none"
+                                  />
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                  {['safaricom', 'airtel'].map((net) => (
+                                    <button
+                                      key={net}
+                                      type="button"
+                                      onClick={() => setNewPayee({...newPayee, mobileNetwork: net})}
+                                      className={`py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all border ${
+                                        (newPayee.mobileNetwork || 'safaricom') === net
+                                          ? 'bg-[#00351D] text-white border-[#00351D]'
+                                          : 'bg-white text-on-surface-variant/40 border-outline-variant/20 hover:border-emerald-500/30'
+                                      }`}
+                                    >
+                                      {net === 'airtel' ? 'Airtel Money' : 'M-PESA'}
+                                    </button>
+                                  ))}
+                                </div>
                               </div>
                             )}
 

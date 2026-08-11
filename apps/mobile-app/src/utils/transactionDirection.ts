@@ -55,7 +55,7 @@ const TYPE_LABELS: Record<string, string> = {
   ncba_inbound: 'Inbound',
   ncba_outbound: 'Bank Transfer',
   mpesa_b2c: 'M-PESA Withdrawal',
-  ncba_mobile_b2w: 'M-PESA Withdrawal',
+  ncba_mobile_b2w: 'Mobile Money Withdrawal',
   mpesa_b2b: 'Paybill/Till Payout',
   ncba_lipa_na_mpesa: 'Paybill/Till Payout',
   ncba_kplc: 'KPLC Bill Payment',
