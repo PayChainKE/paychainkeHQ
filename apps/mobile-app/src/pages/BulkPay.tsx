@@ -2105,8 +2105,8 @@ export default function BulkPay() {
                                 className={`flex-row items-center gap-1.5 px-3.5 py-2.5 rounded-xl border ${active ? 'bg-[#00351d] border-[#00351d]' : 'bg-[#f0fdf4] border-[#e7ece7]'}`}
                               >
                                 {logoSrc && (
-                                  <View className="bg-white rounded px-1 py-0.5">
-                                    <Image source={logoSrc} style={{ height: 12, width: 20, resizeMode: 'contain' }} />
+                                  <View className="bg-white rounded-md px-1.5 py-1">
+                                    <Image source={logoSrc} style={{ height: 20, width: 34, resizeMode: 'contain' }} />
                                   </View>
                                 )}
                                 <Text className={`font-jakarta-bold text-[11px] uppercase tracking-wider ${active ? 'text-white' : 'text-[#404942]'}`}>
@@ -2150,9 +2150,11 @@ export default function BulkPay() {
                         strings, not ones built from an interpolated variable. */}
                     {(newPayee.utilityProvider === 'KPLC' || newPayee.utilityProvider === 'KPLC_PREPAID') && (
                       <View className="bg-[#fef9e7] rounded-2xl p-4 mb-4 border border-[#f5deb3]">
-                        <View className="flex-row items-center gap-2 mb-1">
-                          <Image source={require('../../assets/kplc-logo.png')} style={{ height: 16, width: 28, resizeMode: 'contain' }} />
-                          <Text className="text-[10px] font-jakarta-bold text-[#b87333] uppercase tracking-wider">
+                        <View className="flex-row items-center gap-2.5 mb-2">
+                          <View className="bg-white rounded-lg px-2 py-1.5 shadow-sm">
+                            <Image source={require('../../assets/kplc-logo.png')} style={{ height: 28, width: 48, resizeMode: 'contain' }} />
+                          </View>
+                          <Text className="text-[10px] font-jakarta-bold text-[#b87333] uppercase tracking-wider flex-1">
                             {newPayee.utilityProvider === 'KPLC_PREPAID' ? 'KPLC Prepaid Details' : 'KPLC Postpaid Details'}
                           </Text>
                         </View>
@@ -2213,9 +2215,11 @@ export default function BulkPay() {
 
                     {newPayee.utilityProvider === 'WATER' && (
                       <View className="bg-[#e6f6fd] rounded-2xl p-4 mb-4 border border-[#bae4f5]">
-                        <View className="flex-row items-center gap-2 mb-3">
-                          <Image source={require('../../assets/ncwsc-logo.png')} style={{ height: 16, width: 40, resizeMode: 'contain' }} />
-                          <Text className="text-[10px] font-jakarta-bold text-[#0369a1] uppercase tracking-wider">NCWSC (Nairobi Water) Details</Text>
+                        <View className="flex-row items-center gap-2.5 mb-3">
+                          <View className="bg-white rounded-lg px-2 py-1.5 shadow-sm">
+                            <Image source={require('../../assets/ncwsc-logo.png')} style={{ height: 28, width: 70, resizeMode: 'contain' }} />
+                          </View>
+                          <Text className="text-[10px] font-jakarta-bold text-[#0369a1] uppercase tracking-wider flex-1">NCWSC (Nairobi Water) Details</Text>
                         </View>
                         <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">Meter Number</Text>
                         <TextInput
