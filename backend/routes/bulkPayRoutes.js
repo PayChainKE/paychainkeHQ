@@ -1,7 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import rateLimit from 'express-rate-limit';
-import { getPayees, getPayeeById, addPayee, updatePayee, deletePayee, getBatches, getBatchById, uploadCSV, authorizeBatch, validateKplcMeter, validateNcwscMeter, validateKplcPrepaidMeter } from '../controllers/bulkPayController.js';
+import { getPayees, getPayeeById, addPayee, updatePayee, deletePayee, getBatches, getBatchById, uploadCSV, authorizeBatch } from '../controllers/bulkPayController.js';
 import { protectMerchant } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -36,30 +36,35 @@ const pinLimiter = rateLimit({
   message: { error: 'Too many PIN attempts. Try again in 15 minutes.' },
 });
 
-// External NCBA lookup — same abuse-prevention posture as pinLimiter above,
-// just not PIN-specific (guards against a merchant hammering NCBA's biller
-// validation endpoints via repeated Add-Payee attempts).
-const utilityValidationLimiter = rateLimit({
+// Only /authorize had its own throttle beyond the app-wide 600/15min
+// backstop in server.js — payee writes and CSV upload (disk I/O) had no
+// dedicated limit, letting a compromised/malicious authenticated session
+// hammer either well within that generous global cap. Found during a
+// security review of the bulk-pay flow.
+const writeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Try again in 15 minutes.' },
+});
+const uploadLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many meter lookups. Try again in 15 minutes.' },
+  message: { error: 'Too many uploads. Try again in 15 minutes.' },
 });
 
 // Payee routes
 router.route('/payees')
   .get(getPayees)
-  .post(addPayee);
-
-router.post('/validate-kplc-meter', utilityValidationLimiter, validateKplcMeter);
-router.post('/validate-kplc-prepaid-meter', utilityValidationLimiter, validateKplcPrepaidMeter);
-router.post('/validate-ncwsc-meter', utilityValidationLimiter, validateNcwscMeter);
+  .post(writeLimiter, addPayee);
 
 router.route('/payees/:id')
   .get(getPayeeById)
-  .put(updatePayee)
-  .delete(deletePayee);
+  .put(writeLimiter, updatePayee)
+  .delete(writeLimiter, deletePayee);
 
 // Batch routes
 router.route('/batches')
@@ -69,7 +74,14 @@ router.route('/batches/:id')
   .get(getBatchById);
 
 // CSV and Authorization
-router.post('/upload-csv', upload.single('file'), uploadCSV);
+router.post('/upload-csv', uploadLimiter, upload.single('file'), uploadCSV);
+// Was `pinLimiter, generateToken, authorizeBatch` — generateToken fetches a
+// Safaricom Daraja OAuth token that authorizeBatch never reads (bulk pay is
+// 100% NCBA-routed now). Left in place, it meant every bulk-pay batch
+// authorization — including pure bank/KPLC/NCWSC ones with zero Daraja
+// involvement — silently depended on Safaricom's OAuth endpoint being up
+// and MPESA_CONSUMER_KEY/SECRET being configured, an unrelated single point
+// of failure discovered during a security review of this route.
 router.post('/authorize', pinLimiter, authorizeBatch);
 
 export default router;

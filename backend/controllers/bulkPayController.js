@@ -19,6 +19,24 @@ import { validatePhoneNumber } from '../utils/ncbaValidators.js';
 import { validateMobileWalletNumber, submitMobileB2wPayment, validateLipaNaMpesaAccount, submitLipaNaMpesaPayment, validateKplcAccount, submitKplcPayment, validateKplcPrepaidAccount, submitKplcPrepaidPayment, validateNcwscAccount, submitNcwscPayment, NcbaOpenBankingValidationError } from '../services/ncbaOpenBankingService.js';
 import { buildPayoutSentSms } from '../utils/paymentSmsTemplates.js';
 
+// Every catch block in this file used to respond with { error: error.message }
+// directly, which bypasses server.js's global error handler entirely (that
+// handler only redacts errors reaching it via next(err) in production) — so
+// raw internal exception text (library internals, occasionally a fragment of
+// a DB error) was always sent straight to the client regardless of
+// environment. Found during a security review of the bulk-pay flow.
+// serverError() logs the full detail server-side always, and only echoes
+// error.message back to the client outside production, matching the app's
+// own established redaction behavior elsewhere.
+function serverError(res, status, publicMessage, error, logPrefix) {
+  console.error(logPrefix || publicMessage, error);
+  const body = { message: publicMessage };
+  if (process.env.NODE_ENV !== 'production') {
+    body.error = error?.message || String(error);
+  }
+  return res.status(status).json(body);
+}
+
 // @desc    Get all payees for a merchant
 // @route   GET /api/bulkpay/payees
 // @access  Private
@@ -27,7 +45,7 @@ export const getPayees = async (req, res) => {
     const payees = await Payee.find({ merchantId: req.merchant._id }).sort({ createdAt: -1 });
     res.json(payees);
   } catch (error) {
-    res.status(500).json({ message: 'Server error fetching payees', error: error.message });
+    serverError(res, 500, 'Server error fetching payees', error);
   }
 };
 
@@ -63,7 +81,7 @@ export const addPayee = async (req, res) => {
     const savedPayee = await payee.save();
     res.status(201).json(savedPayee);
   } catch (error) {
-    res.status(500).json({ message: 'Failed to add payee', error: error.message });
+    serverError(res, 500, 'Failed to add payee', error);
   }
 };
 
@@ -78,12 +96,6 @@ export const updatePayee = async (req, res) => {
       kraPin, idNumber, nssfNumber, shifNumber, etimsInvoiceNumber, cuNumber, defaultAmount
     } = req.body;
 
-    // Validate ownership
-    const payee = await Payee.findOne({ _id: req.params.id, merchantId: req.merchant._id });
-    if (!payee) {
-      return res.status(404).json({ message: 'Payee not found' });
-    }
-
     // KRA validations for updated type
     if (type === 'employee' && (!kraPin || !idNumber)) {
       return res.status(400).json({ message: 'KRA PIN and ID Number are required for Employees.' });
@@ -91,9 +103,15 @@ export const updatePayee = async (req, res) => {
       return res.status(400).json({ message: 'KRA PIN, eTIMS Invoice Number, and CU Number are required for Suppliers.' });
     }
 
-    // Update payee
-    const updatedPayee = await Payee.findByIdAndUpdate(
-      req.params.id,
+    // Ownership check + update collapsed into one atomic, merchantId-scoped
+    // call (was a separate findOne ownership check followed by an unscoped
+    // findByIdAndUpdate(req.params.id, ...) — not exploitable as written
+    // since both calls targeted the same id within one request, but it's a
+    // TOCTOU-shaped anti-pattern; this matches deletePayee's already-correct
+    // single-scoped-query pattern). Found during a security review of the
+    // bulk-pay flow.
+    const updatedPayee = await Payee.findOneAndUpdate(
+      { _id: req.params.id, merchantId: req.merchant._id },
       {
         name, type, paymentMethod, mobileMoneyType, mobileNetwork, phone, paybillNumber,
         businessAccount, tillNumber, bankName, accountNumber, bankCode, utilityProvider,
@@ -102,10 +120,13 @@ export const updatePayee = async (req, res) => {
       },
       { returnDocument: 'after' }
     );
+    if (!updatedPayee) {
+      return res.status(404).json({ message: 'Payee not found' });
+    }
 
     res.json(updatedPayee);
   } catch (error) {
-    res.status(500).json({ message: 'Failed to update payee', error: error.message });
+    serverError(res, 500, 'Failed to update payee', error);
   }
 };
 
@@ -121,7 +142,7 @@ export const deletePayee = async (req, res) => {
     await Payee.deleteOne({ _id: req.params.id, merchantId: req.merchant._id });
     res.status(200).json({ message: 'Payee removed successfully' });
   } catch (error) {
-    res.status(500).json({ message: 'Failed to delete payee', error: error.message });
+    serverError(res, 500, 'Failed to delete payee', error);
   }
 };
 
@@ -315,7 +336,7 @@ export const uploadCSV = async (req, res) => {
       });
 
   } catch (error) {
-    res.status(500).json({ message: 'Error processing CSV', error: error.message });
+    serverError(res, 500, 'Error processing CSV', error);
   }
 };
 
@@ -842,57 +863,82 @@ export const authorizeBatch = async (req, res) => {
 
   } catch (error) {
     console.error('Bulk Pay Error:', error.response?.data || error);
-    res.status(500).json({ 
-      message: error.response?.data?.errorMessage || 'Failed to authorize batch', 
-      error: error.message 
-    });
+    // Was: message: error.response?.data?.errorMessage — echoing NCBA's own
+    // raw upstream error text straight to the client, not just error.message.
+    // Full detail (including error.response.data) is already logged above
+    // for debugging; only a generic message + (non-prod only) error.message
+    // goes to the client now, matching serverError()'s pattern used
+    // elsewhere in this file.
+    const body = { message: 'Failed to authorize batch' };
+    if (process.env.NODE_ENV !== 'production') {
+      body.error = error.response?.data?.errorMessage || error.message;
+    }
+    res.status(500).json(body);
   }
 };
 
 // @desc    Get all batch history for a merchant
 // @route   GET /api/bulkpay/batches
 // @access  Private
+const VALID_BATCH_STATUSES = ['Pending', 'Processed', 'Partial', 'Failed'];
+
 export const getBatches = async (req, res) => {
   try {
     const { page = 1, limit = 10, status, fromDate, toDate } = req.query;
-    
+
     let query = { merchantId: req.merchant._id };
-    
-    // Filter by status if provided
-    if (status) {
+
+    // status must be a plain string from a fixed enum — req.query can
+    // otherwise carry a parsed object (e.g. ?status[$ne]=x becomes
+    // { $ne: 'x' } under Express's default query parser), which would let a
+    // caller inject a Mongo operator into this field. server.js's
+    // stripMongoOperators only covers req.body, not req.query, so this
+    // needed its own whitelist. Scoped by merchantId regardless, so this
+    // was never a cross-merchant data leak — but it could still corrupt
+    // query semantics or throw on a crafted operator. Found during a
+    // security review of the bulk-pay flow.
+    if (status && typeof status === 'string' && VALID_BATCH_STATUSES.includes(status)) {
       query.status = status;
     }
-    
+
     // Filter by date range if provided
     if (fromDate || toDate) {
       query.createdAt = {};
-      if (fromDate) {
-        query.createdAt.$gte = new Date(fromDate);
+      if (fromDate && typeof fromDate === 'string') {
+        const parsed = new Date(fromDate);
+        if (!Number.isNaN(parsed.getTime())) query.createdAt.$gte = parsed;
       }
-      if (toDate) {
-        query.createdAt.$lte = new Date(toDate);
+      if (toDate && typeof toDate === 'string') {
+        const parsed = new Date(toDate);
+        if (!Number.isNaN(parsed.getTime())) query.createdAt.$lte = parsed;
       }
+      if (Object.keys(query.createdAt).length === 0) delete query.createdAt;
     }
-    
-    const skip = (page - 1) * limit;
+
+    // Clamp page/limit to sane bounds — unbounded values let a caller pull
+    // arbitrarily large result sets (or a negative skip) in one request.
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 10));
+    const skip = (pageNum - 1) * limitNum;
+
     const batches = await PayoutBatch.find(query)
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(parseInt(limit));
-    
+      .limit(limitNum);
+
     const total = await PayoutBatch.countDocuments(query);
-    
+
     res.json({
       batches,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: pageNum,
+        limit: limitNum,
         total,
-        pages: Math.ceil(total / limit)
+        pages: Math.ceil(total / limitNum)
       }
     });
   } catch (error) {
-    res.status(500).json({ message: 'Error fetching batches', error: error.message });
+    serverError(res, 500, 'Error fetching batches', error);
   }
 };
 
@@ -912,7 +958,7 @@ export const getBatchById = async (req, res) => {
     
     res.json(batch);
   } catch (error) {
-    res.status(500).json({ message: 'Error fetching batch', error: error.message });
+    serverError(res, 500, 'Error fetching batch', error);
   }
 };
 
@@ -932,6 +978,6 @@ export const getPayeeById = async (req, res) => {
     
     res.json(payee);
   } catch (error) {
-    res.status(500).json({ message: 'Error fetching payee', error: error.message });
+    serverError(res, 500, 'Error fetching payee', error);
   }
 };

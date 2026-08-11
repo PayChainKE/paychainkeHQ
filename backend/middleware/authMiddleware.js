@@ -70,6 +70,19 @@ const protectMerchant = async (req, res, next) => {
     const merchant = await Merchant.findById(decoded.id).select('-password');
     if (!merchant) return fail(res, 401, 'MERCHANT_NOT_FOUND', 'Merchant account no longer exists. Please sign in again.');
 
+    // Mirrors protect()'s admin.status check above — without this, an
+    // account an admin locks (e.g. for suspected fraud) could keep using
+    // its still-valid JWT to hit every merchant route, including money
+    // movement like Bulk Pay's authorizeBatch, since locking previously
+    // only blocked a *new* login rather than an existing session. Found
+    // during a security review of the bulk-pay flow: adminController.js's
+    // lock action sets status='locked' but never bumped tokenVersion, and
+    // no route checked status on every request — so a lock had no actual
+    // enforcement point once a merchant already held a token.
+    if (merchant.status === 'locked') {
+      return fail(res, 403, 'MERCHANT_LOCKED', 'This account has been locked. Contact support.');
+    }
+
     // Tokens issued before this field existed carry no tokenVersion claim —
     // treat that as version 0 so old sessions keep working until the first
     // "Sign Out All Devices" bumps the account forward.

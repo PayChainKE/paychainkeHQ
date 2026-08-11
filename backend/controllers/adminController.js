@@ -320,6 +320,11 @@ export const confirmMerchantAction = async (req, res) => {
       merchant.status = 'locked';
       merchant.lockedAt = new Date();
       merchant.lockedBy = admin._id;
+      // Same "Sign Out All Devices" mechanism merchantAuthController.js uses
+      // — forces every already-issued JWT to fail protectMerchant's
+      // tokenVersion check immediately, rather than relying solely on the
+      // status==='locked' check to catch it on the next request.
+      merchant.tokenVersion = (merchant.tokenVersion || 0) + 1;
       await merchant.save();
       logAudit({
         action: 'admin.merchant.locked', category: 'admin', severity: 'critical',
