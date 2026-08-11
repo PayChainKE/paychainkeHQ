@@ -18,7 +18,7 @@ import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLocked
 import { claimPayoutSubmission, DuplicateSubmissionError } from '../utils/idempotencyGuard.js';
 import { KENYAN_BANK_CODES } from '../config/kenyanBankCodes.js';
 import { getB2cTariff } from '../config/mpesaB2cTariffCard.js';
-import { PAYCHAIN_TXN_RATE } from '../config/revenueRateCard.js';
+import { NCBA_LIPA_NA_MPESA_FLAT_FEE_KES } from '../config/revenueRateCard.js';
 
 export class InsufficientFundsError extends Error {
   constructor(merchantId, requested, available) {
@@ -467,7 +467,7 @@ export const handlePesaLinkCallback = async (req, res) => {
         const { totalFee } = getB2cTariff(transaction.amount);
         refundAmount += totalFee;
       } else if (transaction.type === 'ncba_lipa_na_mpesa') {
-        refundAmount += Math.round(transaction.amount * PAYCHAIN_TXN_RATE * 100) / 100;
+        refundAmount += NCBA_LIPA_NA_MPESA_FLAT_FEE_KES;
       }
       merchantForSms = await Merchant.findByIdAndUpdate(
         transaction.merchantId,

@@ -20,15 +20,15 @@ const DESTINATIONS = [
 ]
 
 // PayChain's own flat margin on B2B (Paybill/Till) payouts — mirrors
-// backend/config/revenueRateCard.js's PAYCHAIN_TXN_RATE, the same rate
-// mpesaController.js#initiateB2B actually charges server-side. Safaricom's
-// own B2B tariff isn't modeled anywhere in this codebase (see
-// bulkPayController.js), so unlike the B2C estimate above, this is not a
-// Safaricom-cost estimate — it's PayChain's own charge, computed exactly.
-const PAYCHAIN_B2B_RATE = 0.005
+// backend/config/revenueRateCard.js's NCBA_LIPA_NA_MPESA_FLAT_FEE_KES, the
+// same flat fee mpesaController.js#initiateB2B actually charges
+// server-side. Safaricom's own B2B tariff isn't modeled anywhere in this
+// codebase (see bulkPayController.js), so unlike the B2C estimate above,
+// this is not a Safaricom-cost estimate — it's PayChain's own charge.
+const PAYCHAIN_B2B_FLAT_FEE_KES = 30
 function estimateB2bFee(amount) {
   if (!amount || amount <= 0) return 0
-  return Math.round(amount * PAYCHAIN_B2B_RATE * 100) / 100
+  return PAYCHAIN_B2B_FLAT_FEE_KES
 }
 
 // Mirrors backend/config/mpesaB2cTariffCard.js — Safaricom's real M-Pesa

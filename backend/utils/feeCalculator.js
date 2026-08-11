@@ -94,7 +94,7 @@ export function calculateFees(type, kesAmount) {
   }
 
   const paychainFee = stream && v > 0
-    ? Math.max(stream.minFee || 0, v * stream.rate)
+    ? (stream.flatFee != null ? stream.flatFee : Math.max(stream.minFee || 0, v * stream.rate))
     : 0;
 
   // Safaricom passthrough applies only to streams marked as such.
