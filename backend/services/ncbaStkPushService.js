@@ -197,7 +197,10 @@ export async function initiateStkPush({ phone, amount, accountNo }) {
  * the `till` field as documented (`"till#narration"`).
  *
  * @param {object} params
- * @param {number} params.amount - fixed amount to bake into the QR
+ * @param {number} [params.amount] - fixed amount to bake into the QR;
+ *        omit for an open-amount QR (NCBA's own `amount` field is
+ *        documented optional — the customer enters it themselves when
+ *        they scan, same as a merchant's standing "pay me" code).
  * @param {string} params.narration - embedded in the till field; carries
  *        the merchant's ncbaMerchantCode so the resulting payment's
  *        Narrative can be attributed the same way any other NCBA Virtual
@@ -205,22 +208,22 @@ export async function initiateStkPush({ phone, amount, accountNo }) {
  * @returns {{ qrCodeDataUri: string }}
  */
 export async function generateQrCode({ amount, narration }) {
-  if (!amount || !narration) {
-    throw new NcbaStkRequestError('amount and narration are required to generate a QR code');
+  if (!narration) {
+    throw new NcbaStkRequestError('narration is required to generate a QR code');
   }
+  const hasAmount = amount !== undefined && amount !== null;
 
   if (!liveCallsEnabled) {
-    simulate('ncba_qr_generate_sandbox', { amount, narration });
+    simulate('ncba_qr_generate_sandbox', { amount: hasAmount ? amount : 'open', narration });
     // A tiny valid 1x1 PNG data URI — enough for the frontend to render an
     // <img> without a real NCBA round trip, same spirit as STK's fake
     // TransactionID in sandbox mode.
     return { qrCodeDataUri: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=' };
   }
 
-  const result = await ncbaStkPost('/payments/api/v1/qr/generate', {
-    till: `${NCBA_STK_PAYBILL}#${narration}`,
-    amount: Number(amount),
-  });
+  const body = { till: `${NCBA_STK_PAYBILL}#${narration}` };
+  if (hasAmount) body.amount = Number(amount);
+  const result = await ncbaStkPost('/payments/api/v1/qr/generate', body);
 
   if (!result?.Base64QrCode) {
     throw new NcbaStkRequestError(result?.StatusDescription || 'The QR code could not be generated. Please try again.');

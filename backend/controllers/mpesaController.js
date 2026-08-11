@@ -1088,6 +1088,35 @@ export const generateQrCheckout = async (req, res) => {
   }
 };
 
+// @desc    Generate an OPEN-AMOUNT Dynamic QR Code for the merchant's own
+//          NCBA Virtual Account — "my QR", a standing code (Wallet page,
+//          MyAccounts per-row modal) rather than a one-time checkout. No
+//          amount is baked in (NCBA's `amount` field is optional — the
+//          customer enters it themselves when they scan), so there's no
+//          checkout total to track: this settles through the same generic
+//          ncba_inbound account-notification path any other Virtual
+//          Account collection does (services/ncbaLedgerService.js), not
+//          through STKRequest/resolveStkOutcome — there's no customer
+//          surcharge concept for an open amount the merchant didn't set.
+//          Replaces the old client-side qrcode.react QR that just encoded
+//          a link to PayChain's own /pay/account/:id page — this is a real
+//          M-PESA-scannable code instead.
+// @route   GET /api/callbacks/account-qr
+// @access  Private (merchant)
+export const generateAccountQr = async (req, res) => {
+  try {
+    const merchant = await Merchant.findById(req.merchant._id).select('ncbaMerchantCode');
+    if (!merchant?.ncbaMerchantCode) {
+      return res.status(400).json({ error: 'This merchant has no NCBA virtual account assigned yet.' });
+    }
+    const { qrCodeDataUri } = await ncbaGenerateQrCode({ amount: undefined, narration: merchant.ncbaMerchantCode });
+    res.status(200).json({ success: true, qrCodeDataUri });
+  } catch (error) {
+    console.error('❌ Account QR Generate Error:', error.message);
+    res.status(502).json({ error: 'Failed to generate QR code — please try again.' });
+  }
+};
+
 export const getSTKStatus = async (req, res) => {
   try {
     const { checkoutId } = req.params;

@@ -1,25 +1,28 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, Animated, Easing } from 'react-native';
+import { View, Text, Animated, Easing, Image, ActivityIndicator } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import QRCode from 'react-native-qrcode-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import { formatAccountNumber } from '../../utils/formatAccountNumber';
 
 // Premium settlement-QR card — dark bezel frame, corner brackets, an
 // animated "scan me" badge + curved arrow pointing at the code, a soft
-// pulsing halo, and the PayChain mark embedded at the QR's center
-// (ecl="H" error correction leaves plenty of headroom for that). RN port of
+// pulsing halo. RN port of
 // apps/merchant-dashboard/src/components/ui/SettlementQrCard.jsx — kept
 // visually equivalent so the two apps' settlement QR reads the same way.
+//
+// qrCodeDataUri is a real NCBA Dynamic QR Code (scannable directly in
+// M-PESA) fetched from GET /api/callbacks/account-qr by the caller — this
+// used to render its own client-side QR (react-native-qrcode-svg) encoding
+// a link to PayChain's own /pay/account/:id page; replaced so there's one
+// QR mechanism in the app, not two.
 interface SettlementQrCardProps {
-  qrData: string;
+  qrCodeDataUri: string;
   businessName?: string | null;
   accountNumber?: string | null;
   size?: number;
-  qrRef?: (ref: any) => void;
 }
 
-export default function SettlementQrCard({ qrData, businessName, accountNumber, size = 144, qrRef }: SettlementQrCardProps) {
+export default function SettlementQrCard({ qrCodeDataUri, businessName, accountNumber, size = 144 }: SettlementQrCardProps) {
   const wiggle = useRef(new Animated.Value(0)).current;
   const bounce = useRef(new Animated.Value(0)).current;
   const pulse = useRef(new Animated.Value(0)).current;
@@ -100,19 +103,17 @@ export default function SettlementQrCard({ qrData, businessName, accountNumber, 
               opacity: pulseOpacity, transform: [{ scale: pulseScale }],
             }}
           />
-          <QRCode
-            value={qrData}
-            size={size}
-            color="#00351D"
-            backgroundColor="#FFFFFF"
-            ecl="H"
-            logo={require('../../../assets/icon.png')}
-            logoSize={size * 0.22}
-            logoBackgroundColor="#FFFFFF"
-            logoBorderRadius={8}
-            logoMargin={2}
-            getRef={qrRef}
-          />
+          {qrCodeDataUri ? (
+            <Image
+              source={{ uri: qrCodeDataUri }}
+              style={{ width: size, height: size }}
+              resizeMode="contain"
+            />
+          ) : (
+            <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+              <ActivityIndicator color="#00351D" size="small" />
+            </View>
+          )}
         </View>
 
         {/* Footer */}

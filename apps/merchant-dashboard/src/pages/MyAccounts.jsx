@@ -1,11 +1,10 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 import axios from 'axios'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { formatAccountNumber } from '../utils/formatAccountNumber'
 import SettlementQrCard from '../components/ui/SettlementQrCard'
 import { useToast } from '../context/NotificationContext'
-import { getAppUrl } from '../utils/appUrl'
 import { escapeHtml } from '../utils/escapeHtml'
 
 const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
@@ -16,8 +15,23 @@ export default function MyAccounts() {
   const [searchTerm, setSearchTerm] = useState('')
   const [entries, setEntries] = useState(10)
   const [qrAccount, setQrAccount] = useState(null)
+  const [qrCodeDataUri, setQrCodeDataUri] = useState('')
   const [downloadingSticker, setDownloadingSticker] = useState(false)
-  const qrModalContainerRef = useRef(null)
+
+  // Fetches the real NCBA Dynamic QR Code (scannable in M-PESA) whenever the
+  // modal opens for an account — was rendered client-side via qrcode.react
+  // encoding a link to PayChain's own /pay/account/:id page; replaced so
+  // there's one QR mechanism in the app, not two.
+  useEffect(() => {
+    if (!qrAccount) {
+      setQrCodeDataUri('')
+      return
+    }
+    const token = localStorage.getItem('paychain_merchant_token')
+    axios.get(`${API_URL}/api/callbacks/account-qr`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((res) => setQrCodeDataUri(res.data?.qrCodeDataUri || ''))
+      .catch((e) => console.error('Failed to load account QR', e))
+  }, [qrAccount])
 
   const accountsData = [
     {
@@ -42,7 +56,7 @@ export default function MyAccounts() {
 
   const closeQrModal = () => setQrAccount(null)
 
-  const getQrDataUrl = () => qrModalContainerRef.current?.querySelector('canvas')?.toDataURL('image/png')
+  const getQrDataUrl = () => qrCodeDataUri
 
   const handleDownloadQr = () => {
     const dataUrl = getQrDataUrl()
@@ -348,10 +362,9 @@ export default function MyAccounts() {
               </button>
 
               <SettlementQrCard
-                qrData={`${getAppUrl()}/pay/account/${qrAccount.accountNumber}`}
+                qrCodeDataUri={qrCodeDataUri}
                 businessName={qrAccount.name}
                 accountNumber={qrAccount.accountNumber}
-                containerRef={qrModalContainerRef}
               />
 
               <div className="flex gap-3 mt-5">

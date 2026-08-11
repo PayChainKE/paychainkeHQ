@@ -99,16 +99,20 @@ export default function DigitalWallet({ navigation }: any) {
   const [isProcessingTopUp, setIsProcessingTopUp] = useState(false);
   const [stkStatusText, setStkStatusText] = useState('');
 
-  // app.paychain.co.ke, not the marketing site (paychain.co.ke) — that's
-  // where /pay/account/:account actually lives (merchant-dashboard's
-  // App.jsx). Previously pointed at the marketing site, which has no such
-  // route and would have 404'd on every scan.
-  const qrData = `https://app.paychain.co.ke/pay/account/${merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || ''}`;
-  // Underlying react-native-svg ref, set via SettlementQrCard's qrRef prop —
-  // gives access to .toDataURL() for the PDF export below. QR is now
-  // rendered locally (react-native-qrcode-svg) instead of fetched from a
-  // remote image API, so the PayChain mark can be embedded at its center.
-  const qrSvgRef = useRef<any>(null);
+  // Real NCBA Dynamic QR Code (scannable directly in M-PESA), fetched once
+  // on mount. Was a link to PayChain's own /pay/account/:id page rendered
+  // as a client-side QR (react-native-qrcode-svg) — replaced so there's one
+  // QR mechanism in the app (same NCBA API Request Money's "Scan to Pay QR"
+  // uses), not two.
+  const [qrCodeDataUri, setQrCodeDataUri] = useState('');
+  const accountShareText = `Pay ${merchant?.businessName || 'this business'} via PayChain — Account: ${formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending')}`;
+
+  useEffect(() => {
+    if (!merchant?.ncbaMerchantCode) return;
+    api.get('/api/callbacks/account-qr')
+      .then((res) => setQrCodeDataUri(res.data?.qrCodeDataUri || ''))
+      .catch((e) => console.error('Failed to load account QR', e));
+  }, [merchant?.ncbaMerchantCode]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -274,7 +278,7 @@ export default function DigitalWallet({ navigation }: any) {
   const shareQR = async () => {
     try {
       await Share.share({
-        message: `Scan to pay ${merchant?.businessName || 'Merchant'} on PayChain: ${qrData}`,
+        message: accountShareText,
       });
     } catch (err) {
       console.error('Share failed', err);
@@ -282,24 +286,14 @@ export default function DigitalWallet({ navigation }: any) {
   };
 
   const copyQrLink = async () => {
-    await Clipboard.setStringAsync(qrData);
-    Alert.alert('Link Copied', 'Payment link copied to clipboard.');
+    await Clipboard.setStringAsync(accountShareText);
+    Alert.alert('Copied', 'Account details copied to clipboard.');
   };
-
-  const getQrDataUri = (): Promise<string | null> =>
-    new Promise((resolve) => {
-      if (!qrSvgRef.current) return resolve(null);
-      try {
-        qrSvgRef.current.toDataURL((base64: string) => resolve(base64 ? `data:image/png;base64,${base64}` : null));
-      } catch {
-        resolve(null);
-      }
-    });
 
   const exportQrPdf = async () => {
     setIsExportingPdf(true);
     try {
-      const qrImgSrc = await getQrDataUri();
+      const qrImgSrc = qrCodeDataUri;
       if (!qrImgSrc) {
         Alert.alert('Export Failed', 'The QR code was not ready — please try again.');
         return;
@@ -662,10 +656,9 @@ export default function DigitalWallet({ navigation }: any) {
 
               <View className="mb-6">
                 <SettlementQrCard
-                  qrData={qrData}
+                  qrCodeDataUri={qrCodeDataUri}
                   businessName={merchant?.businessName || 'Merchant'}
                   accountNumber={merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending'}
-                  qrRef={(ref) => { qrSvgRef.current = ref; }}
                 />
               </View>
 

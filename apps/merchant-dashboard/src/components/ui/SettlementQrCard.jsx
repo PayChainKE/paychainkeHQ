@@ -1,15 +1,18 @@
 import React from 'react'
-import { QRCodeCanvas } from 'qrcode.react'
-import paychainMark from '../../assets/paychain-mark.png'
 import { formatAccountNumber } from '../../utils/formatAccountNumber'
 
 // Premium settlement-QR card — dark bezel frame, corner brackets, an
 // animated "scan me" badge + curved arrow pointing at the code, a soft
-// pulsing halo, and the PayChain mark embedded at the QR's center
-// (level="H" error correction leaves plenty of headroom for that).
-// Shared between Wallet.jsx ("My QR") and MyAccounts.jsx (per-row QR modal)
-// so both stay visually identical rather than drifting apart.
-export default function SettlementQrCard({ qrData, businessName, accountNumber, containerRef, size = 144 }) {
+// pulsing halo. Shared between Wallet.jsx ("My QR") and MyAccounts.jsx
+// (per-row QR modal) so both stay visually identical rather than drifting
+// apart.
+//
+// qrCodeDataUri is a real NCBA Dynamic QR Code (scannable directly in
+// M-PESA) fetched from GET /api/callbacks/account-qr by the caller — this
+// component used to render its own client-side QR (qrcode.react) encoding
+// a link to PayChain's own /pay/account/:id page; replaced so there's one
+// QR mechanism in the app, not two.
+export default function SettlementQrCard({ qrCodeDataUri, businessName, accountNumber, size = 144 }) {
   return (
     <div className="p-[1.5px] rounded-[26px] bg-gradient-to-br from-[#5EFEB3]/50 via-[#1E2532] to-[#2775CA]/40 shadow-[0_8px_30px_rgba(0,0,0,0.6)] w-full">
       <div className="bg-[#131722] p-5 rounded-[24px] flex flex-col items-center justify-center border border-[#1E2532] relative group w-full h-fit overflow-hidden">
@@ -36,23 +39,21 @@ export default function SettlementQrCard({ qrData, businessName, accountNumber, 
           </svg>
         </div>
 
-        <div ref={containerRef} className="bg-white p-3 rounded-[16px] shadow-lg mb-5 relative z-10 transition-transform group-hover:scale-[1.02] w-[168px] h-[168px] flex items-center justify-center shrink-0 border border-white/10">
+        <div className="bg-white p-3 rounded-[16px] shadow-lg mb-5 relative z-10 transition-transform group-hover:scale-[1.02] w-[168px] h-[168px] flex items-center justify-center shrink-0 border border-white/10">
           {/* Soft pulsing halo — signals "live/scannable" without being distracting */}
           <span className="absolute inset-0 rounded-[16px] bg-[#5EFEB3]/25 animate-ping [animation-duration:2.5s]"></span>
-          <QRCodeCanvas
-            value={qrData}
-            size={size}
-            bgColor="#FFFFFF"
-            fgColor="#00351D"
-            level="H"
-            className="relative z-10"
-            imageSettings={{
-              src: paychainMark,
-              height: 32,
-              width: 32,
-              excavate: true,
-            }}
-          />
+          {qrCodeDataUri ? (
+            <img
+              src={qrCodeDataUri}
+              alt="Scan to pay QR code"
+              className="relative z-10 object-contain"
+              style={{ width: size, height: size }}
+            />
+          ) : (
+            <div className="relative z-10 flex items-center justify-center" style={{ width: size, height: size }}>
+              <div className="w-6 h-6 border-2 border-[#00351D]/15 border-t-[#00351D] rounded-full animate-spin"></div>
+            </div>
+          )}
         </div>
 
         <div className="text-center relative z-10 w-full flex flex-col items-center">

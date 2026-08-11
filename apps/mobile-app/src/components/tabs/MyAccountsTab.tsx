@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, Modal, Share, Alert } from 'react-native';
 import { MaterialIcons, Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -14,7 +14,22 @@ export default function MyAccountsTab() {
   const { merchant } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [qrAccount, setQrAccount] = useState<{ name: string; accountNumber: string } | null>(null);
+  const [qrCodeDataUri, setQrCodeDataUri] = useState('');
   const [downloadingSticker, setDownloadingSticker] = useState(false);
+
+  // Real NCBA Dynamic QR Code (scannable directly in M-PESA), fetched
+  // whenever the modal opens — was a link to PayChain's own
+  // /pay/account/:id page rendered as a client-side QR; replaced so
+  // there's one QR mechanism in the app, not two.
+  useEffect(() => {
+    if (!qrAccount) {
+      setQrCodeDataUri('');
+      return;
+    }
+    api.get('/api/callbacks/account-qr')
+      .then((res) => setQrCodeDataUri(res.data?.qrCodeDataUri || ''))
+      .catch((e) => console.error('Failed to load account QR', e));
+  }, [qrAccount]);
 
   // Downloads the official branded PayChain/NCBA paybill sticker (PDF),
   // pre-filled server-side with this merchant's own account number and
@@ -181,14 +196,14 @@ export default function MyAccountsTab() {
 
             {qrAccount && (
               <SettlementQrCard
-                qrData={`https://app.paychain.co.ke/pay/account/${qrAccount.accountNumber}`}
+                qrCodeDataUri={qrCodeDataUri}
                 businessName={qrAccount.name}
                 accountNumber={qrAccount.accountNumber}
               />
             )}
 
             <TouchableOpacity
-              onPress={() => qrAccount && Share.share({ message: `Scan to pay ${qrAccount.name} on PayChain: https://app.paychain.co.ke/pay/account/${qrAccount.accountNumber}` })}
+              onPress={() => qrAccount && Share.share({ message: `Pay ${qrAccount.name} via PayChain — Account: ${formatAccountNumber(qrAccount.accountNumber)}` })}
               activeOpacity={0.85}
               className="flex-row items-center justify-center gap-2 mt-5 py-3.5 bg-[#5EFEB3] rounded-2xl"
             >
