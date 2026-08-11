@@ -643,7 +643,7 @@ const IntegrationBanner = () => (
         <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 mb-0.5">Channel integration</p>
         <h3 className="text-base font-bold text-on-surface tracking-tight mb-1">Connect your telephony provider</h3>
         <p className="text-xs text-on-surface-variant/70 mb-3 max-w-2xl">
-          Records show up here automatically once a provider webhook is wired. PayChain supports Africa's Talking, Twilio, and Safaricom Daraja by posting to <code className="font-mono text-xs bg-surface-container-low px-1.5 py-0.5 rounded">/api/webhooks/communications</code>.
+          Records show up here automatically once a provider webhook is wired. PayChain supports Africa's Talking and Twilio by posting to <code className="font-mono text-xs bg-surface-container-low px-1.5 py-0.5 rounded">/api/webhooks/communications</code>.
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-outline-variant/30 text-2xs font-bold uppercase tracking-widest text-on-surface-variant/70">
@@ -653,10 +653,6 @@ const IntegrationBanner = () => (
           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-outline-variant/30 text-2xs font-bold uppercase tracking-widest text-on-surface-variant/70">
             <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
             Twilio · Not connected
-          </span>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-outline-variant/30 text-2xs font-bold uppercase tracking-widest text-on-surface-variant/70">
-            <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
-            Safaricom Daraja · Not connected
           </span>
         </div>
       </div>
