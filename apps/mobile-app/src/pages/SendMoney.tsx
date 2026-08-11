@@ -24,13 +24,13 @@ const DESTINATIONS: Array<{ id: Destination; label: string; icon: keyof typeof M
 ];
 
 // Mirrors merchant-dashboard's SendMoney.jsx and backend/config/revenueRateCard.js's
-// PAYCHAIN_TXN_RATE — the exact rate mpesaController.js#initiateB2B charges
-// server-side. Not a Safaricom-cost estimate (B2B isn't modeled there); this
-// is PayChain's own flat margin, computed exactly.
-const PAYCHAIN_B2B_RATE = 0.005;
+// NCBA_LIPA_NA_MPESA_FLAT_FEE_KES — the exact flat fee mpesaController.js#initiateB2B
+// charges server-side. Not a Safaricom-cost estimate (B2B isn't modeled there); this
+// is PayChain's own flat margin.
+const PAYCHAIN_B2B_FLAT_FEE_KES = 30;
 function estimateB2bFee(amount: number) {
   if (!amount || amount <= 0) return 0;
-  return Math.round(amount * PAYCHAIN_B2B_RATE * 100) / 100;
+  return PAYCHAIN_B2B_FLAT_FEE_KES;
 }
 
 // Mirrors backend/config/mpesaB2cTariffCard.js — Safaricom's real M-Pesa B2C
