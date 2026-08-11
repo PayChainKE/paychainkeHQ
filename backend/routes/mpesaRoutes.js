@@ -1,6 +1,6 @@
 import express from 'express';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
-import { generateToken, registerURLs, validationURL, confirmationURL, initiateSTKPush, getSTKStatus, initiateB2C, initiateB2B } from '../controllers/mpesaController.js';
+import { generateToken, registerURLs, validationURL, confirmationURL, initiateSTKPush, getSTKStatus, initiateB2C, initiateB2B, generateQrCheckout } from '../controllers/mpesaController.js';
 import { protect, protectMerchant, requireRole } from '../middleware/authMiddleware.js';
 import { timingSafeStringEqual } from '../utils/timingSafeCompare.js';
 
@@ -71,6 +71,11 @@ router.post('/confirmation', verifyMpesaWebhookSecret, confirmationURL);
 // STK Push Routes (Inbound, via NCBA)
 router.post('/stk-push', protectMerchant, stkPushLimiter, initiateSTKPush);
 router.get('/stk-status/:checkoutId', protectMerchant, getSTKStatus);
+
+// Dynamic QR Code collection (Inbound, via NCBA) — same abuse shape as STK
+// (a real NCBA API call an authenticated account could otherwise spam),
+// same limiter.
+router.post('/generate-qr', protectMerchant, stkPushLimiter, generateQrCheckout);
 
 // B2C Routes (Outbound to a phone number, via NCBA Mobile B2W)
 router.post('/b2c-request', protectMerchant, pinLimiter, initiateB2C);

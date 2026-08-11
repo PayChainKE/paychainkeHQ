@@ -21,7 +21,7 @@ import { formatPhoneDisplay } from '../utils/formatPhoneDisplay.js';
 import { AUTO_INFLATION_SHIELD_ENABLED } from '../config/inflationShieldFlag.js';
 import { logAudit } from '../utils/auditLog.js';
 import { buildPaymentReceivedSms, buildCustomerPaidSms } from '../utils/paymentSmsTemplates.js';
-import { initiateStkPush as ncbaInitiateStkPush, queryStkPush as ncbaQueryStkPush } from '../services/ncbaStkPushService.js';
+import { initiateStkPush as ncbaInitiateStkPush, queryStkPush as ncbaQueryStkPush, generateQrCode as ncbaGenerateQrCode } from '../services/ncbaStkPushService.js';
 import { validateMobileWalletNumber as ncbaValidateMobileWalletNumber, submitMobileB2wPayment as ncbaSubmitMobileB2wPayment, validateLipaNaMpesaAccount as ncbaValidateLnmAccount, submitLipaNaMpesaPayment as ncbaSubmitLnmPayment, NcbaOpenBankingValidationError } from '../services/ncbaOpenBankingService.js';
 import { validatePhoneNumber, NcbaValidationError, getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
 
@@ -1018,6 +1018,75 @@ export async function initiateAndTrackNcbaStk({ merchantId, phone, checkoutTotal
 
   return transactionId;
 }
+
+// Dynamic QR Code collection — same idea as initiateAndTrackNcbaStk above
+// (fixed amount, PayChain's customer surcharge baked in via
+// getCheckoutTotal before this is ever called), but the customer scans
+// instead of receiving a push prompt. NCBA's QR API returns no transaction
+// ID, so there's no poll loop to start here — resolution happens off the
+// account-notification webhook once the resulting payment lands, matched
+// by merchantId + amount (see ncbaAccountNotificationController.js).
+// checkoutRequestId is a PayChain-generated reference rather than an
+// NCBA-issued one, purely to satisfy STKRequest's existing unique key.
+export async function generateNcbaQrCheckout({ merchantId, checkoutTotal, extra = {} }) {
+  const merchant = await Merchant.findById(merchantId).select('ncbaMerchantCode');
+  if (!merchant?.ncbaMerchantCode) {
+    throw new Error('This merchant has no NCBA virtual account assigned yet — cannot process this payment request.');
+  }
+
+  const reference = `QR-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+
+  // Narration carries the merchant's ncbaMerchantCode so the resulting
+  // payment's Narrative can be attributed the same way any other NCBA
+  // Virtual Account collection is — reuses extractMerchantCode unchanged.
+  const { qrCodeDataUri } = await ncbaGenerateQrCode({ amount: checkoutTotal, narration: merchant.ncbaMerchantCode });
+
+  await STKRequest.create({
+    merchantId,
+    checkoutRequestId: reference,
+    amount: checkoutTotal,
+    phone: null,
+    channel: 'qr',
+    status: 'pending',
+    ...extra,
+  });
+
+  return { reference, qrCodeDataUri };
+}
+
+// @desc    Generate a Dynamic QR Code for a fixed amount on PayChain's NCBA
+//          Till — customer scans in their own M-PESA app to pay. PayChain's
+//          flat customer surcharge is baked into the amount encoded in the
+//          QR, same as an STK Push checkout.
+// @route   POST /api/callbacks/generate-qr
+// @access  Private (merchant)
+export const generateQrCheckout = async (req, res) => {
+  try {
+    const merchantId = req.merchant._id;
+    const intAmount = Math.ceil(Number(req.body.amount));
+    if (!Number.isFinite(intAmount) || intAmount <= 0) {
+      return res.status(400).json({ error: 'A valid amount is required.' });
+    }
+
+    const checkoutTotal = getCheckoutTotal(intAmount);
+    const { reference, qrCodeDataUri } = await generateNcbaQrCheckout({
+      merchantId,
+      checkoutTotal,
+      extra: { baseAmount: intAmount, kind: 'qr' },
+    });
+
+    res.status(200).json({
+      success: true,
+      reference,
+      amount: checkoutTotal,
+      qrCodeDataUri,
+      message: 'Show this QR code to your customer to scan and pay in M-PESA.',
+    });
+  } catch (error) {
+    console.error('❌ QR Generate Error:', error.message);
+    res.status(502).json({ error: 'Failed to generate QR code — please try again.' });
+  }
+};
 
 export const getSTKStatus = async (req, res) => {
   try {
