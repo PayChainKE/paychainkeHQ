@@ -21,6 +21,8 @@ export default function RequestMoney() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [statusText, setStatusText] = useState('')
   const [generatedLink, setGeneratedLink] = useState('')
+  const [qrCodeDataUri, setQrCodeDataUri] = useState('')
+  const [qrPaid, setQrPaid] = useState(false)
 
   const steps = [
     { id: 1, label: 'Selection' },
@@ -46,6 +48,15 @@ export default function RequestMoney() {
       color: 'bg-emerald-50',
       textColor: 'text-emerald-700',
       tag: 'Versatile'
+    },
+    {
+      id: 'qr',
+      title: 'Scan to Pay QR',
+      description: 'Show a QR code for them to scan in M-PESA',
+      icon: 'qr_code_2',
+      color: 'bg-emerald-50',
+      textColor: 'text-emerald-700',
+      tag: 'In Person'
     }
   ]
 
@@ -53,6 +64,8 @@ export default function RequestMoney() {
     setAmount('')
     setPhone('')
     setGeneratedLink('')
+    setQrCodeDataUri('')
+    setQrPaid(false)
     setStatusText('')
   }
 
@@ -125,6 +138,52 @@ export default function RequestMoney() {
     }
   }
 
+  const generateQr = async () => {
+    if (!amount || Number(amount) <= 0) {
+      addNotification({ title: 'Invalid Amount', message: 'Please enter a valid amount.', type: 'error' })
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      const res = await axios.post(`${API_URL}/api/callbacks/generate-qr`, {
+        amount: Number(amount)
+      }, { headers: authHeaders() })
+
+      setQrCodeDataUri(res.data.qrCodeDataUri)
+      setStep(3)
+
+      // Same poll shape as sendMpesaPrompt — reuses the same stk-status
+      // endpoint, since a QR request is tracked the same way an STK one is
+      // (just via a PayChain-generated reference instead of NCBA's own
+      // transaction ID). Doesn't block navigation — the QR is already shown
+      // so the merchant can display it while this resolves in the background.
+      const checkoutId = res.data.reference
+      let attempts = 0
+      const maxAttempts = 100 // 100 * 3s = 5min — a counter QR may sit unscanned longer than a push prompt
+      const pollInterval = setInterval(async () => {
+        attempts++
+        try {
+          const statusRes = await axios.get(`${API_URL}/api/callbacks/stk-status/${checkoutId}`, { headers: authHeaders() })
+          if (statusRes.data.status === 'success') {
+            clearInterval(pollInterval)
+            await refreshSession()
+            setQrPaid(true)
+            addNotification({ title: 'Payment Received', message: `KES ${Number(amount).toLocaleString()} has been received.`, type: 'success' })
+          } else if (statusRes.data.status === 'failed' || attempts >= maxAttempts) {
+            clearInterval(pollInterval)
+          }
+        } catch (e) {
+          console.error('QR status poll error', e)
+        }
+      }, 3000)
+    } catch (err) {
+      addNotification({ title: 'Generation Failed', message: err.response?.data?.error || 'Failed to generate QR code.', type: 'error' })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   const createPaymentLink = async () => {
     if (!amount || Number(amount) <= 0) {
       addNotification({ title: 'Invalid Amount', message: 'Please enter a valid amount.', type: 'error' })
@@ -152,6 +211,14 @@ export default function RequestMoney() {
   const handlePrimaryAction = () => {
     if (selectedOption?.id === 'mpesa') return sendMpesaPrompt()
     if (selectedOption?.id === 'link') return createPaymentLink()
+    if (selectedOption?.id === 'qr') return generateQr()
+  }
+
+  const downloadQr = () => {
+    const link = document.createElement('a')
+    link.href = qrCodeDataUri
+    link.download = `PayChain-QR-KES-${amount}.png`
+    link.click()
   }
 
   const copyLink = () => {
@@ -258,6 +325,8 @@ export default function RequestMoney() {
               <p className="text-on-surface-variant font-medium max-w-sm mx-auto opacity-70 leading-relaxed">
                 {selectedOption?.id === 'mpesa'
                   ? "We'll send an M-PESA prompt to this number for them to complete."
+                  : selectedOption?.id === 'qr'
+                  ? "Set an amount and we'll generate a QR code for them to scan and pay in M-PESA."
                   : 'Set an amount and we\'ll generate a secure, shareable link.'}
               </p>
             </div>
@@ -306,7 +375,7 @@ export default function RequestMoney() {
                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                       {statusText || 'Processing...'}
                     </>
-                  ) : selectedOption?.id === 'mpesa' ? 'Send Prompt' : 'Generate Link'}
+                  ) : selectedOption?.id === 'mpesa' ? 'Send Prompt' : selectedOption?.id === 'qr' ? 'Generate QR Code' : 'Generate Link'}
                 </button>
               </div>
             </div>
@@ -314,34 +383,57 @@ export default function RequestMoney() {
         ) : (
           <div className="bg-white rounded-[32px] border border-slate-200 shadow-2xl p-8 lg:p-12 relative max-w-2xl mx-auto lg:mx-0">
             <div className="py-10 text-center">
-              <div className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-xl bg-emerald-500 text-white">
-                <span className="material-symbols-outlined text-4xl">check_circle</span>
-              </div>
-
-              {selectedOption?.id === 'mpesa' ? (
+              {selectedOption?.id === 'qr' && !qrPaid ? (
                 <>
-                  <h3 className="text-2xl font-headline font-bold text-primary mb-3">Payment Received</h3>
-                  <p className="text-on-surface-variant font-medium max-w-sm mx-auto opacity-70 leading-relaxed mb-10">
-                    KES {Number(amount).toLocaleString()} has been credited to your PayChain balance.
+                  <div className="bg-white border border-slate-200 rounded-3xl p-4 inline-block shadow-lg mb-6">
+                    <img src={qrCodeDataUri} alt="Scan to pay QR code" className="w-56 h-56 object-contain" />
+                  </div>
+                  <h3 className="text-2xl font-headline font-bold text-primary mb-3">Show This to Your Customer</h3>
+                  <p className="text-on-surface-variant font-medium max-w-sm mx-auto opacity-70 leading-relaxed mb-6">
+                    They scan this in their M-PESA app to pay KES {Number(amount).toLocaleString()}. This updates automatically once paid.
                   </p>
+                  <div className="flex items-center justify-center gap-2 text-[11px] font-black uppercase tracking-widest text-emerald-700 mb-6">
+                    <div className="w-3.5 h-3.5 border-2 border-emerald-200 border-t-emerald-600 rounded-full animate-spin"></div>
+                    Waiting for payment...
+                  </div>
+                  <div className="flex gap-3 justify-center mb-4">
+                    <button onClick={downloadQr} className="px-5 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black uppercase tracking-widest text-primary hover:bg-slate-100 transition-all flex items-center gap-2">
+                      <span className="material-symbols-outlined text-base">download</span> Download
+                    </button>
+                  </div>
                 </>
               ) : (
                 <>
-                  <h3 className="text-2xl font-headline font-bold text-primary mb-3">Link Ready to Share</h3>
-                  <p className="text-on-surface-variant font-medium max-w-sm mx-auto opacity-70 leading-relaxed mb-6">
-                    Share this link with your customer to collect KES {Number(amount).toLocaleString()}.
-                  </p>
-                  <div className="bg-surface-container-low border border-outline-variant/10 rounded-2xl p-4 mb-6 break-all text-sm font-medium text-primary">
-                    {generatedLink}
+                  <div className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-xl bg-emerald-500 text-white">
+                    <span className="material-symbols-outlined text-4xl">check_circle</span>
                   </div>
-                  <div className="flex gap-3 justify-center mb-4">
-                    <button onClick={copyLink} className="px-5 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black uppercase tracking-widest text-primary hover:bg-slate-100 transition-all flex items-center gap-2">
-                      <span className="material-symbols-outlined text-base">content_copy</span> Copy
-                    </button>
-                    <button onClick={shareLink} className="px-5 py-3 bg-[#5EFEB3] text-[#00351D] rounded-xl text-xs font-black uppercase tracking-widest hover:brightness-105 transition-all flex items-center gap-2">
-                      <span className="material-symbols-outlined text-base">share</span> Share
-                    </button>
-                  </div>
+
+                  {selectedOption?.id === 'mpesa' || selectedOption?.id === 'qr' ? (
+                    <>
+                      <h3 className="text-2xl font-headline font-bold text-primary mb-3">Payment Received</h3>
+                      <p className="text-on-surface-variant font-medium max-w-sm mx-auto opacity-70 leading-relaxed mb-10">
+                        KES {Number(amount).toLocaleString()} has been credited to your PayChain balance.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <h3 className="text-2xl font-headline font-bold text-primary mb-3">Link Ready to Share</h3>
+                      <p className="text-on-surface-variant font-medium max-w-sm mx-auto opacity-70 leading-relaxed mb-6">
+                        Share this link with your customer to collect KES {Number(amount).toLocaleString()}.
+                      </p>
+                      <div className="bg-surface-container-low border border-outline-variant/10 rounded-2xl p-4 mb-6 break-all text-sm font-medium text-primary">
+                        {generatedLink}
+                      </div>
+                      <div className="flex gap-3 justify-center mb-4">
+                        <button onClick={copyLink} className="px-5 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black uppercase tracking-widest text-primary hover:bg-slate-100 transition-all flex items-center gap-2">
+                          <span className="material-symbols-outlined text-base">content_copy</span> Copy
+                        </button>
+                        <button onClick={shareLink} className="px-5 py-3 bg-[#5EFEB3] text-[#00351D] rounded-xl text-xs font-black uppercase tracking-widest hover:brightness-105 transition-all flex items-center gap-2">
+                          <span className="material-symbols-outlined text-base">share</span> Share
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </>
               )}
 
