@@ -5,6 +5,7 @@ import PayoutBatch from '../models/PayoutBatch.js';
 import {
   validatePesaLinkAccount,
   submitPesaLinkTransfer,
+  submitEftTransfer,
   NcbaOpenBankingValidationError,
 } from '../services/ncbaOpenBankingService.js';
 import { createNotification } from './notificationController.js';
@@ -31,26 +32,43 @@ function logEvent(level, event, fields) {
 }
 
 /**
- * Validates the destination and submits a PesaLink transfer. Pure
- * submit-only helper — does NOT touch Merchant balance or create a
- * Transaction record, so it's safe to call from contexts that already
- * manage their own balance reservation (bulkPayController.authorizeBatch's
- * Bank branch reserves the whole batch's total upfront, one level above
- * this per-row call).
+ * Validates the destination and submits a bank transfer via either of
+ * NCBA's two local-bank rails. Pure submit-only helper — does NOT touch
+ * Merchant balance or create a Transaction record, so it's safe to call
+ * from contexts that already manage their own balance reservation
+ * (bulkPayController.authorizeBatch's Bank branch reserves the whole
+ * batch's total upfront, one level above this per-row call).
  *
- * Per NCBA's UAT Guide, PesaLink resolves synchronously — if this resolves
- * at all, the transfer succeeded (submitPesaLinkTransfer throws on a
- * non-'000' resultCode, unlike M-Pesa's B2C/bulk-pay rails, which only ever
- * report "accepted" here and confirm completion later via a callback).
+ * @param {'pesalink'|'eft'} [rail='pesalink'] - 'pesalink' settles
+ *        immediately, 24/7/365; 'eft' settles next business day (T+1),
+ *        Mon-Fri only. Per the UAT Guide both share the same request/
+ *        response shape and KES 50-999,999 bounds — only settlement timing
+ *        differs.
+ *
+ * The account-validation call (validatePesaLinkAccount) is reused for both
+ * rails: NCBA's UAT Guide documents only one "Request for Account Number
+ * Validation" endpoint, positioned ahead of the PesaLink section but
+ * generic over bankCode/accountNumber — there is no separate EFT-specific
+ * validation call documented, and skipping validation entirely for EFT
+ * would leave that rail with no typo protection at all.
+ *
+ * Per NCBA's UAT Guide, both rails resolve synchronously — if this resolves
+ * at all, the transfer succeeded (submitPesaLinkTransfer/submitEftTransfer
+ * throw on a non-'000' resultCode, unlike M-Pesa's B2C/bulk-pay rails,
+ * which only ever report "accepted" here and confirm completion later via
+ * a callback).
  *
  * Throws NcbaOpenBankingValidationError on bad input or a failed
  * destination-account validation, or NcbaOpenBankingRequestError on a
  * synchronous rejection from NCBA.
  */
-export async function submitNcbaBankTransfer({ businessName, bankCode, accountNumber, accountName, amount, narration }) {
+export async function submitNcbaBankTransfer({ businessName, bankCode, accountNumber, accountName, amount, narration, rail = 'pesalink' }) {
   const numericAmount = Number(amount);
   if (!bankCode || !accountNumber || !Number.isFinite(numericAmount) || numericAmount <= 0) {
     throw new NcbaOpenBankingValidationError('bankCode, accountNumber and a positive amount are required for a bank payout');
+  }
+  if (rail !== 'pesalink' && rail !== 'eft') {
+    throw new NcbaOpenBankingValidationError('rail must be either "pesalink" or "eft"');
   }
 
   // Fail fast on a bad destination account before touching balance.
@@ -60,9 +78,10 @@ export async function submitNcbaBankTransfer({ businessName, bankCode, accountNu
     debitAccount: process.env.NCBA_OPENBANKING_ACCOUNT_NUMBER,
   });
 
-  const transactionId = `NCBA-PL-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+  const transactionId = `NCBA-${rail === 'eft' ? 'EFT' : 'PL'}-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 
-  const hostResponse = await submitPesaLinkTransfer({
+  const submit = rail === 'eft' ? submitEftTransfer : submitPesaLinkTransfer;
+  const hostResponse = await submit({
     transactionId,
     beneficiaryAccountNumber: accountNumber,
     beneficiaryBankCode: bankCode,
@@ -71,7 +90,7 @@ export async function submitNcbaBankTransfer({ businessName, bankCode, accountNu
     narration: narration || `PayChain Payout - ${businessName || 'Merchant'}`,
   });
 
-  return { transactionId, hostResponse };
+  return { transactionId, hostResponse, rail };
 }
 
 /**
@@ -83,7 +102,7 @@ export async function submitNcbaBankTransfer({ businessName, bankCode, accountNu
  * whatever ncbaOpenBankingService throws on a submission failure (after
  * refunding the reservation).
  */
-export async function executeNcbaBankPayout({ merchantId, bankCode, accountNumber, accountName, amount, narration }) {
+export async function executeNcbaBankPayout({ merchantId, bankCode, accountNumber, accountName, amount, narration, rail = 'pesalink' }) {
   const numericAmount = Number(amount);
 
   // Fail fast on a bad destination account before touching balance —
@@ -91,6 +110,9 @@ export async function executeNcbaBankPayout({ merchantId, bankCode, accountNumbe
   // too avoids reserving funds for input that's already known-invalid.
   if (!bankCode || !accountNumber || !Number.isFinite(numericAmount) || numericAmount <= 0) {
     throw new NcbaOpenBankingValidationError('bankCode, accountNumber and a positive amount are required for a bank payout');
+  }
+  if (rail !== 'pesalink' && rail !== 'eft') {
+    throw new NcbaOpenBankingValidationError('rail must be either "pesalink" or "eft"');
   }
 
   // Atomically reserve funds — the $gte guard means this either fully
@@ -112,7 +134,7 @@ export async function executeNcbaBankPayout({ merchantId, bankCode, accountNumbe
   let transactionId, hostResponse;
   try {
     ({ transactionId, hostResponse } = await submitNcbaBankTransfer({
-      businessName: reservedMerchant.businessName, bankCode, accountNumber, accountName, amount: numericAmount, narration,
+      businessName: reservedMerchant.businessName, bankCode, accountNumber, accountName, amount: numericAmount, narration, rail,
     }));
   } catch (err) {
     // Submission never reached (or was rejected outright by) NCBA — refund
@@ -137,6 +159,7 @@ export async function executeNcbaBankPayout({ merchantId, bankCode, accountNumbe
     reference: transactionId,
     sender: { name: reservedMerchant.businessName, id: process.env.NCBA_OPENBANKING_ACCOUNT_NUMBER || 'PAYCHAIN_NCBA_ACCOUNT' },
     recipient: { name: accountName || 'Bank Account', id: accountNumber },
+    settlementRail: rail,
   });
 
   return { transaction, hostResponse, merchant: reservedMerchant };
@@ -150,16 +173,21 @@ export const getBankCodes = (req, res) => {
   res.json({ bankCodes: KENYAN_BANK_CODES });
 };
 
-// @desc    Merchant-initiated single withdrawal to a bank account via NCBA PesaLink
+// @desc    Merchant-initiated single withdrawal to a bank account via NCBA
+//          PesaLink (immediate) or EFT (next business day)
 // @route   POST /openbanking/bank-payout (mounted at /api/v1 and /v1)
 // @access  Private (merchant)
 export const handleBankPayout = async (req, res) => {
   const merchantId = req.merchant._id;
-  const { bankCode, accountNumber, accountName, amount, narration, pin } = req.body;
+  const { bankCode, accountNumber, accountName, amount, narration, pin, rail: requestedRail } = req.body;
+  const rail = requestedRail === 'eft' ? 'eft' : 'pesalink';
 
   try {
     if (!pin || String(pin).length !== 4) {
       return res.status(400).json({ error: 'A valid 4-digit payment PIN is required.' });
+    }
+    if (requestedRail && requestedRail !== 'pesalink' && requestedRail !== 'eft') {
+      return res.status(400).json({ error: 'rail must be either "pesalink" or "eft".' });
     }
 
     // PIN checked inline, within this same request that executes the
@@ -188,21 +216,23 @@ export const handleBankPayout = async (req, res) => {
     await resetPinAttempts(merchantId);
 
     const { transaction, hostResponse, merchant: updatedMerchant } = await executeNcbaBankPayout({
-      merchantId, bankCode, accountNumber, accountName, amount, narration,
+      merchantId, bankCode, accountNumber, accountName, amount, narration, rail,
     });
 
     createNotification({
       merchantId,
       kind: 'payment',
       title: 'Bank payout completed',
-      message: `KES ${Number(amount).toLocaleString()} was sent to your bank account via PesaLink.`,
+      message: rail === 'eft'
+        ? `KES ${Number(amount).toLocaleString()} was sent to your bank account via EFT. It settles by the next business day.`
+        : `KES ${Number(amount).toLocaleString()} was sent to your bank account via PesaLink.`,
     }).catch((e) => logEvent('error', 'ncba_openbanking_payout_notification_failed', { transactionId: transaction.reference, error: e.message }));
 
     if (updatedMerchant.phone) {
       const { date, time } = formatTransactionDateTime();
       const { message } = buildPayoutSentSms({
         ref: transaction.reference,
-        label: 'Bank Payout',
+        label: rail === 'eft' ? 'Bank Payout (EFT)' : 'Bank Payout',
         amount: Number(amount),
         recipientName: accountName || 'your bank account',
         date,
@@ -219,7 +249,9 @@ export const handleBankPayout = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Bank transfer completed via NCBA PesaLink.',
+      message: rail === 'eft'
+        ? 'Bank transfer submitted via NCBA EFT. It settles by the next business day.'
+        : 'Bank transfer completed via NCBA PesaLink.',
       transaction,
       newBalance: updatedMerchant.kesBalance,
       hostResponse,

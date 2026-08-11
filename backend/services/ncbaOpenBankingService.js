@@ -272,11 +272,13 @@ export async function submitPesaLinkTransfer({
 }
 
 /**
- * EFT transfer wrapper — implemented alongside PesaLink for completeness
- * (same shape, thin wrapper, same synchronous-response behaviour) but not
- * yet routed to by any payout business logic. PesaLink (real-time) covers
- * this phase's need; EFT (T+1, per the UAT Guide) is available for a future
- * amount-threshold decision.
+ * Submits an EFT transfer — NCBA's next-business-day local bank rail,
+ * routed to from ncbaOpenBankingController.js#submitNcbaBankTransfer
+ * whenever the caller picks rail: 'eft' instead of the default 'pesalink'.
+ * Same request/response shape and amount bounds as PesaLink (per the UAT
+ * Guide, both are KES 50–999,999) and also resolves synchronously — the
+ * only real difference NCBA documents is settlement timing (PesaLink:
+ * immediate, 24/7/365; EFT: T+1, business days only).
  */
 export async function submitEftTransfer({
   transactionId,

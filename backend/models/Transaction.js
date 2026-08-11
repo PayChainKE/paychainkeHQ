@@ -73,6 +73,11 @@ const transactionSchema = new mongoose.Schema({
   // M-Pesa's own SMS shows. Optional/null on transaction types that don't
   // stamp it yet — never back-computed from other rows.
   balanceAfter: { type: Number, default: null },
+  // Which NCBA local-bank rail settled this transfer — only meaningful for
+  // 'ncba_outbound' bank payouts, which can go via either PesaLink
+  // (immediate, 24/7/365) or EFT (T+1, business days only). Null for every
+  // other transaction type.
+  settlementRail: { type: String, enum: ['pesalink', 'eft', null], default: null },
 }, {
   timestamps: true
 });

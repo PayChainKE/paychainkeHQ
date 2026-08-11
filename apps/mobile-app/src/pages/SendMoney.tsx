@@ -68,6 +68,7 @@ export default function SendMoney({ navigation }: any) {
   const [paybillAccountRef, setPaybillAccountRef] = useState('');
   const [bankCode, setBankCode] = useState('');
   const [bankCodes, setBankCodes] = useState<{ code: string; name: string }[]>([]);
+  const [bankRail, setBankRail] = useState<'pesalink' | 'eft'>('pesalink');
   const [amount, setAmount] = useState('');
   const [reference, setReference] = useState('');
   const [pin, setPin] = useState('');
@@ -165,6 +166,7 @@ export default function SendMoney({ navigation }: any) {
             amount: Number(amount),
             narration: reference || `Transfer to ${recipientAccount}`,
             pin,
+            rail: bankRail,
           });
         } else {
           await api.post('/api/callbacks/b2b-request', {
@@ -308,6 +310,31 @@ export default function SendMoney({ navigation }: any) {
                 </View>
               )}
 
+              {destination === 'bank' && (
+                <View className="mb-5">
+                  <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#00351d]/60 mb-2 ml-1">Transfer Speed</Text>
+                  <View className="flex-row gap-2.5">
+                    {([
+                      { id: 'pesalink', title: 'Instant', hint: 'PesaLink · 24/7' },
+                      { id: 'eft', title: 'Next Business Day', hint: 'EFT · Mon–Fri' },
+                    ] as const).map((opt) => {
+                      const active = bankRail === opt.id;
+                      return (
+                        <TouchableOpacity
+                          key={opt.id}
+                          onPress={() => setBankRail(opt.id)}
+                          activeOpacity={0.85}
+                          className={`flex-1 p-3.5 rounded-2xl border-2 ${active ? 'border-[#00351d] bg-[#f0fdf4]' : 'border-[#eff4ef] bg-white'}`}
+                        >
+                          <Text className={`text-[13px] font-jakarta-bold ${active ? 'text-[#00351d]' : 'text-[#0c2010]'}`}>{opt.title}</Text>
+                          <Text className="text-[10px] text-[#707971] font-jakarta-medium mt-0.5">{opt.hint}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+
               <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#00351d]/60 mb-2 ml-1">
                 {isMobileDest ? 'Phone Number' : destination === 'till' ? 'Till Number' : destination === 'paybill' ? 'Paybill Number' : 'Account Number'}
               </Text>
@@ -416,6 +443,7 @@ export default function SendMoney({ navigation }: any) {
                 {([
                   ['Destination', selectedDest?.label || ''],
                   ...(destination === 'bank' ? [['Bank', bankCodes.find((b) => b.code === bankCode)?.name || bankCode]] : []),
+                  ...(destination === 'bank' ? [['Transfer Speed', bankRail === 'eft' ? 'Next Business Day (EFT)' : 'Instant (PesaLink)']] : []),
                   ['Recipient', recipientAccount],
                   ...(destination === 'paybill' ? [['Account Number', paybillAccountRef]] : []),
                   ['Amount', formatKES(Number(amount) || 0)],

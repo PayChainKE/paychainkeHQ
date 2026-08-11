@@ -70,6 +70,7 @@ export default function SendMoney() {
   const [paybillAccountRef, setPaybillAccountRef] = useState('')
   const [bankCode, setBankCode]             = useState('')
   const [bankCodes, setBankCodes]           = useState([])
+  const [bankRail, setBankRail]             = useState('pesalink')
   const [amount, setAmount]                 = useState('')
   const [reference, setReference]           = useState('')
   const [pin, setPin]                       = useState('')
@@ -170,6 +171,7 @@ export default function SendMoney() {
             amount: Number(amount),
             narration: reference || `Transfer to ${recipientAccount}`,
             pin,
+            rail: bankRail,
           }, cfg())
         } else {
           await axios.post(`${API_URL}/api/callbacks/b2b-request`, {
@@ -374,6 +376,32 @@ export default function SendMoney() {
                 </div>
               )}
 
+              {destination === 'bank' && (
+                <div className="space-y-2">
+                  <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Transfer Speed</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { id: 'pesalink', title: 'Instant', hint: 'PesaLink · 24/7' },
+                      { id: 'eft',      title: 'Next Business Day', hint: 'EFT · Mon–Fri' },
+                    ].map(opt => (
+                      <button
+                        type="button"
+                        key={opt.id}
+                        onClick={() => setBankRail(opt.id)}
+                        className={`p-3.5 rounded-2xl border-2 text-left transition-all ${
+                          bankRail === opt.id
+                            ? 'border-[#00351D] bg-[#f0fdf4]'
+                            : 'border-slate-100 hover:border-emerald-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        <p className={`text-sm font-bold ${bankRail === opt.id ? 'text-[#00351D]' : 'text-primary'}`}>{opt.title}</p>
+                        <p className="text-[10px] text-slate-400 font-medium mt-0.5">{opt.hint}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">
                   {destination.includes('mpesa') || destination === 'mobile' ? 'Phone Number' : destination === 'till' ? 'Till Number' : destination === 'paybill' ? 'Paybill Number' : 'Account Number'}
@@ -498,6 +526,7 @@ export default function SendMoney() {
                   {[
                     ['Destination', selectedDest?.label],
                     ...(destination === 'bank' ? [['Bank', bankCodes.find(b => b.code === bankCode)?.name || bankCode]] : []),
+                    ...(destination === 'bank' ? [['Transfer Speed', bankRail === 'eft' ? 'Next Business Day (EFT)' : 'Instant (PesaLink)']] : []),
                     ['Recipient',   recipientAccount],
                     ...(destination === 'paybill' ? [['Account Number', paybillAccountRef]] : []),
                     ['Amount',      formatKES(amount || 0)],
