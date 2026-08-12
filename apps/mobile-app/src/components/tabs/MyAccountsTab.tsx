@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TextInput, TouchableOpacity, Modal, Share, Aler
 import { MaterialIcons, Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { File, Directory, Paths } from 'expo-file-system';
+import * as FileSystemLegacy from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as SecureStore from 'expo-secure-store';
 import { useAuth } from '../../context/AuthContext';
@@ -54,6 +55,25 @@ export default function MyAccountsTab() {
       Alert.alert('Download Failed', 'Could not download the sticker — please try again.');
     } finally {
       setDownloadingSticker(false);
+    }
+  };
+
+  // Saves the QR as an actual PNG image via the native share sheet (which
+  // includes "Save Image" among its targets on both iOS/Android) — the
+  // Share button below only ever sent a plain text message, never the QR
+  // image itself, so there was previously no way to save the standalone
+  // scannable image, unlike the dashboard's direct PNG download.
+  const handleSaveQr = async () => {
+    if (!qrCodeDataUri || !qrAccount) return;
+    try {
+      const base64 = qrCodeDataUri.replace(/^data:image\/\w+;base64,/, '');
+      const fileUri = `${FileSystemLegacy.cacheDirectory}paychain-qr-${qrAccount.accountNumber}.png`;
+      await FileSystemLegacy.writeAsStringAsync(fileUri, base64, { encoding: 'base64' });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, { mimeType: 'image/png', dialogTitle: 'Save PayChain QR Code' });
+      }
+    } catch (err) {
+      Alert.alert('Save Failed', 'Could not save the QR code — please try again.');
     }
   };
 
@@ -202,14 +222,24 @@ export default function MyAccountsTab() {
               />
             )}
 
-            <TouchableOpacity
-              onPress={() => qrAccount && Share.share({ message: `Pay ${qrAccount.name} via PayChain — Account: ${formatAccountNumber(qrAccount.accountNumber)}` })}
-              activeOpacity={0.85}
-              className="flex-row items-center justify-center gap-2 mt-5 py-3.5 bg-[#5EFEB3] rounded-2xl"
-            >
-              <Feather name="share-2" size={16} color="#00351D" />
-              <Text className="text-[#00351D] text-[11px] font-jakarta-extrabold uppercase tracking-widest">Share</Text>
-            </TouchableOpacity>
+            <View className="flex-row gap-2.5 mt-5">
+              <TouchableOpacity
+                onPress={handleSaveQr}
+                activeOpacity={0.85}
+                className="flex-1 flex-row items-center justify-center gap-2 py-3.5 bg-white/10 border border-white/20 rounded-2xl"
+              >
+                <Feather name="download" size={16} color="#fff" />
+                <Text className="text-white text-[11px] font-jakarta-extrabold uppercase tracking-widest">Save</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => qrAccount && Share.share({ message: `Pay ${qrAccount.name} via PayChain — Account: ${formatAccountNumber(qrAccount.accountNumber)}` })}
+                activeOpacity={0.85}
+                className="flex-1 flex-row items-center justify-center gap-2 py-3.5 bg-[#5EFEB3] rounded-2xl"
+              >
+                <Feather name="share-2" size={16} color="#00351D" />
+                <Text className="text-[#00351D] text-[11px] font-jakarta-extrabold uppercase tracking-widest">Share</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>

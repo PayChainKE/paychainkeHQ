@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import api from '../api/config';
@@ -33,10 +33,13 @@ const formatTimestamp = (iso: string) => {
   return `${date.toLocaleDateString('en-KE', { day: '2-digit', month: 'short' })} · ${time}`;
 };
 
+type FilterTab = 'all' | 'unread';
+
 export default function Notifications({ navigation }: any) {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [filter, setFilter] = useState<FilterTab>('all');
 
   const fetchNotifications = async () => {
     try {
@@ -81,9 +84,32 @@ export default function Notifications({ navigation }: any) {
     }
   };
 
+  const deleteNotificationItem = (id: string) => {
+    Alert.alert('Delete Notification', 'Remove this notification? This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          const prev = notifications;
+          setNotifications((cur) => cur.filter((n) => n._id !== id));
+          try {
+            await api.delete(`/api/notifications/${id}`);
+          } catch (err) {
+            console.error('Failed to delete notification', err);
+            setNotifications(prev);
+            Alert.alert('Failed', 'Could not delete this notification. Please try again.');
+          }
+        },
+      },
+    ]);
+  };
+
+  const visible = filter === 'unread' ? notifications.filter((n) => !n.read) : notifications;
+
   const groups: Array<{ label: 'Today' | 'Earlier'; items: NotificationItem[] }> = [
-    { label: 'Today', items: notifications.filter((n) => isToday(new Date(n.createdAt))) },
-    { label: 'Earlier', items: notifications.filter((n) => !isToday(new Date(n.createdAt))) },
+    { label: 'Today', items: visible.filter((n) => isToday(new Date(n.createdAt))) },
+    { label: 'Earlier', items: visible.filter((n) => !isToday(new Date(n.createdAt))) },
   ];
 
   return (
@@ -92,13 +118,27 @@ export default function Notifications({ navigation }: any) {
         title="Notifications"
         subtitle={unreadCount > 0 ? `${unreadCount} unread` : 'You are all caught up'}
       />
-      {unreadCount > 0 && (
-        <View className="w-full max-w-lg mx-auto px-6 pt-3 items-end">
+      <View className="w-full max-w-lg mx-auto px-6 pt-3 flex-row items-center justify-between">
+        <View className="flex-row gap-2">
+          {([
+            { key: 'all' as const, label: 'All' },
+            { key: 'unread' as const, label: unreadCount > 0 ? `Unread (${unreadCount})` : 'Unread' },
+          ]).map((tab) => (
+            <TouchableOpacity
+              key={tab.key}
+              onPress={() => setFilter(tab.key)}
+              className={`px-3.5 py-1.5 rounded-full border ${filter === tab.key ? 'bg-[#00351d] border-[#00351d]' : 'bg-white border-[#eff4ef]'}`}
+            >
+              <Text className={`text-[10px] font-jakarta-extrabold uppercase tracking-wider ${filter === tab.key ? 'text-white' : 'text-[#707971]'}`}>{tab.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        {unreadCount > 0 && (
           <TouchableOpacity onPress={markAllRead} activeOpacity={0.8}>
             <Text className="text-[#006c4e] text-[11px] font-jakarta-bold uppercase tracking-widest">Mark all read</Text>
           </TouchableOpacity>
-        </View>
-      )}
+        )}
+      </View>
 
       <ScrollView
         className="flex-1"
@@ -111,12 +151,14 @@ export default function Notifications({ navigation }: any) {
             <View className="py-24 items-center justify-center">
               <ActivityIndicator color="#00351d" />
             </View>
-          ) : notifications.length === 0 ? (
+          ) : visible.length === 0 ? (
             <View className="items-center justify-center py-24">
               <View className="w-16 h-16 rounded-full bg-white border border-[#eff4ef] items-center justify-center mb-4">
                 <Feather name="bell-off" size={24} color="#b3b9b4" />
               </View>
-              <Text className="text-[14px] text-[#707971] font-jakarta-medium">No notifications yet</Text>
+              <Text className="text-[14px] text-[#707971] font-jakarta-medium">
+                {filter === 'unread' ? "You're all caught up" : 'No notifications yet'}
+              </Text>
             </View>
           ) : (
             groups.map((group) => {
@@ -147,9 +189,14 @@ export default function Notifications({ navigation }: any) {
                             <Text className="text-[12.5px] text-[#707971] font-jakarta-medium leading-relaxed mb-1.5">
                               {item.message}
                             </Text>
-                            <Text className="text-[10.5px] text-[#b3b9b4] font-jakarta-bold uppercase tracking-wider">
-                              {formatTimestamp(item.createdAt)}
-                            </Text>
+                            <View className="flex-row items-center justify-between">
+                              <Text className="text-[10.5px] text-[#b3b9b4] font-jakarta-bold uppercase tracking-wider">
+                                {formatTimestamp(item.createdAt)}
+                              </Text>
+                              <TouchableOpacity onPress={() => deleteNotificationItem(item._id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                                <Feather name="trash-2" size={13} color="#b3b9b4" />
+                              </TouchableOpacity>
+                            </View>
                           </View>
                         </TouchableOpacity>
                       );

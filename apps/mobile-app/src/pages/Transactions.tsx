@@ -1,17 +1,33 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Modal, Alert } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Modal, Alert, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import api from '../api/config';
 import TopBar from '../components/layout/TopBar';
-import { isCreditTransaction, typeLabel as txTypeLabel } from '../utils/transactionDirection';
+import { useAuth } from '../context/AuthContext';
+import { isCreditTransaction, isDebitTransaction, typeLabel as txTypeLabel } from '../utils/transactionDirection';
 import { formatTxDate, formatTxTime } from '../utils/formatDate';
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay';
 import { buildAuditReceiptHtml } from '../utils/auditReceiptHtml';
+import { buildStatementHtml } from '../utils/statementHtml';
+import { InlineDatePicker } from '../components/InlineDatePicker';
+
+const EXPORT_PRESETS = [
+  { key: '7d', label: 'Last 7 Days' },
+  { key: '30d', label: 'Last 30 Days' },
+  { key: 'month', label: 'This Month' },
+  { key: 'year', label: 'This Year' },
+  { key: 'all', label: 'All Time' },
+  { key: 'custom', label: 'Custom Range' },
+] as const;
+type ExportPreset = typeof EXPORT_PRESETS[number]['key'];
 
 const ITEMS_PER_PAGE = 20;
+const FILTER_TABS = ['All', 'Inbound', 'Outbound', 'FX Swaps'] as const;
+type FilterTab = typeof FILTER_TABS[number];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function formatKES(amount: number) {
@@ -67,30 +83,52 @@ const STAT_CARD_STYLES = [
 ];
 
 export default function Transactions({ navigation }: any) {
+  const { merchant } = useAuth();
   const [currentPage, setCurrentPage] = useState(1);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedTx, setSelectedTx] = useState<any | null>(null);
   const [isGeneratingReceipt, setIsGeneratingReceipt] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeFilter, setActiveFilter] = useState<FilterTab>('All');
+
+  // ─── Statement export ──────────────────────────────────────────────────
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportPreset, setExportPreset] = useState<ExportPreset>('30d');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
+
+  const fetchTransactions = useCallback(async () => {
+    try {
+      const res = await api.get('/api/transactions');
+      if (res.data.success) {
+        setTransactions(res.data.transactions || []);
+      } else if (Array.isArray(res.data)) {
+        // Fallback: some endpoints return array directly
+        setTransactions(res.data);
+      }
+    } catch (error) {
+      console.error('Error fetching transactions', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const fetchTransactions = async () => {
-      try {
-        const res = await api.get('/api/transactions');
-        if (res.data.success) {
-          setTransactions(res.data.transactions || []);
-        } else if (Array.isArray(res.data)) {
-          // Fallback: some endpoints return array directly
-          setTransactions(res.data);
-        }
-      } catch (error) {
-        console.error('Error fetching transactions', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
     fetchTransactions();
-  }, []);
+  }, [fetchTransactions]);
+
+  // Keep the list live, matching the dashboard's identical 5s poll
+  // (Transactions.jsx) — previously this only ever fetched once on mount,
+  // so a new payment never appeared until the merchant left and re-entered
+  // the screen.
+  useEffect(() => {
+    const interval = setInterval(fetchTransactions, 5000);
+    return () => clearInterval(interval);
+  }, [fetchTransactions]);
+
+  useFocusEffect(useCallback(() => { fetchTransactions(); }, [fetchTransactions]));
 
   // ─── Stats calculation (mirroring merchant dashboard) ─────────────────────
   const inboundTxs = transactions.filter(t => isCreditTransaction(t.type));
@@ -116,13 +154,126 @@ export default function Transactions({ navigation }: any) {
     { label: 'All Time',   value: stats.allTime, style: STAT_CARD_STYLES[3] },
   ];
 
+  // ─── Search + type filter (mirrors the dashboard's identical logic) ───────
+  const filteredTransactions = transactions.filter((t) => {
+    const q = searchQuery.trim().toLowerCase();
+    const matchesSearch = !q ||
+      (t.sender?.name || '').toLowerCase().includes(q) ||
+      (t.recipient?.name || '').toLowerCase().includes(q) ||
+      (t.reference || '').toLowerCase().includes(q);
+    if (!matchesSearch) return false;
+    if (activeFilter === 'All') return true;
+    if (activeFilter === 'Inbound') return isCreditTransaction(t.type);
+    if (activeFilter === 'Outbound') return isDebitTransaction(t.type);
+    if (activeFilter === 'FX Swaps') return t.type === 'fx_swap';
+    return true;
+  });
+
   // ─── Pagination ────────────────────────────────────────────────────────────
-  const totalPages = Math.max(1, Math.ceil(transactions.length / ITEMS_PER_PAGE));
+  const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / ITEMS_PER_PAGE));
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const currentTransactions = transactions.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  const currentTransactions = filteredTransactions.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  useEffect(() => { setCurrentPage(1); }, [searchQuery, activeFilter]);
 
   const handleNext = () => { if (currentPage < totalPages) setCurrentPage(p => p + 1); };
   const handlePrev = () => { if (currentPage > 1) setCurrentPage(p => p - 1); };
+
+  // ─── Statement export (mirrors the dashboard's identical period logic
+  // in Transactions.jsx's resolveExportRange/handleExport) ────────────────
+  const resolveExportRange = (): { from: Date | null; to: Date | null } => {
+    const now = new Date();
+    const endOfToday = new Date(now); endOfToday.setHours(23, 59, 59, 999);
+
+    if (exportPreset === '7d') {
+      const from = new Date(now); from.setDate(from.getDate() - 7); from.setHours(0, 0, 0, 0);
+      return { from, to: endOfToday };
+    }
+    if (exportPreset === '30d') {
+      const from = new Date(now); from.setDate(from.getDate() - 30); from.setHours(0, 0, 0, 0);
+      return { from, to: endOfToday };
+    }
+    if (exportPreset === 'month') {
+      return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: endOfToday };
+    }
+    if (exportPreset === 'year') {
+      return { from: new Date(now.getFullYear(), 0, 1), to: endOfToday };
+    }
+    if (exportPreset === 'custom') {
+      const fromDate = customFrom ? new Date(customFrom) : null;
+      const toDate = customTo ? new Date(customTo) : null;
+      const from = fromDate ? new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate(), 0, 0, 0) : null;
+      const to = toDate ? new Date(toDate.getFullYear(), toDate.getMonth(), toDate.getDate(), 23, 59, 59) : endOfToday;
+      return { from, to };
+    }
+    return { from: null, to: null }; // All Time
+  };
+
+  const formatPeriodLabel = (from: Date | null, to: Date | null) => {
+    const fmt = (d: Date) => d.toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' });
+    if (!from && !to) return 'All transactions';
+    if (from && to) return `${fmt(from)} – ${fmt(to)}`;
+    if (from) return `From ${fmt(from)}`;
+    return `Up to ${fmt(to as Date)}`;
+  };
+
+  const confirmExport = async () => {
+    const { from, to } = resolveExportRange();
+
+    if (exportPreset === 'custom' && from && to && from > to) {
+      Alert.alert('Invalid Range', 'The "from" date must be before the "to" date.');
+      return;
+    }
+
+    const rows = transactions.filter((t) => {
+      const d = new Date(t.createdAt || t.timestamp);
+      if (from && d < from) return false;
+      if (to && d > to) return false;
+      return true;
+    });
+
+    if (rows.length === 0) {
+      Alert.alert('No Transactions', 'No transactions were found in the selected period.');
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      const periodLabel = formatPeriodLabel(from, to);
+      const html = buildStatementHtml({
+        rows,
+        allTransactions: transactions,
+        merchant,
+        periodLabel,
+        periodEnd: to,
+        currentBalance: merchant?.kesBalance || 0,
+      });
+      const { uri, base64 } = await Print.printToFileAsync({ html, base64: true });
+      setShowExportModal(false);
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: 'PayChain Statement', UTI: 'com.adobe.pdf' });
+      }
+
+      if (base64) {
+        try {
+          await api.post('/api/transactions/statement/email', {
+            pdfBase64: base64,
+            periodLabel,
+            filename: `PayChain-Statement-${new Date().toISOString().slice(0, 10)}.pdf`,
+          });
+        } catch (err) {
+          console.error('Failed to email statement:', err);
+          Alert.alert('Email Failed', 'The statement downloaded fine, but we could not email you a copy.');
+        }
+      }
+    } catch (err: any) {
+      console.error('Statement export failed', err);
+      Alert.alert('Export Failed', err?.message || 'Could not generate the statement. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const handleGenerateAuditReceipt = async () => {
     if (!selectedTx) return;
@@ -151,7 +302,7 @@ export default function Transactions({ navigation }: any) {
   return (
     <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
 
-      <TopBar title="Transactions" subtitle="Inbound payment history" />
+      <TopBar title="Transactions" subtitle="Full payment history" />
 
       <ScrollView
         className="flex-1"
@@ -232,9 +383,48 @@ export default function Transactions({ navigation }: any) {
           </View>
 
           {/* ── Transaction List ───────────────────────────────────────────── */}
-          <Text className="text-[10px] font-jakarta-bold text-[#006c4e] uppercase tracking-[0.2em] mb-4">
-            All Transactions
-          </Text>
+          <View className="flex-row items-center justify-between mb-4">
+            <Text className="text-[10px] font-jakarta-bold text-[#006c4e] uppercase tracking-[0.2em]">
+              All Transactions
+            </Text>
+            <TouchableOpacity
+              onPress={() => setShowExportModal(true)}
+              className="flex-row items-center gap-1.5 bg-white border border-[#bfc9bf]/20 px-3 py-1.5 rounded-full"
+            >
+              <Feather name="download" size={12} color="#00351d" />
+              <Text className="text-[#00351d] text-[10px] font-jakarta-extrabold uppercase tracking-wider">Statement</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View className="flex-row items-center gap-2 bg-white rounded-2xl border border-[#bfc9bf]/10 px-4 py-3 mb-3">
+            <Feather name="search" size={15} color="#a1a1aa" />
+            <TextInput
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search by name or reference"
+              placeholderTextColor="#a1a1aa"
+              className="flex-1 text-[13px] font-jakarta-medium text-[#0c2010]"
+            />
+            {!!searchQuery && (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <Feather name="x" size={15} color="#a1a1aa" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4 -mx-6 px-6">
+            <View className="flex-row gap-2">
+              {FILTER_TABS.map((tab) => (
+                <TouchableOpacity
+                  key={tab}
+                  onPress={() => setActiveFilter(tab)}
+                  className={`px-4 py-2 rounded-full border ${activeFilter === tab ? 'bg-[#00351d] border-[#00351d]' : 'bg-white border-[#eff4ef]'}`}
+                >
+                  <Text className={`text-[11px] font-jakarta-bold ${activeFilter === tab ? 'text-white' : 'text-[#707971]'}`}>{tab}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
 
           <View className="bg-white rounded-[28px] shadow-sm border border-[#bfc9bf]/10 mb-6 overflow-hidden">
             {isLoading ? (
@@ -247,9 +437,13 @@ export default function Transactions({ navigation }: any) {
                 <View className="w-16 h-16 rounded-full bg-[#eff4ef] items-center justify-center mb-4">
                   <MaterialIcons name="receipt-long" size={28} color="#707971" />
                 </View>
-                <Text className="text-[#0c2010] font-jakarta-bold text-[16px] mb-1">No transactions yet</Text>
+                <Text className="text-[#0c2010] font-jakarta-bold text-[16px] mb-1">
+                  {searchQuery || activeFilter !== 'All' ? 'No matching transactions' : 'No transactions yet'}
+                </Text>
                 <Text className="text-[#707971] font-jakarta-medium text-[13px] text-center leading-relaxed">
-                  Inbound payments to your account will appear here.
+                  {searchQuery || activeFilter !== 'All'
+                    ? 'Try a different search term or filter.'
+                    : 'Inbound payments to your account will appear here.'}
                 </Text>
               </View>
             ) : (
@@ -310,7 +504,7 @@ export default function Transactions({ navigation }: any) {
           </View>
 
           {/* ── Pagination ─────────────────────────────────────────────────── */}
-          {!isLoading && transactions.length > ITEMS_PER_PAGE && (
+          {!isLoading && filteredTransactions.length > ITEMS_PER_PAGE && (
             <View className="flex-row items-center justify-between bg-white p-4 rounded-[24px] shadow-sm border border-[#bfc9bf]/10">
               <TouchableOpacity
                 onPress={handlePrev}
@@ -426,6 +620,60 @@ export default function Transactions({ navigation }: any) {
               </View>
             );
           })()}
+        </View>
+      </Modal>
+
+      {/* ── Statement Export ── */}
+      <Modal visible={showExportModal} transparent animationType="slide" onRequestClose={() => setShowExportModal(false)}>
+        <View className="flex-1 justify-end bg-black/50">
+          <TouchableOpacity className="absolute inset-0" activeOpacity={1} onPress={() => !isExporting && setShowExportModal(false)} />
+          <View className="w-full max-w-lg mx-auto bg-white rounded-t-[36px] px-6 pt-4 pb-8 mt-auto max-h-[85%]">
+            <View className="items-center mb-4"><View className="w-12 h-1.5 bg-[#e7ece7] rounded-full" /></View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text className="font-jakarta-extrabold text-[20px] text-[#0c2010] mb-1">Download Statement</Text>
+              <Text className="text-[#707971] font-jakarta-medium text-[13px] mb-6">Choose a period — we'll also email you a copy.</Text>
+
+              <View className="gap-2 mb-2">
+                {EXPORT_PRESETS.map((p) => (
+                  <TouchableOpacity
+                    key={p.key}
+                    onPress={() => setExportPreset(p.key)}
+                    className={`flex-row items-center justify-between px-4 py-3.5 rounded-2xl border ${exportPreset === p.key ? 'bg-[#f0fdf4] border-[#00351d]' : 'bg-white border-[#eff4ef]'}`}
+                  >
+                    <Text className={`font-jakarta-bold text-[13px] ${exportPreset === p.key ? 'text-[#00351d]' : 'text-[#404942]'}`}>{p.label}</Text>
+                    {exportPreset === p.key && <Feather name="check" size={15} color="#00351d" />}
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {exportPreset === 'custom' && (
+                <View className="flex-row gap-3 mt-3 mb-2">
+                  <View className="flex-1">
+                    <InlineDatePicker label="From" value={customFrom} onChange={setCustomFrom} clearable />
+                  </View>
+                  <View className="flex-1">
+                    <InlineDatePicker label="To" value={customTo} onChange={setCustomTo} minDate={customFrom} clearable />
+                  </View>
+                </View>
+              )}
+
+              <TouchableOpacity
+                onPress={confirmExport}
+                disabled={isExporting}
+                className="w-full bg-[#00351d] h-[56px] rounded-full flex-row items-center justify-center mt-6"
+                style={isExporting ? { opacity: 0.6 } : undefined}
+              >
+                {isExporting ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <>
+                    <Feather name="download" size={16} color="#fff" style={{ marginRight: 8 }} />
+                    <Text className="text-white font-jakarta-bold text-[15px]">Download & Email Statement</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
         </View>
       </Modal>
     </SafeAreaView>
