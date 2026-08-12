@@ -673,12 +673,13 @@ export const processPaymentLink = async (req, res) => {
     }
 
     // Checkout initializer: the amount actually prompted on the customer's
-    // handset — base bill + PayChain's customer surcharge (currently 0
-    // until pricing sheets are finalized, see utils/pricingEngine.js).
-    // Computed once, up front, so what the customer sees and approves on
-    // their phone already includes any surcharge — never added silently
-    // after the fact. resolveStkOutcome re-derives the split from this same
-    // total plus link.amount (the base) once the payment is confirmed.
+    // handset — base bill + PayChain's customer surcharge (the Standard
+    // Transaction Tariff / Hosted Payment Link tariff, see
+    // utils/pricingEngine.js#calculateCustomerSurcharge). Computed once, up
+    // front, so what the customer sees and approves on their phone already
+    // includes any surcharge — never added silently after the fact.
+    // resolveStkOutcome re-derives the split from this same total plus
+    // link.amount (the base) once the payment is confirmed.
     const checkoutTotal = getCheckoutTotal(link.amount);
 
     // Real STK Push via NCBA's Till short code 889066 (or simulated — see

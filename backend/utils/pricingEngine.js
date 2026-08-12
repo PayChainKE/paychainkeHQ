@@ -189,6 +189,13 @@ export class PricingEngineError extends Error {
 // a range per compressed row (e.g. "20,001-250,000: KES 25-35") — expanded
 // here into SAFARICOM_TARIFF's real finer sub-bands, stepping evenly from
 // the range's low end to its high end (confirmed against the sheet 2026-08-12).
+//
+// Also serves as the "Hosted Payment Link Tariff Schedule" (Web & Social
+// Checkout Links, 2026-08-12) — verified band-for-band identical to that
+// separate tariff sheet, so the same table and functions cover both
+// products; getCheckoutTotal is already called from
+// transactionController.js#processPaymentLink for this product line, no
+// separate code path needed.
 const CUSTOMER_SURCHARGE_BANDS = [
   { max: 100,      fee: 0  },
   { max: 500,      fee: 3  },
