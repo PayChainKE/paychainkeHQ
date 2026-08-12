@@ -2,6 +2,7 @@ import { REVENUE_STREAMS, safaricomFeeFor } from '../config/revenueRateCard.js';
 import { getNcbaTariffBand } from '../config/ncbaTariffCard.js';
 import { calculateMerchantFee } from './pricingEngine.js';
 import { getB2cTariff } from '../config/mpesaB2cTariffCard.js';
+import { getKplcPostpaidTariff, getKplcPrepaidTariff, getNcwscTariff } from '../config/billPaymentTariffCard.js';
 
 // Build the type → stream map once at module load.
 const TYPE_TO_STREAM = (() => {
@@ -75,6 +76,42 @@ export function calculateFees(type, kesAmount) {
       safaricomFee,
       streamId: stream?.id || null,
     };
+  }
+
+  // KPLC postpaid bill payments (Bulk Pay) — flat Bill Payment tariff, see
+  // config/billPaymentTariffCard.js. paychainFee is the service-fee portion
+  // PayChain actually keeps; safaricomFee here holds the third-party bank/
+  // aggregator base cost (this field is reused across every rail in this
+  // file as "the pass-through cost", not literally Safaricom-specific).
+  // Was a no-op flat KES 20 stamped for reporting only, never actually
+  // deducted from the merchant — bulkPayController.js now folds this same
+  // totalFee into the batch's atomic debit, so the two can't disagree.
+  if (type === 'ncba_kplc') {
+    if (v <= 0) {
+      return { paychainFee: 0, safaricomFee: 0, streamId: stream?.id || null };
+    }
+    const { baseCost, serviceFee } = getKplcPostpaidTariff();
+    return { paychainFee: serviceFee, safaricomFee: baseCost, streamId: stream?.id || null };
+  }
+
+  // KPLC prepaid token purchases (Bulk Pay) — tiered Bill Payment tariff,
+  // unlike postpaid above. Same reasoning as ncba_kplc.
+  if (type === 'ncba_kplc_prepaid') {
+    if (v <= 0) {
+      return { paychainFee: 0, safaricomFee: 0, streamId: stream?.id || null };
+    }
+    const { baseCost, serviceFee } = getKplcPrepaidTariff(v);
+    return { paychainFee: serviceFee, safaricomFee: baseCost, streamId: stream?.id || null };
+  }
+
+  // NCWSC (Nairobi Water) bill payments (Bulk Pay) — flat Bill Payment
+  // tariff. Same reasoning as ncba_kplc.
+  if (type === 'ncba_ncwsc') {
+    if (v <= 0) {
+      return { paychainFee: 0, safaricomFee: 0, streamId: stream?.id || null };
+    }
+    const { baseCost, serviceFee } = getNcwscTariff();
+    return { paychainFee: serviceFee, safaricomFee: baseCost, streamId: stream?.id || null };
   }
 
   // M-Pesa inbound collections (C2B paybill + STK Push) price off the

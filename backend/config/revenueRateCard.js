@@ -1,3 +1,5 @@
+import { KPLC_POSTPAID_SERVICE_FEE, NCWSC_SERVICE_FEE } from './billPaymentTariffCard.js';
+
 // Single source of truth for PayChain's revenue model. Two layers:
 //
 //   1. SAFARICOM_TARIFF — Safaricom's published M-Pesa tariff. This is a
@@ -81,9 +83,10 @@ export const CASH_ADVANCE_RATE    = 0.025;  // 2.50% — pilot product
 // pricing rollout.
 export const NCBA_LIPA_NA_MPESA_FLAT_FEE_KES = 30;
 export const NCBA_DISBURSEMENT_FLAT_FEE_KES  = 50;
-export const NCBA_KPLC_FLAT_FEE_KES          = 20;
-export const NCBA_KPLC_PREPAID_FLAT_FEE_KES  = 15;
-export const NCBA_NCWSC_FLAT_FEE_KES         = 20;
+// KPLC (postpaid/prepaid) and NCWSC no longer have their own flat constants
+// here — utils/feeCalculator.js prices them via the Standard Bill Payment
+// Tariff in config/billPaymentTariffCard.js instead (KPLC Prepaid is
+// genuinely tiered, not flat).
 export const STABLECOIN_PAYMENT_FLAT_FEE_KES = 30;
 export const SETTLEMENT_FLAT_FEE_KES         = 20;
 export const MPESA_B2B_LEGACY_FLAT_FEE_KES   = 20;
@@ -227,11 +230,11 @@ export const REVENUE_STREAMS = [
   {
     id: 'ncba_kplc_fee',
     label: 'NCBA KPLC Bill Payment Fee',
-    description: `PayChain's flat KES ${NCBA_KPLC_FLAT_FEE_KES} margin on Bulk Pay KPLC (Kenya Power) postpaid bill payments, via NCBA's Open Banking KPLC Payment API. NCBA hasn't published a cost schedule for this rail, so no NCBA cost passes through; this is PayChain's own charge only, distinct from the generic ncba_disbursement_fee stream used by bank and other utility (WATER) bulk payouts.`,
+    description: `PayChain's flat KES ${KPLC_POSTPAID_SERVICE_FEE} service fee on Bulk Pay KPLC (Kenya Power) postpaid bill payments (config/billPaymentTariffCard.js), via NCBA's Open Banking KPLC Payment API — plus a KES 10 third-party bank/aggregator base cost, both charged to the merchant alongside the bill value, distinct from the generic ncba_disbursement_fee stream used by bank and other utility (WATER) bulk payouts.`,
     icon: 'bolt',
     accent: 'amber',
     rate: null,
-    flatFee: NCBA_KPLC_FLAT_FEE_KES,
+    flatFee: KPLC_POSTPAID_SERVICE_FEE,
     minFee: 0,
     txTypes: ['ncba_kplc'],
     statuses: ['completed', 'verified'],
@@ -240,11 +243,11 @@ export const REVENUE_STREAMS = [
   {
     id: 'ncba_kplc_prepaid_fee',
     label: 'NCBA KPLC Prepaid Token Fee',
-    description: `PayChain's flat KES ${NCBA_KPLC_PREPAID_FLAT_FEE_KES} margin on Bulk Pay KPLC (Kenya Power) prepaid electricity token purchases, via NCBA's Open Banking KPLC Prepaid Transaction API. Distinct from ncba_kplc_fee (postpaid bill payments) — NCBA treats prepaid and postpaid as separate products.`,
+    description: 'Tiered PayChain service fee (KES 7-69, plus a KES 5-15 third-party base cost) on Bulk Pay KPLC (Kenya Power) prepaid electricity token purchases, via NCBA\'s Open Banking KPLC Prepaid Transaction API — see config/billPaymentTariffCard.js. Distinct from ncba_kplc_fee (postpaid bill payments) — NCBA treats prepaid and postpaid as separate products.',
     icon: 'bolt',
     accent: 'amber',
+    tiered: true,
     rate: null,
-    flatFee: NCBA_KPLC_PREPAID_FLAT_FEE_KES,
     minFee: 0,
     txTypes: ['ncba_kplc_prepaid'],
     statuses: ['completed', 'verified'],
@@ -253,11 +256,11 @@ export const REVENUE_STREAMS = [
   {
     id: 'ncba_ncwsc_fee',
     label: 'NCBA NCWSC Bill Payment Fee',
-    description: `PayChain's flat KES ${NCBA_NCWSC_FLAT_FEE_KES} margin on Bulk Pay Nairobi Water (NCWSC) bill payments, via NCBA's Open Banking NWSC Payment API. NCBA hasn't published a cost schedule for this rail, so no NCBA cost passes through; this is PayChain's own charge only.`,
+    description: `PayChain's flat KES ${NCWSC_SERVICE_FEE} service fee on Bulk Pay Nairobi Water (NCWSC) bill payments (config/billPaymentTariffCard.js), via NCBA's Open Banking NWSC Payment API — plus a KES 10 third-party bank/aggregator base cost, both charged to the merchant alongside the bill value.`,
     icon: 'water_drop',
     accent: 'sky',
     rate: null,
-    flatFee: NCBA_NCWSC_FLAT_FEE_KES,
+    flatFee: NCWSC_SERVICE_FEE,
     minFee: 0,
     txTypes: ['ncba_ncwsc'],
     statuses: ['completed', 'verified'],
