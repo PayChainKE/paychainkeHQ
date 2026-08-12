@@ -395,7 +395,6 @@ export default function SendMoney() {
                 </div>
                 <div>
                   <p className="text-xs font-bold text-primary">{selectedDest?.label}</p>
-                  <p className="text-[10px] text-slate-400">Fee: {formatKES(fee)}</p>
                 </div>
               </div>
 

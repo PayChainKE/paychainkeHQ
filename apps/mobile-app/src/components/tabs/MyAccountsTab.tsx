@@ -17,19 +17,19 @@ export default function MyAccountsTab() {
   const [qrCodeDataUri, setQrCodeDataUri] = useState('');
   const [downloadingSticker, setDownloadingSticker] = useState(false);
 
-  // Real NCBA Dynamic QR Code (scannable directly in M-PESA), fetched
-  // whenever the modal opens — was a link to PayChain's own
+  // Real NCBA Dynamic QR Code (scannable directly in M-PESA), fetched once
+  // on mount rather than re-fetching every time the modal opens — the
+  // backend caches this per merchant so it's cheap either way, but there's
+  // still no reason for a network round trip on every open when the same
+  // image is shown every time. Was a link to PayChain's own
   // /pay/account/:id page rendered as a client-side QR; replaced so
   // there's one QR mechanism in the app, not two.
   useEffect(() => {
-    if (!qrAccount) {
-      setQrCodeDataUri('');
-      return;
-    }
+    if (!merchant?.ncbaMerchantCode) return;
     api.get('/api/callbacks/account-qr')
       .then((res) => setQrCodeDataUri(res.data?.qrCodeDataUri || ''))
       .catch((e) => console.error('Failed to load account QR', e));
-  }, [qrAccount]);
+  }, [merchant?.ncbaMerchantCode]);
 
   // Downloads the official branded PayChain/NCBA paybill sticker (PDF),
   // pre-filled server-side with this merchant's own account number and

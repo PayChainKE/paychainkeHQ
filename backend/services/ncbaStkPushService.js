@@ -12,6 +12,18 @@ const ncbaStkBaseUrl = (process.env.NCBA_STK_BASE_URL || 'https://c2bapis.ncbagr
 const ncbaStkUsername = process.env.NCBA_STK_USERNAME || process.env.NCBA_OPENBANKING_USER_ID;
 const ncbaStkPassword = process.env.NCBA_STK_PASSWORD || process.env.NCBA_OPENBANKING_PASSWORD;
 export const NCBA_STK_PAYBILL = process.env.NCBA_STK_PAYBILL || '889066';
+// NCBA's STK/QR spec doc never mentions a subscription key, unlike Open
+// Banking (which requires an Ocp-Apim-Subscription-Key header — see
+// ncbaOpenBankingService.js — on every call, not just token generation).
+// That doc is already known to be self-contradictory elsewhere (its STK
+// section says GET for token generation, its QR section says POST for the
+// identical endpoint), so "no subscription key documented" isn't strong
+// evidence one truly isn't required — c2bapis.ncbagroup.com plausibly sits
+// behind the same NCBA Azure APIM gateway as Open Banking, which gates
+// every route on a subscription key regardless of per-product docs. Falls
+// back to the Open Banking key since a single APIM subscription commonly
+// grants access to multiple API products under one gateway.
+const ncbaStkSubscriptionKey = process.env.NCBA_STK_SUBSCRIPTION_KEY || process.env.NCBA_OPENBANKING_SUBSCRIPTION_KEY;
 
 // Real network calls to NCBA (UAT or live) only happen when this is
 // explicitly 'true' — mirrors ncbaOpenBankingService.js's liveCallsEnabled,
@@ -82,10 +94,16 @@ async function fetchNewToken() {
     // try POST instead).
     const response = await axios.get(`${ncbaStkBaseUrl}/payments/api/v1/auth/token`, {
       auth: { username: ncbaStkUsername, password: ncbaStkPassword },
-      // See the identical comment in ncbaOpenBankingService.js — NCBA's
-      // gateway has been observed blocking axios's default User-Agent
-      // outright, even from an already-whitelisted IP.
-      headers: { 'User-Agent': 'PayChain-Backend/1.0 (+https://paychain.co.ke)' },
+      headers: {
+        // See the identical comment in ncbaOpenBankingService.js — NCBA's
+        // gateway has been observed blocking axios's default User-Agent
+        // outright, even from an already-whitelisted IP.
+        'User-Agent': 'PayChain-Backend/1.0 (+https://paychain.co.ke)',
+        // Undocumented for this product per NCBA's own spec, but sent
+        // whenever available — see the doc comment on ncbaStkSubscriptionKey
+        // above. A no-op if NCBA's gateway ignores it for this route.
+        ...(ncbaStkSubscriptionKey ? { 'Ocp-Apim-Subscription-Key': ncbaStkSubscriptionKey } : {}),
+      },
       timeout: 15000,
     });
 
@@ -124,6 +142,7 @@ async function ncbaStkPost(path, body, { retrying = false } = {}) {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
         'User-Agent': 'PayChain-Backend/1.0 (+https://paychain.co.ke)',
+        ...(ncbaStkSubscriptionKey ? { 'Ocp-Apim-Subscription-Key': ncbaStkSubscriptionKey } : {}),
       },
       timeout: 20000,
     });

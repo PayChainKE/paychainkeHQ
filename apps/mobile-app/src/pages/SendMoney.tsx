@@ -322,7 +322,6 @@ export default function SendMoney({ navigation }: any) {
                 </View>
                 <View>
                   <Text className="text-[12px] font-jakarta-bold text-[#0c2010]">{selectedDest?.label}</Text>
-                  <Text className="text-[10px] text-[#707971] font-jakarta-medium">Fee: {formatKES(fee)}</Text>
                 </View>
               </View>
 
