@@ -175,7 +175,7 @@ export const REVENUE_STREAMS = [
   {
     id: 'mpesa_b2c_fee',
     label: 'M-Pesa B2C Fee',
-    description: 'Safaricom\'s standard B2C tariff on merchant withdrawals to M-Pesa, passed through at cost (deducted from the merchant alongside the withdrawal). PayChain\'s own margin on top (PAYCHAIN_B2C_MARKUP) is not charged yet, so this stream reads near-zero revenue until that changes.',
+    description: 'Safaricom\'s standard B2C tariff on merchant withdrawals to M-Pesa, passed through at cost, plus PayChain\'s own tiered Mobile Withdrawal service fee (config/mpesaB2cTariffCard.js#calculateB2cServiceFee) — both deducted from the merchant alongside the withdrawal.',
     icon: 'smartphone',
     accent: 'rose',
     tiered: true,
@@ -188,7 +188,7 @@ export const REVENUE_STREAMS = [
   {
     id: 'ncba_mobile_b2w_fee',
     label: 'NCBA Mobile B2W Fee',
-    description: 'NCBA\'s replacement for Daraja B2C — merchant withdrawals to M-Pesa/Airtel numbers via NCBA\'s Mobile B2W Payment API. NCBA has not published a real cost schedule for this rail; the numbers here are inherited from Safaricom\'s own B2C tariff (getB2cTariff) as a placeholder, not a claim about NCBA\'s actual cost.',
+    description: 'NCBA\'s replacement for Daraja B2C — merchant withdrawals to M-Pesa/Airtel numbers via NCBA\'s Mobile B2W Payment API, billed under the same Mobile Withdrawal tariff as mpesa_b2c_fee (config/mpesaB2cTariffCard.js). NCBA has not published a real cost schedule for this rail, so the Safaricom-cost portion here is inherited from Safaricom\'s own B2C tariff as a placeholder — PayChain\'s own service fee portion is real either way.',
     icon: 'smartphone',
     accent: 'rose',
     tiered: true,

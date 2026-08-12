@@ -42,8 +42,9 @@ export function calculateFees(type, kesAmount) {
   // config/mpesaB2cTariffCard.js. This is the exact same figure the
   // controller already deducted from the merchant's balance via
   // getB2cTariff(amount) before creating this Transaction, so the two can
-  // never disagree. paychainFee is PAYCHAIN_B2C_MARKUP (0 today); the rest
-  // is the real Safaricom cost, passed straight through.
+  // never disagree. paychainFee is the tiered Mobile Withdrawal service fee
+  // (calculateB2cServiceFee); the rest is the real Safaricom cost, passed
+  // straight through.
   if (type === 'mpesa_b2c') {
     if (v <= 0) {
       return { paychainFee: 0, safaricomFee: 0, streamId: stream?.id || null };

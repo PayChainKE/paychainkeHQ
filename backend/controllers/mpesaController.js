@@ -1203,8 +1203,9 @@ export const initiateB2C = async (req, res) => {
     // hasn't published a real Mobile B2W cost schedule, so this figure is
     // inherited from the Daraja era as a placeholder (see
     // config/mpesaB2cTariffCard.js and revenueRateCard.js's
-    // ncba_mobile_b2w_fee stream), plus PayChain's own flat margin
-    // (PAYCHAIN_B2C_MARKUP), both passed through to the merchant.
+    // ncba_mobile_b2w_fee stream), plus PayChain's own tiered Mobile
+    // Withdrawal service fee (calculateB2cServiceFee), both deducted from
+    // the merchant alongside the withdrawal principal.
     let b2cFee;
     try {
       ({ totalFee: b2cFee } = getB2cTariff(amount));
