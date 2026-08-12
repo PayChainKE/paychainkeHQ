@@ -86,26 +86,37 @@ async function fetchNewToken() {
     throw new NcbaStkAuthError('STK Push is not fully configured. Please contact support.');
   }
 
+  const tokenUrl = `${ncbaStkBaseUrl}/payments/api/v1/auth/token`;
+  const requestConfig = {
+    auth: { username: ncbaStkUsername, password: ncbaStkPassword },
+    headers: {
+      // See the identical comment in ncbaOpenBankingService.js — NCBA's
+      // gateway has been observed blocking axios's default User-Agent
+      // outright, even from an already-whitelisted IP.
+      'User-Agent': 'PayChain-Backend/1.0 (+https://paychain.co.ke)',
+      // Undocumented for this product per NCBA's own spec, but sent
+      // whenever available — see the doc comment on ncbaStkSubscriptionKey
+      // above. A no-op if NCBA's gateway ignores it for this route.
+      ...(ncbaStkSubscriptionKey ? { 'Ocp-Apim-Subscription-Key': ncbaStkSubscriptionKey } : {}),
+    },
+    timeout: 15000,
+  };
+
   try {
-    // Per the STK Push section of NCBA's spec this is a GET with Basic auth
-    // (the doc's QR Code section shows POST for the identical path — a
-    // contradiction within NCBA's own document; GET is what's implemented
-    // here since STK is what this integration needs. If UAT rejects it,
-    // try POST instead).
-    const response = await axios.get(`${ncbaStkBaseUrl}/payments/api/v1/auth/token`, {
-      auth: { username: ncbaStkUsername, password: ncbaStkPassword },
-      headers: {
-        // See the identical comment in ncbaOpenBankingService.js — NCBA's
-        // gateway has been observed blocking axios's default User-Agent
-        // outright, even from an already-whitelisted IP.
-        'User-Agent': 'PayChain-Backend/1.0 (+https://paychain.co.ke)',
-        // Undocumented for this product per NCBA's own spec, but sent
-        // whenever available — see the doc comment on ncbaStkSubscriptionKey
-        // above. A no-op if NCBA's gateway ignores it for this route.
-        ...(ncbaStkSubscriptionKey ? { 'Ocp-Apim-Subscription-Key': ncbaStkSubscriptionKey } : {}),
-      },
-      timeout: 15000,
-    });
+    let response;
+    try {
+      // Per the STK Push section of NCBA's spec this is a GET with Basic
+      // auth (the doc's QR Code section shows POST for the identical
+      // path — a contradiction within NCBA's own document). Try GET first;
+      // on a 4xx, fall back to POST once before giving up, so whichever
+      // this NCBA deployment actually implements works without needing
+      // another round of manual guessing.
+      response = await axios.get(tokenUrl, requestConfig);
+    } catch (getErr) {
+      if (!getErr.response || getErr.response.status < 400 || getErr.response.status >= 500) throw getErr;
+      logEvent('warn', 'ncba_stk_token_get_failed_retrying_post', { status: getErr.response.status });
+      response = await axios.post(tokenUrl, {}, requestConfig);
+    }
 
     const { access_token: accessToken, expires_in: expiresIn } = response.data || {};
     if (!accessToken) {
