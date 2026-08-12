@@ -508,6 +508,25 @@ export default function Dashboard({ navigation }: any) {
                   </View>
                 </View>
               </View>
+              <View className="flex-row items-center justify-between mt-5 pt-5 border-t border-[#eff4ef]">
+                <Text className="text-[#707971] text-[10px] font-jakarta-bold uppercase tracking-wider">All-Time Transactions</Text>
+                <Text className="text-[#0c2010] text-[14px] font-jakarta-extrabold">{transactions.length}</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Growth Tip */}
+          <View className="px-6 mb-8">
+            <View className="bg-[#e6fffa] p-5 rounded-[24px] border border-emerald-100 flex-row items-start gap-4">
+              <View className="w-10 h-10 rounded-full bg-white items-center justify-center border border-emerald-100">
+                <MaterialIcons name="lightbulb" size={18} color="#059669" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-[9px] font-jakarta-extrabold text-emerald-800 uppercase tracking-[0.2em] mb-1">Growth Tip</Text>
+                <Text className="text-[11px] text-emerald-900 font-jakarta-medium leading-relaxed opacity-80">
+                  Instruct your customers to pay via M-Pesa Paybill 880100, Account Number {formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || '...')}, to increase your daily volume.
+                </Text>
+              </View>
             </View>
           </View>
 

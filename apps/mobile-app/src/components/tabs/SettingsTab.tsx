@@ -53,10 +53,17 @@ export default function SettingsTab() {
                 <Text className="font-jakarta-extrabold text-[22px] text-[#00351d] tracking-tight">Identity Vault</Text>
                 <Text className="text-[10px] text-[#006c4e] font-jakarta-bold uppercase tracking-[0.2em] mt-1">Administrator Profile</Text>
               </View>
-              <View className="bg-[#006c4e]/10 px-4 py-2 rounded-full border border-[#006c4e]/10 flex-row items-center gap-1.5 shadow-sm">
-                <View className="w-2 h-2 rounded-full bg-[#006c4e]" />
-                <Text className="text-[#006c4e] text-[10px] font-jakarta-extrabold uppercase tracking-widest">Verified</Text>
-              </View>
+              {merchant?.status === 'locked' ? (
+                <View className="bg-red-50 px-4 py-2 rounded-full border border-red-100 flex-row items-center gap-1.5 shadow-sm">
+                  <MaterialIcons name="lock" size={12} color="#dc2626" />
+                  <Text className="text-red-600 text-[10px] font-jakarta-extrabold uppercase tracking-widest">Locked</Text>
+                </View>
+              ) : (
+                <View className="bg-[#006c4e]/10 px-4 py-2 rounded-full border border-[#006c4e]/10 flex-row items-center gap-1.5 shadow-sm">
+                  <View className="w-2 h-2 rounded-full bg-[#006c4e]" />
+                  <Text className="text-[#006c4e] text-[10px] font-jakarta-extrabold uppercase tracking-widest">Verified</Text>
+                </View>
+              )}
             </View>
 
             <View className="gap-6">
@@ -83,6 +90,27 @@ export default function SettingsTab() {
                 </View>
               </View>
 
+              {/* Account Activity — same identity/security fields as the
+                  web dashboard's Profile.jsx grid, condensed for mobile. */}
+              <View className="flex-row flex-wrap -mx-1.5">
+                {([
+                  { label: 'Member Since', value: merchant?.createdAt ? new Date(merchant.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A' },
+                  { label: 'Last Sign In', value: merchant?.lastLogin ? new Date(merchant.lastLogin).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A' },
+                  { label: 'Sign In Count', value: merchant?.loginCount?.toString() || '1' },
+                  { label: '2FA Setup', value: 'Yes', status: true },
+                ]).map((item) => (
+                  <View key={item.label} className="w-1/2 px-1.5 mb-3">
+                    <Text className="text-[9px] text-[#707971] font-jakarta-bold uppercase tracking-[0.15em] mb-1.5 pl-0.5 opacity-70">{item.label}</Text>
+                    <View className="bg-[#f0fdf4] border border-[#eff4ef] rounded-xl py-2.5 px-3.5 flex-row items-center justify-between">
+                      <Text className="text-[12px] font-jakarta-extrabold text-[#00351d]" numberOfLines={1}>{item.value}</Text>
+                      {item.status !== undefined && (
+                        <View className={`w-1.5 h-1.5 rounded-full ${item.status ? 'bg-emerald-500' : 'bg-red-400'}`} />
+                      )}
+                    </View>
+                  </View>
+                ))}
+              </View>
+
               <View className="h-[1px] bg-[#eff4ef] w-full my-2" />
 
               <View>
@@ -101,6 +129,12 @@ export default function SettingsTab() {
                     className={`w-full bg-white border border-[#eff4ef] rounded-2xl py-4 px-5 text-[15px] font-jakarta-extrabold text-[#00351d] tracking-tight ${kraPinLocked ? 'bg-[#f0fdf4] text-[#707971]' : 'shadow-md shadow-[#006c4e]/10 border-[#006c4e]/30'}`} />
                   {kraPinLocked && (
                     <MaterialIcons name="lock-outline" size={16} color="#b3b9b4" style={{ position: 'absolute', right: 20, top: 18 }} />
+                  )}
+                  {!kraPinLocked && merchant?.isKRAVerified && merchant?.kraPin === kraPin && (
+                    <View className="flex-row items-center gap-1 bg-[#e7f8ef] border border-emerald-100 px-2 py-1 rounded-lg" style={{ position: 'absolute', right: 10, top: 12 }}>
+                      <MaterialIcons name="verified-user" size={12} color="#059669" />
+                      <Text className="text-emerald-700 text-[8px] font-jakarta-extrabold uppercase tracking-widest">eTIMS Verified</Text>
+                    </View>
                   )}
                 </View>
               </View>

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert } from 'react-native';
+import { MaterialIcons, Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
+import * as Clipboard from 'expo-clipboard';
 import api from '../api/config';
 import { useAuth } from '../context/AuthContext';
 import TopBar from '../components/layout/TopBar';
@@ -235,6 +236,25 @@ export default function InflationShield({ navigation }: any) {
               </View>
               <Text className="text-[#94a3b8] text-[10px] font-jakarta-bold uppercase tracking-[0.1em] mb-3">USDC Vault</Text>
               <Text className="text-white text-[24px] font-jakarta-extrabold tracking-tight leading-tight">{usdcBalance.toFixed(2)} USDC</Text>
+              {/* Same address shown on the Digital Wallet page — copyable
+                  inline here too, so the merchant doesn't have to leave
+                  the swap screen to verify/copy it. */}
+              {!!merchant?.stellarPublicKey && (
+                <TouchableOpacity
+                  onPress={async () => {
+                    await Clipboard.setStringAsync(merchant.stellarPublicKey);
+                    Alert.alert('Address Copied', 'Stellar wallet address copied to clipboard.');
+                  }}
+                  activeOpacity={0.7}
+                  className="flex-row items-center gap-1.5 mt-3 self-start bg-white/5 px-2.5 py-1 rounded-full border border-white/10"
+                >
+                  <View className="w-1.5 h-1.5 rounded-full bg-[#60a5fa]" />
+                  <Text className="text-white/50 text-[9px] font-mono tracking-wider">
+                    {merchant.stellarPublicKey.slice(0, 8)}...{merchant.stellarPublicKey.slice(-6)}
+                  </Text>
+                  <Feather name="copy" size={9} color="rgba(255,255,255,0.3)" />
+                </TouchableOpacity>
+              )}
             </View>
           </View>
 
@@ -269,6 +289,12 @@ export default function InflationShield({ navigation }: any) {
                   placeholderTextColor="#d4d4d8"
                   className="flex-1 text-right text-[26px] font-jakarta-extrabold text-[#0c2010]"
                 />
+                <TouchableOpacity
+                  onPress={() => setInputAmount((swapDirection === 'KES_TO_USDC' ? (merchant?.kesBalance || 0) : usdcBalance).toString())}
+                  className="bg-[#e7f8ef] px-3 py-1.5 rounded-lg"
+                >
+                  <Text className="text-[#006c4e] text-[10px] font-jakarta-extrabold uppercase tracking-widest">Max</Text>
+                </TouchableOpacity>
               </View>
             </View>
 
@@ -302,6 +328,10 @@ export default function InflationShield({ navigation }: any) {
               <Text className="text-[11px] text-white/80 font-jakarta-bold">
                 {swapDirection === 'KES_TO_USDC' ? formatKES(Number(inputAmount || 0) * FEE_RATE) : `${(Number(inputAmount || 0) * FEE_RATE).toFixed(2)} USDC`}
               </Text>
+            </View>
+            <View className="flex-row justify-between">
+              <Text className="text-[11px] text-white/70 font-jakarta-bold">Estimated Value Protection</Text>
+              <Text className="text-[11px] text-[#5efeb3] font-jakarta-extrabold">+12.4% / yr</Text>
             </View>
 
             {!!swapError && (

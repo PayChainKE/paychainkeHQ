@@ -13,6 +13,7 @@ import { isCreditTransaction, isDebitTransaction } from '../utils/transactionDir
 import { formatAccountNumber } from '../utils/formatAccountNumber';
 import { formatTxDate, formatTxTime } from '../utils/formatDate';
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay';
+import { getAppUrl } from '../utils/appUrl';
 import SettlementQrCard from '../components/ui/SettlementQrCard';
 
 function formatKES(n: number | null | undefined) {
@@ -260,7 +261,7 @@ export default function DigitalWallet({ navigation }: any) {
     try {
       const res = await api.post('/api/transactions/payment-link', { amount });
       if (res.data?.success) {
-        setGeneratedLink(`https://app.paychain.co.ke/pay/${res.data.linkId}`);
+        setGeneratedLink(`${getAppUrl()}/pay/${res.data.linkId}`);
       }
     } catch (err: any) {
       Alert.alert('Generation Failed', err?.response?.data?.error || 'Failed to generate secure payment link.');

@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { ValidatedTextInput } from '../components/ValidatedTextInput';
 import TopBar from '../components/layout/TopBar';
 import api from '../api/config';
+import { getAppUrl } from '../utils/appUrl';
 
 type OptionId = 'mpesa' | 'link' | 'qr';
 
@@ -125,7 +126,7 @@ export default function RequestMoney({ navigation }: any) {
     try {
       const res = await api.post('/api/transactions/payment-link', { amount: Number(amount) });
       if (res.data?.success) {
-        setGeneratedLink(`https://app.paychain.co.ke/pay/${res.data.linkId}`);
+        setGeneratedLink(`${getAppUrl()}/pay/${res.data.linkId}`);
         setStep(3);
       }
     } catch (err: any) {
