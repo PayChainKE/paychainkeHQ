@@ -826,14 +826,26 @@ export async function submitNcwscPayment({
  * Validates a destination Paybill or Till number before a Lipa na M-Pesa
  * payout — "This is a prerequisite for Bill Payments" per the UAT Guide's
  * "LIPA NA MPESA VALIDATION (LNM)" section. identifierType is "4" for
- * Paybill, "2" for Till (per that section's own labeling). That section's
- * prose shows the request fields capitalized (Identifier/IdentifierType)
- * while its response sample shows lowercase errorCode/errorMessage — the
- * request body below matches the (also lowercase) sample already confirmed
- * live in NCBA's "Open Banking V2 - Callback Enabled" Postman collection.
- * If a real Paybill/Till rejects with no useful errorMessage, check the
- * ncba_openbanking_lnm_validate_rejected log line below for NCBA's raw
- * response before assuming the casing is the problem.
+ * Paybill, "2" for Till (per that section's own labeling).
+ *
+ * NCBA's own docs disagree on request-field casing for this exact call:
+ * the UAT Guide's prose shows it capitalized (Identifier/IdentifierType),
+ * while the "Open Banking V2 - Callback Enabled" Postman collection shows
+ * lowercase (identifier/identifierType) — and that Postman example's own
+ * response body was never actually captured, so it was never confirmed to
+ * really work. Rather than guess, this tries lowercase first (cheaper to
+ * rule out first only because it's what shipped originally) and
+ * automatically retries once with the capitalized casing before giving up
+ * — same "try both documented variants" approach used for the STK token
+ * endpoint's GET/POST ambiguity. Both response field names read below
+ * (errorCode/errorMessage/OrganizationName/origanizationShortCode) match
+ * the UAT Guide's response sample exactly, so only the outgoing request
+ * casing is in question, not the incoming parse.
+ *
+ * If both attempts are rejected, check the ncba_openbanking_lnm_validate_
+ * rejected log line for NCBA's raw response — a Paybill/Till that's
+ * genuinely invalid still produces that same log line, so this doesn't by
+ * itself prove a casing/shape issue vs. a real bad number.
  *
  * @param {object} params
  * @param {'Paybill'|'Till'} params.paymentType
@@ -849,24 +861,20 @@ export async function validateLipaNaMpesaAccount({ paymentType, payBillTillNo })
   }
 
   const identifierType = paymentType === 'Till' ? '2' : '4';
-  const result = await ncbaOpenBankingPost('/api/v1/LipaNaMpesaValidation/accountdetails', {
-    identifier: payBillTillNo,
-    identifierType,
-  });
+  const path = '/api/v1/LipaNaMpesaValidation/accountdetails';
+
+  let result = await ncbaOpenBankingPost(path, { identifier: payBillTillNo, identifierType });
+
+  if (result?.errorCode !== '000') {
+    logEvent('warn', 'ncba_openbanking_lnm_validate_lowercase_rejected', { paymentType, payBillTillNo, response: result });
+    result = await ncbaOpenBankingPost(path, { Identifier: payBillTillNo, IdentifierType: identifierType });
+  }
 
   if (result?.errorCode !== '000') {
     // The client only ever sees a generic "could not verify" message (never
-    // raw upstream data), but this specific 200-with-errorCode-!=='000' path
-    // previously logged nothing at all server-side either — unlike an
-    // axios-level failure (caught in ncbaOpenBankingPost above), which does
-    // get logged. That made "NCBA genuinely doesn't recognize this Paybill/
-    // Till number" indistinguishable from "NCBA returned a shape this code
-    // doesn't parse correctly" (e.g. a field-casing mismatch — NCBA's own
-    // docs aren't even internally consistent on this: the UAT Guide's LNM
-    // Validation section documents lowercase errorCode/errorMessage, but the
-    // request fields are shown capitalized (Identifier/IdentifierType) right
-    // next to a lowercase Postman sample). Logging the full raw response
-    // here is what makes that distinguishable from Render logs alone.
+    // raw upstream data) — this log line is the only way to tell a
+    // genuinely invalid Paybill/Till apart from a request shape NCBA still
+    // doesn't recognize even after the casing retry above.
     logEvent('warn', 'ncba_openbanking_lnm_validate_rejected', { paymentType, payBillTillNo, response: result });
     throw new NcbaOpenBankingValidationError(result?.errorMessage || 'Could not verify the destination Paybill/Till number');
   }
