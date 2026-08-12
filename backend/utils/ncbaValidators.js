@@ -130,7 +130,21 @@ export function validatePhoneNumber(phoneNumber) {
   // Kenyan MSISDN, normalised to 254XXXXXXXXX (matches the convention already
   // used for M-Pesa numbers elsewhere in this codebase).
   let normalised = digits;
-  if (normalised.startsWith('0')) normalised = `254${normalised.slice(1)}`;
+  if (normalised.startsWith('0')) {
+    normalised = `254${normalised.slice(1)}`;
+  } else if (/^[71]\d{8}$/.test(normalised)) {
+    // Bare 9-digit MSISDN body, no leading 0 or 254 — this is how
+    // Merchant.phone is stored for merchants who signed up before a leading
+    // 0/254 was consistently stripped or added at signup (e.g. "790889066"
+    // instead of "0790889066"). frontend/utils/formatPhoneDisplay.js and
+    // this file's own display counterpart already treat this exact shape as
+    // valid and render it correctly — this validator was the one place
+    // still rejecting it outright, which is what broke "Send Money" ->
+    // Primary M-PESA Number (recipientAccount is set straight from
+    // merchant.phone there, unlike the free-typed "Any M-PESA Number" field,
+    // which always normalizes to a leading 0 as the user types).
+    normalised = `254${normalised}`;
+  }
   if (!/^254\d{9}$/.test(normalised)) {
     throw new NcbaValidationError(`PhoneNumber is not a valid MSISDN, received "${phoneNumber}"`, 'INVALID_PHONE');
   }
