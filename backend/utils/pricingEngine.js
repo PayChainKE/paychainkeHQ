@@ -265,6 +265,122 @@ export function getCheckoutTotal(baseInvoiceAmount) {
   return round2(base + calculateCustomerSurcharge(base));
 }
 
+// ── Electronic Invoicing tariff (Hybrid Pricing Architecture, 2026-08-12) ──
+// Unlike every other product on this page, Invoicing monetizes BOTH sides
+// of the transaction: a client-facing markup (added to the STK prompt, same
+// mechanism as calculateCustomerSurcharge above) AND a merchant-facing
+// "Invoice Service Fee" (deducted from the merchant's net settlement, to
+// cover invoice generation/PDF delivery/tracking/ERP sync). Kept as its own
+// pair of band tables rather than reusing CUSTOMER_SURCHARGE_BANDS /
+// calculateMerchantFee above — the two schedules diverge in the
+// 1,001-2,500 and 10,001-20,000 rows, and MPESA_MERCHANT_FEE_ENABLED must
+// stay false for every other product's zero-merchant-fee model while
+// Invoicing genuinely charges one. Both tables mirror SAFARICOM_TARIFF's
+// own `max` boundaries, same convention as CUSTOMER_SURCHARGE_BANDS.
+//
+// The 20,001-250,000 Client Markup range (given in the sheet as "25-35")
+// steps evenly across the same 8 real Safaricom sub-bands as the STK/QR
+// tariff's identical range, per the same interpretation confirmed there
+// (2026-08-12). The 10,001-20,000 range ("20-25") maps 1:1 onto its two
+// real sub-bands (15,000/20,000) with no interpolation needed. The Invoice
+// Service Fee is given as a single flat value per compressed row in the
+// sheet (not a range) — repeated across each row's real sub-bands here
+// purely so both tables share one boundary list.
+const INVOICE_CLIENT_MARKUP_BANDS = [
+  { max: 100,      fee: 0  },
+  { max: 500,      fee: 3  },
+  { max: 1_000,    fee: 5  },
+  { max: 1_500,    fee: 5  },
+  { max: 2_500,    fee: 7  },
+  { max: 3_500,    fee: 8  },
+  { max: 5_000,    fee: 10 },
+  { max: 7_500,    fee: 12 },
+  { max: 10_000,   fee: 15 },
+  { max: 15_000,   fee: 20 },
+  { max: 20_000,   fee: 25 },
+  { max: 25_000,   fee: 25 },
+  { max: 30_000,   fee: 27 },
+  { max: 35_000,   fee: 29 },
+  { max: 40_000,   fee: 31 },
+  { max: 45_000,   fee: 33 },
+  { max: 50_000,   fee: 35 },
+  { max: 70_000,   fee: 35 },
+  { max: 250_000,  fee: 35 },
+];
+
+const INVOICE_MERCHANT_SERVICE_FEE_BANDS = [
+  { max: 100,      fee: 0  },
+  { max: 500,      fee: 5  },
+  { max: 1_000,    fee: 10 },
+  { max: 1_500,    fee: 15 },
+  { max: 2_500,    fee: 20 },
+  { max: 3_500,    fee: 20 },
+  { max: 5_000,    fee: 25 },
+  { max: 7_500,    fee: 30 },
+  { max: 10_000,   fee: 35 },
+  { max: 15_000,   fee: 40 },
+  { max: 20_000,   fee: 40 },
+  { max: 25_000,   fee: 50 },
+  { max: 30_000,   fee: 50 },
+  { max: 35_000,   fee: 50 },
+  { max: 40_000,   fee: 50 },
+  { max: 45_000,   fee: 50 },
+  { max: 50_000,   fee: 50 },
+  { max: 70_000,   fee: 50 },
+  { max: 250_000,  fee: 50 },
+];
+
+/**
+ * PayChain's client-facing markup on an Invoice STK prompt — the Invoicing
+ * analogue of calculateCustomerSurcharge, with its own (slightly different)
+ * band schedule. Free at or below FLAT_FEE_FREE_TIER_MAX_KES.
+ *
+ * @param {number} baseInvoiceAmount
+ * @returns {number} markup in KES, rounded to 2dp.
+ */
+export function calculateInvoiceClientMarkup(baseInvoiceAmount) {
+  const base = Number(baseInvoiceAmount);
+  if (!Number.isFinite(base) || base <= 0) return 0;
+  if (base <= FLAT_FEE_FREE_TIER_MAX_KES) return 0;
+  const band = INVOICE_CLIENT_MARKUP_BANDS.find((b) => base <= b.max) || INVOICE_CLIENT_MARKUP_BANDS[INVOICE_CLIENT_MARKUP_BANDS.length - 1];
+  return round2(band.fee);
+}
+
+/**
+ * PayChain's merchant-facing "Invoice Service Fee" — deducted from the
+ * merchant's net settlement on a paid Invoice (software/workflow charge,
+ * distinct from calculateMerchantFee's disabled general M-Pesa fee engine).
+ * Free at or below FLAT_FEE_FREE_TIER_MAX_KES.
+ *
+ * @param {number} baseInvoiceAmount
+ * @returns {number} fee in KES, rounded to 2dp.
+ */
+export function calculateInvoiceServiceFee(baseInvoiceAmount) {
+  const base = Number(baseInvoiceAmount);
+  if (!Number.isFinite(base) || base <= 0) return 0;
+  if (base <= FLAT_FEE_FREE_TIER_MAX_KES) return 0;
+  const band = INVOICE_MERCHANT_SERVICE_FEE_BANDS.find((b) => base <= b.max) || INVOICE_MERCHANT_SERVICE_FEE_BANDS[INVOICE_MERCHANT_SERVICE_FEE_BANDS.length - 1];
+  return round2(band.fee);
+}
+
+/**
+ * Invoicing's version of getCheckoutTotal — the exact amount to send as the
+ * STK Push `Amount` when the PaymentLink being paid is invoice-backed
+ * (link.invoiceId set), using calculateInvoiceClientMarkup instead of the
+ * generic calculateCustomerSurcharge.
+ *
+ * @param {number} baseInvoiceAmount
+ * @returns {number} total in KES to request via STK Push.
+ * @throws {PricingEngineError} if baseInvoiceAmount isn't a positive number.
+ */
+export function getInvoiceCheckoutTotal(baseInvoiceAmount) {
+  const base = Number(baseInvoiceAmount);
+  if (!Number.isFinite(base) || base <= 0) {
+    throw new PricingEngineError(`baseInvoiceAmount must be a positive number, received "${baseInvoiceAmount}"`);
+  }
+  return round2(base + calculateInvoiceClientMarkup(base));
+}
+
 /**
  * Splits a completed STK Push settlement between the merchant and PayChain.
  * Called from mpesaController.js#resolveStkOutcome once the payment is
@@ -309,6 +425,53 @@ export function processSplitTransaction(totalMpesaReceived, baseInvoiceAmount) {
   // "what PayChain keeps". A mismatch (rounding drift, a stale base amount,
   // a bad edit to the formulas above) must halt settlement, not silently
   // mis-credit real money.
+  const reconciled = round2(merchantNetSettlement + paychainTotalRevenue);
+  if (reconciled !== round2(total)) {
+    throw new PricingEngineError(
+      `Ledger integrity failure: totalMpesaReceived (KES ${total}) !== merchantNetSettlement + paychainTotalRevenue (KES ${reconciled}). Refusing to settle.`
+    );
+  }
+
+  return { customerFee, merchantFee, paychainTotalRevenue, merchantNetSettlement };
+}
+
+/**
+ * Invoicing's version of processSplitTransaction — settles a paid Invoice
+ * (mpesaController.js#resolveStkOutcome, when the PaymentLink being
+ * resolved has link.invoiceId set). Same shape and same ledger guard as
+ * processSplitTransaction, but the merchant fee comes from
+ * calculateInvoiceServiceFee (the Invoice Service Fee) instead of
+ * calculateMerchantFee, which stays disabled for every other product.
+ *
+ * @param {number} totalMpesaReceived
+ * @param {number} baseInvoiceAmount
+ * @returns {{ customerFee: number, merchantFee: number, paychainTotalRevenue: number, merchantNetSettlement: number }}
+ * @throws {PricingEngineError} on invalid input, or if the ledger identity
+ *         fails to hold.
+ */
+export function processInvoiceSplitTransaction(totalMpesaReceived, baseInvoiceAmount) {
+  const total = Number(totalMpesaReceived);
+  const base = Number(baseInvoiceAmount);
+
+  if (!Number.isFinite(total) || total <= 0 || !Number.isFinite(base) || base <= 0) {
+    throw new PricingEngineError(
+      `processInvoiceSplitTransaction requires positive numbers — received totalMpesaReceived="${totalMpesaReceived}", baseInvoiceAmount="${baseInvoiceAmount}"`
+    );
+  }
+
+  // Client Fee — whatever was collected beyond the invoice's base bill
+  // (calculateInvoiceClientMarkup, baked into the STK total at
+  // getInvoiceCheckoutTotal time).
+  const customerFee = round2(total - base);
+
+  // Merchant Invoice Service Fee — the one place on this page a merchant is
+  // actually charged a fee today (calculateMerchantFee stays disabled
+  // everywhere else).
+  const merchantFee = calculateInvoiceServiceFee(base);
+
+  const paychainTotalRevenue = round2(customerFee + merchantFee);
+  const merchantNetSettlement = round2(base - merchantFee);
+
   const reconciled = round2(merchantNetSettlement + paychainTotalRevenue);
   if (reconciled !== round2(total)) {
     throw new PricingEngineError(

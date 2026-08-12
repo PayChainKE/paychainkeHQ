@@ -67,6 +67,13 @@ const transactionSchema = new mongoose.Schema({
   // (see utils/pricingEngine.js), so revenue sweeps and pool-balance
   // reconciliation only ever need to read paychainFee.
   customerSurchargeFee: { type: Number, default: 0 },
+  // Same idea as customerSurchargeFee, but for the merchant-side portion of
+  // paychainFee on a paid Invoice specifically (Electronic Invoicing's
+  // "Invoice Service Fee", utils/pricingEngine.js#calculateInvoiceServiceFee)
+  // — deducted from the merchant's net settlement, unlike every other
+  // product's zero-merchant-fee model. Always included inside paychainFee
+  // itself, same convention as customerSurchargeFee.
+  invoiceServiceFee: { type: Number, default: 0 },
   // The merchant's KES balance immediately after this transaction was
   // applied — captured at write time from the atomic $inc's returned
   // document (never recomputed later), same "resulting balance" figure

@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import Transaction from '../models/Transaction.js';
 import Merchant from '../models/Merchant.js';
 import { safeSendSMS, sendStaggeredSms } from '../utils/smsSanitizer.js';
-import { calculateMerchantFee, processSplitTransaction, splitCustomerSurcharge, getCheckoutTotal, calculateRawC2bMarkup, PricingEngineError } from '../utils/pricingEngine.js';
+import { calculateMerchantFee, processSplitTransaction, processInvoiceSplitTransaction, splitCustomerSurcharge, getCheckoutTotal, calculateRawC2bMarkup, PricingEngineError } from '../utils/pricingEngine.js';
 import { sendInvoicePaidReceiptEmail } from '../utils/resend.js';
 import { settleInflationShield } from '../utils/stellarHelper.js';
 import { getLiveKesToUsdcRate } from '../utils/rateEngine.js';
@@ -615,10 +615,13 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
           const merchant = link.merchantId;
           if (merchant) {
             // Dual-sided split: stkReq.amount is the TOTAL Safaricom just
-            // confirmed (base + any customer surcharge, from
-            // getCheckoutTotal at checkout-initiation time); link.amount is
-            // the original base bill. Wrapped defensively — this only
-            // throws on a genuine ledger-integrity failure (see
+            // confirmed (base + any customer-facing markup, from
+            // getCheckoutTotal/getInvoiceCheckoutTotal at checkout-initiation
+            // time); link.amount is the original base bill. An
+            // invoice-backed link uses the Electronic Invoicing tariff's own
+            // split (it genuinely charges the merchant an Invoice Service
+            // Fee, unlike every other product here). Wrapped defensively —
+            // this only throws on a genuine ledger-integrity failure (see
             // pricingEngine.js), and by this point Safaricom has already
             // confirmed real money moved, so a calculation bug must never
             // silently swallow the merchant's credit. Falls back to
@@ -629,8 +632,9 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
             let paychainTotalRevenue;
             let customerFee;
             try {
-              ({ merchantFee, merchantNetSettlement, paychainTotalRevenue, customerFee } =
-                processSplitTransaction(stkReq.amount, link.amount));
+              ({ merchantFee, merchantNetSettlement, paychainTotalRevenue, customerFee } = link.invoiceId
+                ? processInvoiceSplitTransaction(stkReq.amount, link.amount)
+                : processSplitTransaction(stkReq.amount, link.amount));
             } catch (splitError) {
               console.error(
                 `🚨 CRITICAL ledger split failure for ${receipt} (STK payment-link ${link.linkId}):`,
@@ -698,6 +702,22 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
               await Transaction.updateOne(
                 { _id: transaction._id },
                 { $inc: { paychainFee: customerFee, customerSurchargeFee: customerFee } }
+              );
+            }
+
+            if (link.invoiceId && merchantFee > 0) {
+              // The Transaction pre-save hook auto-stamps paychainFee from
+              // the generic (disabled) calculateMerchantFee, not
+              // calculateInvoiceServiceFee — so on an invoice-backed link
+              // this doc's paychainFee comes out of Transaction.create as 0
+              // even though the merchant was genuinely charged merchantFee
+              // above (already deducted from merchantNetSettlement / the
+              // $inc into kesBalance). Top it up here the same way
+              // customerFee is, so paychainFee actually reflects total
+              // PayChain revenue on this row, not just the customer side.
+              await Transaction.updateOne(
+                { _id: transaction._id },
+                { $inc: { paychainFee: merchantFee, invoiceServiceFee: merchantFee } }
               );
             }
 
