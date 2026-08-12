@@ -89,6 +89,12 @@ export const createApplication = async (req, res) => {
       uploadedAt: new Date(),
       status: 'pending',
     }));
+    // Optional proof-of-existence photos (e.g. shopfront) — no type/status,
+    // purely supplementary evidence for admin due diligence.
+    const businessPhotos = (files.business_photos || []).map((f) => ({
+      url: f.path,
+      uploadedAt: new Date(),
+    }));
 
     const merchant = await Merchant.create({
       name,
@@ -101,6 +107,7 @@ export const createApplication = async (req, res) => {
       isVerified: false,
       kybStatus: 'pending',
       kybDocuments,
+      businessPhotos,
       onboardingOfficerId: req.admin._id,
       submittedAt: new Date(),
       registrationSource: 'web',
@@ -110,7 +117,7 @@ export const createApplication = async (req, res) => {
       action: 'officer.application.created', category: 'admin', severity: 'info',
       message: `KYC application submitted for ${businessName}`,
       merchant, actor: officerActor(req.admin), req,
-      metadata: { businessName, docsUploaded: kybDocuments.length },
+      metadata: { businessName, docsUploaded: kybDocuments.length, photosUploaded: businessPhotos.length },
     });
 
     const missingDocs = QUEUE_DOC_TYPES.filter((t) => !files[t]?.[0]);
@@ -123,6 +130,7 @@ export const createApplication = async (req, res) => {
         kybStatus: merchant.kybStatus,
         submittedAt: merchant.submittedAt,
         kybDocuments: merchant.kybDocuments,
+        businessPhotos: merchant.businessPhotos,
         missingDocs,
       },
     });

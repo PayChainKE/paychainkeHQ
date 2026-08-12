@@ -35,6 +35,12 @@ const docFields = [
   { name: 'address_proof', maxCount: 1 },
 ];
 
+// Application intake only — optional on-site photos (e.g. the shopfront) an
+// officer captures as due-diligence evidence the business exists. Not part
+// of the KYC checklist/revision workflow, so kept out of docFields (which
+// the public kyc-resubmit route also uses) rather than added there.
+const applicationFields = [...docFields, { name: 'business_photos', maxCount: 6 }];
+
 // Throttle application intake the same way merchant onboarding is throttled.
 const applicationCreateLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
@@ -55,7 +61,7 @@ const resubmitLimiter = rateLimit({
 
 router.get('/metrics', protect, viewOrAct, getMetrics);
 router.get('/applications', protect, viewOrAct, getQueue);
-router.post('/applications', protect, officerOnly, applicationCreateLimiter, upload.fields(docFields), createApplication);
+router.post('/applications', protect, officerOnly, applicationCreateLimiter, upload.fields(applicationFields), createApplication);
 router.get('/applications/:id', protect, viewOrAct, getApplication);
 router.post('/applications/:id/claim', protect, officerOnly, claimApplication);
 router.patch('/applications/:id/checklist', protect, viewOrAct, updateChecklist);

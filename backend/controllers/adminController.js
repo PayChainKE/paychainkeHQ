@@ -800,6 +800,7 @@ export const getMerchantDetail = async (req, res) => {
       .populate('lockedBy', 'email')
       .populate('invitedBy', 'email')
       .populate('flaggedBy', 'email')
+      .populate('onboardingOfficerId', 'name email')
       .lean();
     if (!merchant) return res.status(404).json({ error: 'Merchant not found.' });
 
@@ -937,6 +938,16 @@ export const getMerchantDetail = async (req, res) => {
           amount: lastTxn.amount,
           status: lastTxn.status,
         } : null,
+        // Onboarding-officer pipeline due diligence — absent (null/[]) for
+        // self-serve/admin-direct merchants, since kybStatus is only ever
+        // set by officerController.js's createApplication.
+        kybStatus: merchant.kybStatus || null,
+        riskTier: merchant.riskTier || null,
+        onboardingOfficer: merchant.onboardingOfficerId
+          ? { name: merchant.onboardingOfficerId.name, email: merchant.onboardingOfficerId.email }
+          : null,
+        kybDocuments: merchant.kybDocuments || [],
+        businessPhotos: merchant.businessPhotos || [],
       },
     });
   } catch (error) {
