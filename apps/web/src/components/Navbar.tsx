@@ -196,13 +196,13 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
                         </div>
                       </div>
                       <div className="pt-3 space-y-2 px-2">
-                        <Link
-                          to="/waitlist"
+                        <a
+                          href="https://app.paychain.co.ke"
                           onClick={() => setIsAvatarDropdownOpen(false)}
-                          className="w-full block px-4 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition-colors duration-200 rounded-md border border-gray-200 text-center"
+                          className="w-full block px-4 py-2 text-sm font-bold text-white bg-[#00bf63] hover:bg-[#00a857] transition-colors duration-200 rounded-md text-center shadow-sm"
                         >
-                          Join our waitlist
-                        </Link>
+                          Sign Up
+                        </a>
                       </div>
                     </div>
                   )}
@@ -237,13 +237,13 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
                       </div>
                     </div>
                       <div className="pt-3 space-y-2 px-2">
-                      <Link
-                        to="/waitlist"
+                      <a
+                        href="https://app.paychain.co.ke"
                         onClick={() => setIsAvatarDropdownOpen(false)}
-                        className="w-full block px-4 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition-colors duration-200 rounded-md border border-gray-200 text-center"
+                        className="w-full block px-4 py-2 text-sm font-bold text-white bg-[#00bf63] hover:bg-[#00a857] transition-colors duration-200 rounded-md text-center shadow-sm"
                       >
-                        Join our waitlist
-                      </Link>
+                        Sign Up
+                      </a>
                     </div>
                   </div>
                 )}

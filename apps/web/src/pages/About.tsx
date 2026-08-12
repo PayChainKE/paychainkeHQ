@@ -313,7 +313,7 @@ export default function About(): JSX.Element {
           <p className="about__cta-body">Whether you are a merchant ready for early access, an investor who sees what we see in this market, a strategic partner looking to plug into Kenya's next payment infrastructure, or a talented operator who wants to build something that matters — we want to hear from you.</p>
 
           <div className="about__cta-actions">
-            <a className="btn btn--primary" href="/waitlist" aria-label="Join the Beta Waitlist">Join the Beta Waitlist →</a>
+            <a className="btn btn--primary" href="https://app.paychain.co.ke" aria-label="Sign Up">Sign Up →</a>
           </div>
         </section>
       </main>

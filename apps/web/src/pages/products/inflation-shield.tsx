@@ -79,9 +79,9 @@ const InflationShield: React.FC = () => {
                   The PayChain Inflation Shield lets you swap KES to USDC instantly — protecting your purchasing power, paying international suppliers in stablecoin, and hedging shilling depreciation without ever visiting a forex bureau.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4">
-                  <Link to="/waitlist" className="inline-flex items-center justify-center px-8 py-4 text-base font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_20px_rgba(0,191,99,0.3)]">
+                  <a href="https://app.paychain.co.ke" className="inline-flex items-center justify-center px-8 py-4 text-base font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_20px_rgba(0,191,99,0.3)]">
                     Protect Your Money
-                  </Link>
+                  </a>
                   <Link to="/contact" className="inline-flex items-center justify-center px-8 py-4 text-base font-bold text-white bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl transition-all duration-300 backdrop-blur-md">
                     Talk to Sales
                   </Link>
@@ -307,11 +307,11 @@ const InflationShield: React.FC = () => {
               <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/20 rounded-full blur-3xl" />
               
               <h2 className="text-3xl md:text-4xl font-bold text-white mb-6 relative z-10">Your Money Should Hold Its Value. Now It Can.</h2>
-              <p className="text-xl text-gray-400 mb-10 relative z-10">Join our closed beta launching Q2 2026.</p>
+              <p className="text-xl text-gray-400 mb-10 relative z-10">Sign up in minutes and start protecting your money today.</p>
               <div className="relative z-10 inline-flex items-center justify-center">
-                <Link to="/waitlist" className="px-8 py-4 text-lg font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_30px_rgba(0,191,99,0.3)]">
-                  Join the Waitlist
-                </Link>
+                <a href="https://app.paychain.co.ke" className="px-8 py-4 text-lg font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_30px_rgba(0,191,99,0.3)]">
+                  Sign Up
+                </a>
               </div>
             </motion.div>
           </div>
