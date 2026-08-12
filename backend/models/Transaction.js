@@ -102,7 +102,10 @@ const transactionSchema = new mongoose.Schema({
 transactionSchema.pre('save', function() {
   if (this.isNew || this.isModified('amount') || this.isModified('kesAmount') || this.isModified('type')) {
     const basis = this.kesAmount > 0 ? this.kesAmount : this.amount;
-    const { paychainFee, safaricomFee, streamId } = calculateFees(this.type, basis);
+    // settlementRail is only meaningful (and only ever varies the fee) for
+    // 'ncba_outbound' — see feeCalculator.js. Passed through unconditionally
+    // since every other type simply ignores it.
+    const { paychainFee, safaricomFee, streamId } = calculateFees(this.type, basis, this.settlementRail);
     this.paychainFee  = paychainFee;
     this.safaricomFee = safaricomFee;
     this.revenueStream = streamId;
@@ -114,7 +117,7 @@ transactionSchema.pre('save', function() {
 transactionSchema.pre('insertMany', function(docs) {
   for (const doc of docs) {
     const basis = (doc.kesAmount && doc.kesAmount > 0) ? doc.kesAmount : doc.amount;
-    const { paychainFee, safaricomFee, streamId } = calculateFees(doc.type, basis);
+    const { paychainFee, safaricomFee, streamId } = calculateFees(doc.type, basis, doc.settlementRail);
     doc.paychainFee  = paychainFee;
     doc.safaricomFee = safaricomFee;
     doc.revenueStream = streamId;

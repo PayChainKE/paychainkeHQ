@@ -3,7 +3,8 @@ import PayoutBatch from '../models/PayoutBatch.js';
 import Merchant from '../models/Merchant.js';
 import Transaction from '../models/Transaction.js';
 import { calculatePAYE } from '../utils/kraCalculator.js';
-import { submitNcbaBankTransfer } from './ncbaOpenBankingController.js';
+import { submitNcbaBankTransfer, NCBA_OWN_BANK_CODE } from './ncbaOpenBankingController.js';
+import { getBankTransferTariff } from '../config/bankTransferTariffCard.js';
 import { submitNcbaUtilityPayment } from '../services/ncbaBulkPaymentService.js';
 import csv from 'csv-parser';
 import fs from 'fs';
@@ -427,6 +428,7 @@ export const authorizeBatch = async (req, res) => {
     let totalB2cFee = 0;
     let totalUtilityFee = 0;
     let totalLnmFee = 0;
+    let totalBankFee = 0;
 
     for (const row of batchRows) {
       // payeeMatch is a client-supplied Payee _id round-tripped from the
@@ -507,22 +509,38 @@ export const authorizeBatch = async (req, res) => {
         row.lnmFee = 0;
       }
       totalLnmFee += row.lnmFee;
+
+      // Interbank Transfer tariff (config/bankTransferTariffCard.js) — Bank
+      // rows previously charged nothing beyond the transfer principal, same
+      // gap as the other rails above. Bulk Pay never requests EFT/RTGS
+      // explicitly (submitNcbaBankTransfer defaults to 'pesalink'), so
+      // every Bank row prices as PesaLink — except a destination that's
+      // NCBA's own bank code, which gets forced onto the (unpriced) IFT
+      // rail regardless (see submitNcbaBankTransfer), so it's excluded here
+      // too rather than over-reserving a fee that won't actually apply.
+      row.isBankRow = payee.paymentMethod === 'Bank';
+      if (row.isBankRow && payee.bankCode !== NCBA_OWN_BANK_CODE) {
+        ({ totalFee: row.bankFee } = getBankTransferTariff('pesalink', row.netAmount));
+      } else {
+        row.bankFee = 0;
+      }
+      totalBankFee += row.bankFee;
     }
 
-    const totalDebit = Math.round((totalNet + totalB2cFee + totalUtilityFee + totalLnmFee) * 100) / 100;
+    const totalDebit = Math.round((totalNet + totalB2cFee + totalUtilityFee + totalLnmFee + totalBankFee) * 100) / 100;
 
     // 2 & 3. Atomic conditional deduct — avoids two concurrent batch
     // submissions both passing a stale in-memory balance check. Debits
     // totalDebit (recipient payouts + B2C fees + bill payment fees + B2B
-    // PayBill/Till fees), not just totalNet, so the merchant needs enough
-    // balance to cover the fees too, upfront.
+    // PayBill/Till fees + bank transfer fees), not just totalNet, so the
+    // merchant needs enough balance to cover the fees too, upfront.
     const debitedMerchant = await Merchant.findOneAndUpdate(
       { _id: merchant._id, kesBalance: { $gte: totalDebit } },
       { $inc: { kesBalance: -totalDebit } },
       { returnDocument: 'after' }
     );
     if (!debitedMerchant) {
-      return res.status(400).json({ message: 'Insufficient funds to process this batch, including the applicable B2C, bill payment, and B2B PayBill/Till charges' });
+      return res.status(400).json({ message: 'Insufficient funds to process this batch, including the applicable B2C, bill payment, B2B PayBill/Till, and bank transfer charges' });
     }
     merchant.kesBalance = debitedMerchant.kesBalance;
 
@@ -671,11 +689,11 @@ export const authorizeBatch = async (req, res) => {
       } else if (payee.paymentMethod === 'Bank') {
         if (!payee.bankCode || !payee.accountNumber) {
           payoutStatus = 'failed';
-          refundAmount += row.netAmount + row.b2cFee;
+          refundAmount += row.netAmount + row.b2cFee + row.bankFee;
           console.error(`❌ Bulk payout to ${payee.name} failed: no bank code on file for this payee.`);
         } else {
           try {
-            const { transactionId } = await submitNcbaBankTransfer({
+            const { transactionId, rail: actualRail } = await submitNcbaBankTransfer({
               businessName: merchant.businessName,
               bankCode: payee.bankCode,
               accountNumber: payee.accountNumber,
@@ -683,6 +701,12 @@ export const authorizeBatch = async (req, res) => {
               amount: row.netAmount,
               narration: `Bulk Payout to ${payee.name}`,
             });
+            // Actual rail (may be forced to 'ift' for an NCBA-own-bank-code
+            // destination — see submitNcbaBankTransfer) — stamped onto the
+            // Transaction below so utils/feeCalculator.js's pre-save hook
+            // prices it correctly, matching how executeNcbaBankPayout
+            // already handles its own single-payout equivalent.
+            row.settlementRail = actualRail;
             // Unlike the Mobile Money branches below (which only get an
             // "accepted" ack here and confirm completion later via
             // handlePesaLinkCallback), NCBA PesaLink resolves synchronously
@@ -712,7 +736,7 @@ export const authorizeBatch = async (req, res) => {
           } catch (err) {
             console.error(`❌ NCBA PesaLink rejected payout for ${payee.name}:`, err.message);
             payoutStatus = 'failed';
-            refundAmount += row.netAmount + row.b2cFee;
+            refundAmount += row.netAmount + row.b2cFee + row.bankFee;
           }
         }
       } else if (payee.paymentMethod === 'Mobile Money' && payee.mobileMoneyType === 'Personal Number') {
@@ -792,6 +816,11 @@ export const authorizeBatch = async (req, res) => {
         mobileNetwork: (payee.paymentMethod === 'Mobile Money' && payee.mobileMoneyType === 'Personal Number')
           ? (payee.mobileNetwork === 'airtel' ? 'airtel' : 'safaricom')
           : null,
+        // Only Bank rows ever set this (captured from submitNcbaBankTransfer's
+        // return above) — utils/feeCalculator.js's pre-save hook uses it to
+        // price 'ncba_outbound' per-rail. undefined for every other row,
+        // which Mongoose leaves at the schema default (null).
+        settlementRail: row.settlementRail,
       });
 
       // The pre-save hook above stamps a generic 0.5% fee for 'bulk_pay' —
@@ -823,6 +852,7 @@ export const authorizeBatch = async (req, res) => {
         b2cFee: payoutStatus !== 'failed' ? row.b2cFee : 0,
         utilityFee: payoutStatus !== 'failed' ? row.utilityFee : 0,
         lnmFee: payoutStatus !== 'failed' ? row.lnmFee : 0,
+        bankFee: payoutStatus !== 'failed' ? row.bankFee : 0,
       });
     }
 

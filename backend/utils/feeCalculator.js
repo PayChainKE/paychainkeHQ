@@ -4,6 +4,7 @@ import { calculateMerchantFee } from './pricingEngine.js';
 import { getB2cTariff } from '../config/mpesaB2cTariffCard.js';
 import { getKplcPostpaidTariff, getKplcPrepaidTariff, getNcwscTariff } from '../config/billPaymentTariffCard.js';
 import { getLipaNaMpesaTariff } from '../config/lipaNaMpesaTariffCard.js';
+import { getBankTransferTariff } from '../config/bankTransferTariffCard.js';
 
 // Build the type → stream map once at module load.
 const TYPE_TO_STREAM = (() => {
@@ -14,12 +15,29 @@ const TYPE_TO_STREAM = (() => {
   return map;
 })();
 
-// Pure: given (type, kesAmount), return { paychainFee, safaricomFee, streamId }.
+// Pure: given (type, kesAmount, rail), return { paychainFee, safaricomFee, streamId }.
 // Used by the Transaction pre-save hook so every transaction across every
 // PayChain merchant account is automatically priced from the rate card.
-export function calculateFees(type, kesAmount) {
+// `rail` (Transaction.settlementRail) only matters for 'ncba_outbound' —
+// every other type ignores it.
+export function calculateFees(type, kesAmount, rail = null) {
   const v = Number(kesAmount) || 0;
   const stream = TYPE_TO_STREAM.get(type);
+
+  // Outbound bank transfers (PesaLink/EFT/RTGS) — ncbaOpenBankingController.js's
+  // executeNcbaBankPayout (the standalone "Withdraw to Bank" endpoint) and
+  // bulkPayController.js's Bank payee rows both stamp settlementRail on the
+  // Transaction before it's ever saved, so it's always known here. Tiered/
+  // flat per rail — see config/bankTransferTariffCard.js. IFT (NCBA-to-NCBA)
+  // and any untracked rail fall through to zero fee, matching today's
+  // actual (unpriced) behavior — this tariff sheet is external-bank-only.
+  if (type === 'ncba_outbound') {
+    if (v <= 0) {
+      return { paychainFee: 0, safaricomFee: 0, streamId: stream?.id || null };
+    }
+    const { baseCost, serviceFee } = getBankTransferTariff(rail, v);
+    return { paychainFee: serviceFee, safaricomFee: baseCost, streamId: stream?.id || null };
+  }
 
   // NCBA Virtual Account collections price off a tiered band table, not a
   // linear rate — see config/ncbaTariffCard.js. paychainFee here is the

@@ -17,7 +17,7 @@ import {
 // the Internal Funds Transfer rail, not PesaLink. PesaLink is the interbank
 // switch; routing an NCBA-to-NCBA transfer through it produces a hard
 // decline even on a real, correct account number (observed live: "RC01").
-const NCBA_OWN_BANK_CODE = '07000';
+export const NCBA_OWN_BANK_CODE = '07000';
 import { createNotification } from './notificationController.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { buildPayoutSentSms, buildPayoutFailedSms } from '../utils/paymentSmsTemplates.js';
@@ -28,6 +28,7 @@ import { KENYAN_BANK_CODES } from '../config/kenyanBankCodes.js';
 import { getB2cTariff } from '../config/mpesaB2cTariffCard.js';
 import { getLipaNaMpesaTariff } from '../config/lipaNaMpesaTariffCard.js';
 import { getKplcPostpaidTariff, getKplcPrepaidTariff, getNcwscTariff } from '../config/billPaymentTariffCard.js';
+import { getBankTransferTariff } from '../config/bankTransferTariffCard.js';
 
 export class InsufficientFundsError extends Error {
   constructor(merchantId, requested, available) {
@@ -201,20 +202,33 @@ export async function executeNcbaBankPayout({
     throw new NcbaOpenBankingValidationError('beneficiaryCountry is required for an RTGS transfer');
   }
 
+  // Interbank Transfer Tariff (config/bankTransferTariffCard.js) — known
+  // upfront from the requested `rail`, except when the destination is
+  // NCBA's own bank code, which submitNcbaBankTransfer always forces onto
+  // the (unpriced) IFT rail regardless of what was requested — checked
+  // here too so the debit doesn't reserve a PesaLink/EFT/RTGS fee for a
+  // transfer that's actually going out fee-free via IFT.
+  const isNcbaOwnAccount = bankCode === NCBA_OWN_BANK_CODE;
+  const { totalFee: transferFee } = isNcbaOwnAccount
+    ? { totalFee: 0 }
+    : getBankTransferTariff(rail, numericAmount);
+  const totalDebit = Math.round((numericAmount + transferFee) * 100) / 100;
+
   // Atomically reserve funds — the $gte guard means this either fully
   // succeeds (balance was sufficient) or matches zero documents (it
   // wasn't), so no read-then-write gap for a concurrent request to race
   // through. Mirrors services/ncbaBulkPaymentService.js's reservation
-  // pattern.
+  // pattern. Reserves totalDebit (principal + fee), not just the
+  // principal, so the merchant needs enough balance to cover the fee too.
   const reservedMerchant = await Merchant.findOneAndUpdate(
-    { _id: merchantId, kesBalance: { $gte: numericAmount } },
-    { $inc: { kesBalance: -numericAmount } },
+    { _id: merchantId, kesBalance: { $gte: totalDebit } },
+    { $inc: { kesBalance: -totalDebit } },
     { returnDocument: 'after' }
   );
 
   if (!reservedMerchant) {
     const merchant = await Merchant.findById(merchantId);
-    throw new InsufficientFundsError(merchantId, numericAmount, merchant?.kesBalance ?? 0);
+    throw new InsufficientFundsError(merchantId, totalDebit, merchant?.kesBalance ?? 0);
   }
 
   let transactionId, hostResponse, actualRail;
@@ -225,16 +239,17 @@ export async function executeNcbaBankPayout({
     }));
   } catch (err) {
     // Submission never reached (or was rejected outright by) NCBA — refund
-    // the reservation in full since nothing was disbursed.
-    await Merchant.findByIdAndUpdate(merchantId, { $inc: { kesBalance: numericAmount } });
+    // the full reservation (principal + fee) since nothing was disbursed.
+    await Merchant.findByIdAndUpdate(merchantId, { $inc: { kesBalance: totalDebit } });
     throw err;
   }
 
   const transaction = await Transaction.create({
     merchantId,
     accountNumber: reservedMerchant.paybillAccount || 'WALLET_FUND',
-    // Already fee-mapped to the ncba_disbursement_fee revenue stream (see
-    // config/revenueRateCard.js) — unlike 'withdrawal', which earns nothing.
+    // Fee-mapped to the ncba_disbursement_fee revenue stream (see
+    // config/revenueRateCard.js), priced per-rail off settlementRail below
+    // — see utils/feeCalculator.js.
     type: 'ncba_outbound',
     amount: numericAmount,
     kesAmount: numericAmount,
@@ -249,7 +264,7 @@ export async function executeNcbaBankPayout({
     settlementRail: actualRail,
   });
 
-  return { transaction, hostResponse, merchant: reservedMerchant };
+  return { transaction, hostResponse, merchant: reservedMerchant, fee: transferFee };
 }
 
 // @desc    List NCBA-recognized bank clearing codes, for the merchant
@@ -365,7 +380,7 @@ export const handleBankPayout = async (req, res) => {
       throw e;
     }
 
-    const { transaction, hostResponse, merchant: updatedMerchant } = await executeNcbaBankPayout({
+    const { transaction, hostResponse, merchant: updatedMerchant, fee } = await executeNcbaBankPayout({
       merchantId, bankCode, accountNumber, accountName, amount, narration, rail,
       beneficiaryCountry, beneficiaryAddress, purposeCode,
     });
@@ -419,11 +434,12 @@ export const handleBankPayout = async (req, res) => {
       message: RAIL_RESPONSE_MESSAGE[usedRail],
       transaction,
       newBalance: updatedMerchant.kesBalance,
+      fee,
       hostResponse,
     });
   } catch (err) {
     if (err instanceof InsufficientFundsError) {
-      return res.status(400).json({ error: 'Insufficient KES balance for this transfer.' });
+      return res.status(400).json({ error: 'Insufficient KES balance for this transfer, including the PayChain service fee.' });
     }
     if (err instanceof NcbaOpenBankingValidationError) {
       return res.status(400).json({ error: err.message });
