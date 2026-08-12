@@ -17,9 +17,143 @@ const DEFAULT_SECURITY_QUESTIONS = [
   'What was the make and model of your first car?',
 ];
 
+type Passkey = {
+  credentialID: string;
+  label: string | null;
+  platform?: string;
+  userAgent?: string;
+  createdAt?: string;
+  lastUsed?: string;
+};
+
+// Mirrors Profile.jsx's identical helpers — a passkey registered from this
+// mobile app itself would come back with platform 'mobile', everything
+// else is a browser's WebAuthn registration (Face ID/Touch ID/Windows
+// Hello) — mobile can't register a new passkey itself (no WebAuthn), but
+// it can view/rename/remove ones registered from any device.
+function deviceLabel(platform?: string, userAgent = ''): string {
+  if (platform === 'mobile') return 'PayChain mobile app';
+  const ua = userAgent.toLowerCase();
+  if (ua.includes('iphone') || ua.includes('ipad')) return 'iPhone / iPad browser';
+  if (ua.includes('android')) return 'Android browser';
+  if (ua.includes('mac os')) return 'Mac browser';
+  if (ua.includes('windows')) return 'Windows browser';
+  return 'Web browser';
+}
+
+function deviceIcon(platform?: string, userAgent = ''): keyof typeof MaterialIcons.glyphMap {
+  if (platform === 'mobile') return 'smartphone';
+  const ua = userAgent.toLowerCase();
+  if (ua.includes('iphone') || ua.includes('android')) return 'smartphone';
+  if (ua.includes('ipad')) return 'tablet-mac';
+  return 'laptop-mac';
+}
+
+function relativeTime(iso?: string): string {
+  if (!iso) return '';
+  const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (seconds < 60) return 'Just now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  const days = Math.floor(seconds / 86400);
+  if (days < 30) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 export default function SecurityTab() {
-  const { merchant, updateToken } = useAuth();
+  const { merchant, updateToken, logout } = useAuth();
   const navigation = useNavigation<any>();
+
+  const [passkeys, setPasskeys] = useState<Passkey[]>([]);
+  const [isLoadingPasskeys, setIsLoadingPasskeys] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [savingRenameId, setSavingRenameId] = useState<string | null>(null);
+  const [isSigningOutAll, setIsSigningOutAll] = useState(false);
+
+  const fetchPasskeys = useCallback(async () => {
+    setIsLoadingPasskeys(true);
+    try {
+      const res = await api.get('/api/auth/merchant/webauthn/passkeys');
+      if (res.data.success) setPasskeys(res.data.passkeys);
+    } catch (err) {
+      // Non-fatal — the card just shows its empty state
+    } finally {
+      setIsLoadingPasskeys(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchPasskeys(); }, [fetchPasskeys]);
+
+  const handleRemovePasskey = (pk: Passkey) => {
+    Alert.alert(
+      'Remove Device',
+      `Remove "${pk.label || deviceLabel(pk.platform, pk.userAgent)}"? It will no longer be able to sign in with a passkey.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            setRemovingId(pk.credentialID);
+            try {
+              await api.delete(`/api/auth/merchant/webauthn/passkeys/${pk.credentialID}`);
+              setPasskeys((prev) => prev.filter((p) => p.credentialID !== pk.credentialID));
+            } catch (err: any) {
+              Alert.alert('Failed', err?.response?.data?.error || 'Failed to remove device.');
+            } finally {
+              setRemovingId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const startRenamePasskey = (pk: Passkey) => {
+    setRenamingId(pk.credentialID);
+    setRenameValue(pk.label || deviceLabel(pk.platform, pk.userAgent));
+  };
+
+  const handleRenamePasskey = async (credentialID: string) => {
+    const label = renameValue.trim();
+    if (!label) { setRenamingId(null); return; }
+    setSavingRenameId(credentialID);
+    try {
+      await api.patch(`/api/auth/merchant/webauthn/passkeys/${credentialID}`, { label });
+      setPasskeys((prev) => prev.map((p) => (p.credentialID === credentialID ? { ...p, label } : p)));
+    } catch (err: any) {
+      Alert.alert('Failed', err?.response?.data?.error || 'Failed to rename device.');
+    } finally {
+      setSavingRenameId(null);
+      setRenamingId(null);
+    }
+  };
+
+  const handleSignOutAllDevices = () => {
+    Alert.alert(
+      'Sign Out All Devices',
+      "This signs you out everywhere, including this device. You'll need to log in again right after.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign Out Everywhere',
+          style: 'destructive',
+          onPress: async () => {
+            setIsSigningOutAll(true);
+            try {
+              await api.post('/api/auth/merchant/sign-out-all-devices');
+              await logout();
+            } catch (err: any) {
+              Alert.alert('Failed', err?.response?.data?.error || 'Failed to sign out all devices.');
+              setIsSigningOutAll(false);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -237,35 +371,41 @@ export default function SecurityTab() {
           </View>
 
           <View className="space-y-6 gap-6 relative z-10">
-            {/* Bulk Pay PIN */}
-            <View className="bg-black/20 p-5 rounded-2xl border border-white/5">
-              <Text className="text-[14px] font-jakarta-extrabold text-white mb-4">Reset Bulk Pay PIN</Text>
-              <View className="gap-3">
-                <ValidatedTextInput kind="pin4" secureTextEntry placeholder="Current PIN (4 digits)" placeholderTextColor="rgba(255,255,255,0.2)"
-                  value={currentPin} onChangeText={setCurrentPin}
-                  className="w-full bg-white/5 border border-white/5 rounded-xl py-3.5 px-4 text-[14px] text-white text-center font-jakarta-bold tracking-[0.5em]" />
-                <View className="flex-row gap-3">
-                  <ValidatedTextInput kind="pin4" secureTextEntry placeholder="New" placeholderTextColor="rgba(255,255,255,0.2)"
-                    value={newPin} onChangeText={setNewPin} containerClassName="flex-1"
-                    className="bg-white/5 border border-white/5 rounded-xl py-3.5 px-4 text-[14px] text-white text-center font-jakarta-bold tracking-[0.5em]" />
-                  <ValidatedTextInput kind="pin4" secureTextEntry placeholder="Confirm" placeholderTextColor="rgba(255,255,255,0.2)"
-                    value={confirmNewPin} onChangeText={setConfirmNewPin} containerClassName="flex-1"
-                    className="bg-white/5 border border-white/5 rounded-xl py-3.5 px-4 text-[14px] text-white text-center font-jakarta-bold tracking-[0.5em]" />
+            {/* Payment PIN — the single PIN used to authorize every
+                payment, including bulk pay batches. Only shown once a PIN
+                actually exists; otherwise reset-app-pin 400s with "No
+                existing PIN found to reset." (merchant sets one for the
+                first time from the Bulk Pay flow instead). */}
+            {merchant?.hasAppPin && (
+              <View className="bg-black/20 p-5 rounded-2xl border border-white/5">
+                <Text className="text-[14px] font-jakarta-extrabold text-white mb-4">Reset Payment PIN</Text>
+                <View className="gap-3">
+                  <ValidatedTextInput kind="pin4" secureTextEntry placeholder="Current PIN (4 digits)" placeholderTextColor="rgba(255,255,255,0.2)"
+                    value={currentPin} onChangeText={setCurrentPin}
+                    className="w-full bg-white/5 border border-white/5 rounded-xl py-3.5 px-4 text-[14px] text-white text-center font-jakarta-bold tracking-[0.5em]" />
+                  <View className="flex-row gap-3">
+                    <ValidatedTextInput kind="pin4" secureTextEntry placeholder="New" placeholderTextColor="rgba(255,255,255,0.2)"
+                      value={newPin} onChangeText={setNewPin} containerClassName="flex-1"
+                      className="bg-white/5 border border-white/5 rounded-xl py-3.5 px-4 text-[14px] text-white text-center font-jakarta-bold tracking-[0.5em]" />
+                    <ValidatedTextInput kind="pin4" secureTextEntry placeholder="Confirm" placeholderTextColor="rgba(255,255,255,0.2)"
+                      value={confirmNewPin} onChangeText={setConfirmNewPin} containerClassName="flex-1"
+                      className="bg-white/5 border border-white/5 rounded-xl py-3.5 px-4 text-[14px] text-white text-center font-jakarta-bold tracking-[0.5em]" />
+                  </View>
+                  <TouchableOpacity
+                    onPress={handlePinReset}
+                    disabled={isSavingPin}
+                    className="w-full py-3.5 rounded-xl bg-[#f59e0b] items-center mt-2 shadow-lg shadow-[#f59e0b]/20 active:bg-[#d97706]"
+                    style={isSavingPin ? { opacity: 0.6 } : undefined}
+                  >
+                    {isSavingPin ? (
+                      <ActivityIndicator size="small" color="#022415" />
+                    ) : (
+                      <Text className="text-[#022415] font-jakarta-extrabold text-[11px] uppercase tracking-widest">Update Authorization PIN</Text>
+                    )}
+                  </TouchableOpacity>
                 </View>
-                <TouchableOpacity
-                  onPress={handlePinReset}
-                  disabled={isSavingPin}
-                  className="w-full py-3.5 rounded-xl bg-[#f59e0b] items-center mt-2 shadow-lg shadow-[#f59e0b]/20 active:bg-[#d97706]"
-                  style={isSavingPin ? { opacity: 0.6 } : undefined}
-                >
-                  {isSavingPin ? (
-                    <ActivityIndicator size="small" color="#022415" />
-                  ) : (
-                    <Text className="text-[#022415] font-jakarta-extrabold text-[11px] uppercase tracking-widest">Update Authorization PIN</Text>
-                  )}
-                </TouchableOpacity>
               </View>
-            </View>
+            )}
 
             {/* Security Questions */}
             <TouchableOpacity
@@ -314,6 +454,121 @@ export default function SecurityTab() {
             </View>
 
           </View>
+        </View>
+
+        {/* Active Sessions & Devices */}
+        <View className="bg-white/5 rounded-[32px] p-7 border border-white/10 mb-8 shadow-xl relative overflow-hidden">
+          <View className="absolute top-0 left-0 w-32 h-32 bg-[#5efeb3]/10 rounded-full -ml-16 -mt-16 blur-xl" />
+
+          <View className="flex-row items-center gap-3 mb-6 relative z-10">
+            <View className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center">
+              <MaterialIcons name="devices" size={22} color="#9ca3af" />
+            </View>
+            <View>
+              <Text className="text-[16px] font-jakarta-extrabold text-white tracking-tight">Active Sessions & Devices</Text>
+              <Text className="text-[10px] text-white/50 font-jakarta-medium mt-0.5">Biometric devices with access to your account</Text>
+            </View>
+          </View>
+
+          {isLoadingPasskeys ? (
+            <View className="py-6 items-center">
+              <ActivityIndicator color="#5efeb3" size="small" />
+            </View>
+          ) : passkeys.length === 0 ? (
+            <View className="items-center py-6">
+              <View className="w-12 h-12 rounded-2xl bg-black/20 items-center justify-center mb-3">
+                <MaterialIcons name="fingerprint" size={22} color="rgba(255,255,255,0.4)" />
+              </View>
+              <Text className="text-white text-[13px] font-jakarta-bold">No devices registered yet</Text>
+              <Text className="text-white/40 text-[11px] font-jakarta-medium mt-1 text-center max-w-[220px]">
+                Add Face ID, Touch ID, or Windows Hello from the web dashboard for passwordless sign-in.
+              </Text>
+            </View>
+          ) : (
+            <View className="gap-1">
+              {passkeys.map((pk, idx) => (
+                <View
+                  key={pk.credentialID}
+                  className={`flex-row items-center gap-3 py-3.5 ${idx !== passkeys.length - 1 ? 'border-b border-white/5' : ''}`}
+                >
+                  <View className="w-10 h-10 rounded-xl bg-black/20 items-center justify-center">
+                    <MaterialIcons name={deviceIcon(pk.platform, pk.userAgent)} size={18} color="#9ca3af" />
+                  </View>
+                  <View className="flex-1 min-w-0">
+                    {renamingId === pk.credentialID ? (
+                      <View className="flex-row items-center gap-1.5">
+                        <TextInput
+                          autoFocus
+                          value={renameValue}
+                          onChangeText={setRenameValue}
+                          maxLength={60}
+                          className="flex-1 text-[12px] font-jakarta-bold text-white bg-black/20 border border-white/10 rounded-lg px-2.5 py-1.5"
+                        />
+                        <TouchableOpacity
+                          onPress={() => handleRenamePasskey(pk.credentialID)}
+                          disabled={savingRenameId === pk.credentialID}
+                          className="w-7 h-7 rounded-lg bg-[#5efeb3]/20 items-center justify-center"
+                        >
+                          {savingRenameId === pk.credentialID ? (
+                            <ActivityIndicator size="small" color="#5efeb3" />
+                          ) : (
+                            <Feather name="check" size={13} color="#5efeb3" />
+                          )}
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => setRenamingId(null)}
+                          disabled={savingRenameId === pk.credentialID}
+                          className="w-7 h-7 rounded-lg bg-white/10 items-center justify-center"
+                        >
+                          <Feather name="x" size={13} color="rgba(255,255,255,0.5)" />
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <TouchableOpacity onPress={() => startRenamePasskey(pk)} activeOpacity={0.7}>
+                        <View className="flex-row items-center gap-1.5">
+                          <Text className="text-[13px] font-jakarta-bold text-white" numberOfLines={1}>
+                            {pk.label || deviceLabel(pk.platform, pk.userAgent)}
+                          </Text>
+                          <Feather name="edit-2" size={10} color="rgba(255,255,255,0.3)" />
+                        </View>
+                      </TouchableOpacity>
+                    )}
+                    <Text className="text-white/40 text-[10px] font-jakarta-medium mt-0.5">
+                      Registered {relativeTime(pk.createdAt)}
+                      {pk.lastUsed ? ` · Last signed in ${relativeTime(pk.lastUsed)}` : ''}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => handleRemovePasskey(pk)}
+                    disabled={removingId === pk.credentialID}
+                    className="w-8 h-8 rounded-lg items-center justify-center"
+                  >
+                    {removingId === pk.credentialID ? (
+                      <ActivityIndicator size="small" color="rgba(255,255,255,0.4)" />
+                    ) : (
+                      <Feather name="trash-2" size={15} color="rgba(255,255,255,0.4)" />
+                    )}
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+
+          <TouchableOpacity
+            onPress={handleSignOutAllDevices}
+            disabled={isSigningOutAll}
+            className="w-full mt-6 py-3.5 rounded-xl bg-red-600/90 flex-row items-center justify-center gap-2"
+            style={isSigningOutAll ? { opacity: 0.6 } : undefined}
+          >
+            {isSigningOutAll ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <MaterialIcons name="phonelink-erase" size={16} color="#fff" />
+                <Text className="text-white font-jakarta-extrabold text-[11px] uppercase tracking-widest">Sign Out All Devices</Text>
+              </>
+            )}
+          </TouchableOpacity>
         </View>
 
         <TouchableOpacity

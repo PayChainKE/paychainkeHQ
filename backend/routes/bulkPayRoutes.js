@@ -1,7 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import rateLimit from 'express-rate-limit';
-import { getPayees, getPayeeById, addPayee, updatePayee, deletePayee, getBatches, getBatchById, uploadCSV, authorizeBatch } from '../controllers/bulkPayController.js';
+import { getPayees, getPayeeById, addPayee, updatePayee, deletePayee, getBatches, getBatchById, uploadCSV, authorizeBatch, validateKplcMeter, validateNcwscMeter, validateKplcPrepaidMeter } from '../controllers/bulkPayController.js';
 import { protectMerchant } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -56,10 +56,31 @@ const uploadLimiter = rateLimit({
   message: { error: 'Too many uploads. Try again in 15 minutes.' },
 });
 
+// External NCBA lookup — same abuse-prevention posture as writeLimiter
+// above, just not payee-write-specific (guards against a merchant
+// hammering NCBA's biller validation endpoints via repeated Add-Payee
+// meter-verification attempts).
+const utilityValidationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many meter lookups. Try again in 15 minutes.' },
+});
+
 // Payee routes
 router.route('/payees')
   .get(getPayees)
   .post(writeLimiter, addPayee);
+
+// The frontend's meter-verification step (both dashboard and mobile) has
+// always called these three paths, but they were never wired up here —
+// controllers existed (bulkPayController.js) since the KPLC/NCWSC
+// integration, the route registration was just missing, so every "Verify
+// Meter" tap 404'd.
+router.post('/validate-kplc-meter', utilityValidationLimiter, validateKplcMeter);
+router.post('/validate-kplc-prepaid-meter', utilityValidationLimiter, validateKplcPrepaidMeter);
+router.post('/validate-ncwsc-meter', utilityValidationLimiter, validateNcwscMeter);
 
 router.route('/payees/:id')
   .get(getPayeeById)

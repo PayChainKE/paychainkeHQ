@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, LayoutAnimation, Platform, UIManager, Linking } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, LayoutAnimation, Platform, UIManager, Linking, ActivityIndicator, Alert } from 'react-native';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import TopBar from '../components/layout/TopBar';
+import { useAuth } from '../context/AuthContext';
+import api from '../api/config';
 
 if (Platform.OS === 'android') {
   if (UIManager.setLayoutAnimationEnabledExperimental) {
@@ -15,6 +17,8 @@ if (Platform.OS === 'android') {
 // so mobile and web never drift apart again.
 const SUPPORT_WHATSAPP_URL = 'https://wa.me/254743283782';
 const SUPPORT_EMAIL = 'support@paychain.co.ke';
+const SUPPORT_PHONE_DISPLAY = '+254 743 283 782';
+const SUPPORT_PHONE_TEL = 'tel:+254743283782';
 const SUPPORT_HOURS = 'Mon–Sat 7am–9pm EAT';
 
 const FAQItem = ({ question, answer }: { question: string, answer: string }) => {
@@ -45,6 +49,102 @@ const FAQItem = ({ question, answer }: { question: string, answer: string }) => 
           <Text className="text-[14px] text-[#404942] font-jakarta-medium leading-relaxed">
             {answer}
           </Text>
+        </View>
+      )}
+    </View>
+  );
+};
+
+// Mirrors the merchant-dashboard's "Send us a message" form (Support.jsx)
+// — same /api/contact endpoint, same payload shape — so a message sent
+// from either app lands in the same team inbox.
+const SupportMessageForm = () => {
+  const { merchant } = useAuth();
+  const [subject, setSubject] = useState('');
+  const [messageBody, setMessageBody] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  const submitMessage = async () => {
+    if (!subject.trim() || !messageBody.trim()) {
+      Alert.alert('Missing info', 'Please fill in a subject and your message.');
+      return;
+    }
+    setSending(true);
+    try {
+      await api.post('/api/contact', {
+        name: merchant?.businessName || 'Merchant',
+        email: merchant?.email || '',
+        phone: merchant?.phone || '',
+        contactType: 'merchant',
+        subject: subject.trim(),
+        message: messageBody.trim(),
+      });
+      setSent(true);
+      setSubject('');
+      setMessageBody('');
+    } catch (err: any) {
+      Alert.alert('Failed to send', err?.response?.data?.error || 'Could not send your message. Please try again.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <View className="mb-12 bg-white p-8 rounded-[40px] shadow-sm shadow-[#00351d]/5 border border-[#bfc9bf]/10">
+      <Text className="font-jakarta-extrabold text-[22px] tracking-tight text-[#00351d] mb-1.5">Send us a message</Text>
+      {sent ? (
+        <View className="items-center py-6">
+          <View className="w-16 h-16 rounded-full bg-[#ebfbf3] items-center justify-center mb-4">
+            <Feather name="check-circle" size={28} color="#059669" />
+          </View>
+          <Text className="font-jakarta-extrabold text-[16px] text-[#00351d] mb-1.5">Message sent!</Text>
+          <Text className="font-jakarta-medium text-[#404942] text-[13px] text-center mb-4">
+            Our team has received it and will get back to you at {merchant?.email || 'your email'} shortly.
+          </Text>
+          <TouchableOpacity onPress={() => setSent(false)}>
+            <Text className="text-[11px] font-jakarta-extrabold uppercase tracking-widest text-[#00351d] underline">Send another message</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View>
+          <Text className="font-jakarta-medium text-[#707971] text-[13px] mb-6">Prefer to write it down? We'll reply straight to your email.</Text>
+          <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-2">Subject</Text>
+          <TextInput
+            value={subject}
+            onChangeText={setSubject}
+            placeholder="What's this about?"
+            placeholderTextColor="#a1a1aa"
+            editable={!sending}
+            className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-4 py-3.5 text-[#0c2010] font-jakarta-semibold text-[14px] mb-4"
+          />
+          <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-2">Message</Text>
+          <TextInput
+            value={messageBody}
+            onChangeText={setMessageBody}
+            placeholder="Tell us what's going on…"
+            placeholderTextColor="#a1a1aa"
+            editable={!sending}
+            multiline
+            numberOfLines={5}
+            textAlignVertical="top"
+            className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-4 py-3.5 text-[#0c2010] font-jakarta-medium text-[14px] mb-5 min-h-[120px]"
+          />
+          <TouchableOpacity
+            onPress={submitMessage}
+            disabled={sending}
+            className="bg-[#0c2010] py-4 rounded-full flex-row items-center justify-center gap-2"
+            style={sending ? { opacity: 0.6 } : undefined}
+          >
+            {sending ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <>
+                <Feather name="send" size={15} color="#fff" />
+                <Text className="font-jakarta-bold text-white text-[15px]">Send Message</Text>
+              </>
+            )}
+          </TouchableOpacity>
         </View>
       )}
     </View>
@@ -99,7 +199,24 @@ export default function SupportPage({ navigation }: any) {
                 <Text className="font-jakarta-bold text-[#0c2010] text-[16px]">Send Email</Text>
               </View>
             </TouchableOpacity>
+
+            {/* Call Card */}
+            <TouchableOpacity activeOpacity={0.9} onPress={() => Linking.openURL(SUPPORT_PHONE_TEL)} className="bg-white p-8 rounded-[40px] shadow-sm shadow-[#00351d]/5 border border-[#bfc9bf]/10">
+              <View className="flex-row justify-between items-start mb-8">
+                <View className="w-14 h-14 bg-[#f7faf7] rounded-full items-center justify-center border border-[#eff4ef]">
+                  <MaterialIcons name="call" size={24} color="#00351d" />
+                </View>
+              </View>
+              <Text className="font-jakarta-extrabold text-[24px] tracking-tight text-[#00351d] mb-2">Call Us</Text>
+              <Text className="font-jakarta-medium text-[#404942] text-[15px] mb-8">{SUPPORT_PHONE_DISPLAY}</Text>
+              <View className="border-[2px] border-[#0c2010] py-4 rounded-full items-center justify-center">
+                <Text className="font-jakarta-bold text-[#0c2010] text-[16px]">Call Now</Text>
+              </View>
+            </TouchableOpacity>
           </View>
+
+          {/* Send a message */}
+          <SupportMessageForm />
 
           {/* Quick Answers Section (FAQ) */}
           <View className="mb-12">

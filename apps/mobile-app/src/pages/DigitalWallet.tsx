@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Modal, Alert, Share } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Modal, Alert, Share, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -13,6 +13,7 @@ import { isCreditTransaction, isDebitTransaction } from '../utils/transactionDir
 import { formatAccountNumber } from '../utils/formatAccountNumber';
 import { formatTxDate, formatTxTime } from '../utils/formatDate';
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay';
+import { getAppUrl } from '../utils/appUrl';
 import SettlementQrCard from '../components/ui/SettlementQrCard';
 
 function formatKES(n: number | null | undefined) {
@@ -260,7 +261,7 @@ export default function DigitalWallet({ navigation }: any) {
     try {
       const res = await api.post('/api/transactions/payment-link', { amount });
       if (res.data?.success) {
-        setGeneratedLink(`https://app.paychain.co.ke/pay/${res.data.linkId}`);
+        setGeneratedLink(`${getAppUrl()}/pay/${res.data.linkId}`);
       }
     } catch (err: any) {
       Alert.alert('Generation Failed', err?.response?.data?.error || 'Failed to generate secure payment link.');
@@ -273,6 +274,25 @@ export default function DigitalWallet({ navigation }: any) {
     if (!generatedLink) return;
     await Clipboard.setStringAsync(generatedLink);
     Alert.alert('Link Copied', 'Payment link copied to clipboard.');
+  };
+
+  // Matches the dashboard's WhatsApp deep-link button (Wallet.jsx) — same
+  // message format — instead of only offering a plain copy-to-clipboard,
+  // which left the merchant to paste into WhatsApp themselves.
+  const shareLinkOnWhatsApp = async () => {
+    if (!generatedLink) return;
+    const text = `Please pay me KES ${linkAmount} via PayChain: ${generatedLink}`;
+    const url = `whatsapp://send?text=${encodeURIComponent(text)}`;
+    try {
+      const canOpen = await Linking.canOpenURL(url);
+      if (canOpen) {
+        await Linking.openURL(url);
+      } else {
+        await Share.share({ message: text });
+      }
+    } catch (err) {
+      await Share.share({ message: text });
+    }
   };
 
   const shareQR = async () => {
@@ -741,14 +761,19 @@ export default function DigitalWallet({ navigation }: any) {
                 </View>
 
                 {!!generatedLink && (
-                  <View className="mt-5 bg-[#0B0E14] rounded-2xl border border-[#1E2532] p-4 flex-row items-center justify-between gap-3">
-                    <View className="flex-1">
-                      <Text className="text-[9px] font-jakarta-bold text-[#8B98A9] uppercase tracking-widest mb-1">Link Ready</Text>
-                      <Text className="text-[12px] font-jakarta-bold text-white" numberOfLines={1}>{generatedLink}</Text>
+                  <View className="mt-5 bg-[#0B0E14] rounded-2xl border border-[#1E2532] p-4">
+                    <Text className="text-[9px] font-jakarta-bold text-[#8B98A9] uppercase tracking-widest mb-1">Link Ready</Text>
+                    <Text className="text-[12px] font-jakarta-bold text-white mb-3" numberOfLines={1}>{generatedLink}</Text>
+                    <View className="flex-row gap-2.5">
+                      <TouchableOpacity onPress={copyPaymentLink} className="flex-1 flex-row items-center justify-center gap-2 px-4 py-2.5 bg-[#131722] border border-[#1E2532] rounded-xl">
+                        <Feather name="copy" size={14} color="#fff" />
+                        <Text className="text-white text-[10px] font-jakarta-extrabold uppercase tracking-widest">Copy</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={shareLinkOnWhatsApp} className="flex-1 flex-row items-center justify-center gap-2 px-4 py-2.5 bg-[#25D366] rounded-xl">
+                        <Feather name="send" size={14} color="#fff" />
+                        <Text className="text-white text-[10px] font-jakarta-extrabold uppercase tracking-widest">WhatsApp</Text>
+                      </TouchableOpacity>
                     </View>
-                    <TouchableOpacity onPress={copyPaymentLink} className="px-4 py-2.5 bg-[#131722] border border-[#1E2532] rounded-xl">
-                      <Feather name="copy" size={14} color="#fff" />
-                    </TouchableOpacity>
                   </View>
                 )}
               </View>

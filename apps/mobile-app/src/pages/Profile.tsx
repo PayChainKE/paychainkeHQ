@@ -9,6 +9,7 @@ import { formatAccountNumber } from '../utils/formatAccountNumber';
 import { ValidatedTextInput } from '../components/ValidatedTextInput';
 import api from '../api/config';
 import TopBar from '../components/layout/TopBar';
+import { getAppUrl } from '../utils/appUrl';
 
 import MyAccountsTab from '../components/tabs/MyAccountsTab';
 import SupportTab from '../components/tabs/SupportTab';
@@ -90,7 +91,7 @@ function PaymentLinkPanel() {
     try {
       const res = await api.post('/api/transactions/payment-link', { amount: value });
       if (res.data?.success) {
-        setGeneratedLink(`https://app.paychain.co.ke/pay/${res.data.linkId}`);
+        setGeneratedLink(`${getAppUrl()}/pay/${res.data.linkId}`);
         fetchHistory();
       }
     } catch (err: any) {
@@ -116,7 +117,7 @@ function PaymentLinkPanel() {
   };
 
   const copyHistoryLink = async (item: any) => {
-    await Clipboard.setStringAsync(`https://app.paychain.co.ke/pay/${item.linkId}`);
+    await Clipboard.setStringAsync(`${getAppUrl()}/pay/${item.linkId}`);
     setCopiedLinkId(item.linkId);
     setTimeout(() => setCopiedLinkId((current) => (current === item.linkId ? null : current)), 1500);
   };
@@ -124,7 +125,7 @@ function PaymentLinkPanel() {
   const shareHistoryLink = async (item: any) => {
     try {
       await Share.share({
-        message: `Please pay me KES ${item.amount.toLocaleString()} via PayChain: https://app.paychain.co.ke/pay/${item.linkId}`,
+        message: `Please pay me KES ${item.amount.toLocaleString()} via PayChain: ${getAppUrl()}/pay/${item.linkId}`,
       });
     } catch {
       // user dismissed the share sheet

@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
-  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -12,8 +11,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../context/AuthContext';
-import { useBiometrics } from '../hooks/useBiometrics';
-import * as LocalAuthentication from 'expo-local-authentication';
+import { useBiometrics, biometricLabel } from '../hooks/useBiometrics';
 
 // ── Animated scanner ring ────────────────────────────────────────────────────
 type Phase = 'idle' | 'scanning' | 'success' | 'fail';
@@ -77,17 +75,6 @@ function ScannerRing({ phase }: { phase: Phase }) {
       </LinearGradient>
     </View>
   );
-}
-
-// ── Biometric method label ───────────────────────────────────────────────────
-function biometricLabel(types: LocalAuthentication.AuthenticationType[]): string {
-  if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
-    return Platform.OS === 'ios' ? 'Face ID' : 'Face Unlock';
-  }
-  if (types.includes(LocalAuthentication.AuthenticationType.IRIS)) {
-    return 'Iris Scan';
-  }
-  return 'Fingerprint';
 }
 
 // ── Main screen ──────────────────────────────────────────────────────────────

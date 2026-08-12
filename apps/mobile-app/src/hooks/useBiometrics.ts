@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Platform } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 
 export type BiometricSupport = {
@@ -7,6 +8,19 @@ export type BiometricSupport = {
   available: boolean;
   types: LocalAuthentication.AuthenticationType[];
 };
+
+// Shared with BiometricSetup.tsx and PinEntry.tsx so both screens describe
+// the same device capability the same way ("Face ID" vs "Fingerprint" etc.)
+// instead of drifting if one gets edited and not the other.
+export function biometricLabel(types: LocalAuthentication.AuthenticationType[]): string {
+  if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
+    return Platform.OS === 'ios' ? 'Face ID' : 'Face Unlock';
+  }
+  if (types.includes(LocalAuthentication.AuthenticationType.IRIS)) {
+    return 'Iris Scan';
+  }
+  return 'Fingerprint';
+}
 
 export type BiometricResult =
   | { success: true }

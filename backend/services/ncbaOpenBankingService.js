@@ -393,6 +393,56 @@ export async function submitEftTransfer({
   return result;
 }
 
+/**
+ * Submits an Internal Funds Transfer — NCBA's own "Transfers to NCBA
+ * Accounts" rail, for when the destination account is itself at NCBA
+ * (BeneficiaryBankBIC '07000'). Confirmed endpoint from NCBA's "Open
+ * Banking V2 - Callback Enabled" Postman collection (not given as a path
+ * in the UAT Guide's own text, only its request/response JSON was — same
+ * situation as several other calls in this file).
+ *
+ * This must NOT go through validatePesaLinkAccount/submitPesaLinkTransfer —
+ * PesaLink is the interbank switch, and NCBA's own account-to-account
+ * transfers routed through it come back with a hard decline (observed
+ * live: StatusCode/reason "RC01" on a real, correct NCBA account number).
+ * IFT is the documented same-bank rail and resolves synchronously like
+ * PesaLink/EFT (resultCode/statusDescription IS the final result).
+ */
+export async function submitInternalNcbaTransfer({
+  transactionId,
+  beneficiaryAccountNumber,
+  beneficiaryAccountName,
+  amount,
+  narration,
+  country = 'Kenya',
+}) {
+  if (!transactionId || !beneficiaryAccountNumber || !amount) {
+    throw new NcbaOpenBankingValidationError('transactionId, beneficiaryAccountNumber and amount are required for an internal NCBA transfer');
+  }
+  assertTransferAmountInBounds(amount);
+
+  const payload = {
+    Country: country,
+    TransactionID: transactionId,
+    BeneficiaryAccountName: beneficiaryAccountName || 'PayChain Payout',
+    DebitAccountNumber: ncbaOpenBankingAccountNumber,
+    CreditAccountNumber: beneficiaryAccountNumber,
+    Currency: 'KES',
+    Amount: Number(amount).toFixed(2),
+    Narration: narration || 'PayChain Payout',
+  };
+
+  if (!liveCallsEnabled) {
+    return simulate('ncba_openbanking_ift_submit_sandbox', { transactionId, amount });
+  }
+
+  const result = await ncbaOpenBankingPost('/api/v1/IFTTransaction/ifttransaction', payload);
+  if (result?.resultCode !== '000') {
+    throw new NcbaOpenBankingRequestError(result?.statusDescription || 'This transfer to NCBA account was rejected');
+  }
+  return result;
+}
+
 // NCBA's own sample requests (both the plain and IMT RTGS Postman examples)
 // use "MSC" as PurposeCode — the UAT Guide itself says the full code list
 // is "to be shared during onboarding", so this is the one confirmed-valid
@@ -831,21 +881,22 @@ export async function submitNcwscPayment({
  * NCBA's own docs disagree on request-field casing for this exact call:
  * the UAT Guide's prose shows it capitalized (Identifier/IdentifierType),
  * while the "Open Banking V2 - Callback Enabled" Postman collection shows
- * lowercase (identifier/identifierType) — and that Postman example's own
- * response body was never actually captured, so it was never confirmed to
- * really work. Rather than guess, this tries lowercase first (cheaper to
- * rule out first only because it's what shipped originally) and
- * automatically retries once with the capitalized casing before giving up
- * — same "try both documented variants" approach used for the STK token
- * endpoint's GET/POST ambiguity. Both response field names read below
- * (errorCode/errorMessage/OrganizationName/origanizationShortCode) match
- * the UAT Guide's response sample exactly, so only the outgoing request
- * casing is in question, not the incoming parse.
+ * lowercase (identifier/identifierType). Live traffic confirms the
+ * lowercase form is the one that actually works, so it's tried first with
+ * the capitalized form kept only as a fallback in case a future NCBA
+ * change flips this.
  *
- * If both attempts are rejected, check the ncba_openbanking_lnm_validate_
- * rejected log line for NCBA's raw response — a Paybill/Till that's
- * genuinely invalid still produces that same log line, so this doesn't by
- * itself prove a casing/shape issue vs. a real bad number.
+ * The UAT Guide's documented response fields (errorCode/errorMessage/
+ * OrganizationName/origanizationShortCode) do NOT match what NCBA's live
+ * endpoint actually returns — confirmed via production logs on
+ * 2026-08-12. The real response shape is:
+ *   { ResponseCode, ResponseMessage, DetailedMessage, OrganizationName,
+ *     OrganizationShortCode, ChargeProfileID, ConversationID }
+ * Success is ResponseCode "4000" / ResponseMessage "Success" (e.g. Paybill
+ * 880100). A genuinely invalid destination comes back as a different
+ * ResponseCode with a descriptive ResponseMessage, e.g. Till 4221930 got
+ * "SFC_IC0003" / "The operator does not exist" — that's real invalid-till
+ * data, not a request-shape problem.
  *
  * @param {object} params
  * @param {'Paybill'|'Till'} params.paymentType
@@ -862,25 +913,25 @@ export async function validateLipaNaMpesaAccount({ paymentType, payBillTillNo })
 
   const identifierType = paymentType === 'Till' ? '2' : '4';
   const path = '/api/v1/LipaNaMpesaValidation/accountdetails';
+  const isSuccess = (r) => r?.ResponseCode === '4000' || r?.ResponseMessage === 'Success';
 
   let result = await ncbaOpenBankingPost(path, { identifier: payBillTillNo, identifierType });
 
-  if (result?.errorCode !== '000') {
+  if (!isSuccess(result)) {
     logEvent('warn', 'ncba_openbanking_lnm_validate_lowercase_rejected', { paymentType, payBillTillNo, response: result });
     result = await ncbaOpenBankingPost(path, { Identifier: payBillTillNo, IdentifierType: identifierType });
   }
 
-  if (result?.errorCode !== '000') {
+  if (!isSuccess(result)) {
     // The client only ever sees a generic "could not verify" message (never
     // raw upstream data) — this log line is the only way to tell a
     // genuinely invalid Paybill/Till apart from a request shape NCBA still
     // doesn't recognize even after the casing retry above.
     logEvent('warn', 'ncba_openbanking_lnm_validate_rejected', { paymentType, payBillTillNo, response: result });
-    throw new NcbaOpenBankingValidationError(result?.errorMessage || 'Could not verify the destination Paybill/Till number');
+    throw new NcbaOpenBankingValidationError(result?.ResponseMessage || result?.DetailedMessage || 'Could not verify the destination Paybill/Till number');
   }
 
-  // origanizationShortCode is NCBA's own typo, kept exactly as documented.
-  return { organizationName: result.OrganizationName || null, shortCode: result.origanizationShortCode || null };
+  return { organizationName: result.OrganizationName || null, shortCode: result.OrganizationShortCode || null };
 }
 
 /**

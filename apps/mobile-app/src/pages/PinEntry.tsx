@@ -1,21 +1,48 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Alert } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
-import { useBiometrics } from '../hooks/useBiometrics';
+import { useBiometrics, biometricLabel } from '../hooks/useBiometrics';
+
+// Give the screen a beat to actually finish mounting/transitioning before
+// invoking the OS biometric sheet — calling authenticateAsync the instant
+// this component mounts can race the React Navigation screen transition
+// (a known expo-local-authentication + react-navigation gotcha where the
+// prompt silently fails to present, or gets dismissed instantly, looking
+// to the user like "biometrics never popped up").
+const AUTO_PROMPT_DELAY_MS = 350;
 
 export default function PinEntry() {
   const { appPin, unlockApp, logout, isBiometricsEnabled } = useAuth();
-  const { authenticate } = useBiometrics();
+  const { support, authenticate } = useBiometrics();
   const [pin, setPin] = useState('');
+  // idle: nothing attempted yet (or PIN pad only) · prompting: OS sheet is
+  // (or should be) up · failed: the last attempt was cancelled/failed, so a
+  // manual retry affordance is shown instead of silently going quiet.
+  const [biometricStatus, setBiometricStatus] = useState<'idle' | 'prompting' | 'failed'>('idle');
+  const autoTriggeredRef = useRef(false);
+
+  const method = biometricLabel(support.types);
+
+  const triggerBiometric = async () => {
+    setBiometricStatus('prompting');
+    const result = await authenticate('Unlock PayChain');
+    if (result.success) {
+      unlockApp();
+      return;
+    }
+    // A cancelled prompt (user backed out) goes back to idle quietly — an
+    // actual failure (wrong finger, hardware error, etc.) surfaces the
+    // retry row so the user isn't left guessing why nothing happened.
+    setBiometricStatus(result.cancelled ? 'idle' : 'failed');
+  };
 
   useEffect(() => {
-    if (!isBiometricsEnabled) return;
-    (async () => {
-      const result = await authenticate('Unlock PayChain');
-      if (result.success) unlockApp();
-    })();
+    if (!isBiometricsEnabled || autoTriggeredRef.current) return;
+    autoTriggeredRef.current = true;
+    const timer = setTimeout(triggerBiometric, AUTO_PROMPT_DELAY_MS);
+    return () => clearTimeout(timer);
   }, [isBiometricsEnabled]);
 
   const handlePress = (digit: string) => {
@@ -50,14 +77,31 @@ export default function PinEntry() {
         <Text className="text-white text-[24px] font-jakarta-bold mb-2">
           Unlock PayChain
         </Text>
-        <Text className="text-[#68dbae] text-[14px] font-jakarta-medium text-center mb-12">
+        <Text className="text-[#68dbae] text-[14px] font-jakarta-medium text-center mb-8">
           Enter your 4-digit PIN to access your dashboard.
         </Text>
 
+        {isBiometricsEnabled && (
+          <TouchableOpacity
+            onPress={triggerBiometric}
+            disabled={biometricStatus === 'prompting'}
+            className={`flex-row items-center gap-2 px-5 py-3 rounded-full mb-8 ${biometricStatus === 'failed' ? 'bg-red-500/10 border border-red-400/30' : 'bg-white/5 border border-white/10'}`}
+          >
+            {biometricStatus === 'prompting' ? (
+              <ActivityIndicator size="small" color="#68dbae" />
+            ) : (
+              <MaterialIcons name="fingerprint" size={18} color={biometricStatus === 'failed' ? '#f87171' : '#68dbae'} />
+            )}
+            <Text className={`font-jakarta-bold text-[13px] ${biometricStatus === 'failed' ? 'text-red-400' : 'text-[#68dbae]'}`}>
+              {biometricStatus === 'prompting' ? `Waiting for ${method}…` : biometricStatus === 'failed' ? `Try ${method} Again` : `Use ${method}`}
+            </Text>
+          </TouchableOpacity>
+        )}
+
         <View className="flex-row justify-center space-x-6 mb-16">
           {[0, 1, 2, 3].map((index) => (
-            <View 
-              key={index} 
+            <View
+              key={index}
               className={`w-4 h-4 rounded-full ${index < pin.length ? 'bg-[#68dbae]' : 'bg-[#1b3a2a]'} mx-2`}
             />
           ))}
@@ -77,8 +121,8 @@ export default function PinEntry() {
                 }
                 if (item === 'delete') {
                   return (
-                    <TouchableOpacity 
-                      key={colIndex} 
+                    <TouchableOpacity
+                      key={colIndex}
                       onPress={handleDelete}
                       className="w-[70px] h-[70px] justify-center items-center rounded-full"
                     >
@@ -87,8 +131,8 @@ export default function PinEntry() {
                   );
                 }
                 return (
-                  <TouchableOpacity 
-                    key={colIndex} 
+                  <TouchableOpacity
+                    key={colIndex}
                     onPress={() => handlePress(item)}
                     className="w-[70px] h-[70px] justify-center items-center rounded-full bg-[#1b3a2a]"
                   >
