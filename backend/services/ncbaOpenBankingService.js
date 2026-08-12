@@ -393,6 +393,56 @@ export async function submitEftTransfer({
   return result;
 }
 
+/**
+ * Submits an Internal Funds Transfer — NCBA's own "Transfers to NCBA
+ * Accounts" rail, for when the destination account is itself at NCBA
+ * (BeneficiaryBankBIC '07000'). Confirmed endpoint from NCBA's "Open
+ * Banking V2 - Callback Enabled" Postman collection (not given as a path
+ * in the UAT Guide's own text, only its request/response JSON was — same
+ * situation as several other calls in this file).
+ *
+ * This must NOT go through validatePesaLinkAccount/submitPesaLinkTransfer —
+ * PesaLink is the interbank switch, and NCBA's own account-to-account
+ * transfers routed through it come back with a hard decline (observed
+ * live: StatusCode/reason "RC01" on a real, correct NCBA account number).
+ * IFT is the documented same-bank rail and resolves synchronously like
+ * PesaLink/EFT (resultCode/statusDescription IS the final result).
+ */
+export async function submitInternalNcbaTransfer({
+  transactionId,
+  beneficiaryAccountNumber,
+  beneficiaryAccountName,
+  amount,
+  narration,
+  country = 'Kenya',
+}) {
+  if (!transactionId || !beneficiaryAccountNumber || !amount) {
+    throw new NcbaOpenBankingValidationError('transactionId, beneficiaryAccountNumber and amount are required for an internal NCBA transfer');
+  }
+  assertTransferAmountInBounds(amount);
+
+  const payload = {
+    Country: country,
+    TransactionID: transactionId,
+    BeneficiaryAccountName: beneficiaryAccountName || 'PayChain Payout',
+    DebitAccountNumber: ncbaOpenBankingAccountNumber,
+    CreditAccountNumber: beneficiaryAccountNumber,
+    Currency: 'KES',
+    Amount: Number(amount).toFixed(2),
+    Narration: narration || 'PayChain Payout',
+  };
+
+  if (!liveCallsEnabled) {
+    return simulate('ncba_openbanking_ift_submit_sandbox', { transactionId, amount });
+  }
+
+  const result = await ncbaOpenBankingPost('/api/v1/IFTTransaction/ifttransaction', payload);
+  if (result?.resultCode !== '000') {
+    throw new NcbaOpenBankingRequestError(result?.statusDescription || 'This transfer to NCBA account was rejected');
+  }
+  return result;
+}
+
 // NCBA's own sample requests (both the plain and IMT RTGS Postman examples)
 // use "MSC" as PurposeCode — the UAT Guide itself says the full code list
 // is "to be shared during onboarding", so this is the one confirmed-valid

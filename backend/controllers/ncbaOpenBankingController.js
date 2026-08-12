@@ -8,8 +8,16 @@ import {
   submitPesaLinkTransfer,
   submitEftTransfer,
   submitRtgsTransfer,
+  submitInternalNcbaTransfer,
   NcbaOpenBankingValidationError,
 } from '../services/ncbaOpenBankingService.js';
+
+// BeneficiaryBankBIC NCBA confirmed for itself (see kenyanBankCodes.js) — a
+// destination account under this code lives at NCBA, so it must go through
+// the Internal Funds Transfer rail, not PesaLink. PesaLink is the interbank
+// switch; routing an NCBA-to-NCBA transfer through it produces a hard
+// decline even on a real, correct account number (observed live: "RC01").
+const NCBA_OWN_BANK_CODE = '07000';
 import { createNotification } from './notificationController.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { buildPayoutSentSms, buildPayoutFailedSms } from '../utils/paymentSmsTemplates.js';
@@ -104,10 +112,18 @@ export async function submitNcbaBankTransfer({
     throw new NcbaOpenBankingValidationError('Multi-currency RTGS transfers are not yet supported — creditCurrency and debitCurrency must be KES until FX conversion is added.');
   }
 
+  // A destination at NCBA itself must go through the Internal Funds
+  // Transfer rail regardless of the requested rail — PesaLink/EFT/RTGS are
+  // all interbank/cross-border rails and NCBA declines an NCBA-to-NCBA
+  // transfer routed through them (see NCBA_OWN_BANK_CODE doc comment
+  // above). No PesaLink pre-validation either: IFT resolves synchronously
+  // and reports its own rejection, same as PesaLink/EFT would.
+  const isNcbaOwnAccount = bankCode === NCBA_OWN_BANK_CODE;
+
   // Fail fast on a bad destination account before touching balance — not
-  // possible for RTGS, which has no documented validation endpoint (see
-  // doc comment above).
-  if (rail !== 'rtgs') {
+  // possible for RTGS (no documented validation endpoint, see doc comment
+  // above) or for an NCBA-own-account transfer (validated via IFT itself).
+  if (rail !== 'rtgs' && !isNcbaOwnAccount) {
     await validatePesaLinkAccount({
       bankCode,
       accountNumber,
@@ -115,11 +131,19 @@ export async function submitNcbaBankTransfer({
     });
   }
 
-  const railPrefix = { pesalink: 'PL', eft: 'EFT', rtgs: 'RTGS' }[rail];
+  const railPrefix = isNcbaOwnAccount ? 'IFT' : { pesalink: 'PL', eft: 'EFT', rtgs: 'RTGS' }[rail];
   const transactionId = `NCBA-${railPrefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 
   let hostResponse;
-  if (rail === 'rtgs') {
+  if (isNcbaOwnAccount) {
+    hostResponse = await submitInternalNcbaTransfer({
+      transactionId,
+      beneficiaryAccountNumber: accountNumber,
+      beneficiaryAccountName: accountName || 'PayChain Payout',
+      amount: numericAmount,
+      narration: narration || `PayChain Payout - ${businessName || 'Merchant'}`,
+    });
+  } else if (rail === 'rtgs') {
     hostResponse = await submitRtgsTransfer({
       transactionId,
       beneficiaryAccountNumber: accountNumber,
@@ -145,7 +169,7 @@ export async function submitNcbaBankTransfer({
     });
   }
 
-  return { transactionId, hostResponse, rail };
+  return { transactionId, hostResponse, rail: isNcbaOwnAccount ? 'ift' : rail };
 }
 
 /**
@@ -192,9 +216,9 @@ export async function executeNcbaBankPayout({
     throw new InsufficientFundsError(merchantId, numericAmount, merchant?.kesBalance ?? 0);
   }
 
-  let transactionId, hostResponse;
+  let transactionId, hostResponse, actualRail;
   try {
-    ({ transactionId, hostResponse } = await submitNcbaBankTransfer({
+    ({ transactionId, hostResponse, rail: actualRail } = await submitNcbaBankTransfer({
       businessName: reservedMerchant.businessName, bankCode, accountNumber, accountName, amount: numericAmount, narration, rail,
       beneficiaryCountry, beneficiaryAddress, creditCurrency, debitCurrency, purposeCode,
     }));
@@ -221,7 +245,7 @@ export async function executeNcbaBankPayout({
     reference: transactionId,
     sender: { name: reservedMerchant.businessName, id: process.env.NCBA_OPENBANKING_ACCOUNT_NUMBER || 'PAYCHAIN_NCBA_ACCOUNT' },
     recipient: { name: accountName || 'Bank Account', id: accountNumber },
-    settlementRail: rail,
+    settlementRail: actualRail,
   });
 
   return { transaction, hostResponse, merchant: reservedMerchant };
@@ -345,24 +369,30 @@ export const handleBankPayout = async (req, res) => {
       beneficiaryCountry, beneficiaryAddress, purposeCode,
     });
 
+    // transaction.settlementRail is the rail actually used — may differ
+    // from the requested `rail` when the destination was an NCBA account
+    // and got routed to IFT instead (see submitNcbaBankTransfer).
+    const usedRail = transaction.settlementRail || rail;
+
     const RAIL_NOTIFICATION_MESSAGE = {
       eft: `KES ${Number(amount).toLocaleString()} was sent to your bank account via EFT. It settles by the next business day.`,
       rtgs: `KES ${Number(amount).toLocaleString()} was sent to your bank account via RTGS. It settles within a few hours.`,
       pesalink: `KES ${Number(amount).toLocaleString()} was sent to your bank account via PesaLink.`,
+      ift: `KES ${Number(amount).toLocaleString()} was sent to your NCBA bank account.`,
     };
     createNotification({
       merchantId,
       kind: 'payment',
       title: 'Bank payout completed',
-      message: RAIL_NOTIFICATION_MESSAGE[rail],
+      message: RAIL_NOTIFICATION_MESSAGE[usedRail],
     }).catch((e) => logEvent('error', 'ncba_openbanking_payout_notification_failed', { transactionId: transaction.reference, error: e.message }));
 
     if (updatedMerchant.phone) {
       const { date, time } = formatTransactionDateTime();
-      const RAIL_SMS_LABEL = { eft: 'Bank Payout (EFT)', rtgs: 'Bank Payout (RTGS)', pesalink: 'Bank Payout' };
+      const RAIL_SMS_LABEL = { eft: 'Bank Payout (EFT)', rtgs: 'Bank Payout (RTGS)', pesalink: 'Bank Payout', ift: 'Bank Payout' };
       const { message } = buildPayoutSentSms({
         ref: transaction.reference,
-        label: RAIL_SMS_LABEL[rail],
+        label: RAIL_SMS_LABEL[usedRail],
         amount: Number(amount),
         recipientName: accountName || 'your bank account',
         date,
@@ -381,10 +411,11 @@ export const handleBankPayout = async (req, res) => {
       eft: 'Bank transfer submitted via EFT. It settles by the next business day.',
       rtgs: 'Bank transfer submitted via RTGS. It settles within a few hours.',
       pesalink: 'Bank transfer completed via PesaLink.',
+      ift: 'Bank transfer completed to your NCBA account.',
     };
     res.status(200).json({
       success: true,
-      message: RAIL_RESPONSE_MESSAGE[rail],
+      message: RAIL_RESPONSE_MESSAGE[usedRail],
       transaction,
       newBalance: updatedMerchant.kesBalance,
       hostResponse,
