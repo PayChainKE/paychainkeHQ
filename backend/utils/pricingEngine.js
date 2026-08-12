@@ -189,13 +189,22 @@ export class PricingEngineError extends Error {
 // a range per compressed row (e.g. "20,001-250,000: KES 25-35") — expanded
 // here into SAFARICOM_TARIFF's real finer sub-bands, stepping evenly from
 // the range's low end to its high end (confirmed against the sheet 2026-08-12).
+// The 20,000 boundary was originally entered here as KES 23 per that first
+// sheet, but the later Invoicing and Wallet Top-Up sheets both independently
+// gave KES 25 for the same boundary (and only KES 25 keeps Total Charge =
+// safaricomFeeFor + fee consistent with those sheets' own stated 77-87
+// total range) — corrected to 25 on 2026-08-12 per explicit confirmation;
+// the original sheet's "85" total (62+23) was the actual typo, not this one.
 //
 // Also serves as the "Hosted Payment Link Tariff Schedule" (Web & Social
-// Checkout Links, 2026-08-12) — verified band-for-band identical to that
-// separate tariff sheet, so the same table and functions cover both
-// products; getCheckoutTotal is already called from
-// transactionController.js#processPaymentLink for this product line, no
-// separate code path needed.
+// Checkout Links, 2026-08-12) and the "Wallet Top-Up Tariff Schedule"
+// (Merchant Operating Float / Wallet Deposits, 2026-08-12) — verified
+// band-for-band identical to both separate tariff sheets (after the 20,000
+// boundary correction above), so the same table and functions cover all
+// three products; getCheckoutTotal is already called from
+// transactionController.js#processPaymentLink (Payment Links/Invoices) and
+// mpesaController.js#initiateSTKPush (wallet top-ups, Request Money, pay-
+// to-account) for these product lines, no separate code path needed.
 const CUSTOMER_SURCHARGE_BANDS = [
   { max: 100,      fee: 0  },
   { max: 500,      fee: 3  },
@@ -207,7 +216,7 @@ const CUSTOMER_SURCHARGE_BANDS = [
   { max: 7_500,    fee: 12 },
   { max: 10_000,   fee: 15 },
   { max: 15_000,   fee: 20 },
-  { max: 20_000,   fee: 23 },
+  { max: 20_000,   fee: 25 },
   { max: 25_000,   fee: 25 },
   { max: 30_000,   fee: 27 },
   { max: 35_000,   fee: 29 },
