@@ -1,7 +1,6 @@
 import React from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Users, Package, Zap, Calendar, FileText, CheckCircle, Check } from 'lucide-react';
 import Breadcrumbs from '@/components/Breadcrumbs';
@@ -76,9 +75,9 @@ const PaychainBulkPay: React.FC = () => {
                 PayChain Bulk Pay lets you run payroll, pay suppliers, and settle utility bills directly from your merchant dashboard — no more app switching, no more manual transfers, no more end-of-month chaos.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
-                <Link to="/waitlist" className="inline-flex items-center justify-center px-8 py-4 text-base font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_20px_rgba(0,191,99,0.3)]">
+                <a href="https://app.paychain.co.ke" className="inline-flex items-center justify-center px-8 py-4 text-base font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_20px_rgba(0,191,99,0.3)]">
                   Start Paying Smarter
-                </Link>
+                </a>
               </div>
             </motion.div>
 
@@ -256,11 +255,11 @@ const PaychainBulkPay: React.FC = () => {
             <div className="absolute top-0 right-0 w-64 h-64 bg-[#00bf63]/20 rounded-full blur-3xl" />
             <div className="absolute bottom-0 left-0 w-64 h-64 bg-violet-500/20 rounded-full blur-3xl" />
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-6 relative z-10">Stop Sending Transfers One by One.</h2>
-            <p className="text-xl text-gray-400 mb-10 relative z-10">Join our closed beta launching Q2 2026.</p>
+            <p className="text-xl text-gray-400 mb-10 relative z-10">Sign up in minutes and run your first batch payout today.</p>
             <div className="relative z-10">
-              <Link to="/waitlist" className="inline-flex px-8 py-4 text-lg font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_30px_rgba(0,191,99,0.3)]">
-                Get Early Access
-              </Link>
+              <a href="https://app.paychain.co.ke" className="inline-flex px-8 py-4 text-lg font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_30px_rgba(0,191,99,0.3)]">
+                Sign Up
+              </a>
             </div>
           </motion.div>
         </div>

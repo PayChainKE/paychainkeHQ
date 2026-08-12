@@ -76,13 +76,13 @@ const CARD_DATA: CardData[] = [
     icon: MessageCircle,
     label: "Merchant Support",
     headline:
-      "Questions about your account, the waitlist, or how PayChain works?",
+      "Questions about your account, signing up, or how PayChain works?",
     body:
-      "Our support team is Nairobi-based and responds to every message personally. Whether you want to understand how Cash Advance eligibility works, need help with your waitlist application, or just want to know if PayChain is right for your business, ask us directly.",
+      "Our support team is Nairobi-based and responds to every message personally. Whether you want to understand how Cash Advance eligibility works, need help completing your sign up, or just want to know if PayChain is right for your business, ask us directly.",
     response: "We respond within 24 hours on business days.",
     emailHref: "mailto:support@paychain.co.ke",
     phoneHref: "tel:+254743283782",
-    secondary: { label: "Or join the waitlist →", href: "/waitlist" },
+    secondary: { label: "Or sign up now →", href: "https://app.paychain.co.ke" },
   },
   {
     icon: Link2,
@@ -422,7 +422,7 @@ export default function ContactUs() {
                     <a href="tel:+254743283782" className={styles.successLink}>+254 743 283 782</a>
                     <div className={styles.successCtas}>
                       <a href="/how-it-works" className={styles.successCta}>How PayChain Works →</a>
-                      <a href="/waitlist" className={styles.successCta}>Join the Waitlist →</a>
+                      <a href="https://app.paychain.co.ke" className={styles.successCta}>Sign Up →</a>
                     </div>
                     <button className={styles.sendAnother} onClick={resetForm}>Send another message</button>
                   </div>
@@ -486,11 +486,11 @@ export default function ContactUs() {
 
       <section className={styles.finalCta}>
         <div className={styles.finalInner}>
-          <div className={styles.pulseBadge}>Closed Beta | Q2 2026</div>
-          <h2 className={styles.finalHeadline}>Not Sure Where to Start? Just Join the Waitlist.</h2>
-          <p className={styles.finalBody}>If you're a Kenyan merchant and you're not sure which contact option is right for you, the waitlist is the best first step. Join in 60 seconds and our team will reach out to you directly before the Q2 2026 beta launch.</p>
-          <a href="/waitlist" className={styles.finalBtn}>Join the Beta Waitlist <ArrowRight size={14} /></a>
-          <div className={styles.finalMicro}>No credit card · No commitment · Limited beta spots available</div>
+          <div className={styles.pulseBadge}>Now Live</div>
+          <h2 className={styles.finalHeadline}>Not Sure Where to Start? Just Sign Up.</h2>
+          <p className={styles.finalBody}>If you're a Kenyan merchant and you're not sure which contact option is right for you, signing up is the best first step. Create your account and our team will reach out to help you get set up.</p>
+          <a href="https://app.paychain.co.ke" className={styles.finalBtn}>Sign Up <ArrowRight size={14} /></a>
+          <div className={styles.finalMicro}>Free to sign up · No commitment</div>
         </div>
       </section>
 

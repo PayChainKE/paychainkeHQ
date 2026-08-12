@@ -149,8 +149,8 @@ const HowItWorks: React.FC = () => {
           <p className="font-sans text-lg md:text-xl max-w-2xl mb-8 text-muted-foreground">
             PayChain replaces five fragmented tools with one verified, intelligent merchant operating system — built on M-PESA infrastructure and blockchain rails.
           </p>
-          <a href="/waitlist" className="howitworks-cta-btn inline-block px-8 py-4 rounded-lg font-semibold text-lg bg-primary text-primary-foreground shadow-lg transition-all focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 hover:scale-105 hover:shadow-xl hover:glow-green" aria-label="Join the Waitlist">
-            Join the Waitlist
+          <a href="https://app.paychain.co.ke" className="howitworks-cta-btn inline-block px-8 py-4 rounded-lg font-semibold text-lg bg-primary text-primary-foreground shadow-lg transition-all focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 hover:scale-105 hover:shadow-xl hover:glow-green" aria-label="Sign Up">
+            Sign Up
           </a>
         </section>
 
@@ -228,9 +228,9 @@ const HowItWorks: React.FC = () => {
         {/* CTA SECTION */}
         <section className="howitworks-cta py-24 text-center fadein-up">
           <h2 className="font-serif text-3xl md:text-4xl font-bold mb-4">Ready to Run Your Business on Better Infrastructure?</h2>
-          <p className="font-sans text-lg max-w-2xl mx-auto mb-8">Join our closed beta launching Q2 2026. Limited spots for Nairobi-based merchants.</p>
-          <a href="/waitlist" className="howitworks-cta-btn inline-block px-8 py-4 rounded-lg font-semibold text-lg bg-primary text-primary-foreground shadow-lg transition-all focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 hover:scale-105 hover:shadow-xl hover:glow-green" aria-label="Join the Waitlist">
-            Join the Waitlist
+          <p className="font-sans text-lg max-w-2xl mx-auto mb-8">Sign up in minutes and start accepting payments today.</p>
+          <a href="https://app.paychain.co.ke" className="howitworks-cta-btn inline-block px-8 py-4 rounded-lg font-semibold text-lg bg-primary text-primary-foreground shadow-lg transition-all focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 hover:scale-105 hover:shadow-xl hover:glow-green" aria-label="Sign Up">
+            Sign Up
           </a>
         </section>
       </main>

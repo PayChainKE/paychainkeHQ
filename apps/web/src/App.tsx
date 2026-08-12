@@ -21,7 +21,6 @@ import PaychainDashboardProxy from './pages/PaychainDashboardProxy';
 import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import About from "./pages/About";
-import Waitlist from "./pages/Waitlist";
 import NotFound from "./pages/NotFound";
 import Blog from "./pages/Blog";
 import BlogPost from "./pages/BlogPost";
@@ -88,7 +87,6 @@ const App = () => {
                   <Route path="/faq" element={<FAQ />} />
                   <Route path="/contact" element={<ContactUs />} />
                   <Route path="/about" element={<About />} />
-                  <Route path="/waitlist" element={<Waitlist />} />
                   <Route path="/book-demo" element={<BookDemo />} />
                   <Route path="/terms-of-service" element={<TermsOfService />} />
                   <Route path="/privacy-policy" element={<PrivacyPolicy />} />

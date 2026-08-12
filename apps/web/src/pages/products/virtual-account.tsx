@@ -1,7 +1,6 @@
 import React from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   ShieldCheck,
@@ -70,9 +69,9 @@ const VirtualAccount: React.FC = () => {
               <p className="text-lg text-gray-400 mb-8 max-w-xl leading-relaxed">
                 The PayChain Virtual Account replaces your basic M-PESA till with a registered, aggregator-backed payment channel that kills SMS fraud, logs every shilling, and builds your business credit — automatically.
               </p>
-              <Link to="/waitlist" className="inline-flex items-center justify-center px-8 py-4 text-base font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_20px_rgba(0,191,99,0.3)]">
+              <a href="https://app.paychain.co.ke" className="inline-flex items-center justify-center px-8 py-4 text-base font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_20px_rgba(0,191,99,0.3)]">
                 Get Your Virtual Account
-              </Link>
+              </a>
             </motion.div>
 
             <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.8, delay: 0.2 }} className="relative">
@@ -223,11 +222,11 @@ const VirtualAccount: React.FC = () => {
             <div className="absolute top-0 right-0 w-64 h-64 bg-[#00bf63]/20 rounded-full blur-3xl" />
             <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-400/20 rounded-full blur-3xl" />
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-6 relative z-10">Stop Trusting Screenshots. Start Running a Verified Business.</h2>
-            <p className="text-xl text-gray-400 mb-10 relative z-10">Join our closed beta launching Q2 2026. Limited spots for Nairobi merchants.</p>
+            <p className="text-xl text-gray-400 mb-10 relative z-10">Sign up in minutes and start running a verified business today.</p>
             <div className="relative z-10">
-              <Link to="/waitlist" className="inline-flex px-8 py-4 text-lg font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_30px_rgba(0,191,99,0.3)]">
-                Get Early Access
-              </Link>
+              <a href="https://app.paychain.co.ke" className="inline-flex px-8 py-4 text-lg font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_30px_rgba(0,191,99,0.3)]">
+                Sign Up
+              </a>
             </div>
           </motion.div>
         </div>

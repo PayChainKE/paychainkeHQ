@@ -254,56 +254,6 @@ export default function About(): JSX.Element {
           </ol>
         </section>
 
-        {/* ROADMAP */}
-        <section className="about__roadmap" aria-labelledby="roadmap-heading">
-          <h2 id="roadmap-heading" className="about__section-title">Where We Are. Where We Are Going.</h2>
-          <div className="about__timeline" aria-hidden>
-            <div className="about__timeline-line" />
-            <ol className="about__timeline-list">
-              <li className="about__timeline-item about__timeline-item--active" data-node>
-                <div className="about__timeline-node">1</div>
-                <div className="about__timeline-content">
-                  <div className="about__timeline-title">Build (Now → Q2 2026)</div>
-                  <div className="about__timeline-badge">In Progress</div>
-                  <p>Engineering underway. M-PESA integration live via NCBA Bank. Base Network blockchain rails configured. Merchant dashboard UI being built. CBK licensing initiated.</p>
-                </div>
-              </li>
-
-              <li className="about__timeline-item" data-node>
-                <div className="about__timeline-node">2</div>
-                <div className="about__timeline-content">
-                  <div className="about__timeline-title">Closed Beta (Q2 2026)</div>
-                  <p>Hand-selected Nairobi and Juja merchants gain full platform access. Real transactions. Real Trust Scores. Real feedback shaping the product before public launch.</p>
-                </div>
-              </li>
-
-              <li className="about__timeline-item" data-node>
-                <div className="about__timeline-node">3</div>
-                <div className="about__timeline-content">
-                  <div className="about__timeline-title">Public Launch (Q3 2026)</div>
-                  <p>PayChain opens to all Kenyan merchants. Target: 5,000 merchants in Year 1. Full product suite live from Day 1.</p>
-                </div>
-              </li>
-
-              <li className="about__timeline-item" data-node>
-                <div className="about__timeline-node">4</div>
-                <div className="about__timeline-content">
-                  <div className="about__timeline-title">Regional Expansion (Year 2–3)</div>
-                  <p>Mombasa, Kisumu, and Nakuru in Year 2. Uganda and Tanzania in Year 3.</p>
-                </div>
-              </li>
-
-              <li className="about__timeline-item" data-node>
-                <div className="about__timeline-node">5</div>
-                <div className="about__timeline-content">
-                  <div className="about__timeline-title">Pan-African Infrastructure (Year 4–5)</div>
-                  <p>1,000,000+ merchants. The dominant hybrid payment service provider for African SMEs.</p>
-                </div>
-              </li>
-            </ol>
-          </div>
-        </section>
-
         {/* TRUST & INFRASTRUCTURE */}
       
 
@@ -313,7 +263,7 @@ export default function About(): JSX.Element {
           <p className="about__cta-body">Whether you are a merchant ready for early access, an investor who sees what we see in this market, a strategic partner looking to plug into Kenya's next payment infrastructure, or a talented operator who wants to build something that matters — we want to hear from you.</p>
 
           <div className="about__cta-actions">
-            <a className="btn btn--primary" href="/waitlist" aria-label="Join the Beta Waitlist">Join the Beta Waitlist →</a>
+            <a className="btn btn--primary" href="https://app.paychain.co.ke" aria-label="Sign Up">Sign Up →</a>
           </div>
         </section>
       </main>

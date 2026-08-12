@@ -72,7 +72,7 @@ const Hero: React.FC = () => {
           {/* Call to Actions */}
           <motion.div variants={itemVariants} className="mt-8 flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full sm:w-auto">
             <a
-              href="/waitlist"
+              href="https://app.paychain.co.ke"
               className="inline-flex items-center justify-center px-6 py-2.5 text-sm rounded-lg bg-emerald-400 text-emerald-950 font-extrabold hover:bg-emerald-300 transition-colors cursor-pointer shadow-lg hover:shadow-xl"
             >
               Get started today <ArrowRight className="w-4 h-4 ml-1.5" />

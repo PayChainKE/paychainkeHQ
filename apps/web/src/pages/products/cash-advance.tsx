@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   TrendingUp,
@@ -174,11 +173,11 @@ const CashAdvance: React.FC = () => {
                 ))}
               </div>
               <div className="flex flex-col sm:flex-row gap-4">
-                <Link to="/waitlist" className="inline-flex items-center justify-center px-8 py-4 text-base font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_20px_rgba(0,191,99,0.3)]">
-                  Join the Waitlist
-                </Link>
+                <a href="https://app.paychain.co.ke" className="inline-flex items-center justify-center px-8 py-4 text-base font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_20px_rgba(0,191,99,0.3)]">
+                  Sign Up
+                </a>
               </div>
-              <p className="text-sm text-gray-500 mt-4">Closed beta Q2 2026 · Limited merchant spots</p>
+              <p className="text-sm text-gray-500 mt-4">Free to sign up · Get started in minutes</p>
             </motion.div>
 
             <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.8, delay: 0.2 }} className="relative">
@@ -461,10 +460,10 @@ const CashAdvance: React.FC = () => {
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-6 relative z-10">The Sooner You Start Transacting, the Sooner You Unlock Working Capital.</h2>
             <p className="text-xl text-gray-400 mb-10 relative z-10">Every verified collection through PayChain brings you closer to your first Cash Advance offer.</p>
             <div className="relative z-10">
-              <Link to="/waitlist" className="inline-flex px-8 py-4 text-lg font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_30px_rgba(0,191,99,0.3)]">
-                Join the Beta Waitlist
-              </Link>
-              <p className="text-sm text-gray-500 mt-4">Closed beta Q2 2026 · Limited merchant spots · No collateral · No bank queue</p>
+              <a href="https://app.paychain.co.ke" className="inline-flex px-8 py-4 text-lg font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_30px_rgba(0,191,99,0.3)]">
+                Sign Up
+              </a>
+              <p className="text-sm text-gray-500 mt-4">No collateral · No bank queue</p>
             </div>
           </motion.div>
         </div>
