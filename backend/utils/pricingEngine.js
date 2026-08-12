@@ -91,12 +91,12 @@ export function calculateMerchantFee(grossAmount) {
 // account number directly into their own M-Pesa menu picks their own
 // amount, so unlike STK Push there's no PayChain-controlled prompt to add a
 // customer-facing surcharge to (see "Dual-sided checkout model" further
-// down). This is PayChain's way of still collecting the same flat KES 5 on
-// this rail — deducted from the merchant alongside calculateMerchantFee
-// above, not billed to the payer. Same figure as
-// CUSTOMER_SURCHARGE_FLAT_KES below, kept as its own constant since the two
-// are collected through entirely different mechanisms and should be able to
-// move independently.
+// down). This is PayChain's way of still collecting a flat margin on this
+// rail — deducted from the merchant alongside calculateMerchantFee above,
+// not billed to the payer. Kept as its own constant (separate from the
+// tiered CUSTOMER_SURCHARGE_BANDS further down) since the two are collected
+// through entirely different mechanisms and should be able to move
+// independently.
 export const RAW_C2B_FLAT_MARKUP_KES = 5;
 
 /**
@@ -177,11 +177,39 @@ export class PricingEngineError extends Error {
 // also does not apply to a merchant topping up their own wallet with their
 // own phone — there's no external "sender" being charged in that case.
 //
-// Flat KES 5 per transaction, billed to the payer on top of whatever
-// Safaricom's own tariff already charges them, and kept by PayChain as
-// revenue (not shared with the merchant). Not a percentage — a KES 10
-// transaction and a KES 10,000 transaction both carry the same flat KES 5.
-export const CUSTOMER_SURCHARGE_FLAT_KES = 5;
+// PayChain Standard Transaction Tariff (Dynamic QR Code & STK Push
+// Collections, 2026-08-12) — Zero-Merchant-Fee model: the merchant is
+// billed KES 0 (MPESA_MERCHANT_FEE_ENABLED stays false), and this entire
+// PayChain Service Fee is billed to the paying customer instead, on top of
+// Safaricom's own tariff. Bands mirror SAFARICOM_TARIFF's own `max`
+// boundaries exactly (config/revenueRateCard.js) — Total Charge to Customer
+// in the tariff sheet is, band for band, safaricomFeeFor(amount) + the fee
+// below, e.g. KES 501-1,000: safaricom 10 + service fee 5 = KES 15 total.
+// The two highest bands (10,001-250,000) were given in the tariff sheet as
+// a range per compressed row (e.g. "20,001-250,000: KES 25-35") — expanded
+// here into SAFARICOM_TARIFF's real finer sub-bands, stepping evenly from
+// the range's low end to its high end (confirmed against the sheet 2026-08-12).
+const CUSTOMER_SURCHARGE_BANDS = [
+  { max: 100,      fee: 0  },
+  { max: 500,      fee: 3  },
+  { max: 1_000,    fee: 5  },
+  { max: 1_500,    fee: 7  },
+  { max: 2_500,    fee: 8  },
+  { max: 3_500,    fee: 8  },
+  { max: 5_000,    fee: 10 },
+  { max: 7_500,    fee: 12 },
+  { max: 10_000,   fee: 15 },
+  { max: 15_000,   fee: 20 },
+  { max: 20_000,   fee: 23 },
+  { max: 25_000,   fee: 25 },
+  { max: 30_000,   fee: 27 },
+  { max: 35_000,   fee: 29 },
+  { max: 40_000,   fee: 31 },
+  { max: 45_000,   fee: 33 },
+  { max: 50_000,   fee: 35 },
+  { max: 70_000,   fee: 35 },
+  { max: 250_000,  fee: 35 },
+];
 
 // Amounts at or below this are exempt from every flat PayChain fee across
 // the platform — the STK customer surcharge, the raw-C2B markup, and the
@@ -196,7 +224,9 @@ export const FLAT_FEE_FREE_TIER_MAX_KES = 100;
  * PayChain's own surcharge collected directly from the paying customer, on
  * top of the merchant's base bill — separate from calculateCustomerMpesaFee
  * (Safaricom's cut, which this is never added to or confused with). Free
- * for amounts at or below FLAT_FEE_FREE_TIER_MAX_KES.
+ * for amounts at or below FLAT_FEE_FREE_TIER_MAX_KES. Tiered per
+ * CUSTOMER_SURCHARGE_BANDS above (the Standard Transaction Tariff), not a
+ * flat KES 5 regardless of amount.
  *
  * @param {number} baseInvoiceAmount
  * @returns {number} surcharge in KES, rounded to 2dp.
@@ -205,7 +235,8 @@ export function calculateCustomerSurcharge(baseInvoiceAmount) {
   const base = Number(baseInvoiceAmount);
   if (!Number.isFinite(base) || base <= 0) return 0;
   if (base <= FLAT_FEE_FREE_TIER_MAX_KES) return 0;
-  return round2(CUSTOMER_SURCHARGE_FLAT_KES);
+  const band = CUSTOMER_SURCHARGE_BANDS.find((b) => base <= b.max) || CUSTOMER_SURCHARGE_BANDS[CUSTOMER_SURCHARGE_BANDS.length - 1];
+  return round2(band.fee);
 }
 
 /**
