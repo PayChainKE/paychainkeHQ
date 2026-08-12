@@ -475,6 +475,13 @@ export async function submitRtgsTransfer({
 
   const result = await ncbaOpenBankingPost('/api/v1/RTGSPayment/RTGSPayment', payload);
   if (result?.resultCode !== '000') {
+    // RTGS has no documented pre-flight validation endpoint (see this
+    // function's own doc comment / submitNcbaBankTransfer's), so this
+    // rejection is the *only* point a bad beneficiary detail, a currency/
+    // country the deployment doesn't support, or a genuine credential/shape
+    // issue would ever surface — same "log the raw response so a rejection
+    // is diagnosable" reasoning as the LNM and Hakikisha validators above.
+    logEvent('warn', 'ncba_openbanking_rtgs_submit_rejected', { transactionId, beneficiaryCountry, creditCurrency, response: result });
     throw new NcbaOpenBankingRequestError(result?.statusDescription || 'This RTGS transfer was rejected');
   }
   return result;
@@ -504,6 +511,13 @@ export async function validateMobileWalletNumber({ provider, msisdn }) {
 
   const result = await ncbaOpenBankingPost(ncbaMobileWalletValidationPath, { provider, msisdn });
   if (!result?.validationId) {
+    // Same reasoning as the LNM validator's rejection log — ncbaMobileWalletValidationPath
+    // was sourced from NCBA's Postman collection, not the UAT Guide's own
+    // text (which documents this call's request/response shape but never
+    // states its endpoint path), so a rejection here could mean a genuinely
+    // invalid number OR a path/shape mismatch. This is the only way to tell
+    // them apart from Render logs alone.
+    logEvent('warn', 'ncba_openbanking_mobile_wallet_validate_rejected', { provider, msisdn, path: ncbaMobileWalletValidationPath, response: result });
     throw new NcbaOpenBankingValidationError(result?.message || 'Could not validate the destination mobile number.');
   }
 
