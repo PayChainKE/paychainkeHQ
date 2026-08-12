@@ -61,15 +61,16 @@ export function safaricomFeeFor(kesAmount) {
 // (PAYCHAIN_TXN_RATE) on top of the transaction amount. Per 2026-08-11
 // instruction: PayChain charges flat KES fees, not a percentage cut,
 // "unless otherwise" — so each of those streams now has its own flat
-// figure instead. FX_SPREAD_RATE and CASH_ADVANCE_RATE are the deliberate
-// exceptions: FX conversion is priced as a spread industry-wide (a flat
-// fee doesn't scale sensibly from a KES 100 swap to a KES 1M one, and
-// 2% already matches Kotani Pay/HoneyCoin's own standard), and cash
-// advance origination fees are conventionally percentage-based lending
-// pricing — plus neither is wired to a real payout yet (both pilot/
-// reporting-only), so there's no live charge to migrate.
+// figure instead. FX_SPREAD_RATE is the deliberate exception: FX
+// conversion is priced as a spread industry-wide (a flat fee doesn't scale
+// sensibly from a KES 100 swap to a KES 1M one, and 2% already matches
+// Kotani Pay/HoneyCoin's own standard) — not wired to a real payout yet
+// (pilot/reporting-only), so there's no live charge to migrate.
 export const FX_SPREAD_RATE       = 0.020;  // 2.00% — Kotani / HoneyCoin standard
-export const CASH_ADVANCE_RATE    = 0.025;  // 2.50% — pilot product
+// Cash Advance no longer uses a flat rate — see
+// config/cashAdvanceTariffCard.js for the tiered origination-fee/factor-
+// rate/split-rate schedule (pricing functions only; still not wired to a
+// real disbursement or repayment anywhere — see that file's header).
 // NCBA Virtual Account collections no longer use a flat linear rate — see
 // config/ncbaTariffCard.js for the tiered Safaricom-cost + markup bands.
 
@@ -267,10 +268,11 @@ export const REVENUE_STREAMS = [
   {
     id: 'cash_advance',
     label: 'Cash Advance Fee',
-    description: 'Origination fee on PayChain Cash Advance product (merchant credit line). Pilot stage.',
+    description: 'Tiered origination fee + fixed factor fee on PayChain Cash Advance (Revenue-Based Financing) — see config/cashAdvanceTariffCard.js. Pilot stage: pricing only, not wired to any real disbursement, repayment, or Transaction type yet.',
     icon: 'savings',
     accent: 'violet',
-    rate: CASH_ADVANCE_RATE,
+    tiered: true,
+    rate: null,
     minFee: 0,
     txTypes: [],
     statuses: [],
