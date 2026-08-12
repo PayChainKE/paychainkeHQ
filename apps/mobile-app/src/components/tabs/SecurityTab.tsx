@@ -237,35 +237,41 @@ export default function SecurityTab() {
           </View>
 
           <View className="space-y-6 gap-6 relative z-10">
-            {/* Bulk Pay PIN */}
-            <View className="bg-black/20 p-5 rounded-2xl border border-white/5">
-              <Text className="text-[14px] font-jakarta-extrabold text-white mb-4">Reset Bulk Pay PIN</Text>
-              <View className="gap-3">
-                <ValidatedTextInput kind="pin4" secureTextEntry placeholder="Current PIN (4 digits)" placeholderTextColor="rgba(255,255,255,0.2)"
-                  value={currentPin} onChangeText={setCurrentPin}
-                  className="w-full bg-white/5 border border-white/5 rounded-xl py-3.5 px-4 text-[14px] text-white text-center font-jakarta-bold tracking-[0.5em]" />
-                <View className="flex-row gap-3">
-                  <ValidatedTextInput kind="pin4" secureTextEntry placeholder="New" placeholderTextColor="rgba(255,255,255,0.2)"
-                    value={newPin} onChangeText={setNewPin} containerClassName="flex-1"
-                    className="bg-white/5 border border-white/5 rounded-xl py-3.5 px-4 text-[14px] text-white text-center font-jakarta-bold tracking-[0.5em]" />
-                  <ValidatedTextInput kind="pin4" secureTextEntry placeholder="Confirm" placeholderTextColor="rgba(255,255,255,0.2)"
-                    value={confirmNewPin} onChangeText={setConfirmNewPin} containerClassName="flex-1"
-                    className="bg-white/5 border border-white/5 rounded-xl py-3.5 px-4 text-[14px] text-white text-center font-jakarta-bold tracking-[0.5em]" />
+            {/* Payment PIN — the single PIN used to authorize every
+                payment, including bulk pay batches. Only shown once a PIN
+                actually exists; otherwise reset-app-pin 400s with "No
+                existing PIN found to reset." (merchant sets one for the
+                first time from the Bulk Pay flow instead). */}
+            {merchant?.hasAppPin && (
+              <View className="bg-black/20 p-5 rounded-2xl border border-white/5">
+                <Text className="text-[14px] font-jakarta-extrabold text-white mb-4">Reset Payment PIN</Text>
+                <View className="gap-3">
+                  <ValidatedTextInput kind="pin4" secureTextEntry placeholder="Current PIN (4 digits)" placeholderTextColor="rgba(255,255,255,0.2)"
+                    value={currentPin} onChangeText={setCurrentPin}
+                    className="w-full bg-white/5 border border-white/5 rounded-xl py-3.5 px-4 text-[14px] text-white text-center font-jakarta-bold tracking-[0.5em]" />
+                  <View className="flex-row gap-3">
+                    <ValidatedTextInput kind="pin4" secureTextEntry placeholder="New" placeholderTextColor="rgba(255,255,255,0.2)"
+                      value={newPin} onChangeText={setNewPin} containerClassName="flex-1"
+                      className="bg-white/5 border border-white/5 rounded-xl py-3.5 px-4 text-[14px] text-white text-center font-jakarta-bold tracking-[0.5em]" />
+                    <ValidatedTextInput kind="pin4" secureTextEntry placeholder="Confirm" placeholderTextColor="rgba(255,255,255,0.2)"
+                      value={confirmNewPin} onChangeText={setConfirmNewPin} containerClassName="flex-1"
+                      className="bg-white/5 border border-white/5 rounded-xl py-3.5 px-4 text-[14px] text-white text-center font-jakarta-bold tracking-[0.5em]" />
+                  </View>
+                  <TouchableOpacity
+                    onPress={handlePinReset}
+                    disabled={isSavingPin}
+                    className="w-full py-3.5 rounded-xl bg-[#f59e0b] items-center mt-2 shadow-lg shadow-[#f59e0b]/20 active:bg-[#d97706]"
+                    style={isSavingPin ? { opacity: 0.6 } : undefined}
+                  >
+                    {isSavingPin ? (
+                      <ActivityIndicator size="small" color="#022415" />
+                    ) : (
+                      <Text className="text-[#022415] font-jakarta-extrabold text-[11px] uppercase tracking-widest">Update Authorization PIN</Text>
+                    )}
+                  </TouchableOpacity>
                 </View>
-                <TouchableOpacity
-                  onPress={handlePinReset}
-                  disabled={isSavingPin}
-                  className="w-full py-3.5 rounded-xl bg-[#f59e0b] items-center mt-2 shadow-lg shadow-[#f59e0b]/20 active:bg-[#d97706]"
-                  style={isSavingPin ? { opacity: 0.6 } : undefined}
-                >
-                  {isSavingPin ? (
-                    <ActivityIndicator size="small" color="#022415" />
-                  ) : (
-                    <Text className="text-[#022415] font-jakarta-extrabold text-[11px] uppercase tracking-widest">Update Authorization PIN</Text>
-                  )}
-                </TouchableOpacity>
               </View>
-            </View>
+            )}
 
             {/* Security Questions */}
             <TouchableOpacity

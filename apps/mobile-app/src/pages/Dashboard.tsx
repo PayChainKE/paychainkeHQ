@@ -7,6 +7,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/config';
 import PrivateValue from '../components/PrivateValue';
+import FundAccountModal from '../components/FundAccountModal';
 import { isCreditTransaction, isDebitTransaction } from '../utils/transactionDirection';
 import { formatAccountNumber } from '../utils/formatAccountNumber';
 
@@ -94,6 +95,7 @@ export default function Dashboard({ navigation }: any) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [showAmounts, setShowAmounts] = useState(true);
   const [activeTimeframe, setActiveTimeframe] = useState<Timeframe>('7D');
+  const [showFundAccount, setShowFundAccount] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -286,8 +288,23 @@ export default function Dashboard({ navigation }: any) {
                   <Text className="text-white text-[10px] font-jakarta-bold uppercase tracking-widest">Account No: {formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'PENDING')}</Text>
                 </View>
               </View>
+              {/* Always visible regardless of the digitalWallet feature flag
+                  — unlike DigitalWallet.tsx's own Top Up modal, which is
+                  hidden behind that flag (off by default for new signups).
+                  A merchant in that state previously had no way to fund
+                  their account from the app at all. */}
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => setShowFundAccount(true)}
+                className="flex-row items-center justify-center gap-2 bg-white/10 border border-white/20 rounded-2xl py-3 mt-4"
+              >
+                <Feather name="plus" size={14} color="#fff" />
+                <Text className="text-white text-[11px] font-jakarta-extrabold uppercase tracking-widest">Fund Account</Text>
+              </TouchableOpacity>
             </View>
           </LinearGradient>
+
+          <FundAccountModal visible={showFundAccount} onClose={() => setShowFundAccount(false)} />
 
           {/* Action Buttons (overlapping) */}
           <View className="px-6 flex-row justify-between -mt-6 mb-10 z-10">
