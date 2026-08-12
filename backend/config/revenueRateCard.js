@@ -1,3 +1,5 @@
+import { KPLC_POSTPAID_SERVICE_FEE, NCWSC_SERVICE_FEE } from './billPaymentTariffCard.js';
+
 // Single source of truth for PayChain's revenue model. Two layers:
 //
 //   1. SAFARICOM_TARIFF — Safaricom's published M-Pesa tariff. This is a
@@ -59,31 +61,31 @@ export function safaricomFeeFor(kesAmount) {
 // (PAYCHAIN_TXN_RATE) on top of the transaction amount. Per 2026-08-11
 // instruction: PayChain charges flat KES fees, not a percentage cut,
 // "unless otherwise" — so each of those streams now has its own flat
-// figure instead. FX_SPREAD_RATE and CASH_ADVANCE_RATE are the deliberate
-// exceptions: FX conversion is priced as a spread industry-wide (a flat
-// fee doesn't scale sensibly from a KES 100 swap to a KES 1M one, and
-// 2% already matches Kotani Pay/HoneyCoin's own standard), and cash
-// advance origination fees are conventionally percentage-based lending
-// pricing — plus neither is wired to a real payout yet (both pilot/
-// reporting-only), so there's no live charge to migrate.
+// figure instead. FX_SPREAD_RATE is the deliberate exception: FX
+// conversion is priced as a spread industry-wide (a flat fee doesn't scale
+// sensibly from a KES 100 swap to a KES 1M one, and 2% already matches
+// Kotani Pay/HoneyCoin's own standard) — not wired to a real payout yet
+// (pilot/reporting-only), so there's no live charge to migrate.
 export const FX_SPREAD_RATE       = 0.020;  // 2.00% — Kotani / HoneyCoin standard
-export const CASH_ADVANCE_RATE    = 0.025;  // 2.50% — pilot product
+// Cash Advance no longer uses a flat rate — see
+// config/cashAdvanceTariffCard.js for the tiered origination-fee/factor-
+// rate/split-rate schedule (pricing functions only; still not wired to a
+// real disbursement or repayment anywhere — see that file's header).
 // NCBA Virtual Account collections no longer use a flat linear rate — see
 // config/ncbaTariffCard.js for the tiered Safaricom-cost + markup bands.
 
-// Flat PayChain margin per transaction, one constant per outbound stream.
-// ncba_lipa_na_mpesa is the only one of these actually deducted from a real
-// merchant balance today (controllers/mpesaController.js#initiateB2B) — the
-// rest are currently reporting-only figures on the admin Revenue dashboard
-// (no controller deducts them from a merchant yet), but are still expressed
-// as real flat KES amounts now rather than a phantom percentage-of-amount
+// Flat PayChain margin per transaction, one constant per outbound stream
+// that's still genuinely flat. ncba_lipa_na_mpesa and KPLC (postpaid/
+// prepaid)/NCWSC no longer have their own flat constants here — they're
+// priced via their own tiered tariff cards instead (config/
+// lipaNaMpesaTariffCard.js, config/billPaymentTariffCard.js), both actually
+// deducted from a real merchant balance today. The rest below are still
+// currently reporting-only figures on the admin Revenue dashboard (no
+// controller deducts them from a merchant yet), but are still expressed as
+// real flat KES amounts now rather than a phantom percentage-of-amount
 // figure, so the dashboard shows an honest number pending each rail's own
 // pricing rollout.
-export const NCBA_LIPA_NA_MPESA_FLAT_FEE_KES = 30;
 export const NCBA_DISBURSEMENT_FLAT_FEE_KES  = 50;
-export const NCBA_KPLC_FLAT_FEE_KES          = 20;
-export const NCBA_KPLC_PREPAID_FLAT_FEE_KES  = 15;
-export const NCBA_NCWSC_FLAT_FEE_KES         = 20;
 export const STABLECOIN_PAYMENT_FLAT_FEE_KES = 30;
 export const SETTLEMENT_FLAT_FEE_KES         = 20;
 export const MPESA_B2B_LEGACY_FLAT_FEE_KES   = 20;
@@ -175,7 +177,7 @@ export const REVENUE_STREAMS = [
   {
     id: 'mpesa_b2c_fee',
     label: 'M-Pesa B2C Fee',
-    description: 'Safaricom\'s standard B2C tariff on merchant withdrawals to M-Pesa, passed through at cost (deducted from the merchant alongside the withdrawal). PayChain\'s own margin on top (PAYCHAIN_B2C_MARKUP) is not charged yet, so this stream reads near-zero revenue until that changes.',
+    description: 'Safaricom\'s standard B2C tariff on merchant withdrawals to M-Pesa, passed through at cost, plus PayChain\'s own tiered Mobile Withdrawal service fee (config/mpesaB2cTariffCard.js#calculateB2cServiceFee) — both deducted from the merchant alongside the withdrawal.',
     icon: 'smartphone',
     accent: 'rose',
     tiered: true,
@@ -188,7 +190,7 @@ export const REVENUE_STREAMS = [
   {
     id: 'ncba_mobile_b2w_fee',
     label: 'NCBA Mobile B2W Fee',
-    description: 'NCBA\'s replacement for Daraja B2C — merchant withdrawals to M-Pesa/Airtel numbers via NCBA\'s Mobile B2W Payment API. NCBA has not published a real cost schedule for this rail; the numbers here are inherited from Safaricom\'s own B2C tariff (getB2cTariff) as a placeholder, not a claim about NCBA\'s actual cost.',
+    description: 'NCBA\'s replacement for Daraja B2C — merchant withdrawals to M-Pesa/Airtel numbers via NCBA\'s Mobile B2W Payment API, billed under the same Mobile Withdrawal tariff as mpesa_b2c_fee (config/mpesaB2cTariffCard.js). NCBA has not published a real cost schedule for this rail, so the Safaricom-cost portion here is inherited from Safaricom\'s own B2C tariff as a placeholder — PayChain\'s own service fee portion is real either way.',
     icon: 'smartphone',
     accent: 'rose',
     tiered: true,
@@ -214,11 +216,11 @@ export const REVENUE_STREAMS = [
   {
     id: 'ncba_lipa_na_mpesa_fee',
     label: 'NCBA Lipa na M-Pesa Fee',
-    description: `PayChain's flat KES ${NCBA_LIPA_NA_MPESA_FLAT_FEE_KES} margin on merchant payouts to another business's Paybill or Till, via NCBA's Lipa na M-Pesa Payment API — NCBA's replacement for Daraja B2B. NCBA hasn't published a cost schedule for this rail, so no NCBA cost passes through; this is PayChain's own charge only. The one stream here actually deducted from a merchant today — see controllers/mpesaController.js#initiateB2B.`,
+    description: 'Tiered B2B PayBill & Till Payout tariff (third-party NCBA + Safaricom B2B cost, plus PayChain\'s own service fee) on merchant payouts to another business\'s Paybill or Till, via NCBA\'s Lipa na M-Pesa Payment API — NCBA\'s replacement for Daraja B2B. See config/lipaNaMpesaTariffCard.js. Charged both on the standalone single-payout endpoint (controllers/mpesaController.js#initiateB2B) and on Bulk Pay\'s Mobile Money -> Paybill/Buy Goods rows.',
     icon: 'point_of_sale',
     accent: 'indigo',
+    tiered: true,
     rate: null,
-    flatFee: NCBA_LIPA_NA_MPESA_FLAT_FEE_KES,
     minFee: 0,
     txTypes: ['ncba_lipa_na_mpesa'],
     statuses: ['completed', 'verified'],
@@ -227,11 +229,11 @@ export const REVENUE_STREAMS = [
   {
     id: 'ncba_kplc_fee',
     label: 'NCBA KPLC Bill Payment Fee',
-    description: `PayChain's flat KES ${NCBA_KPLC_FLAT_FEE_KES} margin on Bulk Pay KPLC (Kenya Power) postpaid bill payments, via NCBA's Open Banking KPLC Payment API. NCBA hasn't published a cost schedule for this rail, so no NCBA cost passes through; this is PayChain's own charge only, distinct from the generic ncba_disbursement_fee stream used by bank and other utility (WATER) bulk payouts.`,
+    description: `PayChain's flat KES ${KPLC_POSTPAID_SERVICE_FEE} service fee on Bulk Pay KPLC (Kenya Power) postpaid bill payments (config/billPaymentTariffCard.js), via NCBA's Open Banking KPLC Payment API — plus a KES 10 third-party bank/aggregator base cost, both charged to the merchant alongside the bill value, distinct from the generic ncba_disbursement_fee stream used by bank and other utility (WATER) bulk payouts.`,
     icon: 'bolt',
     accent: 'amber',
     rate: null,
-    flatFee: NCBA_KPLC_FLAT_FEE_KES,
+    flatFee: KPLC_POSTPAID_SERVICE_FEE,
     minFee: 0,
     txTypes: ['ncba_kplc'],
     statuses: ['completed', 'verified'],
@@ -240,11 +242,11 @@ export const REVENUE_STREAMS = [
   {
     id: 'ncba_kplc_prepaid_fee',
     label: 'NCBA KPLC Prepaid Token Fee',
-    description: `PayChain's flat KES ${NCBA_KPLC_PREPAID_FLAT_FEE_KES} margin on Bulk Pay KPLC (Kenya Power) prepaid electricity token purchases, via NCBA's Open Banking KPLC Prepaid Transaction API. Distinct from ncba_kplc_fee (postpaid bill payments) — NCBA treats prepaid and postpaid as separate products.`,
+    description: 'Tiered PayChain service fee (KES 7-69, plus a KES 5-15 third-party base cost) on Bulk Pay KPLC (Kenya Power) prepaid electricity token purchases, via NCBA\'s Open Banking KPLC Prepaid Transaction API — see config/billPaymentTariffCard.js. Distinct from ncba_kplc_fee (postpaid bill payments) — NCBA treats prepaid and postpaid as separate products.',
     icon: 'bolt',
     accent: 'amber',
+    tiered: true,
     rate: null,
-    flatFee: NCBA_KPLC_PREPAID_FLAT_FEE_KES,
     minFee: 0,
     txTypes: ['ncba_kplc_prepaid'],
     statuses: ['completed', 'verified'],
@@ -253,11 +255,11 @@ export const REVENUE_STREAMS = [
   {
     id: 'ncba_ncwsc_fee',
     label: 'NCBA NCWSC Bill Payment Fee',
-    description: `PayChain's flat KES ${NCBA_NCWSC_FLAT_FEE_KES} margin on Bulk Pay Nairobi Water (NCWSC) bill payments, via NCBA's Open Banking NWSC Payment API. NCBA hasn't published a cost schedule for this rail, so no NCBA cost passes through; this is PayChain's own charge only.`,
+    description: `PayChain's flat KES ${NCWSC_SERVICE_FEE} service fee on Bulk Pay Nairobi Water (NCWSC) bill payments (config/billPaymentTariffCard.js), via NCBA's Open Banking NWSC Payment API — plus a KES 10 third-party bank/aggregator base cost, both charged to the merchant alongside the bill value.`,
     icon: 'water_drop',
     accent: 'sky',
     rate: null,
-    flatFee: NCBA_NCWSC_FLAT_FEE_KES,
+    flatFee: NCWSC_SERVICE_FEE,
     minFee: 0,
     txTypes: ['ncba_ncwsc'],
     statuses: ['completed', 'verified'],
@@ -266,10 +268,11 @@ export const REVENUE_STREAMS = [
   {
     id: 'cash_advance',
     label: 'Cash Advance Fee',
-    description: 'Origination fee on PayChain Cash Advance product (merchant credit line). Pilot stage.',
+    description: 'Tiered origination fee + fixed factor fee on PayChain Cash Advance (Revenue-Based Financing) — see config/cashAdvanceTariffCard.js. Pilot stage: pricing only, not wired to any real disbursement, repayment, or Transaction type yet.',
     icon: 'savings',
     accent: 'violet',
-    rate: CASH_ADVANCE_RATE,
+    tiered: true,
+    rate: null,
     minFee: 0,
     txTypes: [],
     statuses: [],

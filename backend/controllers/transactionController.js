@@ -9,7 +9,7 @@ import { encryptKey } from '../utils/cryptoHelper.js';
 import { getLiveKesToUsdcRate } from '../utils/rateEngine.js';
 import { sendWalletActivationEmail, sendStatementEmail } from '../utils/resend.js';
 import { createNotification } from './notificationController.js';
-import { getCheckoutTotal } from '../utils/pricingEngine.js';
+import { getCheckoutTotal, getInvoiceCheckoutTotal } from '../utils/pricingEngine.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
@@ -673,13 +673,17 @@ export const processPaymentLink = async (req, res) => {
     }
 
     // Checkout initializer: the amount actually prompted on the customer's
-    // handset — base bill + PayChain's customer surcharge (currently 0
-    // until pricing sheets are finalized, see utils/pricingEngine.js).
-    // Computed once, up front, so what the customer sees and approves on
-    // their phone already includes any surcharge — never added silently
-    // after the fact. resolveStkOutcome re-derives the split from this same
-    // total plus link.amount (the base) once the payment is confirmed.
-    const checkoutTotal = getCheckoutTotal(link.amount);
+    // handset — base bill + PayChain's customer-facing markup. Computed
+    // once, up front, so what the customer sees and approves on their phone
+    // already includes any surcharge — never added silently after the fact.
+    // resolveStkOutcome re-derives the split from this same total plus
+    // link.amount (the base) once the payment is confirmed. An
+    // invoice-backed link (link.invoiceId set) uses the Electronic
+    // Invoicing tariff's own Client Markup schedule instead of the standard
+    // Hosted Payment Link one — see utils/pricingEngine.js.
+    const checkoutTotal = link.invoiceId
+      ? getInvoiceCheckoutTotal(link.amount)
+      : getCheckoutTotal(link.amount);
 
     // Real STK Push via NCBA's Till short code 889066 (or simulated — see
     // services/ncbaStkPushService.js's NCBA_STK_LIVE_ENABLED gate).

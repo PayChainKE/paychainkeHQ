@@ -67,6 +67,13 @@ const transactionSchema = new mongoose.Schema({
   // (see utils/pricingEngine.js), so revenue sweeps and pool-balance
   // reconciliation only ever need to read paychainFee.
   customerSurchargeFee: { type: Number, default: 0 },
+  // Same idea as customerSurchargeFee, but for the merchant-side portion of
+  // paychainFee on a paid Invoice specifically (Electronic Invoicing's
+  // "Invoice Service Fee", utils/pricingEngine.js#calculateInvoiceServiceFee)
+  // — deducted from the merchant's net settlement, unlike every other
+  // product's zero-merchant-fee model. Always included inside paychainFee
+  // itself, same convention as customerSurchargeFee.
+  invoiceServiceFee: { type: Number, default: 0 },
   // The merchant's KES balance immediately after this transaction was
   // applied — captured at write time from the atomic $inc's returned
   // document (never recomputed later), same "resulting balance" figure
@@ -95,7 +102,10 @@ const transactionSchema = new mongoose.Schema({
 transactionSchema.pre('save', function() {
   if (this.isNew || this.isModified('amount') || this.isModified('kesAmount') || this.isModified('type')) {
     const basis = this.kesAmount > 0 ? this.kesAmount : this.amount;
-    const { paychainFee, safaricomFee, streamId } = calculateFees(this.type, basis);
+    // settlementRail is only meaningful (and only ever varies the fee) for
+    // 'ncba_outbound' — see feeCalculator.js. Passed through unconditionally
+    // since every other type simply ignores it.
+    const { paychainFee, safaricomFee, streamId } = calculateFees(this.type, basis, this.settlementRail);
     this.paychainFee  = paychainFee;
     this.safaricomFee = safaricomFee;
     this.revenueStream = streamId;
@@ -107,7 +117,7 @@ transactionSchema.pre('save', function() {
 transactionSchema.pre('insertMany', function(docs) {
   for (const doc of docs) {
     const basis = (doc.kesAmount && doc.kesAmount > 0) ? doc.kesAmount : doc.amount;
-    const { paychainFee, safaricomFee, streamId } = calculateFees(doc.type, basis);
+    const { paychainFee, safaricomFee, streamId } = calculateFees(doc.type, basis, doc.settlementRail);
     doc.paychainFee  = paychainFee;
     doc.safaricomFee = safaricomFee;
     doc.revenueStream = streamId;

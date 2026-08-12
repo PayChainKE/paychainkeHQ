@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import Transaction from '../models/Transaction.js';
 import Merchant from '../models/Merchant.js';
 import { safeSendSMS, sendStaggeredSms } from '../utils/smsSanitizer.js';
-import { calculateMerchantFee, processSplitTransaction, splitCustomerSurcharge, getCheckoutTotal, calculateRawC2bMarkup, PricingEngineError } from '../utils/pricingEngine.js';
+import { calculateMerchantFee, processSplitTransaction, processInvoiceSplitTransaction, splitCustomerSurcharge, getCheckoutTotal, calculateRawC2bMarkup, PricingEngineError } from '../utils/pricingEngine.js';
 import { sendInvoicePaidReceiptEmail } from '../utils/resend.js';
 import { settleInflationShield } from '../utils/stellarHelper.js';
 import { getLiveKesToUsdcRate } from '../utils/rateEngine.js';
@@ -16,7 +16,7 @@ import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { claimPayoutSubmission, DuplicateSubmissionError } from '../utils/idempotencyGuard.js';
 import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard.js';
-import { NCBA_LIPA_NA_MPESA_FLAT_FEE_KES } from '../config/revenueRateCard.js';
+import { getLipaNaMpesaTariff } from '../config/lipaNaMpesaTariffCard.js';
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay.js';
 import { AUTO_INFLATION_SHIELD_ENABLED } from '../config/inflationShieldFlag.js';
 import { logAudit } from '../utils/auditLog.js';
@@ -615,10 +615,13 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
           const merchant = link.merchantId;
           if (merchant) {
             // Dual-sided split: stkReq.amount is the TOTAL Safaricom just
-            // confirmed (base + any customer surcharge, from
-            // getCheckoutTotal at checkout-initiation time); link.amount is
-            // the original base bill. Wrapped defensively — this only
-            // throws on a genuine ledger-integrity failure (see
+            // confirmed (base + any customer-facing markup, from
+            // getCheckoutTotal/getInvoiceCheckoutTotal at checkout-initiation
+            // time); link.amount is the original base bill. An
+            // invoice-backed link uses the Electronic Invoicing tariff's own
+            // split (it genuinely charges the merchant an Invoice Service
+            // Fee, unlike every other product here). Wrapped defensively —
+            // this only throws on a genuine ledger-integrity failure (see
             // pricingEngine.js), and by this point Safaricom has already
             // confirmed real money moved, so a calculation bug must never
             // silently swallow the merchant's credit. Falls back to
@@ -629,8 +632,9 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
             let paychainTotalRevenue;
             let customerFee;
             try {
-              ({ merchantFee, merchantNetSettlement, paychainTotalRevenue, customerFee } =
-                processSplitTransaction(stkReq.amount, link.amount));
+              ({ merchantFee, merchantNetSettlement, paychainTotalRevenue, customerFee } = link.invoiceId
+                ? processInvoiceSplitTransaction(stkReq.amount, link.amount)
+                : processSplitTransaction(stkReq.amount, link.amount));
             } catch (splitError) {
               console.error(
                 `🚨 CRITICAL ledger split failure for ${receipt} (STK payment-link ${link.linkId}):`,
@@ -698,6 +702,22 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
               await Transaction.updateOne(
                 { _id: transaction._id },
                 { $inc: { paychainFee: customerFee, customerSurchargeFee: customerFee } }
+              );
+            }
+
+            if (link.invoiceId && merchantFee > 0) {
+              // The Transaction pre-save hook auto-stamps paychainFee from
+              // the generic (disabled) calculateMerchantFee, not
+              // calculateInvoiceServiceFee — so on an invoice-backed link
+              // this doc's paychainFee comes out of Transaction.create as 0
+              // even though the merchant was genuinely charged merchantFee
+              // above (already deducted from merchantNetSettlement / the
+              // $inc into kesBalance). Top it up here the same way
+              // customerFee is, so paychainFee actually reflects total
+              // PayChain revenue on this row, not just the customer side.
+              await Transaction.updateOne(
+                { _id: transaction._id },
+                { $inc: { paychainFee: merchantFee, invoiceServiceFee: merchantFee } }
               );
             }
 
@@ -1183,8 +1203,9 @@ export const initiateB2C = async (req, res) => {
     // hasn't published a real Mobile B2W cost schedule, so this figure is
     // inherited from the Daraja era as a placeholder (see
     // config/mpesaB2cTariffCard.js and revenueRateCard.js's
-    // ncba_mobile_b2w_fee stream), plus PayChain's own flat margin
-    // (PAYCHAIN_B2C_MARKUP), both passed through to the merchant.
+    // ncba_mobile_b2w_fee stream), plus PayChain's own tiered Mobile
+    // Withdrawal service fee (calculateB2cServiceFee), both deducted from
+    // the merchant alongside the withdrawal principal.
     let b2cFee;
     try {
       ({ totalFee: b2cFee } = getB2cTariff(amount));
@@ -1331,13 +1352,12 @@ export const initiateB2B = async (req, res) => {
       throw e;
     }
 
-    // NCBA hasn't published a cost schedule for this rail — this is purely
-    // PayChain's own flat margin (2026-08-11: flat KES fee, not a percentage
-    // cut, per standing instruction). Sourced from the same constant the
-    // Transaction pre-save hook's fee calculator reads
-    // (config/revenueRateCard.js), so the debit and the persisted
-    // paychainFee can never disagree.
-    const fee = NCBA_LIPA_NA_MPESA_FLAT_FEE_KES;
+    // B2B PayBill & Till Payout Tariff (config/lipaNaMpesaTariffCard.js) —
+    // tiered third-party base cost + PayChain service fee. Sourced from the
+    // same tariff the Transaction pre-save hook's fee calculator reads
+    // (utils/feeCalculator.js), so the debit and the persisted paychainFee
+    // can never disagree.
+    const { totalFee: fee } = getLipaNaMpesaTariff(numericAmount);
 
     if (!pin) {
       return res.status(400).json({ error: 'Payment PIN is required.' });
