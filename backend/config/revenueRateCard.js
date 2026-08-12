@@ -73,20 +73,18 @@ export const CASH_ADVANCE_RATE    = 0.025;  // 2.50% — pilot product
 // NCBA Virtual Account collections no longer use a flat linear rate — see
 // config/ncbaTariffCard.js for the tiered Safaricom-cost + markup bands.
 
-// Flat PayChain margin per transaction, one constant per outbound stream.
-// ncba_lipa_na_mpesa is the only one of these actually deducted from a real
-// merchant balance today (controllers/mpesaController.js#initiateB2B) — the
-// rest are currently reporting-only figures on the admin Revenue dashboard
-// (no controller deducts them from a merchant yet), but are still expressed
-// as real flat KES amounts now rather than a phantom percentage-of-amount
+// Flat PayChain margin per transaction, one constant per outbound stream
+// that's still genuinely flat. ncba_lipa_na_mpesa and KPLC (postpaid/
+// prepaid)/NCWSC no longer have their own flat constants here — they're
+// priced via their own tiered tariff cards instead (config/
+// lipaNaMpesaTariffCard.js, config/billPaymentTariffCard.js), both actually
+// deducted from a real merchant balance today. The rest below are still
+// currently reporting-only figures on the admin Revenue dashboard (no
+// controller deducts them from a merchant yet), but are still expressed as
+// real flat KES amounts now rather than a phantom percentage-of-amount
 // figure, so the dashboard shows an honest number pending each rail's own
 // pricing rollout.
-export const NCBA_LIPA_NA_MPESA_FLAT_FEE_KES = 30;
 export const NCBA_DISBURSEMENT_FLAT_FEE_KES  = 50;
-// KPLC (postpaid/prepaid) and NCWSC no longer have their own flat constants
-// here — utils/feeCalculator.js prices them via the Standard Bill Payment
-// Tariff in config/billPaymentTariffCard.js instead (KPLC Prepaid is
-// genuinely tiered, not flat).
 export const STABLECOIN_PAYMENT_FLAT_FEE_KES = 30;
 export const SETTLEMENT_FLAT_FEE_KES         = 20;
 export const MPESA_B2B_LEGACY_FLAT_FEE_KES   = 20;
@@ -217,11 +215,11 @@ export const REVENUE_STREAMS = [
   {
     id: 'ncba_lipa_na_mpesa_fee',
     label: 'NCBA Lipa na M-Pesa Fee',
-    description: `PayChain's flat KES ${NCBA_LIPA_NA_MPESA_FLAT_FEE_KES} margin on merchant payouts to another business's Paybill or Till, via NCBA's Lipa na M-Pesa Payment API — NCBA's replacement for Daraja B2B. NCBA hasn't published a cost schedule for this rail, so no NCBA cost passes through; this is PayChain's own charge only. The one stream here actually deducted from a merchant today — see controllers/mpesaController.js#initiateB2B.`,
+    description: 'Tiered B2B PayBill & Till Payout tariff (third-party NCBA + Safaricom B2B cost, plus PayChain\'s own service fee) on merchant payouts to another business\'s Paybill or Till, via NCBA\'s Lipa na M-Pesa Payment API — NCBA\'s replacement for Daraja B2B. See config/lipaNaMpesaTariffCard.js. Charged both on the standalone single-payout endpoint (controllers/mpesaController.js#initiateB2B) and on Bulk Pay\'s Mobile Money -> Paybill/Buy Goods rows.',
     icon: 'point_of_sale',
     accent: 'indigo',
+    tiered: true,
     rate: null,
-    flatFee: NCBA_LIPA_NA_MPESA_FLAT_FEE_KES,
     minFee: 0,
     txTypes: ['ncba_lipa_na_mpesa'],
     statuses: ['completed', 'verified'],

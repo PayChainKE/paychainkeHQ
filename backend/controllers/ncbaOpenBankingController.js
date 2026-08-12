@@ -26,7 +26,8 @@ import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLocked
 import { claimPayoutSubmission, DuplicateSubmissionError } from '../utils/idempotencyGuard.js';
 import { KENYAN_BANK_CODES } from '../config/kenyanBankCodes.js';
 import { getB2cTariff } from '../config/mpesaB2cTariffCard.js';
-import { NCBA_LIPA_NA_MPESA_FLAT_FEE_KES } from '../config/revenueRateCard.js';
+import { getLipaNaMpesaTariff } from '../config/lipaNaMpesaTariffCard.js';
+import { getKplcPostpaidTariff, getKplcPrepaidTariff, getNcwscTariff } from '../config/billPaymentTariffCard.js';
 
 export class InsufficientFundsError extends Error {
   constructor(merchantId, requested, available) {
@@ -488,17 +489,29 @@ export const handlePesaLinkCallback = async (req, res) => {
     let merchantForSms = null;
     if (!succeeded) {
       // The payout never landed — return the funds to the merchant's balance.
-      // For ncba_mobile_b2w/ncba_lipa_na_mpesa specifically, PayChain's own
-      // fee was ALSO deducted alongside the payout amount at initiation
-      // (mpesaController.js's initiateB2C/initiateB2B) — refunding only
-      // transaction.amount here would permanently cost the merchant that
-      // fee even though the transfer never went through.
+      // For every fee-charging rail on this webhook, PayChain's own fee was
+      // ALSO deducted alongside the payout/bill amount at initiation
+      // (mpesaController.js's initiateB2C/initiateB2B, or
+      // bulkPayController.js's batch debit for the Bulk Pay rows) —
+      // refunding only transaction.amount here would permanently cost the
+      // merchant that fee even though the transfer/bill payment never went
+      // through.
       let refundAmount = transaction.amount;
       if (transaction.type === 'ncba_mobile_b2w') {
         const { totalFee } = getB2cTariff(transaction.amount);
         refundAmount += totalFee;
       } else if (transaction.type === 'ncba_lipa_na_mpesa') {
-        refundAmount += NCBA_LIPA_NA_MPESA_FLAT_FEE_KES;
+        const { totalFee } = getLipaNaMpesaTariff(transaction.amount);
+        refundAmount += totalFee;
+      } else if (transaction.type === 'ncba_kplc') {
+        const { totalFee } = getKplcPostpaidTariff();
+        refundAmount += totalFee;
+      } else if (transaction.type === 'ncba_kplc_prepaid') {
+        const { totalFee } = getKplcPrepaidTariff(transaction.amount);
+        refundAmount += totalFee;
+      } else if (transaction.type === 'ncba_ncwsc') {
+        const { totalFee } = getNcwscTariff();
+        refundAmount += totalFee;
       }
       merchantForSms = await Merchant.findByIdAndUpdate(
         transaction.merchantId,

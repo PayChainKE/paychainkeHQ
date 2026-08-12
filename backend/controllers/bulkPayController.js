@@ -16,6 +16,7 @@ import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLocked
 import { claimPayoutSubmission, DuplicateSubmissionError } from '../utils/idempotencyGuard.js';
 import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard.js';
 import { getKplcPostpaidTariff, getKplcPrepaidTariff, getNcwscTariff } from '../config/billPaymentTariffCard.js';
+import { getLipaNaMpesaTariff } from '../config/lipaNaMpesaTariffCard.js';
 import { validatePhoneNumber } from '../utils/ncbaValidators.js';
 import { validateMobileWalletNumber, submitMobileB2wPayment, validateLipaNaMpesaAccount, submitLipaNaMpesaPayment, validateKplcAccount, submitKplcPayment, validateKplcPrepaidAccount, submitKplcPrepaidPayment, validateNcwscAccount, submitNcwscPayment, NcbaOpenBankingValidationError } from '../services/ncbaOpenBankingService.js';
 import { buildPayoutSentSms } from '../utils/paymentSmsTemplates.js';
@@ -425,6 +426,7 @@ export const authorizeBatch = async (req, res) => {
     let totalTax = 0;
     let totalB2cFee = 0;
     let totalUtilityFee = 0;
+    let totalLnmFee = 0;
 
     for (const row of batchRows) {
       // payeeMatch is a client-supplied Payee _id round-tripped from the
@@ -492,22 +494,35 @@ export const authorizeBatch = async (req, res) => {
         row.utilityFee = 0;
       }
       totalUtilityFee += row.utilityFee;
+
+      // B2B PayBill & Till Payout tariff (config/lipaNaMpesaTariffCard.js)
+      // — same "never actually charged" gap as KPLC/NCWSC above: this row
+      // type (Mobile Money, Paybill/Buy Goods) previously reserved nothing
+      // for its fee at all, unlike the standalone initiateB2B endpoint
+      // (mpesaController.js), which already charged its old flat KES 30.
+      row.isLnmRow = payee.paymentMethod === 'Mobile Money' && payee.mobileMoneyType !== 'Personal Number';
+      if (row.isLnmRow) {
+        ({ totalFee: row.lnmFee } = getLipaNaMpesaTariff(row.netAmount));
+      } else {
+        row.lnmFee = 0;
+      }
+      totalLnmFee += row.lnmFee;
     }
 
-    const totalDebit = Math.round((totalNet + totalB2cFee + totalUtilityFee) * 100) / 100;
+    const totalDebit = Math.round((totalNet + totalB2cFee + totalUtilityFee + totalLnmFee) * 100) / 100;
 
     // 2 & 3. Atomic conditional deduct — avoids two concurrent batch
     // submissions both passing a stale in-memory balance check. Debits
-    // totalDebit (recipient payouts + B2C fees + bill payment fees), not
-    // just totalNet, so the merchant needs enough balance to cover the fees
-    // too, upfront.
+    // totalDebit (recipient payouts + B2C fees + bill payment fees + B2B
+    // PayBill/Till fees), not just totalNet, so the merchant needs enough
+    // balance to cover the fees too, upfront.
     const debitedMerchant = await Merchant.findOneAndUpdate(
       { _id: merchant._id, kesBalance: { $gte: totalDebit } },
       { $inc: { kesBalance: -totalDebit } },
       { returnDocument: 'after' }
     );
     if (!debitedMerchant) {
-      return res.status(400).json({ message: 'Insufficient funds to process this batch, including the applicable B2C and bill payment charges' });
+      return res.status(400).json({ message: 'Insufficient funds to process this batch, including the applicable B2C, bill payment, and B2B PayBill/Till charges' });
     }
     merchant.kesBalance = debitedMerchant.kesBalance;
 
@@ -745,27 +760,28 @@ export const authorizeBatch = async (req, res) => {
         } catch (err) {
           console.error(`❌ NCBA Lipa na M-Pesa rejected payout for ${payee.name}:`, err.message);
           payoutStatus = 'failed';
-          refundAmount += row.netAmount + row.b2cFee;
+          refundAmount += row.netAmount + row.b2cFee + row.lnmFee;
         }
       }
 
-      // Record standard Transaction ledger entry. KPLC (postpaid/prepaid)
-      // and NCWSC rows get their own types ('ncba_kplc'/'ncba_kplc_prepaid'/
-      // 'ncba_ncwsc', each fee-mapped to their own revenue stream) so the
-      // webhook and dashboard can tell them apart from bank payouts; Bank
-      // rows (and any future utilityProvider not yet on a dedicated rail)
-      // share 'ncba_outbound' (fee-mapped to ncba_disbursement_fee in
+      // Record standard Transaction ledger entry. KPLC (postpaid/prepaid),
+      // NCWSC, and Lipa na M-Pesa (Paybill/Till) rows get their own types
+      // ('ncba_kplc'/'ncba_kplc_prepaid'/'ncba_ncwsc'/'ncba_lipa_na_mpesa',
+      // each fee-mapped to their own revenue stream) so the webhook and
+      // dashboard can tell them apart from bank payouts; Bank rows (and any
+      // future utilityProvider not yet on a dedicated rail) share
+      // 'ncba_outbound' (fee-mapped to ncba_disbursement_fee in
       // revenueRateCard.js), matching services/ncbaBulkPaymentService.js's
       // convention, rather than 'bulk_pay' which earns no fee for those.
-      // isKplcRow/isKplcPrepaidRow/isNcwscRow were already computed in the
-      // resolve pass above (where they also drove the fee reserved into
-      // totalDebit) — reused here rather than re-derived, so the two can
-      // never disagree.
+      // isKplcRow/isKplcPrepaidRow/isNcwscRow/isLnmRow were already computed
+      // in the resolve pass above (where they also drove the fee reserved
+      // into totalDebit) — reused here rather than re-derived, so the two
+      // can never disagree.
       const isNcbaRouted = payee.paymentMethod === 'Bank' || (payee.type === 'utility' && payee.utilityProvider);
       const transaction = await Transaction.create({
         merchantId: merchant._id,
         accountNumber: merchant.paybillAccount || 'WALLET_FUND',
-        type: row.isKplcRow ? 'ncba_kplc' : row.isKplcPrepaidRow ? 'ncba_kplc_prepaid' : row.isNcwscRow ? 'ncba_ncwsc' : (isNcbaRouted ? 'ncba_outbound' : 'bulk_pay'),
+        type: row.isKplcRow ? 'ncba_kplc' : row.isKplcPrepaidRow ? 'ncba_kplc_prepaid' : row.isNcwscRow ? 'ncba_ncwsc' : row.isLnmRow ? 'ncba_lipa_na_mpesa' : (isNcbaRouted ? 'ncba_outbound' : 'bulk_pay'),
         amount: row.netAmount,
         kesAmount: row.netAmount,
         currency: 'KES',
@@ -806,6 +822,7 @@ export const authorizeBatch = async (req, res) => {
         status: payoutStatus,
         b2cFee: payoutStatus !== 'failed' ? row.b2cFee : 0,
         utilityFee: payoutStatus !== 'failed' ? row.utilityFee : 0,
+        lnmFee: payoutStatus !== 'failed' ? row.lnmFee : 0,
       });
     }
 

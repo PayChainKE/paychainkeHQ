@@ -16,7 +16,7 @@ import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { claimPayoutSubmission, DuplicateSubmissionError } from '../utils/idempotencyGuard.js';
 import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard.js';
-import { NCBA_LIPA_NA_MPESA_FLAT_FEE_KES } from '../config/revenueRateCard.js';
+import { getLipaNaMpesaTariff } from '../config/lipaNaMpesaTariffCard.js';
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay.js';
 import { AUTO_INFLATION_SHIELD_ENABLED } from '../config/inflationShieldFlag.js';
 import { logAudit } from '../utils/auditLog.js';
@@ -1352,13 +1352,12 @@ export const initiateB2B = async (req, res) => {
       throw e;
     }
 
-    // NCBA hasn't published a cost schedule for this rail — this is purely
-    // PayChain's own flat margin (2026-08-11: flat KES fee, not a percentage
-    // cut, per standing instruction). Sourced from the same constant the
-    // Transaction pre-save hook's fee calculator reads
-    // (config/revenueRateCard.js), so the debit and the persisted
-    // paychainFee can never disagree.
-    const fee = NCBA_LIPA_NA_MPESA_FLAT_FEE_KES;
+    // B2B PayBill & Till Payout Tariff (config/lipaNaMpesaTariffCard.js) —
+    // tiered third-party base cost + PayChain service fee. Sourced from the
+    // same tariff the Transaction pre-save hook's fee calculator reads
+    // (utils/feeCalculator.js), so the debit and the persisted paychainFee
+    // can never disagree.
+    const { totalFee: fee } = getLipaNaMpesaTariff(numericAmount);
 
     if (!pin) {
       return res.status(400).json({ error: 'Payment PIN is required.' });

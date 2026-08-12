@@ -3,6 +3,7 @@ import { getNcbaTariffBand } from '../config/ncbaTariffCard.js';
 import { calculateMerchantFee } from './pricingEngine.js';
 import { getB2cTariff } from '../config/mpesaB2cTariffCard.js';
 import { getKplcPostpaidTariff, getKplcPrepaidTariff, getNcwscTariff } from '../config/billPaymentTariffCard.js';
+import { getLipaNaMpesaTariff } from '../config/lipaNaMpesaTariffCard.js';
 
 // Build the type → stream map once at module load.
 const TYPE_TO_STREAM = (() => {
@@ -111,6 +112,19 @@ export function calculateFees(type, kesAmount) {
       return { paychainFee: 0, safaricomFee: 0, streamId: stream?.id || null };
     }
     const { baseCost, serviceFee } = getNcwscTariff();
+    return { paychainFee: serviceFee, safaricomFee: baseCost, streamId: stream?.id || null };
+  }
+
+  // B2B PayBill/Till payouts (mpesaController.js#initiateB2B, and Bulk
+  // Pay's Mobile Money -> Paybill/Buy Goods rows) — tiered B2B PayBill &
+  // Till Payout tariff, see config/lipaNaMpesaTariffCard.js. Replaces the
+  // old flat KES 30 margin. paychainFee is the service-fee portion only;
+  // safaricomFee holds the third-party NCBA+Safaricom B2B base cost.
+  if (type === 'ncba_lipa_na_mpesa') {
+    if (v <= 0) {
+      return { paychainFee: 0, safaricomFee: 0, streamId: stream?.id || null };
+    }
+    const { baseCost, serviceFee } = getLipaNaMpesaTariff(v);
     return { paychainFee: serviceFee, safaricomFee: baseCost, streamId: stream?.id || null };
   }
 
