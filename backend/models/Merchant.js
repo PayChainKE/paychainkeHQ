@@ -141,6 +141,17 @@ const merchantSchema = new mongoose.Schema({
     unique: true,
     sparse: true,
   },
+  // Cached NCBA Dynamic QR Code for this merchant's open-amount "My
+  // Account" QR (Wallet / My Accounts "Scan to Pay"). Its content
+  // (`till#ncbaMerchantCode`) is fixed once ncbaMerchantCode is assigned,
+  // so generating it fresh from NCBA's live API on every page/modal load
+  // was pure added latency for a real bank-API round trip — cached here on
+  // first generation (see mpesaController.js#generateAccountQr) and served
+  // from Mongo on every subsequent request instead.
+  ncbaAccountQrCodeDataUri: {
+    type: String,
+    default: null,
+  },
   settlementMobile: {
     type: String,
     default: null,

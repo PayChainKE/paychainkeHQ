@@ -1114,11 +1114,22 @@ export const generateQrCheckout = async (req, res) => {
 // @access  Private (merchant)
 export const generateAccountQr = async (req, res) => {
   try {
-    const merchant = await Merchant.findById(req.merchant._id).select('ncbaMerchantCode');
+    const merchant = await Merchant.findById(req.merchant._id).select('ncbaMerchantCode ncbaAccountQrCodeDataUri');
     if (!merchant?.ncbaMerchantCode) {
       return res.status(400).json({ error: 'This merchant has no NCBA virtual account assigned yet.' });
     }
+    // This QR's content never changes once ncbaMerchantCode is assigned, so
+    // a cached copy is always still correct — skip the live NCBA round trip
+    // entirely once one exists (that round trip, repeated on every page/
+    // modal load, was the source of the reported QR loading delay).
+    if (merchant.ncbaAccountQrCodeDataUri) {
+      return res.status(200).json({ success: true, qrCodeDataUri: merchant.ncbaAccountQrCodeDataUri });
+    }
     const { qrCodeDataUri } = await ncbaGenerateQrCode({ amount: undefined, narration: merchant.ncbaMerchantCode });
+    // $set via updateOne, not merchant.save() — the doc above was fetched
+    // with a narrow .select(), and .save() would run full-document
+    // validation against fields that were never loaded.
+    await Merchant.updateOne({ _id: merchant._id }, { $set: { ncbaAccountQrCodeDataUri: qrCodeDataUri } });
     res.status(200).json({ success: true, qrCodeDataUri });
   } catch (error) {
     console.error('❌ Account QR Generate Error:', error.message);
