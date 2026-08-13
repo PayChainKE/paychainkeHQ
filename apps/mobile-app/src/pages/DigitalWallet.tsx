@@ -780,14 +780,14 @@ export default function DigitalWallet({ navigation }: any) {
             </View>
           </View>
 
-          {/* Bank Transfer / EFT / PesaLink — PayChain Account */}
+          {/* Bank Transfer / PesaLink — PayChain Account */}
           <View className="bg-white rounded-[32px] p-6 mb-8 border border-[#eff4ef] shadow-sm shadow-[#00351d]/5">
             <View className="flex-row items-start gap-4 mb-4">
               <View className="w-11 h-11 rounded-2xl bg-blue-50 items-center justify-center">
                 <MaterialIcons name="account-balance" size={20} color="#2563eb" />
               </View>
               <View className="flex-1">
-                <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-[0.2em] text-[#707971] mb-1">Bank Transfer · EFT · PesaLink</Text>
+                <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-[0.2em] text-[#707971] mb-1">Bank Transfer · PesaLink</Text>
                 <Text className="font-jakarta-extrabold text-[16px] text-[#00351d] tracking-tight">PayChain Account</Text>
                 <Text className="text-[#707971] text-[11px] font-jakarta-medium mt-1 leading-relaxed">
                   Customers can also pay directly from their bank using this dedicated account number.
@@ -949,7 +949,7 @@ export default function DigitalWallet({ navigation }: any) {
                 <Feather name="briefcase" size={15} color="#059669" />
                 <Text className="font-jakarta-bold text-[16px] text-[#00351d]">Bank Account</Text>
               </View>
-              <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#00351d]/60 mb-2 ml-1">Bank (for PesaLink/EFT payouts)</Text>
+              <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#00351d]/60 mb-2 ml-1">Bank (for PesaLink/RTGS payouts)</Text>
               <View className="flex-row flex-wrap gap-1.5 mb-4">
                 {bankCodes.length === 0 && (
                   <Text className="text-[#707971] font-jakarta-medium text-[11px] py-2">Loading banks…</Text>

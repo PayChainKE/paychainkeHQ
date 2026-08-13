@@ -69,7 +69,7 @@ export default function SendMoney({ navigation }: any) {
   const [paybillAccountRef, setPaybillAccountRef] = useState('');
   const [bankCode, setBankCode] = useState('');
   const [bankCodes, setBankCodes] = useState<{ code: string; name: string }[]>([]);
-  const [bankRail, setBankRail] = useState<'pesalink' | 'eft' | 'rtgs'>('pesalink');
+  const [bankRail, setBankRail] = useState<'pesalink' | 'rtgs'>('pesalink');
   // RTGS-only fields — see dashboard SendMoney.jsx's equivalent comment.
   const [beneficiaryCountry, setBeneficiaryCountry] = useState('KE');
   const [beneficiaryAddress, setBeneficiaryAddress] = useState('');
@@ -77,17 +77,6 @@ export default function SendMoney({ navigation }: any) {
   // Which mobile wallet network to pay into — see dashboard SendMoney.jsx's
   // equivalent comment.
   const [provider, setProvider] = useState<'safaricom' | 'airtel'>('safaricom');
-  // Optional "look up by phone number" convenience — see dashboard
-  // SendMoney.jsx's equivalent comment for why this can't return an
-  // account number, only a bank + holder's name.
-  const [showPhoneLookup, setShowPhoneLookup] = useState(false);
-  const [lookupPhone, setLookupPhone] = useState('');
-  const [phoneLookup, setPhoneLookup] = useState<{
-    status: 'idle' | 'loading' | 'success' | 'error';
-    destName: string;
-    banks: { bankCode: string; bankName: string; isDefault: boolean }[];
-    error: string;
-  }>({ status: 'idle', destName: '', banks: [], error: '' });
   const [amount, setAmount] = useState('');
   const [reference, setReference] = useState('');
   const [pin, setPin] = useState('');
@@ -117,20 +106,6 @@ export default function SendMoney({ navigation }: any) {
       console.warn('Failed to load bank codes', e);
     }
   }, [bankCodes.length]);
-
-  const handlePhoneLookup = async () => {
-    if (!lookupPhone) return;
-    setPhoneLookup({ status: 'loading', destName: '', banks: [], error: '' });
-    try {
-      const res = await api.post('/api/v1/openbanking/pesalink-lookup-phone', { phoneNumber: lookupPhone });
-      const { destName, banks } = res.data;
-      setPhoneLookup({ status: 'success', destName, banks, error: '' });
-      if (banks.length === 1) setBankCode(banks[0].bankCode);
-      if (!reference) setReference(destName);
-    } catch (e: any) {
-      setPhoneLookup({ status: 'error', destName: '', banks: [], error: e.response?.data?.error || 'Could not look up this number.' });
-    }
-  };
 
   const canContinue = () => {
     if (step === 1) return !!destination;
@@ -331,7 +306,6 @@ export default function SendMoney({ navigation }: any) {
                   <View className="flex-row gap-2">
                     {([
                       { id: 'pesalink', title: 'Instant', hint: 'PesaLink · 24/7' },
-                      { id: 'eft', title: 'Next Business Day', hint: 'EFT · Mon–Fri' },
                       { id: 'rtgs', title: 'International', hint: 'RTGS · ~3 hrs' },
                     ] as const).map((opt) => {
                       const active = bankRail === opt.id;
@@ -353,61 +327,6 @@ export default function SendMoney({ navigation }: any) {
 
               {destination === 'bank' && bankRail !== 'rtgs' && (
                 <View className="mb-5">
-                  {!showPhoneLookup ? (
-                    <TouchableOpacity onPress={() => setShowPhoneLookup(true)} className="mb-3">
-                      <Text className="text-[12px] font-jakarta-bold text-[#00351d] underline">Know their phone number instead?</Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <View className="mb-3 p-4 rounded-2xl bg-[#f7faf7] border border-[#eff4ef]">
-                      <Text className="text-[10px] text-[#707971] font-jakarta-medium leading-relaxed mb-3">
-                        We'll look up which bank this number is registered with for PesaLink. This only confirms the bank and holder's name — you'll still need to enter and confirm the actual account number with them.
-                      </Text>
-                      <View className="flex-row gap-2">
-                        <TextInput
-                          value={lookupPhone}
-                          onChangeText={setLookupPhone}
-                          keyboardType="phone-pad"
-                          placeholder="0712 345 678"
-                          placeholderTextColor="#a1a1aa"
-                          className="flex-1 bg-white border border-[#eff4ef] rounded-2xl px-4 py-3 text-[13px] font-jakarta-bold text-[#00351d]"
-                        />
-                        <TouchableOpacity
-                          onPress={handlePhoneLookup}
-                          disabled={!lookupPhone || phoneLookup.status === 'loading'}
-                          className="px-4 justify-center rounded-2xl bg-[#00351d]"
-                          style={{ opacity: !lookupPhone || phoneLookup.status === 'loading' ? 0.4 : 1 }}
-                        >
-                          <Text className="text-white text-[12px] font-jakarta-bold">
-                            {phoneLookup.status === 'loading' ? 'Looking up…' : 'Look Up'}
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                      {phoneLookup.status === 'success' && (
-                        <View className="mt-3 p-3 rounded-xl bg-[#f0fdf4] border border-[#d1fae5]">
-                          <Text className="text-[12px] font-jakarta-bold text-[#065f46]">{phoneLookup.destName}</Text>
-                          {phoneLookup.banks.length > 1 ? (
-                            <View className="flex-row flex-wrap gap-1.5 mt-2">
-                              {phoneLookup.banks.map((b) => (
-                                <TouchableOpacity
-                                  key={b.bankCode}
-                                  onPress={() => setBankCode(b.bankCode)}
-                                  className={`px-3 py-1.5 rounded-lg border ${bankCode === b.bankCode ? 'bg-[#00351d] border-[#00351d]' : 'bg-white border-[#eff4ef]'}`}
-                                >
-                                  <Text className={`text-[11px] font-jakarta-bold ${bankCode === b.bankCode ? 'text-white' : 'text-[#404942]'}`}>{b.bankName}</Text>
-                                </TouchableOpacity>
-                              ))}
-                            </View>
-                          ) : (
-                            <Text className="text-[11px] text-[#065f46] mt-1">Registered with {phoneLookup.banks[0]?.bankName} — bank selection filled in below.</Text>
-                          )}
-                        </View>
-                      )}
-                      {phoneLookup.status === 'error' && (
-                        <Text className="text-[11px] font-jakarta-bold text-red-600 mt-2">{phoneLookup.error}</Text>
-                      )}
-                    </View>
-                  )}
-
                   <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#00351d]/60 mb-2 ml-1">Bank</Text>
                   <View className="flex-row flex-wrap gap-1.5">
                     {bankCodes.length === 0 && (
@@ -429,7 +348,7 @@ export default function SendMoney({ navigation }: any) {
               {destination === 'bank' && bankRail === 'rtgs' && (
                 <View className="mb-5 p-4 rounded-2xl bg-[#f7faf7] border border-[#eff4ef]">
                   <Text className="text-[11px] text-[#707971] font-jakarta-medium leading-relaxed mb-3">
-                    RTGS sends to banks outside PesaLink/EFT's network, including other East African countries. Settles same business day, ~3 hours. KES only for now.
+                    RTGS sends to banks outside PesaLink's network, including other East African countries. Settles same business day, ~3 hours. KES only for now.
                   </Text>
                   <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#00351d]/60 mb-2">Beneficiary Bank SWIFT Code</Text>
                   <TextInput
@@ -618,7 +537,7 @@ export default function SendMoney({ navigation }: any) {
                   ['Destination', selectedDest?.label || ''],
                   ...(destination === 'bank' && bankRail !== 'rtgs' ? [['Bank', bankCodes.find((b) => b.code === bankCode)?.name || bankCode]] : []),
                   ...(destination === 'bank' && bankRail === 'rtgs' ? [['Beneficiary Bank BIC', bankCode]] : []),
-                  ...(destination === 'bank' ? [['Transfer Speed', bankRail === 'eft' ? 'Next Business Day (EFT)' : bankRail === 'rtgs' ? 'International (RTGS)' : 'Instant (PesaLink)']] : []),
+                  ...(destination === 'bank' ? [['Transfer Speed', bankRail === 'rtgs' ? 'International (RTGS)' : 'Instant (PesaLink)']] : []),
                   ...(destination === 'bank' && bankRail === 'rtgs' ? [['Beneficiary Country', ({ KE: 'Kenya', UG: 'Uganda', TZ: 'Tanzania', RW: 'Rwanda' } as Record<string, string>)[beneficiaryCountry] || beneficiaryCountry]] : []),
                   ...(isMobileDest ? [['Network', provider === 'airtel' ? 'Airtel Money' : 'M-PESA']] : []),
                   ['Recipient', formatPhoneDisplay(recipientAccount)],

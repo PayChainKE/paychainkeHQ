@@ -831,7 +831,7 @@ export const initiateB2C = async (req, res) => {
 //          (ncbaOpenBankingController.js), the same generic webhook that
 //          resolves NCBA's other async payout rails (see
 //          submitLipaNaMpesaPayment's doc comment for why this is treated
-//          as async rather than synchronous like PesaLink/EFT).
+//          as async rather than synchronous like PesaLink).
 // @route   POST /api/callbacks/b2b-request
 // @access  Private (merchant)
 export const initiateB2B = async (req, res) => {

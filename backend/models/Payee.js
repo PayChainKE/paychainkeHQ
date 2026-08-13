@@ -44,7 +44,7 @@ const payeeSchema = new mongoose.Schema(
     bankName: String,
     accountNumber: String,
     // NCBA bank clearing code (see config/kenyanBankCodes.js) — required to
-    // route this payee's payout through NCBA PesaLink/EFT when
+    // route this payee's payout through NCBA PesaLink/RTGS when
     // paymentMethod === 'Bank'.
     bankCode: String,
 

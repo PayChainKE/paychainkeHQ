@@ -512,7 +512,7 @@ export const authorizeBatch = async (req, res) => {
 
       // Interbank Transfer tariff (config/bankTransferTariffCard.js) — Bank
       // rows previously charged nothing beyond the transfer principal, same
-      // gap as the other rails above. Bulk Pay never requests EFT/RTGS
+      // gap as the other rails above. Bulk Pay never requests RTGS
       // explicitly (submitNcbaBankTransfer defaults to 'pesalink'), so
       // every Bank row prices as PesaLink — except a destination that's
       // NCBA's own bank code, which gets forced onto the (unpriced) IFT
@@ -675,7 +675,7 @@ export const authorizeBatch = async (req, res) => {
               amount: row.netAmount,
               name: payee.name,
             });
-            // Unlike PesaLink/EFT below, NCBA's Bulk H2H "BILLPAY" rail is
+            // Unlike PesaLink below, NCBA's Bulk H2H "BILLPAY" rail is
             // asynchronous — a successful submission only means NCBA
             // accepted the instruction, not that the bill is paid yet.
             // payoutStatus stays 'pending' (its default above).

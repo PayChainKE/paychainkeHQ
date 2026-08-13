@@ -108,7 +108,7 @@ const messages = [
     message: `NCBA-BAT-TEST-1 NCBA Bulk Payout Submitted. KES 8,000 to 2 recipients on ${date} at ${time}. New balance: KES 160,000.`,
   },
   {
-    label: 'NCBA PesaLink/EFT bank payout sent (ncbaOpenBankingController.js handleBankPayout)',
+    label: 'NCBA PesaLink/RTGS bank payout sent (ncbaOpenBankingController.js handleBankPayout)',
     message: `TESTREF1 Bank Payout Sent. KES 12,000 paid to Jane Supplier Ltd on ${date} at ${time}. New balance: KES 168,000.`,
   },
   {
