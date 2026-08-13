@@ -92,7 +92,6 @@ export default function CashAdvanceRequests() {
         const haystack = [
           request.merchantName,
           request.merchantEmail,
-          request.paybillAccount,
           request.purpose,
           request.manager,
         ].filter(Boolean).join(' ').toLowerCase();
@@ -305,7 +304,7 @@ export default function CashAdvanceRequests() {
                             <Avatar name={request.merchantName} />
                             <div>
                               <p className="font-bold text-xs text-on-surface tracking-tight">{request.merchantName}</p>
-                              <p className="text-2xs text-on-surface-variant/55">{request.paybillAccount ? `Acc #${request.paybillAccount} · ` : ''}{request.merchantEmail}</p>
+                              <p className="text-2xs text-on-surface-variant/55">{request.merchantEmail}</p>
                             </div>
                           </div>
                         </Td>
@@ -430,7 +429,6 @@ export default function CashAdvanceRequests() {
                   )}
 
                   <div className="mt-4 space-y-2.5 text-xs text-on-surface-variant/70">
-                    <Row label="Account No." value={selectedRequest.paybillAccount ? `#${selectedRequest.paybillAccount}` : '—'} />
                     <Row label="Assigned analyst" value={selectedRequest.manager} />
                     <Row label="Last decision" value={formatDateISO(selectedRequest.updatedAt)} />
                     <Row label="Admin notes" value={selectedRequest.notes} />

@@ -885,7 +885,7 @@ const DetailDrawer = ({ entry, notes, onNotesChange, onSaveNotes, saving, saved,
             {entry.convertedMerchantId && (
               <Row label="Merchant Record" value={
                 <span className="font-mono text-xs bg-violet-50 text-violet-700 px-2 py-0.5 rounded border border-violet-200">
-                  {entry.convertedMerchantId.paybillAccount ? `#${entry.convertedMerchantId.paybillAccount}` : 'Linked'}
+                  Linked
                 </span>
               } />
             )}

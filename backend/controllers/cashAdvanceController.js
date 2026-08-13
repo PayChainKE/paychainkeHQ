@@ -126,7 +126,6 @@ const toAdminShape = (app, statsByMerchant) => {
     merchantId,
     merchantName: merchant.businessName || merchant.name || 'Unknown merchant',
     merchantEmail: merchant.email || null,
-    paybillAccount: merchant.paybillAccount || null,
     requestedAmount: app.requestedAmount,
     approvedLimit: app.approvedLimit,
     tenorDays: app.tenorDays,
@@ -180,7 +179,7 @@ async function computeMerchantStats(merchantIds) {
 export const adminListCashAdvanceRequests = async (req, res) => {
   try {
     const applications = await CashAdvanceApplication.find({})
-      .populate('merchant', 'businessName name email paybillAccount')
+      .populate('merchant', 'businessName name email')
       .populate('reviewedBy', 'email')
       .sort('-createdAt')
       .lean();

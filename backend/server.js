@@ -24,7 +24,6 @@ import smsRoutes from './routes/smsRoutes.js';
 import { ensurePrimaryOwner } from './migrations/ensurePrimaryOwner.js';
 import { backfillTransactionFees } from './migrations/backfillTransactionFees.js';
 import { backfillNcbaMerchantCodes } from './migrations/backfillNcbaMerchantCodes.js';
-import { fixPaybillAccountSparseIndex } from './migrations/fixPaybillAccountSparseIndex.js';
 import { checkAndSendDormancyReminders } from './services/dormancyReminderService.js';
 import { runWeeklyRevenueSweepIfDue } from './services/revenueSweepService.js';
 
@@ -236,7 +235,6 @@ async function bootstrap() {
     await ensurePrimaryOwner();
     await backfillTransactionFees();
     await backfillNcbaMerchantCodes();
-    await fixPaybillAccountSparseIndex();
   } catch (error) {
     // Hard-exiting on a failed initial connection only makes sense for a
     // traditional long-running deploy — killing the process is meaningless

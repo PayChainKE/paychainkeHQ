@@ -894,8 +894,8 @@ export default function BulkPay() {
       // Transform response to match frontend receipts. `status` is carried
       // through now — it used to be dropped here, so every receipt card
       // rendered as "Confirmed / Settled" even for rows that actually
-      // failed (blocked/rejected by Daraja or NCBA) and were refunded back
-      // to the merchant's balance. See the status-aware rendering below.
+      // failed (blocked/rejected by NCBA) and were refunded back to the
+      // merchant's balance. See the status-aware rendering below.
       const newReceipts = processedBatch.transactions.map(tx => ({
         id: tx.receiptNumber,
         name: tx.name,
@@ -1834,7 +1834,7 @@ export default function BulkPay() {
                   <h4 className="text-sm font-bold text-primary uppercase tracking-widest mb-6">Select Funding Source</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {[
-                      { id: 'TILL_1', name: merchant?.businessName || 'Main Business Till', balance: merchant?.kesBalance ?? 0, number: merchant?.paybillAccount || '852300' },
+                      { id: 'TILL_1', name: merchant?.businessName || 'Main Business Till', balance: merchant?.kesBalance ?? 0, number: '889066' },
                     ].map(till => (
                       <div 
                         key={till.id}

@@ -11,7 +11,6 @@ const safeMerchant = (m) => m && ({
   businessName: m.businessName,
   name: m.name,
   phone: m.phone,
-  paybillAccount: m.paybillAccount,
   status: m.status,
   flagged: m.flagged,
 });
@@ -54,7 +53,7 @@ export const getCommunications = async (req, res) => {
         .sort('-occurredAt')
         .skip((page - 1) * limit)
         .limit(limit)
-        .populate('merchant', 'businessName name phone paybillAccount status flagged')
+        .populate('merchant', 'businessName name phone status flagged')
         .lean(),
 
       Communication.countDocuments({ occurredAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } }),
@@ -149,7 +148,7 @@ export const updateCommunication = async (req, res) => {
     if (req.body.assignedTo === null) update.assignedTo = null;
 
     const doc = await Communication.findByIdAndUpdate(req.params.id, { $set: update }, { returnDocument: 'after' })
-      .populate('merchant', 'businessName name phone paybillAccount status flagged')
+      .populate('merchant', 'businessName name phone status flagged')
       .lean();
     if (!doc) return res.status(404).json({ error: 'Not found' });
 
@@ -180,7 +179,7 @@ export const addCommunicationNote = async (req, res) => {
       req.params.id,
       { $push: { notes: note } },
       { returnDocument: 'after' }
-    ).populate('merchant', 'businessName name phone paybillAccount status flagged').lean();
+    ).populate('merchant', 'businessName name phone status flagged').lean();
     if (!doc) return res.status(404).json({ error: 'Not found' });
 
     res.json({ success: true, data: doc });

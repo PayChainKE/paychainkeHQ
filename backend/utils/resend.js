@@ -287,7 +287,7 @@ export const sendWalletActivationEmail = async (email, name, stellarPublicKey) =
 // getNcbaVirtualAccountNumber. Null until NCBA_INSTITUTION_PREFIX is
 // configured (NCBA hasn't assigned it yet); rendered as a pending state
 // rather than a fake/placeholder number.
-export const sendWelcomeEmail = async (email, name, password, phone, paybillAccount, ncbaVirtualAccountNumber, ncbaMerchantCode, businessName) => {
+export const sendWelcomeEmail = async (email, name, password, phone, ncbaVirtualAccountNumber, ncbaMerchantCode, businessName) => {
   const firstName = (name || '').split(' ')[0] || 'Merchant';
   // Full 12-digit virtual account is unavailable until NCBA assigns the
   // institution prefix — until then, customers can pay using the 8-digit
@@ -610,7 +610,7 @@ export const sendAdminActionOTP = async (email, otp, actionLabel, target) => {
 
 // Send Merchant Invite (Admin-Onboarded) — credentialless invite with a
 // single-use, time-limited setup link. We never send the password in the email.
-export const sendMerchantInvite = async (email, name, businessName, paybillAccount, setupLink, ncbaVirtualAccountNumber, ncbaMerchantCode) => {
+export const sendMerchantInvite = async (email, name, businessName, setupLink, ncbaVirtualAccountNumber, ncbaMerchantCode) => {
   const accountDisplay = formatAccountNumberDisplay(ncbaVirtualAccountNumber || ncbaMerchantCode || 'Pending assignment');
   const accountIsInterim = !ncbaVirtualAccountNumber && !!ncbaMerchantCode;
 

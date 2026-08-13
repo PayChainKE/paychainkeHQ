@@ -108,12 +108,6 @@ export const registerMerchant = async (req, res) => {
     const certificateUrl = certificateFile ? certificateFile.path : null;
     const otp = crypto.randomInt(100000, 1000000).toString();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
-    // paybillAccount (the old 5-digit shared-Paybill sub-account) is
-    // deliberately no longer assigned to new merchants — the live payment
-    // rail is the NCBA virtual account (ncbaMerchantCode), auto-assigned by
-    // the Merchant model's pre-save hook. See RetiredMerchantCode.js /
-    // PR history for why the field itself is kept (existing merchants still
-    // have one) rather than dropped from the schema.
 
     const merchant = await Merchant.create({
       name,
@@ -133,7 +127,7 @@ export const registerMerchant = async (req, res) => {
     });
 
     console.log(`📧 Dispatching Welcome Email to: ${merchant.email}`);
-    sendWelcomeEmail(merchant.email, merchant.name, password, merchant.phone, merchant.paybillAccount, getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode), merchant.ncbaMerchantCode, merchant.businessName).catch(err => {
+    sendWelcomeEmail(merchant.email, merchant.name, password, merchant.phone, getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode), merchant.ncbaMerchantCode, merchant.businessName).catch(err => {
       console.error(`📧 Resend Error: Failed to send Welcome Email to ${merchant.email}:`, err);
     });
 
@@ -167,7 +161,6 @@ export const registerMerchant = async (req, res) => {
         phone: 'phone number',
         kraPin: 'KRA PIN',
         businessNumber: 'business registration number',
-        paybillAccount: 'paybill account',
       };
       const label = labels[key] || 'detail';
       return res.status(400).json({ error: `A merchant with that ${label} already exists.` });
@@ -234,7 +227,6 @@ export const verifyMerchantOTP = async (req, res) => {
         email: merchant.email,
         phone: merchant.phone,
         businessName: merchant.businessName,
-        paybillAccount: merchant.paybillAccount,
         // NCBA virtual account — ncbaVirtualAccountNumber is null until
         // NCBA_INSTITUTION_PREFIX is configured (i.e. until NCBA actually
         // assigns PayChain's 4-digit code); render that as "pending bank
@@ -835,7 +827,6 @@ export const getMerchantMe = async (req, res) => {
         email: merchant.email,
         phone: merchant.phone,
         businessName: merchant.businessName,
-        paybillAccount: merchant.paybillAccount,
         // NCBA virtual account — ncbaVirtualAccountNumber is null until
         // NCBA_INSTITUTION_PREFIX is configured (i.e. until NCBA actually
         // assigns PayChain's 4-digit code); render that as "pending bank
@@ -935,7 +926,6 @@ export const updateMerchantProfile = async (req, res) => {
         email: merchant.email,
         phone: merchant.phone,
         businessName: merchant.businessName,
-        paybillAccount: merchant.paybillAccount,
         // NCBA virtual account — ncbaVirtualAccountNumber is null until
         // NCBA_INSTITUTION_PREFIX is configured (i.e. until NCBA actually
         // assigns PayChain's 4-digit code); render that as "pending bank
@@ -1074,7 +1064,7 @@ export const setupPassword = async (req, res) => {
     // Send confirmation email with their official credentials so the merchant
     // has a record of their username (email/phone) and the password they just set.
     // Fire-and-forget — never block the response on email delivery.
-    sendWelcomeEmail(merchant.email, merchant.name, password, merchant.phone, merchant.paybillAccount, getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode), merchant.ncbaMerchantCode, merchant.businessName)
+    sendWelcomeEmail(merchant.email, merchant.name, password, merchant.phone, getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode), merchant.ncbaMerchantCode, merchant.businessName)
       .catch((err) => console.error(`📧 Failed to send credentials email to ${merchant.email}:`, err));
 
     res.json({ success: true, message: 'Password set successfully. You can now sign in.' });

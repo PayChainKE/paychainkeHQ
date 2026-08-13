@@ -62,7 +62,7 @@ export const getWaitlist = async (req, res) => {
     const entries = await Waitlist.find({})
       .sort({ priority: -1, createdAt: -1 })
       .populate('updatedBy', 'email')
-      .populate('convertedMerchantId', 'email businessName paybillAccount')
+      .populate('convertedMerchantId', 'email businessName')
       .lean();
     res.json(entries);
   } catch (error) {
@@ -275,7 +275,7 @@ export const convertWaitlistEntry = async (req, res) => {
     });
 
     const setupLink = `${MERCHANT_DASHBOARD_URL.replace(/\/$/, '')}/setup-password?token=${rawToken}`;
-    sendMerchantInvite(entry.email, entry.fullName, entry.businessName, null, setupLink, getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode), merchant.ncbaMerchantCode)
+    sendMerchantInvite(entry.email, entry.fullName, entry.businessName, setupLink, getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode), merchant.ncbaMerchantCode)
       .catch((err) => console.error('Convert: invite email failed:', err));
 
     entry.status = 'converted';

@@ -854,7 +854,6 @@ const Revenue = () => {
                               <div className="font-bold text-on-surface truncate max-w-[280px]">{m.businessName || '—'}</div>
                               <div className="text-2xs text-on-surface-variant truncate max-w-[280px]">
                                 {m.email}
-                                {m.paybillAccount ? <span className="ml-2 font-mono text-on-surface-variant">·{m.paybillAccount}</span> : null}
                               </div>
                             </Link>
                           </td>

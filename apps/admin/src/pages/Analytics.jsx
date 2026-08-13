@@ -427,7 +427,7 @@ const TopMerchantsTable = ({ rows }) => {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-bold text-on-surface tracking-tight truncate">{m.businessName}</p>
-              <p className="text-2xs text-on-surface-variant/60 font-mono">#{m.paybillAccount || '—'} · {fmtNum(m.txnCount)} txns</p>
+              <p className="text-2xs text-on-surface-variant/60 font-mono">{fmtNum(m.txnCount)} txns</p>
               <div className="h-1 bg-surface-container-low rounded-full overflow-hidden mt-1.5">
                 <div className="h-full bg-gradient-to-r from-primary to-emerald-500 rounded-full" style={{ width: `${pct}%` }}></div>
               </div>

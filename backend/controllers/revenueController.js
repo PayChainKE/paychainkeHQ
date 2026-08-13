@@ -246,7 +246,6 @@ export const getRevenue = async (req, res) => {
           merchantId: '$_id',
           businessName: '$merchant.businessName',
           email: '$merchant.email',
-          paybillAccount: '$merchant.paybillAccount',
           status: '$merchant.status',
           revenue: { $round: ['$revenue', 2] },
           volume:  { $round: ['$volume', 2] },

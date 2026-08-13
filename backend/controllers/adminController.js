@@ -350,16 +350,13 @@ export const confirmMerchantAction = async (req, res) => {
         message: `Account permanently deleted — "${merchant.businessName || merchant.email}"`,
         merchant, actor: adminActor(admin), req,
       });
-      // Retire this merchant's account-identifier codes permanently, before
-      // deleting them, so the random generators for ncbaMerchantCode/
-      // paybillAccount never hand them out to a future, unrelated merchant
-      // (see RetiredMerchantCode.js for why that matters).
+      // Retire this merchant's NCBA account code permanently, before
+      // deleting it, so the random generator never hands it out to a
+      // future, unrelated merchant (see RetiredMerchantCode.js for why
+      // that matters).
       const retirements = [];
       if (merchant.ncbaMerchantCode) {
         retirements.push({ type: 'ncbaMerchantCode', code: merchant.ncbaMerchantCode, formerMerchantId: merchant._id, formerBusinessName: merchant.businessName || null });
-      }
-      if (merchant.paybillAccount) {
-        retirements.push({ type: 'paybillAccount', code: merchant.paybillAccount, formerMerchantId: merchant._id, formerBusinessName: merchant.businessName || null });
       }
 
       await Promise.all([
@@ -864,7 +861,6 @@ export const getMerchantDetail = async (req, res) => {
         businessNumber: merchant.businessNumber,
         certificateUrl: merchant.certificateUrl,
         // Account
-        paybillAccount: merchant.paybillAccount,
         // The raw 8-digit code NCBA's Account-Level Notification webhook
         // matches against (extractMerchantCode in
         // utils/ncbaAccountNotificationValidators.js) — needed for NCBA to
@@ -993,29 +989,12 @@ export const createMerchant = async (req, res) => {
       return res.status(409).json({ error: 'A merchant with that business registration number already exists.' });
     }
 
-    // paybillAccount (the old 5-digit shared-Paybill sub-account) is
-    // deliberately no longer assigned to new merchants — the live payment
-    // rail is the NCBA virtual account (ncbaMerchantCode), auto-assigned by
-    // the Merchant model's pre-save hook. The one exception is demo/evidence
-    // merchants below: they need a paybillAccount specifically so the
-    // legacy Safaricom Daraja C2B confirmationURL webhook (which still
-    // matches BillRefNumber against this field) can find them — that's the
-    // Stellar grant deliverable's specified trigger path, separate from the
-    // NCBA rail real merchants use.
-    let demoPaybillAccount = null;
-    if (isDemoMerchant) {
-      const MAX_ATTEMPTS = 10;
-      for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-        const candidate = String(Math.floor(10000 + Math.random() * 90000));
-        if (!(await Merchant.exists({ paybillAccount: candidate }))) {
-          demoPaybillAccount = candidate;
-          break;
-        }
-      }
-      if (!demoPaybillAccount) {
-        return res.status(500).json({ error: 'Could not generate a unique demo paybill account. Try again.' });
-      }
-    }
+    // paybillAccount (the old 5-digit shared-Paybill sub-account) is no
+    // longer assigned to any merchant, including demo ones — it existed
+    // only to let the (now-removed) Safaricom Daraja C2B confirmationURL
+    // webhook match an incoming payment's BillRefNumber to a merchant. The
+    // live payment rail for everyone is the NCBA virtual account
+    // (ncbaMerchantCode), auto-assigned by the Merchant model's pre-save hook.
 
     // Generate a 32-byte raw token (URL-safe) and store only its sha256.
     const rawToken = crypto.randomBytes(32).toString('hex');
@@ -1035,7 +1014,6 @@ export const createMerchant = async (req, res) => {
       passwordResetToken: hashedToken,
       passwordResetExpires: expires,
       isDemoMerchant,
-      paybillAccount: demoPaybillAccount,
     });
 
     // Deliverable 1 of the Stellar grant pipeline: a demo merchant's testnet
@@ -1065,7 +1043,7 @@ export const createMerchant = async (req, res) => {
 
     const setupLink = `${MERCHANT_DASHBOARD_URL.replace(/\/$/, '')}/setup-password?token=${rawToken}`;
 
-    sendMerchantInvite(email, name, businessName, null, setupLink, getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode), merchant.ncbaMerchantCode).catch((err) => {
+    sendMerchantInvite(email, name, businessName, setupLink, getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode), merchant.ncbaMerchantCode).catch((err) => {
       console.error(`📧 Failed to send invite to ${email}:`, err);
     });
 
@@ -1084,7 +1062,6 @@ export const createMerchant = async (req, res) => {
         email: merchant.email,
         phone: merchant.phone,
         businessName: merchant.businessName,
-        paybillAccount: merchant.paybillAccount,
         ncbaMerchantCode: merchant.ncbaMerchantCode,
         ncbaVirtualAccountNumber: getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode),
         isDemoMerchant: merchant.isDemoMerchant,
@@ -1102,7 +1079,6 @@ export const createMerchant = async (req, res) => {
         phone: 'phone number',
         kraPin: 'KRA PIN',
         businessNumber: 'business registration number',
-        paybillAccount: 'paybill account',
       };
       const label = labels[key] || 'detail';
       return res.status(409).json({ error: `A merchant with that ${label} already exists.` });
@@ -1161,7 +1137,7 @@ export const getLedger = async (req, res) => {
         .sort('-createdAt')
         .skip((page - 1) * limit)
         .limit(limit)
-        .populate('merchantId', 'businessName paybillAccount status flagged')
+        .populate('merchantId', 'businessName status flagged')
         .lean(),
       // Aggregates over the FULL range (ignore q/type/status filters so KPIs reflect headline performance, not user's view)
       Transaction.aggregate([
@@ -1249,7 +1225,6 @@ export const getLedger = async (req, res) => {
             ? {
                 _id: t.merchantId._id,
                 businessName: t.merchantId.businessName,
-                paybillAccount: t.merchantId.paybillAccount,
                 status: t.merchantId.status,
                 flagged: t.merchantId.flagged,
               }
@@ -1523,7 +1498,7 @@ export const getInsights = async (req, res) => {
     ]);
     const topMerchantIds = topMerchantsRaw.map((r) => r._id);
     const topMerchantDocs = await Merchant.find({ _id: { $in: topMerchantIds } })
-      .select('businessName name paybillAccount status flagged')
+      .select('businessName name status flagged')
       .lean();
     const docMap = new Map(topMerchantDocs.map((d) => [String(d._id), d]));
     const topMerchants = topMerchantsRaw.map((row) => {
@@ -1532,7 +1507,6 @@ export const getInsights = async (req, res) => {
         _id: row._id,
         businessName: doc.businessName || '— Unknown —',
         name: doc.name || '',
-        paybillAccount: doc.paybillAccount || '',
         status: doc.status || 'active',
         flagged: !!doc.flagged,
         txnCount: row.txnCount,

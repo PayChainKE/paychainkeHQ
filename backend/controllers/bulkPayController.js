@@ -804,14 +804,14 @@ export const authorizeBatch = async (req, res) => {
       const isNcbaRouted = payee.paymentMethod === 'Bank' || (payee.type === 'utility' && payee.utilityProvider);
       const transaction = await Transaction.create({
         merchantId: merchant._id,
-        accountNumber: merchant.paybillAccount || 'WALLET_FUND',
+        accountNumber: merchant.ncbaMerchantCode || 'WALLET_FUND',
         type: row.isKplcRow ? 'ncba_kplc' : row.isKplcPrepaidRow ? 'ncba_kplc_prepaid' : row.isNcwscRow ? 'ncba_ncwsc' : row.isLnmRow ? 'ncba_lipa_na_mpesa' : (isNcbaRouted ? 'ncba_outbound' : 'bulk_pay'),
         amount: row.netAmount,
         kesAmount: row.netAmount,
         currency: 'KES',
         status: payoutStatus,
         reference: payoutRef,
-        sender: { name: merchant.businessName, id: merchant.paybillAccount },
+        sender: { name: merchant.businessName, id: merchant.ncbaMerchantCode },
         recipient: { name: payee.name, id: (payee.type === 'utility' && payee.utilityProvider) ? payee.accountNumber : (payee.phone || payee.paybillNumber || payee.tillNumber) },
         mobileNetwork: (payee.paymentMethod === 'Mobile Money' && payee.mobileMoneyType === 'Personal Number')
           ? (payee.mobileNetwork === 'airtel' ? 'airtel' : 'safaricom')

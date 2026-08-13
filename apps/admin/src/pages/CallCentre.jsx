@@ -445,7 +445,6 @@ const DetailPanel = ({ item, onClose, onStatus, onPriority, onDelete, noteText, 
             <div className="flex-1 min-w-0">
               <p className="text-2xs font-bold uppercase tracking-widest text-emerald-700 mb-0.5">Matched Merchant</p>
               <p className="font-bold text-on-surface text-sm truncate">{item.merchant.businessName}</p>
-              {item.merchant.paybillAccount && <p className="text-2xs text-on-surface-variant/60 font-mono">Acc #{item.merchant.paybillAccount}</p>}
             </div>
             {item.merchant.flagged && (
               <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-red-50 text-red-700 border border-red-200 text-2xs font-bold uppercase tracking-widest">

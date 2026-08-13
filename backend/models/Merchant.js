@@ -121,13 +121,6 @@ const merchantSchema = new mongoose.Schema({
     ref: 'Admin',
     default: null,
   },
-  paybillAccount: {
-    type: String,
-    unique: true,
-    sparse: true,
-    minlength: 5,
-    maxlength: 5,
-  },
   // PayChain's 8-digit half of the NCBA Virtual Account number — NCBA
   // concatenates its own 4-digit institution prefix with this to form the
   // full 12-digit virtual account merchants receive M-Pesa/EFT/PesaLink
