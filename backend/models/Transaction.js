@@ -82,10 +82,13 @@ const transactionSchema = new mongoose.Schema({
   balanceAfter: { type: Number, default: null },
   // Which NCBA local/cross-border bank rail settled this transfer — only
   // meaningful for 'ncba_outbound' bank payouts, which can go via PesaLink
-  // (immediate, 24/7/365), EFT (T+1, business days only), RTGS (T+3
-  // hours, cross-border/multi-currency), or IFT (Internal Funds Transfer,
-  // used when the destination account is itself at NCBA). Null for every
-  // other transaction type.
+  // (immediate, 24/7/365), RTGS (T+3 hours, cross-border/multi-currency),
+  // or IFT (Internal Funds Transfer, used when the destination account is
+  // itself at NCBA). Null for every other transaction type. EFT was
+  // removed as a supported rail (2026-08-13) — NCBA's EFT endpoint
+  // rejected the confirmed PesaLink bank code with BIC_NOT_FOUND, and no
+  // working code/format was found; kept in the enum below only so any
+  // pre-existing 'eft' rows from before the removal stay schema-valid.
   settlementRail: { type: String, enum: ['pesalink', 'eft', 'rtgs', 'ift', null], default: null },
   // Which mobile money network the recipient's wallet is on — only
   // meaningful for 'ncba_mobile_b2w' payouts, which can target either

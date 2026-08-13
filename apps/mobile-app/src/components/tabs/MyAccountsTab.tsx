@@ -86,7 +86,7 @@ export default function MyAccountsTab() {
       // code, already safe to use as an interim account number (PayChain's
       // webhook matches it inside NCBA's Narrative field).
       accountNumber: merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending bank assignment',
-      type: 'M-Pesa / Bank / EFT / PesaLink',
+      type: 'M-Pesa / Bank / PesaLink',
       name: merchant?.businessName || 'Merchant',
       // NCBA's real M-Pesa Paybill business number — how a customer sends
       // money into the account number above via M-Pesa.

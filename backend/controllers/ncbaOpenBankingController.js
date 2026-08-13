@@ -4,9 +4,7 @@ import Transaction from '../models/Transaction.js';
 import PayoutBatch from '../models/PayoutBatch.js';
 import {
   validatePesaLinkAccount,
-  validatePesaLinkMobileNumber,
   submitPesaLinkTransfer,
-  submitEftTransfer,
   submitRtgsTransfer,
   submitInternalNcbaTransfer,
   NcbaOpenBankingValidationError,
@@ -45,19 +43,22 @@ function logEvent(level, event, fields) {
 }
 
 /**
- * Validates the destination and submits a bank transfer via any of NCBA's
- * three local/cross-border bank rails. Pure submit-only helper — does NOT
- * touch Merchant balance or create a Transaction record, so it's safe to
- * call from contexts that already manage their own balance reservation
+ * Validates the destination and submits a bank transfer via either of
+ * NCBA's local bank rails. Pure submit-only helper — does NOT touch
+ * Merchant balance or create a Transaction record, so it's safe to call
+ * from contexts that already manage their own balance reservation
  * (bulkPayController.authorizeBatch's Bank branch reserves the whole
  * batch's total upfront, one level above this per-row call).
  *
- * @param {'pesalink'|'eft'|'rtgs'} [rail='pesalink'] - 'pesalink' settles
- *        immediately, 24/7/365, Kenya/KES only; 'eft' settles next business
- *        day (T+1), Mon-Fri only, Kenya/KES only; 'rtgs' settles T+3 hours
- *        same business day, supports KE/UG/TZ/RW beneficiaries in seven
- *        currencies, and has no maximum amount cap (only pesalink/eft are
- *        bounded at KES 999,999).
+ * EFT was removed as a supported rail (2026-08-13) — a real UAT submit
+ * test against NCBA's confirmed PesaLink bank code came back
+ * BIC_NOT_FOUND, and no working code/format was found for it. Only
+ * PesaLink and RTGS are offered.
+ *
+ * @param {'pesalink'|'rtgs'} [rail='pesalink'] - 'pesalink' settles
+ *        immediately, 24/7/365, Kenya/KES only, bounded at KES 999,999;
+ *        'rtgs' settles T+3 hours same business day, supports KE/UG/TZ/RW
+ *        beneficiaries in seven currencies, and has no maximum amount cap.
  * @param {string} [beneficiaryCountry] - required for rail:'rtgs' (KE/UG/TZ/RW)
  * @param {string} [beneficiaryAddress] - used for rail:'rtgs' only
  * @param {string} [creditCurrency] - used for rail:'rtgs' only, defaults 'KES'
@@ -67,22 +68,17 @@ function logEvent(level, event, fields) {
  *        UAT Guide, so this falls back to their own sample value ('MSC')
  *        when not provided — see submitRtgsTransfer.
  *
- * The account-validation call (validatePesaLinkAccount) is reused for
- * pesalink/eft: NCBA's UAT Guide documents only one "Request for Account
- * Number Validation" endpoint, positioned ahead of the PesaLink section but
- * generic over bankCode/accountNumber — there is no separate EFT-specific
- * validation call documented, and skipping validation entirely for EFT
- * would leave that rail with no typo protection at all. RTGS has no
- * documented validation endpoint at all (its BeneficiaryBankBIC is a real
- * SWIFT code, not a CBK clearing code validatePesaLinkAccount understands),
- * so rail:'rtgs' skips this pre-flight check entirely — submission is the
- * only available correctness check for that rail today.
+ * RTGS has no documented validation endpoint at all (its BeneficiaryBankBIC
+ * is a real SWIFT code, not a CBK clearing code validatePesaLinkAccount
+ * understands), so rail:'rtgs' skips the pre-flight validation check
+ * entirely — submission is the only available correctness check for that
+ * rail today.
  *
- * Per NCBA's UAT Guide, all three rails resolve synchronously — if this
+ * Per NCBA's UAT Guide, both rails resolve synchronously — if this
  * resolves at all, the transfer succeeded (submitPesaLinkTransfer/
- * submitEftTransfer/submitRtgsTransfer throw on a non-'000' resultCode,
- * unlike M-Pesa's B2C/bulk-pay rails, which only ever report "accepted"
- * here and confirm completion later via a callback).
+ * submitRtgsTransfer throw on a non-'000' resultCode, unlike M-Pesa's
+ * B2C/bulk-pay rails, which only ever report "accepted" here and confirm
+ * completion later via a callback).
  *
  * Throws NcbaOpenBankingValidationError on bad input or a failed
  * destination-account validation, or NcbaOpenBankingRequestError on a
@@ -96,8 +92,8 @@ export async function submitNcbaBankTransfer({
   if (!bankCode || !accountNumber || !Number.isFinite(numericAmount) || numericAmount <= 0) {
     throw new NcbaOpenBankingValidationError('bankCode, accountNumber and a positive amount are required for a bank payout');
   }
-  if (!['pesalink', 'eft', 'rtgs'].includes(rail)) {
-    throw new NcbaOpenBankingValidationError('rail must be "pesalink", "eft" or "rtgs"');
+  if (!['pesalink', 'rtgs'].includes(rail)) {
+    throw new NcbaOpenBankingValidationError('rail must be "pesalink" or "rtgs"');
   }
   if (rail === 'rtgs' && !beneficiaryCountry) {
     throw new NcbaOpenBankingValidationError('beneficiaryCountry is required for an RTGS transfer');
@@ -115,11 +111,11 @@ export async function submitNcbaBankTransfer({
   }
 
   // A destination at NCBA itself must go through the Internal Funds
-  // Transfer rail regardless of the requested rail — PesaLink/EFT/RTGS are
-  // all interbank/cross-border rails and NCBA declines an NCBA-to-NCBA
+  // Transfer rail regardless of the requested rail — PesaLink/RTGS are
+  // both interbank/cross-border rails and NCBA declines an NCBA-to-NCBA
   // transfer routed through them (see NCBA_OWN_BANK_CODE doc comment
   // above). No PesaLink pre-validation either: IFT resolves synchronously
-  // and reports its own rejection, same as PesaLink/EFT would.
+  // and reports its own rejection, same as PesaLink would.
   const isNcbaOwnAccount = bankCode === NCBA_OWN_BANK_CODE;
 
   // Fail fast on a bad destination account before touching balance — not
@@ -133,7 +129,7 @@ export async function submitNcbaBankTransfer({
     });
   }
 
-  const railPrefix = isNcbaOwnAccount ? 'IFT' : { pesalink: 'PL', eft: 'EFT', rtgs: 'RTGS' }[rail];
+  const railPrefix = isNcbaOwnAccount ? 'IFT' : { pesalink: 'PL', rtgs: 'RTGS' }[rail];
   const transactionId = `NCBA-${railPrefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 
   let hostResponse;
@@ -160,8 +156,7 @@ export async function submitNcbaBankTransfer({
       purposeCode,
     });
   } else {
-    const submit = rail === 'eft' ? submitEftTransfer : submitPesaLinkTransfer;
-    hostResponse = await submit({
+    hostResponse = await submitPesaLinkTransfer({
       transactionId,
       beneficiaryAccountNumber: accountNumber,
       beneficiaryBankCode: bankCode,
@@ -195,8 +190,8 @@ export async function executeNcbaBankPayout({
   if (!bankCode || !accountNumber || !Number.isFinite(numericAmount) || numericAmount <= 0) {
     throw new NcbaOpenBankingValidationError('bankCode, accountNumber and a positive amount are required for a bank payout');
   }
-  if (!['pesalink', 'eft', 'rtgs'].includes(rail)) {
-    throw new NcbaOpenBankingValidationError('rail must be "pesalink", "eft" or "rtgs"');
+  if (!['pesalink', 'rtgs'].includes(rail)) {
+    throw new NcbaOpenBankingValidationError('rail must be "pesalink" or "rtgs"');
   }
   if (rail === 'rtgs' && !beneficiaryCountry) {
     throw new NcbaOpenBankingValidationError('beneficiaryCountry is required for an RTGS transfer');
@@ -206,7 +201,7 @@ export async function executeNcbaBankPayout({
   // upfront from the requested `rail`, except when the destination is
   // NCBA's own bank code, which submitNcbaBankTransfer always forces onto
   // the (unpriced) IFT rail regardless of what was requested — checked
-  // here too so the debit doesn't reserve a PesaLink/EFT/RTGS fee for a
+  // here too so the debit doesn't reserve a PesaLink/RTGS fee for a
   // transfer that's actually going out fee-free via IFT.
   const isNcbaOwnAccount = bankCode === NCBA_OWN_BANK_CODE;
   const { totalFee: transferFee } = isNcbaOwnAccount
@@ -275,54 +270,9 @@ export const getBankCodes = (req, res) => {
   res.json({ bankCodes: KENYAN_BANK_CODES });
 };
 
-// @desc    Look up which bank(s) a phone number is registered with for
-//          PesaLink, plus the account holder's name — a convenience for a
-//          merchant who knows a payee's phone number but not their bank,
-//          used in Send Money before a PesaLink/EFT bank transfer.
-//          IMPORTANT: NCBA's mobile-number validation only ever returns a
-//          bank identity (sortCode/bankName) and the holder's name — never
-//          an account number, so this can only pre-fill the bank selection
-//          and a name to cross-check against; the merchant still has to
-//          type the real account number themselves and confirm it with
-//          the recipient directly.
-// @route   POST /openbanking/pesalink-lookup-phone (mounted at /api/v1 and /v1)
-// @access  Private (merchant)
-export const handlePesaLinkPhoneLookup = async (req, res) => {
-  try {
-    const { phoneNumber } = req.body;
-    if (!phoneNumber) {
-      return res.status(400).json({ error: 'phoneNumber is required.' });
-    }
-
-    const result = await validatePesaLinkMobileNumber({ phoneNumber });
-
-    // Match each returned sortCode against our own bank-code list so the
-    // frontend can auto-select an entry in the same dropdown getBankCodes
-    // above powers, rather than showing NCBA's raw bankName (which doesn't
-    // necessarily match our list's naming).
-    const banks = result.banks.map((b) => {
-      const match = KENYAN_BANK_CODES.find((k) => k.code === b.sortCode);
-      return {
-        bankCode: b.sortCode,
-        bankName: match?.name || b.bankName || b.lookupBankName,
-        isDefault: b.isDefault,
-      };
-    });
-
-    res.json({ destName: result.destName, banks });
-  } catch (err) {
-    if (err instanceof NcbaOpenBankingValidationError) {
-      return res.status(404).json({ error: err.message });
-    }
-    console.error('❌ PesaLink phone lookup error:', err.message);
-    res.status(500).json({ error: 'Could not look up this phone number. Please try again.' });
-  }
-};
-
 // @desc    Merchant-initiated single withdrawal to a bank account via NCBA
-//          PesaLink (immediate), EFT (next business day), or RTGS
-//          (cross-border/multi-currency, KES-only for now — see
-//          submitNcbaBankTransfer's doc comment)
+//          PesaLink (immediate) or RTGS (cross-border/multi-currency,
+//          KES-only for now — see submitNcbaBankTransfer's doc comment)
 // @route   POST /openbanking/bank-payout (mounted at /api/v1 and /v1)
 // @access  Private (merchant)
 export const handleBankPayout = async (req, res) => {
@@ -331,14 +281,14 @@ export const handleBankPayout = async (req, res) => {
     bankCode, accountNumber, accountName, amount, narration, pin, rail: requestedRail,
     beneficiaryCountry, beneficiaryAddress, purposeCode,
   } = req.body;
-  const rail = ['eft', 'rtgs'].includes(requestedRail) ? requestedRail : 'pesalink';
+  const rail = requestedRail === 'rtgs' ? 'rtgs' : 'pesalink';
 
   try {
     if (!pin || String(pin).length !== 4) {
       return res.status(400).json({ error: 'A valid 4-digit payment PIN is required.' });
     }
-    if (requestedRail && !['pesalink', 'eft', 'rtgs'].includes(requestedRail)) {
-      return res.status(400).json({ error: 'rail must be "pesalink", "eft" or "rtgs".' });
+    if (requestedRail && !['pesalink', 'rtgs'].includes(requestedRail)) {
+      return res.status(400).json({ error: 'rail must be "pesalink" or "rtgs".' });
     }
     if (rail === 'rtgs' && !beneficiaryCountry) {
       return res.status(400).json({ error: 'beneficiaryCountry is required for an RTGS transfer.' });
@@ -391,7 +341,6 @@ export const handleBankPayout = async (req, res) => {
     const usedRail = transaction.settlementRail || rail;
 
     const RAIL_NOTIFICATION_MESSAGE = {
-      eft: `KES ${Number(amount).toLocaleString()} was sent to your bank account via EFT. It settles by the next business day.`,
       rtgs: `KES ${Number(amount).toLocaleString()} was sent to your bank account via RTGS. It settles within a few hours.`,
       pesalink: `KES ${Number(amount).toLocaleString()} was sent to your bank account via PesaLink.`,
       ift: `KES ${Number(amount).toLocaleString()} was sent to your NCBA bank account.`,
@@ -405,7 +354,7 @@ export const handleBankPayout = async (req, res) => {
 
     if (updatedMerchant.phone) {
       const { date, time } = formatTransactionDateTime();
-      const RAIL_SMS_LABEL = { eft: 'Bank Payout (EFT)', rtgs: 'Bank Payout (RTGS)', pesalink: 'Bank Payout', ift: 'Bank Payout' };
+      const RAIL_SMS_LABEL = { rtgs: 'Bank Payout (RTGS)', pesalink: 'Bank Payout', ift: 'Bank Payout' };
       const { message } = buildPayoutSentSms({
         ref: transaction.reference,
         label: RAIL_SMS_LABEL[usedRail],
@@ -424,7 +373,6 @@ export const handleBankPayout = async (req, res) => {
     }
 
     const RAIL_RESPONSE_MESSAGE = {
-      eft: 'Bank transfer submitted via EFT. It settles by the next business day.',
       rtgs: 'Bank transfer submitted via RTGS. It settles within a few hours.',
       pesalink: 'Bank transfer completed via PesaLink.',
       ift: 'Bank transfer completed to your NCBA account.',
@@ -455,7 +403,7 @@ export const handleBankPayout = async (req, res) => {
 //
 //          This IS the settlement path for bulk payouts: services/
 //          ncbaBulkPaymentService.js's BILLPAY/utility rows are created
-//          'pending' and only ever resolved here (PesaLink/EFT single
+//          'pending' and only ever resolved here (PesaLink/RTGS single
 //          payouts resolve synchronously in handleBankPayout above and
 //          never reach this handler in 'pending' state). Route-level auth
 //          (verifyNcbaBasicAuth in ncbaRoutes.js) is what stops anyone who
@@ -538,7 +486,7 @@ export const handlePesaLinkCallback = async (req, res) => {
       merchantForSms = await Merchant.findById(transaction.merchantId).select('phone');
     }
 
-    // This webhook now resolves bank-account payouts (PesaLink/EFT), Mobile
+    // This webhook now resolves bank-account payouts (PesaLink/RTGS), Mobile
     // B2W (M-Pesa/Airtel number) payouts, Lipa na M-Pesa (Paybill/Till)
     // payouts, KPLC bill payments, and NCWSC (Nairobi Water) bill payments
     // — "Bank payout" wording would be wrong for all but the first. Note

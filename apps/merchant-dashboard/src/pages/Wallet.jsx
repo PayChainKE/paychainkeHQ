@@ -989,7 +989,7 @@ export default function Wallet() {
             </div>
           </section>
 
-              {/* Bank Transfer / EFT / PesaLink — PayChain Account */}
+              {/* Bank Transfer / PesaLink — PayChain Account */}
               <section className="col-span-12 bg-white rounded-[32px] lg:rounded-[40px] border border-outline-variant/5 shadow-sm overflow-hidden editorial-shadow animate-fade-in-up [animation-delay:175ms] p-6 md:p-8">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                   <div className="flex items-start gap-4">
@@ -997,7 +997,7 @@ export default function Wallet() {
                       <span className="material-symbols-outlined text-2xl">account_balance</span>
                     </div>
                     <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/40 mb-1">Bank Transfer · EFT · PesaLink</p>
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/40 mb-1">Bank Transfer · PesaLink</p>
                       <h3 className="font-headline text-lg md:text-xl text-primary tracking-tight">PayChain Account</h3>
                       <p className="text-xs text-on-surface-variant opacity-70 mt-1 max-w-md">
                         Customers can pay via M-Pesa Paybill <span className="font-bold text-primary">880100</span>, or transfer directly from their bank, using this dedicated account number — funds reflect automatically once received.
@@ -1351,7 +1351,7 @@ export default function Wallet() {
                   />
                 </div>
                 <div className="space-y-3">
-                  <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Bank (for PesaLink/EFT payouts)</label>
+                  <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Bank (for PesaLink/RTGS payouts)</label>
                   <select
                     value={settleBankCode}
                     onChange={(e) => setSettleBankCode(e.target.value)}

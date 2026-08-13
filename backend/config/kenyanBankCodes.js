@@ -1,4 +1,4 @@
-// Kenyan bank clearing codes accepted by NCBA's PesaLink/EFT rails, used as
+// Kenyan bank clearing codes accepted by NCBA's PesaLink rail, used as
 // `BeneficiaryBankBIC` on payment payloads and `targetPic` on PesaLink
 // validation. Per NCBA's Open Banking UAT Guide, these are the Central Bank
 // of Kenya clearing code "prefixed with 00 (zero zero)" — e.g. Equity's
@@ -43,7 +43,7 @@ export const KENYAN_BANK_CODES = [
   // above and was never verified against NCBA's own documentation).
   { code: '07000', name: 'NCBA Bank' },
   // Was 'KCBLKENX' (KCB's SWIFT BIC, an RTGS example in NCBA's docs, not
-  // confirmed for PesaLink/EFT) — replaced with KCB's actual CBK clearing
+  // confirmed for PesaLink) — replaced with KCB's actual CBK clearing
   // code from the KBA listing (bank code 01), matching the "00"-prefix
   // pattern every other entry here uses.
   { code: '0001', name: 'KCB Bank' },

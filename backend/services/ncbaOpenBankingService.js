@@ -21,7 +21,7 @@ const ncbaOpenBankingSubscriptionKey = process.env.NCBA_OPENBANKING_SUBSCRIPTION
 const ncbaOpenBankingAccountNumber  = process.env.NCBA_OPENBANKING_ACCOUNT_NUMBER;
 // "Customer number – first 6 digits of the sender account number or any
 // other assigned customer number as guided by NCBA" (UAT Guide). Required
-// on PesaLink/EFT payment payloads, separate from the account number itself.
+// on PesaLink payment payloads, separate from the account number itself.
 const ncbaOpenBankingSenderCif      = process.env.NCBA_OPENBANKING_SENDER_CIF;
 
 // Mobile B2W's "senderNumber" ("mobile number to receive the notification"
@@ -34,8 +34,8 @@ const ncbaOpenBankingSenderCif      = process.env.NCBA_OPENBANKING_SENDER_CIF;
 // batch failed 100% of rows with this exact error until it's set.
 const ncbaOpenBankingSenderMsisdn   = process.env.NCBA_OPENBANKING_SENDER_MSISDN;
 
-// Per the UAT Guide's Payment Rules for both PesaLink and EFT: "Minimum
-// payments of KES. 50 ... and a maximum of KES. 999,999".
+// Per the UAT Guide's Payment Rules for PesaLink: "Minimum payments of
+// KES. 50 ... and a maximum of KES. 999,999".
 const MIN_TRANSFER_AMOUNT = 50;
 const MAX_TRANSFER_AMOUNT = 999999;
 
@@ -165,13 +165,12 @@ async function getAccessToken({ forceRefresh = false } = {}) {
  * than our conservative local TTL assumes).
  */
 async function ncbaOpenBankingPost(path, body, { retrying = false } = {}) {
-  // Every real call funnels through here — validatePesaLinkAccount,
-  // submitPesaLinkTransfer, and submitEftTransfer all end up needing
-  // PayChain's own NCBA account number (as SenderAccountNumber/
-  // DebitAccountNumber, or as the debitAccount fallback). Unlike
-  // ncbaBulkPaymentService.js's equivalent check, this used to be missing
-  // here — a blank value would silently ride along as `undefined` in the
-  // request body instead of failing clearly before ever reaching NCBA.
+  // Every real call funnels through here and ends up needing PayChain's own
+  // NCBA account number (as SenderAccountNumber/DebitAccountNumber, or as
+  // the debitAccount fallback). Unlike ncbaBulkPaymentService.js's
+  // equivalent check, this used to be missing here — a blank value would
+  // silently ride along as `undefined` in the request body instead of
+  // failing clearly before ever reaching NCBA.
   if (!ncbaOpenBankingAccountNumber) {
     throw new NcbaOpenBankingAuthError('Open Banking is not fully configured. Please contact support.');
   }
@@ -210,7 +209,7 @@ function assertTransferAmountInBounds(amount) {
   const numeric = Number(amount);
   if (numeric < MIN_TRANSFER_AMOUNT || numeric > MAX_TRANSFER_AMOUNT) {
     throw new NcbaOpenBankingValidationError(
-      `Amount must be between KES ${MIN_TRANSFER_AMOUNT} and KES ${MAX_TRANSFER_AMOUNT.toLocaleString()} (PesaLink/EFT limits)`
+      `Amount must be between KES ${MIN_TRANSFER_AMOUNT} and KES ${MAX_TRANSFER_AMOUNT.toLocaleString()} (PesaLink limits)`
     );
   }
 }
@@ -301,7 +300,7 @@ export async function validatePesaLinkMobileNumber({ phoneNumber, debitAccount }
 /**
  * Submits a real-time PesaLink transfer.
  *
- * Per NCBA's UAT Guide, PesaLink/EFT payments do NOT accept a callbackUrl —
+ * Per NCBA's UAT Guide, PesaLink payments do NOT accept a callbackUrl —
  * unlike the bill-pay/wallet endpoints (KPLC, water, KRA, mobile wallets),
  * these resolve synchronously: the response's resultCode/statusDescription
  * IS the final result, not just an "accepted" acknowledgement. This throws
@@ -347,53 +346,6 @@ export async function submitPesaLinkTransfer({
 }
 
 /**
- * Submits an EFT transfer — NCBA's next-business-day local bank rail,
- * routed to from ncbaOpenBankingController.js#submitNcbaBankTransfer
- * whenever the caller picks rail: 'eft' instead of the default 'pesalink'.
- * Same request/response shape and amount bounds as PesaLink (per the UAT
- * Guide, both are KES 50–999,999) and also resolves synchronously — the
- * only real difference NCBA documents is settlement timing (PesaLink:
- * immediate, 24/7/365; EFT: T+1, business days only).
- */
-export async function submitEftTransfer({
-  transactionId,
-  beneficiaryAccountNumber,
-  beneficiaryBankCode,
-  beneficiaryName,
-  amount,
-  narration,
-  senderCountry = 'Kenya',
-}) {
-  if (!transactionId || !beneficiaryAccountNumber || !beneficiaryBankCode || !amount) {
-    throw new NcbaOpenBankingValidationError('transactionId, beneficiaryAccountNumber, beneficiaryBankCode and amount are required for an EFT transfer');
-  }
-  assertTransferAmountInBounds(amount);
-
-  const payload = {
-    Amount: Number(amount).toFixed(2),
-    BeneficiaryAccountNumber: beneficiaryAccountNumber,
-    BeneficiaryBankBIC: beneficiaryBankCode,
-    BeneficiaryName: beneficiaryName,
-    Currency: 'KES',
-    DebitAccountNumber: ncbaOpenBankingAccountNumber,
-    Narration: narration || 'PayChain Payout',
-    SenderCIF: ncbaOpenBankingSenderCif,
-    SenderCountry: senderCountry,
-    TransactionID: transactionId,
-  };
-
-  if (!liveCallsEnabled) {
-    return simulate('ncba_openbanking_eft_submit_sandbox', { transactionId, amount });
-  }
-
-  const result = await ncbaOpenBankingPost('/api/v1/EFTTransaction/efttransaction', payload);
-  if (result?.resultCode !== '000') {
-    throw new NcbaOpenBankingRequestError(result?.statusDescription || 'This EFT transfer was rejected');
-  }
-  return result;
-}
-
-/**
  * Submits an Internal Funds Transfer — NCBA's own "Transfers to NCBA
  * Accounts" rail, for when the destination account is itself at NCBA
  * (BeneficiaryBankBIC '07000'). Confirmed endpoint from NCBA's "Open
@@ -406,7 +358,7 @@ export async function submitEftTransfer({
  * transfers routed through it come back with a hard decline (observed
  * live: StatusCode/reason "RC01" on a real, correct NCBA account number).
  * IFT is the documented same-bank rail and resolves synchronously like
- * PesaLink/EFT (resultCode/statusDescription IS the final result).
+ * PesaLink (resultCode/statusDescription IS the final result).
  */
 export async function submitInternalNcbaTransfer({
   transactionId,
@@ -452,19 +404,19 @@ const RTGS_DEFAULT_PURPOSE_CODE = 'MSC';
 
 /**
  * Submits an RTGS transfer — NCBA's cross-border/multi-currency local bank
- * rail, distinct from PesaLink/EFT in three ways: BeneficiaryBankBIC here
+ * rail, distinct from PesaLink in three ways: BeneficiaryBankBIC here
  * is a real SWIFT BIC (not a "00"-prefixed CBK clearing code), it supports
  * KE/UG/TZ/RW beneficiaries in KES/USD/GBP/EUR/TZS/UGX/RWF (not KES-only,
  * Kenya-only), and it has no minimum-amount-bounded maximum (per the UAT
  * Guide: "Minimum payments of KES 50 ... with no maximum CAP" — so, unlike
- * PesaLink/EFT, assertTransferAmountInBounds is NOT applied here). No RTGS-
+ * PesaLink, assertTransferAmountInBounds is NOT applied here). No RTGS-
  * specific account-validation endpoint is documented anywhere in the UAT
  * Guide or Postman collection (unlike PesaLink/LNM/KPLC/NCWSC, which each
  * have one) — this is submit-only, no pre-flight validation call.
  *
  * Per the UAT Guide, RTGS resolves synchronously (T+3 hours is the bank's
  * own settlement window, not this API call — the resultCode IS the final
- * submission result, matching PesaLink/EFT's response shape, not the
+ * submission result, matching PesaLink's response shape, not the
  * "accepted into processing" shape of the async rails).
  *
  * @param {object} params
@@ -940,7 +892,7 @@ export async function validateLipaNaMpesaAccount({ paymentType, payBillTillNo })
  * BusinessBuyGoods). Response shape (hdrRefNo/hdrTranId/resErrorCode/
  * UnitId) matches NCBA's other "accepted into processing" rails (e.g. M-Pesa
  * Float Purchase, explicitly documented as a 24-hour service) rather than
- * PesaLink/EFT's synchronous resultCode shape, and the payload carries no
+ * PesaLink's synchronous resultCode shape, and the payload carries no
  * callbackUrl field to opt out of that — so this is treated as ASYNCHRONOUS,
  * same as submitMobileB2wPayment/BILLPAY: an immediate resErrorCode: '000'
  * only means NCBA accepted the instruction, not that it settled. Callers
@@ -1006,8 +958,8 @@ export async function submitLipaNaMpesaPayment({
  * is an ASYNCHRONOUS rail: a `succeeded: true` response only means NCBA
  * accepted the instruction into its processing queue (same shape as the
  * doc's KPLC/Water/E-Citizen examples, all explicitly documented as
- * resolving via a later callback) — unlike submitPesaLinkTransfer/
- * submitEftTransfer above, which resolve synchronously. callbackUrl is left
+ * resolving via a later callback) — unlike submitPesaLinkTransfer above,
+ * which resolves synchronously. callbackUrl is left
  * blank (the doc marks it optional), matching how services/
  * ncbaBulkPaymentService.js's existing utility-payment calls already handle
  * this — NCBA posts back to whatever webhook was registered during

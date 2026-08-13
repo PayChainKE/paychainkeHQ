@@ -1,4 +1,4 @@
-// Interbank Transfer Tariff Schedules (PesaLink, EFT, RTGS, 2026-08-12) —
+// Interbank Transfer Tariff Schedules (PesaLink, RTGS, 2026-08-12) —
 // outbound bank transfers from a merchant's PayChain balance/Virtual
 // Account (same underlying Merchant.kesBalance field — "Virtual Account"
 // is the NCBA-provisioned account-number concept, not a separate ledger)
@@ -50,24 +50,8 @@ export function getPesaLinkTariff(amount) {
   };
 }
 
-// EFT — flat, any amount. Note: NCBA's manual branch EFT charge is
-// KES 500, but PayChain's automated API routing executes at NCBA's
-// Online/Mobile rate of KES 90 instead — the number below.
-export const EFT_BASE_COST = 90;
-export const EFT_SERVICE_FEE = 55;
-
-/** @returns {{ baseCost: number, serviceFee: number, totalFee: number }} */
-export function getEftTariff() {
-  return {
-    baseCost: EFT_BASE_COST,
-    serviceFee: EFT_SERVICE_FEE,
-    totalFee: round2(EFT_BASE_COST + EFT_SERVICE_FEE),
-  };
-}
-
-// RTGS — flat, any amount. Same "manual vs automated API rate" note as
-// EFT above: NCBA's manual branch RTGS charge is KES 500, PayChain's
-// automated rate is KES 300.
+// RTGS — flat, any amount. NCBA's manual branch RTGS charge is KES 500,
+// PayChain's automated rate is KES 300.
 export const RTGS_BASE_COST = 300;
 export const RTGS_SERVICE_FEE = 130;
 
@@ -82,16 +66,18 @@ export function getRtgsTariff() {
 
 /**
  * Dispatch by rail — the single place callers look up "what does this
- * transfer cost" without needing their own pesalink/eft/rtgs branching.
- * Unrecognized rail (e.g. 'ift', null) returns zero fee — this tariff
- * doesn't cover those, matching today's actual (unpriced) behavior.
+ * transfer cost" without needing their own pesalink/rtgs branching.
+ * Unrecognized rail (e.g. 'ift', 'eft', null) returns zero fee — this
+ * tariff doesn't cover those, matching today's actual (unpriced) behavior.
+ * EFT was removed as a supported rail (2026-08-13) — NCBA's EFT endpoint
+ * rejected the confirmed PesaLink bank code with BIC_NOT_FOUND and no
+ * working code/format was found; PesaLink and RTGS both work.
  *
- * @param {'pesalink'|'eft'|'rtgs'|string|null} rail
+ * @param {'pesalink'|'rtgs'|string|null} rail
  * @param {number} amount
  * @returns {{ baseCost: number, serviceFee: number, totalFee: number }}
  */
 export function getBankTransferTariff(rail, amount) {
-  if (rail === 'eft') return getEftTariff();
   if (rail === 'rtgs') return getRtgsTariff();
   if (rail === 'pesalink') return getPesaLinkTariff(amount);
   return { baseCost: 0, serviceFee: 0, totalFee: 0 };

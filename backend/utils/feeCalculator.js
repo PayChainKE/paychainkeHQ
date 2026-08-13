@@ -24,7 +24,7 @@ export function calculateFees(type, kesAmount, rail = null) {
   const v = Number(kesAmount) || 0;
   const stream = TYPE_TO_STREAM.get(type);
 
-  // Outbound bank transfers (PesaLink/EFT/RTGS) — ncbaOpenBankingController.js's
+  // Outbound bank transfers (PesaLink/RTGS) — ncbaOpenBankingController.js's
   // executeNcbaBankPayout (the standalone "Withdraw to Bank" endpoint) and
   // bulkPayController.js's Bank payee rows both stamp settlementRail on the
   // Transaction before it's ever saved, so it's always known here. Tiered/

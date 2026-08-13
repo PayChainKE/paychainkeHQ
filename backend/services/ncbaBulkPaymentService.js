@@ -262,7 +262,7 @@ export async function initiateBulkPayment(merchantId, payoutItems) {
  * submitNcbaBankTransfer (ncbaOpenBankingController.js) works for the Bank
  * branch of the same loop.
  *
- * Unlike NCBA Open Banking's PesaLink/EFT (synchronous — resultCode is the
+ * Unlike NCBA Open Banking's PesaLink (synchronous — resultCode is the
  * final answer), this H2H rail is asynchronous: a successful submission
  * here only means NCBA *accepted* the instruction, not that the bill was
  * paid. The caller should record the resulting Transaction as 'pending',
