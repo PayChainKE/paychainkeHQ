@@ -246,7 +246,7 @@ export async function executeNcbaBankPayout({
 
   const transaction = await Transaction.create({
     merchantId,
-    accountNumber: reservedMerchant.paybillAccount || 'WALLET_FUND',
+    accountNumber: reservedMerchant.ncbaMerchantCode || 'WALLET_FUND',
     // Fee-mapped to the ncba_disbursement_fee revenue stream (see
     // config/revenueRateCard.js), priced per-rail off settlementRail below
     // — see utils/feeCalculator.js.

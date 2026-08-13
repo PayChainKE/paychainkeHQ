@@ -9,7 +9,7 @@ const server = new StellarSdk.Horizon.Server('https://horizon-testnet.stellar.or
 
 async function check() {
   await mongoose.connect(process.env.MONGO_URI);
-  const merchant = await Merchant.findOne({ paybillAccount: '84729' }); // the user is logged into 84729 based on default demo or something
+  const merchant = await Merchant.findOne({ isDemoMerchant: true });
   if (!merchant || !merchant.stellarPublicKey) {
     console.log("No wallet");
     process.exit(1);

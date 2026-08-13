@@ -1,8 +1,7 @@
 import express from 'express';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
-import { generateToken, registerURLs, validationURL, confirmationURL, initiateSTKPush, getSTKStatus, initiateB2C, initiateB2B, generateQrCheckout, generateAccountQr } from '../controllers/mpesaController.js';
-import { protect, protectMerchant, requireRole } from '../middleware/authMiddleware.js';
-import { timingSafeStringEqual } from '../utils/timingSafeCompare.js';
+import { initiateSTKPush, getSTKStatus, initiateB2C, initiateB2B, generateQrCheckout, generateAccountQr } from '../controllers/mpesaController.js';
+import { protectMerchant } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
@@ -32,41 +31,6 @@ const stkPushLimiter = rateLimit({
   keyGenerator: (req) => (req.merchant?._id ? String(req.merchant._id) : ipKeyGenerator(req.ip)),
   message: { error: 'Too many STK Push requests. Try again in 15 minutes.' },
 });
-
-// Daraja has no native webhook signature — the standard practical mitigation
-// is a shared secret embedded in the callback URL itself, since we control
-// every URL string handed to Safaricom (see mpesaController.js's
-// registerURLs). Without this, these routes were public+unauthenticated and
-// confirmationURL could be used to fabricate a merchant's balance from the
-// open internet. Fails closed if the secret isn't configured at all,
-// matching the NCBA webhook convention (verifyNcbaBasicAuth in ncbaRoutes.js).
-function verifyMpesaWebhookSecret(req, res, next) {
-  const expected = process.env.MPESA_WEBHOOK_SECRET;
-  if (!expected) {
-    console.error(JSON.stringify({ level: 'error', event: 'mpesa_webhook_auth_misconfigured', path: req.path }));
-    return res.status(500).json({ error: 'Webhook authentication is not configured' });
-  }
-  const provided = req.query.key;
-  if (!provided || !timingSafeStringEqual(String(provided), expected)) {
-    console.warn(JSON.stringify({ level: 'warn', event: 'mpesa_webhook_auth_failed', path: req.path }));
-    return res.status(403).json({ error: 'Forbidden' });
-  }
-  return next();
-}
-
-// Reconfigures where Safaricom sends confirmations for the whole platform —
-// not merchant-scoped, so admin-only (owner-only: this is platform routing,
-// not a day-to-day admin action). Still Daraja: this is C2B webhook
-// registration for the Stellar demo-merchant pipeline (see
-// mpesaController.js's confirmationURL doc comment) — STK Push, B2C and B2B
-// money movement itself all route through NCBA now.
-router.post('/register-urls', protect, requireRole('owner'), generateToken, registerURLs);
-
-// Public webhook routes that Safaricom will ping — gated by the shared
-// secret embedded in the URL registered with Safaricom (see registerURLs
-// caller).
-router.post('/validation', verifyMpesaWebhookSecret, validationURL);
-router.post('/confirmation', verifyMpesaWebhookSecret, confirmationURL);
 
 // STK Push Routes (Inbound, via NCBA)
 router.post('/stk-push', protectMerchant, stkPushLimiter, initiateSTKPush);

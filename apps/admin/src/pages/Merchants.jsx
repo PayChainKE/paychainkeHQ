@@ -141,7 +141,7 @@ const Merchants = () => {
       // Search
       if (q) {
         const haystack = [
-          m.businessName, m.name, m.email, m.paybillAccount, m.ncbaVirtualAccountNumber, m.ncbaMerchantCode,
+          m.businessName, m.name, m.email, m.ncbaVirtualAccountNumber, m.ncbaMerchantCode,
         ].filter(Boolean).map((s) => String(s).toLowerCase());
         const phoneMatch = qPhone && normalizePhone(m.phone).includes(qPhone);
         const textMatch = haystack.some((s) => s.includes(q));
@@ -262,7 +262,7 @@ const Merchants = () => {
       if (res.data?.success) {
         setSuccess({
           email: res.data.data.email,
-          paybillAccount: res.data.data.paybillAccount,
+          accountNumber: res.data.data.ncbaVirtualAccountNumber || res.data.data.ncbaMerchantCode,
           businessName: res.data.data.businessName,
         });
         fetchMerchants();
@@ -711,7 +711,7 @@ const Merchants = () => {
                 </p>
                 <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 mb-5 inline-block">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-700 mb-1">Account Number</p>
-                  <p className="font-mono text-xl font-bold text-emerald-900">{success.paybillAccount}</p>
+                  <p className="font-mono text-xl font-bold text-emerald-900">{success.accountNumber || 'Pending assignment'}</p>
                 </div>
                 <div className="flex gap-2 justify-center">
                   <button onClick={() => setShowModal(false)} className="px-5 py-2.5 rounded-lg bg-primary text-white text-sm font-semibold uppercase tracking-widest hover:shadow-lg active:scale-95 transition-all">Done</button>
@@ -1310,68 +1310,15 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
                     </button>
                     <span className="text-[12px] font-semibold text-on-surface-variant/80">{features.inflationShield ? 'Enabled' : 'Disabled'}</span>
                   </div>
-                }
+                } 
               />
             </Section>
-
-            {/* Officer onboarding due diligence — only present for merchants
-                that came through the officer pipeline (kybStatus is unset
-                for self-serve/admin-direct signups). */}
-            {(m.kybStatus || m.onboardingOfficer || (m.kybDocuments?.length ?? 0) > 0 || (m.businessPhotos?.length ?? 0) > 0) && (
-              <Section title="Onboarding Due Diligence" icon="fact_check">
-                {m.onboardingOfficer && <Row label="Onboarding Officer" value={`${m.onboardingOfficer.name || m.onboardingOfficer.email}`} />}
-                {m.kybStatus && <Row label="KYB Status" value={<span className="capitalize">{m.kybStatus.replace('_', ' ')}</span>} />}
-                {m.riskTier && <Row label="Risk Tier" value={<span className="capitalize">{m.riskTier}</span>} />}
-                <div className="px-4 py-3">
-                  <p className="text-[12px] font-semibold text-on-surface-variant/60 uppercase tracking-wide mb-2">KYC Documents</p>
-                  {(m.kybDocuments?.length ?? 0) === 0 ? (
-                    <p className="text-[13px] text-on-surface-variant/50">None uploaded.</p>
-                  ) : (
-                    <div className="space-y-1.5">
-                      {m.kybDocuments.map((doc, i) => (
-                        <div key={i} className="flex items-center justify-between gap-2 text-[13px]">
-                          <a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-semibold underline">
-                            {(DOC_TYPE_LABELS[doc.type] || doc.type)} ↗
-                          </a>
-                          <span className={`text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full border ${
-                            doc.status === 'approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            : doc.status === 'rejected' ? 'bg-red-50 text-red-700 border-red-200'
-                            : 'bg-amber-50 text-amber-700 border-amber-200'
-                          }`}>{doc.status}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="px-4 py-3">
-                  <p className="text-[12px] font-semibold text-on-surface-variant/60 uppercase tracking-wide mb-2">Business Photos</p>
-                  {(m.businessPhotos?.length ?? 0) === 0 ? (
-                    <p className="text-[13px] text-on-surface-variant/50">None uploaded — optional field.</p>
-                  ) : (
-                    <div className="grid grid-cols-4 gap-2">
-                      {m.businessPhotos.map((p, i) => (
-                        <a key={i} href={p.url} target="_blank" rel="noopener noreferrer" className="block aspect-square rounded-lg overflow-hidden border border-outline-variant/20 hover:opacity-80 transition-opacity">
-                          <img src={p.url} alt={`Business photo ${i + 1}`} className="w-full h-full object-cover" />
-                        </a>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </Section>
-            )}
           </div>
         )}
       </div>
       <style>{`@keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }`}</style>
     </div>
   );
-};
-
-const DOC_TYPE_LABELS = {
-  business_registration: 'Business Registration Certificate',
-  kra_pin: 'KRA PIN Certificate',
-  national_id: 'National ID / Passport',
-  address_proof: 'Proof of Address',
 };
 
 const Section = ({ title, icon, children }) => (

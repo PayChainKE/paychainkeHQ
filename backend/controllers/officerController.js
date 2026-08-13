@@ -453,7 +453,7 @@ export const approveApplication = async (req, res) => {
 
     const setupLink = `${MERCHANT_DASHBOARD_URL.replace(/\/$/, '')}/setup-password?token=${rawToken}`;
     sendMerchantInvite(
-      application.email, application.name, application.businessName, null, setupLink,
+      application.email, application.name, application.businessName, setupLink,
       getNcbaVirtualAccountNumber(application.ncbaMerchantCode), application.ncbaMerchantCode
     ).catch((err) => console.error(`📧 Failed to send approval invite to ${application.email}:`, err));
 

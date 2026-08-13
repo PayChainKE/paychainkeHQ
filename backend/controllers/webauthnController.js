@@ -302,7 +302,6 @@ export const verifyLogin = async (req, res) => {
         email:            merchant.email,
         phone:            merchant.phone,
         businessName:     merchant.businessName,
-        paybillAccount:   merchant.paybillAccount,
         kesBalance:       merchant.kesBalance,
         usdcBalance:      merchant.usdcBalance,
         stellarPublicKey: merchant.stellarPublicKey,

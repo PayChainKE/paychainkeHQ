@@ -1,12 +1,9 @@
-import axios from 'axios';
 import bcrypt from 'bcryptjs';
 import Transaction from '../models/Transaction.js';
 import Merchant from '../models/Merchant.js';
 import { safeSendSMS, sendStaggeredSms } from '../utils/smsSanitizer.js';
-import { calculateMerchantFee, processSplitTransaction, processInvoiceSplitTransaction, splitCustomerSurcharge, getCheckoutTotal, calculateRawC2bMarkup, PricingEngineError } from '../utils/pricingEngine.js';
+import { processSplitTransaction, processInvoiceSplitTransaction, splitCustomerSurcharge, getCheckoutTotal, PricingEngineError } from '../utils/pricingEngine.js';
 import { sendInvoicePaidReceiptEmail } from '../utils/resend.js';
-import { settleInflationShield } from '../utils/stellarHelper.js';
-import { getLiveKesToUsdcRate } from '../utils/rateEngine.js';
 import STKRequest from '../models/STKRequest.js';
 import PayoutBatch from '../models/PayoutBatch.js';
 import PaymentLink from '../models/PaymentLink.js';
@@ -19,497 +16,17 @@ import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard
 import { getLipaNaMpesaTariff } from '../config/lipaNaMpesaTariffCard.js';
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay.js';
 import { AUTO_INFLATION_SHIELD_ENABLED } from '../config/inflationShieldFlag.js';
-import { logAudit } from '../utils/auditLog.js';
 import { buildPaymentReceivedSms, buildCustomerPaidSms } from '../utils/paymentSmsTemplates.js';
 import { initiateStkPush as ncbaInitiateStkPush, queryStkPush as ncbaQueryStkPush, generateQrCode as ncbaGenerateQrCode } from '../services/ncbaStkPushService.js';
 import { validateMobileWalletNumber as ncbaValidateMobileWalletNumber, submitMobileB2wPayment as ncbaSubmitMobileB2wPayment, validateLipaNaMpesaAccount as ncbaValidateLnmAccount, submitLipaNaMpesaPayment as ncbaSubmitLnmPayment, NcbaOpenBankingValidationError } from '../services/ncbaOpenBankingService.js';
 import { validatePhoneNumber, NcbaValidationError, getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
 
-// ── M-PESA configuration ──────────────────────────────────────────────────────
-// MPESA_ENVIRONMENT controls which Daraja endpoint is used.
-// Defaults to 'sandbox' — must be explicitly set to 'live' to reach production.
-// Never derive this from NODE_ENV: hosting platforms set NODE_ENV='production'
-// even for staging deployments, which would accidentally hit the live API.
-const mpesaEnv      = (process.env.MPESA_ENVIRONMENT || 'sandbox').toLowerCase();
-// Exported so every M-PESA-calling code path in the app (not just this
-// file) derives live/sandbox and the target Daraja host from the same
-// single source of truth — a second, independently-computed copy of this
-// logic elsewhere (e.g. keyed off NODE_ENV instead) is exactly how a
-// token/endpoint mismatch bug happens: generateToken below fetches an
-// OAuth token scoped to one Daraja host, and a caller using a different
-// host for the actual API call gets rejected.
-export const isLive        = mpesaEnv === 'live';
-export const mpesaBaseUrl  = isLive
-  ? 'https://api.safaricom.co.ke'
-  : 'https://sandbox.safaricom.co.ke';
-
-if (isLive) {
-  console.log('⚠️  M-PESA running in LIVE mode — real money will move');
-} else {
-  console.log('🧪 M-PESA running in SANDBOX mode — no real money at risk');
-}
-
-const consumerKey     = process.env.MPESA_CONSUMER_KEY;
-const consumerSecret  = process.env.MPESA_CONSUMER_SECRET;
-export const shortCode = process.env.MPESA_SHORTCODE;
-// Public URL Safaricom will POST callbacks to.
-// Must be HTTPS and reachable by Safaricom servers.
-export const callbackBase = (process.env.MPESA_CALLBACK_URL || '').replace(/\/$/, '');
-
-// Appended to every callback URL handed to Safaricom — routes/mpesaRoutes.js
-// rejects any callback that doesn't carry this in ?key=. Daraja has no
-// native webhook signature, so a secret embedded in the URL itself is the
-// standard practical substitute.
-const webhookSecret = process.env.MPESA_WEBHOOK_SECRET || '';
-const withWebhookSecret = (url) => `${url}${webhookSecret ? `?key=${encodeURIComponent(webhookSecret)}` : ''}`;
-
-// Generate OAuth Token for Safaricom Daraja API — STK Push, B2C and B2B all
-// route through NCBA now (see initiateSTKPush/initiateB2C/initiateB2B
-// below); this token is only needed by registerURLs, which points
-// Safaricom's C2B confirmation/validation webhooks at this deployment for
-// the Stellar demo-merchant pipeline (see confirmationURL's doc comment).
-export const generateToken = async (req, res, next) => {
-  if (!consumerKey || !consumerSecret) {
-    console.error('❌ M-PESA credentials not configured (MPESA_CONSUMER_KEY / MPESA_CONSUMER_SECRET)');
-    return res.status(500).json({ error: 'M-PESA is not configured on this server.' });
-  }
-  try {
-    const auth = Buffer.from(`${consumerKey}:${consumerSecret}`).toString('base64');
-    const url  = `${mpesaBaseUrl}/oauth/v1/generate?grant_type=client_credentials`;
-
-    const response = await axios.get(url, {
-      headers: { Authorization: `Basic ${auth}` },
-      timeout: 15000,
-    });
-
-    req.mpesaToken = response.data.access_token;
-    next();
-  } catch (error) {
-    const detail = error.response?.data
-      ? JSON.stringify(error.response.data)
-      : error.message;
-    console.error(`❌ M-PESA Token Error [env=${mpesaEnv} url=${mpesaBaseUrl}]:`, detail);
-    res.status(502).json({
-      error: 'Failed to reach Safaricom — check your M-PESA credentials and MPESA_ENVIRONMENT setting.',
-      detail,
-    });
-  }
-};
-
-// Register C2B URLs. Always builds the confirmation/validation URLs itself
-// from callbackBase + the real MPESA_WEBHOOK_SECRET (same withWebhookSecret
-// helper every other Daraja callback URL in this file uses) rather than
-// trusting a caller-supplied URL — there's no legitimate reason to point
-// Safaricom's C2B callbacks anywhere other than this deployment's own
-// routes, and requiring the secret to be manually retyped into a request
-// body every time this is called is exactly the kind of manual step that
-// gets fumbled (e.g. registered with a placeholder/wrong key by mistake).
-// `shortCode` is an optional override in the body: MPESA_SHORTCODE is the
-// shared STK Push test paybill in sandbox, which Safaricom's C2B product
-// rejects outright — a *different* sandbox shortcode with C2B enabled must
-// be passed here to actually register successfully.
-export const registerURLs = async (req, res) => {
-  try {
-    const token = req.mpesaToken;
-    const { shortCode: shortCodeOverride } = req.body || {};
-    const targetShortCode = shortCodeOverride || shortCode;
-
-    if (!callbackBase) {
-      return res.status(500).json({ error: 'MPESA_CALLBACK_URL is not configured.' });
-    }
-
-    const url = `${mpesaBaseUrl}/mpesa/c2b/v1/registerurl`;
-
-    const data = {
-      ShortCode: targetShortCode,
-      ResponseType: 'Completed',
-      ConfirmationURL: withWebhookSecret(`${callbackBase}/api/callbacks/confirmation`),
-      ValidationURL: withWebhookSecret(`${callbackBase}/api/callbacks/validation`),
-    };
-
-    const response = await axios.post(url, data, {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    });
-
-    res.status(200).json({ ...response.data, registeredShortCode: targetShortCode });
-  } catch (error) {
-    console.error('❌ M-PESA Register URLs Error:', error.response?.data || error.message);
-    res.status(400).json({ error: error.response?.data?.errorMessage || 'Failed to register M-PESA URLs' });
-  }
-};
-
-// Validation Webhook (Safaricom hits this to check if transaction should proceed)
-export const validationURL = (req, res) => {
-  // We accept all transactions by returning ResultCode 0
-  res.status(200).json({
-    ResultCode: 0,
-    ResultDesc: 'Accepted'
-  });
-};
-
-// Confirmation Webhook (Safaricom hits this when transaction completes)
-// Shared by the live Safaricom C2B webhook (confirmationURL) below and the
-// owner-only debug endpoint (simulateMpesaConfirmation) further down —
-// both run this exact same processing, so a manually-triggered run is
-// genuine proof the production pipeline works, not a reimplementation that
-// could silently drift from what a real webhook actually does. Returns a
-// small summary (merchant, transaction, txHash if an on-chain settlement
-// happened) so the debug endpoint has something useful to show back.
-async function processMpesaC2bPayload(payload) {
-    const {
-      TransID,
-      TransAmount,
-      BillRefNumber,
-      MSISDN,
-      FirstName,
-      MiddleName,
-      LastName
-    } = payload;
-
-    const accountNumber = BillRefNumber?.trim();
-    const amount = Number(TransAmount);
-
-    if (!accountNumber) return { skipped: 'no_account_number' };
-
-    // Find the merchant by their unique Paybill Account number
-    const merchant = await Merchant.findOne({ paybillAccount: accountNumber });
-
-    if (!merchant) {
-      console.warn(`⚠️ Received M-PESA payment for unknown account: ${accountNumber}`);
-      return { skipped: 'unknown_account', accountNumber };
-    }
-
-    // Check if transaction already exists (idempotency)
-    const existingTx = await Transaction.findOne({ reference: TransID });
-    if (existingTx) {
-      console.log(`⚠️ Transaction ${TransID} already processed.`);
-      return { skipped: 'duplicate', accountNumber };
-    }
-
-    // Combine names
-    const senderName = [FirstName, MiddleName, LastName].filter(Boolean).join(' ');
-
-    // Save the real transaction
-    const transaction = await Transaction.create({
-      merchantId: merchant._id,
-      accountNumber: merchant.paybillAccount,
-      type: 'inbound',
-      amount: amount,
-      kesAmount: amount,
-      currency: 'KES',
-      status: 'completed',
-      reference: TransID,
-      sender: {
-        name: senderName || 'M-PESA CUSTOMER',
-        id: formatPhoneDisplay(MSISDN)
-      },
-      recipient: {
-        name: merchant.businessName,
-        id: merchant.paybillAccount
-      }
-    });
-
-    // PayChain's own tiered merchant fee, plus a flat KES 5 markup on every
-    // C2B paybill deposit above FLAT_FEE_FREE_TIER_MAX_KES
-    // (calculateRawC2bMarkup — see pricingEngine.js) — both deducted from
-    // the gross receipt before it ever reaches the merchant's balance or
-    // the Inflation Shield FX conversion below. Clamped so the combined
-    // fee never exceeds the gross amount itself.
-    const tieredMerchantFee = calculateMerchantFee(amount);
-    const rawC2bMarkup = calculateRawC2bMarkup(amount);
-    const merchantFee = Math.min(amount, Math.round((tieredMerchantFee + rawC2bMarkup) * 100) / 100);
-    const netKESAmount = Math.round((amount - merchantFee) * 100) / 100;
-    console.log(`💰 M-PESA C2B fee for ${TransID}: gross KES ${amount}, PayChain fee KES ${merchantFee} (tiered KES ${tieredMerchantFee} + flat KES ${rawC2bMarkup}), net KES ${netKESAmount}`);
-
-    // The Transaction pre-save hook (utils/feeCalculator.js) only knows the
-    // tiered portion (it calls calculateMerchantFee the same way, on the
-    // same amount) — top up paychainFee with whatever's left of the flat
-    // markup on top (normally the full rawC2bMarkup, less only if the
-    // clamp above capped the total at the gross amount for a very small
-    // deposit), so the persisted field always matches what was actually
-    // deducted below, not just the tiered part.
-    const flatMarkupApplied = Math.round((merchantFee - tieredMerchantFee) * 100) / 100;
-    if (flatMarkupApplied > 0) {
-      await Transaction.updateOne({ _id: transaction._id }, { $inc: { paychainFee: flatMarkupApplied } });
-    }
-
-    const { date, time } = formatTransactionDateTime(payload.TransTime);
-
-    // Customer receipt SMS fired here, immediately after the base
-    // Transaction record above — it only needs TransID/amount/name/account,
-    // none of which depend on the balance credit or Inflation Shield
-    // settlement below. Previously this was built after that settlement
-    // block, so a slow/retrying Stellar submission delayed the customer's
-    // receipt for no reason; sending it here means it goes out at the same
-    // speed regardless of whether this merchant has a Stellar wallet.
-    // Deliberately omits a "New M-PESA balance" line — that figure is the
-    // *paying customer's own personal M-Pesa wallet balance*, which
-    // Safaricom's C2B confirmation payload never includes (it belongs to
-    // the other side of the transaction). Fabricating a number there would
-    // be a real customer-facing correctness problem, not a cosmetic one.
-    const customerSms = MSISDN
-      ? safeSendSMS({
-          to: MSISDN,
-          message: buildCustomerPaidSms({
-            ref: TransID,
-            amount,
-            businessName: merchant.businessName,
-            accountRef: accountNumber,
-            date,
-            time,
-          }).message,
-        }).then((result) => {
-          if (!result.success) console.error(`Customer SMS receipt failed for ${TransID}:`, result.error);
-        })
-      : Promise.resolve();
-
-    // Live FX rate is only needed for the Inflation Shield conversion below
-    // — fetched inside that branch now instead of unconditionally here, so
-    // merchants without a Stellar wallet (the common case) never pay the
-    // latency of an external exchangerate-api.com round trip (up to 5s on a
-    // slow response) before their balance update and SMS.
-    //
-    // Atomic $inc rather than a read-modify-write on the in-memory `merchant`
-    // doc — the gap between fetching `merchant` above and saving here spans
-    // several awaits (getLiveKesToUsdcRate, settleInflationShield), during
-    // which a concurrent webhook for the same merchant could read the same
-    // stale balance and silently clobber it on save(). $inc is race-free
-    // regardless of how long this branch takes.
-    let updatedMerchant;
-    let settlementTxHash = null;
-    // Demo/evidence merchants (Stellar grant deliverable pipeline) always
-    // get the automatic conversion, regardless of AUTO_INFLATION_SHIELD_ENABLED
-    // — that flag exists purely to protect real merchants from this on-chain
-    // dependency sitting in their live payment path, and isDemoMerchant is
-    // never set on a real merchant (see models/Merchant.js), so this can't
-    // change behavior for anyone but the demo accounts it's built for.
-    //
-    // For real merchants, also requires merchant.features.inflationShield —
-    // "hidden until an admin enables it" (2026-08-11) has to mean the
-    // automatic conversion doesn't silently run in the background either,
-    // not just that the UI is hidden. !== false (not === true) so this
-    // can't change behavior for any merchant who already had the feature on
-    // before this per-merchant gate existed — only merchants whose flag is
-    // explicitly false (new signups, or one an admin explicitly turned off)
-    // are affected.
-    if (merchant.stellarPublicKey && (merchant.isDemoMerchant || (AUTO_INFLATION_SHIELD_ENABLED && merchant.features?.inflationShield !== false))) {
-      try {
-        const liveRate = await getLiveKesToUsdcRate();
-        const usdcPayoutValue = (netKESAmount * liveRate).toFixed(7);
-
-        console.log(`🛡️ Executing Inflation Shield for Acc ${accountNumber}:`);
-        console.log(`   - Gross M-Pesa KES: ${amount}`);
-        console.log(`   - Live KES/USDC Rate (Fractional): ${liveRate}`);
-        console.log(`   - Exact On-Chain Payout: ${usdcPayoutValue} USDC`);
-
-        const txHash = await settleInflationShield(merchant.stellarPublicKey, usdcPayoutValue);
-        settlementTxHash = txHash;
-
-        // Log the blockchain settlement transaction
-        await Transaction.create({
-          merchantId: merchant._id,
-          accountNumber: merchant.paybillAccount,
-          type: 'settlement',
-          amount: parseFloat(usdcPayoutValue),
-          kesAmount: netKESAmount,
-          currency: 'USDC',
-          status: 'completed',
-          reference: txHash,
-          sender: { name: 'PayChain Settlement', id: 'MASTER_WALLET' },
-          recipient: { name: merchant.businessName, id: merchant.stellarPublicKey }
-        });
-
-        updatedMerchant = await Merchant.findByIdAndUpdate(
-          merchant._id,
-          { $inc: { usdcBalance: parseFloat(usdcPayoutValue) } },
-          { returnDocument: 'after' }
-        );
-
-      } catch (e) {
-        console.error(`❌ Inflation Shield failed for ${accountNumber}:`, e.message);
-        // If settlement fails, funds remain as KES balance
-        updatedMerchant = await Merchant.findByIdAndUpdate(
-          merchant._id,
-          { $inc: { kesBalance: netKESAmount } },
-          { returnDocument: 'after' }
-        );
-      }
-    } else {
-      // If no Stellar wallet, just add to KES balance
-      updatedMerchant = await Merchant.findByIdAndUpdate(
-        merchant._id,
-        { $inc: { kesBalance: netKESAmount } },
-        { returnDocument: 'after' }
-      );
-    }
-
-    console.log(`✅ Successfully processed M-PESA payment of KES ${amount} for account ${accountNumber}`);
-
-    createNotification({
-      merchantId: merchant._id,
-      kind: 'payment',
-      title: 'Payment received',
-      message: `You received KES ${amount.toLocaleString()} from ${senderName || 'a customer'} via your PayChain Account Number ${merchant.paybillAccount}.`,
-    });
-
-    // Explicit pause before the merchant SMS, only when a customer SMS was
-    // actually sent above too — confirmed live (2026-08-04) that firing two
-    // SMS too close together gets the second one queued by Africa's
-    // Talking for minutes (100% hit rate across every real multi-recipient
-    // transaction sampled). The Inflation Shield branch above sometimes
-    // already provides enough of a gap on its own, but the common
-    // no-Stellar-wallet path resolves in milliseconds — not enough. Safe to
-    // await here regardless: the response to Safaricom was already sent
-    // above this block (see the Promise.all comment below).
-    if (MSISDN) {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-    }
-
-    // Merchant transaction alert SMS — new balance here IS real data we
-    // hold (updatedMerchant.kesBalance from the atomic $inc above).
-    const merchantSms = merchant.phone
-      ? safeSendSMS({
-          to: merchant.phone,
-          message: buildPaymentReceivedSms({
-            ref: TransID,
-            amount,
-            payerName: senderName,
-            payerPhone: MSISDN,
-            date,
-            time,
-            balance: updatedMerchant.kesBalance || 0,
-          }).message,
-        }).then((result) => {
-          if (!result.success) console.error(`Merchant SMS alert failed for ${merchant._id}:`, result.error);
-        })
-      : Promise.resolve();
-
-    // Both dispatches never throw (see utils/sms.js) — awaited together
-    // purely so both attempts fire before this handler returns, not because
-    // a delivery failure here could ever affect the response already sent
-    // to Safaricom above.
-    await Promise.all([customerSms, merchantSms]);
-
-    return { merchant: updatedMerchant, transaction, txHash: settlementTxHash };
-}
-
-// Public webhook — Safaricom hits this when a real (or sandboxed) C2B
-// payment completes. Acks immediately, then runs the actual processing
-// (processMpesaC2bPayload above) without the response waiting on it.
-export const confirmationURL = async (req, res) => {
-  try {
-    const payload = req.body;
-    // Summary only, not the full payload — it carries customer MSISDN/name
-    // (PII) which doesn't need to sit in plaintext stdout logs.
-    console.log(`📥 M-PESA Confirmation: TransID=${payload?.TransID} Amount=${payload?.TransAmount} BillRef=${payload?.BillRefNumber}`);
-
-    /*
-      Expected Payload:
-      {
-        TransactionType: 'Pay Bill',
-        TransID: 'SGH2D8X1P',
-        TransTime: '20250622143000',
-        TransAmount: '1000.00',
-        BusinessShortCode: '400200',
-        BillRefNumber: '84729',
-        InvoiceNumber: '',
-        OrgAccountBalance: '...',
-        ThirdPartyTransID: '',
-        MSISDN: '254700000000',
-        FirstName: 'JOHN',
-        MiddleName: 'DOE',
-        LastName: ''
-      }
-    */
-
-    // Acknowledge receipt to Safaricom immediately
-    res.status(200).json({
-      ResultCode: 0,
-      ResultDesc: 'Success'
-    });
-
-    await processMpesaC2bPayload(payload);
-  } catch (error) {
-    console.error('❌ M-PESA Confirmation Webhook Error:', error);
-    // Safaricom expects a 200 even if internal processing fails to avoid retries
-    res.status(200).json({ ResultCode: 1, ResultDesc: 'Internal Failure' });
-  }
-};
-
-// @desc    Manually run the exact same confirmation pipeline as the live
-//          Safaricom webhook above, for a demo merchant — Safaricom's C2B
-//          sandbox callback delivery is well known to be unreliable/slow,
-//          so this gives a deterministic way to produce a real Stellar
-//          settlement + tx hash without waiting on it. Restricted to
-//          isDemoMerchant accounts only: this fabricates a real balance
-//          credit and (if the merchant has a wallet) a real on-chain
-//          transaction, so it must never be reachable against a real
-//          merchant's account.
-// @route   POST /api/admin/merchants/:id/simulate-mpesa-confirmation
-// @access  Private (Admin, owner only)
-export const simulateMpesaConfirmation = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { amount, senderName, senderPhone } = req.body || {};
-
-    const numericAmount = Number(amount);
-    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
-      return res.status(400).json({ error: 'A valid positive amount is required.' });
-    }
-
-    const merchant = await Merchant.findById(id);
-    if (!merchant) return res.status(404).json({ error: 'Merchant not found' });
-    if (!merchant.isDemoMerchant) {
-      return res.status(403).json({ error: 'This debug tool only works on demo merchants, so it can never fabricate a credit against a real merchant account.' });
-    }
-    if (!merchant.paybillAccount) {
-      return res.status(400).json({ error: 'This demo merchant has no paybillAccount assigned — cannot match it to a simulated payment.' });
-    }
-
-    const now = new Date();
-    const pad = (n) => String(n).padStart(2, '0');
-    const transTime = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-    const nameParts = String(senderName || 'TEST SIMULATION').trim().split(/\s+/);
-
-    const payload = {
-      TransactionType: 'Pay Bill',
-      TransID: `TESTSIM${Date.now()}`,
-      TransTime: transTime,
-      TransAmount: String(numericAmount),
-      BusinessShortCode: shortCode || '',
-      BillRefNumber: merchant.paybillAccount,
-      MSISDN: senderPhone || '254700000000',
-      FirstName: nameParts[0],
-      MiddleName: '',
-      LastName: nameParts.slice(1).join(' '),
-    };
-
-    const result = await processMpesaC2bPayload(payload);
-
-    logAudit({
-      action: 'admin.mpesa.simulate_confirmation', category: 'admin', severity: 'success',
-      message: `Manually triggered M-PESA confirmation pipeline for demo merchant ${merchant.businessName} (KES ${numericAmount})`,
-      merchant,
-      actor: req.admin ? { type: 'admin', id: req.admin._id || null, email: req.admin.email || null, name: req.admin.name || req.admin.email || 'admin' } : { type: 'admin', id: null, email: null, name: 'admin' },
-      req,
-      metadata: { amount: numericAmount, transId: payload.TransID, txHash: result?.txHash || null },
-    });
-
-    res.status(200).json({
-      success: true,
-      transId: payload.TransID,
-      txHash: result?.txHash || null,
-      settled: !!result?.txHash,
-      transaction: result?.transaction || null,
-    });
-  } catch (error) {
-    console.error('❌ Simulate M-PESA Confirmation Error:', error);
-    res.status(500).json({ error: error.message || 'Simulation failed' });
-  }
-};
-
+// Safaricom Daraja is no longer used anywhere in this app — STK Push, B2C,
+// and B2B all route through NCBA (see initiateSTKPush/initiateB2C/initiateB2B
+// below). The Daraja C2B confirmation webhook, its OAuth token/URL
+// registration, and the demo-merchant simulator that drove it have been
+// removed; MPESA_CONSUMER_KEY/_SECRET/_CALLBACK_URL/_WEBHOOK_SECRET/
+// _SHORTCODE/_ENVIRONMENT are no longer read anywhere in the codebase.
 // ================= STK PUSH (LIPA NA M-PESA ONLINE) =================
 
 export const initiateSTKPush = async (req, res) => {
@@ -653,8 +170,7 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
             );
 
             // Atomic $inc (not merchant.save()) — also hands back the real
-            // post-credit balance for the SMS below, same reasoning as
-            // confirmationURL above.
+            // post-credit balance for the SMS below.
             const updatedMerchant = await Merchant.findByIdAndUpdate(
               merchant._id,
               { $inc: { kesBalance: merchantNetSettlement } },
@@ -672,7 +188,7 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
             // amount/type change — an atomic update bypasses that safely).
             const transaction = await Transaction.create({
               merchantId: merchant._id,
-              accountNumber: merchant.paybillAccount || 'WALLET_FUND',
+              accountNumber: merchant.ncbaMerchantCode || 'WALLET_FUND',
               type: 'inbound',
               amount: link.amount,
               kesAmount: link.amount,
@@ -686,7 +202,7 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
               // real M-Pesa confirmation SMS falls back to showing the
               // number when it has no name to show.
               sender: { name: formatPhoneDisplay(stkReq.phone), id: formatPhoneDisplay(stkReq.phone) },
-              recipient: { name: merchant.businessName, id: merchant.paybillAccount },
+              recipient: { name: merchant.businessName, id: merchant.ncbaMerchantCode },
               balanceAfter: updatedMerchant.kesBalance,
             });
 
@@ -755,11 +271,10 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
             // how the NCBA controllers already handle this. Account
             // reference mirrors M-Pesa's own "for account X" convention:
             // the invoice number if this settled an invoice, else the
-            // merchant's paybill account if they have one, else the raw
-            // payment-link id as a last resort (some merchants — e.g. ones
-            // predating the paybillAccount field — have none).
+            // merchant's NCBA account code, else the raw payment-link id
+            // as a last resort.
             const payerLabel = link.invoiceId ? 'invoice' : 'payment link';
-            const accountRef = paidInvoice?.invoiceNumber || merchant.paybillAccount || stkReq.linkId;
+            const accountRef = paidInvoice?.invoiceNumber || merchant.ncbaMerchantCode || stkReq.linkId;
             const linkSends = [];
             if (stkReq.phone) {
               linkSends.push({
@@ -854,7 +369,7 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
 
           const transaction = await Transaction.create({
             merchantId: merchant._id,
-            accountNumber: merchant.paybillAccount || 'WALLET_FUND',
+            accountNumber: merchant.ncbaMerchantCode || 'WALLET_FUND',
             type: 'top_up',
             amount: merchantCredit,
             kesAmount: merchantCredit,
@@ -928,7 +443,7 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
                 ref: receipt,
                 amount: stkReq.amount,
                 businessName: merchant.businessName,
-                accountRef: merchant.paybillAccount,
+                accountRef: merchant.ncbaMerchantCode,
                 date,
                 time,
               }).message,
@@ -1281,14 +796,14 @@ export const initiateB2C = async (req, res) => {
     // for how this resolves from 'pending'.
     const tx = await Transaction.create({
       merchantId: merchant._id,
-      accountNumber: merchant.paybillAccount || 'WALLET_FUND',
+      accountNumber: merchant.ncbaMerchantCode || 'WALLET_FUND',
       type: 'ncba_mobile_b2w',
       amount: amount,
       kesAmount: amount,
       currency: 'KES',
       status: 'pending',
       reference: transactionId,
-      sender: { name: merchant.businessName, id: merchant.paybillAccount },
+      sender: { name: merchant.businessName, id: merchant.ncbaMerchantCode },
       recipient: { name: destination, id: phone },
       mobileNetwork: provider,
     });
@@ -1419,14 +934,14 @@ export const initiateB2B = async (req, res) => {
 
     const tx = await Transaction.create({
       merchantId: merchant._id,
-      accountNumber: merchant.paybillAccount || 'WALLET_FUND',
+      accountNumber: merchant.ncbaMerchantCode || 'WALLET_FUND',
       type: 'ncba_lipa_na_mpesa',
       amount: numericAmount,
       kesAmount: numericAmount,
       currency: 'KES',
       status: 'pending', // resolved asynchronously via handlePesaLinkCallback
       reference: transactionId,
-      sender: { name: merchant.businessName, id: merchant.paybillAccount },
+      sender: { name: merchant.businessName, id: merchant.ncbaMerchantCode },
       recipient: { name: recipientName, id: partyB },
     });
 

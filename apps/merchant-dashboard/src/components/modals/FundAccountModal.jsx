@@ -286,8 +286,6 @@ export default function FundAccountModal({ method, onClose }) {
                   // 4-digit institution code) — falls back to the 8-digit merchant
                   // code (still usable — see ncbaAccountDisplay above), then finally
                   // to a plain pending state if neither exists yet.
-                  // This used to show merchant.paybillAccount here, which is the
-                  // unrelated 5-digit M-Pesa Paybill sub-account, not a bank account.
                   ['PayChain Account', ncbaAccountDisplay],
                 ].map(([label, value]) => (
                   <div key={label}>

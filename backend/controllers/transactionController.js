@@ -129,7 +129,7 @@ export const simulateIncomingPayment = async (req, res) => {
     // Create the transaction
     const transaction = await Transaction.create({
       merchantId: merchant._id,
-      accountNumber: merchant.paybillAccount,
+      accountNumber: merchant.ncbaMerchantCode,
       type: 'inbound',
       amount: Number(amount),
       kesAmount: Number(amount),
@@ -142,7 +142,7 @@ export const simulateIncomingPayment = async (req, res) => {
       },
       recipient: {
         name: merchant.businessName,
-        id: merchant.paybillAccount
+        id: merchant.ncbaMerchantCode
       }
     });
 
@@ -154,7 +154,7 @@ export const simulateIncomingPayment = async (req, res) => {
       merchantId: merchant._id,
       kind: 'payment',
       title: 'Payment received',
-      message: `You received KES ${Number(amount).toLocaleString()} from ${senderName || 'a customer'} via your PayChain Account Number ${merchant.paybillAccount}.`,
+      message: `You received KES ${Number(amount).toLocaleString()} from ${senderName || 'a customer'} via your PayChain Account Number ${merchant.ncbaMerchantCode}.`,
     });
 
     res.status(201).json({
@@ -213,14 +213,14 @@ export const swapKesToUsdc = async (req, res) => {
       }
 
       const usdcPayoutValue = (amount * liveRate).toFixed(7);
-      console.log(`💱 Manual Swap: Converting ${amount} KES to ${usdcPayoutValue} USDC for ${merchant.paybillAccount}`);
+      console.log(`💱 Manual Swap: Converting ${amount} KES to ${usdcPayoutValue} USDC for ${merchant.ncbaMerchantCode}`);
 
       try {
         const txHash = await settleInflationShield(merchant.stellarPublicKey, usdcPayoutValue);
 
         await Transaction.create({
           merchantId: merchant._id,
-          accountNumber: merchant.paybillAccount,
+          accountNumber: merchant.ncbaMerchantCode,
           type: 'fx_swap',
           amount: parseFloat(usdcPayoutValue),
           kesAmount: amount,
@@ -268,7 +268,7 @@ export const swapKesToUsdc = async (req, res) => {
       }
 
       const kesPayoutValue = amount / liveRate;
-      console.log(`💱 Manual Swap: Converting ${amount} USDC to ${kesPayoutValue} KES for ${merchant.paybillAccount}`);
+      console.log(`💱 Manual Swap: Converting ${amount} USDC to ${kesPayoutValue} KES for ${merchant.ncbaMerchantCode}`);
 
       try {
         const txHash = await swapUsdcToKesOnChain(merchant.stellarEncryptedSecretKey, amount);
@@ -286,7 +286,7 @@ export const swapKesToUsdc = async (req, res) => {
 
         await Transaction.create({
           merchantId: merchant._id,
-          accountNumber: merchant.paybillAccount,
+          accountNumber: merchant.ncbaMerchantCode,
           type: 'fx_swap',
           amount: kesPayoutValue,
           kesAmount: kesPayoutValue,
@@ -352,7 +352,7 @@ export const activateWallet = async (req, res) => {
       return res.status(400).json({ error: 'Wallet is already activated' });
     }
 
-    console.log(`🌟 Activating digital wallet for ${merchant.paybillAccount}...`);
+    console.log(`🌟 Activating digital wallet for ${merchant.ncbaMerchantCode}...`);
     
     const stellarWallet = await provisionMerchantWallet();
     
@@ -460,7 +460,7 @@ export const sendMoney = async (req, res) => {
     const ref = `OUT-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
     const transaction = await Transaction.create({
       merchantId,
-      accountNumber: merchant.paybillAccount,
+      accountNumber: merchant.ncbaMerchantCode,
       amount: totalDeduction,
       kesAmount: totalDeduction,
       currency: 'KES',
@@ -516,7 +516,7 @@ export const syncWalletBalance = async (req, res) => {
       if (liveBalance > (merchant.usdcBalance || 0)) {
         await Transaction.create({
           merchantId: merchant._id,
-          accountNumber: merchant.paybillAccount,
+          accountNumber: merchant.ncbaMerchantCode,
           type: 'inbound',
           amount: liveBalance - (merchant.usdcBalance || 0),
           kesAmount: 0,

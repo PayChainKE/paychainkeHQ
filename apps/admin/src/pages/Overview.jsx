@@ -552,7 +552,6 @@ const Overview = () => {
                       <td className="px-4 py-2.5">
                         <div className="flex flex-col">
                           <span className="text-xs font-bold text-on-surface tracking-tight truncate max-w-[180px]">{m.businessName}</span>
-                          {m.paybillAccount && <span className="text-2xs text-on-surface-variant/60 font-mono">#{m.paybillAccount}</span>}
                         </div>
                       </td>
                       <td className="px-4 py-2.5 text-xs font-bold text-on-surface tracking-tight tabular-nums text-right">

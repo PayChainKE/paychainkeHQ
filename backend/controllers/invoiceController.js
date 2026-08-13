@@ -369,7 +369,7 @@ export const adminListInvoices = async (req, res) => {
         .sort('-createdAt')
         .skip((page - 1) * limit)
         .limit(limit)
-        .populate('merchantId', 'businessName email paybillAccount')
+        .populate('merchantId', 'businessName email')
         .populate('paymentLinkId', 'linkId status')
         .lean(),
       Invoice.aggregate(totalsPipeline),
@@ -399,7 +399,6 @@ export const adminListInvoices = async (req, res) => {
             _id: inv.merchantId._id,
             businessName: inv.merchantId.businessName,
             email: inv.merchantId.email,
-            paybillAccount: inv.merchantId.paybillAccount,
           } : null,
           customer: inv.customer,
           currency: inv.currency,
