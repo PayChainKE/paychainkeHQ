@@ -1,5 +1,6 @@
 import { isCreditTransaction, isDebitTransaction } from './transactionDirection';
 import { formatAccountNumber } from './formatAccountNumber';
+import { formatName } from './formatName';
 
 // Mirrors the merchant-dashboard's jsPDF-built statement (Transactions.jsx's
 // handleExport) in content — same account details, summary strip, running
@@ -86,8 +87,8 @@ export function buildStatementHtml({
     const desc = isSwap
       ? `FX Swap → ${tx.usdcAmount || 0} USDC`
       : tx.sender?.name !== tx.recipient?.name
-        ? `${tx.sender?.name || '—'} → ${tx.recipient?.name || '—'}`
-        : tx.sender?.name || tx.recipient?.name || '—';
+        ? `${formatName(tx.sender?.name) || '—'} → ${formatName(tx.recipient?.name) || '—'}`
+        : formatName(tx.sender?.name) || formatName(tx.recipient?.name) || '—';
 
     return `<tr>
       <td class="mono small">${esc(dateStr)}<br/><span class="dim">${esc(timeStr)}</span></td>

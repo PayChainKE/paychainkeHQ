@@ -1,4 +1,5 @@
 import { isCreditTransaction as isInboundType } from './transactionDirection';
+import { formatName } from './formatName';
 
 // Single source of truth for the printable "Official Audit Receipt" PDF —
 // used by both Collections.tsx (inbound collections) and Transactions.tsx
@@ -17,8 +18,8 @@ export type ReceiptTx = {
 };
 
 const counterpartyName = (tx: ReceiptTx): string => {
-  if (isInboundType(tx.type as any)) return tx.sender?.name || 'Unknown';
-  return tx.recipient?.name || tx.sender?.name || 'Treasury';
+  if (isInboundType(tx.type as any)) return formatName(tx.sender?.name) || 'Unknown';
+  return formatName(tx.recipient?.name) || formatName(tx.sender?.name) || 'Treasury';
 };
 
 const formatCurrency = (amount: number) =>

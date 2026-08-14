@@ -6,6 +6,7 @@ import { formatKES, formatUSDC } from '../utils/formatCurrency'
 import { formatAccountNumber } from '../utils/formatAccountNumber'
 import { formatTxDate, formatTxTime } from '../utils/formatDate'
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay'
+import { formatName } from '../utils/formatName'
 import { getAmountSign, getAmountColorClassWithHover, isCreditTransaction, isDebitTransaction, isSwapTransaction } from '../utils/transactionDirection'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
@@ -549,7 +550,7 @@ export default function Overview() {
               </div>
             ) : (
               recentTx.map(tx => {
-                const party = tx.sender?.name || tx.recipient?.name || 'PayChain'
+                const party = formatName(tx.sender?.name) || formatName(tx.recipient?.name) || 'PayChain'
                 const initials = party.slice(0, 2).toUpperCase()
                 const isIn  = isCreditTransaction(tx.type)
                 const isSwp = isSwapTransaction(tx.type)

@@ -12,6 +12,7 @@ import TopBar from '../components/layout/TopBar';
 import { isCreditTransaction as isInboundType, isDebitTransaction as isOutboundType, typeLabel as txTypeLabel } from '../utils/transactionDirection';
 import { formatAccountNumber } from '../utils/formatAccountNumber';
 import { buildAuditReceiptHtml } from '../utils/auditReceiptHtml';
+import { formatName } from '../utils/formatName';
 
 type DateFilter = 'all' | 'today' | 'yesterday' | 'week' | 'last7' | 'month' | 'last30' | 'year' | 'custom';
 // Backend type enum includes the legacy 'inbound'/'outbound'/'bulk_pay'/
@@ -40,8 +41,8 @@ type Tx = {
 };
 
 const counterpartyName = (tx: Tx): string => {
-  if (isInboundType(tx.type)) return tx.sender?.name || 'Unknown';
-  return tx.recipient?.name || tx.sender?.name || 'Treasury';
+  if (isInboundType(tx.type)) return formatName(tx.sender?.name) || 'Unknown';
+  return formatName(tx.recipient?.name) || formatName(tx.sender?.name) || 'Treasury';
 };
 
 const kesValue = (tx: Tx): number => tx.kesAmount || tx.amount || 0;

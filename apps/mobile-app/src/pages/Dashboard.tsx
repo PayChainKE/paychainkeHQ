@@ -10,6 +10,7 @@ import PrivateValue from '../components/PrivateValue';
 import FundAccountModal from '../components/FundAccountModal';
 import { isCreditTransaction, isDebitTransaction } from '../utils/transactionDirection';
 import { formatAccountNumber } from '../utils/formatAccountNumber';
+import { formatName } from '../utils/formatName';
 
 type Timeframe = '7D' | '30D' | '6M';
 const DAY_NAMES = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
@@ -666,7 +667,7 @@ export default function Dashboard({ navigation }: any) {
                 transactions.slice(0, 5).map((tx, index) => {
                   const isInbound = isCreditTransaction(tx.type);
                   const isSwap = tx.type === 'fx_swap';
-                  const name = isInbound ? (tx.sender?.name || 'Unknown') : (tx.recipient?.name || tx.sender?.name || 'Treasury');
+                  const name = isInbound ? (formatName(tx.sender?.name) || 'Unknown') : (formatName(tx.recipient?.name) || formatName(tx.sender?.name) || 'Treasury');
                   const verified = tx.status === 'completed' || tx.status === 'verified';
                   const kes = tx.kesAmount || tx.amount || 0;
                   const rawRef = tx.reference || tx.type.replace('_', ' ');

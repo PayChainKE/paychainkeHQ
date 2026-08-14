@@ -4,6 +4,7 @@ import MerchantLayout from '../components/layout/MerchantLayout'
 import { formatKES, formatUSDC } from '../utils/formatCurrency'
 import { formatDateISO } from '../utils/formatDate'
 import { formatAccountNumber } from '../utils/formatAccountNumber'
+import { formatName } from '../utils/formatName'
 import { getAmountSign, getAmountColorClass, isCreditTransaction, isSwapTransaction } from '../utils/transactionDirection'
 import { ValidatedInput } from '../components/ValidatedInput'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
@@ -1088,7 +1089,7 @@ export default function Wallet() {
                         <p className="text-[9px] md:text-[10px] text-on-surface-variant font-medium opacity-60">{formatDateISO(tx.createdAt || tx.timestamp)}</p>
                         <span className="text-[9px] md:text-[10px] text-on-surface-variant/20 block md:hidden">•</span>
                         <p className="hidden md:block text-[9px] text-on-surface-variant uppercase font-black tracking-widest opacity-40">
-                          {isCreditTransaction(tx.type) ? (tx.sender?.name || 'Unknown') : (tx.recipient?.name || tx.sender?.name || 'Internal Account')}
+                          {isCreditTransaction(tx.type) ? (formatName(tx.sender?.name) || 'Unknown') : (formatName(tx.recipient?.name) || formatName(tx.sender?.name) || 'Internal Account')}
                         </p>
                       </div>
                     </div>

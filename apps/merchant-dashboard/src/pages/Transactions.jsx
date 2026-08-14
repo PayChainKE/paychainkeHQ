@@ -7,6 +7,7 @@ import { formatDateISO, formatTxDate, formatTxTime } from '../utils/formatDate'
 import { formatKES, formatUSDC } from '../utils/formatCurrency'
 import { formatAccountNumber } from '../utils/formatAccountNumber'
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay'
+import { formatName } from '../utils/formatName'
 import { getAmountSign, getAmountColorClass, isCreditTransaction, isDebitTransaction } from '../utils/transactionDirection'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useNotification } from '../context/NotificationContext'
@@ -329,8 +330,8 @@ export default function Transactions() {
         const desc = isSwp
           ? `FX Swap -> ${tx.usdcAmount || 0} USDC`
           : (tx.sender?.name !== tx.recipient?.name
-              ? `${tx.sender?.name || '—'} -> ${tx.recipient?.name || '—'}`
-              : tx.sender?.name || tx.recipient?.name || '—')
+              ? `${formatName(tx.sender?.name) || '—'} -> ${formatName(tx.recipient?.name) || '—'}`
+              : formatName(tx.sender?.name) || formatName(tx.recipient?.name) || '—')
 
         return [
           `${dateStr}\n${timeStr}`,
@@ -491,7 +492,7 @@ export default function Transactions() {
     doc.setTextColor(22, 39, 35)
     doc.text(tx.type.replace('_', ' ').toUpperCase(), 20, valueY)
     doc.text(tx.status.toUpperCase(), 20, valueY + 20)
-    doc.text(tx.sender?.name || tx.recipient?.name || 'Internal Treasury', 20, valueY + 40)
+    doc.text(formatName(tx.sender?.name) || formatName(tx.recipient?.name) || 'Internal Treasury', 20, valueY + 40)
     doc.text(formatDateISO(tx.createdAt || tx.timestamp), 20, valueY + 60)
 
     // Column 2 - Amount Focus
@@ -712,7 +713,7 @@ export default function Transactions() {
                           </span>
                         </td>
                         <td className="px-6 py-2">
-                          <p className="text-[13px] font-semibold text-primary leading-tight">{tx.sender?.name || tx.recipient?.name || 'PayChain'}</p>
+                          <p className="text-[13px] font-semibold text-primary leading-tight">{formatName(tx.sender?.name) || formatName(tx.recipient?.name) || 'PayChain'}</p>
                           <p className="text-[10px] font-mono text-on-surface-variant group-hover:text-primary transition-colors leading-tight tabular-nums">
                             {[formatPhoneDisplay(tx.sender?.id || tx.recipient?.id), tx.reference].filter(Boolean).join(' · ')}
                           </p>
@@ -762,7 +763,7 @@ export default function Transactions() {
 
                   {/* Party & Reference */}
                   <p className="text-base font-bold text-primary leading-tight">
-                    {tx.sender?.name || tx.recipient?.name || 'PayChain'}
+                    {formatName(tx.sender?.name) || formatName(tx.recipient?.name) || 'PayChain'}
                   </p>
                   <p className="text-[10px] text-on-surface-variant/40 font-mono tracking-tight mb-2 tabular-nums">
                     {[formatPhoneDisplay(tx.sender?.id || tx.recipient?.id), tx.reference].filter(Boolean).join(' · ')}
@@ -878,7 +879,7 @@ export default function Transactions() {
                   <div className="space-y-3 pt-6 border-t border-outline-variant/5">
                     <p className="text-[10px] text-on-surface-variant/60 font-bold uppercase tracking-[0.2em]">Counterparty</p>
                     <div>
-                      <p className="text-lg font-bold text-primary">{selectedTx.sender?.name || selectedTx.recipient?.name || 'Internal Treasury'}</p>
+                      <p className="text-lg font-bold text-primary">{formatName(selectedTx.sender?.name) || formatName(selectedTx.recipient?.name) || 'Internal Treasury'}</p>
                       <p className="text-[10px] text-on-surface-variant/40 font-bold mt-1 uppercase tracking-widest">{formatPhoneDisplay(selectedTx.sender?.id || selectedTx.recipient?.id) || 'SYSTEM'}</p>
                     </div>
                   </div>
