@@ -226,21 +226,37 @@ export default function SupportPage({ navigation }: any) {
             </View>
             
             <View className="gap-4">
-              <FAQItem 
-                question="How do I withdraw funds?" 
-                answer="Navigate to your balance card, tap 'Withdraw', and select your linked bank or mobile money account. Transfers are processed instantly." 
+              <FAQItem
+                question="How do I collect a payment from a customer?"
+                answer="From Request Money, send an Instant M-PESA Prompt straight to their phone, share a Payment Link, or show a Scan-to-Pay QR code. All three settle straight into your PayChain balance the moment they're paid."
+              />
+              <FAQItem
+                question="How do I send money to someone?"
+                answer="Go to Send Money and choose a destination — any M-PESA number, a bank account, or a business Till or Paybill. Every transfer is authorised with your Payment PIN before it goes out."
+              />
+              <FAQItem
+                question="How do I pay multiple people at once?"
+                answer="Bulk Pay lets you save Employees, Suppliers, Contractors and Utility billers (KPLC, Nairobi Water) as recipients, then run a single batch payout across all of them with one authorisation."
+              />
+              <FAQItem
+                question="What are the transaction fees?"
+                answer="Collections carry PayChain's standard tiered fee. Send Money and Bulk Pay payouts — bank, M-PESA, Paybill/Till, KPLC, and Water — each carry their own tiered PayChain fee plus the relevant third-party cost, shown before you confirm. FX conversions (KES to USDC) carry no PayChain fee today."
+              />
+              <FAQItem
+                question="What is my PayChain Virtual Account?"
+                answer="It's the dedicated NCBA account number tied to your business, shown on your home screen. Anyone can pay into it directly by bank transfer or M-PESA, and it settles straight into your PayChain balance."
+              />
+              <FAQItem
+                question="How do I increase my Trust Score?"
+                answer="Trust Score is built purely from your completed collection volume on PayChain — the more payments you process through your Virtual Account, the higher it climbs. Once it reaches 60, you're eligible to apply for a Cash Advance."
               />
               <FAQItem
                 question="Is my money safe?"
                 answer="Your funds move through PayChain's own secured virtual account rails, and your password and PIN are hashed — never stored or logged in plain text, not even our own team can read them."
               />
               <FAQItem
-                question="How to increase my Trust Score?"
-                answer="Consistent transaction volume, timely repayments of advances, and positive customer feedback are the fastest ways to improve your score."
-              />
-              <FAQItem
-                question="What are the transaction fees?"
-                answer="Collections carry PayChain's standard tiered fee. Send Money and Bulk Pay payouts — bank, M-PESA, Paybill/Till, KPLC, and Water — each carry their own tiered PayChain fee plus the relevant third-party cost, shown before you confirm. FX conversions (KES to USDC) carry no PayChain fee today."
+                question="What happens if I enter my Payment PIN wrong?"
+                answer="You get 5 attempts before your account is temporarily locked for 15 minutes, to protect it from unauthorised access. You can change your PIN any time from Profile → Security, and if you're ever locked out, our support team can help you back in."
               />
             </View>
           </View>

@@ -153,7 +153,11 @@ export default function BulkPay() {
     setNewPayee({
       name: p.name,
       type: p.type.charAt(0).toUpperCase() + p.type.slice(1),
-      utilityType: (p.utilityProvider === 'KPLC' || p.utilityProvider === 'KPLC_PREPAID') ? 'Electricity' : p.utilityProvider === 'WATER' ? 'Water' : 'Electricity',
+      // Only meaningful for Utility payees — defaulting this to 'Electricity'
+      // for every payee regardless of type used to make the KPLC Postpaid/
+      // Prepaid toggle (gated on utilityType alone, not type) incorrectly
+      // appear while editing a Contractor/Employee/Supplier.
+      utilityType: p.utilityProvider === 'WATER' ? 'Water' : (p.utilityProvider === 'KPLC' || p.utilityProvider === 'KPLC_PREPAID') ? 'Electricity' : '',
       utilityProvider: p.utilityProvider || '',
       paymentMethod: p.paymentMethod || 'Mobile Money',
       mobileMoneyType: p.mobileMoneyType || 'Personal Number',
@@ -1072,7 +1076,14 @@ export default function BulkPay() {
                 </div>
               </div>
 
-              <div className="px-6 md:px-10 pb-6 md:pb-10 overflow-y-auto custom-scrollbar">
+              {/* flex-1 min-h-0 is load-bearing here, not decorative — without it
+                  a flex child defaults to min-height:auto, so it grows to fit
+                  all its content instead of being capped at the space left
+                  under the header, and overflow-y-auto never gets a chance to
+                  kick in. That was silently clipping the Save button below
+                  the fold on long forms (e.g. Employee) with no way to
+                  scroll to it. */}
+              <div className="px-6 md:px-10 pb-6 md:pb-10 overflow-y-auto custom-scrollbar flex-1 min-h-0">
                 {addStep === 1 ? (
                   <div className="flex flex-col gap-3">
                     {[
@@ -1166,7 +1177,7 @@ export default function BulkPay() {
                         </div>
                       )}
 
-                      {newPayee.utilityType === 'Electricity' && (
+                      {newPayee.type === 'Utility' && newPayee.utilityType === 'Electricity' && (
                         <div className="space-y-2 pt-2 animate-in fade-in duration-500">
                           <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Account Type</label>
                           <div className="flex gap-2 p-1.5 bg-surface-container-low/50 rounded-2xl border border-outline-variant/5">
@@ -1190,7 +1201,7 @@ export default function BulkPay() {
                         </div>
                       )}
 
-                      {DEDICATED_RAIL_UTILITIES.includes(newPayee.utilityProvider) && (() => {
+                      {newPayee.type === 'Utility' && DEDICATED_RAIL_UTILITIES.includes(newPayee.utilityProvider) && (() => {
                         const isKplc = newPayee.utilityProvider === 'KPLC' || newPayee.utilityProvider === 'KPLC_PREPAID'
                         const isPrepaid = newPayee.utilityProvider === 'KPLC_PREPAID'
                         const logo = isKplc ? '/utilities%20logo/kplc.png' : '/utilities%20logo/ncwsc.png'
