@@ -105,19 +105,25 @@ export function buildPayoutSentSms({ ref, label, amount, recipientName, date, ti
 }
 
 /**
- * Merchant-facing "your payout failed and was refunded" SMS — see
- * buildPayoutSentSms's doc comment for why this needs real truncation
- * headroom, unlike the raw template it replaces.
+ * Merchant-facing "your payout failed and was refunded" SMS. `date`/`time`
+ * are accepted but deliberately left out of the message — with the longest
+ * `label` ("KPLC prepaid token purchase") and a full-length `ref`, the old
+ * wording (which included them plus "could not be completed on ... and has
+ * been refunded") ran 190-215 chars, guaranteeing safeSendSMS's hard-truncate
+ * backstop fired on every payout failure and silently cut off the refund
+ * confirmation and balance. This shorter wording stays under 160 chars even
+ * in the worst case, so recipientName's truncation headroom is a real
+ * safety margin again instead of always being exhausted.
  *
  * @param {{ ref: string, label: string, amount: number, recipientName?: string|null, date: string, time: string, balance: number }} params
  * @returns {{ message: string, truncated: boolean, length: number }}
  */
-export function buildPayoutFailedSms({ ref, label, amount, recipientName, date, time, balance }) {
+export function buildPayoutFailedSms({ ref, label, amount, recipientName, balance }) {
   return buildStrictSms(
-    ({ ref, label, amt, name, date, time, balance }) =>
-      `${ref} ${label} Failed. KES ${amt} to ${name} could not be completed on ${date} at ${time} and has been refunded. Your updated PayChain available balance is KES ${balance}.`,
+    ({ ref, label, amt, name, balance }) =>
+      `${ref} ${label} Failed. KES ${amt} to ${name} refunded. New PayChain balance: KES ${balance}.`,
     {
-      fixed: { ref, label, amt: amount.toLocaleString(), date, time, balance: balance.toLocaleString() },
+      fixed: { ref, label, amt: amount.toLocaleString(), balance: balance.toLocaleString() },
       truncatable: [{ key: 'name', value: recipientName || 'the recipient', minLength: 6 }],
     }
   );
