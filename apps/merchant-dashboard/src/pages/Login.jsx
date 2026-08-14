@@ -99,16 +99,17 @@ export default function Login() {
 
   const signupSubmittingRef = useRef(false)
 
-  // Navigation Tabs
-  const [activeTab, setActiveTab] = useState('login')
+  // Navigation Tabs — a brand-new visitor (no remembered identifier, same
+  // signal quickLogin above uses) lands on Signup instead of Login, so
+  // first-time merchants aren't stuck on the wrong tab by default.
+  const [activeTab, setActiveTab] = useState(() => localStorage.getItem(LAST_IDENTIFIER_KEY) ? 'login' : 'signup')
   const [isSignupPasswordStep, setIsSignupPasswordStep] = useState(false)
   const [otpFlowType, setOtpFlowType] = useState('') // 'login' or 'reset'
   const [authEmail, setAuthEmail] = useState('') // Captured from backend for OTP verification
   const [otpChannel, setOtpChannel] = useState('email') // 'email' or 'sms' — which channel the current OTP went out on
   const [otpMaskedPhone, setOtpMaskedPhone] = useState('')
   const [resendTimer, setResendTimer] = useState(59)
-  const [hasAccount, setHasAccount] = useState(() => localStorage.getItem('hasAccount') === 'true')
-  
+
   // Real-time security validation
   useEffect(() => {
     setStrength({
@@ -219,8 +220,6 @@ export default function Login() {
 
     if (res.success) {
       setIsOTPMode(false)
-      localStorage.setItem('hasAccount', 'true')
-      setHasAccount(true)
       nav('/overview')
     } else {
       setErr(res.error)
