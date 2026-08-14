@@ -738,7 +738,11 @@ export default function BulkPay() {
     setNewPayee({
       name: p.name || '',
       type: p.type || 'employee',
-      utilityType: (p.utilityProvider === 'KPLC' || p.utilityProvider === 'KPLC_PREPAID') ? 'Electricity' : p.utilityProvider === 'WATER' ? 'Water' : 'Electricity',
+      // Only meaningful for Utility payees — defaulting this to 'Electricity'
+      // for every payee regardless of type used to make the KPLC Postpaid/
+      // Prepaid toggle (gated on utilityType alone, not type) incorrectly
+      // appear while editing an Employee/Supplier/Contractor.
+      utilityType: p.utilityProvider === 'WATER' ? 'Water' : (p.utilityProvider === 'KPLC' || p.utilityProvider === 'KPLC_PREPAID') ? 'Electricity' : '',
       utilityProvider: p.utilityProvider || '',
       paymentMethod: (p.paymentMethod as PaymentMethod) || 'Mobile Money',
       mobileMoneyType: (p.mobileMoneyType as MobileMoneyType) || 'Personal Number',
@@ -2094,7 +2098,12 @@ export default function BulkPay() {
                 </TouchableOpacity>
               </View>
 
-              <ScrollView showsVerticalScrollIndicator={false}>
+              {/* flex-1 is load-bearing — without it this ScrollView sizes to
+                  its own content instead of being bounded by the sheet's
+                  maxHeight, so on a long form (e.g. Employee) the content
+                  overflows past the fixed footer below with no way to
+                  scroll down to the Save/Add button. */}
+              <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
                 {addStep === 1 ? (
                   <View>
                     {(Object.keys(TYPE_META) as PayeeType[]).map((key) => {
@@ -2169,7 +2178,7 @@ export default function BulkPay() {
                     )}
 
                     {/* Postpaid / Prepaid toggle */}
-                    {newPayee.utilityType === 'Electricity' && (
+                    {newPayee.type === 'utility' && newPayee.utilityType === 'Electricity' && (
                       <View className="mb-4">
                         <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-2">Account Type</Text>
                         <View className="flex-row gap-2 p-1.5 bg-[#f0fdf4] rounded-2xl border border-[#e7ece7]">
@@ -2197,7 +2206,7 @@ export default function BulkPay() {
                         colors spelled out explicitly per-branch since
                         NativeWind (like Tailwind) needs literal class
                         strings, not ones built from an interpolated variable. */}
-                    {(newPayee.utilityProvider === 'KPLC' || newPayee.utilityProvider === 'KPLC_PREPAID') && (
+                    {newPayee.type === 'utility' && (newPayee.utilityProvider === 'KPLC' || newPayee.utilityProvider === 'KPLC_PREPAID') && (
                       <View className="bg-[#fef9e7] rounded-2xl p-4 mb-4 border border-[#f5deb3]">
                         <View className="flex-row items-center gap-2.5 mb-2">
                           <View className="bg-white rounded-lg px-2 py-1.5 shadow-sm">
@@ -2262,7 +2271,7 @@ export default function BulkPay() {
                       </View>
                     )}
 
-                    {newPayee.utilityProvider === 'WATER' && (
+                    {newPayee.type === 'utility' && newPayee.utilityProvider === 'WATER' && (
                       <View className="bg-[#e6f6fd] rounded-2xl p-4 mb-4 border border-[#bae4f5]">
                         <View className="flex-row items-center gap-2.5 mb-3">
                           <View className="bg-white rounded-lg px-2 py-1.5 shadow-sm">
