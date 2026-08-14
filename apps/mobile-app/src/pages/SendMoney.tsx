@@ -64,14 +64,33 @@ const DESTINATIONS: Array<{ id: Destination; label: string; icon: keyof typeof M
   { id: 'paybill', label: 'Paybill', icon: 'receipt-long', hint: 'Pay to a Paybill number', feeLabel: 'Varies' },
 ];
 
-// Mirrors merchant-dashboard's SendMoney.jsx and backend/config/revenueRateCard.js's
-// NCBA_LIPA_NA_MPESA_FLAT_FEE_KES — the exact flat fee mpesaController.js#initiateB2B
-// charges server-side. Not a Safaricom-cost estimate (B2B isn't modeled there); this
-// is PayChain's own flat margin.
-const PAYCHAIN_B2B_FLAT_FEE_KES = 30;
+// Mirrors merchant-dashboard's SendMoney.jsx and backend/config/lipaNaMpesaTariffCard.js's
+// LIPA_NA_MPESA_B2B_BANDS (2026-08-12 tiered schedule) — recomputed server-side in
+// mpesaController.js#initiateB2B via getLipaNaMpesaTariff regardless of what this
+// estimate shows. This used to be a flat KES 30 mirroring the now-removed
+// NCBA_LIPA_NA_MPESA_FLAT_FEE_KES; the estimate was never updated when the backend
+// moved to this tiered table, so it was showing KES 30 for transfers (e.g. KES 50)
+// that actually cost KES 0.
+const B2B_TARIFF_BANDS: Array<{ max: number; totalFee: number }> = [
+  { max: 100,      totalFee: 0   },
+  { max: 500,      totalFee: 10  },
+  { max: 1_000,    totalFee: 15  },
+  { max: 2_500,    totalFee: 23  },
+  { max: 5_000,    totalFee: 27  },
+  { max: 10_000,   totalFee: 35  },
+  { max: 20_000,   totalFee: 57  },
+  { max: 30_000,   totalFee: 64  },
+  { max: 40_000,   totalFee: 72  },
+  { max: 50_000,   totalFee: 79  },
+  { max: 100_000,  totalFee: 86  },
+  { max: 150_000,  totalFee: 104 },
+  { max: 200_000,  totalFee: 122 },
+  { max: 250_000,  totalFee: 140 },
+];
 function estimateB2bFee(amount: number) {
   if (!amount || amount <= 0) return 0;
-  return PAYCHAIN_B2B_FLAT_FEE_KES;
+  const band = B2B_TARIFF_BANDS.find((b) => amount <= b.max) || B2B_TARIFF_BANDS[B2B_TARIFF_BANDS.length - 1];
+  return band.totalFee;
 }
 
 // Mirrors backend/config/mpesaB2cTariffCard.js — Safaricom's real M-Pesa B2C
