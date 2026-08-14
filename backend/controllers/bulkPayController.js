@@ -18,7 +18,7 @@ import { claimPayoutSubmission, DuplicateSubmissionError } from '../utils/idempo
 import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard.js';
 import { getKplcPostpaidTariff, getKplcPrepaidTariff, getNcwscTariff } from '../config/billPaymentTariffCard.js';
 import { getLipaNaMpesaTariff } from '../config/lipaNaMpesaTariffCard.js';
-import { validatePhoneNumber } from '../utils/ncbaValidators.js';
+import { validatePhoneNumber, NcbaValidationError } from '../utils/ncbaValidators.js';
 import { validateMobileWalletNumber, submitMobileB2wPayment, validateLipaNaMpesaAccount, submitLipaNaMpesaPayment, validateKplcAccount, submitKplcPayment, validateKplcPrepaidAccount, submitKplcPrepaidPayment, validateNcwscAccount, submitNcwscPayment, NcbaOpenBankingValidationError } from '../services/ncbaOpenBankingService.js';
 import { buildPayoutSentSms } from '../utils/paymentSmsTemplates.js';
 
@@ -166,7 +166,19 @@ export const validateKplcMeter = async (req, res) => {
     if (!meterNumber || !msisdn) {
       return res.status(400).json({ message: 'meterNumber and msisdn are required.' });
     }
-    const result = await validateKplcAccount({ meterNumber, msisdn });
+    // NCBA's validate/pay calls reject an msisdn that starts with 0, requiring
+    // 254XXXXXXXXX instead — same normalization authorizeBatch already
+    // applies at actual payout time. Without it, this preview rejected every
+    // meter number for a phone typed in the normal 07... local format, even
+    // when the meter itself was perfectly valid.
+    let normalizedMsisdn;
+    try {
+      normalizedMsisdn = validatePhoneNumber(msisdn);
+    } catch (e) {
+      if (e instanceof NcbaValidationError) return res.status(400).json({ message: 'Enter a valid Kenyan phone number.' });
+      throw e;
+    }
+    const result = await validateKplcAccount({ meterNumber, msisdn: normalizedMsisdn });
     res.json({
       meterNumber: result.meterNumber,
       customerName: result.customerName,
@@ -192,7 +204,15 @@ export const validateNcwscMeter = async (req, res) => {
     if (!meterNumber || !msisdn) {
       return res.status(400).json({ message: 'meterNumber and msisdn are required.' });
     }
-    const result = await validateNcwscAccount({ meterNumber, msisdn });
+    // See validateKplcMeter's identical normalization comment above.
+    let normalizedMsisdn;
+    try {
+      normalizedMsisdn = validatePhoneNumber(msisdn);
+    } catch (e) {
+      if (e instanceof NcbaValidationError) return res.status(400).json({ message: 'Enter a valid Kenyan phone number.' });
+      throw e;
+    }
+    const result = await validateNcwscAccount({ meterNumber, msisdn: normalizedMsisdn });
     res.json({
       meterNumber: result.meterNumber,
       customerName: result.customerName,
@@ -219,7 +239,15 @@ export const validateKplcPrepaidMeter = async (req, res) => {
     if (!meterNumber || !msisdn) {
       return res.status(400).json({ message: 'meterNumber and msisdn are required.' });
     }
-    const result = await validateKplcPrepaidAccount({ meterNumber, msisdn });
+    // See validateKplcMeter's identical normalization comment above.
+    let normalizedMsisdn;
+    try {
+      normalizedMsisdn = validatePhoneNumber(msisdn);
+    } catch (e) {
+      if (e instanceof NcbaValidationError) return res.status(400).json({ message: 'Enter a valid Kenyan phone number.' });
+      throw e;
+    }
+    const result = await validateKplcPrepaidAccount({ meterNumber, msisdn: normalizedMsisdn });
     res.json({
       meterNumber: result.meterNumber,
       customerName: result.customerName,

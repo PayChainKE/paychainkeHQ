@@ -88,6 +88,7 @@ interface Invoice {
   recurring: boolean;
   items: InvoiceItem[];
   payUrl?: string | null;
+  qrCodeDataUri?: string | null;
   status: 'draft' | 'sent' | 'paid' | 'void' | string;
   total?: number;
   createdAt?: string;
@@ -202,6 +203,7 @@ export default function BulkPay() {
     recurring: false,
     items: [{ description: '', qty: 1, price: 0 }],
     payUrl: null,
+    qrCodeDataUri: null,
     status: 'draft',
   });
   const [invoicesList, setInvoicesList] = useState<Invoice[]>([]);
@@ -455,6 +457,7 @@ export default function BulkPay() {
       recurring: inv.recurring,
       items: inv.items?.length ? inv.items : [{ description: '', qty: 1, price: 0 }],
       payUrl: inv.payUrl,
+      qrCodeDataUri: inv.qrCodeDataUri,
       status: inv.status,
     });
     setShowInvoiceEditor(true);
@@ -473,7 +476,7 @@ export default function BulkPay() {
         : await api.post('/api/invoices', payload);
       const saved = res.data.invoice;
       setActiveInvoiceId(saved._id);
-      setInvoiceDetails(prev => ({ ...prev, invoiceNumber: saved.invoiceNumber, payUrl: saved.payUrl, status: saved.status }));
+      setInvoiceDetails(prev => ({ ...prev, invoiceNumber: saved.invoiceNumber, payUrl: saved.payUrl, qrCodeDataUri: saved.qrCodeDataUri, status: saved.status }));
       upsertInvoiceInList(saved);
       setShowInvoiceEditor(false);
       Alert.alert('Draft Saved', `Invoice #${saved.invoiceNumber} safely stored in Invoices → Drafts.`);
@@ -506,7 +509,7 @@ export default function BulkPay() {
       }
       const sendRes = await api.post(`/api/invoices/${invoiceId}/send`, {});
       const sent = sendRes.data.invoice;
-      setInvoiceDetails(prev => ({ ...prev, invoiceNumber: sent.invoiceNumber, payUrl: sent.payUrl, status: sent.status }));
+      setInvoiceDetails(prev => ({ ...prev, invoiceNumber: sent.invoiceNumber, payUrl: sent.payUrl, qrCodeDataUri: sent.qrCodeDataUri, status: sent.status }));
       upsertInvoiceInList(sent);
       setShowInvoiceEditor(false);
       Alert.alert('Invoice Sent', `Invoice #${sent.invoiceNumber} has been emailed to ${invoiceDetails.customer.email}.`);
@@ -599,6 +602,8 @@ export default function BulkPay() {
       .notes .body { font-size:10.5px; color:#404942; white-space:pre-wrap; line-height:1.6; }
       .footer { margin-top:40px; padding-top:16px; border-top:1px solid #eff4ef; text-align:center; }
       .footer p { margin:0; font-size:9px; color:#a1a1aa; line-height:1.6; }
+      .footer img { width:72px; height:72px; object-fit:contain; margin-bottom:8px; }
+      .footer .scan-label { font-size:8px; color:#a1a1aa; text-transform:uppercase; letter-spacing:1.2px; font-weight:700; margin-bottom:14px; }
     </style></head><body>
       <div class="header">
         <div class="brand">
@@ -636,6 +641,7 @@ export default function BulkPay() {
       </div>
       ${invoiceDetails.notes ? `<div class="notes"><div class="label">Notes &amp; Terms</div><div class="body">${esc(invoiceDetails.notes)}</div></div>` : ''}
       <div class="footer">
+        ${invoiceDetails.qrCodeDataUri ? `<img src="${invoiceDetails.qrCodeDataUri}" alt="Scan to view/pay this invoice" /><div class="scan-label">Scan to view &amp; pay</div>` : ''}
         <p>This invoice was issued by ${businessName} via PayChain, and is a computer-generated document.</p>
         <p>support@paychain.co.ke &nbsp;·&nbsp; www.paychain.co.ke</p>
       </div>
@@ -2788,8 +2794,15 @@ export default function BulkPay() {
               </TouchableOpacity>
             </View>
             <Text className="text-[#707971] font-jakarta-medium text-[12px] mb-4 leading-relaxed">
-              Share this link with your customer to allow them to view and pay this invoice online.
+              Share this link with your customer to allow them to view and pay this invoice online, or let them scan the QR code below.
             </Text>
+            {invoiceDetails.qrCodeDataUri && (
+              <View className="items-center mb-5">
+                <View className="p-3 bg-white border border-[#eff4ef] rounded-2xl shadow-sm">
+                  <Image source={{ uri: invoiceDetails.qrCodeDataUri }} style={{ width: 140, height: 140 }} resizeMode="contain" />
+                </View>
+              </View>
+            )}
             <View className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl p-4 mb-5">
               <Text className="text-[13px] font-jakarta-bold text-[#0c2010]" numberOfLines={1}>{invoiceDetails.payUrl}</Text>
             </View>

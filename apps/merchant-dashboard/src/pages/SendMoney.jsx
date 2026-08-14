@@ -265,6 +265,10 @@ export default function SendMoney() {
       : selectedDest?.id === 'till' ? `Till ${recipientAccount}`
       : formatPhoneDisplay(recipientAccount)
 
+    const phoneNumber =
+      (selectedDest?.id === 'mpesa-primary' || selectedDest?.id === 'mobile') ? recipientAccount
+      : merchant?.phone
+
     const payeeDraft =
       (selectedDest?.id === 'mpesa-primary' || selectedDest?.id === 'mobile') ? {
         name: reference || recipientAccount, type: 'contractor', paymentMethod: 'Mobile Money',
@@ -291,6 +295,7 @@ export default function SendMoney() {
             amount={amount}
             methodLabel={methodLabel}
             recipientDisplay={recipientDisplay}
+            phoneNumber={phoneNumber}
             transaction={completedTx}
             payeeDraft={payeeDraft}
             onViewTransactions={() => navigate('/transactions')}

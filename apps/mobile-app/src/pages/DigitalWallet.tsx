@@ -63,7 +63,7 @@ export default function DigitalWallet({ navigation }: any) {
   const [withdrawPin, setWithdrawPin] = useState('');
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [withdrawSuccess, setWithdrawSuccess] = useState<{
-    amount: number; methodLabel: string; recipientDisplay: string; payeeDraft: PayeeDraft | null; transaction: any;
+    amount: number; methodLabel: string; recipientDisplay: string; phoneNumber?: string; payeeDraft: PayeeDraft | null; transaction: any;
   } | null>(null);
   const selectedDest = destinations.find((d) => d.id === destination)!;
 
@@ -203,6 +203,7 @@ export default function DigitalWallet({ navigation }: any) {
       let tx: any = null;
       let methodLabel: string;
       let recipientDisplay: string;
+      let phoneNumber: string | undefined;
       let payeeDraft: PayeeDraft | null;
 
       if (selectedDest.type === 'Mobile') {
@@ -211,6 +212,7 @@ export default function DigitalWallet({ navigation }: any) {
         tx = data.transaction;
         methodLabel = 'Mobile Money Withdrawal';
         recipientDisplay = phone;
+        phoneNumber = phone;
         payeeDraft = {
           name: `Withdrawal to ${phone}`, type: 'contractor', paymentMethod: 'Mobile Money',
           mobileMoneyType: 'Personal Number', phone,
@@ -231,6 +233,7 @@ export default function DigitalWallet({ navigation }: any) {
         tx = data.transaction;
         methodLabel = 'Bank Withdrawal · PesaLink';
         recipientDisplay = `${destinationValue}${withdrawBankCode ? ` · ${bankCodes.find((b) => b.code === withdrawBankCode)?.name || withdrawBankCode}` : ''}`;
+        phoneNumber = merchant?.phone;
         payeeDraft = {
           name: `Withdrawal to ${destinationValue}`, type: 'contractor', paymentMethod: 'Bank',
           bankName: bankCodes.find((b) => b.code === withdrawBankCode)?.name || '', accountNumber: destinationValue, bankCode: withdrawBankCode,
@@ -240,7 +243,7 @@ export default function DigitalWallet({ navigation }: any) {
       setDestinationValue('');
       setWithdrawBankCode('');
       setWithdrawPin('');
-      setWithdrawSuccess({ amount, methodLabel, recipientDisplay, payeeDraft, transaction: tx });
+      setWithdrawSuccess({ amount, methodLabel, recipientDisplay, phoneNumber, payeeDraft, transaction: tx });
       await refreshSession();
       fetchData();
     } catch (err: any) {
@@ -893,6 +896,7 @@ export default function DigitalWallet({ navigation }: any) {
               amount={withdrawSuccess.amount}
               methodLabel={withdrawSuccess.methodLabel}
               recipientDisplay={withdrawSuccess.recipientDisplay}
+              phoneNumber={withdrawSuccess.phoneNumber}
               transaction={withdrawSuccess.transaction}
               payeeDraft={withdrawSuccess.payeeDraft}
               onDone={() => setWithdrawSuccess(null)}

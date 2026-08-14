@@ -10,6 +10,7 @@ import PrivateValue from '../components/PrivateValue';
 import FundAccountModal from '../components/FundAccountModal';
 import { isCreditTransaction, isDebitTransaction } from '../utils/transactionDirection';
 import { formatAccountNumber } from '../utils/formatAccountNumber';
+import { formatName } from '../utils/formatName';
 
 type Timeframe = '7D' | '30D' | '6M';
 const DAY_NAMES = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
@@ -389,9 +390,9 @@ export default function Dashboard({ navigation }: any) {
           </View>
 
           {/* Quick Actions — the two fastest ways to get paid, deep-linking
-              into RequestMoney with the relevant option pre-selected. Compact
-              horizontal layout (icon + text + arrow in one row) instead of a
-              tall vertical stack, each with its own frame color — mirrors
+              into RequestMoney with the relevant option pre-selected. Back to
+              full size (was briefly shrunk to a compact horizontal layout) —
+              each still keeps its own frame color, mirroring
               merchant-dashboard's Overview.jsx Quick Action tiles. */}
           <View className="px-6 mb-8">
             <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#0c2010]/40 mb-3">Quick Actions</Text>
@@ -399,31 +400,31 @@ export default function Dashboard({ navigation }: any) {
               <TouchableOpacity
                 activeOpacity={0.9}
                 onPress={() => navigation?.navigate('RequestMoney', { preset: 'mpesa' })}
-                className="flex-1 flex-row items-center bg-[#00351d] rounded-2xl p-3 border-2 border-amber-400/30 overflow-hidden"
+                className="flex-1 bg-[#00351d] rounded-2xl p-4 border-2 border-amber-400/30 overflow-hidden"
               >
-                <View className="w-8 h-8 rounded-xl bg-white/10 items-center justify-center shrink-0">
-                  <Feather name="zap" size={14} color="#5efeb3" />
+                <View className="flex-row items-center justify-between mb-4">
+                  <View className="w-9 h-9 rounded-xl bg-white/10 items-center justify-center">
+                    <Feather name="zap" size={16} color="#5efeb3" />
+                  </View>
+                  <Feather name="arrow-up-right" size={16} color="rgba(255,255,255,0.3)" />
                 </View>
-                <View className="flex-1 ml-2.5">
-                  <Text className="text-white text-[11px] font-jakarta-bold uppercase tracking-wide">Send STK Push</Text>
-                  <Text className="text-white/40 text-[9px] font-jakarta-medium leading-snug">Prompt to pay instantly</Text>
-                </View>
-                <Feather name="arrow-up-right" size={14} color="rgba(255,255,255,0.3)" />
+                <Text className="text-white text-[12px] font-jakarta-bold uppercase tracking-wide mb-1">Send STK Push</Text>
+                <Text className="text-white/40 text-[10px] font-jakarta-medium leading-snug">Prompt a customer to pay instantly</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 activeOpacity={0.9}
                 onPress={() => navigation?.navigate('RequestMoney', { preset: 'link' })}
-                className="flex-1 flex-row items-center bg-[#00351d] rounded-2xl p-3 border-2 border-sky-400/30 overflow-hidden"
+                className="flex-1 bg-[#00351d] rounded-2xl p-4 border-2 border-sky-400/30 overflow-hidden"
               >
-                <View className="w-8 h-8 rounded-xl bg-white/10 items-center justify-center shrink-0">
-                  <Feather name="link" size={14} color="#5efeb3" />
+                <View className="flex-row items-center justify-between mb-4">
+                  <View className="w-9 h-9 rounded-xl bg-white/10 items-center justify-center">
+                    <Feather name="link" size={16} color="#5efeb3" />
+                  </View>
+                  <Feather name="arrow-up-right" size={16} color="rgba(255,255,255,0.3)" />
                 </View>
-                <View className="flex-1 ml-2.5">
-                  <Text className="text-white text-[11px] font-jakarta-bold uppercase tracking-wide">Payment Link</Text>
-                  <Text className="text-white/40 text-[9px] font-jakarta-medium leading-snug">Share for any amount</Text>
-                </View>
-                <Feather name="arrow-up-right" size={14} color="rgba(255,255,255,0.3)" />
+                <Text className="text-white text-[12px] font-jakarta-bold uppercase tracking-wide mb-1">Get Payment Link</Text>
+                <Text className="text-white/40 text-[10px] font-jakarta-medium leading-snug">Share a link for any amount</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -666,7 +667,7 @@ export default function Dashboard({ navigation }: any) {
                 transactions.slice(0, 5).map((tx, index) => {
                   const isInbound = isCreditTransaction(tx.type);
                   const isSwap = tx.type === 'fx_swap';
-                  const name = isInbound ? (tx.sender?.name || 'Unknown') : (tx.recipient?.name || tx.sender?.name || 'Treasury');
+                  const name = isInbound ? (formatName(tx.sender?.name) || 'Unknown') : (formatName(tx.recipient?.name) || formatName(tx.sender?.name) || 'Treasury');
                   const verified = tx.status === 'completed' || tx.status === 'verified';
                   const kes = tx.kesAmount || tx.amount || 0;
                   const rawRef = tx.reference || tx.type.replace('_', ' ');

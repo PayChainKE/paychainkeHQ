@@ -37,9 +37,10 @@ const NAV_SECTIONS = [
   {
     title: 'Communications',
     items: [
-      { icon: 'support_agent', label: 'Call Centre', path: '/call-centre' },
-      { icon: 'mail',          label: 'Messages',    path: '/messages'    },
-      { icon: 'newspaper',     label: 'Newsletter',  path: '/newsletter'  },
+      { icon: 'support_agent', label: 'Call Centre',    path: '/call-centre'    },
+      { icon: 'mail',          label: 'Messages',       path: '/messages'       },
+      { icon: 'newspaper',     label: 'Newsletter',     path: '/newsletter'     },
+      { icon: 'sms',           label: 'SMS Broadcast',  path: '/sms-broadcast'  },
     ],
   },
   {

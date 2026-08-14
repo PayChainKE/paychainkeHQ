@@ -12,6 +12,7 @@ import { isCreditTransaction, isDebitTransaction, typeLabel as txTypeLabel } fro
 import { formatTxDate, formatTxTime } from '../utils/formatDate';
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay';
 import { buildAuditReceiptHtml } from '../utils/auditReceiptHtml';
+import { formatName } from '../utils/formatName';
 import { buildStatementHtml } from '../utils/statementHtml';
 import { InlineDatePicker } from '../components/InlineDatePicker';
 
@@ -451,8 +452,8 @@ export default function Transactions({ navigation }: any) {
                 const isInbound = isCreditTransaction(tx.type);
                 const isSwap = tx.type === 'fx_swap';
                 const name = isInbound
-                  ? (tx.sender?.name || 'Unknown')
-                  : (tx.recipient?.name || tx.sender?.name || 'Treasury');
+                  ? (formatName(tx.sender?.name) || 'Unknown')
+                  : (formatName(tx.recipient?.name) || formatName(tx.sender?.name) || 'Treasury');
                 const verified = tx.status === 'completed' || tx.status === 'verified';
                 const typeLabel = txTypeLabel(tx.type || 'inbound').toUpperCase();
                 const dateStr = formatTxDate(tx.createdAt || tx.timestamp);
@@ -545,8 +546,8 @@ export default function Transactions({ navigation }: any) {
               ? `${(selectedTx.usdcAmount || 0).toLocaleString()} USDC`
               : `${isInbound ? '+' : '-'} ${formatKES(selectedTx.kesAmount || selectedTx.amount || 0)}`;
             const counterpartyName = isInbound
-              ? (selectedTx.sender?.name || 'Unknown')
-              : (selectedTx.recipient?.name || selectedTx.sender?.name || 'Internal Treasury');
+              ? (formatName(selectedTx.sender?.name) || 'Unknown')
+              : (formatName(selectedTx.recipient?.name) || formatName(selectedTx.sender?.name) || 'Internal Treasury');
             const counterpartyPhone = formatPhoneDisplay(selectedTx.sender?.id || selectedTx.recipient?.id);
 
             return (

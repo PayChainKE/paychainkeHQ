@@ -3,12 +3,16 @@ import axios from 'axios'
 import { jsPDF } from 'jspdf'
 import { formatKES } from '../../utils/formatCurrency'
 import { formatTxDate, formatTxTime } from '../../utils/formatDate'
+import { formatPhoneOrDash } from '../../utils/formatPhoneDisplay'
+import { barcodeSvg, drawBarcodePdf } from '../../utils/barcode'
 import { useNotification } from '../../context/NotificationContext'
 import statementLogo from '../../assets/paychain-logo-white.png'
 
 const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
 
 const STATUS_LABEL = { completed: 'Completed', success: 'Completed', pending: 'Processing' }
+const PAYCHAIN_PHONE = '+254 743 283 782'
+const PAYCHAIN_SLOGAN = 'Collect, Pay, Protect, Grow'
 
 // Shared bank-grade success card for every outbound payment flow (Send
 // Money, Wallet withdrawals, and any future rail) — replaces the
@@ -30,6 +34,7 @@ export default function TransactionSuccessCard({
   amount,
   methodLabel,
   recipientDisplay,
+  phoneNumber,
   transaction,
   payeeDraft,
   onViewTransactions,
@@ -81,31 +86,33 @@ export default function TransactionSuccessCard({
     doc.setTextColor(22, 39, 35)
     doc.setFontSize(10)
     doc.setFont('helvetica', 'normal')
-    doc.text('TRANSACTION ID', 20, 55)
+    doc.text('TRANSACTION ID', 20, 50)
     doc.setFontSize(12)
     doc.setFont('helvetica', 'bold')
-    doc.text(reference, 20, 62)
+    doc.text(reference, 20, 57)
 
     doc.setDrawColor(230, 230, 230)
-    doc.line(20, 68, pageWidth - 20, 68)
+    doc.line(20, 63, pageWidth - 20, 63)
 
     // Details grid
-    const labelY = 80, valueY = 87
+    const labelY = 73, rowH = 15
     doc.setFontSize(9)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(100, 100, 100)
     doc.text('DATE & TIME', 20, labelY)
-    doc.text('PAID TO', 20, labelY + 20)
-    doc.text('METHOD', 20, labelY + 40)
-    doc.text('STATUS', 20, labelY + 60)
+    doc.text('PAID TO', 20, labelY + rowH)
+    doc.text('PHONE NUMBER', 20, labelY + rowH * 2)
+    doc.text('PAYMENT TYPE', 20, labelY + rowH * 3)
+    doc.text('STATUS', 20, labelY + rowH * 4)
 
     doc.setFontSize(11)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(22, 39, 35)
-    doc.text(`${formatTxDate(createdAt)}, ${formatTxTime(createdAt)}`, 20, valueY)
-    doc.text(String(recipientDisplay || '—'), 20, valueY + 20)
-    doc.text(String(methodLabel || '—'), 20, valueY + 40)
-    doc.text(statusLabel.toUpperCase(), 20, valueY + 60)
+    doc.text(`${formatTxDate(createdAt)}, ${formatTxTime(createdAt)}`, 20, labelY + 7)
+    doc.text(String(recipientDisplay || '—'), 20, labelY + rowH + 7)
+    doc.text(formatPhoneOrDash(phoneNumber), 20, labelY + rowH * 2 + 7)
+    doc.text(String(methodLabel || '—'), 20, labelY + rowH * 3 + 7)
+    doc.text(statusLabel.toUpperCase(), 20, labelY + rowH * 4 + 7)
 
     // Amount
     doc.setFontSize(9)
@@ -115,21 +122,40 @@ export default function TransactionSuccessCard({
     doc.setFontSize(18)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(22, 39, 35)
-    doc.text(formatKES(amount), 85, valueY + 2)
+    doc.text(formatKES(amount), 85, labelY + 10)
+
+    const gridBottom = labelY + rowH * 4 + 7
+    doc.setDrawColor(230, 230, 230)
+    doc.line(20, gridBottom + 6, pageWidth - 20, gridBottom + 6)
 
     // Verification strip
+    const stripY = gridBottom + 11
     doc.setFillColor(245, 247, 249)
-    doc.rect(20, 155, pageWidth - 40, 15, 'F')
+    doc.rect(20, stripY, pageWidth - 40, 13, 'F')
     doc.setFontSize(9)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(22, 39, 35)
-    doc.text('VERIFIED · SECURED BY PAYCHAIN', pageWidth / 2, 164, { align: 'center' })
+    doc.text('VERIFIED · SECURED BY PAYCHAIN', pageWidth / 2, stripY + 8.5, { align: 'center' })
+
+    // Barcode — unique per transaction reference
+    const barcodeY = stripY + 17, barcodeW = 100, barcodeH = 14
+    drawBarcodePdf(doc, reference, (pageWidth - barcodeW) / 2, barcodeY, barcodeW, barcodeH)
+    doc.setFontSize(8)
+    doc.setFont('courier', 'normal')
+    doc.setTextColor(100, 100, 100)
+    doc.text(reference, pageWidth / 2, barcodeY + barcodeH + 4, { align: 'center' })
 
     // Footer
-    doc.setFontSize(8)
+    const footerY = barcodeY + barcodeH + 9
+    doc.setFontSize(7.5)
     doc.setTextColor(150, 150, 150)
     doc.setFont('helvetica', 'italic')
-    doc.text('This receipt confirms an outbound payment initiated via PayChain.', pageWidth / 2, 185, { align: 'center' })
+    doc.text('This receipt confirms an outbound payment initiated via PayChain.', pageWidth / 2, footerY, { align: 'center' })
+    doc.setFont('helvetica', 'normal')
+    doc.text(`PayChain Kenya · ${PAYCHAIN_PHONE}`, pageWidth / 2, footerY + 4.5, { align: 'center' })
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(22, 39, 35)
+    doc.text(PAYCHAIN_SLOGAN.toUpperCase(), pageWidth / 2, footerY + 9.5, { align: 'center' })
 
     doc.save(`PayChain_Receipt_${reference}.pdf`)
     addNotification({ type: 'success', title: 'Receipt Downloaded', message: `Receipt for ${reference} saved.` })
@@ -158,7 +184,8 @@ export default function TransactionSuccessCard({
           { label: 'Date & Time', value: `${formatTxDate(createdAt)} · ${formatTxTime(createdAt)}` },
           { label: 'Transaction ID', value: reference, mono: true },
           { label: 'Paid To', value: recipientDisplay || '—' },
-          { label: 'Method', value: methodLabel || '—' },
+          { label: 'Phone Number', value: formatPhoneOrDash(phoneNumber), mono: true },
+          { label: 'Payment Type', value: methodLabel || '—' },
         ].map((row) => (
           <div key={row.label} className="flex items-center justify-between gap-4">
             <span className="text-[11px] font-black uppercase tracking-widest text-slate-400 shrink-0">{row.label}</span>
@@ -168,6 +195,14 @@ export default function TransactionSuccessCard({
       </div>
 
       <div className="mx-7 lg:mx-9 border-t border-dashed border-slate-200"></div>
+
+      <div className="pt-6 pb-2 flex flex-col items-center">
+        <div
+          className="opacity-80"
+          dangerouslySetInnerHTML={{ __html: barcodeSvg(reference, { width: 180, height: 34 }) }}
+        />
+        <span className="mt-1.5 text-[10px] font-mono tracking-tight text-slate-400">{reference}</span>
+      </div>
 
       <div className="p-7 lg:p-9 space-y-3">
         <div className="grid grid-cols-2 gap-3">
@@ -212,6 +247,11 @@ export default function TransactionSuccessCard({
             {doneLabel}
           </button>
         )}
+      </div>
+
+      <div className="bg-slate-50 border-t border-slate-100 py-3 text-center">
+        <p className="text-[10px] font-bold text-slate-400 tracking-wide">PayChain Kenya · {PAYCHAIN_PHONE}</p>
+        <p className="text-[9px] font-black uppercase tracking-[0.15em] text-emerald-700/70 mt-0.5">{PAYCHAIN_SLOGAN}</p>
       </div>
     </div>
   )

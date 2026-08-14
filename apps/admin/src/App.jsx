@@ -20,6 +20,7 @@ import CallCentre from './pages/CallCentre';
 import AuditLog from './pages/AuditLog';
 import Revenue from './pages/Revenue';
 import Bookkeeping from './pages/Bookkeeping';
+import SmsBroadcast from './pages/SmsBroadcast';
 import ToastHost from './components/ui/Toast';
 import { Analytics as VercelAnalytics } from "@vercel/analytics/react";
 
@@ -41,6 +42,7 @@ export default function App(){
             <Route path="/overview" element={<Protected><Overview/></Protected>} />
             <Route path="/waitlist" element={<Protected><Waitlist/></Protected>} />
             <Route path="/newsletter" element={<Protected><Newsletter/></Protected>} />
+            <Route path="/sms-broadcast" element={<Protected><SmsBroadcast/></Protected>} />
             <Route path="/team" element={<Protected><Team/></Protected>} />
             <Route path="/officers" element={<Protected><Officers/></Protected>} />
             <Route path="/merchants" element={<Protected><Merchants/></Protected>} />

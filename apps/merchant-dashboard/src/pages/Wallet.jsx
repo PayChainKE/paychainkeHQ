@@ -4,6 +4,7 @@ import MerchantLayout from '../components/layout/MerchantLayout'
 import { formatKES, formatUSDC } from '../utils/formatCurrency'
 import { formatDateISO } from '../utils/formatDate'
 import { formatAccountNumber } from '../utils/formatAccountNumber'
+import { formatName } from '../utils/formatName'
 import { getAmountSign, getAmountColorClass, isCreditTransaction, isSwapTransaction } from '../utils/transactionDirection'
 import { ValidatedInput } from '../components/ValidatedInput'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
@@ -30,7 +31,7 @@ export default function Wallet() {
   const [withdrawPin, setWithdrawPin] = useState('')
   const [bankCodes, setBankCodes] = useState([])
   const [isWithdrawing, setIsWithdrawing] = useState(false)
-  const [withdrawSuccess, setWithdrawSuccess] = useState(null) // { amount, methodLabel, recipientDisplay, payeeDraft, transaction }
+  const [withdrawSuccess, setWithdrawSuccess] = useState(null) // { amount, methodLabel, recipientDisplay, phoneNumber, payeeDraft, transaction }
 
   // Settlement Settings
   const [showSettingsModal, setShowSettingsModal] = useState(false)
@@ -135,7 +136,7 @@ export default function Wallet() {
 
       const withdrawnAmount = withdrawAmount
       let tx = null
-      let methodLabel, recipientDisplay, payeeDraft
+      let methodLabel, recipientDisplay, payeeDraft, phoneNumber
 
       if (destType === 'Mobile') {
         const normalizedPhone = destinationAccountValue.replace(/^(?:\+?254|0)/, '254')
@@ -149,6 +150,7 @@ export default function Wallet() {
         tx = data.transaction
         methodLabel = 'Mobile Money Withdrawal'
         recipientDisplay = normalizedPhone
+        phoneNumber = normalizedPhone
         payeeDraft = {
           name: `Withdrawal to ${normalizedPhone}`, type: 'contractor', paymentMethod: 'Mobile Money',
           mobileMoneyType: 'Personal Number', phone: normalizedPhone,
@@ -167,6 +169,7 @@ export default function Wallet() {
         tx = data.transaction
         methodLabel = 'Bank Withdrawal · PesaLink'
         recipientDisplay = `${destinationAccountValue}${withdrawBankCode ? ` · ${bankCodes.find(b => b.code === withdrawBankCode)?.name || withdrawBankCode}` : ''}`
+        phoneNumber = merchant?.phone
         payeeDraft = {
           name: `Withdrawal to ${destinationAccountValue}`, type: 'contractor', paymentMethod: 'Bank',
           bankName: bankCodes.find(b => b.code === withdrawBankCode)?.name || '', accountNumber: destinationAccountValue, bankCode: withdrawBankCode,
@@ -183,12 +186,13 @@ export default function Wallet() {
         tx = data.transaction
         methodLabel = 'Withdrawal'
         recipientDisplay = destinationAccountValue
+        phoneNumber = merchant?.phone
         payeeDraft = null
       }
 
       setWithdrawAmount('')
       setDestinationAccountValue('')
-      setWithdrawSuccess({ amount: withdrawnAmount, methodLabel, recipientDisplay, payeeDraft, transaction: tx })
+      setWithdrawSuccess({ amount: withdrawnAmount, methodLabel, recipientDisplay, phoneNumber, payeeDraft, transaction: tx })
       await refreshSession()
     } catch (err) {
       addToast({ title: 'Withdrawal Failed', message: err.response?.data?.error || err.response?.data?.message || 'Failed to withdraw funds', type: 'error' })
@@ -1088,7 +1092,7 @@ export default function Wallet() {
                         <p className="text-[9px] md:text-[10px] text-on-surface-variant font-medium opacity-60">{formatDateISO(tx.createdAt || tx.timestamp)}</p>
                         <span className="text-[9px] md:text-[10px] text-on-surface-variant/20 block md:hidden">•</span>
                         <p className="hidden md:block text-[9px] text-on-surface-variant uppercase font-black tracking-widest opacity-40">
-                          {isCreditTransaction(tx.type) ? (tx.sender?.name || 'Unknown') : (tx.recipient?.name || tx.sender?.name || 'Internal Account')}
+                          {isCreditTransaction(tx.type) ? (formatName(tx.sender?.name) || 'Unknown') : (formatName(tx.recipient?.name) || formatName(tx.sender?.name) || 'Internal Account')}
                         </p>
                       </div>
                     </div>
@@ -1126,6 +1130,7 @@ export default function Wallet() {
               amount={withdrawSuccess.amount}
               methodLabel={withdrawSuccess.methodLabel}
               recipientDisplay={withdrawSuccess.recipientDisplay}
+              phoneNumber={withdrawSuccess.phoneNumber}
               transaction={withdrawSuccess.transaction}
               payeeDraft={withdrawSuccess.payeeDraft}
               onDone={() => setWithdrawSuccess(null)}
