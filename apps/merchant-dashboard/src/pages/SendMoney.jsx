@@ -21,44 +21,64 @@ const DESTINATIONS = [
   { id: 'paybill',       label: 'Paybill',                  icon: 'receipt_long',      fee: null, hint: 'Pay to a Paybill number' },
 ]
 
-// PayChain's own flat margin on B2B (Paybill/Till) payouts — mirrors
-// backend/config/revenueRateCard.js's NCBA_LIPA_NA_MPESA_FLAT_FEE_KES, the
-// same flat fee mpesaController.js#initiateB2B actually charges
-// server-side. Safaricom's own B2B tariff isn't modeled anywhere in this
-// codebase (see bulkPayController.js), so unlike the B2C estimate above,
-// this is not a Safaricom-cost estimate — it's PayChain's own charge.
-const PAYCHAIN_B2B_FLAT_FEE_KES = 30
+// Mirrors backend/config/lipaNaMpesaTariffCard.js's LIPA_NA_MPESA_B2B_BANDS
+// (2026-08-12 tiered schedule, baseCost + serviceFee per band) — that
+// backend table is the authoritative charge, recomputed server-side in
+// mpesaController.js#initiateB2B via getLipaNaMpesaTariff regardless of
+// what this estimate shows. This used to be a flat KES 30 mirroring
+// NCBA_LIPA_NA_MPESA_FLAT_FEE_KES, which the backend replaced with this
+// tiered table — the estimate was never updated to match, so it was
+// showing KES 30 for transfers (e.g. KES 50) that actually cost KES 0.
+const B2B_TARIFF_BANDS = [
+  { max: 100,      totalFee: 0   },
+  { max: 500,      totalFee: 10  },
+  { max: 1_000,    totalFee: 15  },
+  { max: 2_500,    totalFee: 23  },
+  { max: 5_000,    totalFee: 27  },
+  { max: 10_000,   totalFee: 35  },
+  { max: 20_000,   totalFee: 57  },
+  { max: 30_000,   totalFee: 64  },
+  { max: 40_000,   totalFee: 72  },
+  { max: 50_000,   totalFee: 79  },
+  { max: 100_000,  totalFee: 86  },
+  { max: 150_000,  totalFee: 104 },
+  { max: 200_000,  totalFee: 122 },
+  { max: 250_000,  totalFee: 140 },
+]
 function estimateB2bFee(amount) {
   if (!amount || amount <= 0) return 0
-  return PAYCHAIN_B2B_FLAT_FEE_KES
+  const band = B2B_TARIFF_BANDS.find(b => amount <= b.max) || B2B_TARIFF_BANDS[B2B_TARIFF_BANDS.length - 1]
+  return band.totalFee
 }
 
-// Mirrors backend/config/mpesaB2cTariffCard.js — Safaricom's real M-Pesa
-// B2C ("Business Bouquet") tariff bands, plus PayChain's flat KES 10
-// markup. That backend table is the authoritative charge; this is only an
-// estimate so the merchant sees an honest number here instead of "Free"
-// before confirming.
-const B2C_SAFARICOM_BANDS = [
-  { max: 100,     fee: 0  },
-  { max: 500,     fee: 5  },
-  { max: 1_000,   fee: 5  },
-  { max: 1_500,   fee: 5  },
-  { max: 2_500,   fee: 9  },
-  { max: 3_500,   fee: 9  },
-  { max: 5_000,   fee: 9  },
-  { max: 7_500,   fee: 11 },
-  { max: 10_000,  fee: 11 },
-  { max: 15_000,  fee: 11 },
-  { max: 20_000,  fee: 11 },
-  { max: 25_000,  fee: 13 },
-  { max: 250_000, fee: 13 },
+// Mirrors backend/config/mpesaB2cTariffCard.js's combined
+// B2C_REGISTERED_USER_BANDS (Safaricom's real cost) + B2C_SERVICE_FEE_BANDS
+// (PayChain's own tiered markup, 2026-08-12) — getB2cTariff sums both
+// server-side. This used to add a flat KES 10 PayChain markup, which the
+// backend replaced with a tiered schedule (KES 0-200 depending on amount);
+// the estimate was never updated to match, so it understated the real
+// charge at every amount above the lowest band.
+const B2C_TARIFF_BANDS = [
+  { max: 49,      totalFee: 0   },
+  { max: 100,     totalFee: 5   },
+  { max: 500,     totalFee: 11  },
+  { max: 1_000,   totalFee: 17  },
+  { max: 1_500,   totalFee: 24  },
+  { max: 2_500,   totalFee: 29  },
+  { max: 3_500,   totalFee: 34  },
+  { max: 5_000,   totalFee: 37  },
+  { max: 7_500,   totalFee: 57  },
+  { max: 10_000,  totalFee: 67  },
+  { max: 20_000,  totalFee: 84  },
+  { max: 50_000,  totalFee: 113 },
+  { max: 100_000, totalFee: 163 },
+  { max: 250_000, totalFee: 213 },
 ]
-const PAYCHAIN_B2C_MARKUP_KES = 10
 
 function estimateB2cFee(amount) {
-  if (!amount || amount <= 0) return PAYCHAIN_B2C_MARKUP_KES
-  const band = B2C_SAFARICOM_BANDS.find(b => amount <= b.max) || B2C_SAFARICOM_BANDS[B2C_SAFARICOM_BANDS.length - 1]
-  return band.fee + PAYCHAIN_B2C_MARKUP_KES
+  if (!amount || amount <= 0) return 0
+  const band = B2C_TARIFF_BANDS.find(b => amount <= b.max) || B2C_TARIFF_BANDS[B2C_TARIFF_BANDS.length - 1]
+  return band.totalFee
 }
 
 export default function SendMoney() {
@@ -369,9 +389,6 @@ export default function SendMoney() {
                         <p className="text-[10px] text-slate-400 font-medium mt-0.5">{d.hint}</p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                          {d.fee === null ? 'Varies' : formatKES(d.fee)}
-                        </span>
                         {destination === d.id && (
                           <span className="material-symbols-outlined text-[#00351D] text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
                         )}
@@ -652,7 +669,6 @@ export default function SendMoney() {
                     ['Recipient',   formatPhoneDisplay(recipientAccount)],
                     ...(destination === 'paybill' ? [['Account Number', paybillAccountRef]] : []),
                     ['Amount',      formatKES(amount || 0)],
-                    ['Fee',         formatKES(fee)],
                     ...(reference ? [['Reference', reference]] : []),
                   ].map(([k, v]) => (
                     <div key={k} className="flex justify-between items-start gap-4 px-5 py-3">
@@ -700,7 +716,14 @@ export default function SendMoney() {
               }`}
             >
               {isLoading
-                ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ? (
+                  <div className="flex items-center gap-1.5 py-0.5">
+                    <span className="w-2 h-2 rounded-full bg-white animate-bounce [animation-delay:0ms]" />
+                    <span className="w-2 h-2 rounded-full bg-white animate-bounce [animation-delay:150ms]" />
+                    <span className="w-2 h-2 rounded-full bg-white animate-bounce [animation-delay:300ms]" />
+                    <span className="w-2 h-2 rounded-full bg-white animate-bounce [animation-delay:450ms]" />
+                  </div>
+                )
                 : step === confirmStep
                   ? <><span className="material-symbols-outlined text-emerald-400 text-lg">send_money</span>Confirm &amp; Send</>
                   : !hasPin && step === 3

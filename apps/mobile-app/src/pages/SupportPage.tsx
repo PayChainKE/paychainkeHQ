@@ -240,7 +240,7 @@ export default function SupportPage({ navigation }: any) {
               />
               <FAQItem
                 question="What are the transaction fees?"
-                answer="PayChain adds a 0.5% margin on top of Safaricom's standard tariff for inbound payments. FX conversions (KES to USDC) carry a 2% spread. There's no flat rate — see your Revenue page for the exact breakdown."
+                answer="Collections carry PayChain's standard tiered fee. Send Money and Bulk Pay payouts — bank, M-PESA, Paybill/Till, KPLC, and Water — each carry their own tiered PayChain fee plus the relevant third-party cost, shown before you confirm. FX conversions (KES to USDC) carry no PayChain fee today."
               />
             </View>
           </View>

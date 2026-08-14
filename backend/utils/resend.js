@@ -935,6 +935,77 @@ export const sendPasswordResetConfirmation = async (email, name, when, ip, ua) =
   }
 };
 
+// Sent to the OLD email on file when an admin resets a merchant's primary
+// email and/or phone (adminController.js's confirmMerchantAction,
+// action:'reset_contact') — deliberately notifies the address being
+// replaced, not the new one, since that's the channel the legitimate
+// merchant still controls if the reset wasn't theirs.
+//
+// @param {string} email - the merchant's OLD email (recipient)
+// @param {string} name
+// @param {{ emailChanged: {from,to}|null, phoneChanged: {from,to}|null }} changes
+export const sendContactDetailsChangedEmail = async (email, name, changes) => {
+  try {
+    const safeName = (name || 'there').toString().replace(/</g, '&lt;');
+    const esc = (s) => String(s ?? '').replace(/</g, '&lt;');
+    const rows = [
+      changes?.emailChanged ? `<tr><td style="padding: 4px 0; color: #6b7280; width: 90px;">Email</td><td style="padding: 4px 0; font-weight: 600;">${esc(changes.emailChanged.from)} &rarr; ${esc(changes.emailChanged.to)}</td></tr>` : '',
+      changes?.phoneChanged ? `<tr><td style="padding: 4px 0; color: #6b7280;">Phone</td><td style="padding: 4px 0; font-weight: 600;">${esc(changes.phoneChanged.from)} &rarr; ${esc(changes.phoneChanged.to)}</td></tr>` : '',
+    ].join('');
+
+    const data = await resend.emails.send({
+      from: 'PayChain Security <info@paychain.co.ke>',
+      to: [email],
+      subject: 'Your PayChain account contact details were changed',
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 560px; margin: auto; background: #ffffff; border: 1px solid #eef0ee; border-radius: 18px; overflow: hidden;">
+          <div style="background: linear-gradient(135deg, #06201B 0%, #0a3029 100%); padding: 32px 32px 36px;">
+            <div style="margin-bottom: 20px;">${logoImgWhite(108, 'left')}</div>
+            <div style="display: inline-flex; align-items: center; gap: 10px;">
+              <span style="display: inline-block; width: 36px; height: 36px; border-radius: 999px; background: rgba(94, 254, 179, 0.15); text-align: center; line-height: 36px; color: #5EFEB3; font-size: 18px; font-weight: 800;">✓</span>
+              <div>
+                <p style="margin: 0; color: #5EFEB3; font-size: 11px; font-weight: 800; letter-spacing: 2.5px; text-transform: uppercase;">PayChain Security</p>
+                <h1 style="margin: 4px 0 0; color: #fff; font-size: 22px; font-weight: 800; letter-spacing: -0.3px;">Contact details changed</h1>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding: 36px 32px;">
+            <p style="margin: 0 0 16px; color: #111; font-size: 15px;">Hi ${safeName},</p>
+            <p style="margin: 0 0 22px; color: #4b5563; font-size: 15px; line-height: 1.6;">
+              A PayChain administrator changed the primary contact details on your merchant account. This email is going to your <strong>previous</strong> address so you'd know even if you no longer receive mail at the new one.
+            </p>
+
+            <div style="background: #f6fbf7; border: 1px solid #d8ecdd; border-radius: 12px; padding: 18px 20px; margin: 0 0 26px;">
+              <p style="margin: 0 0 10px; color: #06201B; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;">What changed</p>
+              <table style="width: 100%; border-collapse: collapse; font-size: 13px; color: #1f2937;">
+                ${rows}
+              </table>
+            </div>
+
+            <div style="background: #fff7ed; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 16px 18px; margin: 0 0 26px;">
+              <p style="margin: 0 0 6px; color: #92400e; font-size: 13px; font-weight: 700;">Didn't request this?</p>
+              <p style="margin: 0; color: #78350f; font-size: 13px; line-height: 1.5;">
+                Contact <a href="mailto:support@paychain.co.ke" style="color: #b45309; font-weight: 700;">support@paychain.co.ke</a> immediately — we'll lock the account and verify your identity before anyone can sign in with the new details.
+              </p>
+            </div>
+          </div>
+
+          <div style="padding: 22px 30px; background: #fafafa; border-top: 1px solid #eef0ee; text-align: center;">
+            <p style="margin: 0; color: #9ca3af; font-size: 11px;">You've also been signed out of every device as a precaution — sign in again with the updated details.</p>
+            <p style="margin: 8px 0 0; color: #bbb; font-size: 11px;">&copy; ${new Date().getFullYear()} PayChainKE · Nairobi, Kenya</p>
+          </div>
+        </div>
+      `,
+    });
+    console.log(`📧 Contact-changed notification → ${email}`);
+    return data;
+  } catch (error) {
+    console.error('❌ Resend Contact-Changed Notification Error:', error);
+    throw error;
+  }
+};
+
 // Send Batch Payment Receipt Email
 export const sendBatchReceiptEmail = async (email, businessName, batchRows, totalGross, totalNet, totalTax) => {
   try {

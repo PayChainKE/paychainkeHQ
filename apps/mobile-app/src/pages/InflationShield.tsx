@@ -10,8 +10,6 @@ import TopBar from '../components/layout/TopBar';
 
 type SwapDirection = 'KES_TO_USDC' | 'USDC_TO_KES';
 
-const FEE_RATE = 0.005;
-
 function formatKES(amount: number) {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(amount || 0);
 }
@@ -33,10 +31,14 @@ export default function InflationShield({ navigation }: any) {
   const [isSwapping, setIsSwapping] = useState(false);
   const [swapError, setSwapError] = useState('');
 
+  // Swap execution charges no fee at all today — see the identical comment
+  // on merchant-dashboard's InflationShield.jsx. This used to subtract a
+  // flat 0.5% that was never actually charged server-side, understating
+  // what the merchant would really receive.
   const estimatedOutput = inputAmount
     ? swapDirection === 'KES_TO_USDC'
-      ? ((Number(inputAmount) * (1 - FEE_RATE)) / rate).toFixed(2)
-      : (Number(inputAmount) * (1 - FEE_RATE) * rate).toFixed(2)
+      ? (Number(inputAmount) / rate).toFixed(2)
+      : (Number(inputAmount) * rate).toFixed(2)
     : '0.00';
 
   const loadData = useCallback(async () => {
@@ -324,10 +326,8 @@ export default function InflationShield({ navigation }: any) {
             </View>
 
             <View className="flex-row justify-between mb-1">
-              <Text className="text-[11px] text-white/50 font-jakarta-medium">Fee (0.5%)</Text>
-              <Text className="text-[11px] text-white/80 font-jakarta-bold">
-                {swapDirection === 'KES_TO_USDC' ? formatKES(Number(inputAmount || 0) * FEE_RATE) : `${(Number(inputAmount || 0) * FEE_RATE).toFixed(2)} USDC`}
-              </Text>
+              <Text className="text-[11px] text-white/50 font-jakarta-medium">Fee</Text>
+              <Text className="text-[11px] text-white/80 font-jakarta-bold">None — no PayChain fee on swaps today</Text>
             </View>
             <View className="flex-row justify-between">
               <Text className="text-[11px] text-white/70 font-jakarta-bold">Estimated Value Protection</Text>

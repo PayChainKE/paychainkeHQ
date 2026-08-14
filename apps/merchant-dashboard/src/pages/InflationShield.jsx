@@ -17,12 +17,16 @@ export default function InflationShield() {
   const [inputAmount, setInputAmount] = useState('')
   const [swapDirection, setSwapDirection] = useState('KES_TO_USDC')
   const [rate, setRate] = useState(132.45)
-  const feeRate = 0.005
-  
+  // Swap execution (transactionController.js's KES_TO_USDC/USDC_TO_KES
+  // branches) charges no fee at all today — it credits amount * liveRate
+  // with no deduction (see revenueRateCard.js's FX_SPREAD_RATE comment:
+  // "not wired to a real payout yet, pilot/reporting-only"). This used to
+  // subtract a flat 0.5% here that was never actually charged server-side,
+  // understating what the merchant would really receive.
   const estimatedOutput = inputAmount ? (
-    swapDirection === 'KES_TO_USDC' 
-      ? (Number(inputAmount) * (1 - feeRate) / rate).toFixed(2)
-      : (Number(inputAmount) * (1 - feeRate) * rate).toFixed(2)
+    swapDirection === 'KES_TO_USDC'
+      ? (Number(inputAmount) / rate).toFixed(2)
+      : (Number(inputAmount) * rate).toFixed(2)
   ) : '0.00'
 
   const [liveTransactions, setLiveTransactions] = useState([])
@@ -335,8 +339,8 @@ export default function InflationShield() {
             {/* Breakdown */}
             <div className="relative z-10 mt-8 space-y-3 pt-6 border-t border-white/10">
               <div className="flex justify-between text-xs font-medium">
-                <span className="text-white/50">Fee (0.5%)</span>
-                <span className="text-white/80">{swapDirection === 'KES_TO_USDC' ? formatKES(inputAmount * feeRate) : formatUSDC(inputAmount * feeRate)}</span>
+                <span className="text-white/50">Fee</span>
+                <span className="text-white/80">None — no PayChain fee on swaps today</span>
               </div>
               <div className="flex justify-between text-xs font-bold">
                 <span className="text-white/70">Estimated Value Protection</span>
