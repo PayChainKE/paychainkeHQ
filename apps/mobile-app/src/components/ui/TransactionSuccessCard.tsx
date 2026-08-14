@@ -5,7 +5,12 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import api from '../../api/config';
 import { formatTxDate, formatTxTime } from '../../utils/formatDate';
+import { formatPhoneOrDash } from '../../utils/formatPhoneDisplay';
+import { barcodePattern } from '../../utils/barcode';
 import { buildAuditReceiptHtml } from '../../utils/auditReceiptHtml';
+
+const PAYCHAIN_PHONE = '+254 743 283 782';
+const PAYCHAIN_SLOGAN = 'Collect, Pay, Protect, Grow';
 
 function formatKES(n: number | string | null | undefined) {
   if (n == null) return 'KES 0.00';
@@ -48,6 +53,7 @@ export default function TransactionSuccessCard({
   amount,
   methodLabel,
   recipientDisplay,
+  phoneNumber,
   transaction,
   payeeDraft,
   onViewTransactions,
@@ -57,6 +63,7 @@ export default function TransactionSuccessCard({
   amount: number | string;
   methodLabel?: string;
   recipientDisplay?: string;
+  phoneNumber?: string;
   transaction?: Transaction | null;
   payeeDraft?: PayeeDraft | null;
   onViewTransactions?: () => void;
@@ -72,6 +79,7 @@ export default function TransactionSuccessCard({
   const statusKey = (transaction?.status || 'completed').toLowerCase();
   const statusLabel = STATUS_LABEL[statusKey] || (statusKey.charAt(0).toUpperCase() + statusKey.slice(1));
   const isPending = statusKey === 'pending';
+  const barcodeBars = barcodePattern(reference, 40);
 
   const handleAddFavourite = async () => {
     if (!payeeDraft || savingFavourite || savedFavourite) return;
@@ -98,7 +106,7 @@ export default function TransactionSuccessCard({
         kesAmount: Number(amount),
         createdAt,
         recipient: { name: recipientDisplay || methodLabel || 'Recipient' },
-      });
+      }, phoneNumber);
       const { uri } = await Print.printToFileAsync({ html, base64: false });
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: 'PayChain Receipt', UTI: 'com.adobe.pdf' });
@@ -155,7 +163,24 @@ export default function TransactionSuccessCard({
         <DetailRow label="Date & Time" value={`${formatTxDate(createdAt)} · ${formatTxTime(createdAt)}`} />
         <DetailRow label="Transaction ID" value={reference} mono />
         <DetailRow label="Paid To" value={recipientDisplay || '—'} />
-        <DetailRow label="Method" value={methodLabel || '—'} />
+        <DetailRow label="Phone Number" value={formatPhoneOrDash(phoneNumber)} mono />
+        <DetailRow label="Payment Type" value={methodLabel || '—'} />
+      </View>
+
+      <View className="mx-7 border-t border-dashed border-[#00351d]/10" />
+
+      <View className="items-center pt-5 pb-1">
+        <View className="flex-row items-end h-9 opacity-80">
+          {barcodeBars.map((bar, i) => (
+            <View
+              key={i}
+              style={{ width: bar.w, height: bar.on ? 36 : 0, backgroundColor: '#0B1F1A', marginRight: 1 }}
+            />
+          ))}
+        </View>
+        <Text className="mt-1.5 text-[9px] font-jakarta-bold text-[#707971]" style={{ fontVariant: ['tabular-nums'] }}>
+          {reference}
+        </Text>
       </View>
 
       <View className="mx-7 border-t border-dashed border-[#00351d]/10" />
@@ -203,6 +228,13 @@ export default function TransactionSuccessCard({
             <Text className="text-[#00351d]/50 font-jakarta-bold text-[12px]">{doneLabel}</Text>
           </TouchableOpacity>
         )}
+      </View>
+
+      <View className="bg-[#f7faf8] border-t border-[#00351d]/5 py-3 items-center">
+        <Text className="text-[10px] font-jakarta-bold text-[#707971]">PayChain Kenya · {PAYCHAIN_PHONE}</Text>
+        <Text className="text-[9px] font-jakarta-extrabold uppercase tracking-widest text-[#2f6b52] mt-0.5">
+          {PAYCHAIN_SLOGAN}
+        </Text>
       </View>
     </View>
   );

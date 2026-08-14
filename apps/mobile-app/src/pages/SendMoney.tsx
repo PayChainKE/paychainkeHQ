@@ -298,6 +298,8 @@ export default function SendMoney({ navigation }: any) {
         ? `Till ${recipientAccount}`
         : formatPhoneDisplay(recipientAccount);
 
+    const phoneNumber = isMobileDest ? recipientAccount : merchant?.phone;
+
     const payeeDraft: PayeeDraft | null = isMobileDest
       ? {
           name: reference || recipientAccount, type: 'contractor', paymentMethod: 'Mobile Money',
@@ -328,6 +330,7 @@ export default function SendMoney({ navigation }: any) {
             amount={Number(amount)}
             methodLabel={methodLabel}
             recipientDisplay={recipientDisplay}
+            phoneNumber={phoneNumber}
             transaction={completedTx}
             payeeDraft={payeeDraft}
             onViewTransactions={() => navigation?.navigate('Transactions')}

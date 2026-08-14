@@ -6,8 +6,9 @@ import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { formatDateISO, formatTxDate, formatTxTime } from '../utils/formatDate'
 import { formatKES, formatUSDC } from '../utils/formatCurrency'
 import { formatAccountNumber } from '../utils/formatAccountNumber'
-import { formatPhoneDisplay } from '../utils/formatPhoneDisplay'
+import { formatPhoneDisplay, formatPhoneOrDash } from '../utils/formatPhoneDisplay'
 import { formatName } from '../utils/formatName'
+import { drawBarcodePdf } from '../utils/barcode'
 import { getAmountSign, getAmountColorClass, isCreditTransaction, isDebitTransaction } from '../utils/transactionDirection'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useNotification } from '../context/NotificationContext'
@@ -15,6 +16,9 @@ import logo from '../assets/logo2.png'
 import statementLogo from '../assets/paychain-logo-white.png'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
+
+const PAYCHAIN_PHONE = '+254 743 283 782'
+const PAYCHAIN_SLOGAN = 'Collect, Pay, Protect, Grow'
 
 export default function Transactions() {
   const { merchant } = useMerchantAuth()
@@ -472,42 +476,49 @@ export default function Transactions() {
     
     // Divider
     doc.setDrawColor(230, 230, 230)
-    doc.line(20, 68, pageWidth - 20, 68)
+    doc.line(20, 63, pageWidth - 20, 63)
 
     // Grid details
-    const labelY = 80
-    const valueY = 87
-    
+    const labelY = 73, rowH = 15
+    const sentTo = formatName(tx.sender?.name) || formatName(tx.recipient?.name) || 'Internal Treasury'
+    const counterpartyPhone = formatPhoneOrDash(tx.sender?.id || tx.recipient?.id)
+
     // Column 1
     doc.setFontSize(9)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(100, 100, 100)
-    doc.text('TRANSACTION TYPE', 20, labelY)
-    doc.text('NETWORK STATUS', 20, labelY + 20)
-    doc.text('COUNTERPARTY', 20, labelY + 40)
-    doc.text('TIMESTAMP', 20, labelY + 60)
+    doc.text('DATE & TIME', 20, labelY)
+    doc.text('SENT TO', 20, labelY + rowH)
+    doc.text('PHONE NUMBER', 20, labelY + rowH * 2)
+    doc.text('PAYMENT TYPE', 20, labelY + rowH * 3)
+    doc.text('STATUS', 20, labelY + rowH * 4)
 
     doc.setFontSize(11)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(22, 39, 35)
-    doc.text(tx.type.replace('_', ' ').toUpperCase(), 20, valueY)
-    doc.text(tx.status.toUpperCase(), 20, valueY + 20)
-    doc.text(formatName(tx.sender?.name) || formatName(tx.recipient?.name) || 'Internal Treasury', 20, valueY + 40)
-    doc.text(formatDateISO(tx.createdAt || tx.timestamp), 20, valueY + 60)
+    doc.text(formatDateISO(tx.createdAt || tx.timestamp), 20, labelY + 7)
+    doc.text(sentTo, 20, labelY + rowH + 7)
+    doc.text(counterpartyPhone, 20, labelY + rowH * 2 + 7)
+    doc.text(tx.type.replace('_', ' ').toUpperCase(), 20, labelY + rowH * 3 + 7)
+    doc.text(tx.status.toUpperCase(), 20, labelY + rowH * 4 + 7)
 
     // Column 2 - Amount Focus
     doc.setFontSize(9)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(100, 100, 100)
     doc.text('TOTAL AMOUNT', 85, labelY)
-    
+
     doc.setFontSize(18)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(22, 39, 35)
-    const amountStr = tx.type === 'fx_swap' 
-      ? `${tx.usdcAmount} USDC` 
+    const amountStr = tx.type === 'fx_swap'
+      ? `${tx.usdcAmount} USDC`
       : `${(tx.amount || tx.kesAmount || 0).toLocaleString()} KES`
-    doc.text(amountStr, 85, valueY + 2)
+    doc.text(amountStr, 85, labelY + 10)
+
+    const gridBottom = labelY + rowH * 4 + 7
+    doc.setDrawColor(230, 230, 230)
+    doc.line(20, gridBottom + 6, pageWidth - 20, gridBottom + 6)
 
     // Record note — this used to claim "cryptographically verified" /
     // "Audit Hash" / "Verified by PayChain Ledger Node", none of which are
@@ -515,19 +526,33 @@ export default function Transactions() {
     // A merchant relying on that claim for a bank/tax submission would be
     // relying on fabricated verification. The reference ID above is the
     // one real, lookup-able identifier for this transaction.
+    const stripY = gridBottom + 11
     doc.setFillColor(245, 247, 249)
-    doc.rect(20, 155, pageWidth - 40, 15, 'F')
+    doc.rect(20, stripY, pageWidth - 40, 13, 'F')
     doc.setFontSize(9)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(22, 39, 35)
-    doc.text('OFFICIAL PAYCHAIN TRANSACTION RECORD', pageWidth / 2, 164, { align: 'center' })
+    doc.text('OFFICIAL PAYCHAIN TRANSACTION RECORD', pageWidth / 2, stripY + 8.5, { align: 'center' })
+
+    // Barcode — unique per transaction reference
+    const barcodeY = stripY + 17, barcodeW = 100, barcodeH = 14
+    drawBarcodePdf(doc, tx.reference, (pageWidth - barcodeW) / 2, barcodeY, barcodeW, barcodeH)
+    doc.setFontSize(8)
+    doc.setFont('courier', 'normal')
+    doc.setTextColor(100, 100, 100)
+    doc.text(tx.reference, pageWidth / 2, barcodeY + barcodeH + 4, { align: 'center' })
 
     // Footer
-    doc.setFontSize(8)
+    const footerY = barcodeY + barcodeH + 9
+    doc.setFontSize(7.5)
     doc.setTextColor(150, 150, 150)
     doc.setFont('helvetica', 'italic')
-    doc.text('This receipt reflects PayChain\'s record of the transaction identified by the reference above.', pageWidth / 2, 185, { align: 'center' })
-    doc.text('Generated ' + new Date().toLocaleString(), pageWidth / 2, 190, { align: 'center' })
+    doc.text('This receipt reflects PayChain\'s record of the transaction identified by the reference above.', pageWidth / 2, footerY, { align: 'center' })
+    doc.setFont('helvetica', 'normal')
+    doc.text(`PayChain Kenya · ${PAYCHAIN_PHONE} · Generated ${new Date().toLocaleDateString()}`, pageWidth / 2, footerY + 4.5, { align: 'center' })
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(22, 39, 35)
+    doc.text(PAYCHAIN_SLOGAN.toUpperCase(), pageWidth / 2, footerY + 9.5, { align: 'center' })
 
     doc.save(`PayChain_Audit_Receipt_${tx.reference}.pdf`)
     

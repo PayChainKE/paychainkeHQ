@@ -12,3 +12,13 @@ export function formatPhoneDisplay(value) {
   if (/^[71]\d{8}$/.test(digits)) return '0' + digits
   return value
 }
+
+// Same normalization, but for a "Phone Number" receipt field specifically —
+// where showing a passed-through non-phone value (a paybill number, a bank
+// account, "MASTER_WALLET") mislabeled as a phone number would be actively
+// wrong rather than merely unformatted. Returns '—' for anything that isn't
+// recognizably a Kenyan MSISDN.
+export function formatPhoneOrDash(value) {
+  const formatted = formatPhoneDisplay(value)
+  return formatted && /^0[71]\d{8}$/.test(String(formatted)) ? formatted : '—'
+}
