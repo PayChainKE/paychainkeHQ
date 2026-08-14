@@ -851,10 +851,17 @@ export async function submitNcwscPayment({
  *   { ResponseCode, ResponseMessage, DetailedMessage, OrganizationName,
  *     OrganizationShortCode, ChargeProfileID, ConversationID }
  * Success is ResponseCode "4000" / ResponseMessage "Success" (e.g. Paybill
- * 880100). A genuinely invalid destination comes back as a different
- * ResponseCode with a descriptive ResponseMessage, e.g. Till 4221930 got
- * "SFC_IC0003" / "The operator does not exist" — that's real invalid-till
- * data, not a request-shape problem.
+ * 880100).
+ *
+ * NCBA validates Till and Paybill numbers against two separate Safaricom
+ * registries (identifierType "2" vs "4"), and a number that's genuinely
+ * active under one type gets the exact same "SFC_IC0003 / The operator does
+ * not exist" rejection if queried under the other — indistinguishable from a
+ * truly invalid number. Since merchants often don't know (or mis-select)
+ * which one a given number is, a rejection under the caller's chosen
+ * paymentType is retried once under the other type before giving up; the
+ * resolved type (which may differ from the one passed in) is returned so
+ * callers submit the actual payout under the type that validated.
  *
  * @param {object} params
  * @param {'Paybill'|'Till'} params.paymentType
@@ -869,16 +876,21 @@ export async function validateLipaNaMpesaAccount({ paymentType, payBillTillNo })
     return simulate('ncba_openbanking_lnm_validate_sandbox', { paymentType, payBillTillNo });
   }
 
-  const identifierType = paymentType === 'Till' ? '2' : '4';
   const path = '/api/v1/LipaNaMpesaValidation/accountdetails';
   const isSuccess = (r) => r?.ResponseCode === '4000' || r?.ResponseMessage === 'Success';
 
-  let result = await ncbaOpenBankingPost(path, { identifier: payBillTillNo, identifierType });
+  const attempt = async (type) => {
+    const identifierType = type === 'Till' ? '2' : '4';
+    let result = await ncbaOpenBankingPost(path, { identifier: payBillTillNo, identifierType });
+    if (!isSuccess(result)) {
+      logEvent('warn', 'ncba_openbanking_lnm_validate_lowercase_rejected', { paymentType: type, payBillTillNo, response: result });
+      result = await ncbaOpenBankingPost(path, { Identifier: payBillTillNo, IdentifierType: identifierType });
+    }
+    return result;
+  };
 
-  if (!isSuccess(result)) {
-    logEvent('warn', 'ncba_openbanking_lnm_validate_lowercase_rejected', { paymentType, payBillTillNo, response: result });
-    result = await ncbaOpenBankingPost(path, { Identifier: payBillTillNo, IdentifierType: identifierType });
-  }
+  let result = await attempt(paymentType);
+  let resolvedType = paymentType;
 
   if (!isSuccess(result)) {
     // The client only ever sees a generic "could not verify" message (never
@@ -886,10 +898,19 @@ export async function validateLipaNaMpesaAccount({ paymentType, payBillTillNo })
     // genuinely invalid Paybill/Till apart from a request shape NCBA still
     // doesn't recognize even after the casing retry above.
     logEvent('warn', 'ncba_openbanking_lnm_validate_rejected', { paymentType, payBillTillNo, response: result });
+    const otherType = paymentType === 'Till' ? 'Paybill' : 'Till';
+    const retryResult = await attempt(otherType);
+    if (isSuccess(retryResult)) {
+      result = retryResult;
+      resolvedType = otherType;
+    }
+  }
+
+  if (!isSuccess(result)) {
     throw new NcbaOpenBankingValidationError(result?.ResponseMessage || result?.DetailedMessage || 'Could not verify the destination Paybill/Till number');
   }
 
-  return { organizationName: result.OrganizationName || null, shortCode: result.OrganizationShortCode || null };
+  return { organizationName: result.OrganizationName || null, shortCode: result.OrganizationShortCode || null, paymentType: resolvedType };
 }
 
 /**

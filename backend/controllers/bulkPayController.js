@@ -794,10 +794,14 @@ export const authorizeBatch = async (req, res) => {
         // Paybill/Till, via NCBA's Lipa na M-Pesa Payment API — NCBA's
         // replacement for Daraja B2B. Same async shape as Mobile B2W above.
         try {
-          const paymentType = payee.mobileMoneyType === 'Paybill' ? 'Paybill' : 'Till';
           const payBillTillNo = payee.paybillNumber || payee.tillNumber;
           const transactionId = `PAYOUT-BULK-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-          const destination = await validateLipaNaMpesaAccount({ paymentType, payBillTillNo });
+          // The saved payee's mobileMoneyType is only a starting guess — NCBA
+          // checks Till/Paybill against separate Safaricom registries, so
+          // validateLipaNaMpesaAccount retries under the other type on
+          // rejection and returns whichever one actually resolved.
+          const destination = await validateLipaNaMpesaAccount({ paymentType: payee.mobileMoneyType === 'Paybill' ? 'Paybill' : 'Till', payBillTillNo });
+          const paymentType = destination.paymentType;
           await submitLipaNaMpesaPayment({
             transactionId,
             paymentType,

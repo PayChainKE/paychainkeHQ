@@ -218,7 +218,7 @@ export default function SendMoney() {
           const { data } = await axios.post(`${API_URL}/api/callbacks/b2b-request`, {
             billType: destination, // 'till' | 'paybill'
             partyB: recipientAccount,
-            accountReference: destination === 'paybill' ? paybillAccountRef : undefined,
+            accountReference: isB2bDest ? (paybillAccountRef || undefined) : undefined,
             amount: Number(amount),
             reference: reference || `Transfer to ${recipientAccount}`,
             pin,
@@ -262,7 +262,7 @@ export default function SendMoney() {
     const recipientDisplay =
       selectedDest?.id === 'bank' ? `${formatAccountNumber(recipientAccount)}${bankCode ? ` · ${bankCodes.find(b => b.code === bankCode)?.name || bankCode}` : ''}`
       : selectedDest?.id === 'paybill' ? `Paybill ${recipientAccount}${paybillAccountRef ? ` · Acc ${paybillAccountRef}` : ''}`
-      : selectedDest?.id === 'till' ? `Till ${recipientAccount}`
+      : selectedDest?.id === 'till' ? `Till ${recipientAccount}${paybillAccountRef ? ` · Acc ${paybillAccountRef}` : ''}`
       : formatPhoneDisplay(recipientAccount)
 
     const phoneNumber =
@@ -280,7 +280,7 @@ export default function SendMoney() {
       }
       : selectedDest?.id === 'till' ? {
         name: reference || `Till ${recipientAccount}`, type: 'contractor', paymentMethod: 'Mobile Money',
-        mobileMoneyType: 'Buy Goods', tillNumber: recipientAccount,
+        mobileMoneyType: 'Buy Goods', tillNumber: recipientAccount, businessAccount: paybillAccountRef || undefined,
       }
       : selectedDest?.id === 'paybill' ? {
         name: reference || `Paybill ${recipientAccount}`, type: 'contractor', paymentMethod: 'Mobile Money',
@@ -562,20 +562,27 @@ export default function SendMoney() {
                 </div>
               )}
 
-              {destination === 'paybill' && (
+              {isB2bDest && (
                 <div className="space-y-2">
-                  <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Account Number</label>
+                  <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">
+                    {destination === 'paybill' ? 'Account Number' : 'Account Reference (Optional)'}
+                  </label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-300 text-lg">tag</span>
                     <ValidatedInput
                       kind="text"
                       value={paybillAccountRef}
                       onChange={e => setPaybillAccountRef(e.target.value)}
-                      placeholder="Account Number"
+                      placeholder={destination === 'paybill' ? 'Account Number' : 'Account Reference'}
                       className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 pl-12 pr-4 text-primary font-bold focus:border-[#00351D] focus:ring-2 focus:ring-[#00351D]/10 outline-none transition-all"
-                      required
+                      required={destination === 'paybill'}
                     />
                   </div>
+                  {destination === 'till' && (
+                    <p className="text-[10px] text-slate-400 px-1">
+                      Only needed if this turns out to be registered as a Paybill on Safaricom's side.
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -672,7 +679,7 @@ export default function SendMoney() {
                     ...(destination === 'bank' && bankRail === 'rtgs' ? [['Beneficiary Country', { KE: 'Kenya', UG: 'Uganda', TZ: 'Tanzania', RW: 'Rwanda' }[beneficiaryCountry] || beneficiaryCountry]] : []),
                     ...(isMobileDest ? [['Network', provider === 'airtel' ? 'Airtel Money' : 'M-PESA']] : []),
                     ['Recipient',   formatPhoneDisplay(recipientAccount)],
-                    ...(destination === 'paybill' ? [['Account Number', paybillAccountRef]] : []),
+                    ...(isB2bDest && paybillAccountRef ? [['Account Number', paybillAccountRef]] : []),
                     ['Amount',      formatKES(amount || 0)],
                     ...(reference ? [['Reference', reference]] : []),
                   ].map(([k, v]) => (
@@ -698,7 +705,7 @@ export default function SendMoney() {
                     </p>
                   )}
                 </div>
-                <PinBoxes value={pin} onChange={setPin} autoFocus />
+                <PinBoxes value={pin} onChange={setPin} autoFocus loading={isLoading} />
                 {pinError && (
                   <div className="flex items-center justify-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 animate-shake">
                     <span className="material-symbols-outlined text-red-500 text-base shrink-0">error_outline</span>
