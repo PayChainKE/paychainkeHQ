@@ -417,6 +417,7 @@ export default function BulkPay() {
     items: [{ description: '', qty: 1, price: 0 }],
     payUrl: null,
     status: 'draft',
+    qrCodeDataUri: null,
   });
 
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -620,7 +621,7 @@ export default function BulkPay() {
 
       const saved = res.data.invoice;
       setActiveInvoiceId(saved._id);
-      setInvoiceDetails(prev => ({ ...prev, invoiceNumber: saved.invoiceNumber, payUrl: saved.payUrl, status: saved.status }));
+      setInvoiceDetails(prev => ({ ...prev, invoiceNumber: saved.invoiceNumber, payUrl: saved.payUrl, status: saved.status, qrCodeDataUri: saved.qrCodeDataUri }));
       upsertInvoiceInList(saved);
 
       setShowInvoiceModal(false);
@@ -664,7 +665,7 @@ export default function BulkPay() {
       const sendRes = await axios.post(`${API_URL}/api/invoices/${invoiceId}/send`, {}, { headers: { Authorization: `Bearer ${token}` } });
       const sent = sendRes.data.invoice;
 
-      setInvoiceDetails(prev => ({ ...prev, invoiceNumber: sent.invoiceNumber, payUrl: sent.payUrl, status: sent.status }));
+      setInvoiceDetails(prev => ({ ...prev, invoiceNumber: sent.invoiceNumber, payUrl: sent.payUrl, status: sent.status, qrCodeDataUri: sent.qrCodeDataUri }));
       upsertInvoiceInList(sent);
 
       setShowInvoiceModal(false);
@@ -2209,6 +2210,7 @@ export default function BulkPay() {
                                 items: inv.items?.length ? inv.items : [{ description: '', qty: 1, price: 0 }],
                                 payUrl: inv.payUrl,
                                 status: inv.status,
+                                qrCodeDataUri: inv.qrCodeDataUri,
                               });
                               setShowInvoiceModal(true);
                            }}
@@ -2843,7 +2845,13 @@ export default function BulkPay() {
                            </div>
                         )}
 
-                        <div className="mt-auto pt-6 border-t border-outline-variant/10 flex flex-col items-center gap-2">
+                        <div className="mt-auto pt-6 border-t border-outline-variant/10 flex flex-col items-center gap-3">
+                           {invoiceDetails.qrCodeDataUri && (
+                             <div className="flex flex-col items-center gap-1.5">
+                               <img src={invoiceDetails.qrCodeDataUri} alt="Scan to view/pay this invoice" className="w-20 h-20 object-contain" />
+                               <p className="text-[8px] text-on-surface-variant font-bold uppercase tracking-widest opacity-40">Scan to view &amp; pay</p>
+                             </div>
+                           )}
                            <img src={paychainLogo} alt="PayChain" className="h-4 object-contain opacity-40" />
                            <p className="text-[9px] text-center text-on-surface-variant font-bold uppercase tracking-widest opacity-50">Powered by PayChain Finance • Nairobi, Kenya</p>
                         </div>
@@ -2876,8 +2884,16 @@ export default function BulkPay() {
                 </div>
                 
                 <p className="text-xs text-on-surface-variant font-medium mb-6 leading-relaxed">
-                  Share this link with your customer to allow them to view and pay this invoice online.
+                  Share this link with your customer to allow them to view and pay this invoice online, or let them scan the QR code below.
                 </p>
+
+                {invoiceDetails.qrCodeDataUri && (
+                  <div className="flex justify-center mb-6">
+                    <div className="p-3 bg-white border border-outline-variant/20 rounded-2xl shadow-sm">
+                      <img src={invoiceDetails.qrCodeDataUri} alt="Scan to view/pay this invoice" className="w-36 h-36 object-contain" />
+                    </div>
+                  </div>
+                )}
 
                 <div className="bg-surface-container-lowest/50 border border-outline-variant/20 rounded-2xl p-4 flex items-center justify-between gap-3 mb-6">
                    <p className="text-sm font-bold text-primary truncate flex-1">

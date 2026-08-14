@@ -151,6 +151,14 @@ export default function InvoiceView() {
               <p className="text-xs text-on-surface-variant whitespace-pre-wrap">{invoice.notes}</p>
             </div>
           )}
+          {invoice.qrCodeDataUri && (
+            <div className="mt-6 flex flex-col items-center gap-2">
+              <div className="p-2.5 bg-white border border-outline-variant/20 rounded-2xl shadow-sm">
+                <img src={invoice.qrCodeDataUri} alt="Scan to view this invoice" className="w-28 h-28 object-contain" />
+              </div>
+              <p className="text-[9px] text-on-surface-variant font-bold uppercase tracking-widest opacity-40">Unique to invoice #{invoice.invoiceNumber}</p>
+            </div>
+          )}
         </div>
 
         {/* Pay */}

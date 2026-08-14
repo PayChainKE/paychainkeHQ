@@ -4,6 +4,7 @@ import PaymentLink from '../models/PaymentLink.js';
 import Merchant from '../models/Merchant.js';
 import Counter from '../models/Counter.js';
 import { sendInvoiceEmail } from '../utils/resend.js';
+import { generateQrDataUri } from '../utils/qrCode.js';
 
 const FRONTEND_URL = process.env.MERCHANT_DASHBOARD_URL || 'https://app.paychain.co.ke';
 
@@ -53,9 +54,18 @@ const sanitizeCustomer = (customer) => ({
   address: customer.address?.trim() || null,
 });
 
-const serializeInvoice = (inv) => {
+// Unique per invoice, one QR encoding the same link a merchant would
+// otherwise copy/paste — the payment link once one exists (post-send),
+// else the invoice's own view page. Drafts still get one (it just 404s
+// until sent, same as the draft's public link itself) so the PDF/preview
+// doesn't have to special-case "no QR yet".
+const invoiceShareUrl = (inv, link) =>
+  link ? `${FRONTEND_URL}/pay/${link.linkId}` : `${FRONTEND_URL}/invoice/${inv.publicToken}`;
+
+const serializeInvoice = async (inv) => {
   const { subtotal, total } = computeTotals(inv.items);
   const link = inv.paymentLinkId && inv.paymentLinkId.linkId ? inv.paymentLinkId : null;
+  const shareUrl = invoiceShareUrl(inv, link);
   return {
     _id: inv._id,
     invoiceNumber: inv.invoiceNumber,
@@ -75,6 +85,7 @@ const serializeInvoice = (inv) => {
     createdAt: inv.createdAt,
     payUrl: link ? `${FRONTEND_URL}/pay/${link.linkId}` : null,
     paymentLinkStatus: link ? link.status : null,
+    qrCodeDataUri: await generateQrDataUri(shareUrl),
   };
 };
 
@@ -88,7 +99,7 @@ export const listInvoices = async (req, res) => {
       .limit(100)
       .populate('paymentLinkId', 'linkId status');
 
-    res.json({ success: true, invoices: invoices.map(serializeInvoice) });
+    res.json({ success: true, invoices: await Promise.all(invoices.map(serializeInvoice)) });
   } catch (error) {
     console.error('❌ Error listing invoices:', error);
     res.status(500).json({ error: 'Failed to fetch invoices.' });
@@ -153,7 +164,7 @@ export const createInvoice = async (req, res) => {
       }
     }
 
-    res.status(201).json({ success: true, invoice: serializeInvoice(invoice) });
+    res.status(201).json({ success: true, invoice: await serializeInvoice(invoice) });
   } catch (error) {
     console.error('❌ Error creating invoice:', error);
     res.status(500).json({ error: 'Failed to create invoice.' });
@@ -184,7 +195,7 @@ export const updateInvoice = async (req, res) => {
 
     await invoice.save();
     await invoice.populate('paymentLinkId', 'linkId status');
-    res.json({ success: true, invoice: serializeInvoice(invoice) });
+    res.json({ success: true, invoice: await serializeInvoice(invoice) });
   } catch (error) {
     console.error('❌ Error updating invoice:', error);
     res.status(500).json({ error: 'Failed to update invoice.' });
@@ -249,7 +260,7 @@ export const sendInvoice = async (req, res) => {
     await invoice.save();
     await invoice.populate('paymentLinkId', 'linkId status');
 
-    res.json({ success: true, invoice: serializeInvoice(invoice) });
+    res.json({ success: true, invoice: await serializeInvoice(invoice) });
   } catch (error) {
     console.error('❌ Error sending invoice:', error);
     res.status(500).json({ error: 'Failed to send invoice. Please try again.' });
@@ -293,6 +304,7 @@ export const getPublicInvoice = async (req, res) => {
     }
 
     const { subtotal, total } = computeTotals(invoice.items);
+    const shareUrl = invoiceShareUrl(invoice, invoice.paymentLinkId);
 
     res.json({
       success: true,
@@ -310,6 +322,7 @@ export const getPublicInvoice = async (req, res) => {
         status: invoice.status,
         payLinkId: invoice.paymentLinkId?.linkId || null,
         paymentLinkStatus: invoice.paymentLinkId?.status || null,
+        qrCodeDataUri: await generateQrDataUri(shareUrl),
       },
     });
   } catch (error) {
