@@ -446,9 +446,9 @@ export default function Overview() {
         {/* Quick Actions — the two fastest ways to get paid, replacing the old
             Total Transactions / Trust Score stat cards. Both deep-link into
             RequestMoney with the relevant option pre-selected via nav state.
-            self-start keeps these compact instead of grid-stretching to
-            match the taller stat cards beside them; the frame border color
-            is per-action so the two read as distinct at a glance. */}
+            Back to full stat-card height/padding (grid-stretches to match
+            the stat cards beside them) — the frame border color is still
+            per-action so the two read as distinct at a glance. */}
         {[
           { label: 'Send STK Push', description: 'Prompt a customer to pay instantly', icon: 'bolt', preset: 'mpesa', frame: 'border-amber-400/30 hover:border-amber-400/60', glow: 'bg-amber-400/10' },
           { label: 'Get Payment Link', description: 'Share a link for any amount', icon: 'link', preset: 'link', frame: 'border-sky-400/30 hover:border-sky-400/60', glow: 'bg-sky-400/10' },
@@ -456,21 +456,21 @@ export default function Overview() {
           <button
             key={action.preset}
             onClick={() => navigate('/request-money', { state: { preset: action.preset } })}
-            className={`relative self-start overflow-hidden text-left w-full bg-[#00351D] p-4 lg:p-5 rounded-[12px] border-2 ${action.frame} shadow-sm editorial-shadow transition-all group hover:shadow-xl hover:shadow-emerald-900/20 active:scale-[0.98]`}
+            className={`relative overflow-hidden text-left bg-[#00351D] p-6 lg:p-8 rounded-[12px] border-2 ${action.frame} shadow-sm editorial-shadow transition-all group hover:shadow-xl hover:shadow-emerald-900/20 active:scale-[0.98]`}
           >
             {/* Fine dot-grid texture — same "security paper" treatment as the
                 Business Digital Wallet card above, for a matching premium feel. */}
             <div className="absolute inset-0 opacity-[0.05] pointer-events-none mix-blend-overlay" style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '14px 14px' }} />
-            <div className={`absolute top-0 right-0 w-20 h-20 ${action.glow} rounded-full -mr-6 -mt-6 blur-2xl group-hover:scale-125 transition-transform duration-700 pointer-events-none`} />
-            <div className="relative z-10 flex items-center gap-2 lg:gap-3">
-              <div className="w-8 h-8 lg:w-9 lg:h-9 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
-                <span className="material-symbols-outlined text-emerald-400 text-base lg:text-lg leading-none">{action.icon}</span>
+            <div className={`absolute top-0 right-0 w-24 h-24 ${action.glow} rounded-full -mr-8 -mt-8 blur-2xl group-hover:scale-125 transition-transform duration-700 pointer-events-none`} />
+            <div className="relative z-10 flex flex-col h-full">
+              <div className="flex justify-between items-center mb-4 lg:mb-6">
+                <div className="w-9 h-9 lg:w-10 lg:h-10 rounded-xl bg-white/10 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-emerald-400 text-lg leading-none">{action.icon}</span>
+                </div>
+                <span className="material-symbols-outlined text-white/30 text-base group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all">arrow_outward</span>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs lg:text-sm font-headline font-bold text-white leading-tight">{action.label}</p>
-                <p className="text-[8px] lg:text-[9px] text-white/40 font-bold tracking-tight opacity-90 leading-snug">{action.description}</p>
-              </div>
-              <span className="material-symbols-outlined text-white/30 text-sm lg:text-base group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all shrink-0 hidden sm:inline">arrow_outward</span>
+              <p className="text-sm lg:text-base font-headline font-bold text-white leading-tight mb-1">{action.label}</p>
+              <p className="text-[9px] lg:text-[10px] text-white/40 font-bold tracking-tight opacity-90 leading-snug">{action.description}</p>
             </div>
           </button>
         ))}
