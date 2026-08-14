@@ -26,6 +26,7 @@ import { backfillTransactionFees } from './migrations/backfillTransactionFees.js
 import { backfillNcbaMerchantCodes } from './migrations/backfillNcbaMerchantCodes.js';
 import { checkAndSendDormancyReminders } from './services/dormancyReminderService.js';
 import { runWeeklyRevenueSweepIfDue } from './services/revenueSweepService.js';
+import { reconcileStuckOpenBankingPayouts } from './services/ncbaOpenBankingReconciliationService.js';
 
 dotenv.config();
 
@@ -319,6 +320,17 @@ async function bootstrap() {
   setInterval(() => {
     runWeeklyRevenueSweepIfDue().catch((e) => console.error('Revenue sweep check failed:', e));
   }, 24 * 60 * 60 * 1000);
+
+  // NCBA Open Banking async-rail reconciliation — Mobile B2W/Lipa na Mpesa/
+  // KPLC/NCWSC payouts whose settlement callback never arrives would
+  // otherwise sit 'pending' forever with the merchant's balance already
+  // debited (see services/ncbaOpenBankingReconciliationService.js). Checks
+  // every 5 minutes; each stuck payout only actually resolves once it's
+  // been pending past that service's own timeout.
+  reconcileStuckOpenBankingPayouts().catch((e) => console.error('Open Banking reconciliation sweep failed:', e));
+  setInterval(() => {
+    reconcileStuckOpenBankingPayouts().catch((e) => console.error('Open Banking reconciliation sweep failed:', e));
+  }, 5 * 60 * 1000);
 }
 
 bootstrap();

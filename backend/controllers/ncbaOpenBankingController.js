@@ -430,10 +430,23 @@ export const handlePesaLinkCallback = async (req, res) => {
     return;
   }
   const reference = rawReference;
+  const succeeded = ['SUCCESS', 'COMPLETED', '0'].includes(String(body.Status || body.status || '').toUpperCase());
+  await resolvePendingOpenBankingTransaction({ reference, succeeded });
+};
 
+// Shared resolver behind handlePesaLinkCallback above — also called by
+// services/ncbaOpenBankingReconciliationService.js's timeout sweep for
+// async rails (Mobile B2W, Lipa na M-Pesa, KPLC/NCWSC) whose callback never
+// arrives. NCBA's own doc claims these settle "via a later callback" to
+// this same webhook, but that's unconfirmed in practice — nothing has ever
+// been observed calling back for a real Mobile B2W payout, leaving the
+// Transaction stuck 'pending' forever with the merchant's balance already
+// debited. The reconciliation sweep drives this same code path with
+// succeeded:false after a timeout, so a payout that never confirms is
+// refunded instead of silently lost — identical outcome to a real FAILED
+// callback, just triggered by absence of one rather than by one arriving.
+export async function resolvePendingOpenBankingTransaction({ reference, succeeded }) {
   try {
-    const succeeded = ['SUCCESS', 'COMPLETED', '0'].includes(String(body.Status || body.status || '').toUpperCase());
-
     // Atomic claim on the pending->resolved transition — a plain
     // `if (transaction.status === 'pending')` read followed by a separate
     // `.save()` is a TOCTOU race: two redeliveries of the same callback
