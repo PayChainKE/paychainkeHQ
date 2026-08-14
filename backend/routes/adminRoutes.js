@@ -47,6 +47,7 @@ import {
 } from '../controllers/officerAccountController.js';
 import { runWalletAudit } from '../controllers/walletAuditController.js';
 import { adminListInvoices } from '../controllers/invoiceController.js';
+import { sendSmsBroadcast, getSmsBroadcasts } from '../controllers/smsBroadcastController.js';
 import { getRevenue, getRevenueSweeps, triggerRevenueSweep, getReconciliations, submitReconciliation } from '../controllers/revenueController.js';
 import { adminListCashAdvanceRequests, adminUpdateCashAdvanceRequest } from '../controllers/cashAdvanceController.js';
 import {
@@ -170,6 +171,12 @@ router.get('/system-status', protect, excludeOfficer, getSystemStatus);
 
 // Global audit log (filterable, paginated).
 router.get('/audit-log', protect, excludeOfficer, getAuditLog);
+
+// Admin → merchant SMS broadcasts (system maintenance notices, public
+// holiday greetings, security reminders, etc). Sending is rate-limited with
+// the same limiter used for other sensitive bulk/admin actions.
+router.get('/sms-broadcasts',  protect, excludeOfficer, getSmsBroadcasts);
+router.post('/sms-broadcasts', protect, requireMutator, sensitiveActionLimiter, sendSmsBroadcast);
 
 // Call-centre / inbound communications console.
 router.get('/communications',                protect, excludeOfficer, getCommunications);
