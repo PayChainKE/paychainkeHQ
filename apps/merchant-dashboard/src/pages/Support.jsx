@@ -21,8 +21,8 @@ export default function Support() {
 
   const faqs = [
     { q: 'How do I withdraw my USDC balance?', a: 'Head to the Inflation Shield page and swap your USDC back to KES, then settle it straight to your bank account — no extra forms needed.' },
-    { q: 'What are the transaction fees?', a: 'Collections and FX swaps carry PayChain\'s standard fees. Bulk Pay to a bank or utility is free; Bulk Pay to an M-PESA mobile number carries Safaricom\'s own B2C charge plus a small PayChain fee, same as a regular M-PESA withdrawal.' },
-    { q: 'Is my data secure?', a: 'Yes. We use bank-level encryption, and every transaction is verified on-chain, so your money and your data stay protected.' },
+    { q: 'What are the transaction fees?', a: 'Collections carry PayChain\'s standard tiered fee. Send Money and Bulk Pay payouts — bank, M-PESA, Paybill/Till, KPLC, and Water — each carry their own tiered PayChain fee plus the relevant third-party cost, shown before you confirm. FX swaps on Inflation Shield carry no PayChain fee today.' },
+    { q: 'Is my data secure?', a: 'Yes. We use bank-level encryption, and Digital Wallet transactions are additionally verified on the Stellar blockchain, so your money and your data stay protected.' },
     { q: 'How long does settlement take?', a: 'Most settlements land in your bank account within a few hours. If it takes longer than a business day, reach out and we\'ll look into it right away.' },
   ]
 

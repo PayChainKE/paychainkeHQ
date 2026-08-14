@@ -21,7 +21,7 @@ export default function SupportTab() {
 
   const faqs = [
     { q: 'How do I withdraw my USDC balance?', a: 'You can swap USDC back to KES in the Inflation Shield page and then settle to your bank account.' },
-    { q: 'What are the transaction fees?', a: 'PayChain adds a 0.5% margin on top of Safaricom\'s standard tariff for inbound payments, and a 2% spread on FX conversions. There\'s no flat rate.' },
+    { q: 'What are the transaction fees?', a: 'Collections carry PayChain\'s standard tiered fee. Send Money and Bulk Pay payouts — bank, M-PESA, Paybill/Till, KPLC, and Water — each carry their own tiered PayChain fee plus the relevant third-party cost, shown before you confirm. FX swaps on Inflation Shield carry no PayChain fee today.' },
     { q: 'Is my data secure?', a: 'Your password and PIN are hashed, never stored or logged in plain text — not even our own team can read them.' },
   ];
 

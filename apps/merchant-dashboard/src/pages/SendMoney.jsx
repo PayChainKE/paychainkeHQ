@@ -51,32 +51,34 @@ function estimateB2bFee(amount) {
   return band.totalFee
 }
 
-// Mirrors backend/config/mpesaB2cTariffCard.js — Safaricom's real M-Pesa
-// B2C ("Business Bouquet") tariff bands, plus PayChain's flat KES 10
-// markup. That backend table is the authoritative charge; this is only an
-// estimate so the merchant sees an honest number here instead of "Free"
-// before confirming.
-const B2C_SAFARICOM_BANDS = [
-  { max: 100,     fee: 0  },
-  { max: 500,     fee: 5  },
-  { max: 1_000,   fee: 5  },
-  { max: 1_500,   fee: 5  },
-  { max: 2_500,   fee: 9  },
-  { max: 3_500,   fee: 9  },
-  { max: 5_000,   fee: 9  },
-  { max: 7_500,   fee: 11 },
-  { max: 10_000,  fee: 11 },
-  { max: 15_000,  fee: 11 },
-  { max: 20_000,  fee: 11 },
-  { max: 25_000,  fee: 13 },
-  { max: 250_000, fee: 13 },
+// Mirrors backend/config/mpesaB2cTariffCard.js's combined
+// B2C_REGISTERED_USER_BANDS (Safaricom's real cost) + B2C_SERVICE_FEE_BANDS
+// (PayChain's own tiered markup, 2026-08-12) — getB2cTariff sums both
+// server-side. This used to add a flat KES 10 PayChain markup, which the
+// backend replaced with a tiered schedule (KES 0-200 depending on amount);
+// the estimate was never updated to match, so it understated the real
+// charge at every amount above the lowest band.
+const B2C_TARIFF_BANDS = [
+  { max: 49,      totalFee: 0   },
+  { max: 100,     totalFee: 5   },
+  { max: 500,     totalFee: 11  },
+  { max: 1_000,   totalFee: 17  },
+  { max: 1_500,   totalFee: 24  },
+  { max: 2_500,   totalFee: 29  },
+  { max: 3_500,   totalFee: 34  },
+  { max: 5_000,   totalFee: 37  },
+  { max: 7_500,   totalFee: 57  },
+  { max: 10_000,  totalFee: 67  },
+  { max: 20_000,  totalFee: 84  },
+  { max: 50_000,  totalFee: 113 },
+  { max: 100_000, totalFee: 163 },
+  { max: 250_000, totalFee: 213 },
 ]
-const PAYCHAIN_B2C_MARKUP_KES = 10
 
 function estimateB2cFee(amount) {
-  if (!amount || amount <= 0) return PAYCHAIN_B2C_MARKUP_KES
-  const band = B2C_SAFARICOM_BANDS.find(b => amount <= b.max) || B2C_SAFARICOM_BANDS[B2C_SAFARICOM_BANDS.length - 1]
-  return band.fee + PAYCHAIN_B2C_MARKUP_KES
+  if (!amount || amount <= 0) return 0
+  const band = B2C_TARIFF_BANDS.find(b => amount <= b.max) || B2C_TARIFF_BANDS[B2C_TARIFF_BANDS.length - 1]
+  return band.totalFee
 }
 
 export default function SendMoney() {
