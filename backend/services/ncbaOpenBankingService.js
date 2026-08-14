@@ -185,7 +185,13 @@ async function ncbaOpenBankingPost(path, body, { retrying = false } = {}) {
         'Content-Type': 'application/json',
         'User-Agent': 'PayChain-Backend/1.0 (+https://paychain.co.ke)',
       },
-      timeout: 20000,
+      // Widened from 20s after a live Mobile B2W payout timed out waiting on
+      // NCBA's ack — no evidence it was actually slow vs. genuinely dropped,
+      // but 20s was cutting it close for a gateway that's already known to
+      // be slow/silent under load (see the reconciliation sweep in
+      // ncbaOpenBankingReconciliationService.js for the async-callback side
+      // of that same flakiness).
+      timeout: 45000,
     });
     return response.data;
   } catch (err) {

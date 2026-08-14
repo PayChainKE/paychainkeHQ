@@ -13,6 +13,7 @@ import { formatPhoneDisplay } from '../utils/formatPhoneDisplay'
 import paychainLogo from '../assets/paychain-logo-dark.png'
 import paychainLogoWhite from '../assets/paychain-logo-white.png'
 import axios from 'axios'
+import FundAccountModal from '../components/modals/FundAccountModal'
 
 export default function BulkPay() {
   const { showAmounts } = usePrivacyMode()
@@ -728,14 +729,12 @@ export default function BulkPay() {
     setShowLinkModal(false);
   };
 
-  // Fund Account Modal State
+  // Fund Account — showFundModal opens a small method picker; picking one
+  // hands off to the shared FundAccountModal (same component
+  // Overview.jsx/Wallet.jsx use) for the actual STK-push/bank/paybill flow,
+  // instead of duplicating it here.
   const [showFundModal, setShowFundModal] = useState(false)
-  const [fundStep, setFundStep] = useState(1)
-  const [fundDetails, setFundDetails] = useState({
-    amount: '',
-    method: 'Mobile Money',
-    phone: ''
-  })
+  const [activeFundMethod, setActiveFundMethod] = useState(null)
   const [selectedTill, setSelectedTill] = useState(null)
 
   // Security Verification Modal State
@@ -837,17 +836,6 @@ export default function BulkPay() {
     } catch (error) {
       addNotification({ title: 'Error', message: error.response?.data?.message || 'Failed to set PIN', type: 'error' });
     }
-  }
-
-  const handleFundAccount = () => {
-    addNotification({
-      title: 'Funding Initiated',
-      message: `Your deposit of KES ${fundDetails.amount} via ${fundDetails.method} is being processed.`,
-      type: 'success'
-    });
-    setShowFundModal(false);
-    setFundStep(1);
-    setFundDetails({ amount: '', method: 'Mobile Money', phone: '' });
   }
 
   const batchTotal = Object.keys(selectedPayees)
@@ -2350,153 +2338,57 @@ export default function BulkPay() {
             </div>
           </div>
         </section>
-        {/* Fund Account Modal Overlay */}
+        {/* Fund Account — small method picker, then hands off to the shared
+            FundAccountModal (same component Overview.jsx/Wallet.jsx use)
+            for the actual STK-push/bank/paybill flow. This used to be its
+            own inline "Fund Account" modal whose Pay Now button called an
+            undefined setBalance(...) — dead/broken code that would throw
+            if clicked, never wired to any real deposit endpoint. */}
         {showFundModal && (
-          <div className="fixed inset-0 bg-[#0A2540]/60 backdrop-blur-md z-[110] flex items-center justify-center p-4 animate-in fade-in duration-300">
-            <div className="bg-white w-full max-w-md rounded-[32px] md:rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in duration-500 border border-white/20">
+          <div className="fixed inset-0 bg-[#0A2540]/60 backdrop-blur-md z-[110] flex items-center justify-center p-4 animate-in fade-in duration-300" onClick={() => setShowFundModal(false)}>
+            <div className="bg-white w-full max-w-md rounded-[32px] md:rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in duration-500 border border-white/20" onClick={(e) => e.stopPropagation()}>
               <div className="p-6 md:p-8">
                 <div className="flex items-center justify-between mb-8">
                   <div>
                     <h2 className="font-headline text-2xl text-primary tracking-tight font-bold">Fund Account</h2>
-                    <p className="text-[10px] text-on-surface-variant font-medium mt-1 opacity-60">
-                      {fundStep === 1 ? 'Select Funding Method' : fundStep === 2 ? 'Enter Details' : 'Funding Successful'}
-                    </p>
+                    <p className="text-[10px] text-on-surface-variant font-medium mt-1 opacity-60">Choose how to top up your balance</p>
                   </div>
-                  <button 
-                    onClick={() => { setShowFundModal(false); setFundStep(1); }}
+                  <button
+                    onClick={() => setShowFundModal(false)}
                     className="w-10 h-10 rounded-full bg-surface-container-low flex items-center justify-center text-primary/40 hover:text-primary transition-colors"
                   >
                     <span className="material-symbols-outlined text-xl">close</span>
                   </button>
                 </div>
 
-                {fundStep === 1 && (
-                  <div className="flex flex-col gap-3">
-                    {[
-                      { id: 'Virtual Account Transfer', label: 'Virtual Account Transfer', icon: 'account_balance', desc: 'Transfer to your dedicated USD/KES account' },
-                      { id: 'Mobile Money', label: 'Mobile Money', icon: 'smartphone', desc: 'M-Pesa, Airtel Money' },
-                      { id: 'Card Top-up', label: 'Card Top-up', icon: 'credit_card', desc: 'Visa / Mastercard' }
-                    ].map((method) => (
-                      <button
-                        key={method.id}
-                        onClick={() => { setFundDetails({...fundDetails, method: method.id}); setFundStep(2); }}
-                        className="group flex items-center gap-4 p-4 rounded-2xl border border-outline-variant/10 hover:border-emerald-500/30 hover:bg-emerald-500/[0.01] transition-all"
-                      >
-                        <div className="w-12 h-12 rounded-xl bg-surface-container-low flex items-center justify-center text-primary group-hover:bg-[#00351D] group-hover:text-white transition-all shrink-0">
-                          <span className="material-symbols-outlined text-2xl">{method.icon}</span>
-                        </div>
-                        <div className="text-left">
-                          <h4 className="font-bold text-sm text-primary">{method.label}</h4>
-                          <p className="text-[10px] text-on-surface-variant mt-0.5 opacity-60">{method.desc}</p>
-                        </div>
-                        <span className="material-symbols-outlined ml-auto text-primary/10 group-hover:text-emerald-500 transition-all">chevron_right</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {fundStep === 2 && (
-                  <div className="space-y-6 animate-in slide-in-from-right duration-500">
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Amount (KES)</label>
-                      <input 
-                        type="text"
-                        value={fundDetails.amount}
-                        onChange={(e) => setFundDetails({...fundDetails, amount: e.target.value})}
-                        placeholder="e.g. 50,000"
-                        className="w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none"
-                      />
-                    </div>
-
-                    {fundDetails.method === 'Mobile Money' && (
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Phone Number</label>
-                        <input 
-                          type="text"
-                          value={fundDetails.phone}
-                          onChange={(e) => setFundDetails({...fundDetails, phone: e.target.value})}
-                          placeholder="07XX XXX XXX"
-                          className="w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none"
-                        />
-                      </div>
-                    )}
-
-                    <div className="flex gap-4 pt-4">
-                      <button 
-                        onClick={() => setFundStep(1)}
-                        className="flex-1 py-3.5 rounded-2xl border border-outline-variant/10 text-primary font-bold text-sm"
-                      >
-                        Back
-                      </button>
-                      <button 
-                        onClick={() => setFundStep(3)}
-                        className="flex-[2] py-3.5 rounded-2xl bg-[#00351D] text-white font-bold text-sm shadow-xl active:scale-[0.98]"
-                      >
-                        Next Step
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {fundStep === 3 && (
-                  <div className="animate-in zoom-in duration-500 text-center py-4">
-                    <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                      <span className="material-symbols-outlined text-4xl text-emerald-600">contactless</span>
-                    </div>
-                    <h3 className="font-headline text-xl text-primary font-bold mb-2">Confirm Funding</h3>
-                    <p className="text-sm text-on-surface-variant opacity-60 px-6">You are about to deposit</p>
-                    <div className="flex items-center justify-center gap-2 my-4">
-                      <span className="text-sm font-bold text-emerald-600">KES</span>
-                      <span className="font-headline text-4xl text-primary font-bold tracking-tighter">{fundDetails.amount || '0'}</span>
-                    </div>
-                    <p className="text-[10px] text-on-surface-variant font-black uppercase tracking-widest opacity-40">via {fundDetails.method}</p>
-
-                    <div className="flex gap-4 pt-10">
-                      <button 
-                        onClick={() => setFundStep(2)}
-                        className="flex-1 py-3.5 rounded-2xl border border-outline-variant/10 text-primary font-bold text-sm"
-                      >
-                        Back
-                      </button>
-                      <button 
-                        onClick={() => {
-                          setBalance(prev => prev + (parseFloat(fundDetails.amount) || 0));
-                          setFundStep(3);
-                          addNotification({ title: 'Account Funded', message: `KES ${fundDetails.amount} added to your balance.`, type: 'success' });
-                        }}
-                        className="flex-[2] py-3.5 rounded-2xl bg-[#00351D] text-white font-bold text-sm shadow-xl animate-bounce-slow"
-                      >
-                        Pay Now
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {fundStep === 3 && (
-                  <div className="py-12 flex flex-col items-center text-center space-y-6 animate-in zoom-in duration-700">
-                    <div className="w-24 h-24 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center relative">
-                      <div className="absolute inset-0 bg-emerald-400/20 rounded-full animate-ping"></div>
-                      <span className="material-symbols-outlined text-5xl font-black">check</span>
-                    </div>
-                    <div>
-                      <h3 className="font-headline text-2xl font-black text-primary">Funds Received!</h3>
-                      <p className="text-sm text-on-surface-variant font-medium mt-2">Your liquidity has been topped up successfully.</p>
-                      <div className="mt-6 p-4 rounded-3xl bg-emerald-50 border border-emerald-500/10 inline-block">
-                        <p className="text-[10px] text-emerald-700 font-bold uppercase tracking-widest leading-none mb-1">New Balance</p>
-                        <p className="font-headline text-2xl font-black text-emerald-800">KES {(balance + (parseFloat(fundDetails.amount) || 0)).toLocaleString()}</p>
-                      </div>
-                    </div>
-                    <button 
-                      onClick={() => { setShowFundModal(false); setFundStep(1); setFundDetails({...fundDetails, amount: ''}); }}
-                      className="w-full py-4 rounded-2xl bg-[#00351D] text-white font-bold text-sm transition-all shadow-xl"
+                <div className="flex flex-col gap-3">
+                  {[
+                    { id: 'mobile', label: 'Mobile Money', desc: 'M-Pesa, Airtel Money', icon: 'phone_iphone' },
+                    { id: 'bank', label: 'Bank Account', desc: 'Direct Bank Transfer', icon: 'account_balance' },
+                    { id: 'paybill', label: 'Paybill', desc: 'Lipa na M-Pesa instructions', icon: 'storefront' },
+                  ].map((method) => (
+                    <button
+                      key={method.id}
+                      onClick={() => { setActiveFundMethod(method.id); setShowFundModal(false); }}
+                      className="group flex items-center gap-4 p-4 rounded-2xl border border-outline-variant/10 hover:border-emerald-500/30 hover:bg-emerald-500/[0.01] transition-all"
                     >
-                      Continue to Bulk Pay
+                      <div className="w-12 h-12 rounded-xl bg-surface-container-low flex items-center justify-center text-primary group-hover:bg-[#00351D] group-hover:text-white transition-all shrink-0">
+                        <span className="material-symbols-outlined text-2xl">{method.icon}</span>
+                      </div>
+                      <div className="text-left">
+                        <h4 className="font-bold text-sm text-primary">{method.label}</h4>
+                        <p className="text-[10px] text-on-surface-variant mt-0.5 opacity-60">{method.desc}</p>
+                      </div>
+                      <span className="material-symbols-outlined ml-auto text-primary/10 group-hover:text-emerald-500 transition-all">chevron_right</span>
                     </button>
-                  </div>
-                )}
+                  ))}
+                </div>
               </div>
             </div>
           </div>
+        )}
+        {activeFundMethod && (
+          <FundAccountModal method={activeFundMethod} onClose={() => setActiveFundMethod(null)} />
         )}
         {/* Setup PIN Modal Overlay */}
         {showPinSetupModal && (

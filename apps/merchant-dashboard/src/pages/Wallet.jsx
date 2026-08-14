@@ -10,6 +10,8 @@ import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useToast } from '../context/NotificationContext'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import SettlementQrCard from '../components/ui/SettlementQrCard'
+import TransactionSuccessCard from '../components/ui/TransactionSuccessCard'
+import FundAccountModal from '../components/modals/FundAccountModal'
 import { getAppUrl } from '../utils/appUrl'
 import { escapeHtml } from '../utils/escapeHtml'
 
@@ -28,6 +30,7 @@ export default function Wallet() {
   const [withdrawPin, setWithdrawPin] = useState('')
   const [bankCodes, setBankCodes] = useState([])
   const [isWithdrawing, setIsWithdrawing] = useState(false)
+  const [withdrawSuccess, setWithdrawSuccess] = useState(null) // { amount, methodLabel, recipientDisplay, payeeDraft, transaction }
 
   // Settlement Settings
   const [showSettingsModal, setShowSettingsModal] = useState(false)
@@ -46,13 +49,10 @@ export default function Wallet() {
   const [isGeneratingLink, setIsGeneratingLink] = useState(false)
   const [generatedLink, setGeneratedLink] = useState('')
 
-  // Top Up Features
+  // Top Up — the modal/STK-push flow itself lives in the shared
+  // FundAccountModal (also used by Overview.jsx/BulkPay.jsx), not
+  // duplicated here.
   const [showTopUpSelection, setShowTopUpSelection] = useState(false)
-  const [selectedFundingMethod, setSelectedFundingMethod] = useState(null)
-  const [topUpAmount, setTopUpAmount] = useState('')
-  const [topUpPhone, setTopUpPhone] = useState('')
-  const [stkStatusText, setStkStatusText] = useState('')
-  const [isProcessingTopUp, setIsProcessingTopUp] = useState(false)
 
   // Primary Ledger Actions
   const [showMoveMoney, setShowMoveMoney] = useState(false)
@@ -133,18 +133,29 @@ export default function Wallet() {
       const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
       const token = localStorage.getItem('paychain_merchant_token')
 
+      const withdrawnAmount = withdrawAmount
+      let tx = null
+      let methodLabel, recipientDisplay, payeeDraft
+
       if (destType === 'Mobile') {
-        await axios.post(`${API_URL}/api/callbacks/b2c-request`, {
-          phone: destinationAccountValue.replace(/^(?:\+?254|0)/, '254'),
+        const normalizedPhone = destinationAccountValue.replace(/^(?:\+?254|0)/, '254')
+        const { data } = await axios.post(`${API_URL}/api/callbacks/b2c-request`, {
+          phone: normalizedPhone,
           amount: Number(withdrawAmount),
           pin: withdrawPin,
         }, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        addToast({ title: 'Withdrawal Processing', message: `KES ${withdrawAmount} sent to phone. B2C Transfer initiated.`, type: 'success' });
+        tx = data.transaction
+        methodLabel = 'Mobile Money Withdrawal'
+        recipientDisplay = normalizedPhone
+        payeeDraft = {
+          name: `Withdrawal to ${normalizedPhone}`, type: 'contractor', paymentMethod: 'Mobile Money',
+          mobileMoneyType: 'Personal Number', phone: normalizedPhone,
+        }
         setWithdrawPin('')
       } else if (destType === 'Bank') {
-        await axios.post(`${API_URL}/api/v1/openbanking/bank-payout`, {
+        const { data } = await axios.post(`${API_URL}/api/v1/openbanking/bank-payout`, {
           bankCode: withdrawBankCode,
           accountNumber: destinationAccountValue,
           amount: Number(withdrawAmount),
@@ -153,21 +164,31 @@ export default function Wallet() {
         }, {
           headers: { Authorization: `Bearer ${token}` }
         })
-        addToast({ title: 'Withdrawal Submitted', message: `KES ${withdrawAmount} sent via PesaLink.`, type: 'success' })
+        tx = data.transaction
+        methodLabel = 'Bank Withdrawal · PesaLink'
+        recipientDisplay = `${destinationAccountValue}${withdrawBankCode ? ` · ${bankCodes.find(b => b.code === withdrawBankCode)?.name || withdrawBankCode}` : ''}`
+        payeeDraft = {
+          name: `Withdrawal to ${destinationAccountValue}`, type: 'contractor', paymentMethod: 'Bank',
+          bankName: bankCodes.find(b => b.code === withdrawBankCode)?.name || '', accountNumber: destinationAccountValue, bankCode: withdrawBankCode,
+        }
         setWithdrawPin('')
       } else {
-        await axios.post(`${API_URL}/api/transactions/send-money`, {
+        const { data } = await axios.post(`${API_URL}/api/transactions/send-money`, {
           amount: Number(withdrawAmount),
           destination: destination,
           reference: `Withdrawal to ${destinationAccountValue}`
         }, {
           headers: { Authorization: `Bearer ${token}` }
         })
-        addToast({ title: 'Withdrawal Initiated', message: `KES ${withdrawAmount} sent to destination.`, type: 'success' })
+        tx = data.transaction
+        methodLabel = 'Withdrawal'
+        recipientDisplay = destinationAccountValue
+        payeeDraft = null
       }
 
       setWithdrawAmount('')
       setDestinationAccountValue('')
+      setWithdrawSuccess({ amount: withdrawnAmount, methodLabel, recipientDisplay, payeeDraft, transaction: tx })
       await refreshSession()
     } catch (err) {
       addToast({ title: 'Withdrawal Failed', message: err.response?.data?.error || err.response?.data?.message || 'Failed to withdraw funds', type: 'error' })
@@ -1089,214 +1110,30 @@ export default function Wallet() {
         </div>
       </div>
 
-      {/* Top Up Modal Overlay */}
+      {/* Top Up Modal Overlay — shared FundAccountModal, same component
+          Overview.jsx/BulkPay.jsx use, instead of a duplicate inline
+          STK-push implementation drifting out of sync with it. */}
       {showTopUpSelection && (
+        <FundAccountModal method="mobile" onClose={() => setShowTopUpSelection(false)} />
+      )}
+
+      {/* Withdrawal Success Overlay */}
+      {withdrawSuccess && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 animate-fade-in backdrop-blur-xl bg-primary/10">
-          <div className="absolute inset-0 bg-[#00351D]/80" onClick={() => setShowTopUpSelection(false)}></div>
-          
-          <div className="bg-white w-full max-w-2xl rounded-[32px] md:rounded-[40px] shadow-2xl relative z-10 overflow-hidden animate-scale-in max-h-[90vh] flex flex-col">
-            {/* Modal Header */}
-            <div className="p-6 md:p-8 border-b border-outline-variant/10 flex items-center justify-between bg-surface-container-low">
-              <div>
-                <h3 className="font-headline text-2xl md:text-3xl text-primary tracking-tight">
-                  {selectedFundingMethod ? selectedFundingMethod.name : 'Select Funding Method'}
-                </h3>
-                <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-[0.2em] mt-1 opacity-60">
-                  {selectedFundingMethod ? 'Complete your deposit' : 'Choose how to top up your wallet'}
-                </p>
-              </div>
-              <button 
-                onClick={() => {
-                  if (selectedFundingMethod) {
-                    setSelectedFundingMethod(null)
-                  } else {
-                    setShowTopUpSelection(false)
-                  }
-                }}
-                className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-primary/40 hover:text-primary transition-colors border border-outline-variant/10"
-              >
-                <span className="material-symbols-outlined">{selectedFundingMethod ? 'arrow_back' : 'close'}</span>
-              </button>
-            </div>
-
-            {/* Modal Content */}
-            <div className="flex-1 overflow-y-auto p-6 md:p-10">
-              {!selectedFundingMethod ? (
-                /* Selection List */
-                <div className="space-y-4">
-                  {[
-                    {
-                      id: 'mobile',
-                      name: 'Mobile Money',
-                      desc: 'M-Pesa, Airtel Money',
-                      icon: 'smartphone',
-                      color: 'bg-emerald-50 text-emerald-600 border-emerald-100'
-                    }
-                  ].map((method) => (
-                    <div 
-                      key={method.id}
-                      onClick={() => setSelectedFundingMethod(method)}
-                      className="p-6 rounded-3xl border border-outline-variant/10 hover:border-primary/20 hover:bg-surface-container-low transition-all cursor-pointer group flex items-center justify-between"
-                    >
-                      <div className="flex items-center gap-5">
-                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl border ${method.color} shadow-sm group-hover:scale-105 transition-transform`}>
-                          <span className="material-symbols-outlined text-3xl">{method.icon}</span>
-                        </div>
-                        <div>
-                          <p className="font-headline text-lg text-primary">{method.name}</p>
-                          <p className="text-xs text-on-surface-variant opacity-60">{method.desc}</p>
-                        </div>
-                      </div>
-                      <span className="material-symbols-outlined text-primary/20 group-hover:text-primary group-hover:translate-x-1 transition-all">chevron_right</span>
-                    </div>
-                  ))}
-                </div>
-              ) : selectedFundingMethod.id === 'mobile' ? (
-                /* Mobile Money Detail */
-                <div className="space-y-8 animate-fade-in-up">
-                  <div className="bg-emerald-50/50 p-6 rounded-3xl border border-emerald-100 flex items-start gap-4">
-                    <span className="material-symbols-outlined text-emerald-600 mt-1">smartphone</span>
-                    <p className="text-xs md:text-sm text-emerald-900 leading-relaxed font-medium">
-                      Enter the amount and your mobile number. We will send a <span className="font-bold">STK Push</span> to your phone for instant top-up.
-                    </p>
-                  </div>
-                  
-                  <div className="space-y-6">
-                    <div className="space-y-3">
-                      <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Amount to Top Up</label>
-                      <div className="relative group">
-                        <div className="absolute left-6 top-1/2 -translate-y-1/2 text-primary/40 font-bold text-lg">KES</div>
-                        <ValidatedInput
-                          kind="amount"
-                          value={topUpAmount}
-                          onChange={(e) => setTopUpAmount(e.target.value)}
-                          placeholder="Min 100"
-                          className="w-full bg-surface-container-low border border-outline-variant/5 rounded-3xl py-6 pl-16 pr-6 text-2xl font-headline text-primary focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">M-Pesa / Airtel Number</label>
-                      <div className="relative group">
-                        <div className="absolute left-6 top-1/2 -translate-y-1/2 text-primary/40 flex items-center justify-center">
-                          <span className="material-symbols-outlined text-xl">smartphone</span>
-                        </div>
-                        <ValidatedInput
-                          kind="phoneKE"
-                          value={topUpPhone}
-                          onChange={(e) => setTopUpPhone(e.target.value)}
-                          placeholder="0712 345 678"
-                          className="w-full bg-surface-container-low border border-outline-variant/5 rounded-3xl py-6 pl-14 pr-6 text-2xl font-headline text-primary focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
-                        />
-                      </div>
-                    </div>
-
-                    <button 
-                      onClick={async () => {
-                        if (!topUpAmount || !topUpPhone) return
-                        setIsProcessingTopUp(true)
-                        setStkStatusText('Initiating STK Push...')
-                        try {
-                          const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
-                          const token = localStorage.getItem('paychain_merchant_token')
-                          
-                          // 1. Send STK Push
-                          const pushRes = await axios.post(`${API_URL}/api/callbacks/stk-push`, {
-                            amount: Number(topUpAmount),
-                            phone: topUpPhone,
-                            merchantId: merchant._id
-                          }, {
-                            headers: { Authorization: `Bearer ${token}` }
-                          })
-                          
-                          const checkoutId = pushRes.data.checkoutRequestId
-                          setStkStatusText('Awaiting PIN on phone...')
-
-                          // 2. Poll Status
-                          let attempts = 0
-                          const maxAttempts = 20 // 20 * 3s = 60s
-                          
-                          const pollInterval = setInterval(async () => {
-                            attempts++
-                            try {
-                              const statusRes = await axios.get(`${API_URL}/api/callbacks/stk-status/${checkoutId}`, {
-                                headers: { Authorization: `Bearer ${token}` }
-                              })
-                              
-                              if (statusRes.data.status === 'success') {
-                                clearInterval(pollInterval)
-                                addToast({ title: 'Top Up Successful', message: `Successfully funded ${topUpAmount} KES via M-Pesa.`, type: 'success' })
-                                await refreshSession()
-                                setShowTopUpSelection(false)
-                                setSelectedFundingMethod(null)
-                                setTopUpAmount('')
-                                setTopUpPhone('')
-                                setStkStatusText('')
-                                setIsProcessingTopUp(false)
-                              } else if (statusRes.data.status === 'failed') {
-                                clearInterval(pollInterval)
-                                addToast({ title: 'Top Up Failed', message: statusRes.data.resultDesc || 'User cancelled or request failed.', type: 'error' })
-                                setStkStatusText('')
-                                setIsProcessingTopUp(false)
-                              } else if (attempts >= maxAttempts) {
-                                clearInterval(pollInterval)
-                                addToast({ title: 'Timeout', message: 'The request timed out. Please try again.', type: 'error' })
-                                setStkStatusText('')
-                                setIsProcessingTopUp(false)
-                              }
-                            } catch (e) {
-                              console.error('Polling error', e)
-                            }
-                          }, 3000)
-
-                        } catch (err) {
-                          setStkStatusText('')
-                          setIsProcessingTopUp(false)
-                          // 5xx means the STK may have been sent but the backend errored after —
-                          // guide the user to check their phone rather than saying "failed"
-                          if (err.response?.status >= 500) {
-                            addToast({
-                              title: 'Check Your Phone',
-                              message: 'The STK prompt may have been sent. If you see an M-PESA prompt, enter your PIN. Otherwise try again.',
-                              type: 'error',
-                            })
-                          } else {
-                            addToast({ title: 'STK Push Failed', message: err.response?.data?.error || 'Could not send STK Push. Please try again.', type: 'error' })
-                          }
-                        }
-                      }}
-                      disabled={isProcessingTopUp || !topUpAmount || !topUpPhone}
-                      className="w-full bg-[#00351D] text-white py-5 rounded-3xl font-bold text-lg shadow-2xl hover:bg-[#004d2b] active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-white/5 disabled:opacity-20"
-                    >
-                      {isProcessingTopUp ? (
-                        <div className="flex items-center gap-3">
-                          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                          <span className="text-sm font-medium">{stkStatusText}</span>
-                        </div>
-                      ) : (
-                        <>
-                          Request STK Push
-                          <span className="material-symbols-outlined">send_to_mobile</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              ) : null}
-            </div>
-
-            {/* Modal Footer (Optional but good for selection) */}
-            {!selectedFundingMethod && (
-              <div className="p-6 md:p-8 bg-surface-container-low border-t border-outline-variant/10 text-center">
-                <p className="text-[10px] text-on-surface-variant font-medium opacity-60">
-                   Secure end-to-end encrypted transactions by <strong>PayChain Payments</strong>
-                </p>
-              </div>
-            )}
+          <div className="absolute inset-0 bg-[#00351D]/80" onClick={() => setWithdrawSuccess(null)}></div>
+          <div className="relative z-10 w-full max-w-md">
+            <TransactionSuccessCard
+              amount={withdrawSuccess.amount}
+              methodLabel={withdrawSuccess.methodLabel}
+              recipientDisplay={withdrawSuccess.recipientDisplay}
+              transaction={withdrawSuccess.transaction}
+              payeeDraft={withdrawSuccess.payeeDraft}
+              onDone={() => setWithdrawSuccess(null)}
+              doneLabel="Close"
+            />
           </div>
         </div>
-        )}
+      )}
 
       {/* Settings Modal Overlay */}
       {showSettingsModal && (

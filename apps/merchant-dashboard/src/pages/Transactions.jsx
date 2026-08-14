@@ -508,23 +508,25 @@ export default function Transactions() {
       : `${(tx.amount || tx.kesAmount || 0).toLocaleString()} KES`
     doc.text(amountStr, 85, valueY + 2)
 
-    // Verification Note
+    // Record note — this used to claim "cryptographically verified" /
+    // "Audit Hash" / "Verified by PayChain Ledger Node", none of which are
+    // real: the hash was Math.random(), and no such ledger service exists.
+    // A merchant relying on that claim for a bank/tax submission would be
+    // relying on fabricated verification. The reference ID above is the
+    // one real, lookup-able identifier for this transaction.
     doc.setFillColor(245, 247, 249)
     doc.rect(20, 155, pageWidth - 40, 15, 'F')
     doc.setFontSize(9)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(22, 39, 35)
-    doc.text('VERIFICATION: PROTOCOL V4.2 SECURED', pageWidth / 2, 164, { align: 'center' })
+    doc.text('OFFICIAL PAYCHAIN TRANSACTION RECORD', pageWidth / 2, 164, { align: 'center' })
 
     // Footer
     doc.setFontSize(8)
     doc.setTextColor(150, 150, 150)
     doc.setFont('helvetica', 'italic')
-    doc.text('This receipt is a cryptographically verified record of the transaction.', pageWidth / 2, 185, { align: 'center' })
-    doc.text('Audit Hash: ' + Math.random().toString(36).substring(2, 18).toUpperCase(), pageWidth / 2, 190, { align: 'center' })
-    
-    doc.setFont('helvetica', 'normal')
-    doc.text('Verified by PayChain Ledger Node v0.8.2', pageWidth / 2, 195, { align: 'center' })
+    doc.text('This receipt reflects PayChain\'s record of the transaction identified by the reference above.', pageWidth / 2, 185, { align: 'center' })
+    doc.text('Generated ' + new Date().toLocaleString(), pageWidth / 2, 190, { align: 'center' })
 
     doc.save(`PayChain_Audit_Receipt_${tx.reference}.pdf`)
     
@@ -902,7 +904,7 @@ export default function Transactions() {
                     <p className="text-[10px] text-on-surface-variant/60 font-bold uppercase tracking-[0.2em]">Verification</p>
                     <div className="bg-surface-container-low px-4 py-3 rounded-none border border-outline-variant/10 flex items-center gap-3 w-fit">
                       <span className="material-symbols-outlined text-lg text-primary/40">shield_with_heart</span>
-                      <span className="text-[10px] font-bold text-primary/60 uppercase tracking-[0.1em]">Protocol V4.2 Secured</span>
+                      <span className="text-[10px] font-bold text-primary/60 uppercase tracking-[0.1em]">PayChain Transaction Record</span>
                     </div>
                   </div>
 
@@ -925,10 +927,14 @@ export default function Transactions() {
                   </div>
                 </div>
 
-                {/* Footer Section */}
+                {/* Footer Section — used to claim this was "cryptographically
+                    signed and stored on the immutable ledger," which isn't
+                    true for any transaction type here (this is a MongoDB
+                    record, not a blockchain entry, except for actual
+                    Stellar fx_swap transfers) */}
                 <div className="bg-[#162723] p-6 border-t border-white/5 text-center mt-auto">
                   <p className="text-[9px] text-white/30 font-bold uppercase tracking-[0.2em] leading-relaxed">
-                    This transaction is cryptographically signed and stored on the immutable ledger.
+                    This is PayChain's official record of this transaction.
                   </p>
                 </div>
               </div>

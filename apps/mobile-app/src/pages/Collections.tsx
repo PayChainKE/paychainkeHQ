@@ -1087,7 +1087,7 @@ export default function Collections() {
                 <Text className="text-[10px] text-[#707971]/70 font-jakarta-bold uppercase tracking-[0.2em] mb-2">Verification</Text>
                 <View className="flex-row items-center gap-3 bg-[#f7faf7] border border-[#eff4ef] px-4 py-3 rounded-2xl self-start">
                   <Feather name="shield" size={16} color="#00351d40" />
-                  <Text className="text-[10px] font-jakarta-bold text-[#00351d]/60 uppercase tracking-[0.1em]">Protocol V4.2 Secured</Text>
+                  <Text className="text-[10px] font-jakarta-bold text-[#00351d]/60 uppercase tracking-[0.1em]">PayChain Transaction Record</Text>
                 </View>
               </View>
 

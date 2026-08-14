@@ -14,7 +14,12 @@ export default function ToastHost() {
   }
 
   return (
-    <div className="fixed top-6 right-6 z-[100] flex flex-col gap-4 max-w-sm pointer-events-none">
+    // z-[10000] — above every modal in the app (FundAccountModal peaks at
+    // z-[210], SessionTimeoutModal at z-[9999]) so a toast fired while any
+    // modal is open — e.g. the Top-Up success/failure toast from
+    // FundAccountModal — is never rendered underneath that modal's
+    // backdrop-blur layer, which made it look faded/invisible.
+    <div className="fixed top-6 right-6 z-[10000] flex flex-col gap-4 max-w-sm pointer-events-none">
       {toasts.map((t) => (
         <div 
           key={t.id} 

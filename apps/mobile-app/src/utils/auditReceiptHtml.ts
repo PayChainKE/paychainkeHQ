@@ -30,7 +30,6 @@ export function buildAuditReceiptHtml(tx: ReceiptTx): string {
   const amountStr = tx.type === 'fx_swap'
     ? `${(tx.usdcAmount || 0).toLocaleString()} USDC`
     : formatCurrency(tx.kesAmount || tx.amount || 0);
-  const auditHash = Math.random().toString(36).substring(2, 18).toUpperCase();
   const timestamp = new Date(tx.createdAt).toLocaleString('en-KE', {
     day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
   });
@@ -90,11 +89,10 @@ export function buildAuditReceiptHtml(tx: ReceiptTx): string {
       <div class="label">Total Amount</div>
       <div class="value">${esc(amountStr)}</div>
     </div>
-    <div class="verify">VERIFICATION: PROTOCOL V4.2 SECURED</div>
+    <div class="verify">OFFICIAL PAYCHAIN TRANSACTION RECORD</div>
     <div class="footer">
-      This receipt is a cryptographically verified record of the transaction.<br/>
-      Audit Hash: ${auditHash}<br/>
-      Verified by PayChain Ledger Node v0.8.2
+      This receipt reflects PayChain's record of the transaction identified by the reference above.<br/>
+      Generated ${esc(new Date().toLocaleString('en-KE'))}
     </div>
   </div>
 </body>
