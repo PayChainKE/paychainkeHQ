@@ -556,7 +556,7 @@ const Merchants = () => {
                   const riskSignals = m.riskSignals || [];
                   const highSeverity = riskSignals.some((s) => s.severity === 'high');
                   return (
-                    <tr key={m._id || i} className={`hover:bg-secondary-container/5 transition-colors group cursor-pointer ${locked ? 'opacity-70' : ''} ${flagged ? 'bg-red-50/30' : ''}`} onClick={() => openDetail(m._id)}>
+                    <tr key={m._id || i} className={`hover:bg-secondary-container/5 transition-colors group cursor-pointer ${locked ? 'opacity-70' : ''} ${flagged || highSeverity ? 'bg-red-50/30' : ''}`} onClick={() => openDetail(m._id)}>
                       <td className="py-2 px-3 text-on-surface-variant/40 border-b border-outline-variant/5 text-[11px] tabular-nums">{String((page - 1) * PAGE_SIZE + i + 1).padStart(2, '0')}</td>
                       <td className="py-2 px-3 border-b border-outline-variant/5">
                         <div className="flex items-center gap-2.5">

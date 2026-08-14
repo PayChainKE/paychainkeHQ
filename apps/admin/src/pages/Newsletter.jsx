@@ -41,11 +41,9 @@ export default function Newsletter() {
   // Compose modal
   const [composeOpen, setComposeOpen] = useState(false);
   const [composeSubject, setComposeSubject] = useState('');
-  const [composeBody, setComposeBody] = useState('');
   const [composeBusy, setComposeBusy] = useState(false);
   const [composeError, setComposeError] = useState('');
   const [composeDone, setComposeDone] = useState(null);
-  const [showPreview, setShowPreview] = useState(false);
 
   // Draft being edited (null = new, unsaved campaign) + the content it
   // seeds the composer's editor with when continuing one.
@@ -758,102 +756,6 @@ const DeleteModal = ({ state, onClose, onConfirm }) => (
     </div>
   </div>
 );
-
-// ── Compose Modal ────────────────────────────────────────────────────
-const ComposeModal = ({ subject, body, onSubject, onBody, busy, error, done, activeCount, preview, onTogglePreview, onSend, onClose }) => {
-  if (done) {
-    return (
-      <Modal onClose={onClose} maxWidth="max-w-md">
-        <div className="p-7 text-center">
-          <div className="w-14 h-14 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-4">
-            <span className="material-symbols-outlined text-3xl">mark_email_read</span>
-          </div>
-          <h3 className="text-xl font-bold text-on-surface mb-1">Campaign sent</h3>
-          <p className="text-sm text-on-surface-variant mb-5">{done.message}</p>
-          <button onClick={onClose} className="px-5 py-2.5 rounded-lg bg-primary text-white text-sm font-semibold uppercase tracking-widest hover:shadow-lg">Done</button>
-        </div>
-      </Modal>
-    );
-  }
-  return (
-    <Modal onClose={onClose} maxWidth="max-w-2xl">
-      <div className="px-6 py-4 border-b border-outline-variant/10 flex items-center justify-between bg-surface-container-low">
-        <div>
-          <p className="text-2xs font-bold uppercase tracking-[0.2em] text-primary mb-0.5">Compose newsletter</p>
-          <h3 className="text-base font-bold text-on-surface">Reach {activeCount} active subscriber{activeCount === 1 ? '' : 's'}</h3>
-        </div>
-        <button onClick={onClose} disabled={busy} className="p-1 rounded-lg hover:bg-surface-container-high text-on-surface-variant/60 disabled:opacity-40">
-          <span className="material-symbols-outlined">close</span>
-        </button>
-      </div>
-      <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-        <div>
-          <label className="block text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 mb-1.5">Subject</label>
-          <input
-            type="text"
-            value={subject}
-            onChange={(e) => onSubject(e.target.value)}
-            maxLength={200}
-            disabled={busy}
-            placeholder="What's new at PayChain this month?"
-            className="w-full px-3 py-2.5 border border-outline-variant/40 rounded-lg text-sm focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none disabled:opacity-50"
-          />
-          <p className="text-2xs text-on-surface-variant/40 mt-1 text-right">{subject.length}/200</p>
-        </div>
-
-        <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <label className="block text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60">Body</label>
-            <button
-              onClick={onTogglePreview}
-              type="button"
-              className="text-2xs font-bold uppercase tracking-widest text-primary hover:underline"
-            >
-              {preview ? 'Edit' : 'Preview'}
-            </button>
-          </div>
-          {preview ? (
-            <div className="border border-outline-variant/40 rounded-lg bg-white max-h-[300px] overflow-y-auto">
-              <div className="bg-[#06201B] px-5 py-4 text-center">
-                <p className="text-2xs font-bold tracking-[0.3em] text-emerald-300 uppercase">PayChain Updates</p>
-                <h2 className="text-base font-bold text-white mt-1">{subject || '(no subject)'}</h2>
-              </div>
-              <div className="p-5 text-sm leading-[1.7] text-on-surface whitespace-pre-wrap">{body || '(empty body)'}</div>
-            </div>
-          ) : (
-            <textarea
-              value={body}
-              onChange={(e) => onBody(e.target.value)}
-              rows={10}
-              maxLength={50000}
-              disabled={busy}
-              placeholder="Write your newsletter body. Plain text — paragraphs separated by blank lines will be formatted automatically."
-              className="w-full px-3 py-2.5 border border-outline-variant/40 rounded-lg text-sm focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none resize-none font-mono disabled:opacity-50"
-            />
-          )}
-          <p className="text-2xs text-on-surface-variant/40 mt-1">{body.length}/50000 · Plain text with blank-line paragraphs</p>
-        </div>
-
-        {error && <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium">{error}</div>}
-
-        <div className="bg-amber-50 border border-amber-100 rounded-lg p-3 text-xs text-amber-800">
-          <strong>Heads up:</strong> This will send <strong>{activeCount}</strong> emails through Resend. You'll be charged accordingly. Inactive subscribers and unsubscribed addresses are skipped.
-        </div>
-      </div>
-      <div className="px-6 py-4 border-t border-outline-variant/10 flex items-center justify-end gap-3 bg-surface-container-low/30">
-        <button onClick={onClose} disabled={busy} className="px-4 py-2 rounded-lg border border-outline-variant/40 text-on-surface text-2xs font-bold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40">Cancel</button>
-        <button
-          onClick={onSend}
-          disabled={busy || subject.trim().length < 3 || body.trim().length < 10 || activeCount === 0}
-          className="px-5 py-2 rounded-lg bg-primary text-white text-2xs font-bold uppercase tracking-widest hover:shadow-md disabled:opacity-50 flex items-center gap-2"
-        >
-          <span className="material-symbols-outlined text-sm">send</span>
-          {busy ? 'Sending…' : `Send to ${activeCount}`}
-        </button>
-      </div>
-    </Modal>
-  );
-};
 
 const Modal = ({ onClose, children, maxWidth = 'max-w-md' }) => (
   <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
