@@ -94,8 +94,6 @@ export default function Overview() {
     .filter(t => isCreditTransaction(t.type) && new Date(t.createdAt) >= monthAgo)
     .reduce((s, t) => s + (t.kesAmount || t.amount || 0), 0)
 
-  const totalTransactionsCount = liveTransactions.length
-  
   const recentTx = [...liveTransactions]
     .sort((a, b) => new Date(b.createdAt || b.timestamp) - new Date(a.createdAt || a.timestamp))
     .slice(0, 5)
@@ -435,17 +433,40 @@ export default function Overview() {
         {[
           { label: "Today's Revenue", value: formatKES(todaysRevenue), trend: "", trendColor: "text-on-surface-variant" },
           { label: "This Month", value: formatKES(thisMonthRevenue), trend: "", trendColor: "text-emerald-600" },
-          { label: "Total Transactions", value: totalTransactionsCount, trend: "", trendColor: "text-on-surface-variant" },
-          { label: "Trust Score", value: `${trustData?.current || 0}/100`, trend: trustData?.eligibleForAdvance ? "Eligible ✔" : "Building", trendColor: "text-emerald-600", showBadge: true }
         ].map((stat, i) => (
           <div key={i} className="bg-white p-6 lg:p-8 rounded-[12px] border border-[#E5E7EB] shadow-sm editorial-shadow transition-all group">
             <div className="flex justify-between items-center mb-4 lg:mb-6">
               <p className="text-[9px] lg:text-[10px] text-primary font-black uppercase tracking-widest leading-none">{stat.label}</p>
-              {stat.showBadge && <span className="material-symbols-outlined text-xs text-emerald-600" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>}
             </div>
             <p className="text-2xl lg:text-3xl font-headline text-primary mb-2 leading-none">{stat.value}</p>
             <p className={`text-[9px] lg:text-[10px] ${stat.trendColor} font-bold tracking-tight opacity-90`}>{stat.trend}</p>
           </div>
+        ))}
+
+        {/* Quick Actions — the two fastest ways to get paid, replacing the old
+            Total Transactions / Trust Score stat cards. Both deep-link into
+            RequestMoney with the relevant option pre-selected via nav state. */}
+        {[
+          { label: 'Send STK Push', description: 'Prompt a customer to pay instantly', icon: 'bolt', preset: 'mpesa' },
+          { label: 'Get Payment Link', description: 'Share a link for any amount', icon: 'link', preset: 'link' },
+        ].map((action) => (
+          <button
+            key={action.preset}
+            onClick={() => navigate('/request-money', { state: { preset: action.preset } })}
+            className="relative overflow-hidden text-left bg-[#00351D] p-6 lg:p-8 rounded-[12px] shadow-sm editorial-shadow transition-all group hover:shadow-xl hover:shadow-emerald-900/20 active:scale-[0.98]"
+          >
+            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-400/10 rounded-full -mr-8 -mt-8 blur-2xl group-hover:scale-125 transition-transform duration-700 pointer-events-none" />
+            <div className="relative z-10 flex flex-col h-full">
+              <div className="flex justify-between items-center mb-4 lg:mb-6">
+                <div className="w-9 h-9 lg:w-10 lg:h-10 rounded-xl bg-white/10 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-emerald-400 text-lg leading-none">{action.icon}</span>
+                </div>
+                <span className="material-symbols-outlined text-white/30 text-base group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all">arrow_outward</span>
+              </div>
+              <p className="text-sm lg:text-base font-headline font-bold text-white leading-tight mb-1">{action.label}</p>
+              <p className="text-[9px] lg:text-[10px] text-white/40 font-bold tracking-tight opacity-90 leading-snug">{action.description}</p>
+            </div>
+          </button>
         ))}
       </section>
 

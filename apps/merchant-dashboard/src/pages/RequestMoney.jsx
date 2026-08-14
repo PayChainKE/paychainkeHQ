@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import React, { useState, useEffect } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import axios from 'axios'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import { ValidatedInput } from '../components/ValidatedInput'
@@ -11,6 +11,7 @@ const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
 
 export default function RequestMoney() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { addNotification } = useNotification()
   const { merchant, refreshSession } = useMerchantAuth()
   const [step, setStep] = useState(1)
@@ -74,6 +75,18 @@ export default function RequestMoney() {
     resetForm()
     setStep(2)
   }
+
+  // Overview's Quick Action tiles link here with { state: { preset: 'mpesa' | 'link' } }
+  // to skip the selection step entirely. Runs once on arrival — replacing the
+  // history entry drops the state so a manual refresh doesn't re-trigger it.
+  useEffect(() => {
+    const preset = location.state?.preset
+    if (!preset) return
+    const opt = options.find(o => o.id === preset)
+    if (opt) handleSelect(opt)
+    navigate(location.pathname, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const authHeaders = () => ({
     Authorization: `Bearer ${localStorage.getItem('paychain_merchant_token')}`

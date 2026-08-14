@@ -388,6 +388,43 @@ export default function Dashboard({ navigation }: any) {
             </TouchableOpacity>
           </View>
 
+          {/* Quick Actions — the two fastest ways to get paid, deep-linking
+              into RequestMoney with the relevant option pre-selected. */}
+          <View className="px-6 mb-8">
+            <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#0c2010]/40 mb-3">Quick Actions</Text>
+            <View className="flex-row gap-3">
+              <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={() => navigation?.navigate('RequestMoney', { preset: 'mpesa' })}
+                className="flex-1 bg-[#00351d] rounded-2xl p-4 overflow-hidden"
+              >
+                <View className="flex-row items-center justify-between mb-4">
+                  <View className="w-9 h-9 rounded-xl bg-white/10 items-center justify-center">
+                    <Feather name="zap" size={16} color="#5efeb3" />
+                  </View>
+                  <Feather name="arrow-up-right" size={16} color="rgba(255,255,255,0.3)" />
+                </View>
+                <Text className="text-white text-[12px] font-jakarta-bold uppercase tracking-wide mb-1">Send STK Push</Text>
+                <Text className="text-white/40 text-[10px] font-jakarta-medium leading-snug">Prompt a customer to pay instantly</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={() => navigation?.navigate('RequestMoney', { preset: 'link' })}
+                className="flex-1 bg-[#00351d] rounded-2xl p-4 overflow-hidden"
+              >
+                <View className="flex-row items-center justify-between mb-4">
+                  <View className="w-9 h-9 rounded-xl bg-white/10 items-center justify-center">
+                    <Feather name="link" size={16} color="#5efeb3" />
+                  </View>
+                  <Feather name="arrow-up-right" size={16} color="rgba(255,255,255,0.3)" />
+                </View>
+                <Text className="text-white text-[12px] font-jakarta-bold uppercase tracking-wide mb-1">Get Payment Link</Text>
+                <Text className="text-white/40 text-[10px] font-jakarta-medium leading-snug">Share a link for any amount</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
           {/* Digital Ledgers — admin-controlled, hidden by default for new signups */}
           {digitalWalletEnabled && (
           <View className="mb-8">

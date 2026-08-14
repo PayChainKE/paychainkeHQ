@@ -25,7 +25,7 @@ function OptionIcon({ id, icon, size, color }: { id: OptionId; icon: string; siz
   return <Feather name={icon as keyof typeof Feather.glyphMap} size={size} color={color} />;
 }
 
-export default function RequestMoney({ navigation }: any) {
+export default function RequestMoney({ navigation, route }: any) {
   const { merchant, refreshSession } = useAuth();
   const [step, setStep] = useState(1);
   const [selectedOption, setSelectedOption] = useState<OptionId | null>(null);
@@ -57,6 +57,14 @@ export default function RequestMoney({ navigation }: any) {
     resetForm();
     setStep(2);
   };
+
+  // Dashboard's Quick Action tiles navigate here with { preset: 'mpesa' | 'link' }
+  // to skip the selection step entirely.
+  useEffect(() => {
+    const preset = route?.params?.preset as OptionId | undefined;
+    if (preset && OPTIONS.some((o) => o.id === preset)) handleSelect(preset);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const sendMpesaPrompt = async () => {
     if (!amount || Number(amount) <= 0 || !phone) {
