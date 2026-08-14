@@ -49,6 +49,43 @@ function BouncingDots({ color = '#fff' }: { color?: string }) {
   );
 }
 
+// Same shape/colour as the confirm-step PIN field's filled state — swapped
+// in for that field while the PIN-verify + transfer call is in flight, so
+// the "dots" the merchant just entered are what visibly signals loading
+// instead of a generic spinner elsewhere on screen.
+function PinBounceBoxes() {
+  const dots = useRef([0, 1, 2, 3].map(() => new Animated.Value(0))).current;
+
+  useEffect(() => {
+    const loops = dots.map((dot, i) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(i * 120),
+          Animated.timing(dot, { toValue: 1, duration: 300, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+          Animated.timing(dot, { toValue: 0, duration: 300, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+          Animated.delay((dots.length - 1 - i) * 120),
+        ])
+      )
+    );
+    loops.forEach((loop) => loop.start());
+    return () => loops.forEach((loop) => loop.stop());
+  }, [dots]);
+
+  return (
+    <View className="flex-row items-center justify-center gap-3">
+      {dots.map((dot, i) => (
+        <Animated.View
+          key={i}
+          className="w-14 h-16 rounded-2xl bg-[#00351d] items-center justify-center"
+          style={{ transform: [{ translateY: dot.interpolate({ inputRange: [0, 1], outputRange: [0, -10] }) }] }}
+        >
+          <View className="w-2.5 h-2.5 rounded-full bg-white" />
+        </Animated.View>
+      ))}
+    </View>
+  );
+}
+
 function formatKES(n: number | null | undefined) {
   if (n == null) return 'KES 0.00';
   return `KES ${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -250,7 +287,7 @@ export default function SendMoney({ navigation }: any) {
           const { data } = await api.post('/api/callbacks/b2b-request', {
             billType: destination, // 'till' | 'paybill'
             partyB: recipientAccount,
-            accountReference: destination === 'paybill' ? paybillAccountRef : undefined,
+            accountReference: isB2bDest ? (paybillAccountRef || undefined) : undefined,
             amount: Number(amount),
             reference: reference || `Transfer to ${recipientAccount}`,
             pin,
@@ -295,7 +332,7 @@ export default function SendMoney({ navigation }: any) {
         : destination === 'paybill'
         ? `Paybill ${recipientAccount}${paybillAccountRef ? ` · Acc ${paybillAccountRef}` : ''}`
         : destination === 'till'
-        ? `Till ${recipientAccount}`
+        ? `Till ${recipientAccount}${paybillAccountRef ? ` · Acc ${paybillAccountRef}` : ''}`
         : formatPhoneDisplay(recipientAccount);
 
     const phoneNumber = isMobileDest ? recipientAccount : merchant?.phone;
@@ -313,7 +350,7 @@ export default function SendMoney({ navigation }: any) {
       : destination === 'till'
       ? {
           name: reference || `Till ${recipientAccount}`, type: 'contractor', paymentMethod: 'Mobile Money',
-          mobileMoneyType: 'Buy Goods', tillNumber: recipientAccount,
+          mobileMoneyType: 'Buy Goods', tillNumber: recipientAccount, businessAccount: paybillAccountRef || undefined,
         }
       : destination === 'paybill'
       ? {
@@ -542,16 +579,23 @@ export default function SendMoney({ navigation }: any) {
                 </View>
               )}
 
-              {destination === 'paybill' && (
+              {isB2bDest && (
                 <View className="mb-5">
-                  <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#00351d]/60 mb-2 ml-1">Account Number</Text>
+                  <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#00351d]/60 mb-2 ml-1">
+                    {destination === 'paybill' ? 'Account Number' : 'Account Reference (Optional)'}
+                  </Text>
                   <TextInput
                     value={paybillAccountRef}
                     onChangeText={setPaybillAccountRef}
-                    placeholder="Account Number"
+                    placeholder={destination === 'paybill' ? 'Account Number' : 'Account Reference'}
                     placeholderTextColor="#a1a1aa"
                     className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-5 py-4 text-[15px] font-jakarta-bold text-[#00351d]"
                   />
+                  {destination === 'till' && (
+                    <Text className="text-[10px] text-[#a1a1aa] mt-2 ml-1">
+                      Only needed if this turns out to be registered as a Paybill on Safaricom's side.
+                    </Text>
+                  )}
                 </View>
               )}
 
@@ -643,7 +687,7 @@ export default function SendMoney({ navigation }: any) {
                   ...(destination === 'bank' && bankRail === 'rtgs' ? [['Beneficiary Country', ({ KE: 'Kenya', UG: 'Uganda', TZ: 'Tanzania', RW: 'Rwanda' } as Record<string, string>)[beneficiaryCountry] || beneficiaryCountry]] : []),
                   ...(isMobileDest ? [['Network', provider === 'airtel' ? 'Airtel Money' : 'M-PESA']] : []),
                   ['Recipient', formatPhoneDisplay(recipientAccount)],
-                  ...(destination === 'paybill' ? [['Account Number', paybillAccountRef]] : []),
+                  ...(isB2bDest && paybillAccountRef ? [['Account Number', paybillAccountRef]] : []),
                   ['Amount', formatKES(Number(amount) || 0)],
                   ...(reference ? [['Reference', reference]] : []),
                 ] as [string, string][]).map(([k, v]) => (
@@ -659,17 +703,21 @@ export default function SendMoney({ navigation }: any) {
               </View>
 
               <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#00351d]/60 mb-2 text-center">Enter Payment PIN</Text>
-              <TextInput
-                value={pin}
-                onChangeText={(t) => setPin(t.replace(/\D/g, '').slice(0, 4))}
-                keyboardType="numeric"
-                secureTextEntry
-                maxLength={4}
-                autoFocus
-                className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-5 py-4 text-[#00351d] font-jakarta-extrabold text-[20px] tracking-[0.5em] text-center"
-                placeholder="••••"
-                placeholderTextColor="#a1a1aa"
-              />
+              {isLoading ? (
+                <PinBounceBoxes />
+              ) : (
+                <TextInput
+                  value={pin}
+                  onChangeText={(t) => setPin(t.replace(/\D/g, '').slice(0, 4))}
+                  keyboardType="numeric"
+                  secureTextEntry
+                  maxLength={4}
+                  autoFocus
+                  className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-5 py-4 text-[#00351d] font-jakarta-extrabold text-[20px] tracking-[0.5em] text-center"
+                  placeholder="••••"
+                  placeholderTextColor="#a1a1aa"
+                />
+              )}
               {pinError ? (
                 <View className="flex-row items-center justify-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 mt-4">
                   <Feather name="alert-circle" size={14} color="#dc2626" />

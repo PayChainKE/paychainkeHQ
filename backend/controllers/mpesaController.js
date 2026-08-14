@@ -855,17 +855,21 @@ export const initiateB2B = async (req, res) => {
       return res.status(400).json({ error: 'A valid amount is required.' });
     }
 
-    const paymentType = billType === 'paybill' ? 'Paybill' : 'Till';
-
     // Fail fast on a bad destination before ever touching the merchant's
-    // balance or asking for their PIN.
+    // balance or asking for their PIN. The merchant's Till/Paybill selection
+    // is only a starting guess — NCBA checks each against a separate
+    // Safaricom registry, so ncbaValidateLnmAccount silently retries under
+    // the other type on rejection and returns whichever one actually
+    // resolved. Everything downstream uses that resolved type, not the
+    // merchant's original selection.
     let destination;
     try {
-      destination = await ncbaValidateLnmAccount({ paymentType, payBillTillNo: partyB });
+      destination = await ncbaValidateLnmAccount({ paymentType: billType === 'paybill' ? 'Paybill' : 'Till', payBillTillNo: partyB });
     } catch (e) {
       if (e instanceof NcbaOpenBankingValidationError) return res.status(400).json({ error: e.message });
       throw e;
     }
+    const paymentType = destination.paymentType;
 
     // B2B PayBill & Till Payout Tariff (config/lipaNaMpesaTariffCard.js) —
     // tiered third-party base cost + PayChain service fee. Sourced from the
@@ -926,7 +930,7 @@ export const initiateB2B = async (req, res) => {
       paymentType,
       payBillTillNo: partyB,
       amount: numericAmount,
-      accountReference: billType === 'paybill' ? accountReference : undefined,
+      accountReference: paymentType === 'Paybill' ? accountReference : undefined,
       recipientName,
       notifyMobileNumber: merchant.phone,
       narration: reference || `Payout to ${partyB}`,
