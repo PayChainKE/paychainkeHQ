@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, Animated, Easing, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
@@ -8,6 +8,46 @@ import TopBar from '../components/layout/TopBar';
 import api from '../api/config';
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay';
 import TransactionSuccessCard, { PayeeDraft } from '../components/ui/TransactionSuccessCard';
+
+// 4-dot loading indicator for the CTA button — a plain spinner read as "stuck"
+// to merchants during the PIN-verify + transfer round trip; this staggered
+// bounce reads as active progress instead. Same Animated-API loop pattern as
+// SettlementQrCard.tsx/BiometricSetup.tsx elsewhere in this app.
+function BouncingDots({ color = '#fff' }: { color?: string }) {
+  const dots = useRef([0, 1, 2, 3].map(() => new Animated.Value(0))).current;
+
+  useEffect(() => {
+    const loops = dots.map((dot, i) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(i * 120),
+          Animated.timing(dot, { toValue: 1, duration: 300, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+          Animated.timing(dot, { toValue: 0, duration: 300, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+          Animated.delay((dots.length - 1 - i) * 120),
+        ])
+      )
+    );
+    loops.forEach((loop) => loop.start());
+    return () => loops.forEach((loop) => loop.stop());
+  }, [dots]);
+
+  return (
+    <View className="flex-row items-center gap-1.5">
+      {dots.map((dot, i) => (
+        <Animated.View
+          key={i}
+          style={{
+            width: 7,
+            height: 7,
+            borderRadius: 4,
+            backgroundColor: color,
+            transform: [{ translateY: dot.interpolate({ inputRange: [0, 1], outputRange: [0, -6] }) }],
+          }}
+        />
+      ))}
+    </View>
+  );
+}
 
 function formatKES(n: number | null | undefined) {
   if (n == null) return 'KES 0.00';
@@ -580,7 +620,6 @@ export default function SendMoney({ navigation }: any) {
                   ['Recipient', formatPhoneDisplay(recipientAccount)],
                   ...(destination === 'paybill' ? [['Account Number', paybillAccountRef]] : []),
                   ['Amount', formatKES(Number(amount) || 0)],
-                  ['Fee', formatKES(fee)],
                   ...(reference ? [['Reference', reference]] : []),
                 ] as [string, string][]).map(([k, v]) => (
                   <View key={k} className="flex-row justify-between items-start gap-4 px-5 py-3 border-b border-[#eff4ef]">
@@ -627,7 +666,7 @@ export default function SendMoney({ navigation }: any) {
           style={{ backgroundColor: canContinue() && !isLoading ? '#00351d' : '#e0e5e0' }}
         >
           {isLoading ? (
-            <ActivityIndicator color="#fff" size="small" />
+            <BouncingDots />
           ) : step === confirmStep ? (
             <>
               <Feather name="send" size={15} color={canContinue() ? '#5efeb3' : '#a1a1aa'} />

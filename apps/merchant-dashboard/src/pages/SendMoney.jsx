@@ -369,9 +369,6 @@ export default function SendMoney() {
                         <p className="text-[10px] text-slate-400 font-medium mt-0.5">{d.hint}</p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                          {d.fee === null ? 'Varies' : formatKES(d.fee)}
-                        </span>
                         {destination === d.id && (
                           <span className="material-symbols-outlined text-[#00351D] text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
                         )}
@@ -652,7 +649,6 @@ export default function SendMoney() {
                     ['Recipient',   formatPhoneDisplay(recipientAccount)],
                     ...(destination === 'paybill' ? [['Account Number', paybillAccountRef]] : []),
                     ['Amount',      formatKES(amount || 0)],
-                    ['Fee',         formatKES(fee)],
                     ...(reference ? [['Reference', reference]] : []),
                   ].map(([k, v]) => (
                     <div key={k} className="flex justify-between items-start gap-4 px-5 py-3">
@@ -700,7 +696,14 @@ export default function SendMoney() {
               }`}
             >
               {isLoading
-                ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ? (
+                  <div className="flex items-center gap-1.5 py-0.5">
+                    <span className="w-2 h-2 rounded-full bg-white animate-bounce [animation-delay:0ms]" />
+                    <span className="w-2 h-2 rounded-full bg-white animate-bounce [animation-delay:150ms]" />
+                    <span className="w-2 h-2 rounded-full bg-white animate-bounce [animation-delay:300ms]" />
+                    <span className="w-2 h-2 rounded-full bg-white animate-bounce [animation-delay:450ms]" />
+                  </div>
+                )
                 : step === confirmStep
                   ? <><span className="material-symbols-outlined text-emerald-400 text-lg">send_money</span>Confirm &amp; Send</>
                   : !hasPin && step === 3
