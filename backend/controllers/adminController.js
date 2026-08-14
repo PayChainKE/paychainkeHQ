@@ -11,13 +11,14 @@ import RetiredMerchantCode from '../models/RetiredMerchantCode.js';
 import Waitlist from '../models/Waitlist.js';
 import Contact from '../models/Contact.js';
 import Communication from '../models/Communication.js';
-import { sendMerchantInvite, sendAdminActionOTP } from '../utils/resend.js';
+import { sendMerchantInvite, sendAdminActionOTP, sendContactDetailsChangedEmail } from '../utils/resend.js';
 import { logAudit } from '../utils/auditLog.js';
-import { getNcbaVirtualAccountNumber, generateRandomMerchantCode } from '../utils/ncbaValidators.js';
+import { getNcbaVirtualAccountNumber, generateRandomMerchantCode, validatePhoneNumber, NcbaValidationError } from '../utils/ncbaValidators.js';
 import { generateMerchantStickerPdf, generateBulkStickerPdf } from '../utils/stickerGenerator.js';
 import { LIVE_DATA_CUTOFF } from '../config/liveDataCutoff.js';
 import { provisionMerchantWallet } from '../utils/stellarHelper.js';
 import { encryptKey } from '../utils/cryptoHelper.js';
+import { safeSendSMS } from '../utils/smsSanitizer.js';
 
 // Build an `actor` shape from req.admin so audit rows attribute admin-initiated
 // actions to the right operator even when the merchant is the subject.
@@ -33,6 +34,7 @@ const ACTION_LABELS = {
   lock: 'Lock merchant account',
   unlock: 'Unlock merchant account',
   delete: 'Permanently delete merchant account',
+  reset_contact: 'Reset merchant primary email/phone',
 };
 
 // Derive an activity tier from a Date — used to colour-code merchant rows.
@@ -227,7 +229,7 @@ export const requestMerchantAction = async (req, res) => {
       return res.status(400).json({ error: 'Invalid merchant id.' });
     }
 
-    const merchant = await Merchant.findById(id).select('email businessName status');
+    const merchant = await Merchant.findById(id).select('email phone businessName status');
     if (!merchant) return res.status(404).json({ error: 'Merchant not found.' });
 
     // No-op guards — also stops admin from racking up OTPs against a no-op.
@@ -236,6 +238,46 @@ export const requestMerchantAction = async (req, res) => {
     }
     if (action === 'unlock' && merchant.status !== 'locked') {
       return res.status(409).json({ error: 'Account is not locked.' });
+    }
+
+    // reset_contact carries its own payload (the new email/phone) which must
+    // be validated up front and bound into the OTP, so confirm-time can
+    // apply exactly what was requested here rather than trusting whatever
+    // the client resubmits alongside the OTP.
+    let payload = null;
+    if (action === 'reset_contact') {
+      const { email: rawEmail, phone: rawPhone } = req.body || {};
+      const newEmail = rawEmail != null && String(rawEmail).trim() !== ''
+        ? String(rawEmail).trim().toLowerCase()
+        : null;
+      let newPhone = null;
+      if (rawPhone != null && String(rawPhone).trim() !== '') {
+        try {
+          newPhone = validatePhoneNumber(rawPhone);
+        } catch (e) {
+          if (e instanceof NcbaValidationError) return res.status(400).json({ error: 'Enter a valid Kenyan phone number.' });
+          throw e;
+        }
+      }
+      if (!newEmail && !newPhone) {
+        return res.status(400).json({ error: 'Provide a new email and/or phone number to reset.' });
+      }
+      if (newEmail && !/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/.test(newEmail)) {
+        return res.status(400).json({ error: 'Enter a valid email address.' });
+      }
+      if (newEmail && newEmail === merchant.email) {
+        return res.status(400).json({ error: "That's already this merchant's email." });
+      }
+      if (newPhone && newPhone === merchant.phone) {
+        return res.status(400).json({ error: "That's already this merchant's phone number." });
+      }
+      if (newEmail && await Merchant.exists({ email: newEmail, _id: { $ne: merchant._id } })) {
+        return res.status(409).json({ error: 'Another merchant already uses that email.' });
+      }
+      if (newPhone && await Merchant.exists({ phone: { $in: phoneVariations(newPhone) }, _id: { $ne: merchant._id } })) {
+        return res.status(409).json({ error: 'Another merchant already uses that phone number.' });
+      }
+      payload = { ...(newEmail ? { email: newEmail } : {}), ...(newPhone ? { phone: newPhone } : {}) };
     }
 
     const admin = await Admin.findById(req.admin._id);
@@ -247,6 +289,7 @@ export const requestMerchantAction = async (req, res) => {
       targetId: merchant._id,
       otpHash: crypto.createHash('sha256').update(otp).digest('hex'),
       expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 min
+      payload,
     };
     await admin.save();
 
@@ -341,6 +384,41 @@ export const confirmMerchantAction = async (req, res) => {
         message: 'Account unlocked by admin (OTP-verified)',
         merchant, actor: adminActor(admin), req,
       });
+    } else if (action === 'reset_contact') {
+      const payload = pa.payload || {};
+      const before = { email: merchant.email, phone: merchant.phone };
+      if (payload.email) merchant.email = payload.email;
+      if (payload.phone) merchant.phone = payload.phone;
+      // Email/phone are both login-critical (password login uses email;
+      // phone receives login OTPs for merchants who use that channel) —
+      // force every already-issued JWT to fail protectMerchant's
+      // tokenVersion check, same as lock, so a session opened under the old
+      // identity can't keep riding on it after the reset.
+      merchant.tokenVersion = (merchant.tokenVersion || 0) + 1;
+      await merchant.save();
+      logAudit({
+        action: 'admin.merchant.contact_reset', category: 'admin', severity: 'critical',
+        message: `Primary contact reset by admin (OTP-verified) — email "${before.email}" -> "${merchant.email}", phone "${before.phone}" -> "${merchant.phone}"`,
+        merchant, actor: adminActor(admin), req,
+        metadata: { before, after: { email: merchant.email, phone: merchant.phone } },
+      });
+
+      // Best-effort notice to whoever controlled the OLD contact details —
+      // if this reset wasn't legitimate (compromised admin, fat-fingered
+      // merchant), the real merchant is the one who still has access to the
+      // old email/phone, not the new ones just set.
+      if (before.email) {
+        sendContactDetailsChangedEmail(before.email, merchant.name, {
+          emailChanged: payload.email ? { from: before.email, to: merchant.email } : null,
+          phoneChanged: payload.phone ? { from: before.phone, to: merchant.phone } : null,
+        }).catch((err) => console.error('Contact-changed notification email failed:', err));
+      }
+      if (before.phone) {
+        safeSendSMS({
+          to: before.phone,
+          message: "PayChain Security: Your account contact details were changed by an admin. If this wasn't you, contact support@paychain.co.ke now.",
+        }).catch((err) => console.error('Contact-changed notification SMS failed:', err));
+      }
     } else if (action === 'delete') {
       // Hard delete: remove merchant + all owned records. We don't drop
       // Transactions tied to other merchants — only this one's.
@@ -388,7 +466,10 @@ export const confirmMerchantAction = async (req, res) => {
         ? 'Merchant account permanently deleted.'
         : action === 'lock'
           ? 'Merchant account locked.'
-          : 'Merchant account unlocked.',
+          : action === 'reset_contact'
+            ? 'Primary email/phone updated. The merchant has been signed out everywhere.'
+            : 'Merchant account unlocked.',
+      data: action === 'reset_contact' ? { email: merchant.email, phone: merchant.phone } : undefined,
     });
   } catch (error) {
     console.error('Confirm Merchant Action Error:', error);

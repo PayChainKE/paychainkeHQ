@@ -108,6 +108,11 @@ const AdminSchema = new mongoose.Schema({
     targetId: { type: mongoose.Schema.Types.ObjectId, default: null },
     otpHash: { type: String, default: null, select: false },
     expiresAt: { type: Date, default: null },
+    // Action-specific data validated at request time and applied verbatim on
+    // confirm (e.g. reset_contact's { email, phone }) — so the OTP binds to
+    // the exact change requested, not just the action name. Confirm never
+    // trusts values re-submitted by the client at that step.
+    payload: { type: mongoose.Schema.Types.Mixed, default: null },
   },
 }, {
   timestamps: true
