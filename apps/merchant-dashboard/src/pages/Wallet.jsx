@@ -10,6 +10,7 @@ import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useToast } from '../context/NotificationContext'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import SettlementQrCard from '../components/ui/SettlementQrCard'
+import TransactionSuccessCard from '../components/ui/TransactionSuccessCard'
 import { getAppUrl } from '../utils/appUrl'
 import { escapeHtml } from '../utils/escapeHtml'
 
@@ -28,6 +29,7 @@ export default function Wallet() {
   const [withdrawPin, setWithdrawPin] = useState('')
   const [bankCodes, setBankCodes] = useState([])
   const [isWithdrawing, setIsWithdrawing] = useState(false)
+  const [withdrawSuccess, setWithdrawSuccess] = useState(null) // { amount, methodLabel, recipientDisplay, payeeDraft, transaction }
 
   // Settlement Settings
   const [showSettingsModal, setShowSettingsModal] = useState(false)
@@ -133,18 +135,29 @@ export default function Wallet() {
       const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
       const token = localStorage.getItem('paychain_merchant_token')
 
+      const withdrawnAmount = withdrawAmount
+      let tx = null
+      let methodLabel, recipientDisplay, payeeDraft
+
       if (destType === 'Mobile') {
-        await axios.post(`${API_URL}/api/callbacks/b2c-request`, {
-          phone: destinationAccountValue.replace(/^(?:\+?254|0)/, '254'),
+        const normalizedPhone = destinationAccountValue.replace(/^(?:\+?254|0)/, '254')
+        const { data } = await axios.post(`${API_URL}/api/callbacks/b2c-request`, {
+          phone: normalizedPhone,
           amount: Number(withdrawAmount),
           pin: withdrawPin,
         }, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        addToast({ title: 'Withdrawal Processing', message: `KES ${withdrawAmount} sent to phone. B2C Transfer initiated.`, type: 'success' });
+        tx = data.transaction
+        methodLabel = 'Mobile Money Withdrawal'
+        recipientDisplay = normalizedPhone
+        payeeDraft = {
+          name: `Withdrawal to ${normalizedPhone}`, type: 'contractor', paymentMethod: 'Mobile Money',
+          mobileMoneyType: 'Personal Number', phone: normalizedPhone,
+        }
         setWithdrawPin('')
       } else if (destType === 'Bank') {
-        await axios.post(`${API_URL}/api/v1/openbanking/bank-payout`, {
+        const { data } = await axios.post(`${API_URL}/api/v1/openbanking/bank-payout`, {
           bankCode: withdrawBankCode,
           accountNumber: destinationAccountValue,
           amount: Number(withdrawAmount),
@@ -153,21 +166,31 @@ export default function Wallet() {
         }, {
           headers: { Authorization: `Bearer ${token}` }
         })
-        addToast({ title: 'Withdrawal Submitted', message: `KES ${withdrawAmount} sent via PesaLink.`, type: 'success' })
+        tx = data.transaction
+        methodLabel = 'Bank Withdrawal · PesaLink'
+        recipientDisplay = `${destinationAccountValue}${withdrawBankCode ? ` · ${bankCodes.find(b => b.code === withdrawBankCode)?.name || withdrawBankCode}` : ''}`
+        payeeDraft = {
+          name: `Withdrawal to ${destinationAccountValue}`, type: 'contractor', paymentMethod: 'Bank',
+          bankName: bankCodes.find(b => b.code === withdrawBankCode)?.name || '', accountNumber: destinationAccountValue, bankCode: withdrawBankCode,
+        }
         setWithdrawPin('')
       } else {
-        await axios.post(`${API_URL}/api/transactions/send-money`, {
+        const { data } = await axios.post(`${API_URL}/api/transactions/send-money`, {
           amount: Number(withdrawAmount),
           destination: destination,
           reference: `Withdrawal to ${destinationAccountValue}`
         }, {
           headers: { Authorization: `Bearer ${token}` }
         })
-        addToast({ title: 'Withdrawal Initiated', message: `KES ${withdrawAmount} sent to destination.`, type: 'success' })
+        tx = data.transaction
+        methodLabel = 'Withdrawal'
+        recipientDisplay = destinationAccountValue
+        payeeDraft = null
       }
 
       setWithdrawAmount('')
       setDestinationAccountValue('')
+      setWithdrawSuccess({ amount: withdrawnAmount, methodLabel, recipientDisplay, payeeDraft, transaction: tx })
       await refreshSession()
     } catch (err) {
       addToast({ title: 'Withdrawal Failed', message: err.response?.data?.error || err.response?.data?.message || 'Failed to withdraw funds', type: 'error' })
@@ -1297,6 +1320,24 @@ export default function Wallet() {
           </div>
         </div>
         )}
+
+      {/* Withdrawal Success Overlay */}
+      {withdrawSuccess && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 animate-fade-in backdrop-blur-xl bg-primary/10">
+          <div className="absolute inset-0 bg-[#00351D]/80" onClick={() => setWithdrawSuccess(null)}></div>
+          <div className="relative z-10 w-full max-w-md">
+            <TransactionSuccessCard
+              amount={withdrawSuccess.amount}
+              methodLabel={withdrawSuccess.methodLabel}
+              recipientDisplay={withdrawSuccess.recipientDisplay}
+              transaction={withdrawSuccess.transaction}
+              payeeDraft={withdrawSuccess.payeeDraft}
+              onDone={() => setWithdrawSuccess(null)}
+              doneLabel="Close"
+            />
+          </div>
+        </div>
+      )}
 
       {/* Settings Modal Overlay */}
       {showSettingsModal && (

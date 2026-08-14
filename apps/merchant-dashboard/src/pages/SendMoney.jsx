@@ -8,6 +8,8 @@ import PinBoxes from '../components/PinBoxes'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { formatKES } from '../utils/formatCurrency'
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay'
+import { formatAccountNumber } from '../utils/formatAccountNumber'
+import TransactionSuccessCard from '../components/ui/TransactionSuccessCard'
 
 const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
 
@@ -92,6 +94,7 @@ export default function SendMoney() {
   const [isLoading, setIsLoading]           = useState(false)
   const [pinError, setPinError]             = useState('')
   const [success, setSuccess]               = useState(false)
+  const [completedTx, setCompletedTx]       = useState(null)
 
   const hasPin       = !!merchant?.hasAppPin
   const selectedDest = DESTINATIONS.find(d => d.id === destination)
@@ -167,8 +170,9 @@ export default function SendMoney() {
 
         // 2. Execute transfer
         const isMobile = destination === 'mpesa-primary' || destination === 'mobile'
+        let tx = null
         if (isMobile) {
-          await axios.post(`${API_URL}/api/callbacks/b2c-request`, {
+          const { data } = await axios.post(`${API_URL}/api/callbacks/b2c-request`, {
             phone: recipientAccount,
             amount: Number(amount),
             destination: selectedDest.label,
@@ -177,8 +181,9 @@ export default function SendMoney() {
             pin,
             provider,
           }, cfg())
+          tx = data.transaction
         } else if (destination === 'bank') {
-          await axios.post(`${API_URL}/api/v1/openbanking/bank-payout`, {
+          const { data } = await axios.post(`${API_URL}/api/v1/openbanking/bank-payout`, {
             bankCode,
             accountNumber: recipientAccount,
             accountName: reference || undefined,
@@ -188,8 +193,9 @@ export default function SendMoney() {
             rail: bankRail,
             ...(bankRail === 'rtgs' ? { beneficiaryCountry, beneficiaryAddress: beneficiaryAddress || undefined, purposeCode } : {}),
           }, cfg())
+          tx = data.transaction
         } else {
-          await axios.post(`${API_URL}/api/callbacks/b2b-request`, {
+          const { data } = await axios.post(`${API_URL}/api/callbacks/b2b-request`, {
             billType: destination, // 'till' | 'paybill'
             partyB: recipientAccount,
             accountReference: destination === 'paybill' ? paybillAccountRef : undefined,
@@ -197,9 +203,11 @@ export default function SendMoney() {
             reference: reference || `Transfer to ${recipientAccount}`,
             pin,
           }, cfg())
+          tx = data.transaction
         }
 
         await refreshSession()
+        setCompletedTx(tx)
         setSuccess(true)
       } catch (e) {
         const msg = e.response?.data?.error || 'Transfer failed. Please try again.'
@@ -225,36 +233,49 @@ export default function SendMoney() {
 
   // ── SUCCESS STATE ──────────────────────────────────────────────────────────
   if (success) {
+    const methodLabel =
+      selectedDest?.id === 'mpesa-primary' || selectedDest?.id === 'mobile' ? `M-PESA (${provider === 'airtel' ? 'Airtel Money' : 'Safaricom'})`
+      : selectedDest?.id === 'bank' ? `Bank Transfer · ${bankRail === 'rtgs' ? 'RTGS' : 'PesaLink'}`
+      : selectedDest?.id === 'till' ? 'Till Payment'
+      : 'Paybill Payment'
+
+    const recipientDisplay =
+      selectedDest?.id === 'bank' ? `${formatAccountNumber(recipientAccount)}${bankCode ? ` · ${bankCodes.find(b => b.code === bankCode)?.name || bankCode}` : ''}`
+      : selectedDest?.id === 'paybill' ? `Paybill ${recipientAccount}${paybillAccountRef ? ` · Acc ${paybillAccountRef}` : ''}`
+      : selectedDest?.id === 'till' ? `Till ${recipientAccount}`
+      : formatPhoneDisplay(recipientAccount)
+
+    const payeeDraft =
+      (selectedDest?.id === 'mpesa-primary' || selectedDest?.id === 'mobile') ? {
+        name: reference || recipientAccount, type: 'contractor', paymentMethod: 'Mobile Money',
+        mobileMoneyType: 'Personal Number', mobileNetwork: provider, phone: recipientAccount,
+      }
+      : selectedDest?.id === 'bank' ? {
+        name: reference || recipientAccount, type: 'contractor', paymentMethod: 'Bank',
+        bankName: bankCodes.find(b => b.code === bankCode)?.name || '', accountNumber: recipientAccount, bankCode,
+      }
+      : selectedDest?.id === 'till' ? {
+        name: reference || `Till ${recipientAccount}`, type: 'contractor', paymentMethod: 'Mobile Money',
+        mobileMoneyType: 'Buy Goods', tillNumber: recipientAccount,
+      }
+      : selectedDest?.id === 'paybill' ? {
+        name: reference || `Paybill ${recipientAccount}`, type: 'contractor', paymentMethod: 'Mobile Money',
+        mobileMoneyType: 'Paybill', paybillNumber: recipientAccount, businessAccount: paybillAccountRef,
+      }
+      : null
+
     return (
       <MerchantLayout title="Send Money">
-        <div className="max-w-md mx-auto pt-12 text-center animate-fade-in-up">
-          <div className="w-24 h-24 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-6 shadow-lg border-4 border-emerald-200/40">
-            <span className="material-symbols-outlined text-emerald-600 text-5xl" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
-          </div>
-          <h2 className="font-headline text-4xl font-bold text-primary tracking-tight mb-2">Transfer Sent</h2>
-          <p className="text-on-surface-variant font-medium opacity-70 mb-2">
-            {formatKES(amount)} {
-              selectedDest?.id === 'mpesa-primary' || selectedDest?.id === 'mobile' ? 'via M-PESA'
-              : selectedDest?.id === 'bank' ? 'via Bank Transfer'
-              : selectedDest?.id === 'till' ? 'to Till'
-              : 'to Paybill'
-            }
-          </p>
-          <p className="text-sm font-mono text-primary/40 mb-10">→ {recipientAccount}</p>
-          <div className="flex flex-col gap-3">
-            <button
-              onClick={() => navigate('/transactions')}
-              className="w-full py-4 bg-[#00351D] text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl hover:opacity-90 active:scale-[0.98] transition-all"
-            >
-              View Transactions
-            </button>
-            <button
-              onClick={() => navigate('/overview')}
-              className="w-full py-3 text-primary/50 font-bold text-sm hover:text-primary transition-colors"
-            >
-              Back to Dashboard
-            </button>
-          </div>
+        <div className="max-w-md mx-auto pt-8">
+          <TransactionSuccessCard
+            amount={amount}
+            methodLabel={methodLabel}
+            recipientDisplay={recipientDisplay}
+            transaction={completedTx}
+            payeeDraft={payeeDraft}
+            onViewTransactions={() => navigate('/transactions')}
+            onDone={() => navigate('/overview')}
+          />
         </div>
       </MerchantLayout>
     )

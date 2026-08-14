@@ -7,6 +7,7 @@ import { ValidatedTextInput } from '../components/ValidatedTextInput';
 import TopBar from '../components/layout/TopBar';
 import api from '../api/config';
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay';
+import TransactionSuccessCard, { PayeeDraft } from '../components/ui/TransactionSuccessCard';
 
 function formatKES(n: number | null | undefined) {
   if (n == null) return 'KES 0.00';
@@ -85,6 +86,7 @@ export default function SendMoney({ navigation }: any) {
   const [isLoading, setIsLoading] = useState(false);
   const [pinError, setPinError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [completedTx, setCompletedTx] = useState<any>(null);
 
   const selectedDest = DESTINATIONS.find((d) => d.id === destination);
   const isMobileDest = destination === 'mpesa-primary' || destination === 'mobile';
@@ -158,8 +160,9 @@ export default function SendMoney({ navigation }: any) {
       try {
         await api.post('/api/auth/merchant/verify-payment-pin', { pin });
 
+        let tx: any = null;
         if (isMobileDest) {
-          await api.post('/api/callbacks/b2c-request', {
+          const { data } = await api.post('/api/callbacks/b2c-request', {
             phone: recipientAccount,
             amount: Number(amount),
             destination: selectedDest?.label,
@@ -168,8 +171,9 @@ export default function SendMoney({ navigation }: any) {
             pin,
             provider,
           });
+          tx = data.transaction;
         } else if (destination === 'bank') {
-          await api.post('/api/v1/openbanking/bank-payout', {
+          const { data } = await api.post('/api/v1/openbanking/bank-payout', {
             bankCode,
             accountNumber: recipientAccount,
             accountName: reference || undefined,
@@ -179,8 +183,9 @@ export default function SendMoney({ navigation }: any) {
             rail: bankRail,
             ...(bankRail === 'rtgs' ? { beneficiaryCountry, beneficiaryAddress: beneficiaryAddress || undefined, purposeCode } : {}),
           });
+          tx = data.transaction;
         } else {
-          await api.post('/api/callbacks/b2b-request', {
+          const { data } = await api.post('/api/callbacks/b2b-request', {
             billType: destination, // 'till' | 'paybill'
             partyB: recipientAccount,
             accountReference: destination === 'paybill' ? paybillAccountRef : undefined,
@@ -188,9 +193,11 @@ export default function SendMoney({ navigation }: any) {
             reference: reference || `Transfer to ${recipientAccount}`,
             pin,
           });
+          tx = data.transaction;
         }
 
         await refreshSession();
+        setCompletedTx(tx);
         setSuccess(true);
       } catch (e: any) {
         const msg = e?.response?.data?.error || 'Transfer failed. Please try again.';
@@ -212,29 +219,59 @@ export default function SendMoney({ navigation }: any) {
   };
 
   if (success) {
+    const methodLabel = isMobileDest
+      ? `M-PESA (${provider === 'airtel' ? 'Airtel Money' : 'Safaricom'})`
+      : destination === 'bank'
+      ? `Bank Transfer · ${bankRail === 'rtgs' ? 'RTGS' : 'PesaLink'}`
+      : destination === 'till'
+      ? 'Till Payment'
+      : 'Paybill Payment';
+
+    const recipientDisplay =
+      destination === 'bank'
+        ? `${recipientAccount}${bankCode ? ` · ${bankCodes.find((b) => b.code === bankCode)?.name || bankCode}` : ''}`
+        : destination === 'paybill'
+        ? `Paybill ${recipientAccount}${paybillAccountRef ? ` · Acc ${paybillAccountRef}` : ''}`
+        : destination === 'till'
+        ? `Till ${recipientAccount}`
+        : formatPhoneDisplay(recipientAccount);
+
+    const payeeDraft: PayeeDraft | null = isMobileDest
+      ? {
+          name: reference || recipientAccount, type: 'contractor', paymentMethod: 'Mobile Money',
+          mobileMoneyType: 'Personal Number', mobileNetwork: provider, phone: recipientAccount,
+        }
+      : destination === 'bank'
+      ? {
+          name: reference || recipientAccount, type: 'contractor', paymentMethod: 'Bank',
+          bankName: bankCodes.find((b) => b.code === bankCode)?.name || '', accountNumber: recipientAccount, bankCode,
+        }
+      : destination === 'till'
+      ? {
+          name: reference || `Till ${recipientAccount}`, type: 'contractor', paymentMethod: 'Mobile Money',
+          mobileMoneyType: 'Buy Goods', tillNumber: recipientAccount,
+        }
+      : destination === 'paybill'
+      ? {
+          name: reference || `Paybill ${recipientAccount}`, type: 'contractor', paymentMethod: 'Mobile Money',
+          mobileMoneyType: 'Paybill', paybillNumber: recipientAccount, businessAccount: paybillAccountRef,
+        }
+      : null;
+
     return (
       <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
         <TopBar title="Send Money" showBack={false} />
-        <View className="flex-1 items-center justify-center px-8">
-          <View className="w-24 h-24 rounded-full bg-[#e7f8ef] items-center justify-center mb-6 border-4 border-[#d5f3e4]">
-            <Feather name="check-circle" size={44} color="#006c4e" />
-          </View>
-          <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[30px] text-[#00351d] mb-2 text-center">Transfer Sent</Text>
-          <Text className="text-[#707971] font-jakarta-medium text-center mb-1">
-            {formatKES(Number(amount))} {isMobileDest ? 'via M-PESA' : destination === 'bank' ? 'via Bank Transfer' : destination === 'till' ? 'to Till' : 'to Paybill'}
-          </Text>
-          <Text className="text-[12px] font-jakarta-medium text-[#00351d]/40 mb-10">→ {recipientAccount}</Text>
-          <TouchableOpacity
-            onPress={() => navigation?.navigate('Transactions')}
-            activeOpacity={0.9}
-            className="w-full bg-[#00351d] py-4 rounded-2xl items-center justify-center shadow-lg shadow-[#00351d]/20 mb-3"
-          >
-            <Text className="text-white font-jakarta-extrabold text-[12px] uppercase tracking-widest">View Transactions</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation?.navigate('Home')} activeOpacity={0.7}>
-            <Text className="text-[#00351d]/50 font-jakarta-bold text-[12px]">Back to Dashboard</Text>
-          </TouchableOpacity>
-        </View>
+        <ScrollView className="flex-1" contentContainerStyle={{ padding: 24, paddingTop: 16 }}>
+          <TransactionSuccessCard
+            amount={Number(amount)}
+            methodLabel={methodLabel}
+            recipientDisplay={recipientDisplay}
+            transaction={completedTx}
+            payeeDraft={payeeDraft}
+            onViewTransactions={() => navigation?.navigate('Transactions')}
+            onDone={() => navigation?.navigate('Home')}
+          />
+        </ScrollView>
       </SafeAreaView>
     );
   }

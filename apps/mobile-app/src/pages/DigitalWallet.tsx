@@ -15,6 +15,7 @@ import { formatTxDate, formatTxTime } from '../utils/formatDate';
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay';
 import { getAppUrl } from '../utils/appUrl';
 import SettlementQrCard from '../components/ui/SettlementQrCard';
+import TransactionSuccessCard, { PayeeDraft } from '../components/ui/TransactionSuccessCard';
 
 function formatKES(n: number | null | undefined) {
   if (n == null) return 'KES 0.00';
@@ -61,6 +62,9 @@ export default function DigitalWallet({ navigation }: any) {
   const [withdrawBankCode, setWithdrawBankCode] = useState('');
   const [withdrawPin, setWithdrawPin] = useState('');
   const [isWithdrawing, setIsWithdrawing] = useState(false);
+  const [withdrawSuccess, setWithdrawSuccess] = useState<{
+    amount: number; methodLabel: string; recipientDisplay: string; payeeDraft: PayeeDraft | null; transaction: any;
+  } | null>(null);
   const selectedDest = destinations.find((d) => d.id === destination)!;
 
   // Bank withdrawal needs a bankCode (not just a free-text account number)
@@ -200,29 +204,47 @@ export default function DigitalWallet({ navigation }: any) {
     }
     setIsWithdrawing(true);
     try {
+      let tx: any = null;
+      let methodLabel: string;
+      let recipientDisplay: string;
+      let payeeDraft: PayeeDraft | null;
+
       if (selectedDest.type === 'Mobile') {
         const phone = destinationValue.replace(/^(?:\+?254|0)/, '254');
-        await api.post('/api/callbacks/b2c-request', { phone, amount, pin: withdrawPin });
-        Alert.alert('Withdrawal Processing', `KES ${withdrawAmount} sent to phone. B2C transfer initiated.`);
+        const { data } = await api.post('/api/callbacks/b2c-request', { phone, amount, pin: withdrawPin });
+        tx = data.transaction;
+        methodLabel = 'Mobile Money Withdrawal';
+        recipientDisplay = phone;
+        payeeDraft = {
+          name: `Withdrawal to ${phone}`, type: 'contractor', paymentMethod: 'Mobile Money',
+          mobileMoneyType: 'Personal Number', phone,
+        };
       } else {
         // Real NCBA PesaLink bank transfer — this used to fall through to
         // /api/transactions/send-money, which only debits the balance and
         // marks the row "completed" without ever moving money to the bank.
         // Matches web's Wallet.jsx, which already routes Bank withdrawals
         // here.
-        await api.post('/api/v1/openbanking/bank-payout', {
+        const { data } = await api.post('/api/v1/openbanking/bank-payout', {
           bankCode: withdrawBankCode,
           accountNumber: destinationValue,
           amount,
           narration: `Withdrawal to ${destinationValue}`,
           pin: withdrawPin,
         });
-        Alert.alert('Withdrawal Submitted', `KES ${withdrawAmount} sent via PesaLink.`);
+        tx = data.transaction;
+        methodLabel = 'Bank Withdrawal · PesaLink';
+        recipientDisplay = `${destinationValue}${withdrawBankCode ? ` · ${bankCodes.find((b) => b.code === withdrawBankCode)?.name || withdrawBankCode}` : ''}`;
+        payeeDraft = {
+          name: `Withdrawal to ${destinationValue}`, type: 'contractor', paymentMethod: 'Bank',
+          bankName: bankCodes.find((b) => b.code === withdrawBankCode)?.name || '', accountNumber: destinationValue, bankCode: withdrawBankCode,
+        };
       }
       setWithdrawAmount('');
       setDestinationValue('');
       setWithdrawBankCode('');
       setWithdrawPin('');
+      setWithdrawSuccess({ amount, methodLabel, recipientDisplay, payeeDraft, transaction: tx });
       await refreshSession();
       fetchData();
     } catch (err: any) {
@@ -925,6 +947,24 @@ export default function DigitalWallet({ navigation }: any) {
           </View>
         </View>
       </ScrollView>
+
+      {/* Withdrawal Success Modal */}
+      <Modal visible={!!withdrawSuccess} transparent animationType="fade" onRequestClose={() => setWithdrawSuccess(null)}>
+        <View className="flex-1 justify-center bg-black/50 px-6">
+          <TouchableOpacity className="absolute inset-0" activeOpacity={1} onPress={() => setWithdrawSuccess(null)} />
+          {withdrawSuccess && (
+            <TransactionSuccessCard
+              amount={withdrawSuccess.amount}
+              methodLabel={withdrawSuccess.methodLabel}
+              recipientDisplay={withdrawSuccess.recipientDisplay}
+              transaction={withdrawSuccess.transaction}
+              payeeDraft={withdrawSuccess.payeeDraft}
+              onDone={() => setWithdrawSuccess(null)}
+              doneLabel="Close"
+            />
+          )}
+        </View>
+      </Modal>
 
       {/* Settlement Settings Modal */}
       <Modal visible={showSettings} transparent animationType="slide" onRequestClose={() => setShowSettings(false)}>
