@@ -16,6 +16,7 @@ import { formatPhoneDisplay } from '../utils/formatPhoneDisplay';
 import { getAppUrl } from '../utils/appUrl';
 import SettlementQrCard from '../components/ui/SettlementQrCard';
 import TransactionSuccessCard, { PayeeDraft } from '../components/ui/TransactionSuccessCard';
+import FundAccountModal from '../components/FundAccountModal';
 
 function formatKES(n: number | null | undefined) {
   if (n == null) return 'KES 0.00';
@@ -23,7 +24,6 @@ function formatKES(n: number | null | undefined) {
 }
 
 type Destination = 'bank' | 'mpesa';
-type FundingMethod = 'mobile';
 
 export default function DigitalWallet({ navigation }: any) {
   const { merchant, refreshSession } = useAuth();
@@ -96,13 +96,9 @@ export default function DigitalWallet({ navigation }: any) {
   const [generatedLink, setGeneratedLink] = useState('');
   const [isExportingPdf, setIsExportingPdf] = useState(false);
 
-  // Top up
+  // Top up — the modal/STK-push flow itself lives in the shared
+  // FundAccountModal (also used by Dashboard.tsx), not duplicated here.
   const [showTopUp, setShowTopUp] = useState(false);
-  const [fundingMethod, setFundingMethod] = useState<FundingMethod | null>(null);
-  const [topUpAmount, setTopUpAmount] = useState('');
-  const [topUpPhone, setTopUpPhone] = useState('');
-  const [isProcessingTopUp, setIsProcessingTopUp] = useState(false);
-  const [stkStatusText, setStkStatusText] = useState('');
 
   // Real NCBA Dynamic QR Code (scannable directly in M-PESA), fetched once
   // on mount. Was a link to PayChain's own /pay/account/:id page rendered
@@ -361,66 +357,6 @@ export default function DigitalWallet({ navigation }: any) {
       Alert.alert('Export Failed', err?.message || 'Could not export the QR code.');
     } finally {
       setIsExportingPdf(false);
-    }
-  };
-
-  const closeTopUp = () => {
-    setShowTopUp(false);
-    setFundingMethod(null);
-    setTopUpAmount('');
-    setTopUpPhone('');
-    setStkStatusText('');
-  };
-
-  const submitMobileTopUp = async () => {
-    if (!topUpAmount || !topUpPhone) return;
-    setIsProcessingTopUp(true);
-    setStkStatusText('Initiating STK Push...');
-    try {
-      const pushRes = await api.post('/api/callbacks/stk-push', {
-        amount: Number(topUpAmount),
-        phone: topUpPhone,
-        merchantId: merchant?._id,
-      });
-      const checkoutId = pushRes.data.checkoutRequestId;
-      setStkStatusText('Awaiting PIN on phone...');
-
-      let attempts = 0;
-      const maxAttempts = 20;
-      const poll = setInterval(async () => {
-        attempts++;
-        try {
-          const statusRes = await api.get(`/api/callbacks/stk-status/${checkoutId}`);
-          if (statusRes.data.status === 'success') {
-            clearInterval(poll);
-            Alert.alert('Top Up Successful', `Successfully funded ${topUpAmount} KES via M-Pesa.`);
-            await refreshSession();
-            fetchData();
-            closeTopUp();
-            setIsProcessingTopUp(false);
-          } else if (statusRes.data.status === 'failed') {
-            clearInterval(poll);
-            Alert.alert('Top Up Failed', statusRes.data.resultDesc || 'User cancelled or request failed.');
-            setStkStatusText('');
-            setIsProcessingTopUp(false);
-          } else if (attempts >= maxAttempts) {
-            clearInterval(poll);
-            Alert.alert('Timeout', 'The request timed out. Please try again.');
-            setStkStatusText('');
-            setIsProcessingTopUp(false);
-          }
-        } catch (e) {
-          console.error('Polling error', e);
-        }
-      }, 3000);
-    } catch (err: any) {
-      setStkStatusText('');
-      setIsProcessingTopUp(false);
-      if (err?.response?.status >= 500) {
-        Alert.alert('Check Your Phone', 'The STK prompt may have been sent. If you see an M-PESA prompt, enter your PIN. Otherwise try again.');
-      } else {
-        Alert.alert('STK Push Failed', err?.response?.data?.error || 'Could not send STK Push. Please try again.');
-      }
     }
   };
 
@@ -1048,112 +984,10 @@ export default function DigitalWallet({ navigation }: any) {
         </View>
       </Modal>
 
-      {/* Top Up Modal */}
-      <Modal visible={showTopUp} transparent animationType="slide" onRequestClose={closeTopUp}>
-        <View className="flex-1 justify-end bg-black/40">
-          <TouchableOpacity className="absolute inset-0" activeOpacity={1} onPress={closeTopUp} />
-          <View className="w-full max-w-lg mx-auto bg-white rounded-t-[36px] px-6 pt-4 pb-8 mt-auto shadow-2xl" style={{ maxHeight: '90%' }}>
-            <View className="items-center mb-4">
-              <View className="w-12 h-1.5 bg-[#e7ece7] rounded-full" />
-            </View>
-            <View className="flex-row justify-between items-center mb-6">
-              <View>
-                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[22px] text-[#0c2010]">
-                  {fundingMethod === 'mobile' ? 'Mobile Money' : 'Select Funding Method'}
-                </Text>
-                <Text className="text-[9px] text-[#707971] font-jakarta-bold uppercase tracking-[0.2em] mt-1 opacity-70">
-                  {fundingMethod ? 'Complete your deposit' : 'Choose how to top up your wallet'}
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => (fundingMethod ? setFundingMethod(null) : closeTopUp())}
-                className="w-10 h-10 rounded-full bg-[#f7faf7] items-center justify-center"
-              >
-                <Feather name={fundingMethod ? 'arrow-left' : 'x'} size={18} color="#00351d" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {!fundingMethod ? (
-                <View className="gap-3">
-                  {[
-                    { id: 'mobile' as const, name: 'Mobile Money', desc: 'M-Pesa, Airtel Money', icon: 'smartphone' as const, bg: '#e7f8ef', color: '#059669' },
-                  ].map((method) => (
-                    <TouchableOpacity
-                      key={method.id}
-                      onPress={() => setFundingMethod(method.id)}
-                      activeOpacity={0.85}
-                      className="flex-row items-center justify-between p-5 rounded-2xl border border-[#eff4ef]"
-                    >
-                      <View className="flex-row items-center gap-4">
-                        <View style={{ backgroundColor: method.bg }} className="w-12 h-12 rounded-2xl items-center justify-center">
-                          <Feather name={method.icon} size={20} color={method.color} />
-                        </View>
-                        <View>
-                          <Text className="font-jakarta-bold text-[15px] text-[#0c2010]">{method.name}</Text>
-                          <Text className="text-[11px] text-[#707971] font-jakarta-medium">{method.desc}</Text>
-                        </View>
-                      </View>
-                      <Feather name="chevron-right" size={18} color="#b3b9b4" />
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              ) : (
-                <View className="gap-5">
-                  <View className="bg-[#e7f8ef] p-5 rounded-2xl border border-emerald-100 flex-row items-start gap-3">
-                    <Feather name="smartphone" size={15} color="#059669" style={{ marginTop: 1 }} />
-                    <Text className="flex-1 text-[12px] text-[#065f46] font-jakarta-medium leading-relaxed">
-                      Enter the amount and your mobile number. We'll send an <Text className="font-jakarta-extrabold">STK Push</Text> to your phone for instant top-up.
-                    </Text>
-                  </View>
-
-                  <View>
-                    <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#00351d]/60 mb-2 ml-1">Amount to Top Up (KES)</Text>
-                    <TextInput
-                      keyboardType="numeric"
-                      value={topUpAmount}
-                      onChangeText={setTopUpAmount}
-                      placeholder="Min 100"
-                      placeholderTextColor="#a1a1aa"
-                      className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-5 py-4 text-[18px] font-jakarta-extrabold text-[#00351d]"
-                    />
-                  </View>
-                  <View>
-                    <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#00351d]/60 mb-2 ml-1">M-Pesa / Airtel Number</Text>
-                    <ValidatedTextInput
-                      kind="phoneKE"
-                      value={topUpPhone}
-                      onChangeText={setTopUpPhone}
-                      placeholder="0712 345 678"
-                      placeholderTextColor="#a1a1aa"
-                      className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-5 py-4 text-[18px] font-jakarta-extrabold text-[#00351d]"
-                    />
-                  </View>
-
-                  <TouchableOpacity
-                    onPress={submitMobileTopUp}
-                    disabled={isProcessingTopUp || !topUpAmount || !topUpPhone}
-                    className="w-full bg-[#00351d] h-[56px] rounded-full flex-row items-center justify-center shadow-lg shadow-[#00351d]/20"
-                    style={{ opacity: isProcessingTopUp || !topUpAmount || !topUpPhone ? 0.5 : 1 }}
-                  >
-                    {isProcessingTopUp ? (
-                      <View className="flex-row items-center gap-3">
-                        <ActivityIndicator color="#fff" size="small" />
-                        <Text className="text-white text-[12px] font-jakarta-bold">{stkStatusText}</Text>
-                      </View>
-                    ) : (
-                      <>
-                        <Text className="text-white font-jakarta-bold text-[15px] mr-2">Request STK Push</Text>
-                        <Feather name="send" size={16} color="#fff" />
-                      </>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              )}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+      {/* Top Up Modal — shared FundAccountModal, same component
+          Dashboard.tsx uses, instead of a duplicate inline STK-push
+          implementation. */}
+      <FundAccountModal visible={showTopUp} onClose={() => setShowTopUp(false)} />
     </SafeAreaView>
   );
 }
