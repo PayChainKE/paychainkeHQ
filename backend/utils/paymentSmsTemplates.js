@@ -128,3 +128,26 @@ export function buildPayoutFailedSms({ ref, label, amount, recipientName, balanc
     }
   );
 }
+
+/**
+ * Recipient-facing "you've been paid" SMS for a Mobile Money (M-PESA/Airtel
+ * Money) payout landing in someone's personal wallet — sent to the
+ * recipient's own phone alongside (not instead of) Safaricom/Airtel's own
+ * network confirmation SMS, so they know which PayChain business it came
+ * from. No "New balance" line — unlike the merchant-facing templates above,
+ * PayChain has no visibility into the recipient's actual M-Pesa/Airtel
+ * balance, and only Safaricom/Airtel's own SMS can correctly state it.
+ *
+ * @param {{ ref: string, amount: number, businessName?: string|null, date: string, time: string }} params
+ * @returns {{ message: string, truncated: boolean, length: number }}
+ */
+export function buildPayoutRecipientReceivedSms({ ref, amount, businessName, date, time }) {
+  return buildStrictSms(
+    ({ ref, amt, name, date, time }) =>
+      `${ref} Confirmed. You have received KES ${amt} from ${name} via PayChain on ${date} at ${time}.`,
+    {
+      fixed: { ref, amt: amount.toLocaleString(), date, time },
+      truncatable: [{ key: 'name', value: businessName || 'a PayChain business', minLength: 6 }],
+    }
+  );
+}

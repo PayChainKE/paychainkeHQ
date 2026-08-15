@@ -7,11 +7,11 @@ import { formatAccountNumber } from '../../utils/formatAccountNumber'
 // (per-row QR modal) so both stay visually identical rather than drifting
 // apart.
 //
-// qrCodeDataUri is a real NCBA Dynamic QR Code (scannable directly in
-// M-PESA) fetched from GET /api/callbacks/account-qr by the caller — this
-// component used to render its own client-side QR (qrcode.react) encoding
-// a link to PayChain's own /pay/account/:id page; replaced so there's one
-// QR mechanism in the app, not two.
+// qrCodeDataUri is a PayChain-branded QR (PayChain mark composited into the
+// center) fetched from GET /api/callbacks/account-qr by the caller —
+// encodes a link to this merchant's own /pay/account/:code checkout page
+// (see mpesaController.js#generateAccountQr for why this is generated and
+// hosted by PayChain rather than using NCBA's own Dynamic QR product).
 export default function SettlementQrCard({ qrCodeDataUri, businessName, accountNumber, size = 144 }) {
   return (
     <div className="p-[1.5px] rounded-[26px] bg-gradient-to-br from-[#5EFEB3]/50 via-[#1E2532] to-[#2775CA]/40 shadow-[0_8px_30px_rgba(0,0,0,0.6)] w-full">

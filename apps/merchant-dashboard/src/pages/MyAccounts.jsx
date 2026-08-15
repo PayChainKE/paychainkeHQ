@@ -18,13 +18,11 @@ export default function MyAccounts() {
   const [qrCodeDataUri, setQrCodeDataUri] = useState('')
   const [downloadingSticker, setDownloadingSticker] = useState(false)
 
-  // Fetches the real NCBA Dynamic QR Code (scannable in M-PESA) once on
-  // mount rather than re-fetching every time the modal opens — the backend
-  // caches this per merchant so it's cheap either way, but there's still no
-  // reason to make a network round trip on every open when the same image
-  // is shown every time. Was rendered client-side via qrcode.react encoding
-  // a link to PayChain's own /pay/account/:id page; replaced so there's one
-  // QR mechanism in the app, not two.
+  // Fetches the PayChain-branded checkout QR once on mount rather than
+  // re-fetching every time the modal opens — the backend caches this per
+  // merchant so it's cheap either way, but there's still no reason to make
+  // a network round trip on every open when the same image is shown every
+  // time (see mpesaController.js#generateAccountQr).
   useEffect(() => {
     if (!merchant?.ncbaMerchantCode) return
     const token = localStorage.getItem('paychain_merchant_token')
