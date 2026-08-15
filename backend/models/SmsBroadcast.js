@@ -19,6 +19,13 @@ const SmsBroadcastSchema = new mongoose.Schema({
   recipientCount: { type: Number, required: true, default: 0 },
   successCount: { type: Number, default: 0 },
   failureCount: { type: Number, default: 0 },
+  // Sends are staggered in the background (see sendSmsBroadcast) rather than
+  // fired all at once, to avoid tripping Africa's Talking's per-account send
+  // rate limit — the same throttle documented in
+  // utils/smsSanitizer.js#sendStaggeredSms, which delays queued messages by
+  // minutes when several fire back-to-back. successCount/failureCount stay
+  // at 0 until every send finishes.
+  status: { type: String, enum: ['sending', 'completed'], default: 'sending' },
   sentByEmail: { type: String, required: true, trim: true, lowercase: true },
   sentBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },
   sentAt: { type: Date, default: Date.now, index: true },
