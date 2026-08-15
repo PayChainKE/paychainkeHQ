@@ -361,11 +361,9 @@ export default function Wallet() {
     }
   }
 
-  // QR Logic — a real NCBA Dynamic QR Code (scannable directly in M-PESA),
-  // fetched once on mount. Was rendered client-side via qrcode.react,
-  // encoding a link to PayChain's own /pay/account/:id page — replaced so
-  // there's one QR mechanism in the app (same NCBA API Request Money's
-  // "Scan to Pay QR" uses), not two.
+  // QR Logic — a PayChain-branded QR encoding a link to this merchant's own
+  // /pay/account/:code checkout page, fetched once on mount (see
+  // mpesaController.js#generateAccountQr).
   const [qrCodeDataUri, setQrCodeDataUri] = useState('')
 
   useEffect(() => {

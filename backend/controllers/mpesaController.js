@@ -20,6 +20,9 @@ import { buildPaymentReceivedSms, buildCustomerPaidSms } from '../utils/paymentS
 import { initiateStkPush as ncbaInitiateStkPush, queryStkPush as ncbaQueryStkPush, generateQrCode as ncbaGenerateQrCode } from '../services/ncbaStkPushService.js';
 import { validateMobileWalletNumber as ncbaValidateMobileWalletNumber, submitMobileB2wPayment as ncbaSubmitMobileB2wPayment, validateLipaNaMpesaAccount as ncbaValidateLnmAccount, submitLipaNaMpesaPayment as ncbaSubmitLnmPayment, NcbaOpenBankingValidationError } from '../services/ncbaOpenBankingService.js';
 import { validatePhoneNumber, NcbaValidationError, getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
+import { generateBrandedQrDataUri } from '../utils/qrCode.js';
+
+const FRONTEND_URL = process.env.MERCHANT_DASHBOARD_URL || 'https://app.paychain.co.ke';
 
 // Safaricom Daraja is no longer used anywhere in this app — STK Push, B2C,
 // and B2B all route through NCBA (see initiateSTKPush/initiateB2C/initiateB2B
@@ -632,39 +635,45 @@ export const generateQrCheckout = async (req, res) => {
   }
 };
 
-// @desc    Generate an OPEN-AMOUNT Dynamic QR Code for the merchant's own
-//          NCBA Virtual Account — "my QR", a standing code (Wallet page,
-//          MyAccounts per-row modal) rather than a one-time checkout. No
-//          amount is baked in (NCBA's `amount` field is optional — the
-//          customer enters it themselves when they scan), so there's no
-//          checkout total to track: this settles through the same generic
-//          ncba_inbound account-notification path any other Virtual
-//          Account collection does (services/ncbaLedgerService.js), not
-//          through STKRequest/resolveStkOutcome — there's no customer
-//          surcharge concept for an open amount the merchant didn't set.
-//          Replaces the old client-side qrcode.react QR that just encoded
-//          a link to PayChain's own /pay/account/:id page — this is a real
-//          M-PESA-scannable code instead.
+// @desc    Generate an OPEN-AMOUNT, PayChain-branded QR for the merchant's
+//          own checkout page — "my QR", a standing code (Wallet page,
+//          MyAccounts per-row modal) rather than a one-time checkout. Links
+//          to /pay/account/:code (PayAccountPage.jsx), which collects an
+//          amount + the customer's own phone number and triggers a real STK
+//          Push to their phone — the customer enters their M-PESA PIN
+//          natively on their own device, never on this web page. No amount
+//          is baked into the QR itself; the customer picks it after
+//          scanning.
+//          Used to encode NCBA's own Dynamic QR instead (Base64QrCode from
+//          ncbaStkPushService.js#generateQrCode) — decoding a real one in
+//          production showed it actually links to NCBA's own hosted
+//          checkout (c2bportal.ncbagroup.com), not a native M-PESA prompt,
+//          so there was no native-scan benefit being traded away by
+//          switching to a self-hosted link — only the loss of "opens an
+//          unfamiliar ncbagroup.com page" and "can't brand the QR".
 // @route   GET /api/callbacks/account-qr
 // @access  Private (merchant)
 export const generateAccountQr = async (req, res) => {
   try {
-    const merchant = await Merchant.findById(req.merchant._id).select('ncbaMerchantCode ncbaAccountQrCodeDataUri');
+    const merchant = await Merchant.findById(req.merchant._id).select('ncbaMerchantCode checkoutQrCodeDataUri');
     if (!merchant?.ncbaMerchantCode) {
       return res.status(400).json({ error: 'This merchant has no NCBA virtual account assigned yet.' });
     }
     // This QR's content never changes once ncbaMerchantCode is assigned, so
-    // a cached copy is always still correct — skip the live NCBA round trip
-    // entirely once one exists (that round trip, repeated on every page/
-    // modal load, was the source of the reported QR loading delay).
-    if (merchant.ncbaAccountQrCodeDataUri) {
-      return res.status(200).json({ success: true, qrCodeDataUri: merchant.ncbaAccountQrCodeDataUri });
+    // a cached copy is always still correct — skip re-rendering (QR encode
+    // + logo compositing) on every page/modal load once one exists.
+    if (merchant.checkoutQrCodeDataUri) {
+      return res.status(200).json({ success: true, qrCodeDataUri: merchant.checkoutQrCodeDataUri });
     }
-    const { qrCodeDataUri } = await ncbaGenerateQrCode({ amount: undefined, narration: merchant.ncbaMerchantCode });
+    const checkoutUrl = `${FRONTEND_URL}/pay/account/${merchant.ncbaMerchantCode}`;
+    const qrCodeDataUri = await generateBrandedQrDataUri(checkoutUrl);
+    if (!qrCodeDataUri) {
+      return res.status(502).json({ error: 'Failed to generate QR code — please try again.' });
+    }
     // $set via updateOne, not merchant.save() — the doc above was fetched
     // with a narrow .select(), and .save() would run full-document
     // validation against fields that were never loaded.
-    await Merchant.updateOne({ _id: merchant._id }, { $set: { ncbaAccountQrCodeDataUri: qrCodeDataUri } });
+    await Merchant.updateOne({ _id: merchant._id }, { $set: { checkoutQrCodeDataUri: qrCodeDataUri } });
     res.status(200).json({ success: true, qrCodeDataUri });
   } catch (error) {
     console.error('❌ Account QR Generate Error:', error.message);

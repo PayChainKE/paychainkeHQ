@@ -100,11 +100,9 @@ export default function DigitalWallet({ navigation }: any) {
   // FundAccountModal (also used by Dashboard.tsx), not duplicated here.
   const [showTopUp, setShowTopUp] = useState(false);
 
-  // Real NCBA Dynamic QR Code (scannable directly in M-PESA), fetched once
-  // on mount. Was a link to PayChain's own /pay/account/:id page rendered
-  // as a client-side QR (react-native-qrcode-svg) — replaced so there's one
-  // QR mechanism in the app (same NCBA API Request Money's "Scan to Pay QR"
-  // uses), not two.
+  // PayChain-branded QR encoding a link to this merchant's own
+  // /pay/account/:code checkout page, fetched once on mount (see
+  // mpesaController.js#generateAccountQr).
   const [qrCodeDataUri, setQrCodeDataUri] = useState('');
   const accountShareText = `Pay ${merchant?.businessName || 'this business'} via PayChain — Account: ${formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending')}`;
 
