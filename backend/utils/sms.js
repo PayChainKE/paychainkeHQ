@@ -11,7 +11,61 @@ import { sendAfricasTalkingSms } from './notificationService.js';
 import { formatPhoneDisplay } from './formatPhoneDisplay.js';
 import SmsLog from '../models/SmsLog.js';
 
-export const sendSMS = async (phoneNumber, message) => {
+// Global, process-wide throttle — a strict minimum gap between successive
+// dispatches to Africa's Talking, regardless of which controller/request
+// triggered them. Confirmed live (2026-08-04, see doc comment on
+// smsSanitizer.js#sendStaggeredSms): two sends landing too close together
+// get the second one queued by Africa's Talking for MINUTES, not seconds —
+// a per-account send-rate limit, not something scoped to a single request.
+// sendStaggeredSms and the SMS broadcast controller's own delay only
+// stagger sends made within the SAME function call; they don't protect
+// against two DIFFERENT concurrent transactions — e.g. two merchants both
+// getting paid around the same time — whose SMS could still collide
+// without a shared, app-wide gate. This is that gate: every real send in
+// the app already funnels through sendSMS below, so throttling here
+// covers every call site at once rather than requiring each one to
+// remember to stagger itself.
+//
+// Two priority lanes, not one plain FIFO — a single shared queue would mean
+// a large admin broadcast mid-flight blocks every real payment SMS behind
+// it for however long the broadcast takes to drain (worse than the problem
+// this throttle exists to fix). 'normal' (the default — payments, OTP, bulk
+// pay) always jumps ahead of 'low' (broadcast) on the next available slot;
+// 'low' items only get pulled when nothing urgent is waiting, and a
+// broadcast that's mid-drain pauses the instant urgent traffic shows up
+// rather than finishing its own backlog first.
+const MIN_SEND_GAP_MS = 2000;
+let lastDispatchAt = 0;
+const normalQueue = [];
+const lowQueue = [];
+let pumping = false;
+
+async function pumpSendQueue() {
+  if (pumping) return;
+  pumping = true;
+  while (normalQueue.length || lowQueue.length) {
+    const item = normalQueue.length ? normalQueue.shift() : lowQueue.shift();
+    const wait = MIN_SEND_GAP_MS - (Date.now() - lastDispatchAt);
+    if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+    lastDispatchAt = Date.now();
+    // sendSMS/dispatchSms never throws (documented contract above) — no
+    // try/catch needed to keep one bad send from wedging the pump loop.
+    item.resolve(await item.task());
+  }
+  pumping = false;
+}
+
+function enqueueSend(task, priority) {
+  return new Promise((resolve) => {
+    (priority === 'low' ? lowQueue : normalQueue).push({ task, resolve });
+    pumpSendQueue();
+  });
+}
+
+export const sendSMS = (phoneNumber, message, opts = {}) =>
+  enqueueSend(() => dispatchSms(phoneNumber, message), opts.priority);
+
+async function dispatchSms(phoneNumber, message) {
   try {
     const response = await sendAfricasTalkingSms(phoneNumber, message);
 
@@ -93,4 +147,4 @@ export const sendSMS = async (phoneNumber, message) => {
     }
     return { success: false, error: errorMessage };
   }
-};
+}

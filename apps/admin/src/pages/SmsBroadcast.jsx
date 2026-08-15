@@ -322,8 +322,10 @@ export default function SmsBroadcast() {
                       <p className="text-xs text-on-surface/80 line-clamp-2 mb-2">{h.message}</p>
                       <div className="flex items-center justify-between text-[10px] text-on-surface-variant/50 font-bold">
                         <span>{h.audience === 'all' ? 'All merchants' : `${h.merchantIds?.length || 0} selected`} · {h.recipientCount} recipient{h.recipientCount === 1 ? '' : 's'}</span>
-                        <span className={h.failureCount ? 'text-amber-600' : 'text-emerald-600'}>
-                          {h.successCount} sent{h.failureCount ? `, ${h.failureCount} failed` : ''}
+                        <span className={h.status === 'sending' ? 'text-primary' : h.failureCount ? 'text-amber-600' : 'text-emerald-600'}>
+                          {h.status === 'sending'
+                            ? 'Sending…'
+                            : `${h.successCount} sent${h.failureCount ? `, ${h.failureCount} failed` : ''}`}
                         </span>
                       </div>
                     </div>

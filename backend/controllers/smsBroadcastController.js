@@ -9,6 +9,25 @@ const CATEGORIES = ['maintenance', 'holiday', 'security', 'general'];
 const MAX_LEN = 918;
 const MIN_LEN = 5;
 
+// Pacing and priority both live in utils/sms.js#sendSMS's own global send
+// queue now — every broadcast recipient here is 'low' priority, so the
+// queue paces them out on its own AND automatically pauses the broadcast
+// the instant a real payment/OTP SMS needs to go out, resuming once that
+// urgent traffic clears. Run in the background (not awaited by the
+// request handler) so the admin's request doesn't hang for however long a
+// large audience takes to drain.
+async function sendBroadcastInBackground(broadcastId, recipients, trimmed) {
+  const results = await Promise.all(
+    recipients.map((r) => sendSMS(r.phone, trimmed, { priority: 'low' }).catch(() => ({ success: false })))
+  );
+  const success = results.filter((r) => r?.success).length;
+  const failure = results.length - success;
+  await SmsBroadcast.updateOne(
+    { _id: broadcastId },
+    { $set: { successCount: success, failureCount: failure, status: 'completed' } }
+  );
+}
+
 // @desc    Send a short SMS notification to merchants — system maintenance
 //          notices, public holiday greetings, security reminders, etc.
 // @route   POST /api/admin/sms-broadcasts
@@ -38,36 +57,28 @@ export const sendSmsBroadcast = async (req, res) => {
       return res.status(400).json({ error: 'No merchants with a phone number on file matched.' });
     }
 
-    // Same batching convention as newsletterController.sendCampaign — bound
-    // concurrency rather than firing every send at once.
-    let success = 0;
-    let failure = 0;
-    const BATCH = 10;
-    for (let i = 0; i < recipients.length; i += BATCH) {
-      const slice = recipients.slice(i, i + BATCH);
-      const results = await Promise.allSettled(slice.map((m) => sendSMS(m.phone, trimmed)));
-      results.forEach((r) => {
-        if (r.status === 'fulfilled' && r.value?.success) success++;
-        else failure++;
-      });
-    }
-
     const broadcast = await SmsBroadcast.create({
       message: trimmed,
       category: CATEGORIES.includes(category) ? category : 'general',
       audience,
       merchantIds: audience === 'selected' ? merchantIds : [],
       recipientCount: recipients.length,
-      successCount: success,
-      failureCount: failure,
+      status: 'sending',
       sentByEmail: req.admin?.email || 'unknown',
       sentBy: req.admin?._id || null,
       sentAt: new Date(),
     });
 
+    // Detached — never block this response on however long the staggered
+    // send takes (same "webhook acks immediately, SMS dispatch happens
+    // after" convention used everywhere else in this codebase).
+    sendBroadcastInBackground(broadcast._id, recipients, trimmed).catch((err) => {
+      console.error('SMS Broadcast background send failed:', err);
+    });
+
     res.json({
       success: true,
-      message: `SMS sent to ${success} of ${recipients.length} merchant${recipients.length === 1 ? '' : 's'}${failure ? ` (${failure} failed)` : ''}.`,
+      message: `Sending to ${recipients.length} merchant${recipients.length === 1 ? '' : 's'}…`,
       data: broadcast,
     });
   } catch (error) {
