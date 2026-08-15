@@ -18,7 +18,7 @@ import {
 export const NCBA_OWN_BANK_CODE = '07000';
 import { createNotification } from './notificationController.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
-import { buildPayoutSentSms, buildPayoutFailedSms } from '../utils/paymentSmsTemplates.js';
+import { buildPayoutSentSms, buildPayoutFailedSms, buildPayoutRecipientReceivedSms } from '../utils/paymentSmsTemplates.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { claimPayoutSubmission, DuplicateSubmissionError } from '../utils/idempotencyGuard.js';
@@ -520,14 +520,37 @@ export async function resolvePendingOpenBankingTransaction({ reference, succeede
         : `KES ${transaction.amount.toLocaleString()} ${payoutLabel.toLowerCase()} to ${transaction.recipient?.name || 'the recipient'} failed and was refunded to your balance.`,
     }).catch((e) => logEvent('error', 'ncba_openbanking_callback_notification_failed', { reference, error: e.message }));
 
+    // Shared by both the merchant-facing and recipient-facing SMS blocks
+    // below, so the two always quote the same date/time for one resolution.
+    const { date, time } = formatTransactionDateTime();
+
     if (merchantForSms?.phone) {
-      const { date, time } = formatTransactionDateTime();
       const recipientName = transaction.recipient?.name || 'the recipient';
       const { message } = succeeded
         ? buildPayoutSentSms({ ref: reference, label: payoutLabel, amount: transaction.amount, recipientName, date, time })
         : buildPayoutFailedSms({ ref: reference, label: payoutLabel, amount: transaction.amount, recipientName, date, time, balance: merchantForSms.kesBalance || 0 });
       safeSendSMS({ to: merchantForSms.phone, message }).then((r) => {
         if (!r.success) logEvent('error', 'ncba_openbanking_callback_sms_failed', { reference, error: r.error });
+      });
+    }
+
+    // Recipient-facing "you've been paid" SMS — Mobile Money (M-PESA/Airtel
+    // Money) payouts only, since those are the only rail here where
+    // transaction.recipient.id is actually the recipient's own phone number
+    // (mobileNetwork is only ever set for this rail — see initiateB2C and
+    // bulkPayController.js's Personal Number branch). Bank/Till/Paybill
+    // payouts don't collect a recipient phone number today, so there's
+    // nothing to notify.
+    if (succeeded && transaction.mobileNetwork && transaction.recipient?.id) {
+      const { message: recipientMessage } = buildPayoutRecipientReceivedSms({
+        ref: reference,
+        amount: transaction.amount,
+        businessName: transaction.sender?.name,
+        date,
+        time,
+      });
+      safeSendSMS({ to: transaction.recipient.id, message: recipientMessage }).then((r) => {
+        if (!r.success) logEvent('error', 'ncba_openbanking_callback_recipient_sms_failed', { reference, error: r.error });
       });
     }
 
