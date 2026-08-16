@@ -5,6 +5,7 @@ import { logAudit } from '../utils/auditLog.js';
 import { phoneVariations } from './adminController.js';
 import { getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
 import { sendMerchantInvite, sendKybRevisionRequest, sendKybRejection } from '../utils/resend.js';
+import { normalizeKraPin, isValidKraPin, KRA_PIN_FORMAT_HINT } from '../utils/kraPinValidator.js';
 
 // Onboarding-officer application pipeline. Officers originate new merchant
 // applications (business details + KYC documents) and drive them through a
@@ -63,8 +64,12 @@ export const createApplication = async (req, res) => {
     name = String(name).trim();
     businessName = String(businessName).trim();
     businessType = businessType ? String(businessType).trim() : null;
-    kraPin = kraPin ? String(kraPin).trim().toUpperCase() : null;
+    kraPin = kraPin ? normalizeKraPin(kraPin) : null;
     businessNumber = businessNumber ? String(businessNumber).trim() : null;
+
+    if (kraPin && !isValidKraPin(kraPin)) {
+      return res.status(400).json({ error: `Invalid KRA PIN format. ${KRA_PIN_FORMAT_HINT}` });
+    }
 
     // Checked against every merchant regardless of kybStatus, so an officer
     // can't double-file a business that's already approved, pending, or

@@ -21,6 +21,7 @@ import { getLipaNaMpesaTariff } from '../config/lipaNaMpesaTariffCard.js';
 import { validatePhoneNumber, NcbaValidationError } from '../utils/ncbaValidators.js';
 import { validateMobileWalletNumber, submitMobileB2wPayment, validateLipaNaMpesaAccount, submitLipaNaMpesaPayment, validateKplcAccount, submitKplcPayment, validateKplcPrepaidAccount, submitKplcPrepaidPayment, validateNcwscAccount, submitNcwscPayment, NcbaOpenBankingValidationError } from '../services/ncbaOpenBankingService.js';
 import { buildPayoutSentSms } from '../utils/paymentSmsTemplates.js';
+import { normalizeKraPin, isValidKraPin, KRA_PIN_FORMAT_HINT } from '../utils/kraPinValidator.js';
 
 // Every catch block in this file used to respond with { error: error.message }
 // directly, which bypasses server.js's global error handler entirely (that
@@ -57,11 +58,16 @@ export const getPayees = async (req, res) => {
 // @access  Private
 export const addPayee = async (req, res) => {
   try {
-    const {
+    let {
       name, type, paymentMethod, mobileMoneyType, mobileNetwork, phone, paybillNumber,
       businessAccount, tillNumber, bankName, accountNumber, bankCode, utilityProvider,
       kraPin, idNumber, nssfNumber, shifNumber, etimsInvoiceNumber, cuNumber, defaultAmount
     } = req.body;
+
+    kraPin = kraPin ? normalizeKraPin(kraPin) : kraPin;
+    if (kraPin && !isValidKraPin(kraPin)) {
+      return res.status(400).json({ message: `Invalid KRA PIN format. ${KRA_PIN_FORMAT_HINT}` });
+    }
 
     // Strict KRA validations (Simulated for real-world robustness)
     if (type === 'employee') {
@@ -93,11 +99,16 @@ export const addPayee = async (req, res) => {
 // @access  Private
 export const updatePayee = async (req, res) => {
   try {
-    const {
+    let {
       name, type, paymentMethod, mobileMoneyType, mobileNetwork, phone, paybillNumber,
       businessAccount, tillNumber, bankName, accountNumber, bankCode, utilityProvider,
       kraPin, idNumber, nssfNumber, shifNumber, etimsInvoiceNumber, cuNumber, defaultAmount
     } = req.body;
+
+    kraPin = kraPin ? normalizeKraPin(kraPin) : kraPin;
+    if (kraPin && !isValidKraPin(kraPin)) {
+      return res.status(400).json({ message: `Invalid KRA PIN format. ${KRA_PIN_FORMAT_HINT}` });
+    }
 
     // KRA validations for updated type
     if (type === 'employee' && (!kraPin || !idNumber)) {
@@ -121,7 +132,7 @@ export const updatePayee = async (req, res) => {
         kraPin, idNumber, nssfNumber, shifNumber, etimsInvoiceNumber, cuNumber, defaultAmount,
         updatedAt: new Date()
       },
-      { returnDocument: 'after' }
+      { returnDocument: 'after', runValidators: true }
     );
     if (!updatedPayee) {
       return res.status(404).json({ message: 'Payee not found' });

@@ -75,6 +75,31 @@ export const formatters: Record<FieldKind, (raw: string) => string> = {
   text: (raw) => raw.slice(0, 200),
 };
 
+// Mirrors backend/utils/kraPinValidator.js exactly — same shape check (one
+// leading A/P, 9 digits, one trailing letter) plus the same
+// obviously-fake-pattern rejection (all nine digits identical, or a
+// strictly ascending/descending run like 123456789). Keep both in sync if
+// either changes: this only saves a merchant a round trip to the server,
+// the backend validator is still the actual source of truth.
+const KRA_PIN_SHAPE_REGEX = /^([AP])(\d{9})([A-Z])$/i;
+
+const isPlausibleKraPinDigits = (digits: string): boolean => {
+  const d = digits.split('').map(Number);
+  if (d.every((n) => n === d[0])) return false;
+  let ascending = true, descending = true;
+  for (let i = 1; i < d.length; i++) {
+    if (d[i] !== d[i - 1] + 1) ascending = false;
+    if (d[i] !== d[i - 1] - 1) descending = false;
+  }
+  return !ascending && !descending;
+};
+
+export const isValidKraPin = (raw: string): boolean => {
+  const match = KRA_PIN_SHAPE_REGEX.exec(String(raw ?? ''));
+  if (!match) return false;
+  return isPlausibleKraPinDigits(match[2]);
+};
+
 // ─── Validators ──────────────────────────────────────────────────────────────
 const VALID: ValidationResult = { valid: true };
 
@@ -89,7 +114,7 @@ export const validators: Record<FieldKind, (v: string) => ValidationResult> = {
   },
   kraPin: (v) => {
     if (!v) return { valid: false, error: 'KRA PIN is required.' };
-    if (!/^[A-Z]\d{9}[A-Z]$/.test(v)) return { valid: false, error: 'Format must be A123456789Z.' };
+    if (!isValidKraPin(v)) return { valid: false, error: 'Enter a real KRA PIN — format A/P + 9 digits + a letter, e.g. P051892647A.' };
     return VALID;
   },
   nationalId: (v) => {
