@@ -18,7 +18,13 @@ const upload = multer({
   limits: { fileSize: 2 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const ok = ['text/csv', 'application/vnd.ms-excel', 'application/octet-stream', 'text/plain'];
-    cb(null, ok.includes(file.mimetype) || file.originalname?.toLowerCase().endsWith('.csv'));
+    const hasCsvExtension = file.originalname?.toLowerCase().endsWith('.csv');
+    // Extension alone used to be enough to pass regardless of mimetype,
+    // meaning any file content — renamed to end in .csv — bypassed the
+    // MIME allow-list entirely. Only trust the extension when the browser
+    // genuinely sent no useful MIME type (some do send '' for CSV); a
+    // present-but-disallowed mimetype is now rejected even with a .csv name.
+    cb(null, ok.includes(file.mimetype) || (hasCsvExtension && !file.mimetype));
   },
 });
 

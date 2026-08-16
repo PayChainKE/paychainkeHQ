@@ -5,6 +5,7 @@ import Merchant from '../models/Merchant.js';
 import Contact from '../models/Contact.js';
 import Communication from '../models/Communication.js';
 import { sendTeamInvite } from '../utils/resend.js';
+import { notifyAdmins } from '../utils/securityAlerts.js';
 
 const ADMIN_DASHBOARD_URL =
   process.env.ADMIN_DASHBOARD_URL || 'https://admin.paychain.co.ke';
@@ -127,6 +128,15 @@ export const inviteTeamMember = async (req, res) => {
     // Dispatch email async so the API call isn't held by the SMTP round-trip.
     sendTeamInvite(email, name, role, inviterName, setupLink).catch((e) => {
       console.error('Team invite email dispatch failed:', e?.message || e);
+    });
+
+    // Visibility for every other owner/admin — a new privileged account is
+    // exactly the kind of change that should never happen silently, even
+    // when it's legitimate.
+    notifyAdmins({
+      subject: 'New admin account invited',
+      heading: 'New Admin Console Account',
+      details: `<strong>${inviterName}</strong> invited <strong>${email}</strong> as <strong>${role}</strong>.`,
     });
 
     res.status(201).json({ success: true, data: safeAdmin(admin) });

@@ -20,7 +20,10 @@ export const smsDeliveryReport = async (req, res) => {
   try {
     const { id, status, failureReason } = req.body || {};
     if (!id) {
-      console.warn(JSON.stringify({ level: 'warn', event: 'sms_delivery_report_missing_id', body: req.body }));
+      // Logs only the known/expected fields, not the raw body — a webhook
+      // payload shape can change or carry unexpected fields, and this
+      // shouldn't become a place that echoes whatever an inbound POST sent.
+      console.warn(JSON.stringify({ level: 'warn', event: 'sms_delivery_report_missing_id', status, failureReason }));
       return;
     }
 

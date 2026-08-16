@@ -92,6 +92,10 @@ export function AuthProvider({ children }){
   }
 
   function logout(reason) {
+    // Best-effort — invalidates the JWT server-side immediately (bumps
+    // tokenVersion) instead of leaving it valid until its 12h expiry.
+    // Fire-and-forget so an offline/failed call never blocks logout.
+    api.post('/api/admin/auth/logout').catch(() => {});
     localStorage.removeItem('paychain_officer_session');
     localStorage.removeItem('paychain_officer_token');
     localStorage.removeItem(LAST_ACTIVE_KEY);

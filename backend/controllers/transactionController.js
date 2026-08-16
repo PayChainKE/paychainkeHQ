@@ -16,6 +16,14 @@ import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { getNcbaVirtualAccountNumber, validatePhoneNumber, NcbaValidationError } from '../utils/ncbaValidators.js';
 import { generateMerchantStickerPdf } from '../utils/stickerGenerator.js';
+import { claimPayoutSubmission, DuplicateSubmissionError } from '../utils/idempotencyGuard.js';
+import { notifyAdmins } from '../utils/securityAlerts.js';
+
+// Transfers at or above this amount get an admin visibility alert — not a
+// block, just a heads-up. Configurable since "large" depends on the
+// merchant base's real transaction sizes; defaults to a conservative
+// KES 500,000 in case the env var is unset.
+const LARGE_TRANSACTION_ALERT_KES = Number(process.env.LARGE_TRANSACTION_ALERT_KES) || 500_000;
 
 // Resolves either the 12-digit NCBA virtual account number or the 8-digit
 // interim merchant code (see getNcbaVirtualAccountNumber) to a merchant.
@@ -445,6 +453,17 @@ export const sendMoney = async (req, res) => {
     }
     await resetPinAttempts(merchantId);
 
+    // Same fingerprint-based dedup used by B2C/B2B/bulk-pay/bank-transfer —
+    // this endpoint was the one payout path without it, so a double-click
+    // or a client's automatic retry on a slow response could double-debit
+    // the merchant before this.
+    try {
+      await claimPayoutSubmission(merchantId, ['send-money', destination, amount, reference]);
+    } catch (e) {
+      if (e instanceof DuplicateSubmissionError) return res.status(409).json({ error: e.message });
+      throw e;
+    }
+
     // Atomic conditional deduct — avoids the read-then-write race of
     // fetching balance, checking it, then saving separately, where two
     // concurrent requests could both pass the check against the same
@@ -456,6 +475,14 @@ export const sendMoney = async (req, res) => {
     );
     if (!merchant) {
       return res.status(400).json({ error: 'Insufficient KES balance for this transfer.' });
+    }
+
+    if (totalDeduction >= LARGE_TRANSACTION_ALERT_KES) {
+      notifyAdmins({
+        subject: 'Large transfer sent',
+        heading: 'Large Transaction Alert',
+        details: `Merchant <strong>${merchant.businessName || merchant.phone}</strong> sent <strong>KES ${totalDeduction.toLocaleString()}</strong> to ${reference || destination || 'a recipient'}.`,
+      });
     }
 
     const ref = `OUT-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;

@@ -1,4 +1,5 @@
 import Merchant from '../models/Merchant.js';
+import { notifyAdmins } from './securityAlerts.js';
 
 // Account-level lockout for the 4-digit payment/bulk-pay PINs. IP rate
 // limiting (see the pinLimiter in each PIN-guarded route file) stops a
@@ -31,10 +32,20 @@ export async function recordFailedPinAttempt(merchantId) {
   if (!merchant) return;
   const attempts = (merchant.failedPinAttempts || 0) + 1;
   const update = { failedPinAttempts: attempts };
+  const isNewLock = attempts === MAX_ATTEMPTS;
   if (attempts >= MAX_ATTEMPTS) {
     update.pinLockedUntil = new Date(Date.now() + LOCKOUT_MS);
   }
   await Merchant.findByIdAndUpdate(merchantId, update);
+
+  if (isNewLock) {
+    const label = merchant.businessName || merchant.email || merchant.phone || String(merchantId);
+    notifyAdmins({
+      subject: 'Merchant account locked — repeated failed PIN attempts',
+      heading: 'Payment PIN Lockout Triggered',
+      details: `Merchant <strong>${label}</strong> (id: ${merchantId}) was locked for 15 minutes after ${MAX_ATTEMPTS} incorrect payment PIN attempts in a row. This guards every money-movement flow (Send Money, Bulk Pay, B2C/B2B).`,
+    });
+  }
 }
 
 // Call after a successful bcrypt.compare — clears the counter/lock.

@@ -1,6 +1,6 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
-import { login, verifyOTP, getMe, updateMe, changePassword } from '../controllers/authController.js';
+import { login, verifyOTP, getMe, updateMe, changePassword, logout } from '../controllers/authController.js';
 import { validateSetupToken as validateAdminSetupToken, setupPasswordWithToken } from '../controllers/teamController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import {
@@ -134,6 +134,7 @@ router.post('/verify-otp', adminOtpLimiter, verifyOTP);
 router.get('/me', protect, getMe);
 router.put('/me', protect, updateMe);
 router.put('/password', protect, passwordChangeLimiter, changePassword);
+router.post('/logout', protect, logout);
 
 // Admin team-member setup (public — validates the time-limited invite token).
 router.get('/setup-password/:token', validateAdminSetupToken);
@@ -156,6 +157,12 @@ router.get('/merchant/security-questions', protectMerchant, getSecurityQuestions
 router.put('/merchant/security-questions', protectMerchant, passwordChangeLimiter, updateSecurityQuestions);
 router.get('/merchant/security-history', protectMerchant, getSecurityHistory);
 router.post('/merchant/sign-out-all-devices', protectMerchant, signOutAllDevices);
+// Conventionally-named alias — same handler (bumps tokenVersion). There's
+// no per-device session store, so a plain "logout" and "sign out
+// everywhere" are the same operation today; this just gives frontends a
+// predictable endpoint to call on logout instead of relying purely on a
+// local token clear that leaves the JWT valid until its 30-day expiry.
+router.post('/merchant/logout', protectMerchant, signOutAllDevices);
 router.get('/merchant/me', protectMerchant, getMerchantMe);
 router.put('/merchant/profile', protectMerchant, updateMerchantProfile);
 router.put('/merchant/biometrics', protectMerchant, toggleBiometrics);

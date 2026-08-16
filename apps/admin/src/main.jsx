@@ -2,6 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import './index.css';
+import './lib/sentry';
 
 // The offline-caching service worker is only useful (and only registered) in
 // production. In dev it actively fights Vite's module reloading — a

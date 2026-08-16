@@ -250,6 +250,12 @@ export function MerchantAuthProvider({ children }) {
   }
 
   function logout(reason) {
+    // Best-effort — invalidates the JWT server-side immediately (bumps
+    // tokenVersion) instead of leaving it valid until its 30-day expiry.
+    // Fire-and-forget: an offline/failed call must never block the actual
+    // logout below, and the Authorization header is still attached at this
+    // point since it's deleted further down.
+    axios.post('/api/auth/merchant/logout').catch(() => {});
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(LAST_ACTIVE_KEY);

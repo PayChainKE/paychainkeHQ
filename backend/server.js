@@ -1,5 +1,31 @@
-import express from 'express';
 import dotenv from 'dotenv';
+dotenv.config();
+// Imported before everything else so Sentry.init() runs (or safely no-ops)
+// before any route module that might throw during its own module-load.
+import Sentry from './utils/sentry.js';
+
+// Catches crashes/rejections that never reach Express's own error handler
+// (a throw inside a setInterval callback, an unhandled promise anywhere) —
+// otherwise those currently only ever show up as a console.error nobody's
+// watching. Reports to Sentry without changing Node's own default behavior
+// for either event.
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled Rejection:', reason);
+  Sentry.captureException(reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  // Registering this handler at all suppresses Node's normal "crash the
+  // process" default — leaving it running after a truly uncaught exception
+  // is explicitly unsafe (Node's own docs: do not resume normal operation).
+  // Flush the report, then exit so Render/PM2 restarts into a clean state,
+  // same outcome as before this handler existed, just with the error
+  // reported first instead of silently lost in a log nobody's watching.
+  Sentry.captureException(err);
+  Sentry.close(2000).finally(() => process.exit(1));
+});
+
+import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
@@ -27,8 +53,6 @@ import { backfillNcbaMerchantCodes } from './migrations/backfillNcbaMerchantCode
 import { checkAndSendDormancyReminders } from './services/dormancyReminderService.js';
 import { runWeeklyRevenueSweepIfDue } from './services/revenueSweepService.js';
 import { reconcileStuckOpenBankingPayouts } from './services/ncbaOpenBankingReconciliationService.js';
-
-dotenv.config();
 
 const allowedOrigins = [
   // Public marketing site
@@ -101,8 +125,17 @@ app.use(cors({
 
 app.set('trust proxy', 1);
 
+// This server only ever returns JSON (no HTML/templates are rendered or
+// served here — every UI lives in the separate frontend apps), so a
+// locked-down CSP costs nothing: default-src 'none' just formalizes that
+// nothing on this origin should ever execute as a page.
 app.use(helmet({
-  contentSecurityPolicy: false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+    },
+  },
   crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
 
@@ -210,6 +243,7 @@ app.use('/v1', ncbaRoutes);
 
 app.use((err, req, res, next) => {
   console.error('Unhandled Error:', err);
+  Sentry.captureException(err);
   // Full detail always goes server-side via console.error above. The
   // client only gets err.message in non-production — in prod a future
   // error whose .message happens to carry an internal detail (a raw DB
