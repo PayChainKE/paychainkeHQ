@@ -41,9 +41,12 @@ export async function recordFailedPinAttempt(merchantId) {
   if (isNewLock) {
     const label = merchant.businessName || merchant.email || merchant.phone || String(merchantId);
     notifyAdmins({
+      type: 'pin_lockout',
+      severity: 'warning',
       subject: 'Merchant account locked — repeated failed PIN attempts',
       heading: 'Payment PIN Lockout Triggered',
       details: `Merchant <strong>${label}</strong> (id: ${merchantId}) was locked for 15 minutes after ${MAX_ATTEMPTS} incorrect payment PIN attempts in a row. This guards every money-movement flow (Send Money, Bulk Pay, B2C/B2B).`,
+      metadata: { merchantId: String(merchantId), label },
     });
   }
 }

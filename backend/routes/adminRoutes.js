@@ -32,6 +32,12 @@ import {
   getMerchantAuditLog,
 } from '../controllers/auditLogController.js';
 import {
+  getSecurityAlerts,
+  acknowledgeSecurityAlert,
+  getUnacknowledgedCount,
+} from '../controllers/securityAlertController.js';
+import { getSentryOverview } from '../controllers/sentryMonitoringController.js';
+import {
   listTeam,
   inviteTeamMember,
   updateTeamMember,
@@ -171,6 +177,16 @@ router.get('/system-status', protect, excludeOfficer, getSystemStatus);
 
 // Global audit log (filterable, paginated).
 router.get('/audit-log', protect, excludeOfficer, getAuditLog);
+
+// Security alerts (OTP/PIN lockouts, large transfers, new privileged
+// accounts) — persisted record of what utils/securityAlerts.js emails out.
+router.get('/security-alerts', protect, excludeOfficer, getSecurityAlerts);
+router.get('/security-alerts/unacknowledged-count', protect, excludeOfficer, getUnacknowledgedCount);
+router.patch('/security-alerts/:id/acknowledge', protect, requireMutator, acknowledgeSecurityAlert);
+
+// Sentry error-monitoring proxy — see sentryMonitoringController.js for why
+// this isn't called directly from the browser.
+router.get('/monitoring/sentry', protect, excludeOfficer, getSentryOverview);
 
 // Admin → merchant SMS broadcasts (system maintenance notices, public
 // holiday greetings, security reminders, etc). Sending is rate-limited with

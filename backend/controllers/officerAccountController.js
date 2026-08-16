@@ -121,9 +121,12 @@ export const createOfficer = async (req, res) => {
     });
 
     notifyAdmins({
+      type: 'new_officer_account',
+      severity: 'info',
       subject: 'New officer account created',
       heading: 'New Officer Account',
       details: `<strong>${adminName}</strong> created an officer account for <strong>${email}</strong>.`,
+      metadata: { email, createdBy: adminName },
     });
 
     res.status(201).json({ success: true, data: safeOfficer(officer), generatedPassword: password });

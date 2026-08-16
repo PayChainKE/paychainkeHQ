@@ -479,9 +479,12 @@ export const sendMoney = async (req, res) => {
 
     if (totalDeduction >= LARGE_TRANSACTION_ALERT_KES) {
       notifyAdmins({
+        type: 'large_transaction',
+        severity: 'info',
         subject: 'Large transfer sent',
         heading: 'Large Transaction Alert',
         details: `Merchant <strong>${merchant.businessName || merchant.phone}</strong> sent <strong>KES ${totalDeduction.toLocaleString()}</strong> to ${reference || destination || 'a recipient'}.`,
+        metadata: { merchantId: String(merchant._id), amount: totalDeduction, destination: reference || destination || null },
       });
     }
 

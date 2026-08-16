@@ -42,9 +42,12 @@ export async function recordFailedOtpAttempt(Model, id) {
   if (isNewLock) {
     const label = doc.email || doc.businessName || doc.phone || String(id);
     notifyAdmins({
+      type: 'otp_lockout',
+      severity: 'warning',
       subject: 'Account locked — repeated failed OTP attempts',
       heading: 'OTP Lockout Triggered',
       details: `A ${Model.modelName} account <strong>${label}</strong> (id: ${id}) was locked for 15 minutes after ${MAX_ATTEMPTS} incorrect OTP attempts in a row.`,
+      metadata: { model: Model.modelName, id: String(id), label },
     });
   }
 }

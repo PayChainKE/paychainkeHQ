@@ -134,9 +134,12 @@ export const inviteTeamMember = async (req, res) => {
     // exactly the kind of change that should never happen silently, even
     // when it's legitimate.
     notifyAdmins({
+      type: 'new_admin_account',
+      severity: 'info',
       subject: 'New admin account invited',
       heading: 'New Admin Console Account',
       details: `<strong>${inviterName}</strong> invited <strong>${email}</strong> as <strong>${role}</strong>.`,
+      metadata: { email, role, invitedBy: inviterName },
     });
 
     res.status(201).json({ success: true, data: safeAdmin(admin) });
