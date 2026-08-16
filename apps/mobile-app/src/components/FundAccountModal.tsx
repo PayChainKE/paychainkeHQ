@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Modal, Alert, ActivityIndicator, ScrollView } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -41,6 +41,13 @@ export default function FundAccountModal({ visible, onClose }: { visible: boolea
   const stopPolling = () => {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
   };
+
+  // Stop the STK status poll on unmount — closing the modal already calls
+  // stopPolling() via reset()/handleClose(), but navigating away from the
+  // host screen while a top-up poll is in flight (rather than explicitly
+  // closing) previously left the interval running and calling setState on
+  // an unmounted component every 3s.
+  useEffect(() => stopPolling, []);
 
   const reset = () => {
     stopPolling();

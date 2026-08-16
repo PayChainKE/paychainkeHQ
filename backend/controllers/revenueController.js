@@ -118,7 +118,7 @@ export const getRevenue = async (req, res) => {
     const streamJobs = REVENUE_STREAMS.map(async (stream) => {
       if (!stream.txTypes.length) {
         // Pilot / not-yet-instrumented streams — return zeros.
-        return { id: stream.id, revenue: 0, prevRevenue: 0, volume: 0, count: 0 };
+        return { id: stream.id, revenue: 0, prevRevenue: 0, volume: 0, prevVolume: 0, count: 0 };
       }
       const [cur, prv] = await Promise.all([
         Transaction.aggregate([
@@ -134,15 +134,16 @@ export const getRevenue = async (req, res) => {
         ]),
         Transaction.aggregate([
           { $match: { ...streamMatch(stream, prevSince), createdAt: { $gte: prevSince, $lt: since } } },
-          { $group: { _id: null, revenue: { $sum: FEE_EXPR } } },
+          { $group: { _id: null, revenue: { $sum: FEE_EXPR }, volume: { $sum: KES_BASIS } } },
         ]),
       ]);
       const c = cur[0] || { count: 0, volume: 0, revenue: 0 };
-      const p = prv[0] || { revenue: 0 };
+      const p = prv[0] || { revenue: 0, volume: 0 };
       return {
         id: stream.id,
         count: c.count,
         volume: Math.round(c.volume * 100) / 100,
+        prevVolume: Math.round(p.volume * 100) / 100,
         revenue: Math.round(c.revenue * 100) / 100,
         prevRevenue: Math.round(p.revenue * 100) / 100,
       };
@@ -184,24 +185,38 @@ export const getRevenue = async (req, res) => {
             streamId: '$streamId',
           },
           revenue: { $sum: '$_fee' },
+          // Real per-bucket GMV and Safaricom pass-through cost — the chart
+          // used to fabricate a "GMV" bar by dividing gross fees by a flat
+          // assumed 0.5% take rate (`b.total / 0.005`), which doesn't match
+          // the real tiered/per-channel rate card and could show numbers
+          // that don't reconcile with the KPI strip above it. Sourced from
+          // the same persisted fields (kesAmount/safaricomFee) every other
+          // real aggregate in this file already uses — never approximated.
+          gmv:  { $sum: '$_kes' },
+          cost: { $sum: { $ifNull: ['$safaricomFee', 0] } },
         },
       },
       { $sort: { '_id.bucket': 1 } },
     ]);
 
-    // Reshape into [{ bucket, transaction_fee: x, fx_spread: y, ... }]
+    // Reshape into [{ bucket, transaction_fee: x, fx_spread: y, ..., gmv, net }]
     const seriesMap = new Map();
     for (const row of seriesAgg) {
       const b = row._id.bucket;
       if (!seriesMap.has(b)) {
-        const z = { bucket: b, total: 0 };
+        const z = { bucket: b, total: 0, gmv: 0, cost: 0, net: 0 };
         for (const s of REVENUE_STREAMS) z[s.id] = 0;
         seriesMap.set(b, z);
       }
       const node = seriesMap.get(b);
       const rev = Math.round(row.revenue * 100) / 100;
+      const gmv = Math.round(row.gmv * 100) / 100;
+      const cost = Math.round(row.cost * 100) / 100;
       node[row._id.streamId] = rev;
       node.total = Math.round((node.total + rev) * 100) / 100;
+      node.gmv = Math.round((node.gmv + gmv) * 100) / 100;
+      node.cost = Math.round((node.cost + cost) * 100) / 100;
+      node.net = Math.round((node.total - node.cost) * 100) / 100;
     }
     const series = Array.from(seriesMap.values());
 
@@ -486,6 +501,7 @@ export const getRevenue = async (req, res) => {
     const totalRevenue = streams.reduce((s, x) => s + x.revenue, 0);
     const prevTotalRevenue = streams.reduce((s, x) => s + x.prevRevenue, 0);
     const totalVolume = streams.reduce((s, x) => s + x.volume, 0);
+    const prevTotalVolume = streams.reduce((s, x) => s + (x.prevVolume || 0), 0);
     const totalCount  = streams.reduce((s, x) => s + x.count, 0);
     const takeRate    = totalVolume ? (totalRevenue / totalVolume) * 100 : 0;
 
@@ -534,7 +550,7 @@ export const getRevenue = async (req, res) => {
           // Financial-summary fields (preferred naming, used by the
           // Revenue page hero strip).
           gmv:           Math.round(totalVolume * 100) / 100,
-          gmvChange:     pctChange(totalVolume, 0), // placeholder until volume prev wired
+          gmvChange:     pctChange(totalVolume, prevTotalVolume),
           grossRevenue:  Math.round(totalRevenue * 100) / 100,
           grossChange:   pctChange(totalRevenue, prevTotalRevenue),
           networkCosts:  safaricomFees,

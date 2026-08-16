@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import axios from 'axios'
 import MerchantLayout from '../components/layout/MerchantLayout'
@@ -22,6 +22,17 @@ export default function RequestMoney() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [statusText, setStatusText] = useState('')
   const [generatedLink, setGeneratedLink] = useState('')
+  const pollIntervalRef = useRef(null)
+
+  // Stop the STK status poll if the merchant navigates away mid-request —
+  // without this, the interval kept running after unmount and called
+  // setState on stale closures (checkoutId/amount from whatever request was
+  // in flight when the component was torn down).
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
+    }
+  }, [])
 
   const steps = [
     { id: 1, label: 'Selection' },
@@ -100,25 +111,25 @@ export default function RequestMoney() {
 
       let attempts = 0
       const maxAttempts = 20 // 20 * 3s = 60s
-      const pollInterval = setInterval(async () => {
+      pollIntervalRef.current = setInterval(async () => {
         attempts++
         try {
           const statusRes = await axios.get(`${API_URL}/api/callbacks/stk-status/${checkoutId}`, { headers: authHeaders() })
 
           if (statusRes.data.status === 'success') {
-            clearInterval(pollInterval)
+            clearInterval(pollIntervalRef.current)
             setIsSubmitting(false)
             setStatusText('')
             await refreshSession()
             addNotification({ title: 'Payment Received', message: `KES ${Number(amount).toLocaleString()} has been received.`, type: 'success' })
             setStep(3)
           } else if (statusRes.data.status === 'failed') {
-            clearInterval(pollInterval)
+            clearInterval(pollIntervalRef.current)
             setIsSubmitting(false)
             setStatusText('')
             addNotification({ title: 'Request Failed', message: statusRes.data.resultDesc || 'They cancelled or the request failed.', type: 'error' })
           } else if (attempts >= maxAttempts) {
-            clearInterval(pollInterval)
+            clearInterval(pollIntervalRef.current)
             setIsSubmitting(false)
             setStatusText('')
             addNotification({ title: 'Timeout', message: 'The request timed out. Please try again.', type: 'error' })
@@ -190,7 +201,8 @@ export default function RequestMoney() {
         {/* Back Button */}
         <button
           onClick={() => step === 1 ? navigate('/overview') : setStep(step - 1)}
-          className="flex items-center gap-2 text-slate-400 hover:text-primary transition-colors mb-6 group"
+          disabled={isSubmitting}
+          className="flex items-center gap-2 text-slate-400 hover:text-primary transition-colors mb-6 group disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <span className="material-symbols-outlined text-lg group-hover:-translate-x-1 transition-transform">arrow_back</span>
           <span className="text-[10px] font-black uppercase tracking-widest">

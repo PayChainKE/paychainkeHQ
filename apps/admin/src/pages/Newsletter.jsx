@@ -173,25 +173,21 @@ export default function Newsletter() {
 
   function openCompose() {
     setComposeSubject('');
-    setComposeBody('');
     setComposeInitialContent('');
     setActiveDraftId(null);
     setDraftStatus(null);
     setComposeError('');
     setComposeDone(null);
-    setShowPreview(false);
     setComposeOpen(true);
   }
 
   function continueDraft(draft) {
     setComposeSubject(draft.subject || '');
-    setComposeBody('');
     setComposeInitialContent(draft.body || '');
     setActiveDraftId(draft._id);
     setDraftStatus(null);
     setComposeError('');
     setComposeDone(null);
-    setShowPreview(false);
     setComposeOpen(true);
   }
 

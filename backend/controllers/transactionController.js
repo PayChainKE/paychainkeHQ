@@ -1,6 +1,7 @@
 import Transaction from '../models/Transaction.js';
 import Merchant from '../models/Merchant.js';
 import PaymentLink from '../models/PaymentLink.js';
+import STKRequest from '../models/STKRequest.js';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { initiateAndTrackNcbaStk } from './mpesaController.js';
@@ -698,6 +699,37 @@ export const processPaymentLink = async (req, res) => {
   } catch (error) {
     console.error('❌ Payment Link Processing Error:', error.response?.data || error.message);
     res.status(400).json({ error: 'Failed to trigger payment on your phone.' });
+  }
+};
+
+// @desc    Public STK status poll for the three unauthenticated checkout
+//          pages (PaymentPage/PayAccountPage/InvoiceView — no merchant JWT
+//          to gate on, unlike getSTKStatus in mpesaController.js which is
+//          protectMerchant-scoped). These pages previously showed a fixed
+//          `setTimeout` "Payment triggered successfully" message with no
+//          real confirmation — a customer whose M-Pesa PIN was wrong,
+//          cancelled, or timed out still saw "success". checkoutRequestId
+//          is a bank-issued opaque transaction reference (not a guessable
+//          sequence) only ever handed to the customer who just triggered
+//          this exact STK push, and this only ever returns a bare
+//          status/message — same minimal shape as the authenticated
+//          version, no amount/merchant/phone detail — so exposing it
+//          without a merchant JWT carries the same trust model as the
+//          public payment-link/pay-account lookups already on this router.
+// @route   GET /api/transactions/public-stk-status/:checkoutId
+// @access  Public (rate-limited at the route layer)
+export const getPublicSTKStatus = async (req, res) => {
+  try {
+    const { checkoutId } = req.params;
+    const stkReq = await STKRequest.findOne({ checkoutRequestId: checkoutId });
+    if (!stkReq) return res.status(404).json({ error: 'Request not found' });
+
+    res.status(200).json({
+      status: stkReq.status,
+      resultDesc: stkReq.resultDesc,
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Server error fetching payment status' });
   }
 };
 

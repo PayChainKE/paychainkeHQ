@@ -49,8 +49,6 @@ export default function Profile() {
   const { merchant, logout, token, updateToken } = useMerchantAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const [name, setName] = useState(merchant?.name || 'Admin')
-  const [email, setEmail] = useState(merchant?.email || 'admin@paychain.ke')
   const [kraPin, setKraPin] = useState(merchant?.kraPin || '')
   const [businessNumber, setBusinessNumber] = useState(merchant?.businessNumber || '')
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false)
@@ -400,13 +398,10 @@ export default function Profile() {
                   { label: "Name", value: merchant?.businessName || "N/A", locked: true },
                   { label: "Email", value: merchant?.email || "N/A", locked: false },
                   { label: "Phone", value: merchant?.phone || "N/A", locked: true, badge: "Username" },
-                  { label: "Role", value: "Administrator", badge: "Primary" },
-                  { label: "Primary contact", value: "Yes", status: true },
-                  { label: "Created at", value: merchant?.createdAt ? new Date(merchant.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }), sub: "Member since" },
-                  { label: "Last sign in", value: merchant?.lastLogin ? new Date(merchant.lastLogin).toLocaleString('en-GB') : new Date().toLocaleString('en-GB'), sub: "Security timestamp" },
-                  { label: "Sign in count", value: merchant?.loginCount?.toString() || "1", sub: "Access frequency" },
-                  { label: "SMS/USSD activated", value: "No", status: false },
-                  { label: "2FA Setup", value: "Yes", status: true },
+                  { label: "Created at", value: merchant?.createdAt ? new Date(merchant.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : "Unknown", sub: "Member since" },
+                  { label: "Last sign in", value: merchant?.lastLogin ? new Date(merchant.lastLogin).toLocaleString('en-GB') : "Never", sub: "Security timestamp" },
+                  { label: "Sign in count", value: (merchant?.loginCount ?? 0).toString(), sub: "Access frequency" },
+                  { label: "2FA Setup", value: "Yes", sub: "Every login requires a one-time code", status: true },
                 ].map((item, idx) => (
                   <div key={idx} className="space-y-2 group">
                     <label className="text-[9px] text-on-surface-variant font-black uppercase tracking-[0.2em] pl-1 opacity-50 group-hover:opacity-100 transition-opacity">{item.label}</label>
@@ -452,7 +447,7 @@ export default function Profile() {
                     {!kraPinLocked && merchant?.isKRAVerified && merchant?.kraPin === kraPin && (
                       <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 bg-emerald-50 text-emerald-600 px-2 py-1.5 rounded-lg border border-emerald-100 shadow-[0_2px_10px_rgba(16,185,129,0.1)] pointer-events-none">
                         <span className="material-symbols-outlined text-[14px]">verified_user</span>
-                        <span className="text-[8px] font-black uppercase tracking-widest">eTIMS Verified</span>
+                        <span className="text-[8px] font-black uppercase tracking-widest">Format Verified</span>
                       </div>
                     )}
                   </div>
@@ -488,7 +483,7 @@ export default function Profile() {
               </div>
               
               <div className="mt-10 lg:mt-12 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 pt-8 border-t border-slate-100">
-                <p className="text-[10px] text-on-surface-variant font-medium max-w-[240px]">Last USSD PIN failed attempts: <span className="text-primary font-black">0</span> • PIN Blocked: <span className="text-red-500 font-black">No</span></p>
+                <p className="text-[10px] text-on-surface-variant font-medium max-w-[240px]">Failed PIN attempts: <span className="text-primary font-black">{merchant?.failedPinAttempts ?? 0}</span> • PIN Blocked: <span className={`font-black ${merchant?.pinBlocked ? 'text-red-500' : 'text-emerald-600'}`}>{merchant?.pinBlocked ? 'Yes' : 'No'}</span></p>
                 <button 
                   onClick={save}
                   disabled={isUpdatingProfile}

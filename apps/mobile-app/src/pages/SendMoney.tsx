@@ -96,7 +96,7 @@ type Destination = 'mpesa-primary' | 'mobile' | 'bank' | 'till' | 'paybill';
 const DESTINATIONS: Array<{ id: Destination; label: string; icon: keyof typeof MaterialIcons.glyphMap; hint: string; feeLabel: string }> = [
   { id: 'mpesa-primary', label: 'Primary M-PESA Number', icon: 'smartphone', hint: 'Your registered phone number', feeLabel: 'Varies' },
   { id: 'mobile', label: 'Any M-PESA Number', icon: 'smartphone', hint: 'Send to any Kenyan mobile number', feeLabel: 'Varies' },
-  { id: 'bank', label: 'Bank Account', icon: 'account-balance', hint: 'Direct bank transfer', feeLabel: 'KES 50.00' },
+  { id: 'bank', label: 'Bank Account', icon: 'account-balance', hint: 'Direct bank transfer', feeLabel: 'Varies' },
   { id: 'till', label: 'Till Number', icon: 'point-of-sale', hint: 'Pay to a Safaricom Till', feeLabel: 'Varies' },
   { id: 'paybill', label: 'Paybill', icon: 'receipt-long', hint: 'Pay to a Paybill number', feeLabel: 'Varies' },
 ];
@@ -159,6 +159,25 @@ function estimateB2cFee(amount: number) {
   return band.totalFee;
 }
 
+// Mirrors backend/config/bankTransferTariffCard.js — see dashboard
+// SendMoney.jsx's equivalent comment for why a flat KES 50 was wrong (real
+// PesaLink tiers run up to KES 210, RTGS is a flat KES 430).
+const PESALINK_BANDS = [
+  { max: 500,      totalFee: 50  },
+  { max: 3_500,    totalFee: 97  },
+  { max: 7_000,    totalFee: 122 },
+  { max: 10_000,   totalFee: 147 },
+  { max: 250_000,  totalFee: 210 },
+];
+const RTGS_TOTAL_FEE = 430;
+
+function estimateBankFee(rail: 'pesalink' | 'rtgs', amount: number) {
+  if (rail === 'rtgs') return RTGS_TOTAL_FEE;
+  if (!amount || amount <= 0) return 0;
+  const band = PESALINK_BANDS.find((b) => amount <= b.max) || PESALINK_BANDS[PESALINK_BANDS.length - 1];
+  return band.totalFee;
+}
+
 export default function SendMoney({ navigation }: any) {
   const { merchant, refreshSession, setAppPin } = useAuth();
 
@@ -190,7 +209,7 @@ export default function SendMoney({ navigation }: any) {
   const selectedDest = DESTINATIONS.find((d) => d.id === destination);
   const isMobileDest = destination === 'mpesa-primary' || destination === 'mobile';
   const isB2bDest = destination === 'till' || destination === 'paybill';
-  const fee = isMobileDest ? estimateB2cFee(Number(amount) || 0) : isB2bDest ? estimateB2bFee(Number(amount) || 0) : destination === 'bank' ? 50 : 0;
+  const fee = isMobileDest ? estimateB2cFee(Number(amount) || 0) : isB2bDest ? estimateB2bFee(Number(amount) || 0) : destination === 'bank' ? estimateBankFee(bankRail, Number(amount) || 0) : 0;
   const totalAmount = Number(amount || 0) + fee;
   const balance = merchant?.kesBalance || 0;
 

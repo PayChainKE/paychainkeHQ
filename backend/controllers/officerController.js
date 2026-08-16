@@ -174,7 +174,11 @@ export const getQueue = async (req, res) => {
       if (to) filter.submittedAt.$lte = new Date(to);
     }
     if (q) {
-      const re = new RegExp(String(q).trim(), 'i');
+      // Escape regex specials — an unescaped user-controlled pattern here
+      // (e.g. "(a+)+$") is a ReDoS vector against the event loop. Mirrors
+      // auditLogController.js's getAuditLog search.
+      const safe = String(q).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = new RegExp(safe, 'i');
       filter.$or = [{ businessName: re }, { name: re }, { email: re }, { phone: re }];
     }
 

@@ -9,14 +9,30 @@ import { ValidatedInput } from '../components/ValidatedInput'
 import { BiometricLoginButton } from '../components/BiometricButton'
 
 const KENYAN_COUNTIES = [
-  "Baringo", "Bomet", "Bungoma", "Busia", "Elgeyo-Marakwet", "Embu", "Garissa", 
-  "Homa Bay", "Isiolo", "Kajiado", "Kakamega", "Kericho", "Kiambu", "Kilifi", 
-  "Kirinyaga", "Kisii", "Kisumu", "Kitui", "Kwale", "Laikipia", "Lamu", "Machakos", 
-  "Makueni", "Mandera", "Marsabit", "Meru", "Migori", "Mombasa", "Murang'a", 
-  "Nairobi", "Nakuru", "Nandi", "Narok", "Nyamira", "Nyandarua", "Nyeri", "Samburu", 
-  "Siaya", "Taita-Taveta", "Tana River", "Tharaka-Nithi", "Trans Nzoia", "Turkana", 
+  "Baringo", "Bomet", "Bungoma", "Busia", "Elgeyo-Marakwet", "Embu", "Garissa",
+  "Homa Bay", "Isiolo", "Kajiado", "Kakamega", "Kericho", "Kiambu", "Kilifi",
+  "Kirinyaga", "Kisii", "Kisumu", "Kitui", "Kwale", "Laikipia", "Lamu", "Machakos",
+  "Makueni", "Mandera", "Marsabit", "Meru", "Migori", "Mombasa", "Murang'a",
+  "Nairobi", "Nakuru", "Nandi", "Narok", "Nyamira", "Nyandarua", "Nyeri", "Samburu",
+  "Siaya", "Taita-Taveta", "Tana River", "Tharaka-Nithi", "Trans Nzoia", "Turkana",
   "Uasin Gishu", "Vihiga", "Wajir", "West Pokot"
 ]
+
+// Mirrors the backend's canonical list (merchantAuthController.js's
+// registerMerchant) and apps/mobile-app/src/pages/Login.tsx's picker — keep
+// all three in sync if this ever changes.
+const BUSINESS_TYPES = [
+  'Sole Proprietorship',
+  'Partnership',
+  'Limited Liability Company (LLC)',
+  'Public Limited Company (PLC)',
+  'SACCO',
+  'NGO/Non-Profit',
+  'Cooperative Society',
+  'Other',
+]
+
+const EMPLOYEE_BANDS = ['1-10', '11-50', '51-200', '201-500', '501+']
 
 // Remembers the last identifier (email/phone) that successfully signed in on
 // this device — lets a returning merchant skip straight to the fingerprint
@@ -75,9 +91,12 @@ export default function Login() {
   const [signupEmail, setSignupEmail] = useState('')
   const [signupPhone, setSignupPhone] = useState('')
   const [signupBusinessName, setSignupBusinessName] = useState('')
-  const [signupEcommerce, setSignupEcommerce] = useState('yes')
+  const [signupBusinessType, setSignupBusinessType] = useState('')
   const [signupCounty, setSignupCounty] = useState('')
   const [countySearch, setCountySearch] = useState('')
+  const [signupArea, setSignupArea] = useState('')
+  const [signupEmployees, setSignupEmployees] = useState('')
+  const [signupEcommerce, setSignupEcommerce] = useState('')
   const [agreedToTerms, setAgreedToTerms] = useState(false)
 
   // Reset Flow States
@@ -334,6 +353,26 @@ export default function Login() {
       setErr('Please enter a valid Kenyan phone number before continuing.')
       return
     }
+    if (!signupBusinessType) {
+      setErr('Please select a business type.')
+      return
+    }
+    if (!signupCounty) {
+      setErr('Please select your county.')
+      return
+    }
+    if (!signupArea.trim()) {
+      setErr('Please enter your area/location.')
+      return
+    }
+    if (!signupEmployees) {
+      setErr('Please select the number of employees.')
+      return
+    }
+    if (!signupEcommerce) {
+      setErr('Please let us know whether this is an eCommerce business.')
+      return
+    }
     setErr('')
     setIsSignupPasswordStep(true)
   }
@@ -355,7 +394,12 @@ export default function Login() {
       phone: signupPhone.trim(),
       businessName: signupBusinessName.trim(),
       password: newPassword,
+      businessType: signupBusinessType,
+      county: signupCounty,
+      area: signupArea.trim(),
+      employees: signupEmployees,
       ecommerce: signupEcommerce,
+      agreedToTerms,
     }
 
     signupSubmittingRef.current = true
@@ -650,13 +694,16 @@ export default function Login() {
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Business Type *</label>
                   <div className="relative">
-                    <select required className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 pl-4 pr-10 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all appearance-none cursor-pointer">
+                    <select
+                      required
+                      value={signupBusinessType}
+                      onChange={e => setSignupBusinessType(e.target.value)}
+                      className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 pl-4 pr-10 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all appearance-none cursor-pointer"
+                    >
                       <option value="">—Please choose an option—</option>
-                      <option value="retail">Retail</option>
-                      <option value="wholesale">Wholesale</option>
-                      <option value="services">Services</option>
-                      <option value="hospitality">Hospitality</option>
-                      <option value="other">Other</option>
+                      {BUSINESS_TYPES.map(type => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
                     </select>
                     <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-primary/40 pointer-events-none">expand_more</span>
                   </div>
@@ -667,7 +714,7 @@ export default function Login() {
                   <div className="bg-white border border-outline-variant/15 rounded-2xl p-2 lg:p-3 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all">
                     <div className="relative mb-3">
                        <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-primary/40 pointer-events-none text-sm">search</span>
-                       <input 
+                       <input
                          className="w-full bg-slate-50 rounded-xl py-2 pl-9 pr-4 text-xs font-headline text-primary outline-none placeholder:text-outline-variant/40"
                          placeholder="Search your county..."
                          value={countySearch}
@@ -681,8 +728,8 @@ export default function Login() {
                           type="button"
                           onClick={() => setSignupCounty(county)}
                           className={`py-3 px-3 rounded-xl border text-xs font-bold transition-all text-left truncate flex items-center justify-between group ${
-                            signupCounty === county 
-                            ? 'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-sm' 
+                            signupCounty === county
+                            ? 'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-sm'
                             : 'bg-white border-outline-variant/10 text-primary hover:border-emerald-200 hover:bg-emerald-50/30'
                           }`}
                         >
@@ -696,31 +743,35 @@ export default function Login() {
 
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Area/Location *</label>
-                  <input required className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" placeholder="Westlands" />
+                  <input required value={signupArea} onChange={e => setSignupArea(e.target.value)} className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" placeholder="Westlands" />
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Employees *</label>
                   <div className="relative">
-                    <select required className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 pl-4 pr-10 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all appearance-none cursor-pointer">
+                    <select
+                      required
+                      value={signupEmployees}
+                      onChange={e => setSignupEmployees(e.target.value)}
+                      className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 pl-4 pr-10 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all appearance-none cursor-pointer"
+                    >
                       <option value="">—Please choose an option—</option>
-                      <option value="1-5">1 - 5</option>
-                      <option value="6-20">6 - 20</option>
-                      <option value="21-50">21 - 50</option>
-                      <option value="50+">50+</option>
+                      {EMPLOYEE_BANDS.map(band => (
+                        <option key={band} value={band}>{band}</option>
+                      ))}
                     </select>
                     <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-primary/40 pointer-events-none">expand_more</span>
                   </div>
                 </div>
 
                 <div className="space-y-3 pt-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Is this an eCommerce business?</label>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Is this an eCommerce business? *</label>
                   <div className="flex gap-6 pl-1">
                     <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-primary hover:text-emerald-600 transition-colors">
-                      <input type="radio" name="ecommerce" value="yes" className="w-4 h-4 text-emerald-600 focus:ring-emerald-500" required /> Yes
+                      <input type="radio" name="ecommerce" value="yes" checked={signupEcommerce === 'yes'} onChange={e => setSignupEcommerce(e.target.value)} className="w-4 h-4 text-emerald-600 focus:ring-emerald-500" required /> Yes
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-primary hover:text-emerald-600 transition-colors">
-                      <input type="radio" name="ecommerce" value="no" className="w-4 h-4 text-emerald-600 focus:ring-emerald-500" required /> No
+                      <input type="radio" name="ecommerce" value="no" checked={signupEcommerce === 'no'} onChange={e => setSignupEcommerce(e.target.value)} className="w-4 h-4 text-emerald-600 focus:ring-emerald-500" required /> No
                     </label>
                   </div>
                 </div>

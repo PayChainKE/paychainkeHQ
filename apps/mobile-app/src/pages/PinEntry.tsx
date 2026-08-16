@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
+import * as SecureStore from 'expo-secure-store';
 import { useAuth } from '../context/AuthContext';
 import { useBiometrics, biometricLabel } from '../hooks/useBiometrics';
 
@@ -13,6 +14,45 @@ import { useBiometrics, biometricLabel } from '../hooks/useBiometrics';
 // to the user like "biometrics never popped up").
 const AUTO_PROMPT_DELAY_MS = 350;
 
+// This PIN also authorizes real money movement (see AuthContext.tsx —
+// "THE single Payment PIN"), yet verifyPin previously had zero
+// attempt-limiting: no counter, no lockout, just an unlimited offline
+// compare against the SecureStore-cached PIN. SupportPage.tsx's FAQ tells
+// merchants "You get 5 attempts before your account is temporarily locked
+// for 15 minutes" — that promise only held for server-side flows
+// (set-app-pin/reset-app-pin's pinLimiter); this local unlock gate enforced
+// nothing. Persisted in SecureStore (not just component state) so
+// force-quitting/reopening the app doesn't reset the counter.
+const MAX_ATTEMPTS = 5;
+const LOCKOUT_MS = 15 * 60 * 1000;
+const ATTEMPTS_KEY = 'paychain_pin_failed_attempts';
+const LOCKED_UNTIL_KEY = 'paychain_pin_locked_until';
+
+async function loadLockoutState(): Promise<{ attempts: number; lockedUntil: number | null }> {
+  const [attemptsRaw, lockedUntilRaw] = await Promise.all([
+    SecureStore.getItemAsync(ATTEMPTS_KEY),
+    SecureStore.getItemAsync(LOCKED_UNTIL_KEY),
+  ]);
+  return {
+    attempts: parseInt(attemptsRaw || '0', 10) || 0,
+    lockedUntil: lockedUntilRaw ? parseInt(lockedUntilRaw, 10) : null,
+  };
+}
+
+async function clearLockoutState() {
+  await Promise.all([
+    SecureStore.deleteItemAsync(ATTEMPTS_KEY),
+    SecureStore.deleteItemAsync(LOCKED_UNTIL_KEY),
+  ]);
+}
+
+function formatRetryTime(ms: number): string {
+  const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+  const mins = Math.floor(totalSeconds / 60);
+  const secs = totalSeconds % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
 export default function PinEntry() {
   const { appPin, unlockApp, logout, isBiometricsEnabled } = useAuth();
   const { support, authenticate } = useBiometrics();
@@ -22,8 +62,35 @@ export default function PinEntry() {
   // manual retry affordance is shown instead of silently going quiet.
   const [biometricStatus, setBiometricStatus] = useState<'idle' | 'prompting' | 'failed'>('idle');
   const autoTriggeredRef = useRef(false);
+  const [lockedUntil, setLockedUntil] = useState<number | null>(null);
+  const [now, setNow] = useState(Date.now());
 
   const method = biometricLabel(support.types);
+  const isLocked = !!lockedUntil && lockedUntil > now;
+
+  // Load any lockout persisted from a previous attempt (or a previous app
+  // session — see the SecureStore rationale above).
+  useEffect(() => {
+    loadLockoutState().then((state) => {
+      if (state.lockedUntil && state.lockedUntil > Date.now()) {
+        setLockedUntil(state.lockedUntil);
+      }
+    });
+  }, []);
+
+  // Tick every second while locked so the countdown/re-enable is live.
+  useEffect(() => {
+    if (!isLocked) return;
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [isLocked]);
+
+  useEffect(() => {
+    if (lockedUntil && lockedUntil <= now) {
+      setLockedUntil(null);
+      clearLockoutState();
+    }
+  }, [now, lockedUntil]);
 
   const triggerBiometric = async () => {
     setBiometricStatus('prompting');
@@ -39,13 +106,14 @@ export default function PinEntry() {
   };
 
   useEffect(() => {
-    if (!isBiometricsEnabled || autoTriggeredRef.current) return;
+    if (!isBiometricsEnabled || autoTriggeredRef.current || isLocked) return;
     autoTriggeredRef.current = true;
     const timer = setTimeout(triggerBiometric, AUTO_PROMPT_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [isBiometricsEnabled]);
+  }, [isBiometricsEnabled, isLocked]);
 
   const handlePress = (digit: string) => {
+    if (isLocked) return;
     if (pin.length < 4) {
       const newPin = pin + digit;
       setPin(newPin);
@@ -59,13 +127,31 @@ export default function PinEntry() {
     setPin(prev => prev.slice(0, -1));
   };
 
-  const verifyPin = (enteredPin: string) => {
+  const verifyPin = async (enteredPin: string) => {
     if (enteredPin === appPin) {
+      await clearLockoutState();
       unlockApp();
-    } else {
-      Alert.alert('Incorrect PIN', 'Please try again.');
-      setPin('');
+      return;
     }
+
+    const { attempts } = await loadLockoutState();
+    const nextAttempts = attempts + 1;
+    setPin('');
+
+    if (nextAttempts >= MAX_ATTEMPTS) {
+      const until = Date.now() + LOCKOUT_MS;
+      await Promise.all([
+        SecureStore.setItemAsync(ATTEMPTS_KEY, String(nextAttempts)),
+        SecureStore.setItemAsync(LOCKED_UNTIL_KEY, String(until)),
+      ]);
+      setLockedUntil(until);
+      setNow(Date.now());
+      Alert.alert('Too Many Attempts', 'Your account is temporarily locked for 15 minutes.');
+      return;
+    }
+
+    await SecureStore.setItemAsync(ATTEMPTS_KEY, String(nextAttempts));
+    Alert.alert('Incorrect PIN', `Please try again. ${MAX_ATTEMPTS - nextAttempts} attempt${MAX_ATTEMPTS - nextAttempts === 1 ? '' : 's'} remaining.`);
   };
 
   return (
@@ -77,11 +163,13 @@ export default function PinEntry() {
         <Text className="text-white text-[24px] font-jakarta-bold mb-2">
           Unlock PayChain
         </Text>
-        <Text className="text-[#68dbae] text-[14px] font-jakarta-medium text-center mb-8">
-          Enter your 4-digit PIN to access your dashboard.
+        <Text className={`text-[14px] font-jakarta-medium text-center mb-8 ${isLocked ? 'text-red-400' : 'text-[#68dbae]'}`}>
+          {isLocked
+            ? `Too many incorrect attempts. Try again in ${formatRetryTime(lockedUntil! - now)}.`
+            : 'Enter your 4-digit PIN to access your dashboard.'}
         </Text>
 
-        {isBiometricsEnabled && (
+        {isBiometricsEnabled && !isLocked && (
           <TouchableOpacity
             onPress={triggerBiometric}
             disabled={biometricStatus === 'prompting'}
@@ -124,9 +212,10 @@ export default function PinEntry() {
                     <TouchableOpacity
                       key={colIndex}
                       onPress={handleDelete}
+                      disabled={isLocked}
                       className="w-[70px] h-[70px] justify-center items-center rounded-full"
                     >
-                      <Feather name="delete" size={24} color="white" />
+                      <Feather name="delete" size={24} color={isLocked ? '#3d4f45' : 'white'} />
                     </TouchableOpacity>
                   );
                 }
@@ -134,9 +223,10 @@ export default function PinEntry() {
                   <TouchableOpacity
                     key={colIndex}
                     onPress={() => handlePress(item)}
-                    className="w-[70px] h-[70px] justify-center items-center rounded-full bg-[#1b3a2a]"
+                    disabled={isLocked}
+                    className={`w-[70px] h-[70px] justify-center items-center rounded-full ${isLocked ? 'bg-[#142a1e]' : 'bg-[#1b3a2a]'}`}
                   >
-                    <Text className="text-white text-[28px] font-jakarta-bold">{item}</Text>
+                    <Text className={`text-[28px] font-jakarta-bold ${isLocked ? 'text-[#3d4f45]' : 'text-white'}`}>{item}</Text>
                   </TouchableOpacity>
                 );
               })}

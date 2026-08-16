@@ -78,7 +78,9 @@ function computeChartData(transactions: any[]) {
 }
 
 function estateTier(score: number): string {
-  if (score >= 85) return 'Elite';
+  // Backend calculateTrustScore caps the score at 80 (trustScoreController.js)
+  // — 85 was above the ceiling and could never actually be reached.
+  if (score >= 80) return 'Elite';
   if (score >= 70) return 'Trusted';
   if (score >= 40) return 'Established';
   return 'Growing';

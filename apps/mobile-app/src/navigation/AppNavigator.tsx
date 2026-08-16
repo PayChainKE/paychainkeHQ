@@ -16,7 +16,6 @@ import RequestMoney from '../pages/RequestMoney';
 import SupportPage from '../pages/SupportPage';
 import Notifications from '../pages/Notifications';
 import Login from '../pages/Login';
-import SetPassword from '../pages/SetPassword';
 import Transactions from '../pages/Transactions';
 import Onboarding from '../pages/Onboarding';
 import PinSetup from '../pages/PinSetup';
@@ -159,10 +158,7 @@ export default function AppNavigator() {
             <Stack.Screen name="Login" component={Login} />
           </>
         ) : !isAuthenticated ? (
-          <>
-            <Stack.Screen name="Login" component={Login} />
-            <Stack.Screen name="SetPassword" component={SetPassword} />
-          </>
+          <Stack.Screen name="Login" component={Login} />
         ) : !appPin ? (
           <Stack.Screen name="PinSetup" component={PinSetup} />
         ) : !hasSetBiometrics ? (

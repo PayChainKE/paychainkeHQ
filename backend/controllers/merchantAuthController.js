@@ -15,6 +15,23 @@ import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLocked
 import { assertOtpNotLocked, recordFailedOtpAttempt, resetOtpAttempts, OtpLockedError } from '../utils/otpLockout.js';
 import { timingSafeStringEqual } from '../utils/timingSafeCompare.js';
 
+// Canonical option sets for self-serve signup's business-details step —
+// kept here (not just in the frontend) so a request bypassing the UI can't
+// write an arbitrary string into a field the admin/officer dashboards
+// display and filter on. Mirrored exactly in Login.jsx (web) and
+// Login.tsx (mobile); keep all three in sync if this list ever changes.
+const BUSINESS_TYPES = [
+  'Sole Proprietorship',
+  'Partnership',
+  'Limited Liability Company (LLC)',
+  'Public Limited Company (PLC)',
+  'SACCO',
+  'NGO/Non-Profit',
+  'Cooperative Society',
+  'Other',
+];
+const EMPLOYEE_BANDS = ['1-10', '11-50', '51-200', '201-500', '501+'];
+
 // Mask a phone number for safe display in the UI, e.g. +254712345678 →
 // +254•••••••78. Falls back to the raw digits if the number can't be
 // normalized to E.164 (still masks — never shows the full number either way).
@@ -61,16 +78,51 @@ async function dispatchOtp(merchant, { viaPhone, otp }) {
 // @access  Public
 export const registerMerchant = async (req, res) => {
   try {
-    let { name, email, phone, businessName, password, registrationSource, kraPin, businessNumber } = req.body || {};
+    let {
+      name, email, phone, businessName, password, registrationSource, kraPin, businessNumber,
+      businessType, county, area, employees, ecommerce, agreedToTerms,
+    } = req.body || {};
     const certificateFile = req.file;
 
     if (phone) phone = String(phone).replace(/\s+/g, '');
     if (email) email = String(email).trim().toLowerCase();
     if (kraPin) kraPin = String(kraPin).trim().toUpperCase();
     if (businessNumber) businessNumber = String(businessNumber).trim();
+    if (businessType) businessType = String(businessType).trim();
+    if (county) county = String(county).trim();
+    if (area) area = String(area).trim();
+    if (employees) employees = String(employees).trim();
+    // Both frontends currently send 'yes'/'no' strings; accept a real
+    // boolean too so this doesn't silently break if either is updated to
+    // send one directly.
+    const isEcommerce = ecommerce === true || ecommerce === 'yes' ? true
+      : ecommerce === false || ecommerce === 'no' ? false
+      : null;
 
     if (!name?.trim() || !email || !phone || !businessName?.trim() || !password) {
       return res.status(400).json({ error: 'Name, email, phone, business name and password are all required.' });
+    }
+
+    if (!businessType || !BUSINESS_TYPES.includes(businessType)) {
+      return res.status(400).json({ error: 'Select a valid business type.' });
+    }
+    if (!county?.trim()) {
+      return res.status(400).json({ error: 'County is required.' });
+    }
+    if (!area?.trim()) {
+      return res.status(400).json({ error: 'Area/Location is required.' });
+    }
+    if (!employees || !EMPLOYEE_BANDS.includes(employees)) {
+      return res.status(400).json({ error: 'Select a valid number of employees.' });
+    }
+    if (isEcommerce === null) {
+      return res.status(400).json({ error: 'Let us know whether this is an eCommerce business.' });
+    }
+    // Not just a UI nicety — this is the actual consent record. Reject
+    // outright rather than defaulting it, same as both frontends already
+    // disable their submit button until this is checked.
+    if (agreedToTerms !== true && agreedToTerms !== 'true') {
+      return res.status(400).json({ error: 'You must agree to the Privacy Policy and Terms of Service to create an account.' });
     }
 
     // Build phone variations (handles 0790…, 254790…, +254790…, 790…) to
@@ -123,7 +175,14 @@ export const registerMerchant = async (req, res) => {
       kesBalance: 0,
       usdcBalance: 0,
       isVerified: true,
-      registrationSource: registrationSource === 'mobile' ? 'mobile' : 'web'
+      registrationSource: registrationSource === 'mobile' ? 'mobile' : 'web',
+      businessType,
+      county,
+      businessArea: area,
+      employeeCount: employees,
+      isEcommerce,
+      agreedToTerms: true,
+      agreedToTermsAt: new Date(),
     });
 
     console.log(`📧 Dispatching Welcome Email to: ${merchant.email}`);
@@ -175,7 +234,7 @@ export const registerMerchant = async (req, res) => {
 export const verifyMerchantOTP = async (req, res) => {
   try {
     const { email, otp } = req.body || {};
-    const merchant = await Merchant.findOne({ email }).select('+password');
+    const merchant = await Merchant.findOne({ email }).select('+password +otp +otpExpires');
 
     if (!merchant) {
       return res.status(401).json({ error: 'Invalid request' });
@@ -285,22 +344,22 @@ export const loginMerchant = async (req, res) => {
       ]
     }).select('+password');
     
-    if (!merchant) {
+    if (!merchant || !merchant.password) {
+      // Run a dummy bcrypt compare even on a miss so this branch takes
+      // roughly the same time as a real wrong-password rejection below —
+      // without it, "no such account"/"no password set" return near-
+      // instantly while a real account always pays bcrypt's ~ms cost,
+      // letting an attacker distinguish account existence by timing alone.
+      await bcrypt.compare(String(password || ''), '$2a$12$CwTycUXWue0Thq9StjUM0uJ8i.dTQwsxOnJz3XkKvKl.mDcMxLj8O');
       logAudit({
         action: 'merchant.login.failed', category: 'auth', severity: 'warning',
-        message: `Failed sign-in — no account for "${loginIdentifier}"`,
-        req, metadata: { identifier: loginIdentifier, reason: 'no_account' },
+        message: merchant ? 'Failed sign-in — account has no password (admin-onboarded)' : `Failed sign-in — no account for "${loginIdentifier}"`,
+        merchant: merchant || undefined, req,
+        metadata: { identifier: loginIdentifier, reason: merchant ? 'no_password' : 'no_account' },
       });
+      // Same generic message either way — "no password set" previously
+      // confirmed account existence to an unauthenticated caller.
       return res.status(401).json({ error: 'Invalid email/phone or password' });
-    }
-
-    if (!merchant.password) {
-      logAudit({
-        action: 'merchant.login.failed', category: 'auth', severity: 'warning',
-        message: 'Failed sign-in — account has no password (admin-onboarded)',
-        merchant, req, metadata: { reason: 'no_password' },
-      });
-      return res.status(401).json({ error: 'Your account was set up without a password. Please use "Reset Password" to create one.' });
     }
 
     const isMatch = await merchant.matchPassword(password);
@@ -364,7 +423,7 @@ export const loginMerchant = async (req, res) => {
 export const resendMerchantOTP = async (req, res) => {
   try {
     const { email } = req.body || {};
-    const merchant = await Merchant.findOne({ email });
+    const merchant = await Merchant.findOne({ email }).select('+otpChannel');
 
     if (!merchant) {
       return res.status(401).json({ error: 'Invalid request' });
@@ -482,22 +541,36 @@ export const verifyResetOTP = async (req, res) => {
 
     const merchant = await Merchant.findOne({
       $or: [{ email: lookup.toLowerCase() }, { phone: lookup }],
-    });
+    }).select('+otp +otpExpires');
 
     if (!merchant || !merchant.otp || !merchant.otpExpires) {
       return res.status(400).json({ error: 'Invalid code. Request a new one and try again.' });
+    }
+
+    // Account-level lockout — the route's merchantOtpLimiter only throttles
+    // per-IP, which a distributed attacker can spread guesses across to
+    // brute-force this 6-digit code within its 10-min TTL. Mirrors the same
+    // guard verifyMerchantOTP's login flow already applies.
+    try {
+      await assertOtpNotLocked(Merchant, merchant._id);
+    } catch (e) {
+      if (e instanceof OtpLockedError) return res.status(429).json({ error: e.message });
+      throw e;
     }
 
     // Timing-safe OTP comparison.
     const provided = Buffer.from(String(otp).padEnd(6));
     const stored   = Buffer.from(String(merchant.otp).padEnd(6));
     if (provided.length !== stored.length || !crypto.timingSafeEqual(provided, stored)) {
+      await recordFailedOtpAttempt(Merchant, merchant._id);
       return res.status(400).json({ error: 'Invalid code. Check your inbox and try again.' });
     }
 
     if (new Date() > merchant.otpExpires) {
       return res.status(400).json({ error: 'Code has expired. Request a new one.' });
     }
+
+    await resetOtpAttempts(Merchant, merchant._id);
 
     const rawToken    = crypto.randomBytes(32).toString('hex');
     const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
@@ -559,13 +632,25 @@ export const resetPassword = async (req, res) => {
     } else if (email && otp) {
       // Legacy single-shot path (kept so older mobile builds keep working).
       const lookup = String(email).trim().toLowerCase();
-      merchant = await Merchant.findOne({ email: lookup }).select('+password');
-      if (!merchant || !merchant.otp || !timingSafeStringEqual(merchant.otp, String(otp))) {
+      merchant = await Merchant.findOne({ email: lookup }).select('+password +otp +otpExpires');
+      if (!merchant) {
+        return res.status(401).json({ error: 'Invalid verification code.' });
+      }
+      // Account-level lockout — same rationale as verifyResetOTP above.
+      try {
+        await assertOtpNotLocked(Merchant, merchant._id);
+      } catch (e) {
+        if (e instanceof OtpLockedError) return res.status(429).json({ error: e.message });
+        throw e;
+      }
+      if (!merchant.otp || !timingSafeStringEqual(merchant.otp, String(otp))) {
+        await recordFailedOtpAttempt(Merchant, merchant._id);
         return res.status(401).json({ error: 'Invalid verification code.' });
       }
       if (!merchant.otpExpires || new Date() > merchant.otpExpires) {
         return res.status(401).json({ error: 'Verification code has expired.' });
       }
+      await resetOtpAttempts(Merchant, merchant._id);
     } else {
       return res.status(400).json({ error: 'Reset token (or email + code) is required.' });
     }
@@ -801,7 +886,7 @@ export const signOutAllDevices = async (req, res) => {
 // @access  Private (Merchant)
 export const getMerchantMe = async (req, res) => {
   try {
-    const merchant = await Merchant.findById(req.merchant._id).select('+appPin');
+    const merchant = await Merchant.findById(req.merchant._id).select('+appPin +failedPinAttempts +pinLockedUntil');
     if (!merchant) {
       return res.status(404).json({ error: 'Merchant not found' });
     }
@@ -849,6 +934,8 @@ export const getMerchantMe = async (req, res) => {
         settlementBankAccount: merchant.settlementBankAccount,
         settlementBankCode: merchant.settlementBankCode,
         hasAppPin: !!merchant.appPin,
+        failedPinAttempts: merchant.failedPinAttempts || 0,
+        pinBlocked: !!(merchant.pinLockedUntil && merchant.pinLockedUntil > new Date()),
         biometricsEnabled: merchant.biometricsEnabled,
         mobileBiometricUnlockEnabled: merchant.mobileBiometricUnlockEnabled,
         features: merchant.features
@@ -872,18 +959,19 @@ export const updateMerchantProfile = async (req, res) => {
 
     const { kraPin, businessNumber, settlementMobile, settlementBankName, settlementBankAccount, settlementBankCode } = req.body;
     
-    // Validate KRA Pin and Mock eTIMS API
+    // KRA PIN format check — PayChain has no live eTIMS/KRA API integration,
+    // so this only validates the PIN's shape, not that it's real/registered
+    // with KRA. isKRAVerified means "passed format validation," not
+    // "confirmed against a government system" — never present it to a
+    // merchant as an actual eTIMS lookup.
     if (kraPin !== undefined && kraPin !== merchant.kraPin) {
-      // Simulate external API network latency
-      await new Promise(r => setTimeout(r, 1500));
-      
       const kraRegex = /^[AP][0-9]{9}[A-Z]$/i;
       if (!kraRegex.test(kraPin)) {
-        return res.status(400).json({ 
-          error: 'eTIMS Verification Failed: The KRA PIN provided is invalid or not registered with KRA. Format expected: P123456789A' 
+        return res.status(400).json({
+          error: 'Invalid KRA PIN format. Expected format: P123456789A'
         });
       }
-      
+
       merchant.kraPin = kraPin.toUpperCase();
       merchant.isKRAVerified = true;
     }
