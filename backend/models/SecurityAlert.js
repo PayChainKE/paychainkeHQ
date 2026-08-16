@@ -33,4 +33,16 @@ const SecurityAlertSchema = new mongoose.Schema({
 
 SecurityAlertSchema.index({ createdAt: -1 });
 
+// Retention: once an alert has been reviewed (acknowledged), auto-delete it
+// this many days later — reviewed alerts are meant to fade out so the feed
+// reflects current attention, not an ever-growing archive. Unacknowledged
+// alerts are never touched by this: acknowledgedAt stays null for them,
+// and MongoDB's TTL monitor only expires documents where the indexed field
+// is an actual date, so a "needs review" alert is exempt regardless of age.
+const SECURITY_ALERT_RETENTION_DAYS = Number(process.env.SECURITY_ALERT_RETENTION_DAYS) || 90;
+SecurityAlertSchema.index(
+  { acknowledgedAt: 1 },
+  { expireAfterSeconds: SECURITY_ALERT_RETENTION_DAYS * 24 * 60 * 60, partialFilterExpression: { acknowledged: true } }
+);
+
 export default mongoose.model('SecurityAlert', SecurityAlertSchema);
