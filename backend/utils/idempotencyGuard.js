@@ -59,3 +59,34 @@ export async function claimPayoutSubmission(merchantId, parts, { windowSeconds =
     throw err;
   }
 }
+
+// Client-supplied variant for the public Developer API — unlike
+// claimPayoutSubmission above (which derives its own fingerprint from
+// request fields, and only ever needs to catch an accidental double-click),
+// a real third-party integration needs to retry a request across a network
+// failure and get back the *same* result rather than a duplicate charge.
+// The caller's own Idempotency-Key header is trusted as the identity of
+// "this request", scoped per-caller (scopeId) so two different developers
+// can't collide on the same literal key value. 24h default window — long
+// enough to cover a legitimate retry gap, unlike the 20s window used for
+// internal double-click protection above. Reuses the same
+// PayoutIdempotencyGuard collection; no schema change needed.
+export async function claimClientIdempotencyKey(scopeId, idempotencyKey, { windowSeconds = 24 * 60 * 60 } = {}) {
+  const fingerprint = crypto
+    .createHash('sha256')
+    .update(JSON.stringify(['client-key', String(scopeId), String(idempotencyKey)]))
+    .digest('hex');
+
+  try {
+    await PayoutIdempotencyGuard.findOneAndUpdate(
+      { fingerprint, expiresAt: { $lt: new Date() } },
+      { $set: { fingerprint, expiresAt: new Date(Date.now() + windowSeconds * 1000) } },
+      { upsert: true }
+    );
+  } catch (err) {
+    if (err?.code === 11000) {
+      throw new DuplicateSubmissionError();
+    }
+    throw err;
+  }
+}

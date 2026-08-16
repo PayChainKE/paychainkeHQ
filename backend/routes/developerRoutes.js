@@ -9,6 +9,11 @@ import {
   revokeApiKey,
   requestLiveAccess,
 } from '../controllers/developerController.js';
+import {
+  startMerchantLink,
+  verifyMerchantLink,
+  getMerchantLinkStatus,
+} from '../controllers/developerMerchantLinkController.js';
 
 const router = express.Router();
 
@@ -30,5 +35,13 @@ router.post('/api-keys', protectDeveloper, apiKeyActionLimiter, createApiKey);
 router.patch('/api-keys/:id/revoke', protectDeveloper, apiKeyActionLimiter, revokeApiKey);
 
 router.post('/live-access/request', protectDeveloper, requestLiveAccess);
+
+// Linking proves control of a Merchant account (via that merchant's own
+// email+password, then an OTP sent to the merchant's own inbox) before the
+// payment endpoints can touch its wallet at all — see
+// developerMerchantLinkController.js.
+router.post('/link-merchant/start', protectDeveloper, apiKeyActionLimiter, startMerchantLink);
+router.post('/link-merchant/verify', protectDeveloper, apiKeyActionLimiter, verifyMerchantLink);
+router.get('/link-merchant/status', protectDeveloper, getMerchantLinkStatus);
 
 export default router;

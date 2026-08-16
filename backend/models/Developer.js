@@ -60,6 +60,13 @@ const developerSchema = new mongoose.Schema({
     approvedAt: { type: Date, default: null },
     approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },
   },
+  // Set once this developer proves control of a Merchant account (see
+  // developerMerchantLinkController.js) — the public payment API operates
+  // on this merchant's own wallet, never a separate developer-owned one.
+  linkedMerchant: {
+    merchantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Merchant', default: null },
+    linkedAt: { type: Date, default: null },
+  },
   lastLogin: {
     type: Date,
     default: null,

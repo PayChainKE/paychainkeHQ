@@ -43,6 +43,11 @@ import {
   loginDeveloper,
   logoutDeveloper,
 } from '../controllers/developerAuthController.js';
+import {
+  getApiPayoutStatus,
+  enableApiPayout,
+  disableApiPayout,
+} from '../controllers/merchantApiPayoutController.js';
 
 const router = express.Router();
 
@@ -199,6 +204,13 @@ router.put('/merchant/biometrics', protectMerchant, toggleBiometrics);
 router.post('/merchant/set-app-pin', protectMerchant, pinLimiter, setAppPin);
 router.put('/merchant/reset-app-pin', protectMerchant, pinLimiter, resetAppPin);
 router.post('/merchant/verify-payment-pin', protectMerchant, pinLimiter, verifyPaymentPin);
+
+// Developer-API payout authorization — a separate PIN from appPin above,
+// specifically for unattended payouts a linked developer's own backend can
+// trigger. See merchantApiPayoutController.js and models/Merchant.js.
+router.get('/merchant/api-payout/status', protectMerchant, getApiPayoutStatus);
+router.post('/merchant/api-payout/enable', protectMerchant, pinLimiter, enableApiPayout);
+router.post('/merchant/api-payout/disable', protectMerchant, pinLimiter, disableApiPayout);
 
 // WebAuthn / Passkey routes
 // Public — called before the user holds a JWT

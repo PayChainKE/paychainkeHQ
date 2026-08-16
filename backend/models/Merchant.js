@@ -202,6 +202,51 @@ const merchantSchema = new mongoose.Schema({
     select: false,
     default: null,
   },
+  // Separate PIN for the Developer API's unattended payout endpoint — never
+  // the same value as appPin. appPin is meant for lockout-protected,
+  // human-paced mobile entry; reusing it here would mean that same secret
+  // also lives in a third party's server config. Deliberately its own
+  // field, own hash, own lockout counters (see utils/apiPayoutPinLockout.js
+  // — pinLockout.js is hardcoded to appPin's field names and can't be
+  // reused as-is for a second PIN).
+  apiPayoutPin: {
+    type: String,
+    select: false,
+    default: null,
+  },
+  apiPayoutEnabled: {
+    type: Boolean,
+    default: false,
+  },
+  apiPayoutCaps: {
+    perTransactionKes: { type: Number, default: 0 },
+    dailyKes: { type: Number, default: 0 },
+  },
+  failedApiPayoutPinAttempts: {
+    type: Number,
+    select: false,
+    default: 0,
+  },
+  apiPayoutPinLockedUntil: {
+    type: Date,
+    select: false,
+    default: null,
+  },
+  // Verifies a Developer account's claim to control this merchant when
+  // linking (see developerMerchantLinkController.js). Deliberately separate
+  // from the login otp/otpExpires fields above — sharing them would let a
+  // link-merchant request racing a merchant's own in-flight login silently
+  // overwrite each other's pending code.
+  developerLinkOtp: {
+    type: String,
+    select: false,
+    default: null,
+  },
+  developerLinkOtpExpires: {
+    type: Date,
+    select: false,
+    default: null,
+  },
   registrationSource: {
     type: String,
     enum: ['web', 'mobile'],
