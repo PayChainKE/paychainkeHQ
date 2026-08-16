@@ -494,3 +494,10 @@ const FilterSelect = ({ value, onChange, options }) => (
     {options.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
   </select>
 );
+
+const DrawerField = ({ label, value, mono }) => (
+  <div>
+    <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1">{label}</p>
+    <p className={`text-xs text-on-surface ${mono ? 'font-mono' : 'font-semibold'} break-all`}>{value || '—'}</p>
+  </div>
+);
