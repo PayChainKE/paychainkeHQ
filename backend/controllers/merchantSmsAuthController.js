@@ -5,6 +5,7 @@ import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { toE164Kenyan } from '../utils/notificationService.js';
 import { timingSafeStringEqual } from '../utils/timingSafeCompare.js';
 import { logAudit } from '../utils/auditLog.js';
+import { assertOtpNotLocked, recordFailedOtpAttempt, resetOtpAttempts, OtpLockedError } from '../utils/otpLockout.js';
 
 // SMS-based 2FA for merchants, additive to (and independent from) the
 // existing email-OTP login flow in controllers/merchantAuthController.js —
@@ -133,12 +134,30 @@ export const verifyMerchantSmsOtp = async (req, res) => {
     // A TTL index eventually purges expired tokens, but Mongo's background
     // sweep runs on its own ~60s cadence — expiry must also be enforced
     // here explicitly, not just left to that index (see the model file).
-    // Not-found, expired, and mismatched all return the same generic error
-    // — never reveal which case applies (mirrors controllers/authController.js).
-    if (!token || new Date() > token.expiresAt || !timingSafeStringEqual(token.code, submittedOtp)) {
+    // Not-found and expired return the same generic error as a mismatch
+    // below — never reveal which case applies (mirrors controllers/authController.js).
+    if (!token || new Date() > token.expiresAt) {
       return res.status(401).json({ error: 'Invalid or expired code.' });
     }
 
+    // Account-level lockout, keyed on the merchant this token was issued
+    // for (VerificationToken is only ever created once a real merchant
+    // matched — see sendMerchantSmsOtp). The route's per-IP rate limiter
+    // alone doesn't stop a distributed attacker spreading guesses across
+    // many IPs against one victim's 6-digit code within its 5-min TTL.
+    try {
+      await assertOtpNotLocked(Merchant, token.merchantId);
+    } catch (e) {
+      if (e instanceof OtpLockedError) return res.status(429).json({ error: e.message });
+      throw e;
+    }
+
+    if (!timingSafeStringEqual(token.code, submittedOtp)) {
+      await recordFailedOtpAttempt(Merchant, token.merchantId);
+      return res.status(401).json({ error: 'Invalid or expired code.' });
+    }
+
+    await resetOtpAttempts(Merchant, token.merchantId);
     await VerificationToken.deleteOne({ _id: token._id });
 
     logAudit({

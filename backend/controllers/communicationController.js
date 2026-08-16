@@ -34,10 +34,13 @@ export const getCommunications = async (req, res) => {
     if (channel) filter.channel = channel;
     if (status)  filter.status  = status;
     if (q) {
+      // Escape regex specials — an unescaped user-controlled pattern here
+      // (e.g. "(a+)+$") is a ReDoS vector against the event loop.
+      const safeQ = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       filter.$or = [
-        { fromNumber: { $regex: q, $options: 'i' } },
-        { callerName: { $regex: q, $options: 'i' } },
-        { body: { $regex: q, $options: 'i' } },
+        { fromNumber: { $regex: safeQ, $options: 'i' } },
+        { callerName: { $regex: safeQ, $options: 'i' } },
+        { body: { $regex: safeQ, $options: 'i' } },
       ];
     }
 

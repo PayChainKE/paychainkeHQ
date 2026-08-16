@@ -39,6 +39,14 @@ const Queue = () => {
   const [riskTier, setRiskTier] = useState('all');
   const [search, setSearch] = useState('');
   const [toast, setToast] = useState('');
+  const PAGE_SIZE = 25;
+  const [page, setPage] = useState(1);
+  // Backend defaults/caps to 25/page (officerController.js#getQueue) but
+  // this page never sent page/limit or read the response's `pagination`
+  // object back — once a queue held more than 25 matching applications the
+  // rest were silently invisible, with no page controls and a header count
+  // that understated the true total.
+  const [totalApplications, setTotalApplications] = useState(0);
 
   const showToast = useCallback((msg) => { setToast(msg); setTimeout(() => setToast(''), 2200); }, []);
 
@@ -46,17 +54,24 @@ const Queue = () => {
     setLoading(true);
     setError('');
     try {
-      const params = {};
+      const params = { page, limit: PAGE_SIZE };
       if (status !== 'all') params.status = status;
       if (riskTier !== 'all') params.riskTier = riskTier;
       if (search) params.q = search;
       const res = await api.get('/api/officer/applications', { params });
-      if (res.data?.success) setApplications(res.data.data || []);
-      else setError(res.data?.error || 'Could not load the queue.');
+      if (res.data?.success) {
+        setApplications(res.data.data || []);
+        setTotalApplications(res.data.pagination?.total ?? (res.data.data || []).length);
+      } else setError(res.data?.error || 'Could not load the queue.');
     } catch (e) {
       setError(e?.response?.data?.error || 'Could not load the queue.');
     } finally { setLoading(false); }
-  }, [status, riskTier, search]);
+  }, [status, riskTier, search, page]);
+
+  // Any filter change invalidates the current page's meaning — reset to 1
+  // so a filter narrowing the results doesn't strand the view on a page
+  // number that no longer exists.
+  useEffect(() => { setPage(1); }, [status, riskTier, search]);
 
   const fetchMetrics = useCallback(async () => {
     try {
@@ -150,7 +165,7 @@ const Queue = () => {
         <div className="hidden md:block bg-surface-container-lowest rounded-2xl border border-outline-variant/20 shadow-editorial overflow-hidden">
           <div className="px-5 py-3 border-b border-outline-variant/10 bg-white">
             <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-0.5">Queue</p>
-            <h3 className="text-base font-bold text-on-surface tracking-tight">{applications.length} application{applications.length === 1 ? '' : 's'}</h3>
+            <h3 className="text-base font-bold text-on-surface tracking-tight">{totalApplications} application{totalApplications === 1 ? '' : 's'}</h3>
           </div>
           <div className="overflow-x-auto custom-scrollbar">
             <table className="w-full text-left font-body">
@@ -186,6 +201,30 @@ const Queue = () => {
               <QueueCard key={app._id} app={app} currentAdminId={admin?._id} onOpen={() => navigate(`/applications/${app._id}`)} onClaim={() => handleClaim(app)} />
             ))}
         </div>
+
+        {totalApplications > PAGE_SIZE && (
+          <div className="flex items-center justify-between gap-3 px-1">
+            <p className="text-2xs font-medium text-on-surface-variant/60">
+              Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, totalApplications)} of {totalApplications}
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1 || loading}
+                className="px-4 py-2 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-2xs font-bold uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => setPage((p) => p + 1)}
+                disabled={page * PAGE_SIZE >= totalApplications || loading}
+                className="px-4 py-2 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-2xs font-bold uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
 
         {toast && (
           <div className="fixed bottom-6 right-6 z-50 bg-on-surface text-white px-4 py-2.5 rounded-xl shadow-lg text-xs font-bold animate-fadeIn">{toast}</div>

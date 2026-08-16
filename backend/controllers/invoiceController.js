@@ -342,13 +342,17 @@ export const adminListInvoices = async (req, res) => {
     const status = req.query.status && req.query.status !== 'all' ? req.query.status : null;
     const q = (req.query.q || '').trim();
 
+    // Escape regex specials — an unescaped user-controlled pattern here
+    // (e.g. "(a+)+$") is a ReDoS vector against the event loop.
+    const safeQ = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
     const filter = {};
     if (status) filter.status = status;
     if (q) {
       filter.$or = [
-        { invoiceNumber: { $regex: q, $options: 'i' } },
-        { 'customer.name': { $regex: q, $options: 'i' } },
-        { 'customer.email': { $regex: q, $options: 'i' } },
+        { invoiceNumber: { $regex: safeQ, $options: 'i' } },
+        { 'customer.name': { $regex: safeQ, $options: 'i' } },
+        { 'customer.email': { $regex: safeQ, $options: 'i' } },
       ];
     }
 
@@ -370,9 +374,9 @@ export const adminListInvoices = async (req, res) => {
     const overdueMatch = { status: 'sent', dueDate: { $ne: null, $lt: new Date() } };
     if (q) {
       overdueMatch.$or = [
-        { invoiceNumber: { $regex: q, $options: 'i' } },
-        { 'customer.name': { $regex: q, $options: 'i' } },
-        { 'customer.email': { $regex: q, $options: 'i' } },
+        { invoiceNumber: { $regex: safeQ, $options: 'i' } },
+        { 'customer.name': { $regex: safeQ, $options: 'i' } },
+        { 'customer.email': { $regex: safeQ, $options: 'i' } },
       ];
     }
 

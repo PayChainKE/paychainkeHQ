@@ -306,3 +306,37 @@ export const verifyOTP = async (req, res) => {
     res.status(500).json({ error: 'Server Error' });
   }
 };
+
+// @desc    Sign out — invalidates the JWT immediately by bumping
+//          tokenVersion, rather than leaving it valid until its natural 12h
+//          expiry. Mirrors Merchant's sign-out-all-devices; there's no
+//          per-device session store, so this is an all-sessions sign-out,
+//          same tradeoff. Matters most for officer accounts on shared
+//          field devices.
+// @route   POST /api/auth/logout
+// @access  Private (Admin/Officer)
+export const logout = async (req, res) => {
+  try {
+    const admin = await Admin.findById(req.admin._id);
+    if (!admin) return res.status(404).json({ error: 'Admin not found' });
+
+    admin.tokenVersion = (admin.tokenVersion || 0) + 1;
+    await admin.save();
+
+    if (admin.role === 'officer') {
+      logAudit({
+        action: 'officer.logout',
+        category: 'auth',
+        severity: 'info',
+        message: `${admin.name || admin.email} logged out`,
+        actor: { type: 'officer', id: admin._id, email: admin.email, name: admin.name },
+        req,
+      });
+    }
+
+    res.json({ success: true, message: 'Signed out.' });
+  } catch (error) {
+    console.error('Logout Error:', error?.message || error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};

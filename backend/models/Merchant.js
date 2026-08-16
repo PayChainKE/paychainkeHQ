@@ -230,6 +230,42 @@ const merchantSchema = new mongoose.Schema({
     default: null,
     trim: true,
   },
+  // Collected at self-serve signup (Login.jsx/Login.tsx's business-details
+  // step) — previously gathered client-side and silently discarded, never
+  // sent to or accepted by this endpoint. Free-text like businessType
+  // above (not an enum) so it stays valid regardless of which list the
+  // frontend currently offers; registerMerchant still validates against
+  // the canonical option set before persisting.
+  county: {
+    type: String,
+    default: null,
+    trim: true,
+  },
+  businessArea: {
+    type: String,
+    default: null,
+    trim: true,
+  },
+  employeeCount: {
+    type: String,
+    default: null,
+    trim: true,
+  },
+  isEcommerce: {
+    type: Boolean,
+    default: null,
+  },
+  // Consent record for the Privacy Policy / Terms of Service checkbox on
+  // signup — a real compliance requirement, not just a client-side submit
+  // gate. registerMerchant rejects signup outright when this isn't true.
+  agreedToTerms: {
+    type: Boolean,
+    default: false,
+  },
+  agreedToTermsAt: {
+    type: Date,
+    default: null,
+  },
   kybStatus: {
     type: String,
     enum: ['pending', 'requires_revision', 'approved', 'rejected'],
@@ -446,21 +482,32 @@ const merchantSchema = new mongoose.Schema({
     select: false,
     default: [],
   },
+  // select: false — a live OTP is a bearer credential for login/password-reset.
+  // Previously selectable by default, which meant ANY endpoint that returned
+  // a full Merchant document without an explicit field allowlist (e.g. the
+  // officer KYB application-detail view) leaked the merchant's current
+  // pending OTP verbatim, letting anyone who could read that response
+  // complete the merchant's login or password reset. Every call site that
+  // legitimately needs these now explicitly `.select('+otp +otpExpires')`.
   otp: {
     type: String,
+    select: false,
     default: null,
   },
   otpExpires: {
     type: Date,
+    select: false,
     default: null,
   },
   // Which channel the currently-pending `otp` was dispatched through — set
   // whenever a fresh OTP is minted (login/resend) so "resend" can repeat the
   // same channel the merchant originally received without the client having
-  // to track/re-send that context itself.
+  // to track/re-send that context itself. Not itself a secret, but kept
+  // alongside otp/otpExpires since it's meaningless without them.
   otpChannel: {
     type: String,
     enum: ['email', 'sms'],
+    select: false,
     default: 'email',
   },
   lastLogin: {

@@ -222,6 +222,12 @@ export const adminUpdateCashAdvanceRequest = async (req, res) => {
       if (!Number.isFinite(limit) || limit < 0) {
         return res.status(400).json({ error: 'Approved limit must be a valid number.' });
       }
+      // An approved limit above what the merchant actually requested has no
+      // legitimate use and would let a mistaken/malicious entry hand out
+      // more than the application ever asked for.
+      if (limit > application.requestedAmount) {
+        return res.status(400).json({ error: `Approved limit cannot exceed the requested amount (KES ${application.requestedAmount.toLocaleString()}).` });
+      }
       application.approvedLimit = limit;
     }
     if (reviewNotes !== undefined) application.reviewNotes = String(reviewNotes).slice(0, 1000);

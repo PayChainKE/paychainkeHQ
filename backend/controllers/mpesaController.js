@@ -122,11 +122,36 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
       if (stkReq.linkId) {
         // Settling a PaymentLink (optionally backing an Invoice) — this is
         // the customer-facing "pay this link" flow, not a wallet top-up.
-        const link = await PaymentLink.findOne({ linkId: stkReq.linkId }).populate('merchantId');
-        if (link && link.status === 'active') {
-          link.status = 'paid';
-          await link.save();
+        //
+        // Must be an atomic claim, not read-then-write: processPaymentLink
+        // only checks status='active' at STK-initiation time, so two STK
+        // pushes against the same linkId (shared link, double-tap, retry)
+        // can both resolve successfully. A plain `if (link.status ===
+        // 'active') { link.status = 'paid'; await link.save() }` is a TOCTOU
+        // race — both could read 'active' before either write and both
+        // credit the merchant twice, or the loser could silently drop a
+        // real, Safaricom-confirmed payment on the floor. The status:
+        // 'active' filter below is what makes only one caller ever win the
+        // transition — same idiom as the STKRequest claim above.
+        const link = await PaymentLink.findOneAndUpdate(
+          { linkId: stkReq.linkId, status: 'active' },
+          { $set: { status: 'paid' } },
+          { returnDocument: 'after' }
+        ).populate('merchantId');
 
+        if (!link) {
+          // Real money already left the customer's account (Safaricom just
+          // confirmed it) but there's no 'active' link left to credit it
+          // against — either a genuine double-payment on the same link, or
+          // the link was never active. Never drop this silently: it must
+          // surface for manual reconciliation rather than vanish.
+          console.error(
+            `🚨 STK succeeded for linkId ${stkReq.linkId} (receipt ${receipt}) but the link was not in 'active' status — ` +
+            `likely a duplicate/racing payment against an already-settled link. Needs manual reconciliation.`
+          );
+        }
+
+        if (link) {
           let paidInvoice = null;
           if (link.invoiceId) {
             paidInvoice = await Invoice.findByIdAndUpdate(link.invoiceId, { status: 'paid', paidAt: new Date() }, { returnDocument: 'after' });

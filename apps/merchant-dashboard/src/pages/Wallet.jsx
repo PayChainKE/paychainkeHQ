@@ -176,18 +176,15 @@ export default function Wallet() {
         }
         setWithdrawPin('')
       } else {
-        const { data } = await axios.post(`${API_URL}/api/transactions/send-money`, {
-          amount: Number(withdrawAmount),
-          destination: destination,
-          reference: `Withdrawal to ${destinationAccountValue}`
-        }, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        tx = data.transaction
-        methodLabel = 'Withdrawal'
-        recipientDisplay = destinationAccountValue
-        phoneNumber = merchant?.phone
-        payeeDraft = null
+        // withdrawalDestinations only ever contains 'Bank'/'Mobile' entries
+        // (see its declaration above), so destType can never reach here in
+        // practice. Previously this silently fell through to
+        // /api/transactions/send-money, which only debits the balance and
+        // marks the row "completed" without ever moving real money to a
+        // bank/phone — a dead path that would have quietly faked a payout
+        // if it were ever reachable. Mirrors the same fix already applied
+        // to mobile's DigitalWallet.tsx.
+        throw new Error('Unsupported withdrawal destination.')
       }
 
       setWithdrawAmount('')
@@ -237,9 +234,14 @@ export default function Wallet() {
     }
   }
 
-  // Pre-fill settings when modal opens
+  // Pre-fill settings when the modal opens. Guarded to only run on the
+  // closed→open transition, not on every re-render — `merchant` gets a new
+  // object reference from the 5s auth-context poll (context/MerchantAuthContext.jsx),
+  // so depending on it directly re-ran this every ~5s and silently overwrote
+  // whatever the merchant was mid-typing in the form.
+  const prevShowSettingsModal = React.useRef(false)
   useEffect(() => {
-    if (showSettingsModal && merchant) {
+    if (showSettingsModal && !prevShowSettingsModal.current && merchant) {
       setSettleBankName(merchant.settlementBankName || '')
       setSettleBankAccount(merchant.settlementBankAccount || '')
       setSettleBankCode(merchant.settlementBankCode || '')
@@ -252,6 +254,7 @@ export default function Wallet() {
           .catch(e => console.error('Failed to load bank codes', e))
       }
     }
+    prevShowSettingsModal.current = showSettingsModal
   }, [showSettingsModal, merchant])
 
   // Then further down, the JSX changes:
@@ -262,6 +265,10 @@ export default function Wallet() {
   const [liveRate, setLiveRate] = useState(132.45)
   const [usdBalance, setUsdBalance] = useState(0)
 
+  // Only re-sync the on-chain USDC balance when the swap modal actually
+  // opens — `merchant` gets a new object reference from the 5s auth-context
+  // poll, so depending on it directly fired this real Horizon network call
+  // roughly every 5 seconds continuously, whether or not the modal was open.
   useEffect(() => {
     const fetchUsdBalance = async () => {
       if (!merchant?.stellarPublicKey) return;
@@ -278,8 +285,8 @@ export default function Wallet() {
         console.error('Failed to sync USDC balance', err);
       }
     };
-    if (merchant) fetchUsdBalance();
-  }, [merchant]);
+    if (showSwapModal && merchant) fetchUsdBalance();
+  }, [showSwapModal, merchant?.stellarPublicKey]);
 
   useEffect(() => {
     const fetchRate = async () => {

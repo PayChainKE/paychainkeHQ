@@ -55,7 +55,11 @@ export const listExpenses = async (req, res) => {
     const filter = { date: { $gte: since, $lte: until } };
     if (category && category !== 'all') filter.category = category;
     if (search) {
-      const rx = { $regex: String(search).slice(0, 100), $options: 'i' };
+      // Escape regex specials — an unescaped user-controlled pattern here
+      // (e.g. "(a+)+$") is a ReDoS vector against the event loop even at
+      // 100 chars.
+      const safeSearch = String(search).slice(0, 100).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const rx = { $regex: safeSearch, $options: 'i' };
       filter.$or = [{ description: rx }, { payee: rx }, { reference: rx }];
     }
 

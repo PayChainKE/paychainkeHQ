@@ -851,8 +851,11 @@ export default function BulkPay() {
   const isLiquidityLow = batchTotal > balance
 
   const [authorizedReceipts, setAuthorizedReceipts] = useState([])
+  const [isAuthorizing, setIsAuthorizing] = useState(false)
 
   const handleAuthorize = async () => {
+    if (isAuthorizing) return
+    setIsAuthorizing(true)
     try {
       addNotification({ title: 'Processing', message: 'Authorizing batch...', type: 'info' });
       const token = localStorage.getItem('paychain_merchant_token');
@@ -934,6 +937,8 @@ export default function BulkPay() {
       } else {
          setShowSecurityModal(false);
       }
+    } finally {
+      setIsAuthorizing(false)
     }
   }
 
@@ -2537,12 +2542,17 @@ export default function BulkPay() {
                       className="w-full bg-surface-container-low/30 border border-outline-variant/20 rounded-2xl px-5 py-4 text-center font-headline tracking-[1em] text-xl font-bold text-primary focus:ring-0 focus:border-[#00351D]/50 transition-all outline-none"
                     />
 
-                    <button 
+                    <button
                       onClick={handleSecurityVerification}
-                      disabled={pin.length !== 4}
-                      className="w-full py-4 rounded-2xl bg-[#00351D] text-white hover:bg-emerald-950 font-bold text-sm shadow-xl transition-all disabled:opacity-50"
+                      disabled={pin.length !== 4 || isAuthorizing}
+                      className="w-full py-4 rounded-2xl bg-[#00351D] text-white hover:bg-emerald-950 font-bold text-sm shadow-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                     >
-                      Confirm & Pay
+                      {isAuthorizing ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                          Authorizing...
+                        </>
+                      ) : 'Confirm & Pay'}
                     </button>
 
                   </div>

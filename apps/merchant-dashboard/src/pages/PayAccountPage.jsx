@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import paychainLogo from '../../images/logo.png';
@@ -19,6 +19,14 @@ export default function PayAccountPage() {
   const [phone, setPhone] = useState('');
   const [isPaying, setIsPaying] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState('');
+  const [paymentConfirmed, setPaymentConfirmed] = useState(false);
+  const pollIntervalRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     const fetchMerchant = async () => {
@@ -42,18 +50,42 @@ export default function PayAccountPage() {
     if (!phone || !amount || Number(amount) <= 0) return;
     setIsPaying(true);
     setPaymentError('');
+    setPaymentConfirmed(false);
     setPaymentStatus('Initiating secure STK Push...');
 
     try {
       const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
       const res = await axios.post(`${API_URL}/api/transactions/pay-account/${account}`, { phone, amount: Number(amount) });
 
-      if (res.data.success) {
+      if (res.data.success && res.data.checkoutRequestId) {
         setPaymentStatus('Awaiting M-PESA PIN on your phone...');
-        setTimeout(() => {
-          setPaymentStatus('Payment triggered successfully. Check your phone.');
-          setIsPaying(false);
-        }, 3000);
+
+        let attempts = 0;
+        const maxAttempts = 20 // 20 * 3s = 60s
+        pollIntervalRef.current = setInterval(async () => {
+          attempts++
+          try {
+            const statusRes = await axios.get(`${API_URL}/api/transactions/public-stk-status/${res.data.checkoutRequestId}`);
+            if (statusRes.data.status === 'success') {
+              clearInterval(pollIntervalRef.current);
+              setPaymentConfirmed(true);
+              setPaymentStatus('Payment received. Thank you!');
+              setIsPaying(false);
+            } else if (statusRes.data.status === 'failed') {
+              clearInterval(pollIntervalRef.current);
+              setPaymentError(statusRes.data.resultDesc || 'Payment was cancelled or declined.');
+              setPaymentStatus('');
+              setIsPaying(false);
+            } else if (attempts >= maxAttempts) {
+              clearInterval(pollIntervalRef.current);
+              setPaymentError("We couldn't confirm your payment. If M-PESA deducted your money, it will still reach the merchant — check your M-PESA messages.");
+              setPaymentStatus('');
+              setIsPaying(false);
+            }
+          } catch (e) {
+            console.error('STK status poll error', e);
+          }
+        }, 3000)
       }
     } catch (err) {
       setPaymentError(err.response?.data?.error || 'Failed to trigger payment on your phone.');
@@ -147,6 +179,7 @@ export default function PayAccountPage() {
             {paymentStatus && !paymentError && (
               <div className="p-4 bg-emerald-50 text-emerald-800 rounded-2xl text-sm font-medium text-center border border-emerald-100 flex flex-col items-center gap-2">
                  {isPaying && <div className="w-5 h-5 border-2 border-emerald-800/30 border-t-emerald-800 rounded-full animate-spin"></div>}
+                 {paymentConfirmed && <span className="material-symbols-outlined text-2xl">check_circle</span>}
                  {paymentStatus}
               </div>
             )}

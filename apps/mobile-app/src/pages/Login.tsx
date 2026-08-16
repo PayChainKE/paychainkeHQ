@@ -214,6 +214,35 @@ export default function Login({ route }: any) {
     }
   };
 
+  const handleSignupContinue = () => {
+    if (!signupPhone || signupPhone.length < 9) {
+      setErr('Please enter a valid Kenyan phone number before continuing.');
+      return;
+    }
+    if (!businessType) {
+      setErr('Please select a business type.');
+      return;
+    }
+    if (!signupCounty) {
+      setErr('Please select your county.');
+      return;
+    }
+    if (!area.trim()) {
+      setErr('Please enter your area/location.');
+      return;
+    }
+    if (!employees) {
+      setErr('Please select the number of employees.');
+      return;
+    }
+    if (!signupEcommerce) {
+      setErr('Please let us know whether this is an eCommerce business.');
+      return;
+    }
+    setErr('');
+    setIsSignupPasswordStep(true);
+  };
+
   const handleSignupCreateAccount = async () => {
     if (!Object.values(strength).every(v => v)) {
       setErr('Please meet all security requirements.');
@@ -234,7 +263,8 @@ export default function Login({ route }: any) {
       businessType,
       county: signupCounty,
       area,
-      employees
+      employees,
+      agreedToTerms,
     };
 
     setLoading(true);
@@ -518,7 +548,7 @@ export default function Login({ route }: any) {
                       </TouchableOpacity>
                     </View>
                   </View>
-                  <TouchableOpacity onPress={() => setIsSignupPasswordStep(true)} className="w-full bg-[#06201b] py-4 rounded-2xl flex-row justify-center items-center mt-4">
+                  <TouchableOpacity onPress={handleSignupContinue} className="w-full bg-[#06201b] py-4 rounded-2xl flex-row justify-center items-center mt-4">
                     <Text className="text-white font-jakarta-bold text-[16px]">Submit Application</Text>
                   </TouchableOpacity>
                 </View>
@@ -611,7 +641,7 @@ export default function Login({ route }: any) {
               <Text className="text-[#0c2010] text-[18px] font-jakarta-bold">Business Type</Text>
               <TouchableOpacity onPress={() => setShowBusinessModal(false)}><Feather name="x" size={24} color="#0c2010" /></TouchableOpacity>
             </View>
-            {['Sole Proprietorship', 'Partnership', 'Limited Liability Company (LLC)', 'Public Limited Company (PLC)', 'NGO/Non-Profit'].map(type => (
+            {['Sole Proprietorship', 'Partnership', 'Limited Liability Company (LLC)', 'Public Limited Company (PLC)', 'SACCO', 'NGO/Non-Profit', 'Cooperative Society', 'Other'].map(type => (
               <TouchableOpacity key={type} className="py-4 border-b border-[#e5e7eb]" onPress={() => { setBusinessType(type); setShowBusinessModal(false); }}>
                 <Text className="text-[16px] font-jakarta-medium text-[#0c2010]">{type}</Text>
               </TouchableOpacity>

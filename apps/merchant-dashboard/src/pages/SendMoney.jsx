@@ -16,7 +16,7 @@ const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
 const DESTINATIONS = [
   { id: 'mpesa-primary', label: 'Primary M-PESA Number',   icon: 'phone_iphone',     fee: null, hint: 'Your registered phone number' },
   { id: 'mobile',        label: 'Any M-PESA Number',        icon: 'smartphone',        fee: null, hint: 'Send to any Kenyan mobile number' },
-  { id: 'bank',          label: 'Bank Account',             icon: 'account_balance',   fee: 50,   hint: 'Direct bank transfer' },
+  { id: 'bank',          label: 'Bank Account',             icon: 'account_balance',   fee: null, hint: 'Direct bank transfer' },
   { id: 'till',          label: 'Till Number',              icon: 'point_of_sale',     fee: null, hint: 'Pay to a Safaricom Till' },
   { id: 'paybill',       label: 'Paybill',                  icon: 'receipt_long',      fee: null, hint: 'Pay to a Paybill number' },
 ]
@@ -81,6 +81,27 @@ function estimateB2cFee(amount) {
   return band.totalFee
 }
 
+// Mirrors backend/config/bankTransferTariffCard.js — this was previously a
+// flat KES 50 regardless of rail/amount, understating real PesaLink tiers
+// (up to KES 210) and RTGS's flat KES 430, which could let a merchant pass
+// the client-side "sufficient balance" check and enter their PIN only to
+// have the backend charge more than shown.
+const PESALINK_BANDS = [
+  { max: 500,      totalFee: 50  },
+  { max: 3_500,    totalFee: 97  },
+  { max: 7_000,    totalFee: 122 },
+  { max: 10_000,   totalFee: 147 },
+  { max: 250_000,  totalFee: 210 },
+]
+const RTGS_TOTAL_FEE = 430 // baseCost 300 + serviceFee 130, flat any amount
+
+function estimateBankFee(rail, amount) {
+  if (rail === 'rtgs') return RTGS_TOTAL_FEE
+  if (!amount || amount <= 0) return 0
+  const band = PESALINK_BANDS.find(b => amount <= b.max) || PESALINK_BANDS[PESALINK_BANDS.length - 1]
+  return band.totalFee
+}
+
 export default function SendMoney() {
   const navigate = useNavigate()
   const { addNotification } = useNotification()
@@ -120,7 +141,7 @@ export default function SendMoney() {
   const selectedDest = DESTINATIONS.find(d => d.id === destination)
   const isMobileDest = destination === 'mpesa-primary' || destination === 'mobile'
   const isB2bDest     = destination === 'till' || destination === 'paybill'
-  const fee          = isMobileDest ? estimateB2cFee(Number(amount) || 0) : isB2bDest ? estimateB2bFee(Number(amount) || 0) : (selectedDest?.fee || 0)
+  const fee          = isMobileDest ? estimateB2cFee(Number(amount) || 0) : isB2bDest ? estimateB2bFee(Number(amount) || 0) : destination === 'bank' ? estimateBankFee(bankRail, Number(amount) || 0) : (selectedDest?.fee || 0)
   const totalAmount  = Number(amount || 0) + fee
   const balance      = merchant?.kesBalance || 0
 

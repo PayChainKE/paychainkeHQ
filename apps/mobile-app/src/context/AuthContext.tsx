@@ -364,6 +364,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function logout(reason?: string) {
+    // Best-effort — invalidates the JWT server-side immediately (bumps
+    // tokenVersion) instead of leaving it valid until its 30-day expiry.
+    // Deliberately not awaited: an offline/failed call must never delay or
+    // block the local sign-out below.
+    api.post('/api/auth/merchant/logout').catch(() => {});
     try {
       await AsyncStorage.multiRemove([STORAGE_KEY, 'paychain_onboarding_complete']);
       await clearToken();

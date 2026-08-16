@@ -1,6 +1,6 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
-import { getTransactions, simulateIncomingPayment, swapKesToUsdc, activateWallet, getLiveRate, sendMoney, syncWalletBalance, generatePaymentLink, listPaymentLinks, getPaymentLink, processPaymentLink, getMerchantByAccount, payToMerchantAccount, emailStatement, downloadSticker } from '../controllers/transactionController.js';
+import { getTransactions, simulateIncomingPayment, swapKesToUsdc, activateWallet, getLiveRate, sendMoney, syncWalletBalance, generatePaymentLink, listPaymentLinks, getPaymentLink, processPaymentLink, getMerchantByAccount, payToMerchantAccount, emailStatement, downloadSticker, getPublicSTKStatus } from '../controllers/transactionController.js';
 import { protectMerchant } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -60,6 +60,19 @@ router.post('/payment-link/:linkId/pay', payAccountLimiter, processPaymentLink);
 // to the fixed-amount PaymentLink routes above.
 router.get('/pay-account/:account', lookupLimiter, getMerchantByAccount);
 router.post('/pay-account/:account', payAccountLimiter, payToMerchantAccount);
+
+// Public STK status poll — the checkout pages above hit this every ~3s for
+// up to a minute after triggering a push, so it needs its own more generous
+// budget than lookupLimiter (a single checkout attempt alone can use ~20
+// requests).
+const pollStatusLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many status checks. Please refresh and try again shortly.' },
+});
+router.get('/public-stk-status/:checkoutId', pollStatusLimiter, getPublicSTKStatus);
 
 router.post('/statement/email', protectMerchant, emailStatement);
 router.get('/sticker', protectMerchant, downloadSticker);

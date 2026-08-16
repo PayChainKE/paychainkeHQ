@@ -13,6 +13,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@sentry/node": "^10.70.0",
     "@simplewebauthn/server": "^13.3.2",
     "@stellar/stellar-sdk": "^16.0.1",
     "africastalking": "^0.7.9",

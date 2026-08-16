@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import api from '../api/api';
@@ -175,12 +175,93 @@ const Skel = ({ className = 'w-16 h-7' }) => (
   <span className={`inline-block ${className} bg-surface-container/80 rounded align-middle animate-pulse`} aria-hidden="true" />
 );
 
-// ── Volume-vs-Net-Revenue chart ───────────────────────────────────────
-// Bars = GMV (volume). Line overlay = Net Revenue. Dual axis so the
-// finance team can read both signals without losing scale on either.
-const VolumeRevenueChart = ({ series, totalGmv, totalNet }) => {
-  const buckets = series || [];
-  if (!buckets.length) {
+// ── Revenue trend chart ───────────────────────────────────────────────
+// One axis, one metric at a time — GMV, Gross Fees, Network Costs and Net
+// Revenue sit at wildly different magnitudes (take rate is well under 1%),
+// so overlaying two of them on independently-scaled axes (the previous
+// bars+line version did exactly this) invents a correlation that isn't
+// really there. A metric switcher + a single real axis is the honest
+// version of "see volume and margin together". Colors are the dataviz
+// skill's validated categorical slots 1–4 (blue/orange/yellow/aqua),
+// assigned once per metric and never reassigned on interaction.
+const CHART_METRICS = {
+  gmv:   { key: 'gmv',   label: 'GMV',           color: '#2a78d6' },
+  gross: { key: 'total', label: 'Gross Fees',    color: '#eb6834' },
+  costs: { key: 'cost',  label: 'Network Costs', color: '#eda100' },
+  net:   { key: 'net',   label: 'Net Revenue',   color: '#1baf7a' },
+};
+
+// "Nice" axis ticks (0, 20k, 40k, ...) rather than raw fractions of the max.
+function niceTicks(max, targetCount = 4) {
+  if (!max || max <= 0) return [0];
+  const rawStep = max / targetCount;
+  const magnitude = 10 ** Math.floor(Math.log10(rawStep));
+  const residual = rawStep / magnitude;
+  const step = (residual >= 5 ? 5 : residual >= 2 ? 2 : 1) * magnitude;
+  const ticks = [];
+  for (let v = 0; v <= max + step * 0.001; v += step) ticks.push(Math.round(v * 100) / 100);
+  return ticks;
+}
+
+const RevenueTrendChart = ({ series, metric }) => {
+  const rows = series || [];
+  const containerRef = useRef(null);
+  const [dims, setDims] = useState({ width: 640, height: 260 });
+  const [hoverIndex, setHoverIndex] = useState(null);
+
+  // Real pixel dimensions (not just viewBox units) — needed so a pointer
+  // position maps back to the correct bucket index, and so text/gridlines
+  // stay crisp instead of stretching under preserveAspectRatio="none".
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect;
+      if (width > 0 && height > 0) setDims({ width, height });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Without this, hovering at e.g. index 25 on a 30-bucket series, then
+  // switching to a metric/range whose series only has 10 buckets, leaves
+  // hoverIndex out of bounds — the tooltip correctly disappears (rows[25]
+  // is undefined), but the crosshair/dot below don't check bounds and
+  // compute NaN coordinates from it, breaking the SVG paint.
+  useEffect(() => { setHoverIndex(null); }, [series, metric]);
+
+  const meta = CHART_METRICS[metric] || CHART_METRICS.gmv;
+  const values = rows.map((r) => Number(r[meta.key]) || 0);
+  const maxVal = Math.max(...values, 0);
+  const ticks = useMemo(() => niceTicks(maxVal), [maxVal]);
+  const axisMax = ticks[ticks.length - 1] || 1;
+
+  const padL = 54, padR = 8, padT = 12, padB = 26;
+  const plotW = Math.max(dims.width - padL - padR, 1);
+  const plotH = Math.max(dims.height - padT - padB, 1);
+
+  const xAt = (i) => padL + (rows.length > 1 ? (i / (rows.length - 1)) * plotW : plotW / 2);
+  const yAt = (v) => padT + plotH - (v / axisMax) * plotH;
+
+  const linePath = rows.map((r, i) => `${i === 0 ? 'M' : 'L'} ${xAt(i).toFixed(1)} ${yAt(values[i]).toFixed(1)}`).join(' ');
+  const areaPath = rows.length
+    ? `${linePath} L ${xAt(rows.length - 1).toFixed(1)} ${(padT + plotH).toFixed(1)} L ${xAt(0).toFixed(1)} ${(padT + plotH).toFixed(1)} Z`
+    : '';
+
+  const handleMove = (e) => {
+    if (!rows.length || !containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    let nearest = 0;
+    let best = Infinity;
+    for (let i = 0; i < rows.length; i++) {
+      const d = Math.abs(xAt(i) - x);
+      if (d < best) { best = d; nearest = i; }
+    }
+    setHoverIndex(nearest);
+  };
+
+  if (!rows.length) {
     return (
       <div className="h-[260px] flex flex-col items-center justify-center text-on-surface-variant text-xs gap-2">
         <span className="material-symbols-outlined text-4xl opacity-40">monitoring</span>
@@ -189,84 +270,87 @@ const VolumeRevenueChart = ({ series, totalGmv, totalNet }) => {
     );
   }
 
-  // Derive per-bucket GMV and net revenue. We approximate per-bucket net
-  // by holding gross-to-net ratio constant across the window (we don't
-  // ship per-bucket cost data yet; cheap and accurate enough at the chart
-  // resolution finance reads).
-  const grossToNet = totalGmv ? totalNet / Math.max(buckets.reduce((s, b) => s + b.total, 0), 1) : 0;
-  const rows = buckets.map((b) => ({
-    bucket: b.bucket,
-    gmv: (b.total || 0) / 0.005, // gross fee ≈ 0.5% × GMV → invert to GMV proxy
-    net: (b.total || 0) * grossToNet,
-    gross: b.total || 0,
-  }));
-
-  const maxGmv = Math.max(...rows.map((r) => r.gmv), 1);
-  const maxNet = Math.max(...rows.map((r) => r.net), 1);
-
-  // SVG dims
-  const w = 100, h = 100;
-  const points = rows.map((r, i) => {
-    const x = (i / Math.max(rows.length - 1, 1)) * w;
-    const y = h - (r.net / maxNet) * h * 0.85;
-    return `${x.toFixed(2)},${y.toFixed(2)}`;
-  }).join(' ');
+  const hovered = hoverIndex != null ? rows[hoverIndex] : null;
+  const gradientId = `revtrend-${metric}`;
+  const tooltipLeft = hoverIndex != null ? Math.min(Math.max(xAt(hoverIndex), 64), dims.width - 64) : 0;
+  const showEvery = Math.max(1, Math.ceil(rows.length / 6));
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-5 text-2xs">
-        <div className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded-sm bg-outline-variant/40" />
-          <span className="text-on-surface-variant">GMV (volume)</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="w-3 h-0.5 bg-emerald-400" />
-          <span className="text-on-surface-variant">Net Revenue</span>
-        </div>
-      </div>
+    <div
+      ref={containerRef}
+      className="relative h-[260px] select-none"
+      onMouseMove={handleMove}
+      onMouseLeave={() => setHoverIndex(null)}
+    >
+      <svg width="100%" height="100%" className="overflow-visible">
+        <defs>
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={meta.color} stopOpacity="0.18" />
+            <stop offset="100%" stopColor={meta.color} stopOpacity="0" />
+          </linearGradient>
+        </defs>
 
-      <div className="relative h-[240px]">
-        {/* Bars layer */}
-        <div className="absolute inset-0 flex items-end gap-1 pb-7">
-          {rows.map((r, i) => {
-            const heightPct = Math.max(2, (r.gmv / maxGmv) * 100);
-            return (
-              <div key={`${r.bucket}-${i}`} className="flex-1 flex flex-col items-center group relative min-w-[8px]">
-                <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-2xs font-bold text-on-surface whitespace-nowrap tabular-nums z-10">
-                  {fmtKES(r.gmv)}
-                </div>
-                <div
-                  className="w-full rounded-sm bg-on-surface-variant/35 group-hover:bg-on-surface-variant/55 transition-colors"
-                  style={{ height: `${heightPct}%` }}
-                  title={`${r.bucket} · GMV ${fmtKESPrecise(r.gmv)} · Net ${fmtKESPrecise(r.net)}`}
-                />
-                <div className="absolute -bottom-6 text-2xs text-on-surface/70 truncate w-full text-center font-mono">
-                  {r.bucket.length > 5 ? r.bucket.slice(5) : r.bucket}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        {/* Gridlines — solid hairlines, never dashed, one step off surface */}
+        {ticks.map((t) => (
+          <g key={t}>
+            <line
+              x1={padL} x2={padL + plotW} y1={yAt(t)} y2={yAt(t)}
+              stroke="currentColor" className="text-outline-variant/50" strokeWidth="1"
+            />
+            <text x={0} y={yAt(t) + 3} fontSize="9" fontWeight="700" className="fill-on-surface-variant/70 font-mono">
+              {fmtKES(t)}
+            </text>
+          </g>
+        ))}
 
-        {/* Line layer — Net Revenue */}
-        <svg
-          className="absolute inset-0 pointer-events-none"
-          width="100%"
-          height="100%"
-          viewBox={`0 0 ${w} ${h}`}
-          preserveAspectRatio="none"
+        <path d={areaPath} fill={`url(#${gradientId})`} />
+        <path d={linePath} fill="none" stroke={meta.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+
+        {/* X-axis labels — sparse (endpoint + a handful in between), never every bucket */}
+        {rows.map((r, i) => {
+          if (i % showEvery !== 0 && i !== rows.length - 1) return null;
+          return (
+            <text
+              key={r.bucket}
+              x={xAt(i)}
+              y={dims.height - 8}
+              fontSize="9"
+              fontWeight="700"
+              textAnchor={i === 0 ? 'start' : i === rows.length - 1 ? 'end' : 'middle'}
+              className="fill-on-surface/70 font-mono"
+            >
+              {r.bucket.length > 7 ? r.bucket.slice(5) : r.bucket}
+            </text>
+          );
+        })}
+
+        {/* Crosshair — finds the X, snaps to the nearest bucket */}
+        {hoverIndex != null && (
+          <>
+            <line
+              x1={xAt(hoverIndex)} x2={xAt(hoverIndex)} y1={padT} y2={padT + plotH}
+              stroke="currentColor" className="text-outline-variant" strokeWidth="1"
+            />
+            <circle
+              cx={xAt(hoverIndex)} cy={yAt(values[hoverIndex])} r="4.5"
+              fill={meta.color} stroke="white" strokeWidth="2"
+            />
+          </>
+        )}
+      </svg>
+
+      {hovered && (
+        <div
+          className="absolute z-10 pointer-events-none bg-on-surface text-surface-container-lowest rounded-md px-3 py-2 shadow-lg text-2xs"
+          style={{ left: tooltipLeft, top: 4, transform: 'translateX(-50%)' }}
         >
-          <polyline
-            fill="none"
-            stroke="#059669"
-            strokeWidth="2"
-            strokeLinejoin="round"
-            strokeLinecap="round"
-            points={points}
-            vectorEffect="non-scaling-stroke"
-          />
-        </svg>
-      </div>
+          <div className="font-bold uppercase tracking-widest opacity-70 mb-0.5">{hovered.bucket}</div>
+          <div className="flex items-center gap-1.5 font-bold whitespace-nowrap">
+            <span className="w-2 h-0.5 inline-block" style={{ backgroundColor: meta.color }} />
+            {meta.label}: {fmtKESPrecise(hovered[meta.key])}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -279,22 +363,34 @@ const Revenue = () => {
   const [range, setRange] = useState('30d');
   const [granularity, setGranularity] = useState('daily');
   const [channelFilter, setChannelFilter] = useState('all');
+  const [chartMetric, setChartMetric] = useState('gmv');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [sweepsPage, setSweepsPage] = useState(1);
 
-  const fetchRevenue = useCallback(async () => {
-    setLoading(true);
-    setError('');
+  // `silent` powers the live auto-refresh below — the dashboard holds its
+  // previous render (no skeleton, no layout jump) while a background poll
+  // is in flight, and a failed silent poll never clears already-good data
+  // off the screen (only a real user-triggered load/range-change shows the
+  // loading state and can blank the page on failure).
+  const fetchRevenue = useCallback(async (silent = false) => {
+    if (silent) setRefreshing(true);
+    else setLoading(true);
+    if (!silent) setError('');
     try {
       const res = await api.get('/api/admin/revenue', { params: { range } });
       setData(res.data?.data || null);
+      if (silent) setError('');
     } catch (e) {
-      setError(e?.response?.data?.error || 'Could not load revenue.');
-      setData(null);
+      if (!silent) {
+        setError(e?.response?.data?.error || 'Could not load revenue.');
+        setData(null);
+      }
     } finally {
-      setLoading(false);
+      if (silent) setRefreshing(false);
+      else setLoading(false);
     }
   }, [range]);
 
@@ -332,6 +428,17 @@ const Revenue = () => {
   const [toast, setToast] = useState('');
   const showToast = useCallback((msg) => { setToast(msg); setTimeout(() => setToast(''), 4000); }, []);
 
+  // Live — bank-dashboard-style background refresh every 30s, without
+  // disturbing whatever the admin is looking at (hover state, scroll
+  // position). Paused while the sweep confirmation modal is open, so a
+  // refetch can't swap out `data.corporateDestination` out from under the
+  // admin mid-confirmation.
+  useEffect(() => {
+    if (sweepConfirmOpen) return;
+    const id = setInterval(() => fetchRevenue(true), 30_000);
+    return () => clearInterval(id);
+  }, [fetchRevenue, sweepConfirmOpen]);
+
   const runSweepNow = useCallback(async () => {
     setSweepBusy(true);
     try {
@@ -363,7 +470,15 @@ const Revenue = () => {
   const sweeps   = data?.sweepBatches || [];
   const series   = data?.series   || [];
 
-  useEffect(() => { setSweepsPage(1); }, [range]);
+  // The backend's own bucket resolution already varies by range (hourly for
+  // 24h, daily for 7d/30d, monthly for 90d/ytd/all — see
+  // revenueController.js#bucketFormat) — the Daily/Weekly/Monthly switcher
+  // below only makes sense when the source is actually daily. Re-bucketing
+  // an already-monthly series into "weekly" buckets (rebucketSeries's
+  // groupKey falls back to treating each YYYY-MM as a single fake week)
+  // silently produced one misleading data point per month labeled as a
+  // week, so the switcher is hidden and reset outside that range.
+  useEffect(() => { setGranularity('daily'); setChannelFilter('all'); setSweepsPage(1); }, [range]);
   const pagedSweeps = useMemo(
     () => sweeps.slice((sweepsPage - 1) * PAGE_SIZE, sweepsPage * PAGE_SIZE),
     [sweeps, sweepsPage]
@@ -402,7 +517,7 @@ const Revenue = () => {
               </p>
             </div>
             <button
-              onClick={fetchRevenue}
+              onClick={() => fetchRevenue()}
               title="Refresh"
               className="self-start sm:self-end w-9 h-9 inline-flex items-center justify-center bg-surface-container border border-outline-variant/40 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors"
             >
@@ -466,7 +581,14 @@ const Revenue = () => {
               {loading
                 ? <Skel className="w-32 h-9" />
                 : <span className="text-3xl md:text-3xl font-bold text-on-surface tracking-tighter leading-none tabular-nums">{fmtKES(kpis.gmv)}</span>}
-              <p className="text-2xs text-on-surface-variant">Volume routed through PayChain</p>
+              {!loading && (
+                <div className="flex items-baseline gap-1.5 text-2xs">
+                  <span className={`font-bold tabular-nums ${(kpis.gmvChange || 0) >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                    {fmtChange(kpis.gmvChange)}
+                  </span>
+                  <span className="text-on-surface-variant">vs prev period</span>
+                </div>
+              )}
             </div>
 
             {/* Gross Platform Revenue */}
@@ -496,7 +618,7 @@ const Revenue = () => {
               </div>
               {loading
                 ? <Skel className="w-24 h-9" />
-                : <span className="text-3xl md:text-3xl font-bold text-on-surface tracking-tighter leading-none tabular-nums">−{fmtKES(kpis.networkCosts).replace('KES ', 'KES ')}</span>}
+                : <span className="text-3xl md:text-3xl font-bold text-on-surface tracking-tighter leading-none tabular-nums">−{fmtKES(kpis.networkCosts)}</span>}
               <p className="text-2xs text-on-surface-variant">Paid to M-Pesa / banking rails</p>
             </div>
 
@@ -527,37 +649,71 @@ const Revenue = () => {
         <section className="grid grid-cols-1 xl:grid-cols-5 gap-4">
           {/* Chart */}
           <div className="xl:col-span-3 bg-surface-container-lowest border border-outline-variant/40 rounded-lg p-5 md:p-6">
-            <div className="flex items-start justify-between mb-5">
+            <div className="flex flex-wrap items-start justify-between gap-3 mb-2">
               <div>
-                <h3 className="text-sm font-bold text-on-surface tracking-tight">Volume vs Net Platform Fees</h3>
-                <p className="text-2xs text-on-surface-variant mt-1">GMV bars overlaid with the net-revenue trend line.</p>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-on-surface tracking-tight">Revenue Trend</h3>
+                  <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-emerald-700" title="Refreshes automatically every 30s">
+                    <span className={`w-1.5 h-1.5 rounded-full bg-emerald-500 ${refreshing ? 'animate-ping' : 'animate-pulse'}`} />
+                    Live
+                  </span>
+                </div>
+                <p className="text-2xs text-on-surface-variant mt-1">{CHART_METRICS[chartMetric].label} over time — every figure reconciles to the KPI strip above.</p>
               </div>
-              <div className="inline-flex bg-surface-container-lowest border border-outline-variant/40 rounded-md p-0.5">
-                {GRANULARITIES.map((g) => (
-                  <button
-                    key={g.v}
-                    onClick={() => setGranularity(g.v)}
-                    className={`px-2.5 py-1 text-2xs font-bold tracking-wider rounded transition-colors ${
-                      granularity === g.v
-                        ? 'bg-on-surface text-surface-container-lowest'
-                        : 'text-on-surface-variant hover:text-on-surface'
-                    }`}
-                  >
-                    {g.l}
-                  </button>
-                ))}
-              </div>
+              {(range === '7d' || range === '30d') && (
+                <div className="inline-flex bg-surface-container-lowest border border-outline-variant/40 rounded-md p-0.5">
+                  {GRANULARITIES.map((g) => (
+                    <button
+                      key={g.v}
+                      onClick={() => setGranularity(g.v)}
+                      className={`px-2.5 py-1 text-2xs font-bold tracking-wider rounded transition-colors ${
+                        granularity === g.v
+                          ? 'bg-on-surface text-surface-container-lowest'
+                          : 'text-on-surface-variant hover:text-on-surface'
+                      }`}
+                    >
+                      {g.l}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
+
+            {/* Metric switcher — one series on screen at a time (never a
+                dual-axis overlay), each metric permanently mapped to its
+                own validated categorical color so the identity never shifts
+                as the admin switches between them. */}
+            {/* Same neutral "selected" treatment as the Period/Granularity
+                switchers above — not a per-metric colored fill. Two of the
+                four categorical hues (aqua, yellow) fall under 3:1 white-text
+                contrast when used as a solid button fill (checked directly,
+                since the dataviz palette validator only checks color-vs-
+                surface, not color-vs-white-text); a neutral fill sidesteps
+                that entirely and keeps identity on the dot, never the text,
+                per the "text never wears the data color" rule. */}
+            <div className="flex flex-wrap items-center gap-1.5 mb-4">
+              {Object.entries(CHART_METRICS).map(([key, m]) => (
+                <button
+                  key={key}
+                  onClick={() => setChartMetric(key)}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-2xs font-bold tracking-wide transition-colors ${
+                    chartMetric === key
+                      ? 'bg-on-surface text-surface-container-lowest'
+                      : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container/70'
+                  }`}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: m.color }} />
+                  {m.label}
+                </button>
+              ))}
+            </div>
+
             {loading ? (
               <div className="h-[260px] flex items-center justify-center">
                 <Skel className="w-full h-[200px]" />
               </div>
             ) : (
-              <VolumeRevenueChart
-                series={seriesAtGranularity}
-                totalGmv={kpis.gmv}
-                totalNet={kpis.netRevenue}
-              />
+              <RevenueTrendChart series={seriesAtGranularity} metric={chartMetric} />
             )}
           </div>
 

@@ -1204,11 +1204,14 @@ export const getLedger = async (req, res) => {
     if (type) baseFilter.type = type;
     if (status) baseFilter.status = status;
     if (q) {
+      // Escape regex specials — an unescaped user-controlled pattern here
+      // (e.g. "(a+)+$") is a ReDoS vector against the event loop.
+      const safeQ = String(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       baseFilter.$or = [
-        { reference: { $regex: q, $options: 'i' } },
-        { accountNumber: { $regex: q, $options: 'i' } },
-        { 'sender.name': { $regex: q, $options: 'i' } },
-        { 'sender.id': { $regex: q, $options: 'i' } },
+        { reference: { $regex: safeQ, $options: 'i' } },
+        { accountNumber: { $regex: safeQ, $options: 'i' } },
+        { 'sender.name': { $regex: safeQ, $options: 'i' } },
+        { 'sender.id': { $regex: safeQ, $options: 'i' } },
       ];
     }
 

@@ -1234,7 +1234,7 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
               <Badge tone={m.isKRAVerified ? 'emerald' : 'gray'} icon={m.isKRAVerified ? 'verified_user' : 'help'}>
                 {m.isKRAVerified ? 'KRA Verified' : 'KRA Not Verified'}
               </Badge>
-              <Badge tone={(ACTIVITY_STYLE[m.activityTier] || ACTIVITY_STYLE.dormant).pillTone || 'gray'} icon="bolt">
+              <Badge tone={(ACTIVITY_STYLE[m.activityTier]?.dot || '').includes('emerald') ? 'emerald' : (ACTIVITY_STYLE[m.activityTier]?.dot || '').includes('amber') ? 'amber' : 'gray'} icon="bolt">
                 {ACTIVITY_STYLE[m.activityTier]?.label || 'Dormant'}
               </Badge>
             </div>

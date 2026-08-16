@@ -608,6 +608,41 @@ export const sendAdminActionOTP = async (email, otp, actionLabel, target) => {
   }
 };
 
+// Send an internal security/ops alert to an admin — account lockouts, large
+// transfers, new privileged-account creation. Distinct from sendAdminActionOTP
+// (which asks the admin to confirm something); this just informs them.
+export const sendSecurityAlertEmail = async (email, subject, heading, details) => {
+  try {
+    const data = await resend.emails.send({
+      from: 'PayChain Security <info@paychain.co.ke>',
+      to: [email],
+      subject: `[PayChain Alert] ${subject}`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 520px; margin: auto; padding: 40px 32px; border: 1px solid #eef0ee; border-radius: 20px; background: #fff; box-shadow: 0 10px 32px rgba(6,32,27,0.08);">
+          <div style="text-align: center; margin-bottom: 24px;">${logoImgDark(116)}</div>
+          <div style="text-align: center; margin-bottom: 20px;">
+            <span style="display:inline-block;background:#fef2f2;color:#b91c1c;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;padding:4px 10px;border-radius:999px;border:1px solid #fecaca;">Security Alert</span>
+            <h2 style="margin: 12px 0 0; color: #06201B; font-size: 20px; font-weight: 800; letter-spacing: -0.3px;">${heading}</h2>
+          </div>
+          <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 18px 20px; margin-bottom: 20px; color: #374151; font-size: 14px; line-height: 1.6;">
+            ${details}
+          </div>
+          <div style="color: #8a8f8c; font-size: 12px; text-align: center; line-height: 1.6;">
+            <p style="margin: 0;">Sent at ${new Date().toISOString()} — view details in the Admin Console.</p>
+          </div>
+          <div style="margin-top: 26px; padding-top: 16px; border-top: 1px solid #eee; text-align: center;">
+            <p style="margin: 0; color: #aaa; font-size: 11px;">Automated security message — do not reply.</p>
+          </div>
+        </div>
+      `
+    });
+    return data;
+  } catch (error) {
+    console.error('❌ Resend Security Alert Error:', error);
+    throw error;
+  }
+};
+
 // Send Merchant Invite (Admin-Onboarded) — credentialless invite with a
 // single-use, time-limited setup link. We never send the password in the email.
 export const sendMerchantInvite = async (email, name, businessName, setupLink, ncbaVirtualAccountNumber, ncbaMerchantCode) => {

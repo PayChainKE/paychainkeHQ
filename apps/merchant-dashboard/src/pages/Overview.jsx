@@ -26,6 +26,7 @@ export default function Overview() {
   const [showFundAccount, setShowFundAccount] = useState(false)
   const [activeFundMethod, setActiveFundMethod] = useState(null)
   const [showDigitalWallet, setShowDigitalWallet] = useState(() => localStorage.getItem('paychain_show_wallet') !== 'false')
+  const [liveRate, setLiveRate] = useState(132.45)
 
   // A merchant only sees the Digital Wallet card after they've provisioned a
   // Stellar wallet (presence of `stellarPublicKey`). Until then the card —
@@ -59,6 +60,26 @@ export default function Overview() {
     } finally {
       setIsLoading(false)
     }
+  }, [merchant])
+
+  // Live USDC->KES rate for the digital wallet card's estimate — was
+  // previously a hardcoded *130 multiplier that would silently drift from
+  // the real market rate shown on the Wallet page.
+  useEffect(() => {
+    if (!merchant) return
+    const fetchRate = async () => {
+      try {
+        const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+        const token = localStorage.getItem('paychain_merchant_token')
+        const res = await axios.get(`${API_URL}/api/transactions/live-rate`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        if (res.data?.rate) setLiveRate(res.data.rate)
+      } catch (err) {
+        console.error('Failed to fetch live rate', err)
+      }
+    }
+    fetchRate()
   }, [merchant])
 
   // Initial load

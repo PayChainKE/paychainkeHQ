@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import { ValidatedInput } from '../components/ValidatedInput';
@@ -17,6 +17,13 @@ export default function InvoiceView() {
   const [paymentStatus, setPaymentStatus] = useState('');
   const [paymentError, setPaymentError] = useState('');
   const [justPaid, setJustPaid] = useState(false);
+  const pollIntervalRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     const fetchInvoice = async () => {
@@ -44,13 +51,35 @@ export default function InvoiceView() {
 
     try {
       const res = await axios.post(`${API_URL}/api/transactions/payment-link/${invoice.payLinkId}/pay`, { phone });
-      if (res.data.success) {
+      if (res.data.success && res.data.checkoutRequestId) {
         setPaymentStatus('Awaiting M-PESA PIN on your phone...');
-        setTimeout(() => {
-          setPaymentStatus('Payment triggered successfully. Check your phone.');
-          setIsPaying(false);
-          setJustPaid(true);
-        }, 3000);
+
+        let attempts = 0;
+        const maxAttempts = 20 // 20 * 3s = 60s
+        pollIntervalRef.current = setInterval(async () => {
+          attempts++
+          try {
+            const statusRes = await axios.get(`${API_URL}/api/transactions/public-stk-status/${res.data.checkoutRequestId}`);
+            if (statusRes.data.status === 'success') {
+              clearInterval(pollIntervalRef.current);
+              setPaymentStatus('');
+              setIsPaying(false);
+              setJustPaid(true);
+            } else if (statusRes.data.status === 'failed') {
+              clearInterval(pollIntervalRef.current);
+              setPaymentError(statusRes.data.resultDesc || 'Payment was cancelled or declined.');
+              setPaymentStatus('');
+              setIsPaying(false);
+            } else if (attempts >= maxAttempts) {
+              clearInterval(pollIntervalRef.current);
+              setPaymentError("We couldn't confirm your payment. If M-PESA deducted your money, it will still reach the merchant — check your M-PESA messages.");
+              setPaymentStatus('');
+              setIsPaying(false);
+            }
+          } catch (e) {
+            console.error('STK status poll error', e);
+          }
+        }, 3000)
       }
     } catch (err) {
       setPaymentError(err.response?.data?.error || 'Failed to trigger payment on your phone.');

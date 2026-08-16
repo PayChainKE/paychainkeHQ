@@ -10,6 +10,12 @@ const DOC_TYPES = [
   { key: 'address_proof', label: 'Proof of Address' },
 ];
 
+// Mirrors the backend multer limit (backend/utils/cloudinary.js) — checking
+// client-side gives an immediate, specific error instead of letting an
+// oversized file reach the server and bounce back as a raw non-JSON
+// MulterError the submit handler's generic catch can't explain.
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+
 const NewApplication = () => {
   const navigate = useNavigate();
   const [form, setForm] = useState({ name: '', email: '', phone: '', businessName: '', businessType: '', kraPin: '', businessNumber: '' });
@@ -122,6 +128,16 @@ const inputClass = 'w-full px-3 py-2.5 border border-outline-variant/40 rounded-
 const DocUploadField = ({ label, file, onChange }) => {
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
+  const [sizeError, setSizeError] = useState('');
+
+  const handleSelect = (picked) => {
+    if (picked && picked.size > MAX_FILE_SIZE_BYTES) {
+      setSizeError(`File is too large (max 10MB). "${picked.name}" is ${(picked.size / (1024 * 1024)).toFixed(1)}MB.`);
+      return;
+    }
+    setSizeError('');
+    onChange(picked);
+  };
 
   return (
     <div>
@@ -136,7 +152,7 @@ const DocUploadField = ({ label, file, onChange }) => {
           Take Photo
         </button>
         {file && (
-          <button type="button" onClick={() => onChange(null)} title="Remove" className="p-2 text-on-surface-variant/40 hover:text-red-600 transition-colors">
+          <button type="button" onClick={() => { setSizeError(''); onChange(null); }} title="Remove" className="p-2 text-on-surface-variant/40 hover:text-red-600 transition-colors">
             <span className="material-symbols-outlined text-sm">close</span>
           </button>
         )}
@@ -145,7 +161,7 @@ const DocUploadField = ({ label, file, onChange }) => {
         ref={fileInputRef}
         type="file"
         accept="image/jpeg,image/png,application/pdf"
-        onChange={(e) => onChange(e.target.files?.[0] || null)}
+        onChange={(e) => handleSelect(e.target.files?.[0] || null)}
         className="hidden"
       />
       <input
@@ -153,10 +169,14 @@ const DocUploadField = ({ label, file, onChange }) => {
         type="file"
         accept="image/*"
         capture="environment"
-        onChange={(e) => onChange(e.target.files?.[0] || null)}
+        onChange={(e) => handleSelect(e.target.files?.[0] || null)}
         className="hidden"
       />
-      <p className="text-2xs text-on-surface-variant/60 mt-1.5 truncate">{file ? file.name : 'No document selected yet'}</p>
+      {sizeError ? (
+        <p className="text-2xs text-red-600 mt-1.5">{sizeError}</p>
+      ) : (
+        <p className="text-2xs text-on-surface-variant/60 mt-1.5 truncate">{file ? file.name : 'No document selected yet'}</p>
+      )}
     </div>
   );
 };
@@ -169,10 +189,17 @@ const BusinessPhotosField = ({ photos, onChange }) => {
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
   const MAX_PHOTOS = 6;
+  const [sizeError, setSizeError] = useState('');
 
   function addFiles(fileList) {
     const incoming = Array.from(fileList || []);
     if (incoming.length === 0) return;
+    const oversized = incoming.find((f) => f.size > MAX_FILE_SIZE_BYTES);
+    if (oversized) {
+      setSizeError(`File is too large (max 10MB). "${oversized.name}" is ${(oversized.size / (1024 * 1024)).toFixed(1)}MB.`);
+      return;
+    }
+    setSizeError('');
     onChange([...photos, ...incoming].slice(0, MAX_PHOTOS));
   }
   function removeAt(index) {
@@ -218,6 +245,9 @@ const BusinessPhotosField = ({ photos, onChange }) => {
         onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }}
         className="hidden"
       />
+      {sizeError && (
+        <p className="text-2xs text-red-600 mt-1.5">{sizeError}</p>
+      )}
       {photos.length === 0 ? (
         <p className="text-2xs text-on-surface-variant/60 mt-1.5">No photos added — optional, skip if not applicable</p>
       ) : (

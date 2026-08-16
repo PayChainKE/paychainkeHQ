@@ -12,8 +12,6 @@ const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
 export default function MyAccounts() {
   const { merchant } = useMerchantAuth()
   const { addToast } = useToast()
-  const [searchTerm, setSearchTerm] = useState('')
-  const [entries, setEntries] = useState(10)
   const [qrAccount, setQrAccount] = useState(null)
   const [qrCodeDataUri, setQrCodeDataUri] = useState('')
   const [downloadingSticker, setDownloadingSticker] = useState(false)
@@ -248,33 +246,6 @@ export default function MyAccounts() {
           </div>
 
           <div className="p-6 lg:p-8">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-              <div className="flex items-center gap-2 text-xs font-bold text-primary">
-                <span className="text-on-surface-variant opacity-70">Show</span>
-                <select
-                  className="bg-surface-container-low border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-emerald-500/50"
-                  value={entries}
-                  onChange={(e) => setEntries(Number(e.target.value))}
-                >
-                  <option value={10}>10</option>
-                  <option value={25}>25</option>
-                  <option value={50}>50</option>
-                </select>
-                <span className="text-on-surface-variant opacity-70">entries</span>
-              </div>
-
-              <div className="relative w-full md:w-64">
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant opacity-50 text-lg">search</span>
-                <input
-                  type="text"
-                  placeholder="Search accounts..."
-                  className="w-full bg-surface-container-low border border-slate-300 rounded-xl py-2.5 pl-10 pr-4 text-sm font-medium text-primary focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 outline-none transition-all"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-            </div>
-
             <div className="overflow-x-auto custom-scrollbar pb-4">
               <table className="w-full text-left min-w-[900px] border-collapse border border-slate-300">
                 <thead>

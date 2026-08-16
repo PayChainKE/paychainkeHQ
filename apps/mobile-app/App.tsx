@@ -8,6 +8,7 @@ import { Text, TextInput } from 'react-native';
 import MobileLayout from './src/components/layout/MobileLayout';
 import AppNavigator from './src/navigation/AppNavigator';
 import { AuthProvider } from './src/context/AuthContext';
+import Sentry from './src/lib/sentry';
 
 // Prevent system text scaling and default font overrides across the entire application
 // @ts-ignore
@@ -22,7 +23,7 @@ if (TextInput.defaultProps == null) TextInput.defaultProps = {};
 // @ts-ignore
 TextInput.defaultProps.allowFontScaling = false;
 
-export default function App() {
+function App() {
   const [fontsLoaded] = useFonts({
     PlusJakartaSans_400Regular,
     PlusJakartaSans_600SemiBold,
@@ -45,3 +46,5 @@ export default function App() {
     </AuthProvider>
   );
 }
+
+export default Sentry.wrap(App);

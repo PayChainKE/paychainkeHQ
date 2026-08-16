@@ -1,6 +1,7 @@
 import Transaction from '../models/Transaction.js';
 import Merchant from '../models/Merchant.js';
 import PaymentLink from '../models/PaymentLink.js';
+import STKRequest from '../models/STKRequest.js';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { initiateAndTrackNcbaStk } from './mpesaController.js';
@@ -15,6 +16,14 @@ import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { getNcbaVirtualAccountNumber, validatePhoneNumber, NcbaValidationError } from '../utils/ncbaValidators.js';
 import { generateMerchantStickerPdf } from '../utils/stickerGenerator.js';
+import { claimPayoutSubmission, DuplicateSubmissionError } from '../utils/idempotencyGuard.js';
+import { notifyAdmins } from '../utils/securityAlerts.js';
+
+// Transfers at or above this amount get an admin visibility alert — not a
+// block, just a heads-up. Configurable since "large" depends on the
+// merchant base's real transaction sizes; defaults to a conservative
+// KES 500,000 in case the env var is unset.
+const LARGE_TRANSACTION_ALERT_KES = Number(process.env.LARGE_TRANSACTION_ALERT_KES) || 500_000;
 
 // Resolves either the 12-digit NCBA virtual account number or the 8-digit
 // interim merchant code (see getNcbaVirtualAccountNumber) to a merchant.
@@ -444,6 +453,17 @@ export const sendMoney = async (req, res) => {
     }
     await resetPinAttempts(merchantId);
 
+    // Same fingerprint-based dedup used by B2C/B2B/bulk-pay/bank-transfer —
+    // this endpoint was the one payout path without it, so a double-click
+    // or a client's automatic retry on a slow response could double-debit
+    // the merchant before this.
+    try {
+      await claimPayoutSubmission(merchantId, ['send-money', destination, amount, reference]);
+    } catch (e) {
+      if (e instanceof DuplicateSubmissionError) return res.status(409).json({ error: e.message });
+      throw e;
+    }
+
     // Atomic conditional deduct — avoids the read-then-write race of
     // fetching balance, checking it, then saving separately, where two
     // concurrent requests could both pass the check against the same
@@ -455,6 +475,17 @@ export const sendMoney = async (req, res) => {
     );
     if (!merchant) {
       return res.status(400).json({ error: 'Insufficient KES balance for this transfer.' });
+    }
+
+    if (totalDeduction >= LARGE_TRANSACTION_ALERT_KES) {
+      notifyAdmins({
+        type: 'large_transaction',
+        severity: 'info',
+        subject: 'Large transfer sent',
+        heading: 'Large Transaction Alert',
+        details: `Merchant <strong>${merchant.businessName || merchant.phone}</strong> sent <strong>KES ${totalDeduction.toLocaleString()}</strong> to ${reference || destination || 'a recipient'}.`,
+        metadata: { merchantId: String(merchant._id), amount: totalDeduction, destination: reference || destination || null },
+      });
     }
 
     const ref = `OUT-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
@@ -698,6 +729,37 @@ export const processPaymentLink = async (req, res) => {
   } catch (error) {
     console.error('❌ Payment Link Processing Error:', error.response?.data || error.message);
     res.status(400).json({ error: 'Failed to trigger payment on your phone.' });
+  }
+};
+
+// @desc    Public STK status poll for the three unauthenticated checkout
+//          pages (PaymentPage/PayAccountPage/InvoiceView — no merchant JWT
+//          to gate on, unlike getSTKStatus in mpesaController.js which is
+//          protectMerchant-scoped). These pages previously showed a fixed
+//          `setTimeout` "Payment triggered successfully" message with no
+//          real confirmation — a customer whose M-Pesa PIN was wrong,
+//          cancelled, or timed out still saw "success". checkoutRequestId
+//          is a bank-issued opaque transaction reference (not a guessable
+//          sequence) only ever handed to the customer who just triggered
+//          this exact STK push, and this only ever returns a bare
+//          status/message — same minimal shape as the authenticated
+//          version, no amount/merchant/phone detail — so exposing it
+//          without a merchant JWT carries the same trust model as the
+//          public payment-link/pay-account lookups already on this router.
+// @route   GET /api/transactions/public-stk-status/:checkoutId
+// @access  Public (rate-limited at the route layer)
+export const getPublicSTKStatus = async (req, res) => {
+  try {
+    const { checkoutId } = req.params;
+    const stkReq = await STKRequest.findOne({ checkoutRequestId: checkoutId });
+    if (!stkReq) return res.status(404).json({ error: 'Request not found' });
+
+    res.status(200).json({
+      status: stkReq.status,
+      resultDesc: stkReq.resultDesc,
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Server error fetching payment status' });
   }
 };
 
