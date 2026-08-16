@@ -23,11 +23,20 @@ const developerPaymentSchema = new mongoose.Schema({
   // read-only, purely so a GET can show the caller what key produced this
   // payment; the guard itself lives in PayoutIdempotencyGuard.
   idempotencyKey: { type: String, required: true, index: true },
-  // { phone } for a collect, { bankCode, accountNumber, accountName } for a payout.
+  // { phone } for a collect, { bankCode, accountNumber, accountName } (bank),
+  // { phone, network } (mobile money), or { paybillNumber | tillNumber,
+  // accountReference } (paybill/till) for a payout.
   counterparty: { type: mongoose.Schema.Types.Mixed, default: {} },
   // Only ever set for mode:'live' — the real record once it exists.
   linkedTransactionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Transaction', default: null },
   linkedStkCheckoutId: { type: String, default: null },
+  // Set for a live mobile-money/paybill/till payout — those rails confirm
+  // asynchronously (unlike bank, which resolves synchronously below), so
+  // this is how resolvePendingOpenBankingTransaction (ncbaOpenBankingController.js)
+  // finds this record to sync once NCBA's callback (or the reconciliation
+  // sweep) actually resolves it. Same matching idiom as linkedStkCheckoutId
+  // above, just for a different async rail.
+  linkedPayoutReference: { type: String, default: null },
 }, {
   timestamps: true,
 });

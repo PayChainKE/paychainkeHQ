@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { KeyRound, Webhook, Banknote, ArrowRight, Radio, Users, CheckCircle2 } from "lucide-react";
 import CodeGroup from "@/components/CodeGroup";
 import Callout from "@/components/Callout";
+import { useDeveloperAuth } from "@/context/DeveloperAuthContext";
 
 const CARDS = [
   { icon: KeyRound, title: "Authentication", desc: "Test and live API keys, and how to send them.", to: "/authentication" },
@@ -18,6 +19,8 @@ const TRUST_STRIP = [
 ];
 
 export default function Introduction() {
+  const { developer } = useDeveloperAuth();
+
   return (
     <>
       <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-brand/10 border border-brand/20 mb-5">
@@ -33,13 +36,23 @@ export default function Introduction() {
         This is the whole thing: one request, one key:
       </p>
 
-      <div className="flex flex-wrap gap-x-5 gap-y-1.5 mb-7">
+      <div className="flex flex-wrap gap-x-5 gap-y-1.5 mb-5">
         {TRUST_STRIP.map((t) => (
           <span key={t} className="flex items-center gap-1.5 text-[12.5px] text-ink-muted">
             <CheckCircle2 className="w-3.5 h-3.5 text-brand-bright" />
             {t}
           </span>
         ))}
+      </div>
+
+      <div className="flex flex-wrap gap-3 mb-7">
+        <Link
+          to={developer ? "/dashboard/api-keys" : "/signup"}
+          className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg bg-brand text-white text-[14px] font-semibold hover:bg-brand-dim transition-colors"
+        >
+          {developer ? "Get your API keys" : "Create your free sandbox account"}
+          <ArrowRight className="w-4 h-4" />
+        </Link>
       </div>
 
       <CodeGroup
@@ -121,10 +134,12 @@ payment = res.json()['payment']`,
 
       <h2>Get your key</h2>
       <p>
-        Three calls, under two minutes, entirely in test mode: register, link your merchant,
-        create a key. Then drop the key into the example above and it runs. Exact commands for
-        each step are in the <Link to="/integration-guide">Integration Guide</Link>, along with
-        the account model and what "sandbox" actually means here.
+        <Link to="/signup">Sign up</Link> for a free account, link the merchant you're building for, and
+        create a test-mode key from your dashboard — under two minutes, no approval needed. Then
+        drop the key into the example above and it runs. Prefer the API directly? The same three
+        calls (register, link merchant, create key) are in the{" "}
+        <Link to="/integration-guide">Integration Guide</Link>, along with the account model and
+        what "sandbox" actually means here.
       </p>
       <Callout variant="tip" title="Prefer not to poll for results?">
         Register a webhook and PayChain tells you the instant a payment resolves, instead of you

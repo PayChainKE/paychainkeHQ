@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { Menu, Search, ArrowUpRight, Sun, Moon } from "lucide-react";
 import Logo from "./Logo";
 import { flatNav } from "@/data/nav";
 import { useTheme } from "@/context/ThemeContext";
+import { useDeveloperAuth } from "@/context/DeveloperAuthContext";
 
 export default function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
   const [query, setQuery] = useState("");
@@ -11,6 +12,7 @@ export default function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
+  const { developer, loading } = useDeveloperAuth();
 
   const results = query.trim()
     ? flatNav.filter(
@@ -85,6 +87,29 @@ export default function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
           paychain.co.ke
           <ArrowUpRight className="w-3.5 h-3.5" />
         </a>
+
+        {!loading && (
+          developer ? (
+            <Link
+              to="/dashboard"
+              className="px-3 py-1.5 rounded-lg bg-brand/10 border border-brand/25 text-[13px] font-semibold text-brand-bright hover:bg-brand/15 transition-colors"
+            >
+              Dashboard
+            </Link>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Link to="/login" className="hidden sm:inline-flex text-[13px] font-medium text-ink-muted hover:text-ink transition-colors">
+                Sign in
+              </Link>
+              <Link
+                to="/signup"
+                className="px-3 py-1.5 rounded-lg bg-brand text-white text-[13px] font-semibold hover:bg-brand-dim transition-colors"
+              >
+                Sign up
+              </Link>
+            </div>
+          )
+        )}
       </div>
     </header>
   );

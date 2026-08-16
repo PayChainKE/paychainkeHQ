@@ -84,7 +84,11 @@ export default function IntegrationGuide() {
       <h2>The full path, step by step</h2>
 
       <h3>1. Register a developer account</h3>
-      <p className="text-[13.5px] text-ink-muted leading-6">Email + OTP verification. This is your login, separate from any merchant login.</p>
+      <p className="text-[13.5px] text-ink-muted leading-6">
+        Email + OTP verification. This is your login, separate from any merchant login. Easiest
+        via the <Link to="/signup">sign-up form</Link> — steps 1–3 below happen there in one flow.
+        Building your own onboarding instead? Same steps, raw API:
+      </p>
       <CodeBlock
         lang="bash"
         label="curl"
