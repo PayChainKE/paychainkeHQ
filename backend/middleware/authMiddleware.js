@@ -54,6 +54,42 @@ const protect = async (req, res, next) => {
   }
 };
 
+// SSE-only variant of protect() — EventSource can't set custom headers, so
+// the admin dashboard's live-updates connection has to pass its token as a
+// query param instead of Authorization. Deliberately not folded into
+// extractToken()/protect() themselves: that would open a query-string auth
+// path on every admin route, not just this one (URLs get logged/cached in
+// more places than headers do — fine for this single long-lived read-only
+// stream, not fine as a blanket auth mechanism).
+const protectAdminSSE = async (req, res, next) => {
+  const token = extractToken(req) || (typeof req.query.token === 'string' ? req.query.token : null);
+  if (!token) return fail(res, 401, 'NO_TOKEN', 'Authentication required. Please sign in.');
+
+  let decoded;
+  try {
+    decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
+  } catch (err) {
+    const code = err?.name === 'TokenExpiredError' ? 'TOKEN_EXPIRED' : 'TOKEN_INVALID';
+    return fail(res, 401, code, 'Session invalid. Please sign in again.');
+  }
+
+  try {
+    const admin = await Admin.findById(decoded.id).select('-password');
+    if (!admin) return fail(res, 401, 'ADMIN_NOT_FOUND', 'Admin account no longer exists. Please sign in again.');
+    if (admin.status && admin.status !== 'active') {
+      return fail(res, 403, 'ADMIN_INACTIVE', `Admin account is ${admin.status}. Contact an owner.`);
+    }
+    if ((decoded.tokenVersion || 0) !== (admin.tokenVersion || 0)) {
+      return fail(res, 401, 'SESSION_REVOKED', 'This session was signed out remotely. Please sign in again.');
+    }
+    req.admin = admin;
+    return next();
+  } catch (err) {
+    console.error('protectAdminSSE() admin lookup failed:', err);
+    return fail(res, 500, 'AUTH_LOOKUP_FAILED', 'Could not verify admin session. Try again.');
+  }
+};
+
 const protectMerchant = async (req, res, next) => {
   const token = extractToken(req);
   if (!token) return fail(res, 401, 'NO_TOKEN', 'Authentication required. Please sign in.');
@@ -193,4 +229,4 @@ const requireRole = (...allowedRoles) => (req, res, next) => {
   return next();
 };
 
-export { protect, protectMerchant, protectDeveloper, authenticateApiKey, requireRole };
+export { protect, protectAdminSSE, protectMerchant, protectDeveloper, authenticateApiKey, requireRole };

@@ -206,21 +206,25 @@ export async function safeSendSMS({ to, message } = {}) {
 }
 
 // Confirmed live (2026-08-04) against real transactions: when two SMS for
-// the same event (customer + merchant) fire back-to-back via safeSendSMS,
-// the FIRST always dispatches in under a second, but the SECOND is queued
-// by Africa's Talking for minutes — 172s, 380s, 607s and 827s across every
-// real multi-recipient transaction sampled, a 100% hit rate. That pattern
+// the same event (customer + merchant) fire back-to-back, the FIRST always
+// dispatches in under a second, but the SECOND is queued by Africa's
+// Talking for minutes — 172s, 380s, 607s and 827s across every real
+// multi-recipient transaction sampled, a 100% hit rate. That pattern
 // (always-instant first, always-delayed second) is the signature of a
 // per-second/per-minute send-rate limit on the account or sender ID, not
-// random network flakiness — spacing sends out avoids tripping it.
+// random network flakiness.
+//
+// Spacing is now guaranteed entirely by the shared queue in utils/sms.js
+// (every safeSendSMS call funnels through sendSMS's FIFO + MIN_SEND_GAP_MS
+// gate), which didn't exist when this function was first written — back
+// then this had to impose its own manual delay between sends. That queue
+// enforces the gap between ANY two sends app-wide now, in enqueue order,
+// so doing it again here would just double the wait for no extra safety.
+// Do not add a manual delay back in — it stacks on top of the queue's own
+// gap rather than replacing it.
 // Never throws — same contract as safeSendSMS. Callers that shouldn't be
-// delayed by the stagger (e.g. a webhook handler acking a third party)
-// should call this without awaiting it.
-export async function sendStaggeredSms(sends, delayMs = 2000) {
-  const results = [];
-  for (let i = 0; i < sends.length; i++) {
-    if (i > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
-    results.push(await safeSendSMS(sends[i]));
-  }
-  return results;
+// delayed (e.g. a webhook handler acking a third party) should call this
+// without awaiting it.
+export async function sendStaggeredSms(sends) {
+  return Promise.all(sends.map((send) => safeSendSMS(send)));
 }

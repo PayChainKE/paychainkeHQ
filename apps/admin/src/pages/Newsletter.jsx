@@ -38,6 +38,22 @@ export default function Newsletter() {
   const [campaignPage, setCampaignPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState('all'); // all | active | inactive
 
+  // Recipient targeting — when non-empty, "Compose Newsletter" sends only
+  // to these subscribers instead of every active one.
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const toggleSelected = (id) => setSelectedIds((prev) => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+  const togglePageSelected = () => setSelectedIds((prev) => {
+    const pageIds = paged.map((s) => s._id);
+    const allSelected = pageIds.length > 0 && pageIds.every((id) => prev.has(id));
+    const next = new Set(prev);
+    pageIds.forEach((id) => (allSelected ? next.delete(id) : next.add(id)));
+    return next;
+  });
+
   // Compose modal
   const [composeOpen, setComposeOpen] = useState(false);
   const [composeSubject, setComposeSubject] = useState('');
@@ -239,10 +255,12 @@ export default function Newsletter() {
         body: pendingSend.htmlBody,
         htmlMode: true,   // rich HTML from the editor is passed through to Resend as-is
         draftId: activeDraftId, // backend deletes the draft this was composed from, if any
+        recipientIds: selectedIds.size > 0 ? Array.from(selectedIds) : undefined,
       });
       if (res.data?.success) {
         setComposeDone(res.data);
         setActiveDraftId(null);
+        setSelectedIds(new Set());
         fetchAll();
         fetchDrafts();
       } else {
@@ -281,13 +299,19 @@ export default function Newsletter() {
             <p className="text-on-surface-variant/60 mt-1 text-xs md:text-sm font-body">Grow your audience, send updates, and track delivery.</p>
           </div>
           <div className="flex items-center gap-2">
+            {selectedIds.size > 0 && (
+              <button onClick={() => setSelectedIds(new Set())} className="flex items-center gap-1.5 px-3 py-2.5 text-on-surface-variant/60 text-2xs font-bold uppercase tracking-widest hover:text-on-surface transition-colors">
+                <span className="material-symbols-outlined text-sm">close</span>
+                {selectedIds.size} selected
+              </button>
+            )}
             <button onClick={downloadCsv} className="flex items-center gap-2 px-4 py-2.5 bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs font-bold rounded-lg hover:bg-surface-container-low transition-colors shadow-sm uppercase tracking-widest font-label">
               <span className="material-symbols-outlined text-sm">file_download</span>
               Export
             </button>
             <button onClick={openCompose} className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white text-xs font-bold rounded-lg shadow-md hover:shadow-lg transition-all uppercase tracking-widest font-label">
               <span className="material-symbols-outlined text-sm">edit_note</span>
-              Compose Newsletter
+              {selectedIds.size > 0 ? `Compose to ${selectedIds.size} Selected` : 'Compose Newsletter'}
             </button>
           </div>
         </div>
@@ -376,6 +400,17 @@ export default function Newsletter() {
               <table className="w-full text-left border-collapse font-body">
                 <thead>
                   <tr className="bg-surface-container-low/50">
+                    <th className="px-4 py-3 w-8">
+                      {paged.length > 0 && (
+                        <input
+                          type="checkbox"
+                          checked={paged.length > 0 && paged.every((s) => selectedIds.has(s._id))}
+                          onChange={togglePageSelected}
+                          className="w-4 h-4 accent-primary"
+                          title="Select all on this page"
+                        />
+                      )}
+                    </th>
                     <Th>#</Th>
                     <Th>Email</Th>
                     <Th>Status</Th>
@@ -386,7 +421,15 @@ export default function Newsletter() {
                 </thead>
                 <tbody className="text-xs">
                   {paged.map((s, i) => (
-                    <tr key={s._id} className="hover:bg-secondary-container/5 transition-colors group">
+                    <tr key={s._id} className={`hover:bg-secondary-container/5 transition-colors group ${selectedIds.has(s._id) ? 'bg-primary/5' : ''}`}>
+                      <td className="px-4 py-2 border-b border-outline-variant/5">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(s._id)}
+                          onChange={() => toggleSelected(s._id)}
+                          className="w-4 h-4 accent-primary"
+                        />
+                      </td>
                       <td className="px-3 py-2 text-on-surface-variant/40 border-b border-outline-variant/5 text-2xs tabular-nums">{String((page - 1) * PAGE_SIZE + i + 1).padStart(3, '0')}</td>
                       <td className="px-3 py-2 border-b border-outline-variant/5">
                         <p className="font-bold text-on-surface tracking-tight">{s.email}</p>
@@ -432,7 +475,7 @@ export default function Newsletter() {
                   ))}
                   {filtered.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="py-12 text-center text-on-surface-variant/40">
+                      <td colSpan={7} className="py-12 text-center text-on-surface-variant/40">
                         {subscribers.length === 0 ? 'No subscribers yet — add one above or wait for public signups.' : 'No subscribers match this filter.'}
                       </td>
                     </tr>
@@ -534,7 +577,8 @@ export default function Newsletter() {
         <NewsletterComposer
           subject={composeSubject}
           onSubject={setComposeSubject}
-          activeCount={stats.active}
+          activeCount={selectedIds.size > 0 ? selectedIds.size : stats.active}
+          targeted={selectedIds.size > 0}
           busy={composeBusy}
           error={composeError}
           done={composeDone}
@@ -581,7 +625,7 @@ export default function Newsletter() {
             </div>
             <h3 className="text-xl font-bold text-on-surface mb-1">Send campaign?</h3>
             <p className="text-sm text-on-surface-variant mb-5">
-              Send "<strong>{composeSubject.trim()}</strong>" to <strong>{stats.active}</strong> active subscriber{stats.active === 1 ? '' : 's'}? This cannot be undone.
+              Send "<strong>{composeSubject.trim()}</strong>" to <strong>{selectedIds.size > 0 ? selectedIds.size : stats.active}</strong> {selectedIds.size > 0 ? 'selected' : 'active'} subscriber{(selectedIds.size > 0 ? selectedIds.size : stats.active) === 1 ? '' : 's'}? This cannot be undone.
             </p>
             <div className="flex gap-3">
               <button onClick={() => setPendingSend(null)} disabled={composeBusy} className="flex-1 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40">Cancel</button>

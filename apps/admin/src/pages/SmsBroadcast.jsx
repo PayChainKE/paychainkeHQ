@@ -72,6 +72,8 @@ export default function SmsBroadcast() {
   const [historyLoading, setHistoryLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [selectedHistoryIds, setSelectedHistoryIds] = useState(new Set());
+  const [clearState, setClearState] = useState(null); // { mode: 'selected'|'all', busy, error } | null
 
   const [pendingSend, setPendingSend] = useState(false);
   const [sending, setSending] = useState(false);
@@ -106,6 +108,36 @@ export default function SmsBroadcast() {
   }, []);
 
   useEffect(() => { fetchMerchants(); fetchHistory(1); }, [fetchMerchants, fetchHistory]);
+
+  const toggleHistorySelected = (id) => {
+    setSelectedHistoryIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+  const toggleAllHistorySelected = () => {
+    setSelectedHistoryIds((prev) => (prev.size === history.length ? new Set() : new Set(history.map((h) => h._id))));
+  };
+
+  async function confirmClearHistory() {
+    if (!clearState) return;
+    setClearState((s) => ({ ...s, busy: true, error: '' }));
+    try {
+      if (clearState.mode === 'selected') {
+        const res = await api.post('/api/admin/sms-broadcasts/clear', { ids: Array.from(selectedHistoryIds) });
+        showToast(res.data?.message || 'Removed.');
+      } else {
+        const res = await api.post('/api/admin/sms-broadcasts/clear', {});
+        showToast(res.data?.message || 'History cleared.');
+      }
+      setSelectedHistoryIds(new Set());
+      setClearState(null);
+      fetchHistory(1);
+    } catch (e) {
+      setClearState((s) => ({ ...s, busy: false, error: e?.response?.data?.error || 'Could not clear history.' }));
+    }
+  }
 
   const merchantsWithPhone = useMemo(() => merchants.filter((m) => !!m.phone), [merchants]);
   const filteredMerchants = useMemo(() => {
@@ -299,8 +331,39 @@ export default function SmsBroadcast() {
 
           {/* History */}
           <div className="lg:col-span-2 bg-surface-container-lowest border border-outline-variant/10 rounded-2xl overflow-hidden flex flex-col">
-            <div className="px-5 py-4 border-b border-outline-variant/10">
-              <p className="text-sm font-bold text-on-surface">Broadcast History</p>
+            <div className="px-5 py-4 border-b border-outline-variant/10 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-3">
+                {history.length > 0 && (
+                  <input
+                    type="checkbox"
+                    checked={selectedHistoryIds.size > 0 && selectedHistoryIds.size === history.length}
+                    onChange={toggleAllHistorySelected}
+                    className="w-4 h-4 accent-primary"
+                    title="Select all on this page"
+                  />
+                )}
+                <p className="text-sm font-bold text-on-surface">Broadcast History</p>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {selectedHistoryIds.size > 0 && (
+                  <button
+                    onClick={() => setClearState({ mode: 'selected', busy: false, error: '' })}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-2xs font-bold text-red-600 hover:bg-red-50 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-sm">delete</span>
+                    Delete {selectedHistoryIds.size}
+                  </button>
+                )}
+                {history.length > 0 && (
+                  <button
+                    onClick={() => setClearState({ mode: 'all', busy: false, error: '' })}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-2xs font-bold text-on-surface-variant/60 hover:bg-surface-container-low transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-sm">delete_sweep</span>
+                    Clear history
+                  </button>
+                )}
+              </div>
             </div>
             <div className="flex-1 overflow-y-auto divide-y divide-outline-variant/5 max-h-[600px]">
               {historyLoading ? (
@@ -311,22 +374,39 @@ export default function SmsBroadcast() {
                 history.map((h) => {
                   const meta = CATEGORY_META[h.category] || CATEGORY_META.general;
                   return (
-                    <div key={h._id} className="px-5 py-3.5">
-                      <div className="flex items-center justify-between gap-2 mb-1.5">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border ${meta.color}`}>
-                          <span className="material-symbols-outlined text-[12px]">{meta.icon}</span>
-                          {meta.label}
-                        </span>
-                        <span className="text-[10px] text-on-surface-variant/40 font-bold" title={fmtDate(h.sentAt)}>{relativeTime(h.sentAt)}</span>
-                      </div>
-                      <p className="text-xs text-on-surface/80 line-clamp-2 mb-2">{h.message}</p>
-                      <div className="flex items-center justify-between text-[10px] text-on-surface-variant/50 font-bold">
-                        <span>{h.audience === 'all' ? 'All merchants' : `${h.merchantIds?.length || 0} selected`} · {h.recipientCount} recipient{h.recipientCount === 1 ? '' : 's'}</span>
-                        <span className={h.status === 'sending' ? 'text-primary' : h.failureCount ? 'text-amber-600' : 'text-emerald-600'}>
-                          {h.status === 'sending'
-                            ? 'Sending…'
-                            : `${h.successCount} sent${h.failureCount ? `, ${h.failureCount} failed` : ''}`}
-                        </span>
+                    <div key={h._id} className="px-5 py-3.5 flex gap-3 group">
+                      <input
+                        type="checkbox"
+                        checked={selectedHistoryIds.has(h._id)}
+                        onChange={() => toggleHistorySelected(h._id)}
+                        className="w-4 h-4 accent-primary mt-0.5 shrink-0"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border ${meta.color}`}>
+                            <span className="material-symbols-outlined text-[12px]">{meta.icon}</span>
+                            {meta.label}
+                          </span>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-[10px] text-on-surface-variant/40 font-bold" title={fmtDate(h.sentAt)}>{relativeTime(h.sentAt)}</span>
+                            <button
+                              onClick={() => { setSelectedHistoryIds(new Set([h._id])); setClearState({ mode: 'selected', busy: false, error: '' }); }}
+                              className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-on-surface-variant/40 hover:text-red-600 hover:bg-red-50 transition-all"
+                              title="Delete this entry"
+                            >
+                              <span className="material-symbols-outlined text-sm">delete</span>
+                            </button>
+                          </div>
+                        </div>
+                        <p className="text-xs text-on-surface/80 line-clamp-2 mb-2">{h.message}</p>
+                        <div className="flex items-center justify-between text-[10px] text-on-surface-variant/50 font-bold">
+                          <span>{h.audience === 'all' ? 'All merchants' : `${h.merchantIds?.length || 0} selected`} · {h.recipientCount} recipient{h.recipientCount === 1 ? '' : 's'}</span>
+                          <span className={h.status === 'sending' ? 'text-primary' : h.failureCount ? 'text-amber-600' : 'text-emerald-600'}>
+                            {h.status === 'sending'
+                              ? 'Sending…'
+                              : `${h.successCount} sent${h.failureCount ? `, ${h.failureCount} failed` : ''}`}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   );
@@ -368,6 +448,32 @@ export default function SmsBroadcast() {
                 className="flex-1 py-2.5 rounded-xl bg-primary text-white text-xs font-bold shadow-md hover:shadow-lg transition-all disabled:opacity-50"
               >
                 {sending ? 'Sending…' : 'Confirm & Send'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Clear history confirmation */}
+      {clearState && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <div className="w-14 h-14 rounded-full bg-red-50 text-red-600 flex items-center justify-center mb-4">
+              <span className="material-symbols-outlined text-3xl">delete</span>
+            </div>
+            <h3 className="text-xl font-bold text-on-surface mb-1">
+              {clearState.mode === 'all' ? 'Clear entire history?' : `Delete ${selectedHistoryIds.size} ${selectedHistoryIds.size === 1 ? 'entry' : 'entries'}?`}
+            </h3>
+            <p className="text-sm text-on-surface-variant mb-5">
+              {clearState.mode === 'all'
+                ? 'Permanently removes every SMS broadcast history record. This does not un-send any SMS already delivered — only the history record.'
+                : 'Permanently removes the selected broadcast history record(s). This does not un-send any SMS already delivered.'}
+            </p>
+            {clearState.error && <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium mb-4">{clearState.error}</div>}
+            <div className="flex gap-3">
+              <button onClick={() => setClearState(null)} disabled={clearState.busy} className="flex-1 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40">Cancel</button>
+              <button onClick={confirmClearHistory} disabled={clearState.busy} className="flex-1 py-2.5 rounded-lg bg-red-600 text-white text-sm font-semibold uppercase tracking-widest hover:bg-red-700 disabled:opacity-50">
+                {clearState.busy ? 'Removing…' : 'Delete'}
               </button>
             </div>
           </div>

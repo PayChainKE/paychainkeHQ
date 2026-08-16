@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../api/api';
+import api, { API_BASE_URL } from '../api/api';
 import { useIdleTimer, markPersistedActive, isPersistedIdleExpired } from '../hooks/useIdleTimer';
 import SessionTimeoutModal from '../components/modals/SessionTimeoutModal';
+import { triggerSync } from '../utils/syncBus';
 
 const AuthContext = createContext();
 const LAST_ACTIVE_KEY = 'paychain_admin_last_active';
@@ -106,6 +107,26 @@ export function AuthProvider({ children }){
     enabled: !!admin,
     storageKey: LAST_ACTIVE_KEY,
   });
+
+  // Live dashboard updates — one Server-Sent Events connection per
+  // authenticated session, mounted here (rather than per-page) so it
+  // survives route navigation instead of reconnecting on every page.
+  // EventSource can't set an Authorization header, so the token travels as
+  // a query param to the SSE-only auth variant on the backend
+  // (protectAdminSSE) rather than the header everything else uses.
+  useEffect(() => {
+    if (!admin) return undefined;
+    const token = localStorage.getItem('paychain_admin_token');
+    if (!token) return undefined;
+
+    const source = new EventSource(`${API_BASE_URL}/api/admin/events/stream?token=${encodeURIComponent(token)}`);
+    source.addEventListener('transaction', () => triggerSync());
+    // Errors (network blip, server restart) are swallowed — EventSource
+    // retries the connection on its own; nothing for the UI to show here.
+    source.onerror = () => {};
+
+    return () => source.close();
+  }, [admin]);
 
   return (
     <AuthContext.Provider value={{ admin, isLoading, isAuthenticated: !!admin, login, verifyOtp, logout }}>

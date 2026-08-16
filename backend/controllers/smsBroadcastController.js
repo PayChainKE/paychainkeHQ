@@ -1,6 +1,9 @@
+import mongoose from 'mongoose';
 import Merchant from '../models/Merchant.js';
 import SmsBroadcast from '../models/SmsBroadcast.js';
 import { sendSMS } from '../utils/sms.js';
+import { logAudit } from '../utils/auditLog.js';
+import { adminActor } from './adminController.js';
 
 const CATEGORIES = ['maintenance', 'holiday', 'security', 'general'];
 // ~6 concatenated SMS segments (153 chars/part once concatenated) — a
@@ -111,6 +114,62 @@ export const getSmsBroadcasts = async (req, res) => {
     });
   } catch (error) {
     console.error('Get SMS Broadcasts Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Delete one SMS broadcast history entry. Doesn't un-send the SMS
+//          (already delivered or not) — this only removes the record.
+// @route   DELETE /api/admin/sms-broadcasts/:id
+// @access  Private (Admin — owner/admin only, see routes)
+export const deleteSmsBroadcast = async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid id.' });
+    }
+    const broadcast = await SmsBroadcast.findById(req.params.id);
+    if (!broadcast) return res.status(404).json({ error: 'Broadcast not found.' });
+
+    logAudit({
+      action: 'admin.sms_broadcast.deleted', category: 'admin', severity: 'info',
+      message: `Deleted SMS broadcast history entry — "${broadcast.message.slice(0, 60)}" (sent to ${broadcast.recipientCount})`,
+      actor: adminActor(req.admin), req,
+      metadata: { broadcastId: String(broadcast._id) },
+    });
+
+    await SmsBroadcast.deleteOne({ _id: broadcast._id });
+    res.json({ success: true, message: 'Broadcast removed.' });
+  } catch (error) {
+    console.error('Delete SMS Broadcast Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Clear SMS broadcast history — either every record, or a specific
+//          set of ids (matches the "select rows, delete selected" pattern
+//          in the admin table). Never un-sends anything already delivered.
+// @route   POST /api/admin/sms-broadcasts/clear
+// @access  Private (Admin — owner/admin only, see routes)
+export const clearSmsBroadcasts = async (req, res) => {
+  try {
+    const { ids } = req.body || {};
+    const clearingAll = !Array.isArray(ids) || ids.length === 0;
+
+    const filter = clearingAll ? {} : { _id: { $in: ids.filter((id) => mongoose.Types.ObjectId.isValid(id)) } };
+    const result = await SmsBroadcast.deleteMany(filter);
+
+    logAudit({
+      action: 'admin.sms_broadcast.cleared', category: 'admin', severity: 'warning',
+      message: clearingAll
+        ? `Cleared entire SMS broadcast history (${result.deletedCount} entries)`
+        : `Deleted ${result.deletedCount} selected SMS broadcast history entries`,
+      actor: adminActor(req.admin), req,
+      metadata: { deletedCount: result.deletedCount, clearingAll },
+    });
+
+    res.json({ success: true, message: `Removed ${result.deletedCount} broadcast${result.deletedCount === 1 ? '' : 's'}.`, deletedCount: result.deletedCount });
+  } catch (error) {
+    console.error('Clear SMS Broadcasts Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };

@@ -137,7 +137,7 @@ export const deleteSubscriber = async (req, res) => {
 // @access  Private (Admin)
 export const sendCampaign = async (req, res) => {
   try {
-    const { subject, body, htmlMode, draftId } = req.body || {};
+    const { subject, body, htmlMode, draftId, recipientIds } = req.body || {};
     if (!subject || String(subject).trim().length < 3) {
       return res.status(400).json({ error: 'Subject is required (min 3 chars).' });
     }
@@ -145,9 +145,18 @@ export const sendCampaign = async (req, res) => {
       return res.status(400).json({ error: 'Body is required (min 10 chars).' });
     }
 
-    const subscribers = await Subscription.find({ active: true }).select('email').lean();
+    // Optional targeting — when the admin has selected specific rows in the
+    // subscribers table, send only to those. Always re-filtered to
+    // active:true here regardless of what was selected client-side, so a
+    // stale/inactive id in the selection can never actually get emailed.
+    const validRecipientIds = Array.isArray(recipientIds)
+      ? recipientIds.filter((id) => mongoose.Types.ObjectId.isValid(id))
+      : [];
+    const hasSelection = validRecipientIds.length > 0;
+    const query = hasSelection ? { _id: { $in: validRecipientIds }, active: true } : { active: true };
+    const subscribers = await Subscription.find(query).select('email').lean();
     if (subscribers.length === 0) {
-      return res.status(400).json({ error: 'No active subscribers to send to.' });
+      return res.status(400).json({ error: hasSelection ? 'None of the selected subscribers are active.' : 'No active subscribers to send to.' });
     }
 
     // Plain text → paragraphs. HTML mode trusts the admin (it's our own UI).

@@ -220,6 +220,36 @@ function ImageDialog({ onConfirm, onCancel }) {
   );
 }
 
+// TipTap's built-in Image extension is normally styled via a Tailwind
+// class (`max-w-full`), but that class only exists in this admin app's own
+// compiled stylesheet — it's absent from the raw HTML fragment
+// (editor.getHTML()) that actually gets emailed via Resend, so uploaded
+// images rendered at full pixel width (up to Cloudinary's 800px cap) with
+// no cap or styling in the real inbox, even though the in-app preview
+// (which does have Tailwind loaded) looked fine. Extending with a `width`
+// node attribute that renders as an inline `style` fixes that for every
+// image regardless of size, and doubles as the size control below —
+// inline styles survive being extracted into a standalone HTML string.
+const ResizableImage = Image.extend({
+  addAttributes() {
+    return {
+      ...this.parent(),
+      width: {
+        default: '100%',
+        renderHTML: (attrs) => ({
+          style: `max-width:100%;width:${attrs.width};height:auto;display:block;margin:12px auto;border-radius:8px;`,
+        }),
+      },
+    };
+  },
+});
+
+const IMAGE_SIZES = [
+  { value: '33%', label: 'S' },
+  { value: '66%', label: 'M' },
+  { value: '100%', label: 'Full' },
+];
+
 // ── Main composer ─────────────────────────────────────────────────────
 // `initialContent` seeds the editor once at mount — used when continuing a
 // saved draft. Fine as mount-only: Newsletter.jsx conditionally renders
@@ -227,7 +257,7 @@ function ImageDialog({ onConfirm, onCancel }) {
 // switching drafts always remounts it fresh rather than needing a
 // setContent() effect to sync a changed prop into a live editor.
 export default function NewsletterComposer({
-  subject, onSubject, activeCount, busy, error, done, onSend, onClose,
+  subject, onSubject, activeCount, targeted, busy, error, done, onSend, onClose,
   initialContent, draftStatus, onSaveDraft,
 }) {
   const [showPreview, setShowPreview] = useState(false);
@@ -239,7 +269,7 @@ export default function NewsletterComposer({
       StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
       Underline,
       Link.configure({ openOnClick: false, HTMLAttributes: { class: 'text-primary underline' } }),
-      Image.configure({ inline: false, HTMLAttributes: { class: 'max-w-full rounded-lg my-2' } }),
+      ResizableImage.configure({ inline: false }),
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       Color,
       Placeholder.configure({ placeholder: 'Write your newsletter here…' }),
@@ -333,8 +363,10 @@ export default function NewsletterComposer({
             <div className="flex items-center gap-3 px-5 py-2.5 border-b border-outline-variant/15 bg-surface-container-lowest/30 shrink-0">
               <span className="text-2xs font-bold text-on-surface-variant/40 uppercase tracking-widest w-12 shrink-0">To</span>
               <span className="text-xs text-on-surface-variant/70 font-medium">
-                {activeCount} active subscriber{activeCount !== 1 ? 's' : ''}
-                <span className="ml-2 px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full text-2xs font-bold border border-emerald-100">Verified list</span>
+                {activeCount} {targeted ? 'selected' : 'active'} subscriber{activeCount !== 1 ? 's' : ''}
+                <span className={`ml-2 px-2 py-0.5 rounded-full text-2xs font-bold border ${targeted ? 'bg-primary/10 text-primary border-primary/20' : 'bg-emerald-50 text-emerald-700 border-emerald-100'}`}>
+                  {targeted ? 'Targeted send' : 'Verified list'}
+                </span>
               </span>
             </div>
 
@@ -422,6 +454,23 @@ export default function NewsletterComposer({
               <ToolBtn onClick={() => setImageDialog(true)} title="Insert image">
                 <span className="material-symbols-outlined text-base">image</span>
               </ToolBtn>
+
+              {/* Image size — only shows when the cursor is on an image */}
+              {editor?.isActive('image') && (
+                <>
+                  <Divider />
+                  {IMAGE_SIZES.map((s) => (
+                    <ToolBtn
+                      key={s.value}
+                      onClick={() => editor.chain().focus().updateAttributes('image', { width: s.value }).run()}
+                      active={editor.getAttributes('image').width === s.value}
+                      title={`Image size: ${s.label}`}
+                    >
+                      <span className="text-2xs font-black">{s.label}</span>
+                    </ToolBtn>
+                  ))}
+                </>
+              )}
 
               <Divider />
 

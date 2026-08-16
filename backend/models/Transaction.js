@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { calculateFees } from '../utils/feeCalculator.js';
+import { broadcastAdminEvent } from '../utils/adminEventStream.js';
 
 const transactionSchema = new mongoose.Schema({
   merchantId: {
@@ -126,6 +127,33 @@ transactionSchema.pre('insertMany', function(docs) {
     doc.revenueStream = streamId;
   }
 });
+
+// Live-push the admin dashboard the instant a transaction settles — covers
+// both `new Transaction().save()`/`.create()` (post-save) and
+// `findByIdAndUpdate`/`findOneAndUpdate` (post-findOneAndUpdate), the two
+// ways controllers move a transaction to a terminal status across this
+// codebase. Deliberately not trying to detect whether this was actually a
+// *fresh* transition into completed/verified (no prior-value tracking
+// exists to check against) — an occasional redundant broadcast just costs
+// one harmless extra admin refetch, which is a fine trade against the
+// complexity of precise transition-detection. Broadcasting must never be
+// able to fail the save/update itself, so any error here is swallowed.
+function broadcastIfSettled(doc) {
+  if (!doc || !['completed', 'verified'].includes(doc.status)) return;
+  try {
+    broadcastAdminEvent('transaction', {
+      transactionId: String(doc._id),
+      merchantId: doc.merchantId ? String(doc.merchantId) : null,
+      type: doc.type,
+      status: doc.status,
+    });
+  } catch (err) {
+    console.error('Admin event broadcast failed:', err?.message || err);
+  }
+}
+
+transactionSchema.post('save', function(doc) { broadcastIfSettled(doc); });
+transactionSchema.post('findOneAndUpdate', function(doc) { broadcastIfSettled(doc); });
 
 const Transaction = mongoose.model('Transaction', transactionSchema);
 

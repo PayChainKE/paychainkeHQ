@@ -58,7 +58,7 @@ import {
 } from '../controllers/officerAccountController.js';
 import { runWalletAudit } from '../controllers/walletAuditController.js';
 import { adminListInvoices } from '../controllers/invoiceController.js';
-import { sendSmsBroadcast, getSmsBroadcasts } from '../controllers/smsBroadcastController.js';
+import { sendSmsBroadcast, getSmsBroadcasts, deleteSmsBroadcast, clearSmsBroadcasts } from '../controllers/smsBroadcastController.js';
 import { getRevenue, getRevenueSweeps, triggerRevenueSweep, getReconciliations, submitReconciliation } from '../controllers/revenueController.js';
 import { adminListCashAdvanceRequests, adminUpdateCashAdvanceRequest } from '../controllers/cashAdvanceController.js';
 import {
@@ -68,7 +68,8 @@ import {
   deleteExpense,
   getBookkeepingSummary,
 } from '../controllers/bookkeepingController.js';
-import { protect, requireRole } from '../middleware/authMiddleware.js';
+import { protect, protectAdminSSE, requireRole } from '../middleware/authMiddleware.js';
+import { registerAdminEventClient } from '../utils/adminEventStream.js';
 
 const router = express.Router();
 
@@ -203,8 +204,35 @@ router.patch('/developers/:id/reject-live', protect, requireMutator, rejectLiveA
 // Admin → merchant SMS broadcasts (system maintenance notices, public
 // holiday greetings, security reminders, etc). Sending is rate-limited with
 // the same limiter used for other sensitive bulk/admin actions.
-router.get('/sms-broadcasts',  protect, excludeOfficer, getSmsBroadcasts);
-router.post('/sms-broadcasts', protect, requireMutator, sensitiveActionLimiter, sendSmsBroadcast);
+router.get('/sms-broadcasts',        protect, excludeOfficer, getSmsBroadcasts);
+router.post('/sms-broadcasts',       protect, requireMutator, sensitiveActionLimiter, sendSmsBroadcast);
+router.delete('/sms-broadcasts/:id', protect, requireMutator, sensitiveActionLimiter, deleteSmsBroadcast);
+router.post('/sms-broadcasts/clear', protect, requireMutator, sensitiveActionLimiter, clearSmsBroadcasts);
+
+// Live dashboard updates (Server-Sent Events) — the admin frontend opens
+// one long-lived connection per session (see AuthContext.jsx) and gets a
+// `transaction` event pushed the instant any transaction completes
+// anywhere in PayChain (see models/Transaction.js's post-save/post-update
+// hooks), which it turns back into the existing paychain:sync refresh bus.
+// EventSource can't set an Authorization header, so this route alone
+// accepts the token as a query param (protectAdminSSE) rather than only
+// the header everything else uses.
+router.get('/events/stream', protectAdminSSE, (req, res) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no', // disable nginx/proxy response buffering, if any sits in front
+  });
+  res.write('\n');
+  const unregister = registerAdminEventClient(res);
+  // res.on('close'), not req.on('close') — the request stream (no body on
+  // a GET) reports 'close' as soon as it's done being read, essentially
+  // immediately, long before the client actually disconnects. res's
+  // 'close' event is the one that actually reflects the response
+  // connection closing.
+  res.on('close', unregister);
+});
 
 // Call-centre / inbound communications console.
 router.get('/communications',                protect, excludeOfficer, getCommunications);

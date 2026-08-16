@@ -1,13 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { triggerSync } from '../../utils/syncBus';
 
-// Global "sync" — pages subscribe via `window.addEventListener('paychain:sync', ...)`
-// and re-fetch their data. The button shows a spinner for 600ms so the user
-// gets visual feedback even if listeners refetch synchronously.
-export function triggerSync() {
-  window.dispatchEvent(new CustomEvent('paychain:sync'));
-}
+export { triggerSync };
 
 const Header = ({ onToggleSidebar }) => {
   const { admin, logout } = useAuth();

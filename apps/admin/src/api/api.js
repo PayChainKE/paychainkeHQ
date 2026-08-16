@@ -18,7 +18,7 @@ const getBaseUrl = () => {
   return 'https://www.paychain.co.ke';
 };
 
-const API_BASE_URL = getBaseUrl();
+export const API_BASE_URL = getBaseUrl();
 
 // 2. Create Axios Instance
 const api = axios.create({
