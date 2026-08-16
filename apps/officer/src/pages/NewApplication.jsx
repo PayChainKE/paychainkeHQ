@@ -16,6 +16,26 @@ const DOC_TYPES = [
 // MulterError the submit handler's generic catch can't explain.
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 
+// Mirrors backend/utils/kraPinValidator.js — same shape check (one leading
+// A/P, 9 digits, one trailing letter) plus the same obviously-fake-pattern
+// rejection (all nine digits identical, or a strictly ascending/descending
+// run like 123456789). This only saves the officer a round trip to the
+// server before it's submitted — the backend validator is the actual
+// source of truth and rejects the application either way.
+const KRA_PIN_SHAPE_REGEX = /^([AP])(\d{9})([A-Z])$/i;
+function isValidKraPin(raw) {
+  const match = KRA_PIN_SHAPE_REGEX.exec(String(raw || ''));
+  if (!match) return false;
+  const digits = match[2].split('').map(Number);
+  if (digits.every((n) => n === digits[0])) return false;
+  let ascending = true, descending = true;
+  for (let i = 1; i < digits.length; i++) {
+    if (digits[i] !== digits[i - 1] + 1) ascending = false;
+    if (digits[i] !== digits[i - 1] - 1) descending = false;
+  }
+  return !ascending && !descending;
+}
+
 const NewApplication = () => {
   const navigate = useNavigate();
   const [form, setForm] = useState({ name: '', email: '', phone: '', businessName: '', businessType: '', kraPin: '', businessNumber: '' });
@@ -30,6 +50,10 @@ const NewApplication = () => {
   async function submit(e) {
     e.preventDefault();
     setError('');
+    if (form.kraPin && !isValidKraPin(form.kraPin)) {
+      setError('Enter a real KRA PIN — format A/P + 9 digits + a letter, e.g. P051892647A — or leave it blank.');
+      return;
+    }
     setBusy(true);
     try {
       const data = new FormData();
@@ -82,7 +106,7 @@ const NewApplication = () => {
               <input value={form.businessNumber} onChange={(e) => setField('businessNumber', e.target.value)} className={inputClass} />
             </Field>
             <Field label="KRA PIN">
-              <input value={form.kraPin} onChange={(e) => setField('kraPin', e.target.value.toUpperCase())} className={inputClass} placeholder="A123456789Z" />
+              <input value={form.kraPin} onChange={(e) => setField('kraPin', e.target.value.toUpperCase())} className={inputClass} placeholder="P051892647A" />
             </Field>
           </div>
 

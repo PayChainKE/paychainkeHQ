@@ -17,6 +17,25 @@ const normalizePhoneKE = (value) => {
 
 const isValidPhoneKE = (value) => /^(?:7\d{8}|1\d{8})$/.test(normalizePhoneKE(value));
 
+// Mirrors backend/utils/kraPinValidator.js — same shape check (one leading
+// A/P, 9 digits, one trailing letter) plus the same obviously-fake-pattern
+// rejection (all nine digits identical, or a strictly ascending/descending
+// run like 123456789). Only saves the admin a round trip to the server —
+// the backend validator is the actual source of truth.
+const KRA_PIN_SHAPE_REGEX = /^([AP])(\d{9})([A-Z])$/i;
+const isValidKraPin = (value) => {
+  const match = KRA_PIN_SHAPE_REGEX.exec(String(value ?? '').trim());
+  if (!match) return false;
+  const digits = match[2].split('').map(Number);
+  if (digits.every((n) => n === digits[0])) return false;
+  let ascending = true, descending = true;
+  for (let i = 1; i < digits.length; i++) {
+    if (digits[i] !== digits[i - 1] + 1) ascending = false;
+    if (digits[i] !== digits[i - 1] - 1) descending = false;
+  }
+  return !ascending && !descending;
+};
+
 // Default filter state — every dimension at "all" means no filtering.
 const defaultFilters = {
   status: 'all',       // all | active | locked
@@ -240,7 +259,7 @@ const Merchants = () => {
     if (!form.email.trim() || !/^\S+@\S+\.\S+$/.test(form.email)) return 'A valid email is required.';
     if (!isValidPhoneKE(form.phone)) return 'Enter a valid Kenyan phone number (07..., 01..., +2547..., +2541...).';
     if (!form.businessName.trim()) return 'Business name is required.';
-    if (form.kraPin && !/^[AP][0-9]{9}[A-Z]$/i.test(form.kraPin.trim())) return 'KRA PIN format invalid (e.g. P123456789A).';
+    if (form.kraPin && !isValidKraPin(form.kraPin)) return 'Enter a real KRA PIN — format A/P + 9 digits + a letter, e.g. P051892647A.';
     return null;
   }
 
@@ -771,7 +790,7 @@ const Merchants = () => {
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <Field label="KRA PIN (optional)">
-                      <input type="text" value={form.kraPin} onChange={(e) => update('kraPin', e.target.value.toUpperCase())} placeholder="P123456789A" className={`${fieldClass} font-mono`} />
+                      <input type="text" value={form.kraPin} onChange={(e) => update('kraPin', e.target.value.toUpperCase())} placeholder="P051892647A" className={`${fieldClass} font-mono`} />
                     </Field>
                     <Field label="Business Reg # (optional)">
                       <input type="text" value={form.businessNumber} onChange={(e) => update('businessNumber', e.target.value)} placeholder="BN-2024-12345" className={fieldClass} />

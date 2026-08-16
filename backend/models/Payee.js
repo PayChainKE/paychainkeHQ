@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { normalizeKraPin, isValidKraPin, KRA_PIN_FORMAT_HINT } from '../utils/kraPinValidator.js';
 
 const payeeSchema = new mongoose.Schema(
   {
@@ -61,11 +62,26 @@ const payeeSchema = new mongoose.Schema(
       default: null,
     },
 
-    // KRA Employee Details
+    // KRA Employee / Supplier PIN — shared by both `type` values.
+    // required/presence is intentionally enforced only at the controller
+    // level (see addPayee/updatePayee, controllers/bulkPayController.js),
+    // not here: uploadCSV's batch-created payees (bulkPayController.js,
+    // authorizeBatch's `new Payee({...})` fallback) never collect a PIN at
+    // all, and a hard `required` here would break that existing flow.
+    // Format IS enforced here, but only when the value is actually being
+    // set — see the validator below.
     kraPin: {
       type: String,
       trim: true,
-      uppercase: true,
+      set: (v) => normalizeKraPin(v),
+      validate: {
+        validator: function (v) {
+          if (!v) return true;
+          if (typeof this.isModified === 'function' && !this.isModified('kraPin')) return true;
+          return isValidKraPin(v);
+        },
+        message: `Invalid KRA PIN format. ${KRA_PIN_FORMAT_HINT}`,
+      },
     },
     idNumber: {
       type: String,

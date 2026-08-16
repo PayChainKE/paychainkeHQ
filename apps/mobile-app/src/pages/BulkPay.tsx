@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl,
-  Modal, TextInput, Alert, KeyboardAvoidingView, Platform, FlatList, Image,
+  Modal, TextInput, Alert, KeyboardAvoidingView, Platform, FlatList,
 } from 'react-native';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,18 +10,16 @@ import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Clipboard from 'expo-clipboard';
 import { ValidatedTextInput } from '../components/ValidatedTextInput';
-import { InlineDatePicker } from '../components/InlineDatePicker';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/config';
 import TopBar from '../components/layout/TopBar';
 import { formatAccountNumber } from '../utils/formatAccountNumber';
-import { formatPhoneDisplay } from '../utils/formatPhoneDisplay';
+import { isValidKraPin } from '../utils/validators';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type PayeeType = 'employee' | 'supplier' | 'utility' | 'contractor';
 type PaymentMethod = 'Mobile Money' | 'Bank';
 type MobileMoneyType = 'Personal Number' | 'Paybill' | 'Buy Goods';
-type MobileNetwork = 'safaricom' | 'airtel';
 
 interface Payee {
   _id: string;
@@ -29,15 +27,12 @@ interface Payee {
   type: PayeeType;
   paymentMethod?: PaymentMethod;
   mobileMoneyType?: MobileMoneyType;
-  mobileNetwork?: MobileNetwork;
   phone?: string;
   paybillNumber?: string;
   businessAccount?: string;
   tillNumber?: string;
   bankName?: string;
-  bankCode?: string;
   accountNumber?: string;
-  utilityProvider?: string;
   kraPin?: string;
   idNumber?: string;
   nssfNumber?: string;
@@ -88,7 +83,6 @@ interface Invoice {
   recurring: boolean;
   items: InvoiceItem[];
   payUrl?: string | null;
-  qrCodeDataUri?: string | null;
   status: 'draft' | 'sent' | 'paid' | 'void' | string;
   total?: number;
   createdAt?: string;
@@ -134,28 +128,13 @@ const BATCH_STATUS_META: Record<string, { bg: string; text: string }> = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function BulkPay() {
-  const { merchant, refreshSession, setAppPin } = useAuth();
+  const { merchant, refreshSession } = useAuth();
 
   const [activeTab, setActiveTab] = useState<'Payees' | 'Batches' | 'Invoices'>('Payees');
   const [activeFilter, setActiveFilter] = useState<Filter>('All');
   const [payeesList, setPayeesList] = useState<Payee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-
-  // Bank-routed payees need a real NCBA clearing code (bankCode), not just a
-  // free-text bank name — authorizeBatch on the backend refuses to route a
-  // payout without one. Fetched lazily, once, the first time the Bank
-  // settlement method is picked in the Add Payee form.
-  const [bankCodes, setBankCodes] = useState<{ code: string; name: string }[]>([]);
-  const fetchBankCodes = useCallback(async () => {
-    if (bankCodes.length > 0) return;
-    try {
-      const res = await api.get('/api/v1/openbanking/bank-codes');
-      setBankCodes(res.data?.bankCodes || []);
-    } catch (e) {
-      console.warn('Failed to load bank codes', e);
-    }
-  }, [bankCodes.length]);
 
   const [selectedPayees, setSelectedPayees] = useState<Record<string, boolean>>({});
   const [payoutAmounts, setPayoutAmounts] = useState<Record<string, number>>({});
@@ -177,16 +156,11 @@ export default function BulkPay() {
   const [selectedFundingSource, setSelectedFundingSource] = useState(false);
 
   // Security verification (OTP-then-PIN), matches the dashboard's two-step
-  // "Verification" modal. Real SMS-OTP check (merchantSmsAuthController.js's
-  // send-otp/verify-otp, the same endpoints merchant login 2FA uses) — this
-  // used to just require 4+ digits typed with no backend call at all, so no
-  // OTP was ever actually sent or checked. Matches the dashboard fix.
+  // "Verification" modal. The OTP step is not backend-verified on the
+  // dashboard either — the real check is the PIN, enforced server-side in
+  // authorizeBatch. Kept here for exact behavioral parity.
   const [securityStep, setSecurityStep] = useState<1 | 2>(1);
   const [securityOtp, setSecurityOtp] = useState('');
-  const [isSendingOtp, setIsSendingOtp] = useState(false);
-  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
-  const [otpError, setOtpError] = useState('');
-  const [otpResendCooldown, setOtpResendCooldown] = useState(0);
 
   // Which batch is pending authorization — set right before opening the
   // Funding Source Select -> Security flow, consumed once the PIN is confirmed.
@@ -203,7 +177,6 @@ export default function BulkPay() {
     recurring: false,
     items: [{ description: '', qty: 1, price: 0 }],
     payUrl: null,
-    qrCodeDataUri: null,
     status: 'draft',
   });
   const [invoicesList, setInvoicesList] = useState<Invoice[]>([]);
@@ -240,16 +213,12 @@ export default function BulkPay() {
   const blankPayee = {
     name: '',
     type: 'employee' as PayeeType,
-    utilityType: 'Electricity',
-    utilityProvider: '',
     paymentMethod: 'Mobile Money' as PaymentMethod,
     mobileMoneyType: 'Personal Number' as MobileMoneyType,
-    mobileNetwork: 'safaricom' as MobileNetwork,
     amount: '',
     phone: '',
     accountNumber: '',
     bankName: '',
-    bankCode: '',
     paybillNumber: '',
     businessAccount: '',
     tillNumber: '',
@@ -261,45 +230,6 @@ export default function BulkPay() {
     cuNumber: '',
   };
   const [newPayee, setNewPayee] = useState(blankPayee);
-
-  // Utility meter verification (KPLC/NCWSC) — pure UX confirmation before
-  // saving a payee; not persisted (see backend's validateKplcMeter/
-  // validateNcwscMeter doc comments for why the validationId is re-fetched
-  // fresh at actual payment time instead).
-  const DEDICATED_RAIL_UTILITIES = ['KPLC', 'KPLC_PREPAID', 'WATER'];
-  const UTILITY_VALIDATE_ENDPOINT: Record<string, string> = { KPLC: 'validate-kplc-meter', KPLC_PREPAID: 'validate-kplc-prepaid-meter', WATER: 'validate-ncwsc-meter' };
-  const [utilityCheck, setUtilityCheck] = useState<{ status: 'idle' | 'loading' | 'success' | 'error'; customerName: string; serviceName: string; balance: number | null; error: string }>({
-    status: 'idle', customerName: '', serviceName: '', balance: null, error: '',
-  });
-  const resetUtilityCheck = () => setUtilityCheck({ status: 'idle', customerName: '', serviceName: '', balance: null, error: '' });
-  const handleVerifyUtilityMeter = async () => {
-    if (!/^\d{5,15}$/.test(newPayee.accountNumber?.trim() || '')) {
-      Alert.alert('Invalid Format', 'Enter a valid numeric meter number.');
-      return;
-    }
-    if (!validatePhone(newPayee.phone)) {
-      Alert.alert('Invalid Format', 'Enter a valid Kenyan phone number for bill notifications.');
-      return;
-    }
-    const endpoint = UTILITY_VALIDATE_ENDPOINT[newPayee.utilityProvider];
-    if (!endpoint) return;
-    setUtilityCheck({ status: 'loading', customerName: '', serviceName: '', balance: null, error: '' });
-    try {
-      const res = await api.post(`/api/bulkpay/${endpoint}`, {
-        meterNumber: newPayee.accountNumber.trim(),
-        msisdn: newPayee.phone,
-      });
-      setUtilityCheck({
-        status: 'success',
-        customerName: res.data?.customerName || '',
-        serviceName: res.data?.serviceName || '',
-        balance: typeof res.data?.balance === 'number' ? res.data.balance : null,
-        error: '',
-      });
-    } catch (err: any) {
-      setUtilityCheck({ status: 'error', customerName: '', serviceName: '', balance: null, error: err?.response?.data?.message || 'Could not verify this meter number.' });
-    }
-  };
 
   // Amount editor
   const [amountInput, setAmountInput] = useState('');
@@ -378,22 +308,6 @@ export default function BulkPay() {
   );
   const totalInvoicePages = Math.max(1, Math.ceil(filteredInvoicesList.length / invoicesPerPage));
   const paginatedInvoicesList = filteredInvoicesList.slice((invoicePage - 1) * invoicesPerPage, invoicePage * invoicesPerPage);
-
-  // Per-status breakdown for the tracking header — draft (still being
-  // prepared), sent (awaiting the customer's payment), paid (successfully
-  // collected). Monetary totals only sum KES invoices — `currency` is a
-  // free-text field on each invoice, so adding a USD total onto a KES one
-  // would silently misreport the figure.
-  const invoiceStats = useMemo(() => {
-    const byStatus = (s: string) => invoicesList.filter(inv => inv.status === s);
-    const kesTotal = (rows: Invoice[]) => rows.filter(inv => (inv.currency || 'KES') === 'KES').reduce((sum, inv) => sum + (inv.total || 0), 0);
-    return {
-      draft: { count: byStatus('draft').length, kesTotal: kesTotal(byStatus('draft')) },
-      sent: { count: byStatus('sent').length, kesTotal: kesTotal(byStatus('sent')) },
-      paid: { count: byStatus('paid').length, kesTotal: kesTotal(byStatus('paid')) },
-    };
-  }, [invoicesList]);
-
   const invoiceSubtotal = invoiceDetails.items.reduce((sum, item) => sum + (item.qty * item.price), 0);
   const fmtInvoiceCurrency = (n: number) => `${invoiceDetails.currency} ${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -457,7 +371,6 @@ export default function BulkPay() {
       recurring: inv.recurring,
       items: inv.items?.length ? inv.items : [{ description: '', qty: 1, price: 0 }],
       payUrl: inv.payUrl,
-      qrCodeDataUri: inv.qrCodeDataUri,
       status: inv.status,
     });
     setShowInvoiceEditor(true);
@@ -476,7 +389,7 @@ export default function BulkPay() {
         : await api.post('/api/invoices', payload);
       const saved = res.data.invoice;
       setActiveInvoiceId(saved._id);
-      setInvoiceDetails(prev => ({ ...prev, invoiceNumber: saved.invoiceNumber, payUrl: saved.payUrl, qrCodeDataUri: saved.qrCodeDataUri, status: saved.status }));
+      setInvoiceDetails(prev => ({ ...prev, invoiceNumber: saved.invoiceNumber, payUrl: saved.payUrl, status: saved.status }));
       upsertInvoiceInList(saved);
       setShowInvoiceEditor(false);
       Alert.alert('Draft Saved', `Invoice #${saved.invoiceNumber} safely stored in Invoices → Drafts.`);
@@ -509,7 +422,7 @@ export default function BulkPay() {
       }
       const sendRes = await api.post(`/api/invoices/${invoiceId}/send`, {});
       const sent = sendRes.data.invoice;
-      setInvoiceDetails(prev => ({ ...prev, invoiceNumber: sent.invoiceNumber, payUrl: sent.payUrl, qrCodeDataUri: sent.qrCodeDataUri, status: sent.status }));
+      setInvoiceDetails(prev => ({ ...prev, invoiceNumber: sent.invoiceNumber, payUrl: sent.payUrl, status: sent.status }));
       upsertInvoiceInList(sent);
       setShowInvoiceEditor(false);
       Alert.alert('Invoice Sent', `Invoice #${sent.invoiceNumber} has been emailed to ${invoiceDetails.customer.email}.`);
@@ -548,110 +461,59 @@ export default function BulkPay() {
   const downloadInvoicePDF = async () => {
     const esc = (s: any) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const businessName = esc(merchant?.businessName || 'Merchant');
-    const initials = esc((merchant?.businessName || 'M').trim().slice(0, 2).toUpperCase());
-    const statusMeta: Record<string, { label: string; bg: string; text: string }> = {
-      draft: { label: 'DRAFT', bg: '#fef3e7', text: '#b87333' },
-      sent: { label: 'SENT', bg: '#e7f8ef', text: '#006c4e' },
-      paid: { label: 'PAID', bg: '#dbeafe', text: '#1e40af' },
-      void: { label: 'VOID', bg: '#f1f5f9', text: '#64748b' },
-    };
-    const status = statusMeta[invoiceDetails.status] || statusMeta.draft;
-    const fmtDate = (iso: string) => {
-      const d = new Date(iso);
-      return isNaN(d.getTime()) ? esc(iso) : d.toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' });
-    };
-    const itemRows = invoiceDetails.items.map((item, i) => `
-      <tr style="background:${i % 2 === 0 ? '#fbfdfb' : '#ffffff'};">
+    const itemRows = invoiceDetails.items.map(item => `
+      <tr>
         <td>${esc(item.description || '—')}</td>
         <td class="num">${item.qty}</td>
         <td class="amount">${fmtInvoiceCurrency(item.price)}</td>
         <td class="amount">${fmtInvoiceCurrency(item.qty * item.price)}</td>
       </tr>`).join('');
-    const html = `<!doctype html><html><head><meta charset="utf-8"/><title>Invoice ${esc(invoiceDetails.invoiceNumber || '')}</title><style>
-      @page { size: A4; margin: 20mm 18mm; }
-      * { box-sizing: border-box; }
-      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; color:#0c2010; margin:0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      .header { display:flex; justify-content:space-between; align-items:flex-start; padding-bottom:20px; margin-bottom:26px; border-bottom:3px solid #00351d; }
-      .brand { display:flex; align-items:center; gap:12px; }
-      .logo { width:44px; height:44px; border-radius:12px; background:linear-gradient(135deg, #00351d, #1D9E75); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:16px; letter-spacing:0.5px; flex-shrink:0; }
-      .brand-name { font-size:17px; font-weight:800; color:#00351d; }
-      .brand-sub { font-size:9px; color:#707971; text-transform:uppercase; letter-spacing:1.8px; margin-top:2px; font-weight:700; }
+    const html = `<!doctype html><html><head><meta charset="utf-8"/><title>Invoice</title><style>
+      @page { size: A4; margin: 24mm 16mm; }
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; color:#0c2010; margin:0; }
+      .header { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #0b4d2e; padding-bottom:16px; margin-bottom:22px; }
+      .brand-name { font-size:18px; font-weight:700; color:#0b4d2e; }
+      .brand-sub { font-size:10px; color:#707971; text-transform:uppercase; letter-spacing:1.5px; margin-top:2px; }
       .doc-title { text-align:right; }
-      .doc-title h1 { margin:0 0 6px; font-size:22px; color:#0c2010; font-weight:800; letter-spacing:-0.3px; }
-      .status-badge { display:inline-block; font-size:9px; font-weight:800; letter-spacing:1.2px; padding:4px 10px; border-radius:999px; background:${status.bg}; color:${status.text}; }
-      .meta-grid { display:flex; justify-content:space-between; gap:24px; margin-bottom:28px; }
-      .meta-block .label { font-size:9px; color:#a1a1aa; text-transform:uppercase; letter-spacing:1.4px; margin-bottom:6px; font-weight:700; }
-      .meta-block .name { font-size:13px; color:#0c2010; font-weight:800; margin-bottom:2px; }
-      .meta-block .line { font-size:11px; color:#707971; line-height:1.5; }
-      .dates { text-align:right; }
-      .dates .row { font-size:11px; color:#707971; margin-bottom:4px; }
-      .dates .row b { color:#0c2010; font-weight:700; }
-      table { width:100%; border-collapse:collapse; font-size:11px; margin-bottom:4px; }
-      thead th { text-align:left; padding:11px 10px; background:#00351d; color:#e7f8ef; font-weight:700; font-size:9px; text-transform:uppercase; letter-spacing:1px; }
-      thead th:first-child { border-radius:8px 0 0 0; }
-      thead th:last-child { border-radius:0 8px 0 0; }
+      .doc-title h1 { margin:0; font-size:20px; color:#0c2010; font-weight:600; }
+      .doc-title .meta { font-size:10px; color:#707971; margin-top:4px; }
+      .meta-grid { display:grid; grid-template-columns: repeat(2, 1fr); gap:16px; margin-bottom:24px; }
+      .meta-grid .label { font-size:9px; color:#707971; text-transform:uppercase; letter-spacing:1.2px; margin-bottom:4px; }
+      .meta-grid .value { font-size:12px; color:#0c2010; font-weight:600; }
+      table { width:100%; border-collapse:collapse; font-size:11px; margin-bottom: 24px; }
+      thead th { text-align:left; padding:10px 8px; background:#f7faf7; color:#404942; font-weight:700; font-size:9px; text-transform:uppercase; letter-spacing:1px; border-bottom:1px solid #e7ece7; }
       thead th.num, thead th.amount { text-align:right; }
-      tbody td { padding:11px 10px; border-bottom:1px solid #eff4ef; color:#404942; }
-      tbody td.num, tbody td.amount { text-align:right; font-variant-numeric: tabular-nums; }
-      .totals { display:flex; justify-content:flex-end; margin-top:16px; }
-      .totals .box { width:240px; }
-      .totals .row { display:flex; justify-content:space-between; padding:7px 0; font-size:12px; color:#707971; }
-      .totals .row.total { font-weight:800; font-size:17px; color:#00351d; border-top:2px solid #00351d; margin-top:4px; padding-top:12px; }
-      .notes { margin-top:32px; padding:16px 18px; background:#f7faf7; border-radius:10px; border:1px solid #eff4ef; }
-      .notes .label { font-size:9px; color:#a1a1aa; text-transform:uppercase; letter-spacing:1.2px; font-weight:700; margin-bottom:6px; }
-      .notes .body { font-size:10.5px; color:#404942; white-space:pre-wrap; line-height:1.6; }
-      .footer { margin-top:40px; padding-top:16px; border-top:1px solid #eff4ef; text-align:center; }
-      .footer p { margin:0; font-size:9px; color:#a1a1aa; line-height:1.6; }
-      .footer img { width:72px; height:72px; object-fit:contain; margin-bottom:8px; }
-      .footer .scan-label { font-size:8px; color:#a1a1aa; text-transform:uppercase; letter-spacing:1.2px; font-weight:700; margin-bottom:14px; }
+      tbody td { padding:10px 8px; border-bottom:1px solid #eff4ef; }
+      tbody td.num, tbody td.amount { text-align:right; }
+      .totals { display:flex; justify-content:flex-end; }
+      .totals .row { display:flex; justify-content:space-between; width:220px; padding:6px 0; font-size:12px; }
+      .totals .row.total { font-weight:700; font-size:16px; border-top:1px solid #e7ece7; margin-top:4px; padding-top:10px; }
+      .notes { margin-top: 24px; font-size: 10px; color: #707971; white-space: pre-wrap; }
     </style></head><body>
       <div class="header">
-        <div class="brand">
-          <div class="logo">${initials}</div>
-          <div><div class="brand-name">${businessName}</div><div class="brand-sub">Invoice</div></div>
-        </div>
+        <div><div class="brand-name">${businessName}</div><div class="brand-sub">PayChain · Invoice</div></div>
         <div class="doc-title">
-          <h1>#${esc(invoiceDetails.invoiceNumber || '—')}</h1>
-          <span class="status-badge">${status.label}</span>
+          <h1>Invoice ${invoiceDetails.invoiceNumber ? `#${invoiceDetails.invoiceNumber}` : ''}</h1>
+          <div class="meta">Issued ${invoiceDetails.issueDate}</div>
+          ${invoiceDetails.dueDate ? `<div class="meta">Due ${invoiceDetails.dueDate}</div>` : ''}
         </div>
       </div>
       <div class="meta-grid">
-        <div class="meta-block">
-          <div class="label">Bill To</div>
-          <div class="name">${esc(invoiceDetails.customer.name || '—')}</div>
-          ${invoiceDetails.customer.email ? `<div class="line">${esc(invoiceDetails.customer.email)}</div>` : ''}
-          ${invoiceDetails.customer.phone ? `<div class="line">${esc(formatPhoneDisplay(invoiceDetails.customer.phone))}</div>` : ''}
-          ${invoiceDetails.customer.address ? `<div class="line">${esc(invoiceDetails.customer.address)}</div>` : ''}
-        </div>
-        <div class="dates">
-          <div class="row">Issued <b>${fmtDate(invoiceDetails.issueDate)}</b></div>
-          ${invoiceDetails.dueDate ? `<div class="row">Due <b>${fmtDate(invoiceDetails.dueDate)}</b></div>` : ''}
-          ${invoiceDetails.recurring ? `<div class="row">Recurring <b>Yes</b></div>` : ''}
-        </div>
+        <div><div class="label">Bill To</div><div class="value">${esc(invoiceDetails.customer.name || '—')}</div><div class="value">${esc(invoiceDetails.customer.email || '')}</div><div class="value">${esc(invoiceDetails.customer.address || '')}</div></div>
       </div>
       <table>
         <thead><tr><th>Description</th><th class="num">Qty</th><th class="amount">Price</th><th class="amount">Amount</th></tr></thead>
         <tbody>${itemRows}</tbody>
       </table>
       <div class="totals">
-        <div class="box">
-          <div class="row"><span>Subtotal</span><span>${fmtInvoiceCurrency(invoiceSubtotal)}</span></div>
-          <div class="row total"><span>Total Due</span><span>${fmtInvoiceCurrency(invoiceSubtotal)}</span></div>
-        </div>
+        <div class="row total"><span>Total</span><span>${fmtInvoiceCurrency(invoiceSubtotal)}</span></div>
       </div>
-      ${invoiceDetails.notes ? `<div class="notes"><div class="label">Notes &amp; Terms</div><div class="body">${esc(invoiceDetails.notes)}</div></div>` : ''}
-      <div class="footer">
-        ${invoiceDetails.qrCodeDataUri ? `<img src="${invoiceDetails.qrCodeDataUri}" alt="Scan to view/pay this invoice" /><div class="scan-label">Scan to view &amp; pay</div>` : ''}
-        <p>This invoice was issued by ${businessName} via PayChain, and is a computer-generated document.</p>
-        <p>support@paychain.co.ke &nbsp;·&nbsp; www.paychain.co.ke</p>
-      </div>
+      ${invoiceDetails.notes ? `<div class="notes">${esc(invoiceDetails.notes)}</div>` : ''}
     </body></html>`;
     try {
-      // A4 in points at 72dpi (595 x 842) — passed explicitly since the
-      // @page CSS size alone isn't reliably honored by expo-print on Android.
-      const { uri } = await Print.printToFileAsync({ html, base64: false, width: 595, height: 842 });
+      const { uri } = await Print.printToFileAsync({ html, base64: false });
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: `Invoice ${invoiceDetails.invoiceNumber || ''}`, UTI: 'com.adobe.pdf' });
+        await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: 'Invoice', UTI: 'com.adobe.pdf' });
       } else {
         Alert.alert('Saved', uri);
       }
@@ -698,10 +560,9 @@ export default function BulkPay() {
     }
   };
 
-  // ── Trigger PIN setup if needed ── (bulk pay authorizes with the same
-  // single Payment PIN used everywhere else in the app)
+  // ── Trigger PIN setup if needed ──
   useEffect(() => {
-    if (merchant && merchant.hasAppPin === false) {
+    if (merchant && merchant.hasBulkPayPin === false) {
       setShowPinSetup(true);
     }
   }, [merchant]);
@@ -733,31 +594,21 @@ export default function BulkPay() {
   // ── Add / Edit payee ──
   const openAddPayee = () => {
     setNewPayee(blankPayee);
-    resetUtilityCheck();
     setEditingId(null);
     setAddStep(1);
     setShowAddPayee(true);
   };
 
   const openEditPayee = (p: Payee) => {
-    if (p.paymentMethod === 'Bank') fetchBankCodes();
     setNewPayee({
       name: p.name || '',
       type: p.type || 'employee',
-      // Only meaningful for Utility payees — defaulting this to 'Electricity'
-      // for every payee regardless of type used to make the KPLC Postpaid/
-      // Prepaid toggle (gated on utilityType alone, not type) incorrectly
-      // appear while editing an Employee/Supplier/Contractor.
-      utilityType: p.utilityProvider === 'WATER' ? 'Water' : (p.utilityProvider === 'KPLC' || p.utilityProvider === 'KPLC_PREPAID') ? 'Electricity' : '',
-      utilityProvider: p.utilityProvider || '',
       paymentMethod: (p.paymentMethod as PaymentMethod) || 'Mobile Money',
       mobileMoneyType: (p.mobileMoneyType as MobileMoneyType) || 'Personal Number',
-      mobileNetwork: (p.mobileNetwork as MobileNetwork) || 'safaricom',
       amount: p.defaultAmount ? String(p.defaultAmount) : '',
       phone: p.phone || '',
       accountNumber: p.accountNumber || '',
       bankName: p.bankName || '',
-      bankCode: p.bankCode || '',
       paybillNumber: p.paybillNumber || '',
       businessAccount: p.businessAccount || '',
       tillNumber: p.tillNumber || '',
@@ -768,7 +619,6 @@ export default function BulkPay() {
       etimsInvoiceNumber: p.etimsInvoiceNumber || '',
       cuNumber: p.cuNumber || '',
     });
-    resetUtilityCheck();
     setEditingId(p._id);
     setAddStep(2);
     setShowAddPayee(true);
@@ -782,13 +632,8 @@ export default function BulkPay() {
     if (newPayee.type === 'supplier' && (!newPayee.kraPin || !newPayee.etimsInvoiceNumber || !newPayee.cuNumber)) {
       return 'KRA PIN, eTIMS Invoice, and CU Number are required for suppliers.';
     }
-    // KPLC/NCWSC payees route through NCBA's dedicated biller rails, not a
-    // Mobile Money/Bank settlement method — accountNumber/phone here mean
-    // meter number/notification msisdn.
-    if (newPayee.type === 'utility' && DEDICATED_RAIL_UTILITIES.includes(newPayee.utilityProvider)) {
-      if (!/^\d{5,15}$/.test(newPayee.accountNumber.trim())) return 'Enter a valid numeric meter number.';
-      if (!validatePhone(newPayee.phone)) return 'Enter a valid Kenyan phone number for bill notifications.';
-      return null;
+    if (newPayee.kraPin && !isValidKraPin(newPayee.kraPin)) {
+      return 'Enter a real KRA PIN — format A/P + 9 digits + a letter, e.g. P051892647A.';
     }
     if (newPayee.paymentMethod === 'Mobile Money') {
       if (newPayee.mobileMoneyType === 'Personal Number' && !validatePhone(newPayee.phone)) {
@@ -803,10 +648,7 @@ export default function BulkPay() {
       }
     }
     if (newPayee.paymentMethod === 'Bank') {
-      // bankCode (not just a bank name) is what actually routes the payout
-      // through NCBA PesaLink — without it, authorizeBatch refuses to pay
-      // this payee at all and silently refunds the row.
-      if (!newPayee.bankCode) return "Select the payee's bank.";
+      if (!newPayee.bankName.trim()) return 'Bank name is required.';
       if (!/^\d{8,14}$/.test(newPayee.accountNumber.trim())) return 'Bank account number must be 8–14 digits.';
     }
     return null;
@@ -894,17 +736,13 @@ export default function BulkPay() {
       return;
     }
     try {
-      // Goes through AuthContext's setAppPin so the local device-unlock PIN
-      // (SecureStore) stays in sync with the server-side Payment PIN — the
-      // same single PIN now authorizes bulk pay batches, sendMoney, and
-      // B2C/B2B, so there's no separate bulk-pay-only PIN to set anymore.
-      await setAppPin(setupPin);
+      await api.post('/api/bulkpay/set-pin', { pin: setupPin });
       setShowPinSetup(false);
       setSetupPin('');
       setConfirmPin('');
-      Alert.alert('PIN Set', 'Payment PIN configured successfully.');
+      Alert.alert('PIN Set', 'Bulk Pay PIN configured successfully.');
     } catch (e: any) {
-      Alert.alert('Failed', e?.response?.data?.error || e?.response?.data?.message || 'Could not set PIN.');
+      Alert.alert('Failed', e?.response?.data?.message || 'Could not set PIN.');
     }
   };
 
@@ -941,58 +779,18 @@ export default function BulkPay() {
     setShowFundingSourceSelect(true);
   };
 
-  const sendBulkPayOtp = useCallback(async () => {
-    if (!merchant?.phone) {
-      setOtpError('No phone number is on file for this account. Add one in Profile first.');
-      return;
-    }
-    setIsSendingOtp(true);
-    setOtpError('');
-    try {
-      await api.post('/api/auth/merchant/sms/send-otp', { phone: merchant.phone });
-      setOtpResendCooldown(30);
-    } catch (e: any) {
-      setOtpError(e?.response?.data?.error || 'Could not send the verification code. Try again.');
-    } finally {
-      setIsSendingOtp(false);
-    }
-  }, [merchant?.phone]);
-
-  useEffect(() => {
-    if (otpResendCooldown <= 0) return;
-    const t = setTimeout(() => setOtpResendCooldown((s) => s - 1), 1000);
-    return () => clearTimeout(t);
-  }, [otpResendCooldown]);
-
-  const verifyBulkPayOtp = async () => {
-    setIsVerifyingOtp(true);
-    setOtpError('');
-    try {
-      await api.post('/api/auth/merchant/sms/verify-otp', { phone: merchant?.phone, otp: securityOtp });
-      setSecurityStep(2);
-    } catch (e: any) {
-      setOtpError(e?.response?.data?.error || 'Invalid or expired code.');
-      setSecurityOtp('');
-    } finally {
-      setIsVerifyingOtp(false);
-    }
-  };
-
   const confirmFundingSourceAndVerify = () => {
     setShowFundingSourceSelect(false);
     setSecurityStep(1);
     setSecurityOtp('');
-    setOtpError('');
     setAuthPin('');
     setShowSecurity(true);
-    sendBulkPayOtp();
   };
 
   const cancelSecurity = () => {
     setShowSecurity(false);
     setSecurityStep(1);
     setSecurityOtp('');
-    setOtpError('');
     setAuthPin('');
     setPendingBatch(null);
   };
@@ -1000,7 +798,7 @@ export default function BulkPay() {
   // ── Final authorize (fires after Security PIN step, for either source) ──
   const handleAuthorize = async () => {
     if (authPin.length !== 4) {
-      Alert.alert('Invalid PIN', 'Enter your 4-digit Payment PIN.');
+      Alert.alert('Invalid PIN', 'Enter your 4-digit Bulk Pay PIN.');
       return;
     }
     setIsAuthorizing(true);
@@ -1139,7 +937,7 @@ export default function BulkPay() {
         <thead><tr><th class="num">#</th><th>Recipient</th><th>Receipt</th><th class="amount">Amount</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      <div class="footer">Computer-generated batch report. Each receipt is settled via M-PESA / bank transfer and recorded on the PayChain ledger.</div>
+      <div class="footer">Computer-generated batch report. Each receipt is settled via Safaricom Daraja API and recorded on the PayChain ledger.</div>
     </body></html>`;
     try {
       const { uri } = await Print.printToFileAsync({ html, base64: false });
@@ -1443,8 +1241,8 @@ export default function BulkPay() {
                     <Feather name="shield" size={16} color="#b87333" />
                   </View>
                   <View>
-                    <Text className="font-jakarta-bold text-[14px] text-[#0c2010]">Payment PIN</Text>
-                    <Text className="text-[#707971] font-jakarta-medium text-[11px]">{merchant?.hasAppPin === false ? 'Not configured' : 'Configured'}</Text>
+                    <Text className="font-jakarta-bold text-[14px] text-[#0c2010]">Bulk Pay PIN</Text>
+                    <Text className="text-[#707971] font-jakarta-medium text-[11px]">{merchant?.hasBulkPayPin === false ? 'Not configured' : 'Configured'}</Text>
                   </View>
                 </View>
                 <Feather name="chevron-right" size={18} color="#707971" />
@@ -1483,26 +1281,9 @@ export default function BulkPay() {
 
             {/* Invoice Tracking */}
             <View className="bg-white rounded-[24px] p-5 border border-[#bfc9bf]/15 mb-4">
-              <Text className="font-jakarta-bold text-[15px] text-[#0c2010] mb-4">Invoice Tracking</Text>
-              <View className="flex-row gap-2 mb-4">
-                <View className="flex-1 bg-[#fef3e7] rounded-2xl p-3">
-                  <Text className="text-[9px] font-jakarta-bold text-[#b87333] uppercase tracking-wider mb-1">Drafts</Text>
-                  <Text className="font-jakarta-extrabold text-[16px] text-[#0c2010]">{invoiceStats.draft.count}</Text>
-                </View>
-                <View className="flex-1 bg-[#e7f8ef] rounded-2xl p-3">
-                  <Text className="text-[9px] font-jakarta-bold text-[#006c4e] uppercase tracking-wider mb-1">Sent</Text>
-                  <Text className="font-jakarta-extrabold text-[16px] text-[#0c2010]">{invoiceStats.sent.count}</Text>
-                  {invoiceStats.sent.kesTotal > 0 && (
-                    <Text className="text-[8px] font-jakarta-bold text-[#006c4e] opacity-70 mt-0.5">{formatKES(invoiceStats.sent.kesTotal)}</Text>
-                  )}
-                </View>
-                <View className="flex-1 bg-[#dbeafe] rounded-2xl p-3">
-                  <Text className="text-[9px] font-jakarta-bold text-[#1e40af] uppercase tracking-wider mb-1">Paid</Text>
-                  <Text className="font-jakarta-extrabold text-[16px] text-[#0c2010]">{invoiceStats.paid.count}</Text>
-                  {invoiceStats.paid.kesTotal > 0 && (
-                    <Text className="text-[8px] font-jakarta-bold text-[#1e40af] opacity-70 mt-0.5">{formatKES(invoiceStats.paid.kesTotal)}</Text>
-                  )}
-                </View>
+              <View className="flex-row items-center justify-between mb-4">
+                <Text className="font-jakarta-bold text-[15px] text-[#0c2010]">Invoice Tracking</Text>
+                <Text className="font-jakarta-extrabold text-[15px] text-[#00351d]">{invoicesList.length}</Text>
               </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-1 mb-4">
                 {(['All', 'Drafts', 'Sent', 'Paid'] as const).map(f => (
@@ -1660,8 +1441,8 @@ export default function BulkPay() {
                 <View className="w-14 h-14 rounded-full bg-[#e7f8ef] items-center justify-center mb-3">
                   <Feather name="shield" size={22} color="#006c4e" />
                 </View>
-                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#0c2010]">Set Payment PIN</Text>
-                <Text className="text-[#707971] font-jakarta-medium text-[12px] mt-1 text-center">A 4-digit PIN is required to authorize payments, including bulk pay batches.</Text>
+                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#0c2010]">Set Bulk Pay PIN</Text>
+                <Text className="text-[#707971] font-jakarta-medium text-[12px] mt-1 text-center">A 4-digit PIN is required to authorize batches.</Text>
               </View>
               <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-2">New PIN</Text>
               <TextInput
@@ -1878,41 +1659,25 @@ export default function BulkPay() {
                     <View className="w-16 h-16 rounded-full bg-[#dbeafe] items-center justify-center mb-4">
                       <Feather name="message-square" size={26} color="#1e40af" />
                     </View>
-                    <Text className="font-jakarta-bold text-[#0c2010] text-[14px] text-center">
-                      {isSendingOtp ? 'Sending code…' : `Enter OTP Sent to ${formatPhoneDisplay(merchant?.phone) || '07XX XXX XXX'}`}
-                    </Text>
+                    <Text className="font-jakarta-bold text-[#0c2010] text-[14px]">Enter OTP Sent to {merchant?.phone || '07XX XXX XXX'}</Text>
                   </View>
                   <TextInput
                     value={securityOtp}
-                    onChangeText={(t) => { setSecurityOtp(t.replace(/\D/g, '').slice(0, 6)); setOtpError(''); }}
+                    onChangeText={(t) => setSecurityOtp(t.replace(/\D/g, '').slice(0, 6))}
                     keyboardType="numeric"
                     maxLength={6}
-                    className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-5 py-4 text-[#0c2010] font-jakarta-bold text-[20px] tracking-[0.5em] text-center mb-3"
+                    className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-5 py-4 text-[#0c2010] font-jakarta-bold text-[20px] tracking-[0.5em] text-center mb-6"
                     placeholder="••••••"
                     placeholderTextColor="#a1a1aa"
                     autoFocus
                   />
-                  {otpError ? (
-                    <Text className="text-red-600 font-jakarta-bold text-[12px] text-center mb-3">{otpError}</Text>
-                  ) : null}
                   <TouchableOpacity
-                    onPress={verifyBulkPayOtp}
-                    disabled={securityOtp.length < 4 || isVerifyingOtp || isSendingOtp}
-                    className="w-full bg-[#e7f8ef] h-[56px] rounded-full items-center justify-center flex-row gap-2 mb-3"
-                    style={{ opacity: securityOtp.length < 4 || isVerifyingOtp || isSendingOtp ? 0.5 : 1 }}
+                    onPress={() => setSecurityStep(2)}
+                    disabled={securityOtp.length < 4}
+                    className="w-full bg-[#e7f8ef] h-[56px] rounded-full items-center justify-center"
+                    style={{ opacity: securityOtp.length < 4 ? 0.5 : 1 }}
                   >
-                    {isVerifyingOtp ? <ActivityIndicator color="#006c4e" /> : (
-                      <Text className="text-[#006c4e] font-jakarta-bold text-[15px]">Verify OTP</Text>
-                    )}
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={sendBulkPayOtp}
-                    disabled={isSendingOtp || otpResendCooldown > 0}
-                    className="items-center"
-                  >
-                    <Text className="text-[#707971] font-jakarta-bold text-[11px]" style={{ opacity: isSendingOtp || otpResendCooldown > 0 ? 0.5 : 1 }}>
-                      {otpResendCooldown > 0 ? `Resend code in ${otpResendCooldown}s` : 'Resend code'}
-                    </Text>
+                    <Text className="text-[#006c4e] font-jakarta-bold text-[15px]">Verify OTP</Text>
                   </TouchableOpacity>
                 </>
               ) : (
@@ -2104,12 +1869,7 @@ export default function BulkPay() {
                 </TouchableOpacity>
               </View>
 
-              {/* flex-1 is load-bearing — without it this ScrollView sizes to
-                  its own content instead of being bounded by the sheet's
-                  maxHeight, so on a long form (e.g. Employee) the content
-                  overflows past the fixed footer below with no way to
-                  scroll down to the Save/Add button. */}
-              <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+              <ScrollView showsVerticalScrollIndicator={false}>
                 {addStep === 1 ? (
                   <View>
                     {(Object.keys(TYPE_META) as PayeeType[]).map((key) => {
@@ -2148,192 +1908,6 @@ export default function BulkPay() {
                       placeholderTextColor="#a1a1aa"
                       className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-4 py-3.5 text-[#0c2010] font-jakarta-semibold text-[14px] mb-4"
                     />
-
-                    {/* Utility Type */}
-                    {newPayee.type === 'utility' && (
-                      <View className="mb-4">
-                        <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-2">Utility Type</Text>
-                        <View className="flex-row flex-wrap gap-2">
-                          {['Water', 'Electricity', 'Rent', 'Internet'].map((u) => {
-                            const active = newPayee.utilityType === u;
-                            const logoSrc = u === 'Electricity' ? require('../../assets/kplc-logo.png') : u === 'Water' ? require('../../assets/ncwsc-logo.png') : null;
-                            return (
-                              <TouchableOpacity
-                                key={u}
-                                onPress={() => {
-                                  resetUtilityCheck();
-                                  // Default Electricity to Postpaid — the account-type toggle
-                                  // below lets the merchant switch to Prepaid.
-                                  setNewPayee({ ...newPayee, utilityType: u, utilityProvider: u === 'Electricity' ? 'KPLC' : u === 'Water' ? 'WATER' : '' });
-                                }}
-                                className={`flex-row items-center gap-1.5 px-3.5 py-2.5 rounded-xl border ${active ? 'bg-[#00351d] border-[#00351d]' : 'bg-[#f0fdf4] border-[#e7ece7]'}`}
-                              >
-                                {logoSrc && (
-                                  <View className="bg-white rounded-md px-1.5 py-1">
-                                    <Image source={logoSrc} style={{ height: 20, width: 34, resizeMode: 'contain' }} />
-                                  </View>
-                                )}
-                                <Text className={`font-jakarta-bold text-[11px] uppercase tracking-wider ${active ? 'text-white' : 'text-[#404942]'}`}>
-                                  {u === 'Electricity' ? 'Electricity (KPLC)' : u === 'Water' ? 'Water (NCWSC)' : u}
-                                </Text>
-                              </TouchableOpacity>
-                            );
-                          })}
-                        </View>
-                      </View>
-                    )}
-
-                    {/* Postpaid / Prepaid toggle */}
-                    {newPayee.type === 'utility' && newPayee.utilityType === 'Electricity' && (
-                      <View className="mb-4">
-                        <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-2">Account Type</Text>
-                        <View className="flex-row gap-2 p-1.5 bg-[#f0fdf4] rounded-2xl border border-[#e7ece7]">
-                          {([
-                            { id: 'KPLC', label: 'Postpaid', desc: 'Pay down your existing bill' },
-                            { id: 'KPLC_PREPAID', label: 'Prepaid', desc: 'Buy an electricity token' },
-                          ] as const).map((opt) => {
-                            const active = newPayee.utilityProvider === opt.id;
-                            return (
-                              <TouchableOpacity
-                                key={opt.id}
-                                onPress={() => { resetUtilityCheck(); setNewPayee({ ...newPayee, utilityProvider: opt.id }); }}
-                                className={`flex-1 py-2.5 rounded-xl items-center ${active ? 'bg-white' : ''}`}
-                              >
-                                <Text className={`text-[10px] font-jakarta-extrabold uppercase tracking-wider ${active ? 'text-[#0c2010]' : 'text-[#a1a1aa]'}`}>{opt.label}</Text>
-                                <Text className="text-[9px] text-[#707971] font-jakarta-medium mt-0.5">{opt.desc}</Text>
-                              </TouchableOpacity>
-                            );
-                          })}
-                        </View>
-                      </View>
-                    )}
-
-                    {/* KPLC / NCWSC Details — same layout, different biller
-                        colors spelled out explicitly per-branch since
-                        NativeWind (like Tailwind) needs literal class
-                        strings, not ones built from an interpolated variable. */}
-                    {newPayee.type === 'utility' && (newPayee.utilityProvider === 'KPLC' || newPayee.utilityProvider === 'KPLC_PREPAID') && (
-                      <View className="bg-[#fef9e7] rounded-2xl p-4 mb-4 border border-[#f5deb3]">
-                        <View className="flex-row items-center gap-2.5 mb-2">
-                          <View className="bg-white rounded-lg px-2 py-1.5 shadow-sm">
-                            <Image source={require('../../assets/kplc-logo.png')} style={{ height: 28, width: 48, resizeMode: 'contain' }} />
-                          </View>
-                          <Text className="text-[10px] font-jakarta-bold text-[#b87333] uppercase tracking-wider flex-1">
-                            {newPayee.utilityProvider === 'KPLC_PREPAID' ? 'KPLC Prepaid Details' : 'KPLC Postpaid Details'}
-                          </Text>
-                        </View>
-                        <Text className="text-[10px] text-[#707971]/70 font-jakarta-medium mb-3">
-                          {newPayee.utilityProvider === 'KPLC_PREPAID'
-                            ? "The amount below buys a token — sent by KPLC as an SMS to the notification number."
-                            : "The amount below pays down the balance on this meter's existing bill."}
-                        </Text>
-                        <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">Meter Number</Text>
-                        <TextInput
-                          value={newPayee.accountNumber}
-                          onChangeText={(t) => { resetUtilityCheck(); setNewPayee({ ...newPayee, accountNumber: t.replace(/\D/g, '') }); }}
-                          keyboardType="numeric"
-                          placeholder="e.g. 107803292"
-                          placeholderTextColor="#a1a1aa"
-                          className="bg-white border border-[#e7ece7] rounded-xl px-4 py-3 text-[#0c2010] font-jakarta-bold text-[14px] mb-3"
-                        />
-                        <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">Notification Number</Text>
-                        <TextInput
-                          value={newPayee.phone}
-                          onChangeText={(t) => { resetUtilityCheck(); setNewPayee({ ...newPayee, phone: t.replace(/\D/g, '').slice(0, 12) }); }}
-                          keyboardType="phone-pad"
-                          placeholder="07XX XXX XXX"
-                          placeholderTextColor="#a1a1aa"
-                          className="bg-white border border-[#e7ece7] rounded-xl px-4 py-3 text-[#0c2010] font-jakarta-bold text-[14px] mb-3"
-                        />
-                        <TouchableOpacity
-                          onPress={handleVerifyUtilityMeter}
-                          disabled={utilityCheck.status === 'loading'}
-                          className="py-3 rounded-xl items-center bg-[#b87333]"
-                          style={{ opacity: utilityCheck.status === 'loading' ? 0.5 : 1 }}
-                        >
-                          <Text className="font-jakarta-extrabold text-[11px] uppercase tracking-widest text-white">
-                            {utilityCheck.status === 'loading' ? 'Verifying…' : 'Verify Meter'}
-                          </Text>
-                        </TouchableOpacity>
-
-                        {utilityCheck.status === 'success' && (
-                          <View className="flex-row items-start gap-2 bg-white border border-[#bbf7d0] rounded-xl px-3.5 py-3 mt-3">
-                            <Feather name="check-circle" size={16} color="#006c4e" />
-                            <View className="flex-1">
-                              <Text className="font-jakarta-bold text-[13px] text-[#0c2010]">{utilityCheck.customerName || 'Meter verified'}</Text>
-                              <Text className="text-[11px] text-[#707971] font-jakarta-medium mt-0.5">
-                                {utilityCheck.serviceName || (newPayee.utilityProvider === 'KPLC_PREPAID' ? 'Kplc Prepaid' : 'Kplc Postpaid')}
-                                {typeof utilityCheck.balance === 'number' ? ` · Balance due: KES ${utilityCheck.balance.toLocaleString()}` : ''}
-                              </Text>
-                            </View>
-                          </View>
-                        )}
-                        {utilityCheck.status === 'error' && (
-                          <View className="flex-row items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3.5 py-3 mt-3">
-                            <Feather name="alert-circle" size={14} color="#dc2626" />
-                            <Text className="text-[12px] font-jakarta-bold text-red-700 flex-1">{utilityCheck.error}</Text>
-                          </View>
-                        )}
-                      </View>
-                    )}
-
-                    {newPayee.type === 'utility' && newPayee.utilityProvider === 'WATER' && (
-                      <View className="bg-[#e6f6fd] rounded-2xl p-4 mb-4 border border-[#bae4f5]">
-                        <View className="flex-row items-center gap-2.5 mb-3">
-                          <View className="bg-white rounded-lg px-2 py-1.5 shadow-sm">
-                            <Image source={require('../../assets/ncwsc-logo.png')} style={{ height: 28, width: 70, resizeMode: 'contain' }} />
-                          </View>
-                          <Text className="text-[10px] font-jakarta-bold text-[#0369a1] uppercase tracking-wider flex-1">NCWSC (Nairobi Water) Details</Text>
-                        </View>
-                        <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">Meter Number</Text>
-                        <TextInput
-                          value={newPayee.accountNumber}
-                          onChangeText={(t) => { resetUtilityCheck(); setNewPayee({ ...newPayee, accountNumber: t.replace(/\D/g, '') }); }}
-                          keyboardType="numeric"
-                          placeholder="e.g. 5069344"
-                          placeholderTextColor="#a1a1aa"
-                          className="bg-white border border-[#e7ece7] rounded-xl px-4 py-3 text-[#0c2010] font-jakarta-bold text-[14px] mb-3"
-                        />
-                        <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">Notification Number</Text>
-                        <TextInput
-                          value={newPayee.phone}
-                          onChangeText={(t) => { resetUtilityCheck(); setNewPayee({ ...newPayee, phone: t.replace(/\D/g, '').slice(0, 12) }); }}
-                          keyboardType="phone-pad"
-                          placeholder="07XX XXX XXX"
-                          placeholderTextColor="#a1a1aa"
-                          className="bg-white border border-[#e7ece7] rounded-xl px-4 py-3 text-[#0c2010] font-jakarta-bold text-[14px] mb-3"
-                        />
-                        <TouchableOpacity
-                          onPress={handleVerifyUtilityMeter}
-                          disabled={utilityCheck.status === 'loading'}
-                          className="py-3 rounded-xl items-center bg-[#0284c7]"
-                          style={{ opacity: utilityCheck.status === 'loading' ? 0.5 : 1 }}
-                        >
-                          <Text className="font-jakarta-extrabold text-[11px] uppercase tracking-widest text-white">
-                            {utilityCheck.status === 'loading' ? 'Verifying…' : 'Verify Meter'}
-                          </Text>
-                        </TouchableOpacity>
-
-                        {utilityCheck.status === 'success' && (
-                          <View className="flex-row items-start gap-2 bg-white border border-[#bbf7d0] rounded-xl px-3.5 py-3 mt-3">
-                            <Feather name="check-circle" size={16} color="#006c4e" />
-                            <View className="flex-1">
-                              <Text className="font-jakarta-bold text-[13px] text-[#0c2010]">{utilityCheck.customerName || 'Meter verified'}</Text>
-                              <Text className="text-[11px] text-[#707971] font-jakarta-medium mt-0.5">
-                                {utilityCheck.serviceName || 'Nairobi Water'}
-                                {typeof utilityCheck.balance === 'number' ? ` · Balance due: KES ${utilityCheck.balance.toLocaleString()}` : ''}
-                              </Text>
-                            </View>
-                          </View>
-                        )}
-                        {utilityCheck.status === 'error' && (
-                          <View className="flex-row items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3.5 py-3 mt-3">
-                            <Feather name="alert-circle" size={14} color="#dc2626" />
-                            <Text className="text-[12px] font-jakarta-bold text-red-700 flex-1">{utilityCheck.error}</Text>
-                          </View>
-                        )}
-                      </View>
-                    )}
 
                     {/* KRA Employee fields */}
                     {newPayee.type === 'employee' && (
@@ -2425,16 +1999,13 @@ export default function BulkPay() {
                       className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-4 py-3.5 text-[#0c2010] font-jakarta-bold text-[14px] mb-4"
                     />
 
-                    {/* Payment Method — not applicable to KPLC, which routes
-                        through its own dedicated rail (see block above) */}
-                    {newPayee.utilityProvider !== 'KPLC' && (
-                    <>
+                    {/* Payment Method */}
                     <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-2">Settlement Method</Text>
                     <View className="flex-row gap-2 mb-4">
                       {(['Mobile Money', 'Bank'] as PaymentMethod[]).map((m) => (
                         <TouchableOpacity
                           key={m}
-                          onPress={() => { setNewPayee({ ...newPayee, paymentMethod: m }); if (m === 'Bank') fetchBankCodes(); }}
+                          onPress={() => setNewPayee({ ...newPayee, paymentMethod: m })}
                           className={`flex-1 py-3 rounded-xl items-center ${newPayee.paymentMethod === m ? 'bg-[#00351d]' : 'bg-[#f0fdf4] border border-[#e7ece7]'}`}
                         >
                           <Text className={`font-jakarta-bold text-[12px] ${newPayee.paymentMethod === m ? 'text-white' : 'text-[#404942]'}`}>{m}</Text>
@@ -2457,27 +2028,14 @@ export default function BulkPay() {
                           ))}
                         </View>
                         {newPayee.mobileMoneyType === 'Personal Number' && (
-                          <View className="mb-2">
-                            <TextInput
-                              value={newPayee.phone}
-                              onChangeText={(t) => setNewPayee({ ...newPayee, phone: t.replace(/\D/g, '').slice(0, 12) })}
-                              keyboardType="phone-pad"
-                              placeholder="07XX XXX XXX"
-                              placeholderTextColor="#a1a1aa"
-                              className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-4 py-3.5 text-[#0c2010] font-jakarta-bold text-[14px] mb-2"
-                            />
-                            <View className="flex-row gap-1.5">
-                              {(['safaricom', 'airtel'] as MobileNetwork[]).map((net) => (
-                                <TouchableOpacity
-                                  key={net}
-                                  onPress={() => setNewPayee({ ...newPayee, mobileNetwork: net })}
-                                  className={`flex-1 py-2.5 rounded-lg items-center border ${newPayee.mobileNetwork === net ? 'bg-[#00351d] border-[#00351d]' : 'bg-white border-[#e7ece7]'}`}
-                                >
-                                  <Text className={`font-jakarta-bold text-[11px] ${newPayee.mobileNetwork === net ? 'text-white' : 'text-[#707971]'}`}>{net === 'airtel' ? 'Airtel Money' : 'M-PESA'}</Text>
-                                </TouchableOpacity>
-                              ))}
-                            </View>
-                          </View>
+                          <TextInput
+                            value={newPayee.phone}
+                            onChangeText={(t) => setNewPayee({ ...newPayee, phone: t.replace(/\D/g, '').slice(0, 12) })}
+                            keyboardType="phone-pad"
+                            placeholder="07XX XXX XXX"
+                            placeholderTextColor="#a1a1aa"
+                            className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-4 py-3.5 text-[#0c2010] font-jakarta-bold text-[14px] mb-2"
+                          />
                         )}
                         {newPayee.mobileMoneyType === 'Paybill' && (
                           <View className="flex-row gap-2 mb-2">
@@ -2513,20 +2071,13 @@ export default function BulkPay() {
 
                     {newPayee.paymentMethod === 'Bank' && (
                       <View>
-                        <View className="flex-row flex-wrap gap-1.5 mb-2">
-                          {bankCodes.length === 0 && (
-                            <Text className="text-[#707971] font-jakarta-medium text-[11px] py-2">Loading banks…</Text>
-                          )}
-                          {bankCodes.map((b) => (
-                            <TouchableOpacity
-                              key={b.code}
-                              onPress={() => setNewPayee({ ...newPayee, bankCode: b.code, bankName: b.name })}
-                              className={`px-3 py-2 rounded-lg border ${newPayee.bankCode === b.code ? 'bg-[#00351d] border-[#00351d]' : 'bg-white border-[#e7ece7]'}`}
-                            >
-                              <Text className={`font-jakarta-bold text-[11px] ${newPayee.bankCode === b.code ? 'text-white' : 'text-[#404942]'}`}>{b.name}</Text>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
+                        <TextInput
+                          value={newPayee.bankName}
+                          onChangeText={(t) => setNewPayee({ ...newPayee, bankName: t })}
+                          placeholder="Bank Name (e.g. KCB)"
+                          placeholderTextColor="#a1a1aa"
+                          className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-4 py-3.5 text-[#0c2010] font-jakarta-bold text-[14px] mb-2"
+                        />
                         <TextInput
                           value={newPayee.accountNumber}
                           onChangeText={(t) => setNewPayee({ ...newPayee, accountNumber: t.replace(/\D/g, '').slice(0, 14) })}
@@ -2536,8 +2087,6 @@ export default function BulkPay() {
                           className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-4 py-3.5 text-[#0c2010] font-jakarta-bold text-[14px]"
                         />
                       </View>
-                    )}
-                    </>
                     )}
                   </View>
                 )}
@@ -2570,31 +2119,14 @@ export default function BulkPay() {
             <View className="w-full max-w-lg mx-auto bg-white rounded-t-[36px] pt-4 mt-auto" style={{ maxHeight: '92%' }}>
               <View className="items-center mb-2"><View className="w-12 h-1.5 bg-[#e7ece7] rounded-full" /></View>
 
-              <View className="flex-row items-center justify-between px-6 mb-1">
-                <View className="flex-row items-center gap-2.5 flex-1">
-                  <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[22px] text-[#0c2010]">
-                    {invoiceDetails.invoiceNumber ? `Invoice #${invoiceDetails.invoiceNumber}` : 'Create Invoice'}
-                  </Text>
-                  {invoiceDetails.invoiceNumber && (() => {
-                    const badgeMeta: Record<string, { label: string; bg: string; text: string }> = {
-                      draft: { label: 'Draft', bg: '#fef3e7', text: '#b87333' },
-                      sent: { label: 'Sent', bg: '#e7f8ef', text: '#006c4e' },
-                      paid: { label: 'Paid', bg: '#dbeafe', text: '#1e40af' },
-                      void: { label: 'Void', bg: '#f1f5f9', text: '#64748b' },
-                    };
-                    const b = badgeMeta[invoiceDetails.status] || badgeMeta.draft;
-                    return (
-                      <View className="px-2.5 py-1 rounded-full" style={{ backgroundColor: b.bg }}>
-                        <Text className="text-[9px] font-jakarta-extrabold uppercase tracking-wider" style={{ color: b.text }}>{b.label}</Text>
-                      </View>
-                    );
-                  })()}
-                </View>
+              <View className="flex-row items-center justify-between px-6 mb-4">
+                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[22px] text-[#0c2010]">
+                  {invoiceDetails.invoiceNumber ? `Invoice #${invoiceDetails.invoiceNumber}` : 'Create Invoice'}
+                </Text>
                 <TouchableOpacity onPress={() => setShowInvoiceEditor(false)} className="w-9 h-9 rounded-full bg-[#f7faf7] items-center justify-center">
                   <Feather name="x" size={16} color="#0c2010" />
                 </TouchableOpacity>
               </View>
-              <Text className="text-[10px] font-jakarta-medium text-[#707971] px-6 mb-4">From {merchant?.businessName || 'your business'}</Text>
 
               <ScrollView className="px-6" showsVerticalScrollIndicator={false}>
                 <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#707971] mb-4">Customer</Text>
@@ -2645,20 +2177,22 @@ export default function BulkPay() {
 
                 <View className="flex-row gap-4 mb-6">
                   <View className="flex-1">
-                    <InlineDatePicker
-                      label="Issue Date"
+                    <Text className="text-[9px] font-jakarta-bold uppercase tracking-widest text-[#707971] mb-1.5 ml-1">Issue Date</Text>
+                    <TextInput
                       value={invoiceDetails.issueDate}
-                      onChange={(iso) => setInvoiceDetails(prev => ({ ...prev, issueDate: iso }))}
+                      onChangeText={(t) => setInvoiceDetails(prev => ({ ...prev, issueDate: t }))}
+                      placeholder="YYYY-MM-DD"
+                      className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-4 py-3 text-[13px] font-jakarta-bold text-[#0c2010]"
                     />
                   </View>
                   <View className="flex-1">
-                    <InlineDatePicker
-                      label="Due Date"
+                    <Text className="text-[9px] font-jakarta-bold uppercase tracking-widest text-[#707971] mb-1.5 ml-1">Due Date</Text>
+                    <TextInput
                       value={invoiceDetails.dueDate}
-                      onChange={(iso) => setInvoiceDetails(prev => ({ ...prev, dueDate: iso }))}
+                      onChangeText={(t) => setInvoiceDetails(prev => ({ ...prev, dueDate: t }))}
                       placeholder="Optional"
-                      minDate={invoiceDetails.issueDate}
-                      clearable
+                      placeholderTextColor="#a1a1aa"
+                      className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-4 py-3 text-[13px] font-jakarta-bold text-[#0c2010]"
                     />
                   </View>
                 </View>
@@ -2794,15 +2328,8 @@ export default function BulkPay() {
               </TouchableOpacity>
             </View>
             <Text className="text-[#707971] font-jakarta-medium text-[12px] mb-4 leading-relaxed">
-              Share this link with your customer to allow them to view and pay this invoice online, or let them scan the QR code below.
+              Share this link with your customer to allow them to view and pay this invoice online.
             </Text>
-            {invoiceDetails.qrCodeDataUri && (
-              <View className="items-center mb-5">
-                <View className="p-3 bg-white border border-[#eff4ef] rounded-2xl shadow-sm">
-                  <Image source={{ uri: invoiceDetails.qrCodeDataUri }} style={{ width: 140, height: 140 }} resizeMode="contain" />
-                </View>
-              </View>
-            )}
             <View className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl p-4 mb-5">
               <Text className="text-[13px] font-jakarta-bold text-[#0c2010]" numberOfLines={1}>{invoiceDetails.payUrl}</Text>
             </View>

@@ -14,6 +14,7 @@ import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { assertOtpNotLocked, recordFailedOtpAttempt, resetOtpAttempts, OtpLockedError } from '../utils/otpLockout.js';
 import { timingSafeStringEqual } from '../utils/timingSafeCompare.js';
+import { normalizeKraPin, isValidKraPin, KRA_PIN_FORMAT_HINT } from '../utils/kraPinValidator.js';
 
 // Canonical option sets for self-serve signup's business-details step —
 // kept here (not just in the frontend) so a request bypassing the UI can't
@@ -86,7 +87,7 @@ export const registerMerchant = async (req, res) => {
 
     if (phone) phone = String(phone).replace(/\s+/g, '');
     if (email) email = String(email).trim().toLowerCase();
-    if (kraPin) kraPin = String(kraPin).trim().toUpperCase();
+    if (kraPin) kraPin = normalizeKraPin(kraPin);
     if (businessNumber) businessNumber = String(businessNumber).trim();
     if (businessType) businessType = String(businessType).trim();
     if (county) county = String(county).trim();
@@ -150,6 +151,9 @@ export const registerMerchant = async (req, res) => {
       return res.status(400).json({ error: msg });
     }
 
+    if (kraPin && !isValidKraPin(kraPin)) {
+      return res.status(400).json({ error: `Invalid KRA PIN format. ${KRA_PIN_FORMAT_HINT}` });
+    }
     if (kraPin && await Merchant.exists({ kraPin })) {
       return res.status(400).json({ error: 'A merchant with that KRA PIN already exists.' });
     }
@@ -959,20 +963,20 @@ export const updateMerchantProfile = async (req, res) => {
 
     const { kraPin, businessNumber, settlementMobile, settlementBankName, settlementBankAccount, settlementBankCode } = req.body;
     
-    // KRA PIN format check — PayChain has no live eTIMS/KRA API integration,
-    // so this only validates the PIN's shape, not that it's real/registered
-    // with KRA. isKRAVerified means "passed format validation," not
-    // "confirmed against a government system" — never present it to a
-    // merchant as an actual eTIMS lookup.
-    if (kraPin !== undefined && kraPin !== merchant.kraPin) {
-      const kraRegex = /^[AP][0-9]{9}[A-Z]$/i;
-      if (!kraRegex.test(kraPin)) {
+    // KRA PIN format check — isKRAVerified means "passed format
+    // validation," not "confirmed against a government system." The eTIMS
+    // OSCU integration (controllers/etimsController.js) sends this PIN to
+    // KRA as the tin when signing invoices, but neither it nor this check
+    // performs an actual PIN lookup/verification against KRA — never
+    // present a passed check to a merchant as an eTIMS lookup.
+    if (kraPin !== undefined && normalizeKraPin(kraPin) !== merchant.kraPin) {
+      if (!isValidKraPin(kraPin)) {
         return res.status(400).json({
-          error: 'Invalid KRA PIN format. Expected format: P123456789A'
+          error: `Invalid KRA PIN format. ${KRA_PIN_FORMAT_HINT}`
         });
       }
 
-      merchant.kraPin = kraPin.toUpperCase();
+      merchant.kraPin = normalizeKraPin(kraPin);
       merchant.isKRAVerified = true;
     }
 

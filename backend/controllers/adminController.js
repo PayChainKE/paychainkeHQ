@@ -18,6 +18,7 @@ import { generateMerchantStickerPdf, generateBulkStickerPdf } from '../utils/sti
 import { LIVE_DATA_CUTOFF } from '../config/liveDataCutoff.js';
 import { provisionMerchantWallet } from '../utils/stellarHelper.js';
 import { encryptKey } from '../utils/cryptoHelper.js';
+import { normalizeKraPin, isValidKraPin, KRA_PIN_FORMAT_HINT } from '../utils/kraPinValidator.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
 
 // Build an `actor` shape from req.admin so audit rows attribute admin-initiated
@@ -1052,8 +1053,12 @@ export const createMerchant = async (req, res) => {
     phone = String(phone).replace(/\s+/g, '');
     name = String(name).trim();
     businessName = String(businessName).trim();
-    kraPin = kraPin ? String(kraPin).trim().toUpperCase() : null;
+    kraPin = kraPin ? normalizeKraPin(kraPin) : null;
     businessNumber = businessNumber ? String(businessNumber).trim() : null;
+
+    if (kraPin && !isValidKraPin(kraPin)) {
+      return res.status(400).json({ error: `Invalid KRA PIN format. ${KRA_PIN_FORMAT_HINT}` });
+    }
 
     // Per-field uniqueness pre-check so the admin sees exactly which field
     // collides instead of a generic E11000.

@@ -50,6 +50,7 @@ import smsRoutes from './routes/smsRoutes.js';
 import developerRoutes from './routes/developerRoutes.js';
 import developerPublicRoutes from './routes/developerPublicRoutes.js';
 import publicCheckoutRoutes from './routes/publicCheckoutRoutes.js';
+import etimsRoutes from './routes/etimsRoutes.js';
 import { ensurePrimaryOwner } from './migrations/ensurePrimaryOwner.js';
 import { backfillTransactionFees } from './migrations/backfillTransactionFees.js';
 import { backfillNcbaMerchantCodes } from './migrations/backfillNcbaMerchantCodes.js';
@@ -245,6 +246,9 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/cash-advance', cashAdvanceRoutes);
 app.use('/api/developer', developerRoutes);
+// KRA eTIMS OSCU fiscal integration — merchant-authenticated (protectMerchant),
+// not the developer API key flow above. See routes/etimsRoutes.js.
+app.use('/api/v1/etims', etimsRoutes);
 // Kept separate from the /api/v1 NCBA mount above (different concern —
 // public third-party API traffic vs. our own bank-rail integration).
 app.use('/api/v1/developer', developerPublicRoutes);

@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import { generateRandomMerchantCode } from '../utils/ncbaValidators.js';
 import RetiredMerchantCode from './RetiredMerchantCode.js';
+import { normalizeKraPin, isValidKraPin, KRA_PIN_FORMAT_HINT } from '../utils/kraPinValidator.js';
 
 const merchantSchema = new mongoose.Schema({
   name: {
@@ -36,6 +37,27 @@ const merchantSchema = new mongoose.Schema({
     default: null,
     unique: true,
     sparse: true,
+    set: (v) => normalizeKraPin(v),
+    // Only enforced when kraPin is actually being set/changed — every
+    // controller path that writes this field already normalizes+validates
+    // before assignment (see utils/kraPinValidator.js), this is
+    // defense-in-depth for anywhere that isn't. Skipping unmodified values
+    // means a merchant record saved before this validator existed, with a
+    // PIN in an old/nonstandard shape, never fails validation just because
+    // some *other* field on it changed.
+    validate: {
+      validator: function (v) {
+        if (!v) return true;
+        // `this` is the document on a normal save/create; on a
+        // findOneAndUpdate with runValidators it's the query instead
+        // (no isModified) — a value present in an update payload is by
+        // definition the one being set, so validate it unconditionally
+        // in that case rather than assuming `this.isModified` exists.
+        if (typeof this.isModified === 'function' && !this.isModified('kraPin')) return true;
+        return isValidKraPin(v);
+      },
+      message: `Invalid KRA PIN format. ${KRA_PIN_FORMAT_HINT}`,
+    },
   },
   isKRAVerified: {
     type: Boolean,

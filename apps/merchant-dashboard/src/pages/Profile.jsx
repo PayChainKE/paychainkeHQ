@@ -435,7 +435,7 @@ export default function Profile() {
                       kind="kraPin"
                       value={kraPin}
                       onChange={(e) => { setKraPin(e.target.value); setHighlightFields((prev) => { if (!prev.has('kraPin')) return prev; const next = new Set(prev); next.delete('kraPin'); return next }) }}
-                      placeholder="e.g. P123456789A"
+                      placeholder="e.g. P051892647A"
                       disabled={kraPinLocked}
                       className={`w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none ${kraPinLocked ? 'opacity-60 bg-slate-50 cursor-not-allowed pr-32' : 'pr-32'}`}
                     />
