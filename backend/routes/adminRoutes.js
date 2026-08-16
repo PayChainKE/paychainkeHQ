@@ -41,6 +41,7 @@ import {
   listDevelopers,
   approveLiveAccess,
   rejectLiveAccess,
+  getDeveloperWebhooks,
 } from '../controllers/developerAdminController.js';
 import {
   listTeam,
@@ -198,6 +199,7 @@ router.get('/monitoring/sentry', protect, excludeOfficer, getSentryOverview);
 // instantly; live (real-money) keys need an admin to approve the account
 // first, same shape as merchant KYB. See developerAdminController.js.
 router.get('/developers', protect, excludeOfficer, listDevelopers);
+router.get('/developers/:id/webhooks', protect, excludeOfficer, getDeveloperWebhooks);
 router.patch('/developers/:id/approve-live', protect, requireMutator, approveLiveAccess);
 router.patch('/developers/:id/reject-live', protect, requireMutator, rejectLiveAccess);
 

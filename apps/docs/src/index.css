@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 5.5rem;
+}
+
+body {
+  @apply bg-canvas text-ink antialiased;
+  font-feature-settings: "cv11", "ss01";
+}
+
+::selection {
+  background: rgba(0, 191, 99, 0.3);
+  color: #fff;
+}
+
+.custom-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.custom-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scroll::-webkit-scrollbar-thumb {
+  background: #23262a;
+  border-radius: 999px;
+}
+.custom-scroll::-webkit-scrollbar-thumb:hover {
+  background: #2e3237;
+}
+
+.prose-docs h2 {
+  @apply text-xl md:text-2xl font-bold text-ink mt-12 mb-4 scroll-mt-24 tracking-tight;
+}
+.prose-docs h3 {
+  @apply text-base md:text-lg font-bold text-ink mt-8 mb-3 scroll-mt-24 tracking-tight;
+}
+.prose-docs p {
+  @apply text-[15px] leading-7 text-ink-muted mb-4;
+}
+.prose-docs ul {
+  @apply text-[15px] leading-7 text-ink-muted mb-4 list-disc pl-5 space-y-1;
+}
+.prose-docs strong {
+  @apply text-ink font-semibold;
+}
+/* Scoped to inline links within running text/lists — not every <a>-rendered
+   element in the tree (card links, buttons, etc. bring their own styling
+   and shouldn't inherit an underline meant for "a link in a sentence"). */
+.prose-docs p a,
+.prose-docs li a {
+  @apply text-brand hover:text-brand-bright underline underline-offset-4 decoration-brand/30;
+}
+.prose-docs code:not(pre code) {
+  @apply px-1.5 py-0.5 rounded-md bg-surface-raised border border-border-subtle text-brand-bright font-mono text-[13px];
+}
