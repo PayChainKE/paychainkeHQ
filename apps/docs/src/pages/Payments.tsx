@@ -17,7 +17,7 @@ export default function Payments() {
       <Callout variant="tip" title="Idempotency-Key is required on every write">
         Generate one unique value per logical attempt (a UUID is fine) and send it as the{" "}
         <code>Idempotency-Key</code> header. Retry with the <em>same</em> key after a timeout or
-        network error and you'll get the original payment back — <code>replayed: true</code> —
+        network error and you'll get the original payment back (<code>replayed: true</code>)
         instead of a duplicate charge.
       </Callout>
 
@@ -29,7 +29,7 @@ export default function Payments() {
         params={[
           { name: "amount", type: "number", required: true, description: "Amount in KES, rounded up to the nearest shilling." },
           { name: "phone", type: "string", required: true, description: "A Kenyan phone number, any common format (0712345678, 254712345678, +254712345678)." },
-          { name: "reference", type: "string", description: "Your own identifier — a CRM contact ID, an ISP subscriber account number. Echoed back on the payment object and every webhook event for it, so you can match without a lookup." },
+          { name: "reference", type: "string", description: "Your own identifier: a CRM contact ID, an ISP subscriber account number. Echoed back on the payment object and every webhook event for it, so you can match without a lookup." },
         ]}
       />
 
@@ -110,7 +110,7 @@ print(payment['status'])  # "pending"`,
       />
       <p>
         <code>status</code> starts <code>pending</code> and resolves asynchronously once the
-        customer responds to the prompt. Don't poll in a tight loop for this — subscribe a{" "}
+        customer responds to the prompt. Don't poll in a tight loop for this. Subscribe a{" "}
         <a href="/webhooks">webhook</a> instead.
       </p>
 
@@ -125,7 +125,7 @@ print(payment['status'])  # "pending"`,
           { name: "accountNumber", type: "string", required: true, description: "Destination account number." },
           { name: "accountName", type: "string", description: "Destination account holder name, for your own records." },
           { name: "narration", type: "string", description: "Shown on the receiving statement. Defaults to \"Developer API payout\"." },
-          { name: "apiPayoutPin", type: "string", required: true, description: "Required in live mode only. The merchant sets this — and enables API payouts at all — from their PayChain dashboard, along with per-transaction and daily caps." },
+          { name: "apiPayoutPin", type: "string", required: true, description: "Required in live mode only. The merchant sets this (and enables API payouts at all) from their PayChain dashboard, along with per-transaction and daily caps." },
         ]}
       />
 
@@ -193,7 +193,7 @@ payment = res.json()['payment']`,
       />
 
       <Callout variant="info" title="Live payouts resolve synchronously">
-        Unlike a collect, a live payout's outcome is known before the response is sent — you'll
+        Unlike a collect, a live payout's outcome is known before the response is sent. You'll
         get back <code>status: "success"</code> or a <code>402</code> with the failure reason
         immediately, no need to wait for a webhook to know whether it worked (though one still fires).
       </Callout>
@@ -228,7 +228,7 @@ payment = res.json()['payment']`,
           },
         ]}
       />
-      <p>Returns the same payment object shape shown above, with whatever <code>status</code> currently applies. This is a safe fallback to poll — but a webhook subscription is the faster, cheaper way to find out.</p>
+      <p>Returns the same payment object shape shown above, with whatever <code>status</code> currently applies. This is a safe fallback to poll, but a webhook subscription is the faster, cheaper way to find out.</p>
 
       <h2>The payment object</h2>
       <ParamsTable

@@ -1,15 +1,22 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>PayChain Developer Docs</title>
-    <meta name="description" content="Integrate PayChain payments — STK push collections, payouts, and webhooks — into your CRM, ISP billing system, or any backend." />
+    <meta name="description" content="Integrate PayChain payments (STK push collections, payouts, and webhooks) into your CRM, ISP billing system, or any backend." />
     <link rel="canonical" href="https://developer.paychain.co.ke/" />
     <meta property="og:title" content="PayChain Developer Docs" />
-    <meta property="og:description" content="Integrate PayChain payments — STK push collections, payouts, and webhooks — into your CRM, ISP billing system, or any backend." />
+    <meta property="og:description" content="Integrate PayChain payments (STK push collections, payouts, and webhooks) into your CRM, ISP billing system, or any backend." />
     <meta property="og:url" content="https://developer.paychain.co.ke/" />
     <meta property="og:type" content="website" />
+    <script>
+      (function () {
+        var stored = localStorage.getItem("paychain-docs-theme");
+        var dark = stored ? stored === "dark" : !window.matchMedia("(prefers-color-scheme: light)").matches;
+        document.documentElement.classList.toggle("dark", dark);
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />

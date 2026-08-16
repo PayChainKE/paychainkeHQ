@@ -18,13 +18,13 @@ export default function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="flex items-center gap-1.5 text-[11px] font-medium text-ink-faint hover:text-ink transition-colors shrink-0"
+      className="flex items-center gap-1.5 text-[11px] font-medium text-code-faint hover:text-code-text transition-colors shrink-0"
       aria-label="Copy code"
     >
       {copied ? (
         <>
-          <Check className="w-3.5 h-3.5 text-brand" />
-          <span className="text-brand">Copied</span>
+          <Check className="w-3.5 h-3.5 text-code-accent" />
+          <span className="text-code-accent">Copied</span>
         </>
       ) : (
         <>

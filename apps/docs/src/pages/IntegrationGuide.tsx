@@ -2,6 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { User, Store, ArrowRight } from "lucide-react";
 import Callout from "@/components/Callout";
+import CodeBlock from "@/components/CodeBlock";
 
 export default function IntegrationGuide() {
   return (
@@ -9,14 +10,14 @@ export default function IntegrationGuide() {
       <h1 className="text-3xl font-extrabold text-ink tracking-tight mb-4">Integration guide</h1>
       <p>
         A slower, more complete walk through what the <Link to="/">Introduction</Link> page's
-        quickstart moves through fast — the account model, whether there's a sandbox and where to
+        quickstart moves through fast: the account model, whether there's a sandbox and where to
         get it, the full path to your first live payment, and what to check before you get there.
       </p>
 
       <h2>The account model</h2>
       <p>
         PayChain has two kinds of account, and the split trips people up more than anything else
-        here — most payment APIs only have one.
+        here. Most payment APIs only have one.
       </p>
 
       <div className="grid sm:grid-cols-2 gap-3 my-6">
@@ -41,7 +42,7 @@ export default function IntegrationGuide() {
             <span className="text-[14px] font-semibold text-ink">Merchant account</span>
           </div>
           <span className="block text-[13px] text-ink-muted leading-6">
-            The actual PayChain business account with a real wallet — signed up separately, through
+            The actual PayChain business account with a real wallet, signed up separately through
             the merchant dashboard, not through this API. Every payment your keys create moves
             money in or out of <em>this</em> account's balance.
           </span>
@@ -51,76 +52,118 @@ export default function IntegrationGuide() {
       <p>
         A developer account <strong>links to</strong> exactly one merchant account (see{" "}
         <Link to="/authentication">Authentication</Link> for how that link is proven). If you're
-        integrating for your own business, you're both — sign up as a merchant first, then again
+        integrating for your own business, you're both: sign up as a merchant first, then again
         as a developer, then link the two. If you're building for a client, they need an existing
         merchant account and hand you the credentials for the linking step only, once.
       </p>
 
-      <h2>Is there a sandbox — and where is it?</h2>
-      <Callout variant="tip" title="Yes — and it's not a separate place">
+      <h2>Is there a sandbox, and where is it?</h2>
+      <Callout variant="tip" title="Yes, and it's not a separate place">
         There's no <code>sandbox.api.paychain.co.ke</code>, no separate base URL, nothing to point
         your app at differently. <code>https://api.paychain.co.ke</code> is the only host, for both
-        test and live. The sandbox is just <em>which key you send it</em> — a{" "}
+        test and live. The sandbox is just <em>which key you send it</em>: a{" "}
         <code>test</code>-mode key routes through the exact same endpoints and short-circuits to
         simulated behavior. Create your developer account, link a merchant, call{" "}
         <code>POST /api/developer/api-keys</code> with <code>{`{"mode":"test"}`}</code>, and you
-        have a working key in the same response — usually under two minutes end to end.
+        have a working key in the same response, usually under two minutes end to end.
       </Callout>
       <p>What "sandbox" means concretely here: every collect and payout made with a <code>test</code> key</p>
       <ul>
         <li>Never calls M-PESA, NCBA, or any real payment rail</li>
         <li>Never touches the linked merchant's real balance</li>
-        <li>Settles itself to <code>success</code> a few seconds after creation, automatically — nothing to trigger manually</li>
+        <li>Settles itself to <code>success</code> a few seconds after creation, automatically, nothing to trigger manually</li>
         <li>Fires the exact same webhook events a live payment would, with the exact same payload shape</li>
       </ul>
       <p>
-        In other words: you can build and fully exercise your entire integration — collect, payout,
-        webhook delivery, retry handling, idempotency replay — without ever touching live access.
+        In other words: you can build and fully exercise your entire integration (collect, payout,
+        webhook delivery, retry handling, idempotency replay) without ever touching live access.
         Full parameter reference on the <Link to="/payments">Payments</Link> and{" "}
         <Link to="/webhooks">Webhooks</Link> pages.
       </p>
 
       <h2>The full path, step by step</h2>
-      <div className="space-y-3 my-6">
-        {[
-          { title: "Register a developer account", detail: "Email + OTP verification. This is your login, separate from any merchant login." },
-          { title: "Link a PayChain merchant", detail: "One-time proof of control: the merchant's password, then an OTP sent to their inbox. Skip this and every payment call returns NO_LINKED_MERCHANT." },
-          { title: "Create a test-mode key", detail: "Self-serve — this is the sandbox. No approval, no waiting." },
-          { title: "Build against it", detail: "Collect, payout, register a webhook, verify signatures, handle retries — all fully simulated, zero real money." },
-          { title: "Request live access", detail: "One call, once you're confident. Drops into a PayChain admin's review queue." },
-          { title: "Create a live key", detail: "Same endpoints, real money. Payouts also need the merchant to enable API payouts + set a PIN and caps from their own dashboard." },
-        ].map((step, i) => (
-          <div key={step.title} className="flex gap-3">
-            <div className="w-6 h-6 rounded-full bg-brand/10 border border-brand/20 flex items-center justify-center shrink-0 text-[11px] font-bold text-brand-bright mt-0.5">
-              {i + 1}
-            </div>
-            <div>
-              <span className="block text-[14px] font-semibold text-ink">{step.title}</span>
-              <span className="block text-[13px] text-ink-muted leading-6 mt-0.5">{step.detail}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-      <p>
-        Exact request bodies for every one of these calls are on the{" "}
-        <Link to="/">Introduction</Link> page's quickstart — this page is the map, that one's the
-        commands.
+
+      <h3>1. Register a developer account</h3>
+      <p className="text-[13.5px] text-ink-muted leading-6">Email + OTP verification. This is your login, separate from any merchant login.</p>
+      <CodeBlock
+        lang="bash"
+        label="curl"
+        code={`curl -X POST https://api.paychain.co.ke/api/auth/developer/register \\
+  -H "Content-Type: application/json" \\
+  -d '{"name":"Asha Wanjiru","email":"asha@example.com","companyName":"BrightNet ISP","password":"..."}'
+
+# then, with the 6-digit code emailed to you:
+curl -X POST https://api.paychain.co.ke/api/auth/developer/verify-otp \\
+  -H "Content-Type: application/json" \\
+  -d '{"email":"asha@example.com","otp":"482910"}'`}
+      />
+
+      <h3>2. Link a PayChain merchant</h3>
+      <p className="text-[13.5px] text-ink-muted leading-6">
+        One-time proof of control: the merchant's own password, then an OTP sent to{" "}
+        <em>their</em> inbox, not yours. Skip this and every payment call returns{" "}
+        <code>NO_LINKED_MERCHANT</code>.
+      </p>
+      <CodeBlock
+        lang="bash"
+        label="curl · with your developer JWT"
+        code={`curl -X POST https://api.paychain.co.ke/api/developer/link-merchant/start \\
+  -H "Authorization: Bearer <developer-jwt>" \\
+  -H "Content-Type: application/json" \\
+  -d '{"merchantEmail":"shop@example.com","merchantPassword":"..."}'`}
+      />
+
+      <h3>3. Create a test-mode key</h3>
+      <p className="text-[13.5px] text-ink-muted leading-6">Self-serve. This is the sandbox, no approval, no waiting.</p>
+      <CodeBlock
+        lang="bash"
+        label="curl"
+        code={`curl -X POST https://api.paychain.co.ke/api/developer/api-keys \\
+  -H "Authorization: Bearer <developer-jwt>" \\
+  -H "Content-Type: application/json" \\
+  -d '{"mode":"test","label":"local dev"}'`}
+      />
+      <Callout variant="tip" title="Save the key now">
+        The raw key is only ever shown in this response. PayChain stores just its hash after that.
+      </Callout>
+
+      <h3>4. Build against it</h3>
+      <p className="text-[13.5px] text-ink-muted leading-6 mb-6">
+        Collect, payout, register a webhook, verify signatures, handle retries: all fully
+        simulated, zero real money. See <Link to="/payments">Payments</Link> and{" "}
+        <Link to="/webhooks">Webhooks</Link> for the full reference.
+      </p>
+
+      <h3>5. Request live access</h3>
+      <p className="text-[13.5px] text-ink-muted leading-6">One call, once you're confident. Drops into a PayChain admin's review queue.</p>
+      <CodeBlock
+        lang="bash"
+        label="curl · with your developer JWT"
+        code={`curl -X POST https://api.paychain.co.ke/api/developer/live-access/request \\
+  -H "Authorization: Bearer <developer-jwt>"`}
+      />
+
+      <h3>6. Create a live key</h3>
+      <p className="text-[13.5px] text-ink-muted leading-6 mb-6">
+        Same endpoints, real money: the same <code>POST /api/developer/api-keys</code> call with{" "}
+        <code>{`{"mode":"live"}`}</code> once your request is approved. Payouts also need the
+        merchant to enable API payouts and set a PIN and caps from their own dashboard.
       </p>
 
       <h2>Before you request live access</h2>
-      <p>Worth checking in <code>test</code> mode first — all cheap to verify now, expensive to discover in production:</p>
+      <p>Worth checking in <code>test</code> mode first: all cheap to verify now, expensive to discover in production.</p>
       <ul>
-        <li>You're sending a fresh <code>Idempotency-Key</code> per logical attempt, and retrying with the <em>same</em> key on timeout — see <Link to="/errors">Errors & idempotency</Link></li>
+        <li>You're sending a fresh <code>Idempotency-Key</code> per logical attempt, and retrying with the <em>same</em> key on timeout. See <Link to="/errors">Errors & idempotency</Link></li>
         <li>Your webhook endpoint verifies <code>X-PayChain-Signature</code> before acting on a delivery, not after</li>
-        <li>Your webhook endpoint returns <code>2xx</code> quickly and does the real work asynchronously — a slow handler just triggers PayChain's retry backoff for no reason</li>
+        <li>Your webhook endpoint returns <code>2xx</code> quickly and does the real work asynchronously. A slow handler just triggers PayChain's retry backoff for no reason</li>
         <li>You're handling <code>payment.*.failed</code> events, not just the success path</li>
         <li>You're storing <code>reference</code> values that actually let you match a webhook back to your own record</li>
       </ul>
 
-      <Callout variant="info" title="Live payouts need one more thing — on the merchant's side">
+      <Callout variant="info" title="Live payouts need one more thing, on the merchant's side">
         Collecting money live only needs your live key. Paying money out live also needs the
         linked merchant to turn on API payouts, set a payout PIN, and set per-transaction/daily
-        caps from their own PayChain dashboard — a deliberate separate switch, not something a
+        caps from their own PayChain dashboard. It's a deliberate separate switch, not something a
         developer key can enable for them.
       </Callout>
 

@@ -15,15 +15,18 @@ function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+// These paint inside code panels, which stay dark in both site themes (see
+// tailwind.config.ts's "code" palette) — fixed colors, not the theme-able
+// ink-*/brand-* tokens the rest of the page uses.
 const cls = {
-  comment: "text-ink-faint",
-  string: "text-brand-bright",
+  comment: "text-code-faint",
+  string: "text-code-accent",
   key: "text-sky-300",
   number: "text-amber-300",
   keyword: "text-fuchsia-300",
   bool: "text-amber-300",
-  flag: "text-ink-muted",
-  cmd: "text-ink font-semibold",
+  flag: "text-code-muted",
+  cmd: "text-code-text font-semibold",
 };
 
 function wrap(text: string, className: string) {

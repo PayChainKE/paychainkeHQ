@@ -50,7 +50,7 @@ export default function Guides() {
       />
 
       <Callout variant="tip" title="Why the reference field carries the subscriber ID">
-        You already know which subscriber paid at collect time — encode that in <code>reference</code>{" "}
+        You already know which subscriber paid at collect time. Encode that in <code>reference</code>{" "}
         and every webhook for that payment carries it back to you. No separate lookup step, no
         matching by phone number or amount.
       </Callout>

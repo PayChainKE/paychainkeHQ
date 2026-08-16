@@ -22,7 +22,7 @@ export const nav: NavGroup[] = [
     label: "Core API",
     items: [
       { title: "Payments", path: "/payments", description: "Collect via STK push, pay out, and check status." },
-      { title: "Checkout", path: "/checkout", description: "A hosted payment page you redirect customers to — no card/phone data touches your servers." },
+      { title: "Checkout", path: "/checkout", description: "A hosted payment page you redirect customers to. No card/phone data touches your servers." },
       { title: "Webhooks", path: "/webhooks", description: "Get notified the instant a payment resolves." },
       { title: "Errors & idempotency", path: "/errors", description: "Error shape, status codes, and safe retries." },
     ],

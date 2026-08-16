@@ -1,7 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { KeyRound, Webhook, Banknote, ArrowRight, Radio, Users, CheckCircle2 } from "lucide-react";
-import CodeBlock from "@/components/CodeBlock";
 import CodeGroup from "@/components/CodeGroup";
 import Callout from "@/components/Callout";
 
@@ -14,7 +13,7 @@ const CARDS = [
 
 const TRUST_STRIP = [
   "One secret key",
-  "Plain REST — no SDK required",
+  "Plain REST, no SDK required",
   "Free sandbox, no approval needed",
 ];
 
@@ -31,7 +30,7 @@ export default function Introduction() {
       </h1>
       <p className="text-lg text-ink-muted leading-8 mb-5 max-w-[38rem]">
         Collect payments by STK push, pay out to a bank, and know the instant either happens.
-        This is the whole thing — one request, one key:
+        This is the whole thing: one request, one key:
       </p>
 
       <div className="flex flex-wrap gap-x-5 gap-y-1.5 mb-7">
@@ -44,7 +43,7 @@ export default function Introduction() {
       </div>
 
       <CodeGroup
-        className="shadow-glow mb-3"
+        className="mb-3"
         tabs={[
           {
             id: "curl", label: "cURL", lang: "bash", code: `
@@ -86,7 +85,7 @@ payment = res.json()['payment']`,
         ]}
       />
       <p className="text-[13px] text-ink-faint mb-6">
-        That's a real request shape — drop in a test key from step 3 below and it runs, no
+        That's a real request shape. Drop in a test key from the section below and it runs, no
         real money involved. <Link to="/payments">Full reference →</Link>
       </p>
 
@@ -121,70 +120,16 @@ payment = res.json()['payment']`,
       </div>
 
       <h2>Get your key</h2>
-      <p>Four steps, under five minutes, entirely in test mode — nothing below needs live access or moves real money.</p>
-
-      <h3>1. Create a developer account</h3>
-      <CodeBlock
-        lang="bash"
-        label="curl"
-        code={`curl -X POST https://api.paychain.co.ke/api/auth/developer/register \\
-  -H "Content-Type: application/json" \\
-  -d '{"name":"Asha Wanjiru","email":"asha@example.com","companyName":"BrightNet ISP","password":"..."}'`}
-      />
-      <p>Check your email for a 6-digit code and verify it:</p>
-      <CodeBlock
-        lang="bash"
-        label="curl"
-        code={`curl -X POST https://api.paychain.co.ke/api/auth/developer/verify-otp \\
-  -H "Content-Type: application/json" \\
-  -d '{"email":"asha@example.com","otp":"482910"}'`}
-      />
-
-      <h3>2. Link a merchant account</h3>
       <p>
-        Every key acts on behalf of one PayChain merchant. This one-time step proves you control
-        it — the merchant's own password, then an OTP sent to <em>their</em> inbox, not yours.
+        Three calls, under two minutes, entirely in test mode: register, link your merchant,
+        create a key. Then drop the key into the example above and it runs. Exact commands for
+        each step are in the <Link to="/integration-guide">Integration Guide</Link>, along with
+        the account model and what "sandbox" actually means here.
       </p>
-      <CodeBlock
-        lang="bash"
-        label="curl · with your developer JWT"
-        code={`curl -X POST https://api.paychain.co.ke/api/developer/link-merchant/start \\
-  -H "Authorization: Bearer <developer-jwt>" \\
-  -H "Content-Type: application/json" \\
-  -d '{"merchantEmail":"shop@example.com","merchantPassword":"..."}'`}
-      />
-
-      <h3>3. Create a test-mode key</h3>
-      <CodeBlock
-        lang="bash"
-        label="curl"
-        code={`curl -X POST https://api.paychain.co.ke/api/developer/api-keys \\
-  -H "Authorization: Bearer <developer-jwt>" \\
-  -H "Content-Type: application/json" \\
-  -d '{"mode":"test","label":"local dev"}'`}
-      />
-      <Callout variant="tip" title="Save the key now — this is the one from the example up top">
-        The raw key is only ever shown in this response — PayChain stores just its hash after that.
+      <Callout variant="tip" title="Prefer not to poll for results?">
+        Register a webhook and PayChain tells you the instant a payment resolves, instead of you
+        asking. Takes one call. See <Link to="/webhooks">Webhooks</Link>.
       </Callout>
-
-      <h3>4. Run the call from the top of this page</h3>
-      <p>Drop your new <code>pc_test_...</code> key into the example at the top and run it — that's a real, working request.</p>
-
-      <h2>Then hear about it</h2>
-      <p>One more call and you stop needing to ask — PayChain tells you instead:</p>
-      <CodeBlock
-        lang="bash"
-        label="curl"
-        code={`curl -X POST https://api.paychain.co.ke/api/developer/webhooks \\
-  -H "Authorization: Bearer <developer-jwt>" \\
-  -H "Content-Type: application/json" \\
-  -d '{"url":"https://your-server.com/webhooks/paychain","events":["*"]}'`}
-      />
-      <p>
-        Full shape and signature verification on the <Link to="/webhooks">Webhooks</Link> page.
-        When you're ready for real money, see <Link to="/authentication">Authentication</Link> for
-        how live access works.
-      </p>
     </>
   );
 }

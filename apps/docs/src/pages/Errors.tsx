@@ -22,12 +22,12 @@ export default function Errors() {
       <h2>Status codes</h2>
       <ParamsTable
         params={[
-          { name: "400", type: "status", description: "Malformed request — a missing required field, an invalid phone number, a missing Idempotency-Key header." },
+          { name: "400", type: "status", description: "Malformed request: a missing required field, an invalid phone number, a missing Idempotency-Key header." },
           { name: "401", type: "status", description: "Missing/invalid API key or developer JWT, or (on a payout) a wrong apiPayoutPin." },
-          { name: "402", type: "status", description: "A live payout was attempted and failed — insufficient funds or an invalid destination account. The partial payment object is included so you can inspect failureReason." },
-          { name: "403", type: "status", description: "Understood, but not allowed — e.g. a live key with no linked merchant, API payouts not enabled, or a per-transaction/daily cap exceeded." },
+          { name: "402", type: "status", description: "A live payout was attempted and failed: insufficient funds or an invalid destination account. The partial payment object is included so you can inspect failureReason." },
+          { name: "403", type: "status", description: "Understood, but not allowed: e.g. a live key with no linked merchant, API payouts not enabled, or a per-transaction/daily cap exceeded." },
           { name: "404", type: "status", description: "The resource (payment, webhook) doesn't exist, or doesn't belong to your developer account." },
-          { name: "409", type: "status", description: "An Idempotency-Key was reused for a request that's still being processed — retry shortly." },
+          { name: "409", type: "status", description: "An Idempotency-Key was reused for a request that's still being processed. Retry shortly." },
           { name: "429", type: "status", description: "Rate limited, or a payout PIN temporarily locked after too many failed attempts." },
           { name: "500", type: "status", description: "Something broke on PayChain's side. Safe to retry with the same Idempotency-Key." },
         ]}
@@ -48,7 +48,7 @@ export default function Errors() {
       <h2>Idempotency</h2>
       <p>
         <code>POST /payments/collect</code> and <code>POST /payments/payout</code> both require an{" "}
-        <code>Idempotency-Key</code> header — any string you generate, unique per logical attempt
+        <code>Idempotency-Key</code> header: any string you generate, unique per logical attempt
         (a UUID per user action, not per HTTP request).
       </p>
       <Callout variant="tip" title="Retry with the same key, not a new one">
