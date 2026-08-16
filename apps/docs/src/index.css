@@ -2,13 +2,46 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Space-separated R G B triplets, not hex — required so Tailwind can
+   generate opacity-modifier utilities (bg-brand/10, decoration-brand/30,
+   etc.) via its rgb(var(--x) / <alpha-value>) convention. A hex value here
+   compiles fine but silently breaks every "/NN" opacity class using these
+   tokens. */
+:root {
+  --canvas: 255 255 255;
+  --surface: 246 247 248;
+  --surface-raised: 238 240 242;
+  --border: 226 229 233;
+  --border-subtle: 235 237 240;
+  --ink: 14 16 18;
+  --ink-muted: 86 92 100;
+  --ink-faint: 138 143 151;
+  --brand: 0 166 86;
+  --brand-bright: 4 150 78;
+  --brand-dim: 10 153 80;
+}
+
+.dark {
+  --canvas: 8 9 10;
+  --surface: 14 16 18;
+  --surface-raised: 19 22 25;
+  --border: 31 35 39;
+  --border-subtle: 25 28 31;
+  --ink: 244 245 246;
+  --ink-muted: 154 159 166;
+  --ink-faint: 91 97 103;
+  --brand: 0 191 99;
+  --brand-bright: 32 227 127;
+  --brand-dim: 10 153 80;
+}
+
 html {
   scroll-behavior: smooth;
   scroll-padding-top: 5.5rem;
 }
 
 body {
-  @apply bg-canvas text-ink antialiased;
+  @apply bg-canvas text-ink antialiased transition-colors duration-150;
   font-feature-settings: "cv11", "ss01";
 }
 
@@ -25,11 +58,11 @@ body {
   background: transparent;
 }
 .custom-scroll::-webkit-scrollbar-thumb {
-  background: #23262a;
+  background: var(--border);
   border-radius: 999px;
 }
 .custom-scroll::-webkit-scrollbar-thumb:hover {
-  background: #2e3237;
+  background: var(--ink-faint);
 }
 
 .prose-docs h2 {

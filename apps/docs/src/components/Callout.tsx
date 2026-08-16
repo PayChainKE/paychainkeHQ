@@ -3,8 +3,8 @@ import { Info, TriangleAlert, Lightbulb } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 const VARIANTS = {
-  info: { icon: Info, cls: "border-sky-500/20 bg-sky-500/[0.06]", iconCls: "text-sky-300" },
-  warning: { icon: TriangleAlert, cls: "border-amber-500/20 bg-amber-500/[0.06]", iconCls: "text-amber-300" },
+  info: { icon: Info, cls: "border-sky-500/20 bg-sky-500/[0.06]", iconCls: "text-sky-600 dark:text-sky-300" },
+  warning: { icon: TriangleAlert, cls: "border-amber-500/20 bg-amber-500/[0.06]", iconCls: "text-amber-700 dark:text-amber-300" },
   tip: { icon: Lightbulb, cls: "border-brand/20 bg-brand/[0.06]", iconCls: "text-brand-bright" },
 };
 

@@ -10,14 +10,14 @@ export default function Authentication() {
       <p>
         Every request to the Payments API (everything under <code>/api/v1/developer</code>)
         authenticates with an API key. Account-management routes (creating keys, linking a
-        merchant, registering webhooks) use a JWT from logging in as a developer instead — see the{" "}
+        merchant, registering webhooks) use a JWT from logging in as a developer instead. See the{" "}
         <a href="/">Quickstart</a>.
       </p>
 
       <h2>API keys</h2>
       <p>
         Keys come in two modes, chosen when you create one. Both share the exact same host and the
-        exact same endpoints — <code>https://api.paychain.co.ke</code>, no separate sandbox URL —
+        exact same endpoints (<code>https://api.paychain.co.ke</code>, no separate sandbox URL);
         only what they're allowed to touch differs.
       </p>
       <ParamsTable
@@ -28,7 +28,7 @@ export default function Authentication() {
       />
 
       <h2>Sending the key</h2>
-      <p>Either header works — use whichever your HTTP client makes easiest.</p>
+      <p>Either header works. Use whichever your HTTP client makes easiest.</p>
       <CodeBlock
         lang="bash"
         label="Option A"
@@ -42,7 +42,7 @@ export default function Authentication() {
 
       <Callout variant="warning" title="The raw key is shown exactly once">
         PayChain stores only a SHA-256 hash of your key, never the plaintext. If you lose it,
-        revoke it and create a new one — there's no way to retrieve the original value.
+        revoke it and create a new one. There's no way to retrieve the original value.
       </Callout>
 
       <h2>Requesting live access</h2>
@@ -61,7 +61,7 @@ export default function Authentication() {
       <h2>One developer, one merchant</h2>
       <p>
         A developer account links to exactly one PayChain merchant account, proven by that
-        merchant's own password plus an OTP sent to their inbox — not yours. Every payment your
+        merchant's own password plus an OTP sent to their inbox, not yours. Every payment your
         API keys create moves against that merchant's wallet. There's no cross-merchant access,
         by design.
       </p>

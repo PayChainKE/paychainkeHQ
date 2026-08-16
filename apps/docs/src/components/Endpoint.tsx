@@ -2,10 +2,10 @@ import React from "react";
 import { cn } from "@/lib/cn";
 
 const METHOD_STYLES: Record<string, string> = {
-  GET: "bg-sky-500/10 text-sky-300 border-sky-500/20",
+  GET: "bg-sky-500/10 text-sky-600 dark:text-sky-300 border-sky-500/20",
   POST: "bg-brand/10 text-brand-bright border-brand/25",
-  PATCH: "bg-amber-500/10 text-amber-300 border-amber-500/20",
-  DELETE: "bg-red-500/10 text-red-300 border-red-500/20",
+  PATCH: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20",
+  DELETE: "bg-red-500/10 text-red-600 dark:text-red-300 border-red-500/20",
 };
 
 export default function Endpoint({ method, path, auth }: { method: string; path: string; auth?: string }) {

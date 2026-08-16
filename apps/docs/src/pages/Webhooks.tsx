@@ -10,8 +10,8 @@ export default function Webhooks() {
     <>
       <h1 className="text-3xl font-extrabold text-ink tracking-tight mb-4">Webhooks</h1>
       <p>
-        Polling <code>GET /payments/:id</code> works, but most integrations shouldn't have to ask —
-        they should be told. Register an HTTPS endpoint and PayChain pushes an event to it the
+        Polling <code>GET /payments/:id</code> works, but most integrations shouldn't have to ask.
+        They should be told. Register an HTTPS endpoint and PayChain pushes an event to it the
         moment a collection or payout resolves. This is what an ISP's auto-reconnection flow or a
         CRM sync should build on, not a polling loop.
       </p>
@@ -22,18 +22,18 @@ export default function Webhooks() {
           { name: "payment.collect.succeeded", type: "event", description: "An STK push collection cleared. The usual trigger for \"lift the suspension\" / \"mark the invoice paid\" logic." },
           { name: "payment.collect.failed", type: "event", description: "The customer cancelled, the prompt timed out, or the collection otherwise failed." },
           { name: "payment.payout.succeeded", type: "event", description: "A payout was sent successfully." },
-          { name: "payment.payout.failed", type: "event", description: "A payout failed — insufficient funds, an invalid account, etc." },
+          { name: "payment.payout.failed", type: "event", description: "A payout failed: insufficient funds, an invalid account, etc." },
         ]}
       />
 
       <h2>Managing webhooks</h2>
-      <p>These routes use your developer JWT, not an API key — the same auth as account management.</p>
+      <p>These routes use your developer JWT, not an API key. Same auth as account management.</p>
 
       <Endpoint method="POST" path="/api/developer/webhooks" auth="Developer JWT" />
       <ParamsTable
         params={[
           { name: "url", type: "string", required: true, description: "Must be https://. This is where events get POSTed." },
-          { name: "events", type: "string[]", description: "Which event types to receive — any subset of the list above, or [\"*\"] for everything. Defaults to [\"*\"]." },
+          { name: "events", type: "string[]", description: "Which event types to receive: any subset of the list above, or [\"*\"] for everything. Defaults to [\"*\"]." },
         ]}
       />
       <CodeGroup
@@ -60,7 +60,7 @@ const res = await fetch('https://api.paychain.co.ke/api/developer/webhooks', {
 });
 
 const { webhook } = await res.json();
-console.log(webhook.secret); // whsec_... — shown once, store it now`,
+console.log(webhook.secret); // whsec_..., shown once, store it now`,
           },
           {
             id: "python", label: "Python", lang: "python", code: `
@@ -76,7 +76,7 @@ res = requests.post(
 )
 
 webhook = res.json()['webhook']
-print(webhook['secret'])  # whsec_... — shown once, store it now`,
+print(webhook['secret'])  # whsec_..., shown once, store it now`,
           },
         ]}
         className="mb-4"
@@ -155,7 +155,7 @@ X-PayChain-Signature: 4e8a1c...  # hex HMAC-SHA256 of the raw body`}
 
       <h2>Verify the signature</h2>
       <p>
-        Do this before acting on a delivery — before an ISP's system lifts a suspension, before
+        Do this before acting on a delivery: before an ISP's system lifts a suspension, before
         a CRM marks a deal closed. It's a plain HMAC-SHA256 of the raw request body, using the
         secret from when you registered the endpoint.
       </p>
@@ -177,7 +177,7 @@ function isValidSignature(rawBody, signatureHeader, secret) {
   );
 }
 
-// Express example — read the RAW body, not the parsed one, or the
+// Express example: read the RAW body, not the parsed one, or the
 // signature will never match.
 app.post('/webhooks/paychain', express.raw({ type: 'application/json' }), (req, res) => {
   const signature = req.headers['x-paychain-signature'];
@@ -199,7 +199,7 @@ def is_valid_signature(raw_body: bytes, signature_header: str, secret: str) -> b
     expected = hmac.new(secret.encode(), raw_body, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature_header)
 
-# Flask example — use request.get_data() for the RAW body, not
+# Flask example: use request.get_data() for the RAW body, not
 # request.json, or the signature will never match.
 @app.route('/webhooks/paychain', methods=['POST'])
 def paychain_webhook():
@@ -216,7 +216,7 @@ def paychain_webhook():
 
       <h2>Retries</h2>
       <p>
-        Your endpoint should return a <code>2xx</code> quickly (under 10 seconds) — do the real
+        Your endpoint should return a <code>2xx</code> quickly (under 10 seconds). Do the real
         work after responding, not before. Anything else (timeout, non-2xx, connection refused)
         gets retried on a backoff:
       </p>
@@ -231,8 +231,8 @@ def paychain_webhook():
       </div>
       <p>
         After the last retry, the delivery is marked <code>exhausted</code> and stops. Check{" "}
-        <code>GET /api/developer/webhooks/:id/deliveries</code> if events seem to be going missing —
-        it shows the HTTP status and error for every attempt.
+        <code>GET /api/developer/webhooks/:id/deliveries</code> if events seem to be going missing.
+        It shows the HTTP status and error for every attempt.
       </p>
     </>
   );

@@ -22,8 +22,8 @@ export default function CodeGroup({ tabs, className }: { tabs: CodeGroupTab[]; c
   const trimmed = active.code.replace(/^\n/, "").replace(/\n$/, "");
 
   return (
-    <div className={cn("rounded-xl border border-border bg-surface overflow-hidden", className)}>
-      <div className="flex items-center justify-between border-b border-border-subtle bg-surface-raised/60 pr-3">
+    <div className={cn("rounded-xl border border-code-border bg-code-bg overflow-hidden", className)}>
+      <div className="flex items-center justify-between border-b border-code-border-subtle bg-code-header/60 pr-3">
         <div className="flex items-center">
           {tabs.map((tab) => (
             <button
@@ -32,8 +32,8 @@ export default function CodeGroup({ tabs, className }: { tabs: CodeGroupTab[]; c
               className={cn(
                 "px-3.5 py-2.5 text-[12px] font-semibold border-b-2 -mb-px transition-colors",
                 tab.id === active.id
-                  ? "text-ink border-brand"
-                  : "text-ink-faint border-transparent hover:text-ink-muted"
+                  ? "text-code-text border-code-accent"
+                  : "text-code-faint border-transparent hover:text-code-muted"
               )}
             >
               {tab.label}
@@ -42,7 +42,7 @@ export default function CodeGroup({ tabs, className }: { tabs: CodeGroupTab[]; c
         </div>
         <CopyButton text={trimmed} />
       </div>
-      <pre className="overflow-x-auto custom-scroll px-4 py-4 text-[13px] leading-6">
+      <pre className="overflow-x-auto custom-scroll px-4 py-4 text-[13px] leading-6 text-code-text">
         <code className="font-mono" dangerouslySetInnerHTML={{ __html: highlight(trimmed, active.lang) }} />
       </pre>
     </div>
