@@ -49,6 +49,7 @@ const NAV_SECTIONS = [
     items: [
       { icon: 'badge',       label: 'Team',      path: '/team'      },
       { icon: 'how_to_reg',  label: 'Officers',  path: '/officers'  },
+      { icon: 'code',        label: 'Developers', path: '/developers' },
       { icon: 'settings',    label: 'Settings',  path: '/settings'  },
     ],
   },

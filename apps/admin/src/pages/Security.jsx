@@ -8,9 +8,11 @@ const PAGE_SIZE = 25;
 const ALERT_TYPE_META = {
   otp_lockout:         { label: 'OTP Lockout',            icon: 'lock_clock' },
   pin_lockout:          { label: 'PIN Lockout',            icon: 'pin' },
+  api_payout_pin_lockout: { label: 'API Payout PIN Lockout', icon: 'lock_person' },
   large_transaction:    { label: 'Large Transaction',      icon: 'payments' },
   new_admin_account:    { label: 'New Admin Account',      icon: 'admin_panel_settings' },
   new_officer_account:  { label: 'New Officer Account',    icon: 'how_to_reg' },
+  developer_live_access_requested: { label: 'Developer Live Access Requested', icon: 'api' },
 };
 
 const SEVERITY_TONE = {
@@ -23,9 +25,11 @@ const TYPE_OPTIONS = [
   { v: 'all',                  l: 'All Types' },
   { v: 'otp_lockout',          l: 'OTP Lockout' },
   { v: 'pin_lockout',          l: 'PIN Lockout' },
+  { v: 'api_payout_pin_lockout', l: 'API Payout PIN Lockout' },
   { v: 'large_transaction',    l: 'Large Transaction' },
   { v: 'new_admin_account',    l: 'New Admin Account' },
   { v: 'new_officer_account',  l: 'New Officer Account' },
+  { v: 'developer_live_access_requested', l: 'Developer Live Access Requested' },
 ];
 
 const SEVERITY_OPTIONS = [
@@ -493,4 +497,11 @@ const FilterSelect = ({ value, onChange, options }) => (
   >
     {options.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
   </select>
+);
+
+const DrawerField = ({ label, value, mono }) => (
+  <div>
+    <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1">{label}</p>
+    <p className={`text-xs text-on-surface ${mono ? 'font-mono' : 'font-semibold'} break-all`}>{value || '—'}</p>
+  </div>
 );

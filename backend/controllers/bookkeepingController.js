@@ -2,6 +2,21 @@ import Expense, { EXPENSE_CATEGORIES, PAYMENT_METHODS } from '../models/Expense.
 import Transaction from '../models/Transaction.js';
 import { logAudit } from '../utils/auditLog.js';
 import { adminActor } from './adminController.js';
+import { REVENUE_STREAMS } from '../config/revenueRateCard.js';
+import { LIVE_DATA_CUTOFF } from '../config/liveDataCutoff.js';
+
+// Same whitelist Revenue's getRevenue uses — top_up/withdrawal and any
+// other type with no revenue stream must never count as "income" here
+// either, or the two pages can never agree on the same window.
+const REVENUE_TX_TYPES = REVENUE_STREAMS.flatMap((s) => s.txTypes);
+
+// Never let a window start before LIVE_DATA_CUTOFF — mirrors
+// revenueController.js's own clamp() exactly, so the five weeks of
+// pre-production sandbox/simulated transactions it excludes from Revenue
+// can't quietly reappear in Bookkeeping's "all"/"ytd"/custom ranges.
+function clampSince(date) {
+  return date.getTime() < LIVE_DATA_CUTOFF.getTime() ? LIVE_DATA_CUTOFF : date;
+}
 
 // ── Period resolution ────────────────────────────────────────────────────
 // Bookkeeping periods are calendar-aligned (month/quarter/year) rather than
@@ -13,7 +28,7 @@ function resolvePeriod({ preset, from, to }) {
     const until = new Date(to);
     until.setHours(23, 59, 59, 999);
     if (!isNaN(since) && !isNaN(until)) {
-      return { since, until, label: 'Custom range', preset: 'custom' };
+      return { since: clampSince(since), until, label: 'Custom range', preset: 'custom' };
     }
   }
 
@@ -22,24 +37,24 @@ function resolvePeriod({ preset, from, to }) {
     case 'last_month': {
       const since = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       const until = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
-      return { since, until, label: since.toLocaleString('en-KE', { month: 'long', year: 'numeric' }), preset };
+      return { since: clampSince(since), until, label: since.toLocaleString('en-KE', { month: 'long', year: 'numeric' }), preset };
     }
     case 'this_quarter': {
       const q = Math.floor(now.getMonth() / 3);
       const since = new Date(now.getFullYear(), q * 3, 1);
-      return { since, until: now, label: `Q${q + 1} ${now.getFullYear()}`, preset };
+      return { since: clampSince(since), until: now, label: `Q${q + 1} ${now.getFullYear()}`, preset };
     }
     case 'ytd': {
       const since = new Date(now.getFullYear(), 0, 1);
-      return { since, until: now, label: `${now.getFullYear()} (Year to date)`, preset };
+      return { since: clampSince(since), until: now, label: `${now.getFullYear()} (Year to date)`, preset };
     }
     case 'all': {
-      return { since: new Date('2020-01-01'), until: now, label: 'All time', preset };
+      return { since: clampSince(new Date('2020-01-01')), until: now, label: 'All time', preset };
     }
     case 'this_month':
     default: {
       const since = new Date(now.getFullYear(), now.getMonth(), 1);
-      return { since, until: now, label: since.toLocaleString('en-KE', { month: 'long', year: 'numeric' }), preset: 'this_month' };
+      return { since: clampSince(since), until: now, label: since.toLocaleString('en-KE', { month: 'long', year: 'numeric' }), preset: 'this_month' };
     }
   }
 }
@@ -224,7 +239,7 @@ export const getBookkeepingSummary = async (req, res) => {
 
     const [incomeAgg, expenseAgg, categoryAgg, monthlyIncomeAgg, monthlyExpenseAgg] = await Promise.all([
       Transaction.aggregate([
-        { $match: { createdAt: { $gte: since, $lte: until }, status: { $in: ['completed', 'verified'] } } },
+        { $match: { createdAt: { $gte: since, $lte: until }, status: { $in: ['completed', 'verified'] }, type: { $in: REVENUE_TX_TYPES } } },
         { $group: { _id: null, total: { $sum: '$paychainFee' } } },
       ]),
       Expense.aggregate([
@@ -245,7 +260,7 @@ export const getBookkeepingSummary = async (req, res) => {
         { $sort: { total: -1 } },
       ]),
       Transaction.aggregate([
-        { $match: { createdAt: { $gte: trailingStart }, status: { $in: ['completed', 'verified'] } } },
+        { $match: { createdAt: { $gte: trailingStart }, status: { $in: ['completed', 'verified'] }, type: { $in: REVENUE_TX_TYPES } } },
         { $group: { _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } }, total: { $sum: '$paychainFee' } } },
       ]),
       Expense.aggregate([

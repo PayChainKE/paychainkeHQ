@@ -34,8 +34,20 @@ import {
   validateSetupToken,
   setupPassword
 } from '../controllers/merchantAuthController.js';
-import { protectMerchant } from '../middleware/authMiddleware.js';
+import { protectMerchant, protectDeveloper } from '../middleware/authMiddleware.js';
 import { upload } from '../utils/cloudinary.js';
+import {
+  registerDeveloper,
+  verifyDeveloperOtp,
+  resendDeveloperOtp,
+  loginDeveloper,
+  logoutDeveloper,
+} from '../controllers/developerAuthController.js';
+import {
+  getApiPayoutStatus,
+  enableApiPayout,
+  disableApiPayout,
+} from '../controllers/merchantApiPayoutController.js';
 
 const router = express.Router();
 
@@ -128,6 +140,23 @@ const forgotPasswordAccountLimiter = rateLimit({
   message: { error: 'Too many reset requests for this account. Try again in an hour.' },
 });
 
+// Developer equivalents — same shape as the merchant limiters above.
+const developerLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many login attempts. Try again in 15 minutes.' },
+});
+
+const developerOtpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many verification attempts. Restart the login flow.' },
+});
+
 // Admin Auth Routes
 router.post('/login', adminLoginLimiter, login);
 router.post('/verify-otp', adminOtpLimiter, verifyOTP);
@@ -176,6 +205,13 @@ router.post('/merchant/set-app-pin', protectMerchant, pinLimiter, setAppPin);
 router.put('/merchant/reset-app-pin', protectMerchant, pinLimiter, resetAppPin);
 router.post('/merchant/verify-payment-pin', protectMerchant, pinLimiter, verifyPaymentPin);
 
+// Developer-API payout authorization — a separate PIN from appPin above,
+// specifically for unattended payouts a linked developer's own backend can
+// trigger. See merchantApiPayoutController.js and models/Merchant.js.
+router.get('/merchant/api-payout/status', protectMerchant, getApiPayoutStatus);
+router.post('/merchant/api-payout/enable', protectMerchant, pinLimiter, enableApiPayout);
+router.post('/merchant/api-payout/disable', protectMerchant, pinLimiter, disableApiPayout);
+
 // WebAuthn / Passkey routes
 // Public — called before the user holds a JWT
 router.post('/merchant/webauthn/login-options',   webauthnLoginLimiter, getLoginOptions);
@@ -186,5 +222,15 @@ router.post('/merchant/webauthn/verify-registration', protectMerchant, verifyReg
 router.get ('/merchant/webauthn/passkeys', protectMerchant, getPasskeys);
 router.delete('/merchant/webauthn/passkeys/:credentialID', protectMerchant, deletePasskey);
 router.patch('/merchant/webauthn/passkeys/:credentialID', protectMerchant, renamePasskey);
+
+// Developer Auth Routes — accounts for the public Developer API (see
+// routes/developerRoutes.js for the protected self-service routes and
+// routes/developerPublicRoutes.js for the actual API-key-authenticated
+// traffic these accounts unlock).
+router.post('/developer/register', developerLoginLimiter, registerDeveloper);
+router.post('/developer/verify-otp', developerOtpLimiter, verifyDeveloperOtp);
+router.post('/developer/resend-otp', developerOtpLimiter, resendDeveloperOtp);
+router.post('/developer/login', developerLoginLimiter, loginDeveloper);
+router.post('/developer/logout', protectDeveloper, logoutDeveloper);
 
 export default router;

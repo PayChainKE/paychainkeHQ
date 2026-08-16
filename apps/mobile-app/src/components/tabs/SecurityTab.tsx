@@ -407,6 +407,11 @@ export default function SecurityTab() {
               </View>
             )}
 
+            {/* Developer API payouts — a SEPARATE PIN from the payment PIN
+                above, only relevant once a Developer account has linked to
+                this merchant. See backend/controllers/merchantApiPayoutController.js. */}
+            {merchant?.hasAppPin && <ApiPayoutPanel />}
+
             {/* Security Questions */}
             <TouchableOpacity
               onPress={openQuestionsModal}
@@ -650,5 +655,176 @@ export default function SecurityTab() {
         </View>
       </Modal>
     </ScrollView>
+  );
+}
+
+type ApiPayoutStatus = {
+  apiPayoutEnabled: boolean;
+  hasApiPayoutPin: boolean;
+  caps: { perTransactionKes: number; dailyKes: number };
+};
+
+// Developer API payout authorization — mirrors merchant-dashboard's
+// ApiPayoutPanel (apps/merchant-dashboard/src/pages/Profile.jsx). A NEW,
+// separate PIN from the payment PIN above, letting a linked Developer
+// account's own backend trigger real payouts through the API unattended,
+// bounded by per-transaction and daily caps chosen here.
+function ApiPayoutPanel() {
+  const [status, setStatus] = useState<ApiPayoutStatus | null>(null);
+  const [loadingStatus, setLoadingStatus] = useState(true);
+  const [currentPin, setCurrentPin] = useState('');
+  const [apiPayoutPin, setApiPayoutPin] = useState('');
+  const [confirmApiPayoutPin, setConfirmApiPayoutPin] = useState('');
+  const [perTransactionCapKes, setPerTransactionCapKes] = useState('');
+  const [dailyCapKes, setDailyCapKes] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const fetchStatus = useCallback(async () => {
+    setLoadingStatus(true);
+    try {
+      const res = await api.get('/api/auth/merchant/api-payout/status');
+      setStatus(res.data);
+    } catch (e) {
+      // Non-fatal — panel just stays in its loading state's fallback below.
+    } finally {
+      setLoadingStatus(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchStatus(); }, [fetchStatus]);
+
+  async function handleEnable() {
+    if (!currentPin || !apiPayoutPin || !confirmApiPayoutPin || !perTransactionCapKes || !dailyCapKes) {
+      Alert.alert('Missing fields', 'Fill out all fields.');
+      return;
+    }
+    if (apiPayoutPin !== confirmApiPayoutPin) {
+      Alert.alert('Mismatch', 'API payout PIN and confirmation do not match.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.post('/api/auth/merchant/api-payout/enable', {
+        currentPin, apiPayoutPin, confirmApiPayoutPin,
+        perTransactionCapKes: Number(perTransactionCapKes),
+        dailyCapKes: Number(dailyCapKes),
+      });
+      Alert.alert('Enabled', 'API payouts enabled.');
+      setCurrentPin(''); setApiPayoutPin(''); setConfirmApiPayoutPin(''); setPerTransactionCapKes(''); setDailyCapKes('');
+      fetchStatus();
+    } catch (e: any) {
+      Alert.alert('Error', e?.response?.data?.error || 'Could not enable API payouts.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDisable() {
+    if (!currentPin) {
+      Alert.alert('PIN required', 'Enter your current payment PIN.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.post('/api/auth/merchant/api-payout/disable', { currentPin });
+      Alert.alert('Disabled', 'API payouts disabled.');
+      setCurrentPin('');
+      fetchStatus();
+    } catch (e: any) {
+      Alert.alert('Error', e?.response?.data?.error || 'Could not disable API payouts.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (loadingStatus) {
+    return <View className="bg-black/20 p-5 rounded-2xl border border-white/5 h-24" />;
+  }
+
+  return (
+    <View className="bg-black/20 p-5 rounded-2xl border border-white/5">
+      <View className="flex-row items-center justify-between mb-3">
+        <Text className="text-[14px] font-jakarta-extrabold text-white">Developer API Payouts</Text>
+        <View className={`px-2 py-1 rounded-lg ${status?.apiPayoutEnabled ? 'bg-[#5efeb3]/20' : 'bg-white/10'}`}>
+          <Text className={`text-[9px] font-jakarta-extrabold uppercase tracking-widest ${status?.apiPayoutEnabled ? 'text-[#5efeb3]' : 'text-white/40'}`}>
+            {status?.apiPayoutEnabled ? 'Enabled' : 'Disabled'}
+          </Text>
+        </View>
+      </View>
+      <Text className="text-[11px] text-white/50 font-jakarta-medium mb-4">
+        Lets a linked Developer account's own backend trigger real payouts through the API, unattended — guarded by a separate PIN from your payment PIN, with hard per-transaction and daily limits.
+      </Text>
+
+      {status?.apiPayoutEnabled ? (
+        <View className="gap-3">
+          <Text className="text-[11px] text-white/60">
+            Per-transaction cap: KES {status.caps?.perTransactionKes?.toLocaleString()} · Daily cap: KES {status.caps?.dailyKes?.toLocaleString()}
+          </Text>
+          <ValidatedTextInput kind="pin4" secureTextEntry placeholder="Current payment PIN (4 digits)" placeholderTextColor="rgba(255,255,255,0.2)"
+            value={currentPin} onChangeText={setCurrentPin}
+            className="w-full bg-white/5 border border-white/5 rounded-xl py-3.5 px-4 text-[14px] text-white text-center font-jakarta-bold tracking-[0.5em]" />
+          <TouchableOpacity
+            onPress={handleDisable}
+            disabled={busy}
+            className="w-full py-3.5 rounded-xl bg-red-500/20 border border-red-500/30 items-center"
+            style={busy ? { opacity: 0.6 } : undefined}
+          >
+            {busy ? <ActivityIndicator size="small" color="#f87171" /> : (
+              <Text className="text-red-300 font-jakarta-extrabold text-[11px] uppercase tracking-widest">Disable API Payouts</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View className="gap-3">
+          <ValidatedTextInput kind="pin4" secureTextEntry placeholder="Current payment PIN (4 digits)" placeholderTextColor="rgba(255,255,255,0.2)"
+            value={currentPin} onChangeText={setCurrentPin}
+            className="w-full bg-white/5 border border-white/5 rounded-xl py-3.5 px-4 text-[14px] text-white text-center font-jakarta-bold tracking-[0.5em]" />
+          <TextInput
+            secureTextEntry
+            placeholder="New API payout PIN (6+ characters, not your app PIN)"
+            placeholderTextColor="rgba(255,255,255,0.2)"
+            value={apiPayoutPin}
+            onChangeText={setApiPayoutPin}
+            className="w-full bg-white/5 border border-white/5 rounded-xl py-3.5 px-4 text-[13px] text-white"
+          />
+          <TextInput
+            secureTextEntry
+            placeholder="Confirm API payout PIN"
+            placeholderTextColor="rgba(255,255,255,0.2)"
+            value={confirmApiPayoutPin}
+            onChangeText={setConfirmApiPayoutPin}
+            className="w-full bg-white/5 border border-white/5 rounded-xl py-3.5 px-4 text-[13px] text-white"
+          />
+          <View className="flex-row gap-3">
+            <TextInput
+              keyboardType="numeric"
+              placeholder="Per-tx cap (KES)"
+              placeholderTextColor="rgba(255,255,255,0.2)"
+              value={perTransactionCapKes}
+              onChangeText={setPerTransactionCapKes}
+              className="flex-1 bg-white/5 border border-white/5 rounded-xl py-3.5 px-4 text-[13px] text-white"
+            />
+            <TextInput
+              keyboardType="numeric"
+              placeholder="Daily cap (KES)"
+              placeholderTextColor="rgba(255,255,255,0.2)"
+              value={dailyCapKes}
+              onChangeText={setDailyCapKes}
+              className="flex-1 bg-white/5 border border-white/5 rounded-xl py-3.5 px-4 text-[13px] text-white"
+            />
+          </View>
+          <TouchableOpacity
+            onPress={handleEnable}
+            disabled={busy}
+            className="w-full py-3.5 rounded-xl bg-indigo-500 items-center mt-1"
+            style={busy ? { opacity: 0.6 } : undefined}
+          >
+            {busy ? <ActivityIndicator size="small" color="#fff" /> : (
+              <Text className="text-white font-jakarta-extrabold text-[11px] uppercase tracking-widest">Enable API Payouts</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
   );
 }

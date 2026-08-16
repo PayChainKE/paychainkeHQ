@@ -436,7 +436,12 @@ const Revenue = () => {
   useEffect(() => {
     if (sweepConfirmOpen) return;
     const id = setInterval(() => fetchRevenue(true), 30_000);
-    return () => clearInterval(id);
+    // Instant push on top of the 30s poll — see context/AuthContext.jsx's
+    // SSE connection, which fires paychain:sync the moment any transaction
+    // completes anywhere in PayChain.
+    const onSync = () => fetchRevenue(true);
+    window.addEventListener('paychain:sync', onSync);
+    return () => { clearInterval(id); window.removeEventListener('paychain:sync', onSync); };
   }, [fetchRevenue, sweepConfirmOpen]);
 
   const runSweepNow = useCallback(async () => {

@@ -47,6 +47,8 @@ import ncbaRoutes from './routes/ncbaRoutes.js';
 import merchantSmsAuthRoutes from './routes/merchantSmsAuthRoutes.js';
 import officerRoutes from './routes/officerRoutes.js';
 import smsRoutes from './routes/smsRoutes.js';
+import developerRoutes from './routes/developerRoutes.js';
+import developerPublicRoutes from './routes/developerPublicRoutes.js';
 import { ensurePrimaryOwner } from './migrations/ensurePrimaryOwner.js';
 import { backfillTransactionFees } from './migrations/backfillTransactionFees.js';
 import { backfillNcbaMerchantCodes } from './migrations/backfillNcbaMerchantCodes.js';
@@ -232,6 +234,10 @@ app.use('/api/trust-score', trustScoreRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/cash-advance', cashAdvanceRoutes);
+app.use('/api/developer', developerRoutes);
+// Kept separate from the /api/v1 NCBA mount above (different concern —
+// public third-party API traffic vs. our own bank-rail integration).
+app.use('/api/v1/developer', developerPublicRoutes);
 app.use('/api/v1', ncbaRoutes);
 
 // Also served prefix-free — api.paychain.co.ke is a dedicated API subdomain

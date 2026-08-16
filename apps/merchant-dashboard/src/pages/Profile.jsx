@@ -636,7 +636,13 @@ export default function Profile() {
                         </div>
                       )}
 
-                      <button 
+                      {/* Developer API payouts — a SEPARATE PIN from appPin
+                          above, only relevant once a Developer account has
+                          linked to this merchant. See
+                          merchantApiPayoutController.js. */}
+                      {merchant?.hasAppPin && <ApiPayoutPanel token={token} toast={toast} />}
+
+                      <button
                         onClick={() => setShowQuestions(true)}
                         className="w-full flex items-center justify-between p-5 bg-white/5 rounded-[24px] border border-white/5 hover:bg-white/[0.08] transition-all group"
                       >
@@ -1048,5 +1054,173 @@ export default function Profile() {
         </div>
       </div>
     </MerchantLayout>
+  )
+}
+
+// Developer API payout authorization — lets a merchant opt in to letting a
+// linked Developer account's own backend trigger real payouts unattended.
+// Deliberately a NEW, separate PIN from the mobile app's payment PIN (see
+// backend/models/Merchant.js's comment on apiPayoutPin) plus per-transaction
+// and daily caps chosen here, at setup time.
+function ApiPayoutPanel({ token, toast }) {
+  const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+  const [status, setStatus] = useState(null)
+  const [loadingStatus, setLoadingStatus] = useState(true)
+  const [currentPin, setCurrentPin] = useState('')
+  const [apiPayoutPin, setApiPayoutPin] = useState('')
+  const [confirmApiPayoutPin, setConfirmApiPayoutPin] = useState('')
+  const [perTransactionCapKes, setPerTransactionCapKes] = useState('')
+  const [dailyCapKes, setDailyCapKes] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const fetchStatus = useCallback(async () => {
+    setLoadingStatus(true)
+    try {
+      const res = await axios.get(`${API_URL}/api/auth/merchant/api-payout/status`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      setStatus(res.data)
+    } catch (err) {
+      toast.push({ message: 'Could not load API payout settings', type: 'error' })
+    } finally {
+      setLoadingStatus(false)
+    }
+  }, [API_URL, token, toast])
+
+  useEffect(() => { fetchStatus() }, [fetchStatus])
+
+  async function handleEnable() {
+    if (!currentPin || !apiPayoutPin || !confirmApiPayoutPin || !perTransactionCapKes || !dailyCapKes) {
+      toast.push({ message: 'Fill out all fields', type: 'error' })
+      return
+    }
+    if (apiPayoutPin !== confirmApiPayoutPin) {
+      toast.push({ message: 'API payout PIN and confirmation do not match', type: 'error' })
+      return
+    }
+    setBusy(true)
+    try {
+      await axios.post(`${API_URL}/api/auth/merchant/api-payout/enable`, {
+        currentPin, apiPayoutPin, confirmApiPayoutPin,
+        perTransactionCapKes: Number(perTransactionCapKes),
+        dailyCapKes: Number(dailyCapKes),
+      }, { headers: { Authorization: `Bearer ${token}` } })
+      toast.push({ message: 'API payouts enabled', type: 'success' })
+      setCurrentPin(''); setApiPayoutPin(''); setConfirmApiPayoutPin(''); setPerTransactionCapKes(''); setDailyCapKes('')
+      fetchStatus()
+    } catch (err) {
+      toast.push({ message: err.response?.data?.error || 'Could not enable API payouts', type: 'error' })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleDisable() {
+    if (!currentPin) {
+      toast.push({ message: 'Enter your current payment PIN', type: 'error' })
+      return
+    }
+    setBusy(true)
+    try {
+      await axios.post(`${API_URL}/api/auth/merchant/api-payout/disable`, { currentPin }, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      toast.push({ message: 'API payouts disabled', type: 'success' })
+      setCurrentPin('')
+      fetchStatus()
+    } catch (err) {
+      toast.push({ message: err.response?.data?.error || 'Could not disable API payouts', type: 'error' })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (loadingStatus) {
+    return <div className="p-5 rounded-[24px] bg-white/5 border border-white/5 animate-pulse h-24" />
+  }
+
+  return (
+    <div className="space-y-4 bg-white/5 p-5 rounded-[24px] border border-white/5">
+      <div className="flex items-center justify-between">
+        <h5 className="text-xs font-black text-white">Developer API Payouts</h5>
+        <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg ${status?.apiPayoutEnabled ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/10 text-white/40'}`}>
+          {status?.apiPayoutEnabled ? 'Enabled' : 'Disabled'}
+        </span>
+      </div>
+      <p className="text-[11px] text-white/40 leading-relaxed">
+        Lets a linked Developer account's own backend trigger real payouts through the API, unattended — guarded by a separate PIN from your payment PIN, with hard per-transaction and daily limits.
+      </p>
+
+      {status?.apiPayoutEnabled ? (
+        <>
+          <p className="text-[11px] text-white/50">
+            Per-transaction cap: <span className="text-white font-bold">KES {status.caps?.perTransactionKes?.toLocaleString()}</span> · Daily cap: <span className="text-white font-bold">KES {status.caps?.dailyKes?.toLocaleString()}</span>
+          </p>
+          <ValidatedInput
+            kind="pin4"
+            value={currentPin}
+            onChange={(e) => setCurrentPin(e.target.value)}
+            placeholder="Current payment PIN (4 digits)"
+            className="w-full bg-black/20 border border-white/10 rounded-xl py-3 px-4 text-xs font-medium text-white focus:border-indigo-500/50 outline-none transition-all placeholder:text-white/20"
+            errorClassName="text-red-300 text-[11px] font-bold mt-1.5 pl-1"
+          />
+          <button
+            onClick={handleDisable}
+            disabled={busy}
+            className="w-full py-3 rounded-xl bg-red-500/20 text-red-300 border border-red-500/30 font-black text-[10px] uppercase tracking-widest hover:bg-red-500/30 transition-all disabled:opacity-50"
+          >
+            {busy ? 'Disabling…' : 'Disable API Payouts'}
+          </button>
+        </>
+      ) : (
+        <div className="space-y-3">
+          <ValidatedInput
+            kind="pin4"
+            value={currentPin}
+            onChange={(e) => setCurrentPin(e.target.value)}
+            placeholder="Current payment PIN (4 digits)"
+            className="w-full bg-black/20 border border-white/10 rounded-xl py-3 px-4 text-xs font-medium text-white focus:border-indigo-500/50 outline-none transition-all placeholder:text-white/20"
+            errorClassName="text-red-300 text-[11px] font-bold mt-1.5 pl-1"
+          />
+          <input
+            type="password"
+            value={apiPayoutPin}
+            onChange={(e) => setApiPayoutPin(e.target.value)}
+            placeholder="New API payout PIN (6+ characters, not your app PIN)"
+            className="w-full bg-black/20 border border-white/10 rounded-xl py-3 px-4 text-xs font-medium text-white focus:border-indigo-500/50 outline-none transition-all placeholder:text-white/20"
+          />
+          <input
+            type="password"
+            value={confirmApiPayoutPin}
+            onChange={(e) => setConfirmApiPayoutPin(e.target.value)}
+            placeholder="Confirm API payout PIN"
+            className="w-full bg-black/20 border border-white/10 rounded-xl py-3 px-4 text-xs font-medium text-white focus:border-indigo-500/50 outline-none transition-all placeholder:text-white/20"
+          />
+          <div className="flex gap-3">
+            <input
+              type="number"
+              value={perTransactionCapKes}
+              onChange={(e) => setPerTransactionCapKes(e.target.value)}
+              placeholder="Per-transaction cap (KES)"
+              className="w-full bg-black/20 border border-white/10 rounded-xl py-3 px-4 text-xs font-medium text-white focus:border-indigo-500/50 outline-none transition-all placeholder:text-white/20"
+            />
+            <input
+              type="number"
+              value={dailyCapKes}
+              onChange={(e) => setDailyCapKes(e.target.value)}
+              placeholder="Daily cap (KES)"
+              className="w-full bg-black/20 border border-white/10 rounded-xl py-3 px-4 text-xs font-medium text-white focus:border-indigo-500/50 outline-none transition-all placeholder:text-white/20"
+            />
+          </div>
+          <button
+            onClick={handleEnable}
+            disabled={busy}
+            className="w-full py-3 rounded-xl bg-indigo-500 text-white font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-indigo-400 transition-all active:scale-95 disabled:opacity-50"
+          >
+            {busy ? 'Enabling…' : 'Enable API Payouts'}
+          </button>
+        </div>
+      )}
+    </div>
   )
 }

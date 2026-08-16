@@ -82,6 +82,7 @@ const Bookkeeping = () => {
   const [summary, setSummary] = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [summaryError, setSummaryError] = useState('');
+  const [summaryRefreshing, setSummaryRefreshing] = useState(false);
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -98,19 +99,36 @@ const Bookkeeping = () => {
   const categories = data?.categories?.length ? data.categories : FALLBACK_CATEGORIES;
   const paymentMethods = data?.paymentMethods?.length ? data.paymentMethods : FALLBACK_METHODS;
 
-  const fetchSummary = useCallback(async () => {
-    setSummaryLoading(true);
-    setSummaryError('');
+  // silent=true is used by the 30s poll and the live paychain:sync push
+  // (see effects below) — refreshes the numbers/chart without flashing the
+  // loading skeleton over whatever the admin is currently looking at.
+  const fetchSummary = useCallback(async (silent = false) => {
+    if (silent) setSummaryRefreshing(true);
+    else setSummaryLoading(true);
+    if (!silent) setSummaryError('');
     try {
       const res = await api.get('/api/admin/bookkeeping/summary', { params: { preset: period } });
-      if (res.data?.success) setSummary(res.data.data);
-      else setSummaryError(res.data?.error || 'Could not load the P&L summary.');
+      if (res.data?.success) { setSummary(res.data.data); if (silent) setSummaryError(''); }
+      else if (!silent) setSummaryError(res.data?.error || 'Could not load the P&L summary.');
     } catch (e) {
-      setSummaryError(e?.response?.data?.error || 'Could not load the P&L summary.');
+      if (!silent) setSummaryError(e?.response?.data?.error || 'Could not load the P&L summary.');
     } finally {
-      setSummaryLoading(false);
+      if (silent) setSummaryRefreshing(false);
+      else setSummaryLoading(false);
     }
   }, [period]);
+
+  // Live — background refresh every 30s, plus instantly whenever any
+  // transaction completes anywhere in PayChain (pushed via SSE -> the
+  // existing paychain:sync bus, see context/AuthContext.jsx). Keeps this
+  // page's numbers matching Revenue's without the admin ever hitting
+  // manual "Sync".
+  useEffect(() => {
+    const id = setInterval(() => fetchSummary(true), 30_000);
+    const onSync = () => fetchSummary(true);
+    window.addEventListener('paychain:sync', onSync);
+    return () => { clearInterval(id); window.removeEventListener('paychain:sync', onSync); };
+  }, [fetchSummary]);
 
   const fetchExpenses = useCallback(async () => {
     setLoading(true);
@@ -284,7 +302,7 @@ const Bookkeeping = () => {
           </div>
         ) : pnl ? (
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-            <PnlCard label="Income (Fee Revenue)" value={fmtKES(pnl.income)} icon="trending_up" tone="emerald" />
+            <PnlCard label="Income (Fee Revenue)" value={fmtKES(pnl.income)} icon="trending_up" tone="emerald" subtitle="Matches Revenue's Gross figure" />
             <PnlCard label="Total Expenses" value={fmtKES(pnl.totalExpenses)} icon="receipt_long" tone="amber" subtitle={`${pnl.expenseCount} entries`} />
             <PnlCard label="Net Profit" value={fmtKES(pnl.netProfit)} icon="account_balance" tone={pnl.netProfit >= 0 ? 'emerald' : 'red'} />
             <PnlCard label="Taxable Profit" value={fmtKES(pnl.taxableProfit)} icon="calculate" tone="blue" subtitle="Income − deductible" />
@@ -299,7 +317,13 @@ const Bookkeeping = () => {
               <div className="flex items-start justify-between mb-5">
                 <div>
                   <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">Trend</p>
-                  <h3 className="text-lg font-bold text-on-surface tracking-tight">Income vs Expenses (12mo)</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-bold text-on-surface tracking-tight">Income vs Expenses (12mo)</h3>
+                    <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-emerald-700" title="Refreshes automatically every 30s and instantly on new transactions">
+                      <span className={`w-1.5 h-1.5 rounded-full bg-emerald-500 ${summaryRefreshing ? 'animate-ping' : 'animate-pulse'}`} />
+                      Live
+                    </span>
+                  </div>
                 </div>
                 <div className="flex items-center gap-3 text-2xs font-bold">
                   <Legend color="bg-emerald-500" label="Income" />
