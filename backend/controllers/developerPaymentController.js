@@ -1,23 +1,24 @@
 import bcrypt from 'bcryptjs';
 import DeveloperPayment from '../models/DeveloperPayment.js';
 import Merchant from '../models/Merchant.js';
-import STKRequest from '../models/STKRequest.js';
-import { initiateAndTrackNcbaStk } from './mpesaController.js';
 import { executeNcbaBankPayout, InsufficientFundsError } from './ncbaOpenBankingController.js';
 import { NcbaOpenBankingValidationError } from '../services/ncbaOpenBankingService.js';
-import { validatePhoneNumber, NcbaValidationError } from '../utils/ncbaValidators.js';
-import { getCheckoutTotal } from '../utils/pricingEngine.js';
 import { claimClientIdempotencyKey, DuplicateSubmissionError } from '../utils/idempotencyGuard.js';
 import { assertApiPayoutPinNotLocked, recordFailedApiPayoutPinAttempt, resetApiPayoutPinAttempts, ApiPayoutPinLockedError } from '../utils/apiPayoutPinLockout.js';
 import { logAudit } from '../utils/auditLog.js';
+import { publicDeveloperPayment } from '../utils/developerPaymentView.js';
+import { dispatchDeveloperEvent } from '../services/webhookDeliveryService.js';
+import {
+  initiateCollectPayment,
+  findReplayedPayment,
+  syncLiveCollectFromStkRequest,
+  CollectValidationError,
+} from '../services/developerCollectService.js';
 
-// How long a simulated (test-mode) payment stays 'pending' before flipping
-// to 'success' — long enough to let a developer's integration exercise its
-// own "poll for pending" code path at least once, short enough not to make
-// them wait around. Purely an in-process setTimeout: a simulated payment
-// created moments before a server restart could stay pending indefinitely,
-// which is an acceptable trade-off for a zero-stakes test-mode convenience
-// feature, not something worth a persistent job queue for.
+// How long a simulated (test-mode) payout stays 'pending' before flipping
+// to 'success' — see developerCollectService.js's identical constant for
+// collects; payouts don't share that helper (no STK push involved) so this
+// one is kept local.
 const SIMULATED_SETTLE_MS = 4000;
 
 // Bounds how much a merchant's linked developer(s) can move out via live
@@ -33,38 +34,26 @@ async function sumLiveApiPayoutsLast24h(merchantId) {
   return result[0]?.total || 0;
 }
 
-function publicPayment(payment) {
-  return {
-    id: payment._id,
-    mode: payment.mode,
-    kind: payment.kind,
-    amount: payment.amount,
-    currency: payment.currency,
-    status: payment.status,
-    failureReason: payment.failureReason,
-    reference: payment.reference,
-    counterparty: payment.counterparty,
-    createdAt: payment.createdAt,
-    updatedAt: payment.updatedAt,
-  };
-}
+const publicPayment = publicDeveloperPayment;
 
-function simulateSettlement(paymentId) {
+// Payout's own settlement simulator — payouts don't go through
+// developerCollectService (no STK push / phone involved), so this stays
+// local rather than sharing collect's simulateCollectSettlement.
+function simulatePayoutSettlement(payment) {
   setTimeout(async () => {
     try {
-      await DeveloperPayment.updateOne({ _id: paymentId, status: 'pending' }, { $set: { status: 'success' } });
+      const updated = await DeveloperPayment.findOneAndUpdate(
+        { _id: payment._id, status: 'pending' },
+        { $set: { status: 'success' } },
+        { returnDocument: 'after' }
+      );
+      if (updated) {
+        dispatchDeveloperEvent(updated.developerId, `payment.${updated.kind}.succeeded`, { payment: publicPayment(updated) });
+      }
     } catch (err) {
-      console.error('simulateSettlement: failed to settle', paymentId, err?.message || err);
+      console.error('simulatePayoutSettlement: failed to settle', payment._id, err?.message || err);
     }
   }, SIMULATED_SETTLE_MS);
-}
-
-// Resolves an Idempotency-Key replay by returning the original payment
-// instead of erroring — the expected behavior for a real API integration
-// retrying a request, as opposed to claimPayoutSubmission's internal
-// double-click case, which is fine to just reject.
-async function findReplayedPayment(developerId, idempotencyKey) {
-  return DeveloperPayment.findOne({ developerId, idempotencyKey });
 }
 
 // @desc    Collect a payment (STK push) into the linked merchant's wallet.
@@ -83,64 +72,28 @@ export const collectPayment = async (req, res) => {
       return res.status(400).json({ error: 'No merchant account linked. Complete /api/developer/link-merchant first.', code: 'NO_LINKED_MERCHANT' });
     }
 
-    const { amount, reference } = req.body || {};
-    const intAmount = Math.ceil(Number(amount));
-    if (!Number.isFinite(intAmount) || intAmount <= 0) {
-      return res.status(400).json({ error: 'A positive amount is required.' });
-    }
+    const { amount, phone, reference } = req.body || {};
 
-    let phone;
+    let payment;
     try {
-      phone = validatePhoneNumber(req.body?.phone);
+      payment = await initiateCollectPayment({
+        developerId: developer._id,
+        apiKeyId: req.apiKey._id,
+        merchantId,
+        mode: req.apiKey.mode,
+        amount,
+        phone,
+        reference,
+        idempotencyKey,
+      });
     } catch (e) {
-      if (e instanceof NcbaValidationError) return res.status(400).json({ error: 'Enter a valid Kenyan phone number.' });
-      throw e;
-    }
-
-    try {
-      await claimClientIdempotencyKey(developer._id, idempotencyKey);
-    } catch (e) {
+      if (e instanceof CollectValidationError) return res.status(400).json({ error: e.message });
       if (e instanceof DuplicateSubmissionError) {
         const existing = await findReplayedPayment(developer._id, idempotencyKey);
         if (existing) return res.status(200).json({ success: true, payment: publicPayment(existing), replayed: true });
         return res.status(409).json({ error: e.message });
       }
       throw e;
-    }
-
-    const mode = req.apiKey.mode;
-    const payment = await DeveloperPayment.create({
-      developerId: developer._id,
-      apiKeyId: req.apiKey._id,
-      merchantId,
-      mode,
-      kind: 'collect',
-      amount: intAmount,
-      status: 'pending',
-      reference: reference || null,
-      idempotencyKey,
-      counterparty: { phone },
-    });
-
-    if (mode === 'test') {
-      simulateSettlement(payment._id);
-      return res.status(201).json({ success: true, payment: publicPayment(payment) });
-    }
-
-    try {
-      const checkoutTotal = getCheckoutTotal(intAmount);
-      const checkoutRequestId = await initiateAndTrackNcbaStk({
-        merchantId,
-        phone,
-        checkoutTotal,
-        extra: { baseAmount: intAmount, kind: 'request_money' },
-      });
-      payment.linkedStkCheckoutId = checkoutRequestId;
-      await payment.save();
-    } catch (err) {
-      payment.status = 'failed';
-      payment.failureReason = err.message;
-      await payment.save();
     }
 
     res.status(201).json({ success: true, payment: publicPayment(payment) });
@@ -229,7 +182,7 @@ export const payoutPayment = async (req, res) => {
     });
 
     if (mode === 'test') {
-      simulateSettlement(payment._id);
+      simulatePayoutSettlement(payment);
       return res.status(201).json({ success: true, payment: publicPayment(payment) });
     }
 
@@ -240,6 +193,7 @@ export const payoutPayment = async (req, res) => {
       payment.status = 'success';
       payment.linkedTransactionId = transaction._id;
       await payment.save();
+      dispatchDeveloperEvent(developer._id, 'payment.payout.succeeded', { payment: publicPayment(payment) });
 
       logAudit({
         action: 'developer.payment.payout_executed', category: 'security', severity: 'critical',
@@ -253,6 +207,7 @@ export const payoutPayment = async (req, res) => {
         ? err.message
         : 'Payout failed.';
       await payment.save();
+      dispatchDeveloperEvent(developer._id, 'payment.payout.failed', { payment: publicPayment(payment) });
       return res.status(402).json({ error: payment.failureReason, payment: publicPayment(payment) });
     }
 
@@ -271,16 +226,7 @@ export const getPaymentStatus = async (req, res) => {
     const payment = await DeveloperPayment.findOne({ _id: req.params.id, developerId: req.developer._id });
     if (!payment) return res.status(404).json({ error: 'Payment not found.' });
 
-    // Live collects settle asynchronously off NCBA's own resolution — sync
-    // from the linked STKRequest on read rather than needing a webhook/poller.
-    if (payment.mode === 'live' && payment.kind === 'collect' && payment.status === 'pending' && payment.linkedStkCheckoutId) {
-      const stkReq = await STKRequest.findOne({ checkoutRequestId: payment.linkedStkCheckoutId });
-      if (stkReq && stkReq.status !== 'pending') {
-        payment.status = stkReq.status === 'success' ? 'success' : 'failed';
-        if (stkReq.status === 'failed') payment.failureReason = stkReq.resultDesc || 'Collection failed.';
-        await payment.save();
-      }
-    }
+    await syncLiveCollectFromStkRequest(payment);
 
     res.json({ success: true, payment: publicPayment(payment) });
   } catch (error) {

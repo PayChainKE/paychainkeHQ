@@ -30,6 +30,10 @@ const Developers = () => {
   const [toast, setToast] = useState('');
   const [page, setPage] = useState(1);
   const [busyId, setBusyId] = useState(null);
+  const [webhooksDeveloper, setWebhooksDeveloper] = useState(null);
+  const [webhooksData, setWebhooksData] = useState(null);
+  const [webhooksLoading, setWebhooksLoading] = useState(false);
+  const [webhooksError, setWebhooksError] = useState('');
 
   const fetchDevelopers = useCallback(async () => {
     setLoading(true);
@@ -94,6 +98,20 @@ const Developers = () => {
     } finally { setBusyId(null); }
   }
 
+  async function openWebhooks(developer) {
+    setWebhooksDeveloper(developer);
+    setWebhooksData(null);
+    setWebhooksError('');
+    setWebhooksLoading(true);
+    try {
+      const res = await api.get(`/api/admin/developers/${developer._id}/webhooks`);
+      if (res.data?.success) setWebhooksData(res.data.data || []);
+      else setWebhooksError(res.data?.error || 'Could not load webhooks.');
+    } catch (e) {
+      setWebhooksError(e?.response?.data?.error || 'Could not load webhooks.');
+    } finally { setWebhooksLoading(false); }
+  }
+
   return (
     <Layout>
       <div className="space-y-6 pb-12">
@@ -153,18 +171,19 @@ const Developers = () => {
                   <Th>Status</Th>
                   <Th>Live Access</Th>
                   <Th>Joined</Th>
+                  <Th>Webhooks</Th>
                   <Th></Th>
                 </tr>
               </thead>
               <tbody className="text-xs">
                 {loading ? (
                   [...Array(3)].map((_, i) => (
-                    <tr key={i}><td colSpan={5} className="px-3 py-2.5 border-b border-outline-variant/5"><div className="h-6 bg-surface-container-low rounded animate-pulse"></div></td></tr>
+                    <tr key={i}><td colSpan={6} className="px-3 py-2.5 border-b border-outline-variant/5"><div className="h-6 bg-surface-container-low rounded animate-pulse"></div></td></tr>
                   ))
                 ) : filtered.length === 0 ? (
-                  <tr><td colSpan={5} className="px-4 py-10 text-center text-on-surface-variant/40 text-sm">{error || 'No developer accounts yet.'}</td></tr>
+                  <tr><td colSpan={6} className="px-4 py-10 text-center text-on-surface-variant/40 text-sm">{error || 'No developer accounts yet.'}</td></tr>
                 ) : pagedDevelopers.map((d) => (
-                  <DeveloperRow key={d._id} developer={d} canManage={canManage} busy={busyId === d._id} onApprove={() => handleApprove(d)} onReject={() => handleReject(d)} />
+                  <DeveloperRow key={d._id} developer={d} canManage={canManage} busy={busyId === d._id} onApprove={() => handleApprove(d)} onReject={() => handleReject(d)} onViewWebhooks={() => openWebhooks(d)} />
                 ))}
               </tbody>
             </table>
@@ -176,7 +195,7 @@ const Developers = () => {
           {loading ? <div className="p-8 text-center text-on-surface-variant/40 text-sm">Loading developers…</div> :
             filtered.length === 0 ? <div className="p-8 text-center text-on-surface-variant/40 text-sm">{error || 'No developer accounts yet.'}</div> :
             pagedDevelopers.map((d) => (
-              <DeveloperCard key={d._id} developer={d} canManage={canManage} busy={busyId === d._id} onApprove={() => handleApprove(d)} onReject={() => handleReject(d)} />
+              <DeveloperCard key={d._id} developer={d} canManage={canManage} busy={busyId === d._id} onApprove={() => handleApprove(d)} onReject={() => handleReject(d)} onViewWebhooks={() => openWebhooks(d)} />
             ))}
           {!loading && filtered.length > 0 && (
             <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 shadow-editorial overflow-hidden">
@@ -187,6 +206,16 @@ const Developers = () => {
 
         {toast && (
           <div className="fixed bottom-6 right-6 z-50 bg-on-surface text-white px-4 py-2.5 rounded-xl shadow-lg text-xs font-bold animate-fadeIn">{toast}</div>
+        )}
+
+        {webhooksDeveloper && (
+          <WebhooksDrawer
+            developer={webhooksDeveloper}
+            data={webhooksData}
+            loading={webhooksLoading}
+            error={webhooksError}
+            onClose={() => setWebhooksDeveloper(null)}
+          />
         )}
       </div>
     </Layout>
@@ -244,7 +273,7 @@ const DeveloperActions = ({ developer, canManage, busy, onApprove, onReject }) =
   return <span className="text-2xs text-on-surface-variant/40">No action needed</span>;
 };
 
-const DeveloperRow = ({ developer, canManage, busy, onApprove, onReject }) => {
+const DeveloperRow = ({ developer, canManage, busy, onApprove, onReject, onViewWebhooks }) => {
   const statusStyle = STATUS_META[developer.status] || STATUS_META.active;
   const liveStyle = liveAccessMeta(developer);
   const initials = (developer.companyName || developer.email).split(/\s+/).map((s) => s[0]).slice(0, 2).join('').toUpperCase();
@@ -274,6 +303,12 @@ const DeveloperRow = ({ developer, canManage, busy, onApprove, onReject }) => {
       <td className="px-3 py-2 border-b border-outline-variant/5 text-2xs text-on-surface-variant/50">
         {developer.createdAt ? new Date(developer.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
       </td>
+      <td className="px-3 py-2 border-b border-outline-variant/5">
+        <button onClick={onViewWebhooks} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-outline-variant/30 text-2xs font-bold uppercase tracking-widest text-on-surface-variant/70 hover:bg-surface-container-low hover:text-on-surface transition-colors">
+          <span className="material-symbols-outlined text-sm">webhook</span>
+          View
+        </button>
+      </td>
       <td className="px-3 py-2 border-b border-outline-variant/5 text-right">
         <DeveloperActions developer={developer} canManage={canManage} busy={busy} onApprove={onApprove} onReject={onReject} />
       </td>
@@ -281,7 +316,7 @@ const DeveloperRow = ({ developer, canManage, busy, onApprove, onReject }) => {
   );
 };
 
-const DeveloperCard = ({ developer, canManage, busy, onApprove, onReject }) => {
+const DeveloperCard = ({ developer, canManage, busy, onApprove, onReject, onViewWebhooks }) => {
   const statusStyle = STATUS_META[developer.status] || STATUS_META.active;
   const liveStyle = liveAccessMeta(developer);
   const initials = (developer.companyName || developer.email).split(/\s+/).map((s) => s[0]).slice(0, 2).join('').toUpperCase();
@@ -298,9 +333,99 @@ const DeveloperCard = ({ developer, canManage, busy, onApprove, onReject }) => {
             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-bold uppercase tracking-widest border ${statusStyle.pill}`}>{statusStyle.label}</span>
             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-bold uppercase tracking-widest border ${liveStyle.pill}`}>{liveStyle.label}</span>
           </div>
-          <div className="mt-3">
+          <div className="mt-3 flex items-center gap-2">
             <DeveloperActions developer={developer} canManage={canManage} busy={busy} onApprove={onApprove} onReject={onReject} />
+            <button onClick={onViewWebhooks} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-outline-variant/30 text-2xs font-bold uppercase tracking-widest text-on-surface-variant/70">
+              <span className="material-symbols-outlined text-sm">webhook</span>
+              Webhooks
+            </button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const DELIVERY_STATUS_META = {
+  success:   { label: 'Delivered', pill: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
+  pending:   { label: 'Retrying',  pill: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-500' },
+  failed:    { label: 'Failed',    pill: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-500' },
+  exhausted: { label: 'Exhausted', pill: 'bg-red-50 text-red-700 border-red-200', dot: 'bg-red-500' },
+};
+
+// Slide-over panel showing one developer's webhook endpoints and recent
+// delivery health — lets support/ops answer "is this integration actually
+// receiving events" (an ISP's reconnection flow, a CRM sync) without
+// needing raw DB access.
+const WebhooksDrawer = ({ developer, data, loading, error, onClose }) => {
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-lg h-full bg-white shadow-2xl overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-outline-variant/10 px-5 py-4 flex items-start justify-between z-10">
+          <div>
+            <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-0.5">Webhooks</p>
+            <h3 className="text-base font-bold text-on-surface tracking-tight">{developer.companyName}</h3>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant/60 hover:bg-surface-container-low">
+            <span className="material-symbols-outlined text-lg">close</span>
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {loading ? (
+            <div className="space-y-3">
+              {[...Array(2)].map((_, i) => <div key={i} className="h-24 bg-surface-container-low rounded-xl animate-pulse" />)}
+            </div>
+          ) : error ? (
+            <p className="text-sm text-red-600">{error}</p>
+          ) : !data || data.length === 0 ? (
+            <p className="text-sm text-on-surface-variant/50 text-center py-10">This developer hasn't registered any webhook endpoints yet.</p>
+          ) : (
+            data.map((webhook) => (
+              <div key={webhook._id} className="border border-outline-variant/20 rounded-xl overflow-hidden">
+                <div className="p-4 bg-surface-container-low/40">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-xs font-bold text-on-surface break-all">{webhook.url}</p>
+                    <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-bold uppercase tracking-widest border ${webhook.status === 'active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-100 text-gray-700 border-gray-200'}`}>
+                      {webhook.status}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {webhook.events.map((e) => (
+                      <span key={e} className="px-1.5 py-0.5 rounded bg-surface-container-lowest border border-outline-variant/20 text-2xs font-mono text-on-surface-variant/70">{e}</span>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex items-center gap-3 text-2xs text-on-surface-variant/50">
+                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />{webhook.deliveryStats.success} delivered</span>
+                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-amber-500" />{webhook.deliveryStats.pending + webhook.deliveryStats.failed} retrying</span>
+                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-red-500" />{webhook.deliveryStats.exhausted} exhausted</span>
+                  </div>
+                </div>
+
+                {webhook.recentDeliveries.length > 0 && (
+                  <div className="divide-y divide-outline-variant/10">
+                    {webhook.recentDeliveries.map((d) => {
+                      const meta = DELIVERY_STATUS_META[d.status] || DELIVERY_STATUS_META.pending;
+                      return (
+                        <div key={d._id} className="px-4 py-2 flex items-center justify-between gap-2 text-2xs">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${meta.dot}`} />
+                            <span className="font-mono text-on-surface-variant/70 truncate">{d.event}</span>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0 text-on-surface-variant/40">
+                            {d.lastResponseCode && <span>{d.lastResponseCode}</span>}
+                            <span>{new Date(d.createdAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                            <span className={`px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wide border ${meta.pill}`}>{meta.label}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>

@@ -21,6 +21,9 @@ import { initiateStkPush as ncbaInitiateStkPush, queryStkPush as ncbaQueryStkPus
 import { validateMobileWalletNumber as ncbaValidateMobileWalletNumber, submitMobileB2wPayment as ncbaSubmitMobileB2wPayment, validateLipaNaMpesaAccount as ncbaValidateLnmAccount, submitLipaNaMpesaPayment as ncbaSubmitLnmPayment, NcbaOpenBankingValidationError } from '../services/ncbaOpenBankingService.js';
 import { validatePhoneNumber, NcbaValidationError, getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
 import { generateBrandedQrDataUri } from '../utils/qrCode.js';
+import DeveloperPayment from '../models/DeveloperPayment.js';
+import { publicDeveloperPayment } from '../utils/developerPaymentView.js';
+import { dispatchDeveloperEvent } from '../services/webhookDeliveryService.js';
 
 const FRONTEND_URL = process.env.MERCHANT_DASHBOARD_URL || 'https://app.paychain.co.ke';
 
@@ -495,6 +498,31 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
   // Cancelled/failed case: the atomic claim above already persisted
   // status: 'failed' — the PaymentLink itself is deliberately left
   // 'active' so the customer can retry.
+
+  // Developer API fan-out: if this checkout was initiated via POST
+  // /api/v1/developer/payments/collect (matched by linkedStkCheckoutId),
+  // sync its status to whatever this function just resolved and fire the
+  // matching payment.collect.* webhook — this is the only place a live
+  // collect's success is ever learned, so it's the only place that webhook
+  // can fire from. No-ops for any STKRequest that isn't Developer-API-linked
+  // (the far more common case: dashboard-initiated top-ups/payment links).
+  const developerPayment = await DeveloperPayment.findOneAndUpdate(
+    { linkedStkCheckoutId: stkReq.checkoutRequestId, status: 'pending' },
+    {
+      $set: {
+        status: claimed.status,
+        ...(claimed.status === 'failed' ? { failureReason: resultDesc || 'Collection failed.' } : {}),
+      },
+    },
+    { returnDocument: 'after' }
+  );
+  if (developerPayment) {
+    dispatchDeveloperEvent(
+      developerPayment.developerId,
+      `payment.collect.${claimed.status === 'success' ? 'succeeded' : 'failed'}`,
+      { payment: publicDeveloperPayment(developerPayment) }
+    );
+  }
 }
 
 // ── NCBA STK Push resolution (poll-based) ───────────────────────────────────

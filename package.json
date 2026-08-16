@@ -14,8 +14,12 @@
     "lint": "turbo run lint",
     "test": "turbo run test",
     "dev:web": "turbo run dev --filter=@paychain/web",
+    "dev:docs": "turbo run dev --filter=@paychain/docs",
+    "dev:checkout": "turbo run dev --filter=@paychain/checkout",
     "dev:backend": "turbo run dev --filter=@paychain/backend",
     "build:web": "turbo run build --filter=@paychain/web",
+    "build:docs": "turbo run build --filter=@paychain/docs",
+    "build:checkout": "turbo run build --filter=@paychain/checkout",
     "build:backend": "turbo run build --filter=@paychain/backend"
   },
   "devDependencies": {
@@ -33,6 +37,14 @@
   },
   "overrides": {
     "@paychain/web": {
+      "react": "18.3.1",
+      "react-dom": "18.3.1"
+    },
+    "@paychain/docs": {
+      "react": "18.3.1",
+      "react-dom": "18.3.1"
+    },
+    "@paychain/checkout": {
       "react": "18.3.1",
       "react-dom": "18.3.1"
     },

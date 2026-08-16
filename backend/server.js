@@ -49,12 +49,14 @@ import officerRoutes from './routes/officerRoutes.js';
 import smsRoutes from './routes/smsRoutes.js';
 import developerRoutes from './routes/developerRoutes.js';
 import developerPublicRoutes from './routes/developerPublicRoutes.js';
+import publicCheckoutRoutes from './routes/publicCheckoutRoutes.js';
 import { ensurePrimaryOwner } from './migrations/ensurePrimaryOwner.js';
 import { backfillTransactionFees } from './migrations/backfillTransactionFees.js';
 import { backfillNcbaMerchantCodes } from './migrations/backfillNcbaMerchantCodes.js';
 import { checkAndSendDormancyReminders } from './services/dormancyReminderService.js';
 import { runWeeklyRevenueSweepIfDue } from './services/revenueSweepService.js';
 import { reconcileStuckOpenBankingPayouts } from './services/ncbaOpenBankingReconciliationService.js';
+import { processPendingWebhookDeliveries } from './services/webhookDeliveryService.js';
 
 const allowedOrigins = [
   // Public marketing site
@@ -72,6 +74,12 @@ const allowedOrigins = [
   // Demo dashboard
   'https://www.demo.paychain.co.ke',
   'https://demo.paychain.co.ke',
+  // Developer docs
+  'https://developer.paychain.co.ke',
+  // Hosted checkout — the actual page a customer's browser lands on
+  // (checkout.paychain.co.ke/pay/:id) calls /api/public/checkout/* from
+  // this origin.
+  'https://checkout.paychain.co.ke',
   // Legacy alias (kept short-term so existing magic links still work)
   'https://merchant.paychain.co.ke',
   // Merchant dashboard's actual live Vercel deployment URL. Removed once
@@ -91,12 +99,14 @@ const allowedOrigins = [
   'http://localhost:5000',
   'http://localhost:8080',
   'http://localhost:8081',
+  'http://localhost:8082',
   'http://127.0.0.1:5173',
   'http://127.0.0.1:5174',
   'http://127.0.0.1:5175',
   'http://127.0.0.1:5176',
   'http://127.0.0.1:5000',
   'http://127.0.0.1:8081',
+  'http://127.0.0.1:8082',
 ];
 
 const app = express();
@@ -238,6 +248,10 @@ app.use('/api/developer', developerRoutes);
 // Kept separate from the /api/v1 NCBA mount above (different concern —
 // public third-party API traffic vs. our own bank-rail integration).
 app.use('/api/v1/developer', developerPublicRoutes);
+// Backs the hosted checkout.paychain.co.ke page — unauthenticated by
+// design (a browser on that page never has an API key), scoped entirely by
+// the unguessable session id in the path. See publicCheckoutRoutes.js.
+app.use('/api/public/checkout', publicCheckoutRoutes);
 app.use('/api/v1', ncbaRoutes);
 
 // Also served prefix-free — api.paychain.co.ke is a dedicated API subdomain
@@ -371,6 +385,15 @@ async function bootstrap() {
   setInterval(() => {
     reconcileStuckOpenBankingPayouts().catch((e) => console.error('Open Banking reconciliation sweep failed:', e));
   }, 5 * 60 * 1000);
+
+  // Developer API webhook retry sweep — picks up deliveries whose backoff
+  // window has elapsed (see webhookDeliveryService.js). Every minute is
+  // frequent enough that the shortest retry delay (60s) isn't meaningfully
+  // stretched out by the sweep's own cadence.
+  processPendingWebhookDeliveries().catch((e) => console.error('Webhook delivery sweep failed:', e));
+  setInterval(() => {
+    processPendingWebhookDeliveries().catch((e) => console.error('Webhook delivery sweep failed:', e));
+  }, 60 * 1000);
 }
 
 bootstrap();

@@ -7,6 +7,10 @@ import {
   payoutPayment,
   getPaymentStatus,
 } from '../controllers/developerPaymentController.js';
+import {
+  createCheckoutSession,
+  getCheckoutSession,
+} from '../controllers/developerCheckoutController.js';
 
 const router = express.Router();
 
@@ -36,5 +40,11 @@ router.get('/ping', publicApiLimiter, authenticateApiKey, ping);
 router.post('/payments/collect', paymentLimiter, authenticateApiKey, collectPayment);
 router.post('/payments/payout', paymentLimiter, authenticateApiKey, payoutPayment);
 router.get('/payments/:id', publicApiLimiter, authenticateApiKey, getPaymentStatus);
+
+// Hosted checkout — create a payment link to redirect a customer to
+// (the public, unauthenticated /pay/:id page lives under
+// /api/public/checkout, see publicCheckoutRoutes.js).
+router.post('/checkout', paymentLimiter, authenticateApiKey, createCheckoutSession);
+router.get('/checkout/:id', publicApiLimiter, authenticateApiKey, getCheckoutSession);
 
 export default router;

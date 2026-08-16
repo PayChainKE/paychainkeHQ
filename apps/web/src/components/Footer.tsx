@@ -39,6 +39,7 @@ const Footer: React.FC = () => {
               <li><Link to="/blog" className="hover:text-emerald-400 transition-colors">Blog</Link></li>
               <li><Link to="/contact" className="hover:text-emerald-400 transition-colors">Contact Us</Link></li>
               <li><Link to="/book-demo" className="hover:text-emerald-400 transition-colors">Book a Demo</Link></li>
+              <li><a href="https://developer.paychain.co.ke" target="_blank" rel="noopener noreferrer" className="hover:text-emerald-400 transition-colors">API Docs</a></li>
             </ul>
           </div>
 

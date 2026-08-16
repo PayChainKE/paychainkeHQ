@@ -14,6 +14,14 @@ import {
   verifyMerchantLink,
   getMerchantLinkStatus,
 } from '../controllers/developerMerchantLinkController.js';
+import {
+  listWebhooks,
+  createWebhook,
+  updateWebhook,
+  deleteWebhook,
+  testWebhook,
+  listWebhookDeliveries,
+} from '../controllers/developerWebhookController.js';
 
 const router = express.Router();
 
@@ -43,5 +51,14 @@ router.post('/live-access/request', protectDeveloper, requestLiveAccess);
 router.post('/link-merchant/start', protectDeveloper, apiKeyActionLimiter, startMerchantLink);
 router.post('/link-merchant/verify', protectDeveloper, apiKeyActionLimiter, verifyMerchantLink);
 router.get('/link-merchant/status', protectDeveloper, getMerchantLinkStatus);
+
+// Webhooks — how integrations (CRM sync, ISP auto-reconnection systems,
+// etc.) find out about a payment event without polling GET /payments/:id.
+router.get('/webhooks', protectDeveloper, listWebhooks);
+router.post('/webhooks', protectDeveloper, apiKeyActionLimiter, createWebhook);
+router.patch('/webhooks/:id', protectDeveloper, apiKeyActionLimiter, updateWebhook);
+router.delete('/webhooks/:id', protectDeveloper, apiKeyActionLimiter, deleteWebhook);
+router.post('/webhooks/:id/test', protectDeveloper, apiKeyActionLimiter, testWebhook);
+router.get('/webhooks/:id/deliveries', protectDeveloper, listWebhookDeliveries);
 
 export default router;
