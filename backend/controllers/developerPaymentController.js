@@ -1,7 +1,12 @@
 import bcrypt from 'bcryptjs';
 import DeveloperPayment from '../models/DeveloperPayment.js';
 import Merchant from '../models/Merchant.js';
-import { executeNcbaBankPayout, InsufficientFundsError } from './ncbaOpenBankingController.js';
+import {
+  executeNcbaBankPayout,
+  executeNcbaMobileMoneyPayout,
+  executeNcbaLipaNaMpesaPayout,
+  InsufficientFundsError,
+} from './ncbaOpenBankingController.js';
 import { NcbaOpenBankingValidationError } from '../services/ncbaOpenBankingService.js';
 import { claimClientIdempotencyKey, DuplicateSubmissionError } from '../utils/idempotencyGuard.js';
 import { assertApiPayoutPinNotLocked, recordFailedApiPayoutPinAttempt, resetApiPayoutPinAttempts, ApiPayoutPinLockedError } from '../utils/apiPayoutPinLockout.js';
@@ -103,7 +108,48 @@ export const collectPayment = async (req, res) => {
   }
 };
 
-// @desc    Pay out (bank transfer) from the linked merchant's wallet.
+// Every payout destination the Developer API accepts, and which single
+// field (or field pair) identifies it — mirrors the same rails the internal
+// Payee model (merchant dashboard "Send Money") already exposes, just flat
+// instead of a saved-payee object. Exactly one must be provided per request;
+// this is deliberately a validation error, not a silent "first one wins",
+// since a caller who accidentally sends both a phone and a bankCode almost
+// certainly made a mistake worth surfacing rather than guessing past.
+class PayoutDestinationError extends Error {}
+
+function parsePayoutDestination(body) {
+  const { bankCode, accountNumber, accountName, phone, mobileNetwork, paybillNumber, tillNumber, accountReference } = body || {};
+
+  const provided = [];
+  if (bankCode || accountNumber) provided.push('bank');
+  if (phone) provided.push('mobile_money');
+  if (paybillNumber) provided.push('paybill');
+  if (tillNumber) provided.push('till');
+
+  if (provided.length === 0) {
+    throw new PayoutDestinationError('Provide exactly one payout destination: bankCode + accountNumber, phone, paybillNumber + accountReference, or tillNumber.');
+  }
+  if (provided.length > 1) {
+    throw new PayoutDestinationError(`More than one payout destination was provided (${provided.join(', ')}) — send exactly one.`);
+  }
+
+  const type = provided[0];
+  if (type === 'bank') {
+    if (!bankCode || !accountNumber) throw new PayoutDestinationError('bankCode and accountNumber are both required for a bank payout.');
+    return { type, counterparty: { bankCode, accountNumber, accountName: accountName || null } };
+  }
+  if (type === 'mobile_money') {
+    return { type, counterparty: { phone, network: mobileNetwork === 'airtel' ? 'airtel' : 'safaricom' } };
+  }
+  if (type === 'paybill') {
+    if (!accountReference) throw new PayoutDestinationError('accountReference is required for a paybill payout.');
+    return { type, counterparty: { paybillNumber, accountReference } };
+  }
+  return { type: 'till', counterparty: { tillNumber } };
+}
+
+// @desc    Pay out from the linked merchant's wallet — to a bank account,
+//          an M-Pesa/Airtel Money number, a Paybill, or a Till (Buy Goods).
 //          Live mode requires apiPayoutEnabled, a matching apiPayoutPin,
 //          and both caps to be respected. Test mode is fully simulated and
 //          ignores all of the above.
@@ -120,10 +166,18 @@ export const payoutPayment = async (req, res) => {
       return res.status(400).json({ error: 'No merchant account linked. Complete /api/developer/link-merchant first.', code: 'NO_LINKED_MERCHANT' });
     }
 
-    const { bankCode, accountNumber, accountName, narration, apiPayoutPin } = req.body || {};
+    const { narration, apiPayoutPin } = req.body || {};
     const numericAmount = Number(req.body?.amount);
-    if (!bankCode || !accountNumber || !Number.isFinite(numericAmount) || numericAmount <= 0) {
-      return res.status(400).json({ error: 'bankCode, accountNumber and a positive amount are required.' });
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      return res.status(400).json({ error: 'A positive amount is required.' });
+    }
+
+    let destination;
+    try {
+      destination = parsePayoutDestination(req.body);
+    } catch (e) {
+      if (e instanceof PayoutDestinationError) return res.status(400).json({ error: e.message });
+      throw e;
     }
 
     const mode = req.apiKey.mode;
@@ -178,7 +232,7 @@ export const payoutPayment = async (req, res) => {
       amount: numericAmount,
       status: 'pending',
       idempotencyKey,
-      counterparty: { bankCode, accountNumber, accountName: accountName || null },
+      counterparty: destination.counterparty,
     });
 
     if (mode === 'test') {
@@ -186,20 +240,51 @@ export const payoutPayment = async (req, res) => {
       return res.status(201).json({ success: true, payment: publicPayment(payment) });
     }
 
+    // Bank resolves synchronously (NCBA confirms PesaLink/RTGS before
+    // returning); mobile money, paybill, and till only confirm receipt —
+    // the actual outcome lands later via resolvePendingOpenBankingTransaction
+    // (ncbaOpenBankingController.js), matched by linkedPayoutReference, the
+    // same way a live collect's outcome lands via resolveStkOutcome.
+    const isAsyncRail = destination.type !== 'bank';
+
     try {
-      const { transaction } = await executeNcbaBankPayout({
-        merchantId, bankCode, accountNumber, accountName, amount: numericAmount, narration: narration || 'Developer API payout',
-      });
-      payment.status = 'success';
-      payment.linkedTransactionId = transaction._id;
-      await payment.save();
-      dispatchDeveloperEvent(developer._id, 'payment.payout.succeeded', { payment: publicPayment(payment) });
+      let transaction;
+      if (destination.type === 'bank') {
+        ({ transaction } = await executeNcbaBankPayout({
+          merchantId, bankCode: destination.counterparty.bankCode, accountNumber: destination.counterparty.accountNumber,
+          accountName: destination.counterparty.accountName, amount: numericAmount, narration: narration || 'Developer API payout',
+        }));
+      } else if (destination.type === 'mobile_money') {
+        ({ transaction } = await executeNcbaMobileMoneyPayout({
+          merchantId, phone: destination.counterparty.phone, network: destination.counterparty.network,
+          amount: numericAmount, narration: narration || 'Developer API payout',
+        }));
+      } else {
+        ({ transaction } = await executeNcbaLipaNaMpesaPayout({
+          merchantId,
+          paymentType: destination.type === 'paybill' ? 'paybill' : 'till',
+          payBillTillNo: destination.type === 'paybill' ? destination.counterparty.paybillNumber : destination.counterparty.tillNumber,
+          accountReference: destination.counterparty.accountReference,
+          amount: numericAmount, narration: narration || 'Developer API payout',
+        }));
+      }
+
+      if (isAsyncRail) {
+        payment.linkedPayoutReference = transaction.reference;
+        await payment.save();
+        // Left 'pending' — no webhook yet. Fires from the async resolver above.
+      } else {
+        payment.status = 'success';
+        payment.linkedTransactionId = transaction._id;
+        await payment.save();
+        dispatchDeveloperEvent(developer._id, 'payment.payout.succeeded', { payment: publicPayment(payment) });
+      }
 
       logAudit({
         action: 'developer.payment.payout_executed', category: 'security', severity: 'critical',
-        message: `Live API payout of KES ${numericAmount} executed for merchant ${String(merchantId)}`,
+        message: `Live API payout of KES ${numericAmount} ${isAsyncRail ? 'submitted' : 'executed'} for merchant ${String(merchantId)}`,
         req, actor: { type: 'self', id: developer._id, email: developer.email, name: developer.name },
-        metadata: { merchantId: String(merchantId), amount: numericAmount, apiKeyId: String(req.apiKey._id) },
+        metadata: { merchantId: String(merchantId), amount: numericAmount, apiKeyId: String(req.apiKey._id), destinationType: destination.type },
       });
     } catch (err) {
       payment.status = 'failed';

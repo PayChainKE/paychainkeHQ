@@ -35,6 +35,7 @@ export default function Checkout() {
           { name: "description", type: "string", description: "Shown on the payment page under the amount (e.g. \"Order #4821\"). Max 200 characters." },
           { name: "callbackUrl", type: "string", description: "Must be https://. Where the customer's browser is redirected after a successful payment. If omitted, the page just shows a \"you may close this window\" success state." },
           { name: "customer", type: "object", description: "Optional { phone, email, name }. Phone prefills the payment page's input, but the customer can still change it before paying." },
+          { name: "expiresInMinutes", type: "number", description: "How long the link stays payable. Defaults to 30. Accepts up to 10080 (7 days): set this higher for a link you're sharing directly rather than redirecting a customer to mid-purchase. See Payment links below." },
         ]}
       />
 
@@ -114,8 +115,8 @@ session = res.json()['session']
       />
       <p>
         Redirect the customer's browser to <code>session.checkoutUrl</code>. A plain{" "}
-        <code>302</code> or a link click both work. Sessions expire 30 minutes after creation if
-        never paid.
+        <code>302</code> or a link click both work. Sessions expire 30 minutes after creation by
+        default if never paid. See <code>expiresInMinutes</code> above to change that.
       </p>
 
       <h2>What happens on the hosted page</h2>
@@ -142,6 +143,78 @@ session = res.json()['session']
   -H "Authorization: Bearer pc_live_..."`}
       />
       <p>Returns the same session object shown above with whatever <code>status</code> currently applies: <code>pending</code> (no attempt yet, or a previous one failed and it's awaiting retry), <code>processing</code> (STK push in flight), <code>success</code>, or <code>expired</code>.</p>
+
+      <h2>Payment links</h2>
+      <p>
+        A payment link, in the Paystack/Stripe sense, is a <code>checkoutUrl</code> you share
+        directly instead of one you redirect a customer through mid-purchase: dropped into a
+        WhatsApp message, an SMS, an email, or printed on an invoice, then paid whenever the
+        customer gets to it. There's no separate endpoint for this: it's the exact same{" "}
+        <code>POST /checkout</code> above, used two ways:
+      </p>
+      <ul>
+        <li>Skip <code>callbackUrl</code>: there's nothing to redirect back to for a link with no specific purchase flow behind it</li>
+        <li>Set <code>expiresInMinutes</code> to however long the link should stay valid: a day, a week, up to 10080 minutes (7 days)</li>
+      </ul>
+      <CodeGroup
+        tabs={[
+          {
+            id: "curl", label: "cURL", lang: "bash", code: `
+curl -X POST https://api.paychain.co.ke/api/v1/developer/checkout \\
+  -H "Authorization: Bearer pc_live_..." \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "amount": 2500,
+    "reference": "invoice-2026-0417",
+    "description": "Invoice #0417",
+    "expiresInMinutes": 10080
+  }'`,
+          },
+          {
+            id: "node", label: "Node.js", lang: "js", code: `
+const res = await fetch('https://api.paychain.co.ke/api/v1/developer/checkout', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer pc_live_...',
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    amount: 2500,
+    reference: 'invoice-2026-0417',
+    description: 'Invoice #0417',
+    expiresInMinutes: 10080, // 7 days
+  }),
+});
+
+const { session } = await res.json();
+// share session.checkoutUrl however makes sense: SMS, email, WhatsApp`,
+          },
+          {
+            id: "python", label: "Python", lang: "python", code: `
+import requests
+
+res = requests.post(
+    'https://api.paychain.co.ke/api/v1/developer/checkout',
+    headers={'Authorization': 'Bearer pc_live_...'},
+    json={
+        'amount': 2500,
+        'reference': 'invoice-2026-0417',
+        'description': 'Invoice #0417',
+        'expiresInMinutes': 10080,  # 7 days
+    },
+)
+
+session = res.json()['session']
+# share session['checkoutUrl'] however makes sense: SMS, email, WhatsApp`,
+          },
+        ]}
+      />
+      <Callout variant="tip" title="Same webhook, same status polling, same everything">
+        A payment link resolves through the identical <code>payment.collect.succeeded</code> /{" "}
+        <code>payment.collect.failed</code> webhook and <code>GET /checkout/:id</code> status poll
+        as a normal checkout session. If you're already handling one, you're already handling the
+        other.
+      </Callout>
     </>
   );
 }

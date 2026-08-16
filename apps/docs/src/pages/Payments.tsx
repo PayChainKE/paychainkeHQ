@@ -115,19 +115,35 @@ print(payment['status'])  # "pending"`,
       </p>
 
       <h2>Pay out</h2>
-      <p>Sends money from your linked merchant's wallet to a bank account.</p>
+      <p>
+        Sends money from your linked merchant's wallet to a bank account, an M-Pesa/Airtel Money
+        number, a Paybill, or a Till (Buy Goods): the same rails the merchant dashboard's own
+        "Send Money" already uses.
+      </p>
       <Endpoint method="POST" path="/payments/payout" auth="API key" />
 
       <ParamsTable
         params={[
           { name: "amount", type: "number", required: true, description: "Amount in KES." },
-          { name: "bankCode", type: "string", required: true, description: "Destination bank's code." },
-          { name: "accountNumber", type: "string", required: true, description: "Destination account number." },
-          { name: "accountName", type: "string", description: "Destination account holder name, for your own records." },
           { name: "narration", type: "string", description: "Shown on the receiving statement. Defaults to \"Developer API payout\"." },
           { name: "apiPayoutPin", type: "string", required: true, description: "Required in live mode only. The merchant sets this (and enables API payouts at all) from their PayChain dashboard, along with per-transaction and daily caps." },
         ]}
       />
+
+      <p>Plus exactly one destination, chosen by which of these fields you send:</p>
+      <ParamsTable
+        params={[
+          { name: "bankCode + accountNumber", type: "bank", description: "Bank transfer. accountName is optional, for your own records." },
+          { name: "phone", type: "mobile money", description: "M-Pesa or Airtel Money number. Optional mobileNetwork: \"safaricom\" (default) or \"airtel\"." },
+          { name: "paybillNumber + accountReference", type: "paybill", description: "accountReference is the account number/reference the biller expects. Required for a Paybill." },
+          { name: "tillNumber", type: "till", description: "Buy Goods till number. No account reference needed." },
+        ]}
+      />
+      <Callout variant="warning" title="Sending more than one destination is a 400, not a guess">
+        Sending, say, both <code>phone</code> and <code>tillNumber</code> on the same request
+        fails validation rather than silently picking one. Almost always a sign of a bug on the
+        caller's side worth surfacing, not resolving quietly.
+      </Callout>
 
       <CodeGroup
         tabs={[
@@ -192,11 +208,67 @@ payment = res.json()['payment']`,
         ]}
       />
 
-      <Callout variant="info" title="Live payouts resolve synchronously">
-        Unlike a collect, a live payout's outcome is known before the response is sent. You'll
-        get back <code>status: "success"</code> or a <code>402</code> with the failure reason
-        immediately, no need to wait for a webhook to know whether it worked (though one still fires).
+      <Callout variant="info" title="Bank payouts resolve synchronously: the other three don't">
+        A live bank payout's outcome is known before the response is sent: you'll get back{" "}
+        <code>status: "success"</code> or a <code>402</code> with the failure reason immediately.
+        Mobile money, Paybill, and Till only confirm PayChain <em>submitted</em> the payout in that
+        same response (<code>status: "pending"</code>). The actual outcome lands slightly later,
+        the same asynchronous way a collect does. Subscribe a{" "}
+        <a href="/webhooks">webhook</a> rather than assuming a 201 means the money arrived.
       </Callout>
+
+      <h3>Other destinations</h3>
+      <p className="text-[13.5px] text-ink-muted leading-6 mb-3">
+        Same endpoint, same headers as above. Only the body's destination fields change.
+      </p>
+      <CodeBlock
+        lang="bash"
+        label="Mobile money"
+        className="mb-3"
+        code={`curl -X POST https://api.paychain.co.ke/api/v1/developer/payments/payout \\
+  -H "Authorization: Bearer pc_live_..." \\
+  -H "Idempotency-Key: 7c2a91fe-...-1a05" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "amount": 3000,
+    "phone": "0712345678",
+    "mobileNetwork": "safaricom",
+    "narration": "Referral payout"
+  }'`}
+      />
+      <CodeBlock
+        lang="bash"
+        label="Paybill"
+        className="mb-3"
+        code={`curl -X POST https://api.paychain.co.ke/api/v1/developer/payments/payout \\
+  -H "Authorization: Bearer pc_live_..." \\
+  -H "Idempotency-Key: 9d1e04ab-...-77c2" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "amount": 8500,
+    "paybillNumber": "888999",
+    "accountReference": "INV-4821",
+    "narration": "Supplier invoice"
+  }'`}
+      />
+      <CodeBlock
+        lang="bash"
+        label="Till"
+        code={`curl -X POST https://api.paychain.co.ke/api/v1/developer/payments/payout \\
+  -H "Authorization: Bearer pc_live_..." \\
+  -H "Idempotency-Key: 4f6b3c2d-...-e910" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "amount": 1200,
+    "tillNumber": "654321",
+    "narration": "Vendor settlement"
+  }'`}
+      />
+      <p className="mt-4">
+        Same response shape as a bank payout either way. <code>counterparty</code> reflects
+        whichever destination you sent: <code>{`{ phone, network }`}</code>,{" "}
+        <code>{`{ paybillNumber, accountReference }`}</code>, or <code>{`{ tillNumber }`}</code>.
+      </p>
 
       <h2>Check a payment's status</h2>
       <Endpoint method="GET" path="/payments/:id" auth="API key" />
@@ -240,7 +312,7 @@ payment = res.json()['payment']`,
           { name: "status", type: "\"pending\" | \"success\" | \"failed\"", description: "" },
           { name: "failureReason", type: "string | null", description: "Human-readable, present only when status is \"failed\"." },
           { name: "reference", type: "string | null", description: "Whatever you passed at creation." },
-          { name: "counterparty", type: "object", description: "{ phone } for a collect, { bankCode, accountNumber, accountName } for a payout." },
+          { name: "counterparty", type: "object", description: "{ phone } for a collect. For a payout: { bankCode, accountNumber, accountName }, { phone, network }, { paybillNumber, accountReference }, or { tillNumber }, matching whichever destination you sent." },
         ]}
       />
     </>

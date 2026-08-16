@@ -3,6 +3,7 @@ import { highlight } from "@/lib/highlight";
 import { cn } from "@/lib/cn";
 import { useCodeLang, CodeLangId } from "@/context/CodeLangContext";
 import CopyButton from "./CopyButton";
+import TrafficLights from "./TrafficLights";
 
 export interface CodeGroupTab {
   id: CodeLangId;
@@ -25,6 +26,9 @@ export default function CodeGroup({ tabs, className }: { tabs: CodeGroupTab[]; c
     <div className={cn("rounded-xl border border-code-border bg-code-bg overflow-hidden", className)}>
       <div className="flex items-center justify-between border-b border-code-border-subtle bg-code-header/60 pr-3">
         <div className="flex items-center">
+          <div className="pl-4 pr-3">
+            <TrafficLights />
+          </div>
           {tabs.map((tab) => (
             <button
               key={tab.id}

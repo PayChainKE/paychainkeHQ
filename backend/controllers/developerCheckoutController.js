@@ -5,11 +5,15 @@ import { syncCheckoutSessionStatus } from '../services/checkoutSessionService.js
 // checkout.paystack.com) — no API key ever reaches it, only this session id.
 const CHECKOUT_BASE_URL = process.env.CHECKOUT_BASE_URL || 'https://checkout.paychain.co.ke';
 
-// Sessions aren't meant to sit open indefinitely — 30 minutes is generous
-// for a customer to land on the page, enter a phone number, and respond to
-// an STK prompt, without leaving a stale, still-payable link around for
-// hours after a developer generated it for one specific checkout.
-const SESSION_TTL_MS = 30 * 60 * 1000;
+// Default: 30 minutes is generous for a customer to land on the page, enter
+// a phone number, and respond to an STK prompt, without leaving a stale,
+// still-payable link around for hours after a developer generated it for
+// one specific checkout. A caller can widen this via expiresInMinutes for
+// the "payment link" use case — a link meant to be shared and paid
+// whenever, not a one-shot purchase-flow redirect — up to 7 days.
+const DEFAULT_SESSION_TTL_MINUTES = 30;
+const MIN_SESSION_TTL_MINUTES = 5;
+const MAX_SESSION_TTL_MINUTES = 7 * 24 * 60;
 
 function publicSession(session) {
   return {
@@ -40,13 +44,22 @@ export const createCheckoutSession = async (req, res) => {
       return res.status(400).json({ error: 'No merchant account linked. Complete /api/developer/link-merchant first.', code: 'NO_LINKED_MERCHANT' });
     }
 
-    const { amount, reference, description, callbackUrl, customer } = req.body || {};
+    const { amount, reference, description, callbackUrl, customer, expiresInMinutes } = req.body || {};
     const intAmount = Math.ceil(Number(amount));
     if (!Number.isFinite(intAmount) || intAmount <= 0) {
       return res.status(400).json({ error: 'A positive amount is required.' });
     }
     if (callbackUrl && !/^https:\/\//.test(String(callbackUrl))) {
       return res.status(400).json({ error: 'callbackUrl must be https://.' });
+    }
+
+    let ttlMinutes = DEFAULT_SESSION_TTL_MINUTES;
+    if (expiresInMinutes !== undefined) {
+      const n = Number(expiresInMinutes);
+      if (!Number.isFinite(n) || n < MIN_SESSION_TTL_MINUTES || n > MAX_SESSION_TTL_MINUTES) {
+        return res.status(400).json({ error: `expiresInMinutes must be between ${MIN_SESSION_TTL_MINUTES} and ${MAX_SESSION_TTL_MINUTES}.` });
+      }
+      ttlMinutes = n;
     }
 
     const session = await CheckoutSession.create({
@@ -63,7 +76,7 @@ export const createCheckoutSession = async (req, res) => {
         name: customer?.name || null,
       },
       callbackUrl: callbackUrl || null,
-      expiresAt: new Date(Date.now() + SESSION_TTL_MS),
+      expiresAt: new Date(Date.now() + ttlMinutes * 60 * 1000),
     });
 
     res.status(201).json({ success: true, session: publicSession(session) });

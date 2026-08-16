@@ -7,8 +7,15 @@ import {
   submitPesaLinkTransfer,
   submitRtgsTransfer,
   submitInternalNcbaTransfer,
+  validateMobileWalletNumber,
+  submitMobileB2wPayment,
+  validateLipaNaMpesaAccount,
+  submitLipaNaMpesaPayment,
   NcbaOpenBankingValidationError,
 } from '../services/ncbaOpenBankingService.js';
+import DeveloperPayment from '../models/DeveloperPayment.js';
+import { publicDeveloperPayment } from '../utils/developerPaymentView.js';
+import { dispatchDeveloperEvent } from '../services/webhookDeliveryService.js';
 
 // BeneficiaryBankBIC NCBA confirmed for itself (see kenyanBankCodes.js) — a
 // destination account under this code lives at NCBA, so it must go through
@@ -260,6 +267,137 @@ export async function executeNcbaBankPayout({
   });
 
   return { transaction, hostResponse, merchant: reservedMerchant, fee: transferFee };
+}
+
+/**
+ * Single-recipient payout to an M-Pesa/Airtel Money wallet via NCBA Mobile
+ * B2W. Same reservation/refund-on-failure shape as executeNcbaBankPayout
+ * above, extracted alongside it so the Developer API payout endpoint can
+ * reuse the exact NCBA calls bulkPayController.js's Personal Number branch
+ * already makes in production, rather than a second implementation of the
+ * same integration drifting out of sync with it.
+ *
+ * Unlike a bank payout, this rail is asynchronous — NCBA confirms receipt,
+ * not completion. The returned transaction is 'pending' and resolves later
+ * via resolvePendingOpenBankingTransaction below (the same webhook/sweep
+ * that already resolves every other async NCBA rail).
+ *
+ * Throws NcbaOpenBankingValidationError, InsufficientFundsError, or
+ * whatever ncbaOpenBankingService throws on a submission failure (after
+ * refunding the reservation).
+ */
+export async function executeNcbaMobileMoneyPayout({ merchantId, phone, network, amount, narration }) {
+  const numericAmount = Number(amount);
+  if (!phone || !Number.isFinite(numericAmount) || numericAmount <= 0) {
+    throw new NcbaOpenBankingValidationError('phone and a positive amount are required for a mobile money payout');
+  }
+  const resolvedNetwork = network === 'airtel' ? 'airtel' : 'safaricom';
+
+  const { totalFee } = getB2cTariff(numericAmount);
+  const totalDebit = Math.round((numericAmount + totalFee) * 100) / 100;
+
+  const reservedMerchant = await Merchant.findOneAndUpdate(
+    { _id: merchantId, kesBalance: { $gte: totalDebit } },
+    { $inc: { kesBalance: -totalDebit } },
+    { returnDocument: 'after' }
+  );
+  if (!reservedMerchant) {
+    const merchant = await Merchant.findById(merchantId);
+    throw new InsufficientFundsError(merchantId, totalDebit, merchant?.kesBalance ?? 0);
+  }
+
+  const transactionId = `PAYOUT-API-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  try {
+    const { validationId } = await validateMobileWalletNumber({ provider: resolvedNetwork, msisdn: phone });
+    await submitMobileB2wPayment({
+      transactionId, validationId, provider: resolvedNetwork, amount: numericAmount,
+      recipientNumber: phone, narration: narration || 'Developer API payout',
+    });
+  } catch (err) {
+    await Merchant.findByIdAndUpdate(merchantId, { $inc: { kesBalance: totalDebit } });
+    throw err;
+  }
+
+  const transaction = await Transaction.create({
+    merchantId,
+    accountNumber: reservedMerchant.ncbaMerchantCode || 'WALLET_FUND',
+    type: 'ncba_mobile_b2w',
+    amount: numericAmount,
+    kesAmount: numericAmount,
+    currency: 'KES',
+    // 'pending' — Mobile B2W confirms asynchronously, see doc comment above.
+    status: 'pending',
+    reference: transactionId,
+    sender: { name: reservedMerchant.businessName, id: process.env.NCBA_OPENBANKING_ACCOUNT_NUMBER || 'PAYCHAIN_NCBA_ACCOUNT' },
+    recipient: { name: null, id: phone },
+    mobileNetwork: resolvedNetwork,
+  });
+
+  return { transaction, merchant: reservedMerchant, fee: totalFee };
+}
+
+/**
+ * Single-recipient payout to a Paybill or Buy Goods (Till) number via NCBA's
+ * Lipa na M-Pesa Payment API. Same shape as executeNcbaMobileMoneyPayout
+ * above — reuses bulkPayController.js's existing Paybill/Till branch calls,
+ * async (resolves via resolvePendingOpenBankingTransaction), reservation +
+ * refund-on-failure.
+ *
+ * paymentType is only a starting guess — NCBA validates Till/Paybill against
+ * separate Safaricom registries and validateLipaNaMpesaAccount retries under
+ * the other type on rejection, so the transaction is recorded under
+ * whichever one actually resolved.
+ */
+export async function executeNcbaLipaNaMpesaPayout({ merchantId, paymentType, payBillTillNo, accountReference, amount, narration }) {
+  const numericAmount = Number(amount);
+  if (!payBillTillNo || !Number.isFinite(numericAmount) || numericAmount <= 0) {
+    throw new NcbaOpenBankingValidationError('payBillTillNo and a positive amount are required for a paybill/till payout');
+  }
+
+  const { totalFee } = getLipaNaMpesaTariff(numericAmount);
+  const totalDebit = Math.round((numericAmount + totalFee) * 100) / 100;
+
+  const reservedMerchant = await Merchant.findOneAndUpdate(
+    { _id: merchantId, kesBalance: { $gte: totalDebit } },
+    { $inc: { kesBalance: -totalDebit } },
+    { returnDocument: 'after' }
+  );
+  if (!reservedMerchant) {
+    const merchant = await Merchant.findById(merchantId);
+    throw new InsufficientFundsError(merchantId, totalDebit, merchant?.kesBalance ?? 0);
+  }
+
+  const transactionId = `PAYOUT-API-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  let resolvedDestination;
+  try {
+    resolvedDestination = await validateLipaNaMpesaAccount({ paymentType: paymentType === 'paybill' ? 'Paybill' : 'Till', payBillTillNo });
+    await submitLipaNaMpesaPayment({
+      transactionId, paymentType: resolvedDestination.paymentType, payBillTillNo, amount: numericAmount,
+      accountReference: resolvedDestination.paymentType === 'Paybill' ? accountReference : undefined,
+      recipientName: resolvedDestination.organizationName || null,
+      notifyMobileNumber: reservedMerchant.phone,
+      narration: narration || 'Developer API payout',
+    });
+  } catch (err) {
+    await Merchant.findByIdAndUpdate(merchantId, { $inc: { kesBalance: totalDebit } });
+    throw err;
+  }
+
+  const transaction = await Transaction.create({
+    merchantId,
+    accountNumber: reservedMerchant.ncbaMerchantCode || 'WALLET_FUND',
+    type: 'ncba_lipa_na_mpesa',
+    amount: numericAmount,
+    kesAmount: numericAmount,
+    currency: 'KES',
+    // 'pending' — Lipa na M-Pesa confirms asynchronously, see doc comment above.
+    status: 'pending',
+    reference: transactionId,
+    sender: { name: reservedMerchant.businessName, id: process.env.NCBA_OPENBANKING_ACCOUNT_NUMBER || 'PAYCHAIN_NCBA_ACCOUNT' },
+    recipient: { name: resolvedDestination.organizationName || null, id: payBillTillNo },
+  });
+
+  return { transaction, merchant: reservedMerchant, fee: totalFee, resolvedType: resolvedDestination.paymentType };
 }
 
 // @desc    List NCBA-recognized bank clearing codes, for the merchant
@@ -589,6 +727,32 @@ export async function resolvePendingOpenBankingTransaction({ reference, succeede
           });
         }
       }
+    }
+
+    // Developer API fan-out: if this transaction was initiated via POST
+    // /api/v1/developer/payments/payout for a mobile money/paybill/till
+    // destination (matched by linkedPayoutReference), sync its status and
+    // fire the matching payment.payout.* webhook — same generic pattern
+    // resolveStkOutcome (mpesaController.js) uses for collects, matched by
+    // linkedStkCheckoutId instead. No-ops for every transaction that isn't
+    // Developer-API-linked (the far more common case: dashboard payouts,
+    // bulk pay, bill payments).
+    const developerPayment = await DeveloperPayment.findOneAndUpdate(
+      { linkedPayoutReference: reference, status: 'pending' },
+      {
+        $set: {
+          status: succeeded ? 'success' : 'failed',
+          ...(succeeded ? {} : { failureReason: 'Payout failed.' }),
+        },
+      },
+      { returnDocument: 'after' }
+    );
+    if (developerPayment) {
+      dispatchDeveloperEvent(
+        developerPayment.developerId,
+        `payment.payout.${succeeded ? 'succeeded' : 'failed'}`,
+        { payment: publicDeveloperPayment(developerPayment) }
+      );
     }
 
     logEvent('info', 'ncba_openbanking_callback_processed', { reference, succeeded });
