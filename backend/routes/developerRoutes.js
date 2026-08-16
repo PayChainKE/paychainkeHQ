@@ -1,0 +1,34 @@
+import express from 'express';
+import rateLimit from 'express-rate-limit';
+import { protectDeveloper } from '../middleware/authMiddleware.js';
+import { logoutDeveloper } from '../controllers/developerAuthController.js';
+import {
+  getMe,
+  listApiKeys,
+  createApiKey,
+  revokeApiKey,
+  requestLiveAccess,
+} from '../controllers/developerController.js';
+
+const router = express.Router();
+
+// Key creation/revocation are credential-issuing actions — same throttle
+// shape as the PIN/password-change limiters elsewhere in this app.
+const apiKeyActionLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many API key actions. Try again in 15 minutes.' },
+});
+
+router.get('/me', protectDeveloper, getMe);
+router.post('/logout', protectDeveloper, logoutDeveloper);
+
+router.get('/api-keys', protectDeveloper, listApiKeys);
+router.post('/api-keys', protectDeveloper, apiKeyActionLimiter, createApiKey);
+router.patch('/api-keys/:id/revoke', protectDeveloper, apiKeyActionLimiter, revokeApiKey);
+
+router.post('/live-access/request', protectDeveloper, requestLiveAccess);
+
+export default router;

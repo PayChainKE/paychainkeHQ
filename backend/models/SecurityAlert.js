@@ -7,7 +7,7 @@ import mongoose from 'mongoose';
 const SecurityAlertSchema = new mongoose.Schema({
   type: {
     type: String,
-    enum: ['otp_lockout', 'pin_lockout', 'large_transaction', 'new_admin_account', 'new_officer_account'],
+    enum: ['otp_lockout', 'pin_lockout', 'large_transaction', 'new_admin_account', 'new_officer_account', 'developer_live_access_requested'],
     required: true,
     index: true,
   },

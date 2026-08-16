@@ -38,6 +38,11 @@ import {
 } from '../controllers/securityAlertController.js';
 import { getSentryOverview } from '../controllers/sentryMonitoringController.js';
 import {
+  listDevelopers,
+  approveLiveAccess,
+  rejectLiveAccess,
+} from '../controllers/developerAdminController.js';
+import {
   listTeam,
   inviteTeamMember,
   updateTeamMember,
@@ -187,6 +192,13 @@ router.patch('/security-alerts/:id/acknowledge', protect, requireMutator, acknow
 // Sentry error-monitoring proxy — see sentryMonitoringController.js for why
 // this isn't called directly from the browser.
 router.get('/monitoring/sentry', protect, excludeOfficer, getSentryOverview);
+
+// Developer API account review — self-serve signup gets sandbox/test keys
+// instantly; live (real-money) keys need an admin to approve the account
+// first, same shape as merchant KYB. See developerAdminController.js.
+router.get('/developers', protect, excludeOfficer, listDevelopers);
+router.patch('/developers/:id/approve-live', protect, requireMutator, approveLiveAccess);
+router.patch('/developers/:id/reject-live', protect, requireMutator, rejectLiveAccess);
 
 // Admin → merchant SMS broadcasts (system maintenance notices, public
 // holiday greetings, security reminders, etc). Sending is rate-limited with
