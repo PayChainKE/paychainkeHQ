@@ -86,7 +86,14 @@ export function buildPaymentRequestSms({ businessName, baseAmount, fee }) {
     {
       fixed: {
         amt: baseAmount.toLocaleString(),
-        feeLine: showFee ? ` Includes a KES ${fee.toLocaleString()} transaction fee.` : '',
+        // Deliberately no fee figure here — a specific KES amount reads as
+        // a surprise/hidden cost even though it's small, whereas "small
+        // transaction fee" sets the same honest expectation (the total
+        // below is still exact) without drawing attention to the number
+        // itself. The exact fee is still shown in full wherever the
+        // merchant/customer is looking at a screen, not just an SMS —
+        // see checkout-preview in transactionController.js.
+        feeLine: showFee ? ' Includes a small transaction fee.' : '',
         total: total.toLocaleString(),
       },
       truncatable: [{ key: 'name', value: businessName || 'A PayChain business', minLength: 6 }],
