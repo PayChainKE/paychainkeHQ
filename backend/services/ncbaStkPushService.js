@@ -11,7 +11,31 @@ import axios from 'axios';
 const ncbaStkBaseUrl = (process.env.NCBA_STK_BASE_URL || 'https://c2bapis.ncbagroup.com').replace(/\/$/, '');
 const ncbaStkUsername = process.env.NCBA_STK_USERNAME || process.env.NCBA_OPENBANKING_USER_ID;
 const ncbaStkPassword = process.env.NCBA_STK_PASSWORD || process.env.NCBA_OPENBANKING_PASSWORD;
-export const NCBA_STK_PAYBILL = process.env.NCBA_STK_PAYBILL || '889066';
+// PayChain's own NCBA Till — the correct value for the QR "till" field
+// below (dynamic QR generation), but NOT for STK Push's PayBillNo (see
+// NCBA_STK_BUSINESS_NUMBER doc comment — sending this as PayBillNo is
+// exactly what produced NCBA's "shortcode not set for stk push 889066").
+export const NCBA_STK_TILL = process.env.NCBA_STK_PAYBILL || '889066';
+
+// The shared NCBA M-Pesa Paybill STK Push actually settles through — the
+// SAME 880100 shown throughout the app for manual wallet top-ups (see
+// FundAccountModal.jsx's PAYBILL_BUSINESS_NUMBER: "Enter 880100 as the
+// business number, [merchant's NCBA virtual account] as the account
+// number"). Confirmed twice: NCBA's own STK/QR spec's BACKGROUND section
+// says Till STK customers operate "via Paybill 880100", and Rose Soy
+// re-confirmed it directly (2026-08-17) after live STK pushes started
+// failing with "shortcode not set for stk push 889066" — that error was
+// NCBA rejecting 889066 as a top-level PayBillNo, because 889066 is
+// PayChain's own Till (a sub-account under 880100), not a standalone
+// shortcode. AccountNo in initiateStkPush below deliberately stays the
+// merchant's own NCBA virtual account number, NOT 889066 — that's the
+// same pairing (880100 + merchant account) already proven live by the
+// manual top-up flow, and it's what NCBA's account-notification webhook
+// regex-matches back to a specific merchant (extractMerchantCode in
+// utils/ncbaAccountNotificationValidators.js) — hardcoding AccountNo to
+// PayChain's own Till instead would collapse every merchant's collections
+// onto one indistinguishable code and break that attribution.
+export const NCBA_STK_BUSINESS_NUMBER = process.env.NCBA_STK_BUSINESS_NUMBER || '880100';
 // NCBA's STK/QR spec doc never mentions a subscription key, unlike Open
 // Banking (which requires an Ocp-Apim-Subscription-Key header — see
 // ncbaOpenBankingService.js — on every call, not just token generation).
@@ -171,9 +195,9 @@ async function ncbaStkPost(path, body, { retrying = false } = {}) {
 }
 
 /**
- * Sends an STK Push prompt to a customer's phone via PayChain's NCBA Till
- * short code (NCBA_STK_PAYBILL — NCBA's STK API still names this field
- * PayBillNo even though it's a Till). A response with TransactionID === null
+ * Sends an STK Push prompt to a customer's phone via NCBA's shared Paybill
+ * 880100 (NCBA_STK_BUSINESS_NUMBER), the same one PayChain merchants are
+ * already told to use for manual M-Pesa top-ups. A response with TransactionID === null
  * means NCBA rejected the push outright (e.g. bad number) — throws
  * immediately, same as Daraja's ResponseCode !== '0' check. A non-null
  * TransactionID means the prompt was sent; the actual pay/cancel outcome
@@ -202,7 +226,7 @@ export async function initiateStkPush({ phone, amount, accountNo }) {
   const result = await ncbaStkPost('/payments/api/v1/stk-push/initiate', {
     TelephoneNo: phone,
     Amount: String(amount),
-    PayBillNo: NCBA_STK_PAYBILL,
+    PayBillNo: NCBA_STK_BUSINESS_NUMBER,
     AccountNo: accountNo,
     Network: 'Safaricom',
     TransactionType: 'CustomerPayBillOnline',
@@ -251,7 +275,7 @@ export async function generateQrCode({ amount, narration }) {
     return { qrCodeDataUri: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=' };
   }
 
-  const body = { till: `${NCBA_STK_PAYBILL}#${narration}` };
+  const body = { till: `${NCBA_STK_TILL}#${narration}` };
   if (hasAmount) body.amount = Number(amount);
   const result = await ncbaStkPost('/payments/api/v1/qr/generate', body);
 
