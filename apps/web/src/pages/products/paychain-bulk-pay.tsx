@@ -7,10 +7,10 @@ import Breadcrumbs from '@/components/Breadcrumbs';
 
 const features = [
   { title: 'Batch Payroll', icon: Users, desc: 'Upload staff list via CSV or build on dashboard. Run payroll for your entire team in one click with individual M-PESA confirmations sent automatically.' },
-  { title: 'Supplier Payments', icon: Package, desc: 'Save supplier details once. Pay them all simultaneously when invoices are due. No manual transfers, no errors, no delays.' },
+  { title: 'Supplier Payments', icon: Package, desc: 'Save supplier details once — bank account, mobile money, Paybill, or Till. Pay them all simultaneously when invoices are due. No manual transfers, no errors, no delays.' },
   { title: 'Utility Bill Settlement', icon: Zap, desc: 'Connect recurring utility accounts and settle electricity, water, and internet from one dashboard. Never miss a bill again.' },
   { title: 'Scheduled & Recurring Payments', icon: Calendar, desc: 'Set payments to run automatically — weekly wages, monthly rent, recurring orders. PayChain executes on time, every time.' },
-  { title: 'Full Audit Trail', icon: FileText, desc: 'Every payment logged with amount, recipient, timestamp, and reference. Download full reports for accounting and KRA e-TIMS compliance.' },
+  { title: 'Full Audit Trail', icon: FileText, desc: 'Every payment logged with amount, recipient, timestamp, and reference. Download full reports for accounting and KRA eTIMS compliance.' },
   { title: 'Payment Approval Workflow', icon: CheckCircle, desc: 'Require a second sign-off before large payments are released. Protect your business from unauthorized transfers.' },
 ];
 

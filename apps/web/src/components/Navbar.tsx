@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, LayoutDashboard, FileCode, GitBranch, Menu, X, ChevronRight, Copyright, ChevronDown, ShoppingBag, ShoppingCart, HelpCircle, Mail, BookOpen } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Home, Users, Menu, X, ChevronRight, Copyright, ChevronDown, ShoppingCart, HelpCircle, Mail, BookOpen, Code2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NavbarProps {
@@ -13,6 +14,14 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
   const [isAvatarDropdownOpen, setIsAvatarDropdownOpen] = useState(false);
   const [isResourcesDropdownOpen, setIsResourcesDropdownOpen] = useState(false);
   const [isMobileResourcesDropdownOpen, setIsMobileResourcesDropdownOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const wasMobileMenuOpenRef = useRef(false);
+
+  const closeMobileMenu = () => {
+    setIsMobileMenuOpen(false);
+    setIsMobileResourcesDropdownOpen(false);
+  };
 
   // Prevent body scroll when mobile menu is open
   useEffect(() => {
@@ -25,6 +34,42 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
     return () => {
       document.body.style.overflow = 'unset';
     };
+  }, [isMobileMenuOpen]);
+
+  // Focus trap + Escape-to-close + return focus to the hamburger button on
+  // close — a slide-out drawer is a modal surface, so it needs the same
+  // keyboard behavior any dialog does, not just a click-outside handler.
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      const focusable = drawerRef.current?.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      focusable?.[0]?.focus();
+
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          closeMobileMenu();
+          return;
+        }
+        if (e.key !== 'Tab' || !focusable || focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      };
+
+      document.addEventListener('keydown', handleKeyDown);
+      wasMobileMenuOpenRef.current = true;
+      return () => document.removeEventListener('keydown', handleKeyDown);
+    } else if (wasMobileMenuOpenRef.current) {
+      wasMobileMenuOpenRef.current = false;
+      menuButtonRef.current?.focus();
+    }
   }, [isMobileMenuOpen]);
 
   // Close avatar dropdown when clicking outside
@@ -46,7 +91,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
 
   const navItems = [
     { path: '/', label: 'Home', icon: Home },
-    { path: '/about', label: 'Who We Are', icon: FileCode },
+    { path: '/about', label: 'Who We Are', icon: Users },
     {
       path: '/products',
       label: 'Products',
@@ -76,14 +121,12 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
             <div className="flex items-center gap-4">
               {/* Mobile Menu Button */}
               <button
+                ref={menuButtonRef}
                 className="md:hidden p-2 text-black font-bold transition-colors duration-200"
-                onClick={() => {
-                  setIsMobileMenuOpen(!isMobileMenuOpen);
-                  if (isMobileMenuOpen) {
-                    setIsMobileResourcesDropdownOpen(false);
-                  }
-                }}
-                aria-label="Toggle mobile menu"
+                onClick={() => (isMobileMenuOpen ? closeMobileMenu() : setIsMobileMenuOpen(true))}
+                aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
+                aria-expanded={isMobileMenuOpen}
+                aria-controls="mobile-nav-drawer"
               >
                 {isMobileMenuOpen ? <X className="w-6 h-6 font-bold" /> : <Menu className="w-6 h-6 font-bold" />}
               </button>
@@ -161,14 +204,13 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
                 );
               })}
 
-              <a
-                href="https://developer.paychain.co.ke"
-                target="_blank"
-                rel="noopener noreferrer"
+              <Link
+                to="/docs"
                 className="flex items-center gap-2 px-3 py-2 text-sm font-bold text-gray-700 hover:text-gray-900 transition-all duration-200"
               >
                 Developers
-              </a>
+                <span className="text-[9px] font-bold uppercase tracking-wider text-[#00bf63] border border-[#00bf63]/30 rounded-full px-2 py-0.5">Soon</span>
+              </Link>
 
               <Link
                 to="/book-demo"
@@ -261,138 +303,177 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
         </div>
       </nav>
 
-      {/* Mobile Menu Overlay */}
-      <div
-        className={cn(
-          "fixed inset-0 z-40 md:hidden transition-all duration-300 ease-in-out",
-          isMobileMenuOpen ? "opacity-100 visible" : "opacity-0 invisible"
-        )}
-        onClick={() => {
-          setIsMobileMenuOpen(false);
-          setIsMobileResourcesDropdownOpen(false);
-        }}
-      >
-        {/* Backdrop */}
-        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+      {/* Mobile Menu — backdrop + slide-out drawer */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <React.Fragment key="mobile-nav">
+            <motion.div
+              className="fixed inset-0 z-40 md:hidden bg-black/60 backdrop-blur-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={closeMobileMenu}
+              aria-hidden="true"
+            />
 
-        {/* Slide-out Menu */}
-        <div
-          className={cn(
-            "absolute top-0 left-0 h-full w-80 max-w-[85vw] bg-white shadow-2xl transform transition-transform duration-300 ease-in-out z-[60]",
-            isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
-          )}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between p-6">
-            <div className={cn(
-              "flex items-center gap-3 transition-all duration-300",
-              isMobileMenuOpen ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2"
-            )}>
-            </div>
-            <button
-              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors duration-200"
-              onClick={() => setIsMobileMenuOpen(false)}
-              aria-label="Close menu"
+            <motion.div
+              id="mobile-nav-drawer"
+              ref={drawerRef}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Site navigation"
+              className="fixed top-0 left-0 z-50 md:hidden h-full w-[85%] max-w-sm bg-white shadow-2xl flex flex-col"
+              initial={{ x: '-100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '-100%' }}
+              transition={{ type: 'spring', damping: 32, stiffness: 320 }}
             >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* Navigation Links */}
-          <div className="pl-[0.4cm] pr-4 py-8 pb-20">
-            <div className="space-y-2">
-              {navItems.map((item, index) => {
-                const isActive = location.pathname === item.path;
-                
-                if (item.hasDropdown) {
-                  return (
-                    <div key={item.path} className="space-y-2 mt-6 mb-4">
-                      <div className="px-1 mb-2">
-                        <span className="font-bold text-xs text-gray-400 uppercase tracking-widest">{item.label}</span>
-                      </div>
-                      <div className="space-y-2">
-                        {item.dropdownItems?.map((dropdownItem, dropdownIndex) => (
-                          <Link
-                            key={dropdownItem.path}
-                            to={dropdownItem.path}
-                            className={cn(
-                              "flex items-center py-2 px-2 transition-all duration-200 text-sm font-bold",
-                              "text-gray-600 hover:text-primary",
-                              dropdownItem.label === 'Contact Support' && "bg-gray-100 px-3 rounded-lg"
-                            )}
-                            onClick={() => {
-                              setIsMobileMenuOpen(false);
-                            }}
-                            style={{
-                              animationDelay: `${(index * 50) + (dropdownIndex * 30)}ms`,
-                              animation: isMobileMenuOpen ? 'slideInFromRight 0.3s ease-out forwards' : 'none'
-                            }}
-                          >
-                            <span>{dropdownItem.label}</span>
-                          </Link>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                }
-                
-                return (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    className={cn(
-                      "flex items-center justify-between w-full py-3 transition-all duration-200 group",
-                      isActive
-                        ? "text-primary"
-                        : "text-gray-700 hover:text-gray-900"
-                    )}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    style={{
-                      animationDelay: `${index * 50}ms`,
-                      animation: isMobileMenuOpen ? 'slideInFromRight 0.3s ease-out forwards' : 'none'
-                    }}
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <div className="flex items-center">
-                        <span className="font-bold text-lg">{item.label}</span>
-                      </div>
-                    </div>
-                  </Link>
-                );
-              })}
-
-              <a
-                href="https://developer.paychain.co.ke"
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="flex items-center w-full py-3 text-gray-700 hover:text-gray-900 transition-all duration-200"
-              >
-                <span className="font-bold text-lg">Developers</span>
-              </a>
-            </div>
-
-            <div className="mt-8">
-              <Link
-                to="/book-demo"
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="flex items-center justify-center w-full px-4 py-3 text-sm font-bold text-white bg-[#00bf63] hover:bg-[#00a857] rounded-lg transition-colors shadow-sm"
-              >
-                Book a Demo
-              </Link>
-            </div>
-
-            {/* Footer */}
-            <div className="absolute bottom-0 left-0 right-0 bg-gray-900 text-white p-4 border-t border-gray-700">
-              <div className="flex items-center justify-center gap-2 text-xs">
-                <Copyright className="w-3 h-3" />
-                <span style={{ color: '#00bf63', fontWeight: 700, fontSize: '16px' }}>2026 PaychainKE</span>
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 h-16 border-b border-gray-100 shrink-0">
+                <Link to="/" onClick={closeMobileMenu} className="flex items-center gap-2">
+                  <img src="/Home page/paychain official logo.png" alt="PayChain KE" className="h-6 w-auto mix-blend-multiply" />
+                </Link>
+                <button
+                  className="p-2 -mr-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-colors duration-200"
+                  onClick={closeMobileMenu}
+                  aria-label="Close menu"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
-            </div>
-          </div>
-        </div>
-      </div>
+
+              {/* Scrollable nav content */}
+              <div className="flex-1 overflow-y-auto px-3 py-3">
+                <div className="space-y-1">
+                  {navItems.map((item, index) => {
+                    const isActive = location.pathname === item.path;
+                    const Icon = item.icon;
+
+                    if (item.hasDropdown) {
+                      return (
+                        <div key={item.path}>
+                          <button
+                            onClick={() => setIsMobileResourcesDropdownOpen((v) => !v)}
+                            aria-expanded={isMobileResourcesDropdownOpen}
+                            className="flex items-center justify-between w-full px-3 py-3 rounded-xl text-gray-800 hover:bg-gray-50 transition-colors"
+                          >
+                            <span className="flex items-center gap-3">
+                              <Icon className="w-[18px] h-[18px] text-gray-400" />
+                              <span className="font-semibold text-[15px]">{item.label}</span>
+                            </span>
+                            <ChevronDown
+                              className={cn(
+                                "w-4 h-4 text-gray-400 transition-transform duration-200",
+                                isMobileResourcesDropdownOpen && "rotate-180"
+                              )}
+                            />
+                          </button>
+                          <AnimatePresence initial={false}>
+                            {isMobileResourcesDropdownOpen && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.2, ease: 'easeInOut' }}
+                                className="overflow-hidden"
+                              >
+                                <div className="pl-[42px] pr-2 pb-1 space-y-0.5">
+                                  {item.dropdownItems?.map((dropdownItem) => (
+                                    <Link
+                                      key={dropdownItem.path}
+                                      to={dropdownItem.path}
+                                      onClick={closeMobileMenu}
+                                      className="flex items-start gap-2.5 py-2.5 px-2 rounded-lg hover:bg-gray-50 transition-colors group"
+                                    >
+                                      <span className="text-base leading-none mt-0.5">{dropdownItem.emoji}</span>
+                                      <span>
+                                        <span className="block text-sm font-semibold text-gray-800 group-hover:text-[#00351d]">
+                                          {dropdownItem.label}
+                                        </span>
+                                        {dropdownItem.description && (
+                                          <span className="block text-xs text-gray-500 mt-0.5 leading-snug">
+                                            {dropdownItem.description}
+                                          </span>
+                                        )}
+                                      </span>
+                                    </Link>
+                                  ))}
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <Link
+                        key={item.path}
+                        to={item.path}
+                        onClick={closeMobileMenu}
+                        className={cn(
+                          "flex items-center justify-between gap-3 px-3 py-3 rounded-xl transition-colors",
+                          isActive ? "bg-[#EAFBF1] text-[#00351d]" : "text-gray-800 hover:bg-gray-50"
+                        )}
+                      >
+                        <span className="flex items-center gap-3">
+                          <Icon className={cn("w-[18px] h-[18px]", isActive ? "text-[#00bf63]" : "text-gray-400")} />
+                          <span className="font-semibold text-[15px]">{item.label}</span>
+                        </span>
+                        <ChevronRight className="w-4 h-4 text-gray-300" />
+                      </Link>
+                    );
+                  })}
+                </div>
+
+                <div className="my-3 border-t border-gray-100" />
+
+                {/* Developer API isn't publicly self-serve yet — links to
+                    the on-site "coming soon" page (pages/Docs.tsx), not the
+                    live docs app, so this doesn't say one thing here and
+                    another in the footer/desktop nav. */}
+                <Link
+                  to="/docs"
+                  onClick={closeMobileMenu}
+                  className="flex items-center justify-between gap-3 px-3 py-3 rounded-xl text-gray-800 hover:bg-gray-50 transition-colors"
+                >
+                  <span className="flex items-center gap-3">
+                    <Code2 className="w-[18px] h-[18px] text-gray-400" />
+                    <span className="font-semibold text-[15px]">Developer API</span>
+                  </span>
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-[#00bf63] border border-[#00bf63]/30 rounded-full px-2 py-0.5">Coming Soon</span>
+                </Link>
+              </div>
+
+              {/* CTAs + footer — pinned to the bottom, always reachable
+                  regardless of how tall the scrollable content above gets. */}
+              <div className="shrink-0 border-t border-gray-100 px-4 pt-4 pb-5 bg-[#FAFDFC]">
+                <div className="space-y-2">
+                  <Link
+                    to="/book-demo"
+                    onClick={closeMobileMenu}
+                    className="flex items-center justify-center w-full px-4 py-3 text-sm font-bold text-white bg-[#00bf63] hover:bg-[#00a857] rounded-xl transition-colors shadow-sm"
+                  >
+                    Book a Demo
+                  </Link>
+                  <a
+                    href="https://app.paychain.co.ke"
+                    onClick={closeMobileMenu}
+                    className="flex items-center justify-center w-full px-4 py-3 text-sm font-bold text-[#00351d] bg-white border border-[#00351d]/15 hover:bg-[#00351d]/5 rounded-xl transition-colors"
+                  >
+                    Sign Up Free
+                  </a>
+                </div>
+                <div className="flex items-center justify-center gap-1.5 text-[11px] text-gray-400 mt-4">
+                  <Copyright className="w-3 h-3" />
+                  <span>2026 PayChain KE</span>
+                </div>
+              </div>
+            </motion.div>
+          </React.Fragment>
+        )}
+      </AnimatePresence>
     </>
   );
 };

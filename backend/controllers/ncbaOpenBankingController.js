@@ -293,6 +293,13 @@ export async function executeNcbaMobileMoneyPayout({ merchantId, phone, network,
   }
   const resolvedNetwork = network === 'airtel' ? 'airtel' : 'safaricom';
 
+  // Fail fast on a number NCBA doesn't recognize as a real wallet before
+  // ever reserving/debiting the merchant's balance — same ordering as
+  // initiateB2C (controllers/mpesaController.js). Previously this validated
+  // only after the reservation, so an invalid destination still cost a
+  // debit-then-refund round trip for no reason.
+  const { validationId } = await validateMobileWalletNumber({ provider: resolvedNetwork, msisdn: phone });
+
   const { totalFee } = getB2cTariff(numericAmount);
   const totalDebit = Math.round((numericAmount + totalFee) * 100) / 100;
 
@@ -308,7 +315,6 @@ export async function executeNcbaMobileMoneyPayout({ merchantId, phone, network,
 
   const transactionId = `PAYOUT-API-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
   try {
-    const { validationId } = await validateMobileWalletNumber({ provider: resolvedNetwork, msisdn: phone });
     await submitMobileB2wPayment({
       transactionId, validationId, provider: resolvedNetwork, amount: numericAmount,
       recipientNumber: phone, narration: narration || 'Developer API payout',

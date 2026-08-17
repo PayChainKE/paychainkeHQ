@@ -212,8 +212,8 @@ const TermsOfService: React.FC = () => {
                   <li>(a) The PAY service enables Merchants to execute bulk payments to employees, suppliers, and counterparties via the M-PESA B2C gateway.</li>
                   <li>(b) Once a payment instruction is confirmed by you on the Platform, it is irrevocable. You are solely responsible for verifying recipient details before confirming any Transaction.</li>
                   <li>(c) PayChain shall not be liable for payments sent to incorrect recipients due to errors in information provided by you.</li>
-                  <li>(d) Transaction processing times are subject to Safaricom network conditions and may vary.</li>
-                  <li>(e) Bulk payment limits are subject to the Central Bank of Kenya regulations and Safaricom's B2C limits in force from time to time.</li>
+                  <li>(d) Transaction processing times are subject to the conditions of our banking partner NCBA and the underlying mobile money network, and may vary.</li>
+                  <li>(e) Bulk payment limits are subject to the Central Bank of Kenya regulations and our banking partner NCBA's payout limits in force from time to time.</li>
                 </ul>
 
                 <h3 className="text-lg mt-6 mb-2">3.3 PROTECT — Inflation Shield (KES to USDC)</h3>
@@ -304,10 +304,10 @@ const TermsOfService: React.FC = () => {
                 <h2 className="text-2xl mb-4">8. Disclaimers and Limitation of Liability</h2>
                 <div className="not-prose rounded-xl border border-gray-200 bg-gray-50 p-5 my-4 space-y-3 text-sm text-gray-600 leading-relaxed">
                   <p><strong className="text-gray-800">8.1 AS-IS BASIS:</strong> THE PLATFORM IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, OR NON-INFRINGEMENT, TO THE FULLEST EXTENT PERMITTED BY KENYAN LAW.</p>
-                  <p><strong className="text-gray-800">8.2 SERVICE AVAILABILITY:</strong> We do not guarantee that the Platform will be available at all times. Planned and unplanned maintenance, third-party outages (including Safaricom M-PESA downtime), and force majeure events may result in service interruptions.</p>
+                  <p><strong className="text-gray-800">8.2 SERVICE AVAILABILITY:</strong> We do not guarantee that the Platform will be available at all times. Planned and unplanned maintenance, third-party outages (including our banking partner NCBA's systems or M-PESA network downtime), and force majeure events may result in service interruptions.</p>
                   <p><strong className="text-gray-800">8.3 LIMITATION OF LIABILITY:</strong> TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE COMPANY'S TOTAL LIABILITY TO YOU FOR ANY CLAIM ARISING OUT OF OR IN CONNECTION WITH THESE TERMS OR THE SERVICES SHALL NOT EXCEED THE TOTAL FEES PAID BY YOU TO THE COMPANY IN THE THREE (3) MONTHS PRECEDING THE CLAIM.</p>
                   <p><strong className="text-gray-800">8.4 EXCLUDED DAMAGES:</strong> IN NO EVENT SHALL THE COMPANY BE LIABLE FOR ANY INDIRECT, INCIDENTAL, CONSEQUENTIAL, SPECIAL, OR PUNITIVE DAMAGES, INCLUDING LOSS OF PROFIT, LOSS OF REVENUE, LOSS OF DATA, OR LOSS OF GOODWILL, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.</p>
-                  <p><strong className="text-gray-800">8.5 THIRD-PARTY SERVICES:</strong> The Company is not responsible for the availability, terms, or conduct of third-party services integrated with the Platform, including Safaricom M-PESA, Circle (USDC), blockchain networks, or lending partners.</p>
+                  <p><strong className="text-gray-800">8.5 THIRD-PARTY SERVICES:</strong> The Company is not responsible for the availability, terms, or conduct of third-party services integrated with the Platform, including our banking partner NCBA, the M-PESA network, Circle (USDC), blockchain networks, or lending partners.</p>
                 </div>
               </section>
 
