@@ -45,6 +45,7 @@ import {
   approveLiveAccess,
   rejectLiveAccess,
   getDeveloperWebhooks,
+  runIntegrationTest,
 } from '../controllers/developerAdminController.js';
 import {
   listTeam,
@@ -212,6 +213,11 @@ router.get('/developers', protect, excludeOfficer, listDevelopers);
 router.get('/developers/:id/webhooks', protect, excludeOfficer, getDeveloperWebhooks);
 router.patch('/developers/:id/approve-live', protect, requireMutator, approveLiveAccess);
 router.patch('/developers/:id/reject-live', protect, requireMutator, rejectLiveAccess);
+
+// Runs a live check of a developer's integration (simulated test-mode
+// collect + a real ping of every registered webhook) — lets an admin verify
+// everything actually works before approving a live-access request.
+router.post('/developers/:id/run-integration-test', protect, requireMutator, sensitiveActionLimiter, runIntegrationTest);
 
 // Admin → merchant SMS broadcasts (system maintenance notices, public
 // holiday greetings, security reminders, etc). Sending is rate-limited with
