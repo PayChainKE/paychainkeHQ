@@ -716,7 +716,7 @@ export const processPaymentLink = async (req, res) => {
       ? getInvoiceCheckoutTotal(link.amount)
       : getCheckoutTotal(link.amount);
 
-    // Real STK Push via NCBA's Till short code 889066 (or simulated — see
+    // Real STK Push via NCBA's shared Paybill 880100 (or simulated — see
     // services/ncbaStkPushService.js's NCBA_STK_LIVE_ENABLED gate).
     const checkoutRequestId = await initiateAndTrackNcbaStk({
       merchantId: link.merchantId._id,
@@ -821,7 +821,7 @@ export const payToMerchantAccount = async (req, res) => {
 
     const checkoutTotal = getCheckoutTotal(amount);
 
-    // Real STK Push via NCBA's Till short code 889066 (or simulated — see
+    // Real STK Push via NCBA's shared Paybill 880100 (or simulated — see
     // services/ncbaStkPushService.js's NCBA_STK_LIVE_ENABLED gate).
     const checkoutRequestId = await initiateAndTrackNcbaStk({
       merchantId: merchant._id,
