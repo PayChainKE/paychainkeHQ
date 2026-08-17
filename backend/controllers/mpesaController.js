@@ -456,11 +456,24 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
             message: `KES ${merchantCredit.toLocaleString()} was added to your balance via M-PESA.`,
           });
 
-          // 'topup' — the merchant funding their own wallet, no separate
-          // "customer" to name — keeps a plain wallet-top-up message.
-          // 'request_money' / 'pay_account' — a real customer paid, so this
-          // uses the same professional "payment received" format as every
-          // other collection rail.
+          // Self-funding — the merchant paying into their own wallet —
+          // isn't only kind==='topup' (the dedicated Fund Account modal).
+          // It also happens through the open "Pay Account"/Settlement QR
+          // link (kind==='pay_account') whenever the merchant uses their
+          // own link/QR to top up, and through Request Money if a merchant
+          // tests their own request-money prompt (kind==='request_money').
+          // Neither of those carries a distinct kind, so the only reliable
+          // signal is the payer's number matching the merchant's own — this
+          // used to be assumed equivalent to kind==='topup' (see the SMS
+          // skip below), which isn't true for the QR/link case, and
+          // produced a "you have received a payment from [your own number]"
+          // SMS for what was really just a deposit.
+          const isSelfFunding = kind === 'topup' || (merchant.phone && stkReq.phone && merchant.phone === stkReq.phone);
+
+          // Self-funding — no separate "customer" to name — keeps a plain
+          // wallet-top-up/deposit message. A real customer paying uses the
+          // same professional "payment received" format as every other
+          // collection rail.
           // Staggered (see sendStaggeredSms's doc comment in
           // utils/smsSanitizer.js — also covers why "same recipient" cases,
           // like a merchant testing their own request-money link, need this
@@ -474,8 +487,8 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
           if (merchant.phone) {
             topupSends.push({
               to: merchant.phone,
-              message: kind === 'topup'
-                ? `${receipt} Confirmed. KES ${merchantCredit.toLocaleString()} added to your PayChain wallet via M-PESA on ${date} at ${time}. Your updated available balance is KES ${(updatedMerchant.kesBalance || 0).toLocaleString()}.`
+              message: isSelfFunding
+                ? `${receipt} Confirmed. KES ${merchantCredit.toLocaleString()} deposited to your PayChain wallet via M-PESA on ${date} at ${time}. Your updated available balance is KES ${(updatedMerchant.kesBalance || 0).toLocaleString()}.`
                 : buildPaymentReceivedSms({
                     ref: receipt,
                     amount: merchantCredit,
@@ -491,10 +504,9 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
           // The customer/payer side of this — previously missing entirely
           // for 'request_money' and 'pay_account': Payment Links and C2B
           // both already confirm to the payer, this branch never did.
-          // Self-funding top-ups skip this (merchant.phone === stkReq.phone
-          // there in practice, and the merchant SMS above already IS their
+          // Self-funding skips this (the deposit SMS above already IS their
           // confirmation — a second copy would be redundant, not useful).
-          if (kind !== 'topup' && stkReq.phone) {
+          if (!isSelfFunding && stkReq.phone) {
             topupSends.push({
               to: stkReq.phone,
               message: buildCustomerPaidSms({
@@ -514,7 +526,7 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
               const r = results[idx++];
               if (!r.success) console.error(`Wallet top-up SMS failed for merchant ${merchant._id}:`, r.error);
             }
-            if (kind !== 'topup' && stkReq.phone) {
+            if (!isSelfFunding && stkReq.phone) {
               const r = results[idx++];
               if (!r.success) console.error(`STK ${kind} customer SMS failed for ${receipt}:`, r.error);
             }
