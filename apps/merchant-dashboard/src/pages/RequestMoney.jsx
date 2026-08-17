@@ -29,7 +29,33 @@ export default function RequestMoney() {
   // screen success already uses, just in its failed variant.
   const [requestFailed, setRequestFailed] = useState(false)
   const [failureReason, setFailureReason] = useState('')
+  const [feePreview, setFeePreview] = useState(null) // { baseAmount, fee, total } | null
   const pollIntervalRef = useRef(null)
+
+  // The customer on the other end of an M-PESA prompt never sees any
+  // PayChain page (unlike Payment Links / Pay Account, which show this same
+  // breakdown before the customer submits) — the prompt is a fixed
+  // Safaricom template with no room to explain a fee, so a merchant
+  // requesting KES 100 has their customer see a prompt for KES 113 with no
+  // context. Showing the merchant the true total here, before they send it,
+  // means they know to mention it to the customer themselves (a customer
+  // also now gets a heads-up SMS — see buildPaymentRequestSms).
+  useEffect(() => {
+    const numericAmount = Number(amount)
+    if (selectedOption?.id !== 'mpesa' || !Number.isFinite(numericAmount) || numericAmount <= 0) {
+      setFeePreview(null)
+      return
+    }
+    const timeout = setTimeout(async () => {
+      try {
+        const res = await axios.get(`${API_URL}/api/transactions/checkout-preview`, { params: { amount: numericAmount } })
+        if (res.data?.success) setFeePreview(res.data)
+      } catch {
+        setFeePreview(null)
+      }
+    }, 400)
+    return () => clearTimeout(timeout)
+  }, [amount, selectedOption])
 
   // Stop the STK status poll if the merchant navigates away mid-request —
   // without this, the interval kept running after unmount and called
@@ -318,6 +344,17 @@ export default function RequestMoney() {
                   placeholder="1,000"
                   className="w-full bg-surface-container-low border border-outline-variant/5 rounded-3xl py-5 px-6 text-2xl font-headline text-primary focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
                 />
+                {feePreview && (
+                  <div className="flex flex-col gap-1 px-1 text-xs font-medium text-on-surface-variant">
+                    <div className="flex justify-between">
+                      <span>They'll be asked to pay</span>
+                      <span className="tabular-nums font-black text-primary">KES {feePreview.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    {feePreview.fee > 0 && (
+                      <span className="text-[11px] opacity-70">Includes a KES {feePreview.fee.toLocaleString(undefined, { minimumFractionDigits: 2 })} transaction fee on top of your KES {feePreview.baseAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })} request.</span>
+                    )}
+                  </div>
+                )}
               </div>
 
               {selectedOption?.id === 'mpesa' && (

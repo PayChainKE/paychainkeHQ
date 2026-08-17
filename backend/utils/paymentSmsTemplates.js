@@ -63,6 +63,37 @@ export function buildPaymentSentSms({ ref, amount, recipientName, recipientPhone
  * @param {{ ref: string, amount: number, businessName: string, accountRef?: string|null, date: string, time: string }} params
  * @returns {{ message: string, truncated: boolean, length: number }}
  */
+/**
+ * Sent BEFORE the STK prompt fires, only for merchant-initiated "Request
+ * Money" pushes — the only STK flow where the customer never lands on any
+ * PayChain page first (Payment Links / Pay Account already show this same
+ * breakdown on-screen before the customer submits — see checkout-preview's
+ * doc comment in transactionController.js). Without this, the M-PESA
+ * prompt is the customer's first and only signal, and NCBA's STK API has
+ * no free-text field to explain why it's asking for more than the amount
+ * the merchant told them — this fills that gap out-of-band, ideally
+ * arriving just ahead of (or alongside) the prompt itself.
+ *
+ * @param {{ businessName: string, baseAmount: number, fee: number }} params
+ * @returns {{ message: string, truncated: boolean, length: number }}
+ */
+export function buildPaymentRequestSms({ businessName, baseAmount, fee }) {
+  const total = Math.round((baseAmount + fee) * 100) / 100;
+  const showFee = fee > 0;
+  return buildStrictSms(
+    ({ name, amt, feeLine, total }) =>
+      `${name} is requesting KES ${amt} via PayChain.${feeLine} You'll get an M-PESA prompt for KES ${total} shortly — enter your PIN to pay.`,
+    {
+      fixed: {
+        amt: baseAmount.toLocaleString(),
+        feeLine: showFee ? ` Includes a KES ${fee.toLocaleString()} transaction fee.` : '',
+        total: total.toLocaleString(),
+      },
+      truncatable: [{ key: 'name', value: businessName || 'A PayChain business', minLength: 6 }],
+    }
+  );
+}
+
 export function buildCustomerPaidSms({ ref, amount, businessName, accountRef, date, time }) {
   return buildStrictSms(
     ({ ref, amt, name, acct, date, time }) =>

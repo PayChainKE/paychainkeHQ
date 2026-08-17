@@ -37,9 +37,36 @@ export default function RequestMoney({ navigation, route }: any) {
   // success already uses, in its failed variant.
   const [requestFailed, setRequestFailed] = useState(false);
   const [failureReason, setFailureReason] = useState('');
+  const [feePreview, setFeePreview] = useState<{ baseAmount: number; fee: number; total: number } | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
+
+  // The customer on the other end of an M-PESA prompt never sees any
+  // PayChain screen (unlike Payment Links / Pay Account, which show this
+  // same breakdown before the customer submits) — the prompt is a fixed
+  // Safaricom template with no room to explain a fee, so a merchant
+  // requesting KES 100 has their customer see a prompt for KES 113 with no
+  // context. Showing the merchant the true total here, before they send it,
+  // means they know to mention it to the customer themselves (a customer
+  // also now gets a heads-up SMS — see buildPaymentRequestSms on the
+  // backend).
+  useEffect(() => {
+    const numericAmount = Number(amount);
+    if (selectedOption !== 'mpesa' || !Number.isFinite(numericAmount) || numericAmount <= 0) {
+      setFeePreview(null);
+      return;
+    }
+    const timeout = setTimeout(async () => {
+      try {
+        const res = await api.get('/api/transactions/checkout-preview', { params: { amount: numericAmount } });
+        if (res.data?.success) setFeePreview(res.data);
+      } catch {
+        setFeePreview(null);
+      }
+    }, 400);
+    return () => clearTimeout(timeout);
+  }, [amount, selectedOption]);
 
   const resetForm = () => {
     setAmount('');
@@ -235,8 +262,21 @@ export default function RequestMoney({ navigation, route }: any) {
                 onChangeText={setAmount}
                 placeholder="0.00"
                 placeholderTextColor="#a1a1aa"
-                className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-5 py-4 text-[18px] font-jakarta-extrabold text-[#00351d] mb-5"
+                className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-5 py-4 text-[18px] font-jakarta-extrabold text-[#00351d] mb-2"
               />
+              {feePreview && (
+                <View className="mb-5 px-1">
+                  <View className="flex-row justify-between">
+                    <Text className="text-[12px] text-[#707971] font-jakarta-medium">They'll be asked to pay</Text>
+                    <Text className="text-[12px] font-jakarta-extrabold text-[#00351d]">KES {feePreview.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
+                  </View>
+                  {feePreview.fee > 0 && (
+                    <Text className="text-[10px] text-[#707971] font-jakarta-medium opacity-70 mt-0.5">
+                      Includes a KES {feePreview.fee.toLocaleString(undefined, { minimumFractionDigits: 2 })} transaction fee on top of your KES {feePreview.baseAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })} request.
+                    </Text>
+                  )}
+                </View>
+              )}
 
               {selected.id === 'mpesa' && (
                 <>

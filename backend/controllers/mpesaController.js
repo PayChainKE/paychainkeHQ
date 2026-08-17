@@ -16,7 +16,7 @@ import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard
 import { getLipaNaMpesaTariff } from '../config/lipaNaMpesaTariffCard.js';
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay.js';
 import { AUTO_INFLATION_SHIELD_ENABLED } from '../config/inflationShieldFlag.js';
-import { buildPaymentReceivedSms, buildCustomerPaidSms } from '../utils/paymentSmsTemplates.js';
+import { buildPaymentReceivedSms, buildCustomerPaidSms, buildPaymentRequestSms } from '../utils/paymentSmsTemplates.js';
 import { initiateStkPush as ncbaInitiateStkPush, queryStkPush as ncbaQueryStkPush, generateQrCode as ncbaGenerateQrCode } from '../services/ncbaStkPushService.js';
 import { validateMobileWalletNumber as ncbaValidateMobileWalletNumber, submitMobileB2wPayment as ncbaSubmitMobileB2wPayment, validateLipaNaMpesaAccount as ncbaValidateLnmAccount, submitLipaNaMpesaPayment as ncbaSubmitLnmPayment, NcbaOpenBankingValidationError } from '../services/ncbaOpenBankingService.js';
 import { validatePhoneNumber, NcbaValidationError, getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
@@ -66,6 +66,27 @@ export const initiateSTKPush = async (req, res) => {
     // whether the fee applies.
     const kind = purpose === 'request_money' ? 'request_money' : 'topup';
     const checkoutTotal = getCheckoutTotal(intAmount);
+
+    // Request Money is the one STK flow where the customer never lands on
+    // any PayChain page first — Payment Links / Pay Account already show
+    // the fee breakdown on-screen before the customer submits, but here the
+    // M-PESA prompt (fixed Safaricom template, total only, no free-text
+    // field) is their very first and only signal. Without this, a merchant
+    // requesting KES 100 has their customer see a prompt for KES 113 with
+    // no explanation — reads as an overcharge. Fire-and-forget, best-effort:
+    // never blocks or fails the actual push if SMS is slow or down.
+    if (kind === 'request_money') {
+      safeSendSMS({
+        to: formattedPhone,
+        message: buildPaymentRequestSms({
+          businessName: req.merchant.businessName,
+          baseAmount: intAmount,
+          fee: Math.round((checkoutTotal - intAmount) * 100) / 100,
+        }).message,
+      }).then((result) => {
+        if (!result.success) console.error(`Pre-push request SMS failed for ${formattedPhone}:`, result.error);
+      });
+    }
 
     // Real STK Push via NCBA's shared Paybill 880100 (or simulated — see
     // services/ncbaStkPushService.js's NCBA_STK_LIVE_ENABLED gate).
