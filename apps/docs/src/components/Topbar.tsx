@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { Menu, Search, ArrowUpRight, Sun, Moon } from "lucide-react";
+import { Menu, Search, ArrowUpRight, Sun, Moon, LifeBuoy } from "lucide-react";
 import Logo from "./Logo";
 import { flatNav } from "@/data/nav";
 import { useTheme } from "@/context/ThemeContext";
@@ -79,6 +79,14 @@ export default function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
         >
           {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>
+
+        <Link
+          to="/help"
+          className="hidden sm:inline-flex items-center gap-1.5 text-[13px] font-medium text-ink-muted hover:text-ink transition-colors"
+        >
+          <LifeBuoy className="w-3.5 h-3.5" />
+          Help
+        </Link>
 
         <a
           href="https://paychain.co.ke"

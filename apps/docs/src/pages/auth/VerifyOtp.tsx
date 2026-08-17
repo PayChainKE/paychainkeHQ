@@ -74,7 +74,7 @@ export default function VerifyOtp() {
           required
           value={otp}
           onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-          placeholder="482910"
+          placeholder="000000"
         />
         <button
           type="submit"
