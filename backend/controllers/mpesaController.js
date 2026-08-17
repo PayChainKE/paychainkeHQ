@@ -67,7 +67,7 @@ export const initiateSTKPush = async (req, res) => {
     const kind = purpose === 'request_money' ? 'request_money' : 'topup';
     const checkoutTotal = getCheckoutTotal(intAmount);
 
-    // Real STK Push via NCBA's Till short code 889066 (or simulated — see
+    // Real STK Push via NCBA's shared Paybill 880100 (or simulated — see
     // services/ncbaStkPushService.js's NCBA_STK_LIVE_ENABLED gate).
     const checkoutRequestId = await initiateAndTrackNcbaStk({
       merchantId,
@@ -533,16 +533,24 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
 const NCBA_STK_POLL_INTERVAL_MS = 2000;
 const NCBA_STK_POLL_MAX_ATTEMPTS = 60; // ~2 minutes — typical STK prompt validity window, unchanged
 
-// Observed live: NCBA's query endpoint can return status:'FAILED' with a
-// generic description ("Error occured while processing the query") for a
-// transaction that's still genuinely in flight — the customer hasn't
+// Observed live, twice, with different wording: NCBA's query endpoint can
+// return status:'FAILED' with a generic description ("Error occured while
+// processing the query", "The transaction is still under processing") for
+// a transaction that's still genuinely in flight — the customer hasn't
 // answered the prompt yet — not an actual decline. Resolving on a single
 // such response prematurely marked real, still-pending payments as failed
 // and stopped polling before the customer's later real SUCCESS could ever
-// be seen. A genuinely failed/declined push keeps returning FAILED on the
-// very next poll too, so requiring it twice in a row before treating it as
-// final costs at most one extra ~2s interval on a real failure while
-// absorbing this transient case.
+// be seen.
+//
+// Both real examples above contain "processing" — a strong, specific
+// signal for "still working on it" rather than a genuine customer-facing
+// decline (wrong PIN, insufficient funds, cancelled — none of which read
+// like this). Only descriptions matching this pattern get the extra
+// confirmation below; anything else (a real decline reason) still resolves
+// on the very first FAILED response, same as before — this only slows down
+// the specific case that was wrongly resolving too fast, not every
+// failure.
+const TRANSIENT_FAILURE_PATTERN = /processing|internal error|system error/i;
 const REQUIRED_CONSECUTIVE_FAILURES = 2;
 
 // Fire-and-forget: intentionally not awaited by callers, mirroring how every
@@ -569,7 +577,8 @@ export function pollAndResolveNcbaStkPush(checkoutRequestId, transactionId) {
       }
 
       if (status === 'FAILED') {
-        consecutiveFailures += 1;
+        const looksTransient = TRANSIENT_FAILURE_PATTERN.test(description || '');
+        consecutiveFailures = looksTransient ? consecutiveFailures + 1 : REQUIRED_CONSECUTIVE_FAILURES;
         if (consecutiveFailures < REQUIRED_CONSECUTIVE_FAILURES) {
           // Not logged as an error — see doc comment above, this is the
           // expected transient shape, not a real problem yet.

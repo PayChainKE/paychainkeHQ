@@ -99,10 +99,12 @@ export default function Wallet() {
     else setIsLoading(false)
   }, [merchant, fetchTransactions])
 
-  // Poll every 5s so wallet activity and balance stay live without a manual refresh
+  // Poll every 3s (matches Overview.jsx) so wallet activity and balance
+  // stay live without a manual refresh — was 5s, tightened so a payment
+  // reflects here about as fast as it does on the Overview page.
   useEffect(() => {
     if (!merchant) return
-    const interval = setInterval(fetchTransactions, 5000)
+    const interval = setInterval(fetchTransactions, 3000)
     return () => clearInterval(interval)
   }, [merchant, fetchTransactions])
 
