@@ -31,6 +31,12 @@ export default function RequestMoney({ navigation, route }: any) {
   const [statusText, setStatusText] = useState('');
   const [generatedLink, setGeneratedLink] = useState('');
   const [copied, setCopied] = useState(false);
+  // Previously a failed/timed-out STK request only showed an Alert and left
+  // the merchant on the same amount/phone form — indistinguishable from
+  // never having submitted. Now routes to the same step-3 outcome screen
+  // success already uses, in its failed variant.
+  const [requestFailed, setRequestFailed] = useState(false);
+  const [failureReason, setFailureReason] = useState('');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
@@ -41,6 +47,8 @@ export default function RequestMoney({ navigation, route }: any) {
     setGeneratedLink('');
     setStatusText('');
     setCopied(false);
+    setRequestFailed(false);
+    setFailureReason('');
   };
 
   const handleSelect = (id: OptionId) => {
@@ -93,12 +101,16 @@ export default function RequestMoney({ navigation, route }: any) {
             if (pollRef.current) clearInterval(pollRef.current);
             setIsSubmitting(false);
             setStatusText('');
-            Alert.alert('Request Failed', statusRes.data.resultDesc || 'They cancelled or the request failed.');
+            setRequestFailed(true);
+            setFailureReason(statusRes.data.resultDesc || 'They cancelled or the request failed.');
+            setStep(3);
           } else if (attempts >= maxAttempts) {
             if (pollRef.current) clearInterval(pollRef.current);
             setIsSubmitting(false);
             setStatusText('');
-            Alert.alert('Timeout', 'The request timed out. Please try again.');
+            setRequestFailed(true);
+            setFailureReason('The request timed out waiting for a response.');
+            setStep(3);
           }
         } catch (e) {
           console.error('STK status poll error', e);
@@ -108,10 +120,13 @@ export default function RequestMoney({ navigation, route }: any) {
       setIsSubmitting(false);
       setStatusText('');
       if (err?.response?.status >= 500) {
-        Alert.alert('Check Their Phone', 'The prompt may have been sent. If they see an M-PESA popup, they can still enter their PIN.');
+        setRequestFailed(true);
+        setFailureReason('The prompt may have been sent. If they see an M-PESA popup, they can still enter their PIN — check your transaction history shortly.');
       } else {
-        Alert.alert('Request Failed', err?.response?.data?.error || 'Could not send M-PESA prompt.');
+        setRequestFailed(true);
+        setFailureReason(err?.response?.data?.error || 'Could not send M-PESA prompt.');
       }
+      setStep(3);
     }
   };
 
@@ -242,17 +257,26 @@ export default function RequestMoney({ navigation, route }: any) {
           {/* Step 3 — Result */}
           {step === 3 && selected && (
             <View className="items-center pt-4">
-              <View className="w-20 h-20 rounded-full bg-[#e7f8ef] items-center justify-center mb-6 border-4 border-[#d5f3e4]">
-                <Feather name="check-circle" size={36} color="#006c4e" />
+              <View className={`w-20 h-20 rounded-full items-center justify-center mb-6 border-4 ${selected.id === 'mpesa' && requestFailed ? 'bg-[#fdeaea] border-[#f8d2d2]' : 'bg-[#e7f8ef] border-[#d5f3e4]'}`}>
+                <Feather name={selected.id === 'mpesa' && requestFailed ? 'x-circle' : 'check-circle'} size={36} color={selected.id === 'mpesa' && requestFailed ? '#c0392b' : '#006c4e'} />
               </View>
 
               {selected.id === 'mpesa' ? (
-                <>
-                  <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#00351d] mb-2 text-center">Payment Received</Text>
-                  <Text className="text-[13px] text-[#707971] font-jakarta-medium text-center leading-relaxed px-4 mb-8">
-                    KES {Number(amount).toLocaleString()} has been credited to your PayChain balance.
-                  </Text>
-                </>
+                requestFailed ? (
+                  <>
+                    <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#c0392b] mb-2 text-center">Request Failed</Text>
+                    <Text className="text-[13px] text-[#707971] font-jakarta-medium text-center leading-relaxed px-4 mb-8">
+                      {failureReason}
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#00351d] mb-2 text-center">Payment Received</Text>
+                    <Text className="text-[13px] text-[#707971] font-jakarta-medium text-center leading-relaxed px-4 mb-8">
+                      KES {Number(amount).toLocaleString()} has been credited to your PayChain balance.
+                    </Text>
+                  </>
+                )
               ) : (
                 <>
                   <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#00351d] mb-2 text-center">Link Ready to Share</Text>
@@ -284,11 +308,16 @@ export default function RequestMoney({ navigation, route }: any) {
               )}
 
               <TouchableOpacity
-                onPress={() => navigation?.navigate('Home')}
+                // Retry keeps the amount/phone already entered — just clear
+                // the failed state so a successful second attempt doesn't
+                // still show this same failure screen.
+                onPress={selected.id === 'mpesa' && requestFailed ? () => { setRequestFailed(false); setFailureReason(''); setStep(2); } : () => navigation?.navigate('Home')}
                 activeOpacity={0.9}
                 className="w-full bg-[#00351d] py-4 rounded-2xl items-center justify-center shadow-lg shadow-[#00351d]/20"
               >
-                <Text className="text-white font-jakarta-extrabold text-[12px] uppercase tracking-widest">Back to Dashboard</Text>
+                <Text className="text-white font-jakarta-extrabold text-[12px] uppercase tracking-widest">
+                  {selected.id === 'mpesa' && requestFailed ? 'Try Again' : 'Back to Dashboard'}
+                </Text>
               </TouchableOpacity>
             </View>
           )}

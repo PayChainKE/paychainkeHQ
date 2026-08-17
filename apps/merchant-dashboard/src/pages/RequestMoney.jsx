@@ -22,6 +22,13 @@ export default function RequestMoney() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [statusText, setStatusText] = useState('')
   const [generatedLink, setGeneratedLink] = useState('')
+  // Previously a failed/timed-out STK request only showed a toast and reset
+  // back to the same plain amount/phone form — indistinguishable from never
+  // having submitted at all, so a merchant glancing back at the screen had
+  // no idea what actually happened. Now routes to the same step-3 outcome
+  // screen success already uses, just in its failed variant.
+  const [requestFailed, setRequestFailed] = useState(false)
+  const [failureReason, setFailureReason] = useState('')
   const pollIntervalRef = useRef(null)
 
   // Stop the STK status poll if the merchant navigates away mid-request —
@@ -66,6 +73,8 @@ export default function RequestMoney() {
     setPhone('')
     setGeneratedLink('')
     setStatusText('')
+    setRequestFailed(false)
+    setFailureReason('')
   }
 
   const handleSelect = (opt) => {
@@ -127,12 +136,18 @@ export default function RequestMoney() {
             clearInterval(pollIntervalRef.current)
             setIsSubmitting(false)
             setStatusText('')
+            setRequestFailed(true)
+            setFailureReason(statusRes.data.resultDesc || 'They cancelled or the request failed.')
             addNotification({ title: 'Request Failed', message: statusRes.data.resultDesc || 'They cancelled or the request failed.', type: 'error' })
+            setStep(3)
           } else if (attempts >= maxAttempts) {
             clearInterval(pollIntervalRef.current)
             setIsSubmitting(false)
             setStatusText('')
+            setRequestFailed(true)
+            setFailureReason('The request timed out waiting for a response.')
             addNotification({ title: 'Timeout', message: 'The request timed out. Please try again.', type: 'error' })
+            setStep(3)
           }
         } catch (e) {
           console.error('STK status poll error', e)
@@ -142,10 +157,15 @@ export default function RequestMoney() {
       setIsSubmitting(false)
       setStatusText('')
       if (err.response?.status >= 500) {
+        setRequestFailed(true)
+        setFailureReason('The prompt may have been sent. If they see an M-PESA popup, they can still enter their PIN — check your transaction history shortly.')
         addNotification({ title: 'Check Their Phone', message: 'The prompt may have been sent. If they see an M-PESA popup, they can still enter their PIN.', type: 'error' })
       } else {
+        setRequestFailed(true)
+        setFailureReason(err.response?.data?.error || 'Could not send M-PESA prompt.')
         addNotification({ title: 'Request Failed', message: err.response?.data?.error || 'Could not send M-PESA prompt.', type: 'error' })
       }
+      setStep(3)
     }
   }
 
@@ -339,17 +359,26 @@ export default function RequestMoney() {
         ) : (
           <div className="bg-white rounded-[32px] border border-slate-200 shadow-2xl p-8 lg:p-12 relative max-w-2xl mx-auto lg:mx-0">
             <div className="py-10 text-center">
-              <div className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-xl bg-emerald-500 text-white">
-                <span className="material-symbols-outlined text-4xl">check_circle</span>
+              <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-xl text-white ${selectedOption?.id === 'mpesa' && requestFailed ? 'bg-rose-500' : 'bg-emerald-500'}`}>
+                <span className="material-symbols-outlined text-4xl">{selectedOption?.id === 'mpesa' && requestFailed ? 'error' : 'check_circle'}</span>
               </div>
 
               {selectedOption?.id === 'mpesa' ? (
-                <>
-                  <h3 className="text-2xl font-headline font-bold text-primary mb-3">Payment Received</h3>
-                  <p className="text-on-surface-variant font-medium max-w-sm mx-auto opacity-70 leading-relaxed mb-10">
-                    KES {Number(amount).toLocaleString()} has been credited to your PayChain balance.
-                  </p>
-                </>
+                requestFailed ? (
+                  <>
+                    <h3 className="text-2xl font-headline font-bold text-rose-600 mb-3">Request Failed</h3>
+                    <p className="text-on-surface-variant font-medium max-w-sm mx-auto opacity-70 leading-relaxed mb-10">
+                      {failureReason}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h3 className="text-2xl font-headline font-bold text-primary mb-3">Payment Received</h3>
+                    <p className="text-on-surface-variant font-medium max-w-sm mx-auto opacity-70 leading-relaxed mb-10">
+                      KES {Number(amount).toLocaleString()} has been credited to your PayChain balance.
+                    </p>
+                  </>
+                )
               ) : (
                 <>
                   <h3 className="text-2xl font-headline font-bold text-primary mb-3">Link Ready to Share</h3>
@@ -371,10 +400,13 @@ export default function RequestMoney() {
               )}
 
               <button
-                onClick={() => navigate('/overview')}
+                // Retry keeps the amount/phone already entered — no reason to
+                // make the merchant retype the same details for a second
+                // attempt, just clear the failed state so the form re-enables.
+                onClick={selectedOption?.id === 'mpesa' && requestFailed ? () => { setRequestFailed(false); setFailureReason(''); setStep(2) } : () => navigate('/overview')}
                 className="mt-4 py-4 px-10 bg-[#00351D] text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:brightness-110 transition-all shadow-xl"
               >
-                Back to Dashboard
+                {selectedOption?.id === 'mpesa' && requestFailed ? 'Try Again' : 'Back to Dashboard'}
               </button>
             </div>
           </div>
