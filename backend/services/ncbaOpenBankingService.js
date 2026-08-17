@@ -6,13 +6,29 @@ import axios from 'axios';
 // staging, which would otherwise silently point a demo deploy at NCBA's
 // live rail.
 //
-// Base URL confirmed against NCBA's own "Open Banking UAT Guide" PDF
-// (matches the credentials text file; the Postman collection's `baseUrl`
-// variable disagreed and appears to just be stale).
+// The SANDBOX URL below is confirmed against NCBA's own "Open Banking UAT
+// Guide" doc (matches the credentials text file). The guide is explicitly
+// scoped to UAT only ("...before eventual migration to prod") and never
+// once states a live/production base URL anywhere in it, nor does any
+// other doc in API documents/ — 'https://api.ncbagroup.com' below was
+// never actually confirmed by NCBA; it doesn't even resolve via DNS
+// (verified live: curl gets "Couldn't resolve host"), which is exactly
+// why NCBA_OPENBANKING_ENVIRONMENT=live produces "Failed to obtain an
+// Open Banking access token" — the request never reaches NCBA at all, let
+// alone gets rejected. NCBA_OPENBANKING_BASE_URL is therefore a hard
+// requirement once live, not an optional override with a safe guess to
+// fall back to — see the throw below.
 const ncbaOpenBankingEnv = (process.env.NCBA_OPENBANKING_ENVIRONMENT || 'sandbox').toLowerCase();
 const isLiveEnv = ncbaOpenBankingEnv === 'live';
+if (isLiveEnv && !process.env.NCBA_OPENBANKING_BASE_URL) {
+  console.error(JSON.stringify({
+    level: 'error',
+    event: 'ncba_openbanking_live_base_url_missing',
+    message: 'NCBA_OPENBANKING_ENVIRONMENT=live but NCBA_OPENBANKING_BASE_URL is unset — confirm the real live base URL with NCBA and set it; there is no safe default to fall back to.',
+  }));
+}
 const ncbaOpenBankingBaseUrl = isLiveEnv
-  ? (process.env.NCBA_OPENBANKING_BASE_URL || 'https://api.ncbagroup.com')
+  ? process.env.NCBA_OPENBANKING_BASE_URL
   : (process.env.NCBA_OPENBANKING_SANDBOX_BASE_URL || 'https://openbankingtest.api.ncbagroup.com/test/apigateway');
 
 const ncbaOpenBankingUserId         = process.env.NCBA_OPENBANKING_USER_ID;
@@ -112,6 +128,13 @@ let tokenExpiresAt = 0;
 async function fetchNewToken() {
   if (!ncbaOpenBankingUserId || !ncbaOpenBankingPassword || !ncbaOpenBankingSubscriptionKey) {
     throw new NcbaOpenBankingAuthError('Open Banking is not fully configured. Please contact support.');
+  }
+  if (!ncbaOpenBankingBaseUrl) {
+    // Distinct from the generic catch-all below on purpose — this fires
+    // instantly, before any network call, so it's never confused with a
+    // real NCBA-side rejection in the logs (see the module-load check above
+    // for why there's no safe default to fall back to here).
+    throw new NcbaOpenBankingAuthError('Open Banking live base URL is not configured. Please contact support.');
   }
 
   try {

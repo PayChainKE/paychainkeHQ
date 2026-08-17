@@ -13,6 +13,7 @@ import Team from './pages/Team';
 import Officers from './pages/Officers';
 import Developers from './pages/Developers';
 import Ledger from './pages/Ledger';
+import StkMonitor from './pages/StkMonitor';
 import CashAdvanceRequests from './pages/CashAdvanceRequests';
 import Newsletter from './pages/Newsletter';
 import WalletAudit from './pages/WalletAudit';
@@ -54,6 +55,7 @@ export default function App(){
             <Route path="/call-centre" element={<Protected><CallCentre/></Protected>} />
             <Route path="/cash-advance-requests" element={<Protected><CashAdvanceRequests/></Protected>} />
             <Route path="/ledger" element={<Protected><Ledger/></Protected>} />
+            <Route path="/stk-monitor" element={<Protected><StkMonitor/></Protected>} />
             <Route path="/revenue" element={<Protected><Revenue/></Protected>} />
             <Route path="/bookkeeping" element={<Protected><Bookkeeping/></Protected>} />
             <Route path="/wallet-audit" element={<Protected><WalletAudit/></Protected>} />

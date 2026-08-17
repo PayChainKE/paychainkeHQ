@@ -1768,3 +1768,31 @@ export const getSystemStatus = async (req, res) => {
     res.status(500).json({ error: 'Server Error' });
   }
 };
+
+// @desc    Live view of every STK Push / Dynamic QR collection attempt —
+//          lets admin see a customer payment resolve to success/failed in
+//          real time (the merchant dashboard polls this same underlying
+//          data every 3s; this is the admin-side equivalent, since prior to
+//          this there was no admin visibility into STKRequest at all —
+//          only the resulting Transaction once/if one gets created).
+//          `status` still shows 'pending' for a push mid-flight (customer
+//          hasn't entered their PIN yet, or NCBA's poll hasn't caught up —
+//          see pollAndResolveNcbaStkPush's 2s poll in mpesaController.js).
+// @route   GET /api/admin/stk-requests
+// @access  Private (Admin)
+export const getStkRequests = async (req, res) => {
+  try {
+    // Client polls + paginates this at 25/page (same convention as
+    // getRevenueSweeps) — 500 recent rows is cheap to fetch up front and
+    // covers many hours of real traffic without needing a date-range query.
+    const requests = await STKRequest.find({})
+      .sort('-createdAt')
+      .limit(500)
+      .populate('merchantId', 'businessName email')
+      .lean();
+    res.json({ success: true, count: requests.length, data: requests });
+  } catch (error) {
+    console.error('Get STK Requests Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
