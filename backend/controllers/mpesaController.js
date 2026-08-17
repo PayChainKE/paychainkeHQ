@@ -791,6 +791,20 @@ export const initiateB2C = async (req, res) => {
       throw e;
     }
 
+    // Fail fast on a number NCBA doesn't recognize as a real M-Pesa/Airtel
+    // wallet before ever touching the merchant's balance or asking for
+    // their PIN — same ordering as initiateB2B's Paybill/Till check below.
+    // Previously this validated only after the PIN check and the debit,
+    // which meant an invalid destination still cost the merchant a PIN
+    // entry and a debit-then-refund round trip for no reason.
+    let validationId;
+    try {
+      ({ validationId } = await ncbaValidateMobileWalletNumber({ provider, msisdn: phone }));
+    } catch (e) {
+      if (e instanceof NcbaOpenBankingValidationError) return res.status(400).json({ error: e.message });
+      throw e;
+    }
+
     if (!pin) {
       return res.status(400).json({ error: 'Payment PIN is required.' });
     }
@@ -842,8 +856,8 @@ export const initiateB2C = async (req, res) => {
 
     // Mobile B2W payout via NCBA (or simulated — see
     // services/ncbaOpenBankingService.js's NCBA_OPENBANKING_LIVE_ENABLED gate).
+    // validationId was already obtained above, before the PIN check/debit.
     const transactionId = `PAYOUT-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
-    const { validationId } = await ncbaValidateMobileWalletNumber({ provider, msisdn: phone });
     await ncbaSubmitMobileB2wPayment({
       transactionId,
       validationId,
