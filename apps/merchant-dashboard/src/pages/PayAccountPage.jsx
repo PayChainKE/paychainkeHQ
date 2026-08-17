@@ -133,7 +133,7 @@ export default function PayAccountPage() {
           </div>
           <h2 className="font-headline text-2xl text-on-surface mb-1">Pay {merchantDetails.merchantName}</h2>
           <p className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-70">
-            Account: {merchantDetails.account}
+            PayChain Verified Business
           </p>
         </div>
 
