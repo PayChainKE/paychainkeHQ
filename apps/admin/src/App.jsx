@@ -20,6 +20,7 @@ import WalletAudit from './pages/WalletAudit';
 import Invoices from './pages/Invoices';
 import CallCentre from './pages/CallCentre';
 import AuditLog from './pages/AuditLog';
+import TransactionAudit from './pages/TransactionAudit';
 import Security from './pages/Security';
 import Revenue from './pages/Revenue';
 import Bookkeeping from './pages/Bookkeeping';
@@ -61,6 +62,7 @@ export default function App(){
             <Route path="/wallet-audit" element={<Protected><WalletAudit/></Protected>} />
             <Route path="/invoices" element={<Protected><Invoices/></Protected>} />
             <Route path="/audit-log" element={<Protected><AuditLog/></Protected>} />
+            <Route path="/transaction-audit" element={<Protected><TransactionAudit/></Protected>} />
             <Route path="/security" element={<Protected><Security/></Protected>} />
             <Route path="/settings" element={<Protected><Settings/></Protected>} />
           </Routes>

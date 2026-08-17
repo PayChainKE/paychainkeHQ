@@ -119,7 +119,7 @@ export const initiateSTKPush = async (req, res) => {
 // surcharge split, SMS) for a resolved STK Push outcome, called by the NCBA
 // poll loop (pollAndResolveNcbaStkPush, below) once queryStkPush reports
 // SUCCESS or FAILED.
-export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc, transTime }) {
+export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc, transTime, allowFailedRetry = false }) {
   // NCBA's poll and the separate generic account-notification webhook can
   // both observe the same underlying transaction. Everything below this
   // point credits a merchant's balance, so once a request has already
@@ -134,8 +134,20 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
   // status:'pending' filter in this findOneAndUpdate is what actually makes
   // only one caller ever win the transition; everyone else gets null back
   // and returns without touching the ledger.
+  //
+  // allowFailedRetry widens that filter to also match an existing 'failed'
+  // row — the one deliberate exception, used only by the NCBA account-
+  // notification/reconciliation webhooks to correct a false failure: NCBA's
+  // STK Query endpoint can report FAILED for a transaction that was still
+  // genuinely in flight (see TRANSIENT_FAILURE_PATTERN below), and once
+  // pollAndResolveNcbaStkPush gives up after REQUIRED_CONSECUTIVE_FAILURES,
+  // nothing polls again — so if the customer's PIN entry actually succeeds
+  // moments later, the only remaining signal is NCBA's own webhook telling
+  // us the money landed. Callers must only ever pass this alongside
+  // succeeded:true — there is no legitimate case for a confirmed 'success'
+  // to later flip back to 'failed' on a webhook replay.
   const claimed = await STKRequest.findOneAndUpdate(
-    { _id: stkReq._id, status: 'pending' },
+    { _id: stkReq._id, status: allowFailedRetry ? { $in: ['pending', 'failed'] } : 'pending' },
     { $set: { status: succeeded ? 'success' : 'failed', resultDesc } },
     { returnDocument: 'after' }
   );

@@ -21,6 +21,8 @@ import {
   getLedger,
   getSystemStatus,
   getStkRequests,
+  searchTransactionAudit,
+  getTransactionAuditDetail,
 } from '../controllers/adminController.js';
 import {
   getCommunications,
@@ -183,6 +185,12 @@ router.delete('/bookkeeping/expenses/:id',protect, requireMutator, deleteExpense
 // Compact health pulse for the sidebar widget.
 router.get('/system-status', protect, excludeOfficer, getSystemStatus);
 router.get('/stk-requests', protect, excludeOfficer, getStkRequests);
+
+// Transaction Audit — search any transaction across every merchant and drill
+// into a full forensic detail view (related STK Push attempt + SMS receipts),
+// for resolving merchant/customer disputes.
+router.get('/transaction-audit', protect, excludeOfficer, searchTransactionAudit);
+router.get('/transaction-audit/:id', protect, excludeOfficer, getTransactionAuditDetail);
 
 // Global audit log (filterable, paginated).
 router.get('/audit-log', protect, excludeOfficer, getAuditLog);
