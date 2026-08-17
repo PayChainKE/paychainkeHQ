@@ -8,7 +8,7 @@ import TrafficLights from "./TrafficLights";
 export interface CodeGroupTab {
   id: CodeLangId;
   label: string;
-  lang: "bash" | "js" | "python";
+  lang: "bash" | "js" | "python" | "php" | "ruby";
   code: string;
 }
 

@@ -90,6 +90,48 @@ res = requests.post(
 session = res.json()['session']
 # redirect(session['checkoutUrl'])`,
           },
+          {
+            id: "php", label: "PHP", lang: "php", code: `
+$ch = curl_init('https://api.paychain.co.ke/api/v1/developer/checkout');
+curl_setopt_array($ch, [
+    CURLOPT_POST => true,
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_HTTPHEADER => [
+        'Authorization: Bearer pc_live_...',
+        'Content-Type: application/json',
+    ],
+    CURLOPT_POSTFIELDS => json_encode([
+        'amount' => 1500,
+        'reference' => 'order-4821',
+        'description' => 'Order #4821',
+        'callbackUrl' => 'https://your-store.com/orders/4821/complete',
+    ]),
+]);
+
+$session = json_decode(curl_exec($ch), true)['session'];
+header('Location: ' . $session['checkoutUrl']); // send the customer here`,
+          },
+          {
+            id: "ruby", label: "Ruby", lang: "ruby", code: `
+require 'net/http'
+require 'json'
+
+uri = URI('https://api.paychain.co.ke/api/v1/developer/checkout')
+req = Net::HTTP::Post.new(uri, {
+  'Authorization' => 'Bearer pc_live_...',
+  'Content-Type' => 'application/json',
+})
+req.body = {
+  amount: 1500,
+  reference: 'order-4821',
+  description: 'Order #4821',
+  callbackUrl: 'https://your-store.com/orders/4821/complete',
+}.to_json
+
+res = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) { |http| http.request(req) }
+session = JSON.parse(res.body)['session']
+redirect_to session['checkoutUrl'] # send the customer here`,
+          },
         ]}
         className="mb-4"
       />
@@ -205,6 +247,48 @@ res = requests.post(
 )
 
 session = res.json()['session']
+# share session['checkoutUrl'] however makes sense: SMS, email, WhatsApp`,
+          },
+          {
+            id: "php", label: "PHP", lang: "php", code: `
+$ch = curl_init('https://api.paychain.co.ke/api/v1/developer/checkout');
+curl_setopt_array($ch, [
+    CURLOPT_POST => true,
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_HTTPHEADER => [
+        'Authorization: Bearer pc_live_...',
+        'Content-Type: application/json',
+    ],
+    CURLOPT_POSTFIELDS => json_encode([
+        'amount' => 2500,
+        'reference' => 'invoice-2026-0417',
+        'description' => 'Invoice #0417',
+        'expiresInMinutes' => 10080, // 7 days
+    ]),
+]);
+
+$session = json_decode(curl_exec($ch), true)['session'];
+// share $session['checkoutUrl'] however makes sense: SMS, email, WhatsApp`,
+          },
+          {
+            id: "ruby", label: "Ruby", lang: "ruby", code: `
+require 'net/http'
+require 'json'
+
+uri = URI('https://api.paychain.co.ke/api/v1/developer/checkout')
+req = Net::HTTP::Post.new(uri, {
+  'Authorization' => 'Bearer pc_live_...',
+  'Content-Type' => 'application/json',
+})
+req.body = {
+  amount: 2500,
+  reference: 'invoice-2026-0417',
+  description: 'Invoice #0417',
+  expiresInMinutes: 10080, # 7 days
+}.to_json
+
+res = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) { |http| http.request(req) }
+session = JSON.parse(res.body)['session']
 # share session['checkoutUrl'] however makes sense: SMS, email, WhatsApp`,
           },
         ]}

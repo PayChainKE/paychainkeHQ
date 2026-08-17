@@ -86,6 +86,44 @@ res = requests.post(
 payment = res.json()['payment']
 print(payment['status'])  # "pending"`,
           },
+          {
+            id: "php", label: "PHP", lang: "php", code: `
+$ch = curl_init('https://api.paychain.co.ke/api/v1/developer/payments/collect');
+curl_setopt_array($ch, [
+    CURLOPT_POST => true,
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_HTTPHEADER => [
+        'Authorization: Bearer pc_live_...',
+        'Idempotency-Key: 8f14e45f-...-4321',
+        'Content-Type: application/json',
+    ],
+    CURLOPT_POSTFIELDS => json_encode([
+        'amount' => 500,
+        'phone' => '0712345678',
+        'reference' => 'subscriber-4821',
+    ]),
+]);
+
+$payment = json_decode(curl_exec($ch), true)['payment'];
+echo $payment['status']; // "pending"`,
+          },
+          {
+            id: "ruby", label: "Ruby", lang: "ruby", code: `
+require 'net/http'
+require 'json'
+
+uri = URI('https://api.paychain.co.ke/api/v1/developer/payments/collect')
+req = Net::HTTP::Post.new(uri, {
+  'Authorization' => 'Bearer pc_live_...',
+  'Idempotency-Key' => '8f14e45f-...-4321',
+  'Content-Type' => 'application/json',
+})
+req.body = { amount: 500, phone: '0712345678', reference: 'subscriber-4821' }.to_json
+
+res = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) { |http| http.request(req) }
+payment = JSON.parse(res.body)['payment']
+puts payment['status'] # "pending"`,
+          },
         ]}
         className="mb-4"
       />
@@ -205,6 +243,52 @@ res = requests.post(
 
 payment = res.json()['payment']`,
           },
+          {
+            id: "php", label: "PHP", lang: "php", code: `
+$ch = curl_init('https://api.paychain.co.ke/api/v1/developer/payments/payout');
+curl_setopt_array($ch, [
+    CURLOPT_POST => true,
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_HTTPHEADER => [
+        'Authorization: Bearer pc_live_...',
+        'Idempotency-Key: 2b6f0d1a-...-9e3c',
+        'Content-Type: application/json',
+    ],
+    CURLOPT_POSTFIELDS => json_encode([
+        'amount' => 12000,
+        'bankCode' => '011',
+        'accountNumber' => '0123456789',
+        'accountName' => 'Jane Njeri',
+        'narration' => 'Supplier settlement',
+        'apiPayoutPin' => '4821',
+    ]),
+]);
+
+$payment = json_decode(curl_exec($ch), true)['payment'];`,
+          },
+          {
+            id: "ruby", label: "Ruby", lang: "ruby", code: `
+require 'net/http'
+require 'json'
+
+uri = URI('https://api.paychain.co.ke/api/v1/developer/payments/payout')
+req = Net::HTTP::Post.new(uri, {
+  'Authorization' => 'Bearer pc_live_...',
+  'Idempotency-Key' => '2b6f0d1a-...-9e3c',
+  'Content-Type' => 'application/json',
+})
+req.body = {
+  amount: 12000,
+  bankCode: '011',
+  accountNumber: '0123456789',
+  accountName: 'Jane Njeri',
+  narration: 'Supplier settlement',
+  apiPayoutPin: '4821',
+}.to_json
+
+res = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) { |http| http.request(req) }
+payment = JSON.parse(res.body)['payment']`,
+          },
         ]}
       />
 
@@ -297,6 +381,27 @@ res = requests.get(
 )
 
 payment = res.json()['payment']`,
+          },
+          {
+            id: "php", label: "PHP", lang: "php", code: `
+$ch = curl_init('https://api.paychain.co.ke/api/v1/developer/payments/65f3a1e2c9d4e1a2b3c4d5e6');
+curl_setopt_array($ch, [
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_HTTPHEADER => ['Authorization: Bearer pc_live_...'],
+]);
+
+$payment = json_decode(curl_exec($ch), true)['payment'];`,
+          },
+          {
+            id: "ruby", label: "Ruby", lang: "ruby", code: `
+require 'net/http'
+require 'json'
+
+uri = URI('https://api.paychain.co.ke/api/v1/developer/payments/65f3a1e2c9d4e1a2b3c4d5e6')
+req = Net::HTTP::Get.new(uri, { 'Authorization' => 'Bearer pc_live_...' })
+
+res = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) { |http| http.request(req) }
+payment = JSON.parse(res.body)['payment']`,
           },
         ]}
       />

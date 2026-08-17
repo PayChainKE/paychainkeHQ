@@ -95,6 +95,42 @@ res = requests.post(
 
 payment = res.json()['payment']`,
           },
+          {
+            id: "php", label: "PHP", lang: "php", code: `
+$ch = curl_init('https://api.paychain.co.ke/api/v1/developer/payments/collect');
+curl_setopt_array($ch, [
+    CURLOPT_POST => true,
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_HTTPHEADER => [
+        'Authorization: Bearer pc_test_51a2...',
+        'Idempotency-Key: order-4821',
+        'Content-Type: application/json',
+    ],
+    CURLOPT_POSTFIELDS => json_encode([
+        'amount' => 500,
+        'phone' => '0712345678',
+        'reference' => 'order-4821',
+    ]),
+]);
+
+$payment = json_decode(curl_exec($ch), true)['payment'];`,
+          },
+          {
+            id: "ruby", label: "Ruby", lang: "ruby", code: `
+require 'net/http'
+require 'json'
+
+uri = URI('https://api.paychain.co.ke/api/v1/developer/payments/collect')
+req = Net::HTTP::Post.new(uri, {
+  'Authorization' => 'Bearer pc_test_51a2...',
+  'Idempotency-Key' => 'order-4821',
+  'Content-Type' => 'application/json',
+})
+req.body = { amount: 500, phone: '0712345678', reference: 'order-4821' }.to_json
+
+res = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) { |http| http.request(req) }
+payment = JSON.parse(res.body)['payment']`,
+          },
         ]}
       />
       <p className="text-[13px] text-ink-faint mb-6">
