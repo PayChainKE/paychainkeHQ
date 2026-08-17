@@ -10,7 +10,7 @@ import { encryptKey } from '../utils/cryptoHelper.js';
 import { getLiveKesToUsdcRate } from '../utils/rateEngine.js';
 import { sendWalletActivationEmail, sendStatementEmail } from '../utils/resend.js';
 import { createNotification } from './notificationController.js';
-import { getCheckoutTotal, getInvoiceCheckoutTotal } from '../utils/pricingEngine.js';
+import { getCheckoutTotal, getInvoiceCheckoutTotal, calculateCustomerSurcharge, calculateInvoiceClientMarkup, PricingEngineError } from '../utils/pricingEngine.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
@@ -659,9 +659,17 @@ export const getPaymentLink = async (req, res) => {
       return res.status(400).json({ error: `This payment link is ${link.status}.` });
     }
 
+    // Same fee/total the STK prompt will actually charge (processPaymentLink
+    // uses this exact invoiceId branch below) — shown up front here since
+    // NCBA's STK Push payload has no room for a fee breakdown, only a
+    // single total Amount (see getCheckoutPreview's doc comment above).
+    const fee = link.invoiceId ? calculateInvoiceClientMarkup(link.amount) : calculateCustomerSurcharge(link.amount);
+
     res.json({
       success: true,
       amount: link.amount,
+      fee,
+      total: Math.round((link.amount + fee) * 100) / 100,
       currency: link.currency,
       merchantName: link.merchantId.businessName,
       // Was merchant.paybillAccount (PayChain's internal 5-digit STK
@@ -785,6 +793,35 @@ export const getMerchantByAccount = async (req, res) => {
   } catch (error) {
     console.error('❌ Error fetching merchant by account:', error);
     res.status(500).json({ error: 'Failed to fetch account details.' });
+  }
+};
+
+// @desc    Preview the customer-facing fee breakdown for a given amount,
+//          BEFORE the STK prompt is triggered. NCBA's STK Push API has no
+//          free-text/description field (TelephoneNo, Amount, PayBillNo,
+//          AccountNo, Network, TransactionType only — confirmed against
+//          NCBA's own spec) — the actual M-PESA prompt on the customer's
+//          phone is a fixed Safaricom template showing just the total
+//          Amount, so a fee line can never appear inside the prompt
+//          itself. This is the next best thing: reuses the exact same
+//          calculateCustomerSurcharge the real charge uses (never a
+//          separate/duplicated calculation that could drift), so what the
+//          customer sees here always matches what they're actually
+//          charged.
+// @route   GET /api/transactions/checkout-preview?amount=X
+// @access  Public
+export const getCheckoutPreview = (req, res) => {
+  const baseAmount = Number(req.query.amount);
+  if (!Number.isFinite(baseAmount) || baseAmount <= 0) {
+    return res.status(400).json({ error: 'A valid amount is required.' });
+  }
+  try {
+    const fee = calculateCustomerSurcharge(baseAmount);
+    res.json({ success: true, baseAmount, fee, total: Math.round((baseAmount + fee) * 100) / 100 });
+  } catch (err) {
+    if (err instanceof PricingEngineError) return res.status(400).json({ error: err.message });
+    console.error('❌ Error computing checkout preview:', err);
+    res.status(500).json({ error: 'Failed to calculate transaction fee.' });
   }
 };
 
