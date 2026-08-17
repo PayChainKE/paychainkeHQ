@@ -626,8 +626,10 @@ export default function BulkPay() {
 
   const validateNewPayee = (): string | null => {
     if (!newPayee.name.trim()) return 'Recipient name is required.';
-    if (newPayee.type === 'employee' && (!newPayee.kraPin || !newPayee.idNumber)) {
-      return 'KRA PIN and ID Number are required for employees.';
+    // Employees don't always have their KRA PIN on hand — ID Number is an
+    // accepted alternative, matching the merchant dashboard's Add Payee form.
+    if (newPayee.type === 'employee' && !newPayee.kraPin && !newPayee.idNumber) {
+      return 'Enter either a KRA PIN or an ID Number for this employee.';
     }
     if (newPayee.type === 'supplier' && (!newPayee.kraPin || !newPayee.etimsInvoiceNumber || !newPayee.cuNumber)) {
       return 'KRA PIN, eTIMS Invoice, and CU Number are required for suppliers.';
@@ -1913,7 +1915,7 @@ export default function BulkPay() {
                     {newPayee.type === 'employee' && (
                       <View className="bg-[#f0fdf4] rounded-2xl p-4 mb-4 border border-[#bbf7d0]">
                         <Text className="text-[10px] font-jakarta-bold text-[#006c4e] uppercase tracking-wider mb-3">KRA Payroll Details</Text>
-                        <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">KRA PIN *</Text>
+                        <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">KRA PIN {newPayee.idNumber ? '' : '*'}</Text>
                         <TextInput
                           value={newPayee.kraPin}
                           onChangeText={(t) => setNewPayee({ ...newPayee, kraPin: t.toUpperCase() })}
@@ -1922,7 +1924,10 @@ export default function BulkPay() {
                           placeholderTextColor="#a1a1aa"
                           className="bg-white border border-[#e7ece7] rounded-xl px-4 py-3 text-[#0c2010] font-jakarta-bold text-[14px] mb-3"
                         />
-                        <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">ID Number *</Text>
+                        {/* Employees don't always have their KRA PIN on hand —
+                            ID Number is an accepted alternative (see
+                            validateNewPayee above). */}
+                        <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">ID Number {newPayee.kraPin ? '' : '*'}</Text>
                         <TextInput
                           value={newPayee.idNumber}
                           onChangeText={(t) => setNewPayee({ ...newPayee, idNumber: t.replace(/\D/g, '') })}

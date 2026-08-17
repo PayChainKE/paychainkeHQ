@@ -155,10 +155,10 @@ export default function Dashboard({ navigation }: any) {
   }, [merchant, fetchDashboardData]);
 
   // Keep the balance/chart/transaction data live, matching the merchant
-  // dashboard Overview's 5s poll + refetch-on-focus behavior.
+  // dashboard Overview's 3s poll + refetch-on-focus behavior.
   useEffect(() => {
     if (!merchant) return;
-    const interval = setInterval(fetchDashboardData, 5000);
+    const interval = setInterval(fetchDashboardData, 3000);
     return () => clearInterval(interval);
   }, [merchant, fetchDashboardData]);
 

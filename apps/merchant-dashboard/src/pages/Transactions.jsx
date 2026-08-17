@@ -60,7 +60,7 @@ export default function Transactions() {
   // Poll every 5s so the transaction list stays live without a manual refresh
   useEffect(() => {
     if (!merchant) return;
-    const interval = setInterval(fetchTransactions, 5000);
+    const interval = setInterval(fetchTransactions, 3000);
     return () => clearInterval(interval);
   }, [merchant, fetchTransactions]);
 

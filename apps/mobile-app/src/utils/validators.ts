@@ -119,7 +119,7 @@ export const validators: Record<FieldKind, (v: string) => ValidationResult> = {
   },
   nationalId: (v) => {
     if (!v) return { valid: false, error: 'National ID is required.' };
-    if (!/^\d{7,8}$/.test(v)) return { valid: false, error: 'ID must be 7 or 8 digits.' };
+    if (!/^\d{7,9}$/.test(v)) return { valid: false, error: 'ID must be 7 to 9 digits.' };
     return VALID;
   },
   paybill: (v) => {

@@ -20,6 +20,7 @@ import {
   getInsights,
   getLedger,
   getSystemStatus,
+  getStkRequests,
 } from '../controllers/adminController.js';
 import {
   getCommunications,
@@ -181,6 +182,7 @@ router.delete('/bookkeeping/expenses/:id',protect, requireMutator, deleteExpense
 
 // Compact health pulse for the sidebar widget.
 router.get('/system-status', protect, excludeOfficer, getSystemStatus);
+router.get('/stk-requests', protect, excludeOfficer, getStkRequests);
 
 // Global audit log (filterable, paginated).
 router.get('/audit-log', protect, excludeOfficer, getAuditLog);

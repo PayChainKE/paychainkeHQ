@@ -530,8 +530,8 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
 // Query endpoint. Rather than depend on an unconfirmed IPN shape, the
 // outcome is learned by polling shortly after the prompt is sent, then fed
 // through the exact same resolveStkOutcome() a real Safaricom callback uses.
-const NCBA_STK_POLL_INTERVAL_MS = 4000;
-const NCBA_STK_POLL_MAX_ATTEMPTS = 30; // ~2 minutes — typical STK prompt validity window
+const NCBA_STK_POLL_INTERVAL_MS = 2000;
+const NCBA_STK_POLL_MAX_ATTEMPTS = 60; // ~2 minutes — typical STK prompt validity window, unchanged
 
 // Fire-and-forget: intentionally not awaited by callers, mirroring how every
 // other webhook-driven settlement in this codebase (Daraja's own callbacks,

@@ -125,7 +125,7 @@ export default function Transactions({ navigation }: any) {
   // so a new payment never appeared until the merchant left and re-entered
   // the screen.
   useEffect(() => {
-    const interval = setInterval(fetchTransactions, 5000);
+    const interval = setInterval(fetchTransactions, 3000);
     return () => clearInterval(interval);
   }, [fetchTransactions]);
 

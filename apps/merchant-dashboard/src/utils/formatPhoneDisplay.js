@@ -16,9 +16,16 @@ export function formatPhoneDisplay(value) {
 // Same normalization, but for a "Phone Number" receipt field specifically —
 // where showing a passed-through non-phone value (a paybill number, a bank
 // account, "MASTER_WALLET") mislabeled as a phone number would be actively
-// wrong rather than merely unformatted. Returns '—' for anything that isn't
-// recognizably a Kenyan MSISDN.
+// wrong rather than merely unformatted. Only genuinely non-phone-shaped
+// values (no digit run of Kenyan-MSISDN length at all) fall back to '—' —
+// a real phone number that merely didn't match the strict 07XX/01XX
+// pattern (e.g. still 254-prefixed, or with stray formatting) is shown as
+// received rather than hidden outright, since a receipt hiding a real
+// number the record actually has is worse than showing it unformatted.
 export function formatPhoneOrDash(value) {
   const formatted = formatPhoneDisplay(value)
-  return formatted && /^0[71]\d{8}$/.test(String(formatted)) ? formatted : '—'
+  if (formatted && /^0[71]\d{8}$/.test(String(formatted))) return formatted
+  const digits = String(value ?? '').replace(/\D/g, '')
+  if (/\d{9,12}/.test(digits)) return String(value)
+  return '—'
 }
