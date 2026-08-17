@@ -130,15 +130,21 @@ export default function PaymentPage() {
           </div>
           <h2 className="font-headline text-2xl text-on-surface mb-1">Pay {linkDetails.merchantName}</h2>
           <p className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-70">
-            Account: {linkDetails.account}
+            PayChain Verified Business
           </p>
         </div>
 
         <div className="bg-surface-container-lowest p-8 md:p-10 flex flex-col items-center">
-          <p className="text-sm font-medium text-on-surface-variant mb-2">Requested Amount</p>
-          <h1 className="font-headline text-5xl md:text-6xl text-primary tracking-tighter tabular-nums mb-8">
-            {formatKES(linkDetails.amount)}
+          <p className="text-sm font-medium text-on-surface-variant mb-2">Total to Pay</p>
+          <h1 className="font-headline text-5xl md:text-6xl text-primary tracking-tighter tabular-nums mb-3">
+            {formatKES(linkDetails.total ?? linkDetails.amount)}
           </h1>
+          {linkDetails.fee > 0 && (
+            <p className="text-xs font-medium text-on-surface-variant/70 mb-8 tabular-nums">
+              {formatKES(linkDetails.amount)} + {formatKES(linkDetails.fee)} transaction fee
+            </p>
+          )}
+          {!(linkDetails.fee > 0) && <div className="mb-8" />}
 
           <form onSubmit={handlePayment} className="w-full space-y-6">
             <div className="space-y-3">

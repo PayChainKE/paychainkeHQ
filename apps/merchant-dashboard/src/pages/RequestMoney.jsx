@@ -22,7 +22,40 @@ export default function RequestMoney() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [statusText, setStatusText] = useState('')
   const [generatedLink, setGeneratedLink] = useState('')
+  // Previously a failed/timed-out STK request only showed a toast and reset
+  // back to the same plain amount/phone form — indistinguishable from never
+  // having submitted at all, so a merchant glancing back at the screen had
+  // no idea what actually happened. Now routes to the same step-3 outcome
+  // screen success already uses, just in its failed variant.
+  const [requestFailed, setRequestFailed] = useState(false)
+  const [failureReason, setFailureReason] = useState('')
+  const [feePreview, setFeePreview] = useState(null) // { baseAmount, fee, total } | null
   const pollIntervalRef = useRef(null)
+
+  // The customer on the other end of an M-PESA prompt never sees any
+  // PayChain page (unlike Payment Links / Pay Account, which show this same
+  // breakdown before the customer submits) — the prompt is a fixed
+  // Safaricom template with no room to explain a fee, so a merchant
+  // requesting KES 100 has their customer see a prompt for KES 113 with no
+  // context. Showing the merchant the true total here, before they send it,
+  // means they know to mention it to the customer themselves (a customer
+  // also now gets a heads-up SMS — see buildPaymentRequestSms).
+  useEffect(() => {
+    const numericAmount = Number(amount)
+    if (selectedOption?.id !== 'mpesa' || !Number.isFinite(numericAmount) || numericAmount <= 0) {
+      setFeePreview(null)
+      return
+    }
+    const timeout = setTimeout(async () => {
+      try {
+        const res = await axios.get(`${API_URL}/api/transactions/checkout-preview`, { params: { amount: numericAmount } })
+        if (res.data?.success) setFeePreview(res.data)
+      } catch {
+        setFeePreview(null)
+      }
+    }, 400)
+    return () => clearTimeout(timeout)
+  }, [amount, selectedOption])
 
   // Stop the STK status poll if the merchant navigates away mid-request —
   // without this, the interval kept running after unmount and called
@@ -66,6 +99,8 @@ export default function RequestMoney() {
     setPhone('')
     setGeneratedLink('')
     setStatusText('')
+    setRequestFailed(false)
+    setFailureReason('')
   }
 
   const handleSelect = (opt) => {
@@ -127,12 +162,18 @@ export default function RequestMoney() {
             clearInterval(pollIntervalRef.current)
             setIsSubmitting(false)
             setStatusText('')
+            setRequestFailed(true)
+            setFailureReason(statusRes.data.resultDesc || 'They cancelled or the request failed.')
             addNotification({ title: 'Request Failed', message: statusRes.data.resultDesc || 'They cancelled or the request failed.', type: 'error' })
+            setStep(3)
           } else if (attempts >= maxAttempts) {
             clearInterval(pollIntervalRef.current)
             setIsSubmitting(false)
             setStatusText('')
+            setRequestFailed(true)
+            setFailureReason('The request timed out waiting for a response.')
             addNotification({ title: 'Timeout', message: 'The request timed out. Please try again.', type: 'error' })
+            setStep(3)
           }
         } catch (e) {
           console.error('STK status poll error', e)
@@ -142,10 +183,15 @@ export default function RequestMoney() {
       setIsSubmitting(false)
       setStatusText('')
       if (err.response?.status >= 500) {
+        setRequestFailed(true)
+        setFailureReason('The prompt may have been sent. If they see an M-PESA popup, they can still enter their PIN — check your transaction history shortly.')
         addNotification({ title: 'Check Their Phone', message: 'The prompt may have been sent. If they see an M-PESA popup, they can still enter their PIN.', type: 'error' })
       } else {
+        setRequestFailed(true)
+        setFailureReason(err.response?.data?.error || 'Could not send M-PESA prompt.')
         addNotification({ title: 'Request Failed', message: err.response?.data?.error || 'Could not send M-PESA prompt.', type: 'error' })
       }
+      setStep(3)
     }
   }
 
@@ -298,6 +344,17 @@ export default function RequestMoney() {
                   placeholder="1,000"
                   className="w-full bg-surface-container-low border border-outline-variant/5 rounded-3xl py-5 px-6 text-2xl font-headline text-primary focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
                 />
+                {feePreview && (
+                  <div className="flex flex-col gap-1 px-1 text-xs font-medium text-on-surface-variant">
+                    <div className="flex justify-between">
+                      <span>They'll be asked to pay</span>
+                      <span className="tabular-nums font-black text-primary">KES {feePreview.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    {feePreview.fee > 0 && (
+                      <span className="text-[11px] opacity-70">Includes a KES {feePreview.fee.toLocaleString(undefined, { minimumFractionDigits: 2 })} transaction fee on top of your KES {feePreview.baseAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })} request.</span>
+                    )}
+                  </div>
+                )}
               </div>
 
               {selectedOption?.id === 'mpesa' && (
@@ -339,17 +396,26 @@ export default function RequestMoney() {
         ) : (
           <div className="bg-white rounded-[32px] border border-slate-200 shadow-2xl p-8 lg:p-12 relative max-w-2xl mx-auto lg:mx-0">
             <div className="py-10 text-center">
-              <div className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-xl bg-emerald-500 text-white">
-                <span className="material-symbols-outlined text-4xl">check_circle</span>
+              <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-xl text-white ${selectedOption?.id === 'mpesa' && requestFailed ? 'bg-rose-500' : 'bg-emerald-500'}`}>
+                <span className="material-symbols-outlined text-4xl">{selectedOption?.id === 'mpesa' && requestFailed ? 'error' : 'check_circle'}</span>
               </div>
 
               {selectedOption?.id === 'mpesa' ? (
-                <>
-                  <h3 className="text-2xl font-headline font-bold text-primary mb-3">Payment Received</h3>
-                  <p className="text-on-surface-variant font-medium max-w-sm mx-auto opacity-70 leading-relaxed mb-10">
-                    KES {Number(amount).toLocaleString()} has been credited to your PayChain balance.
-                  </p>
-                </>
+                requestFailed ? (
+                  <>
+                    <h3 className="text-2xl font-headline font-bold text-rose-600 mb-3">Request Failed</h3>
+                    <p className="text-on-surface-variant font-medium max-w-sm mx-auto opacity-70 leading-relaxed mb-10">
+                      {failureReason}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h3 className="text-2xl font-headline font-bold text-primary mb-3">Payment Received</h3>
+                    <p className="text-on-surface-variant font-medium max-w-sm mx-auto opacity-70 leading-relaxed mb-10">
+                      KES {Number(amount).toLocaleString()} has been credited to your PayChain balance.
+                    </p>
+                  </>
+                )
               ) : (
                 <>
                   <h3 className="text-2xl font-headline font-bold text-primary mb-3">Link Ready to Share</h3>
@@ -371,10 +437,13 @@ export default function RequestMoney() {
               )}
 
               <button
-                onClick={() => navigate('/overview')}
+                // Retry keeps the amount/phone already entered — no reason to
+                // make the merchant retype the same details for a second
+                // attempt, just clear the failed state so the form re-enables.
+                onClick={selectedOption?.id === 'mpesa' && requestFailed ? () => { setRequestFailed(false); setFailureReason(''); setStep(2) } : () => navigate('/overview')}
                 className="mt-4 py-4 px-10 bg-[#00351D] text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:brightness-110 transition-all shadow-xl"
               >
-                Back to Dashboard
+                {selectedOption?.id === 'mpesa' && requestFailed ? 'Try Again' : 'Back to Dashboard'}
               </button>
             </div>
           </div>

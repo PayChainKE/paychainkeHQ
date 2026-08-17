@@ -34,6 +34,10 @@ const Developers = () => {
   const [webhooksData, setWebhooksData] = useState(null);
   const [webhooksLoading, setWebhooksLoading] = useState(false);
   const [webhooksError, setWebhooksError] = useState('');
+  const [testDeveloper, setTestDeveloper] = useState(null);
+  const [testResult, setTestResult] = useState(null);
+  const [testRunning, setTestRunning] = useState(false);
+  const [testError, setTestError] = useState('');
 
   const fetchDevelopers = useCallback(async () => {
     setLoading(true);
@@ -96,6 +100,25 @@ const Developers = () => {
     } catch (e) {
       showToast(e?.response?.data?.error || e?.message || 'Could not update live access.');
     } finally { setBusyId(null); }
+  }
+
+  function openIntegrationTest(developer) {
+    setTestDeveloper(developer);
+    setTestResult(null);
+    setTestError('');
+  }
+
+  async function runIntegrationTest() {
+    if (!testDeveloper) return;
+    setTestRunning(true);
+    setTestError('');
+    try {
+      const res = await api.post(`/api/admin/developers/${testDeveloper._id}/run-integration-test`);
+      if (res.data?.success) setTestResult(res.data.data);
+      else setTestError(res.data?.error || 'Could not run the integration test.');
+    } catch (e) {
+      setTestError(e?.response?.data?.error || 'Could not run the integration test.');
+    } finally { setTestRunning(false); }
   }
 
   async function openWebhooks(developer) {
@@ -183,7 +206,7 @@ const Developers = () => {
                 ) : filtered.length === 0 ? (
                   <tr><td colSpan={6} className="px-4 py-10 text-center text-on-surface-variant/40 text-sm">{error || 'No developer accounts yet.'}</td></tr>
                 ) : pagedDevelopers.map((d) => (
-                  <DeveloperRow key={d._id} developer={d} canManage={canManage} busy={busyId === d._id} onApprove={() => handleApprove(d)} onReject={() => handleReject(d)} onViewWebhooks={() => openWebhooks(d)} />
+                  <DeveloperRow key={d._id} developer={d} canManage={canManage} busy={busyId === d._id} onApprove={() => handleApprove(d)} onReject={() => handleReject(d)} onViewWebhooks={() => openWebhooks(d)} onTestIntegration={() => openIntegrationTest(d)} />
                 ))}
               </tbody>
             </table>
@@ -195,7 +218,7 @@ const Developers = () => {
           {loading ? <div className="p-8 text-center text-on-surface-variant/40 text-sm">Loading developers…</div> :
             filtered.length === 0 ? <div className="p-8 text-center text-on-surface-variant/40 text-sm">{error || 'No developer accounts yet.'}</div> :
             pagedDevelopers.map((d) => (
-              <DeveloperCard key={d._id} developer={d} canManage={canManage} busy={busyId === d._id} onApprove={() => handleApprove(d)} onReject={() => handleReject(d)} onViewWebhooks={() => openWebhooks(d)} />
+              <DeveloperCard key={d._id} developer={d} canManage={canManage} busy={busyId === d._id} onApprove={() => handleApprove(d)} onReject={() => handleReject(d)} onViewWebhooks={() => openWebhooks(d)} onTestIntegration={() => openIntegrationTest(d)} />
             ))}
           {!loading && filtered.length > 0 && (
             <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 shadow-editorial overflow-hidden">
@@ -215,6 +238,17 @@ const Developers = () => {
             loading={webhooksLoading}
             error={webhooksError}
             onClose={() => setWebhooksDeveloper(null)}
+          />
+        )}
+
+        {testDeveloper && (
+          <IntegrationTestDrawer
+            developer={testDeveloper}
+            result={testResult}
+            running={testRunning}
+            error={testError}
+            onRun={runIntegrationTest}
+            onClose={() => setTestDeveloper(null)}
           />
         )}
       </div>
@@ -273,7 +307,7 @@ const DeveloperActions = ({ developer, canManage, busy, onApprove, onReject }) =
   return <span className="text-2xs text-on-surface-variant/40">No action needed</span>;
 };
 
-const DeveloperRow = ({ developer, canManage, busy, onApprove, onReject, onViewWebhooks }) => {
+const DeveloperRow = ({ developer, canManage, busy, onApprove, onReject, onViewWebhooks, onTestIntegration }) => {
   const statusStyle = STATUS_META[developer.status] || STATUS_META.active;
   const liveStyle = liveAccessMeta(developer);
   const initials = (developer.companyName || developer.email).split(/\s+/).map((s) => s[0]).slice(0, 2).join('').toUpperCase();
@@ -310,13 +344,21 @@ const DeveloperRow = ({ developer, canManage, busy, onApprove, onReject, onViewW
         </button>
       </td>
       <td className="px-3 py-2 border-b border-outline-variant/5 text-right">
-        <DeveloperActions developer={developer} canManage={canManage} busy={busy} onApprove={onApprove} onReject={onReject} />
+        <div className="flex items-center justify-end gap-2">
+          {canManage && (
+            <button onClick={onTestIntegration} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-2xs font-bold uppercase tracking-widest transition-colors">
+              <span className="material-symbols-outlined text-sm">science</span>
+              Test
+            </button>
+          )}
+          <DeveloperActions developer={developer} canManage={canManage} busy={busy} onApprove={onApprove} onReject={onReject} />
+        </div>
       </td>
     </tr>
   );
 };
 
-const DeveloperCard = ({ developer, canManage, busy, onApprove, onReject, onViewWebhooks }) => {
+const DeveloperCard = ({ developer, canManage, busy, onApprove, onReject, onViewWebhooks, onTestIntegration }) => {
   const statusStyle = STATUS_META[developer.status] || STATUS_META.active;
   const liveStyle = liveAccessMeta(developer);
   const initials = (developer.companyName || developer.email).split(/\s+/).map((s) => s[0]).slice(0, 2).join('').toUpperCase();
@@ -333,12 +375,18 @@ const DeveloperCard = ({ developer, canManage, busy, onApprove, onReject, onView
             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-bold uppercase tracking-widest border ${statusStyle.pill}`}>{statusStyle.label}</span>
             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-bold uppercase tracking-widest border ${liveStyle.pill}`}>{liveStyle.label}</span>
           </div>
-          <div className="mt-3 flex items-center gap-2">
+          <div className="mt-3 flex items-center gap-2 flex-wrap">
             <DeveloperActions developer={developer} canManage={canManage} busy={busy} onApprove={onApprove} onReject={onReject} />
             <button onClick={onViewWebhooks} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-outline-variant/30 text-2xs font-bold uppercase tracking-widest text-on-surface-variant/70">
               <span className="material-symbols-outlined text-sm">webhook</span>
               Webhooks
             </button>
+            {canManage && (
+              <button onClick={onTestIntegration} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 text-2xs font-bold uppercase tracking-widest">
+                <span className="material-symbols-outlined text-sm">science</span>
+                Test
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -431,5 +479,120 @@ const WebhooksDrawer = ({ developer, data, loading, error, onClose }) => {
     </div>
   );
 };
+
+// Slide-over panel that lets an admin actually run a developer's
+// integration before approving live access, instead of taking their word
+// for it — Test 1 fires a real simulated test-mode collect through the same
+// pipeline any test API call uses (proves the merchant link + test key are
+// set up correctly); Test 2 pings every one of the developer's registered
+// webhook endpoints for real (proves their server is reachable and returns
+// 2xx). Both zero-risk: test-mode never touches a real rail or balance, and
+// webhook pings are the same "Send test event" ping developers already
+// trigger on themselves from their own dashboard.
+const IntegrationTestDrawer = ({ developer, result, running, error, onRun, onClose }) => {
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-lg h-full bg-white shadow-2xl overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-outline-variant/10 px-5 py-4 flex items-start justify-between z-10">
+          <div>
+            <p className="text-2xs font-bold uppercase tracking-[0.2em] text-indigo-600 mb-0.5">Integration Test</p>
+            <h3 className="text-base font-bold text-on-surface tracking-tight">{developer.companyName}</h3>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant/60 hover:bg-surface-container-low">
+            <span className="material-symbols-outlined text-lg">close</span>
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {!result && !running && (
+            <div className="text-center py-8">
+              <div className="w-14 h-14 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto mb-3">
+                <span className="material-symbols-outlined text-2xl">science</span>
+              </div>
+              <p className="text-sm text-on-surface-variant/70 max-w-xs mx-auto mb-5">
+                Runs a simulated test-mode collect and pings every registered webhook, so you can verify this integration actually works before approving live access.
+              </p>
+              <button onClick={onRun} className="px-4 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold uppercase tracking-widest">
+                Run Test
+              </button>
+            </div>
+          )}
+
+          {running && (
+            <div className="text-center py-10">
+              <div className="w-8 h-8 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-3" />
+              <p className="text-xs text-on-surface-variant/60 font-bold uppercase tracking-widest">Running checks…</p>
+              <p className="text-2xs text-on-surface-variant/40 mt-1">This can take a few seconds — a simulated payment has to settle.</p>
+            </div>
+          )}
+
+          {error && !running && (
+            <div className="bg-red-50 border border-red-100 rounded-xl p-4 text-sm text-red-700">{error}</div>
+          )}
+
+          {result && !running && (
+            <>
+              {result.merchant ? (
+                <div className="bg-surface-container-low/60 rounded-lg p-3">
+                  <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1">Linked merchant</p>
+                  <p className="text-xs font-bold text-on-surface">{result.merchant.businessName}</p>
+                </div>
+              ) : null}
+
+              <TestResultCard
+                title="1. Simulated test-mode collect"
+                subtitle="Proves the merchant link and test API key work end to end"
+                passed={result.collectTest.passed}
+                message={result.collectTest.message}
+              />
+
+              {result.noWebhooksRegistered ? (
+                <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 flex gap-2.5">
+                  <span className="material-symbols-outlined text-amber-600 text-lg shrink-0">info</span>
+                  <p className="text-xs text-amber-800">
+                    No webhook registered yet — this integration will need to poll <code className="font-mono">GET /payments/:id</code> instead, which is a valid alternative but worth confirming with the developer.
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/50 mb-2">2. Webhook delivery</p>
+                  <div className="space-y-2">
+                    {result.webhookTests.map((w) => (
+                      <TestResultCard
+                        key={w.webhookId}
+                        title={w.url}
+                        mono
+                        passed={w.passed}
+                        message={w.passed ? `Delivered — HTTP ${w.responseCode}` : (w.error || 'Delivery failed.')}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <button onClick={onRun} className="w-full px-4 py-2.5 rounded-lg border border-outline-variant/30 text-on-surface-variant/70 hover:bg-surface-container-low text-2xs font-bold uppercase tracking-widest transition-colors">
+                Run again
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const TestResultCard = ({ title, subtitle, message, passed, mono }) => (
+  <div className={`rounded-xl border p-3.5 flex gap-3 ${passed ? 'bg-emerald-50/60 border-emerald-200' : 'bg-red-50/60 border-red-200'}`}>
+    <span className={`material-symbols-outlined text-lg shrink-0 ${passed ? 'text-emerald-600' : 'text-red-600'}`}>
+      {passed ? 'check_circle' : 'cancel'}
+    </span>
+    <div className="min-w-0">
+      <p className={`text-xs font-bold break-all ${mono ? 'font-mono' : ''} ${passed ? 'text-emerald-800' : 'text-red-800'}`}>{title}</p>
+      {subtitle && <p className="text-2xs text-on-surface-variant/50 mt-0.5">{subtitle}</p>}
+      <p className={`text-2xs mt-1 ${passed ? 'text-emerald-700/80' : 'text-red-700/80'}`}>{message}</p>
+    </div>
+  </div>
+);
 
 export default Developers;

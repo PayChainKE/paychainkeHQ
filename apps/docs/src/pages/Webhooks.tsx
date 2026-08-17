@@ -78,6 +78,41 @@ res = requests.post(
 webhook = res.json()['webhook']
 print(webhook['secret'])  # whsec_..., shown once, store it now`,
           },
+          {
+            id: "php", label: "PHP", lang: "php", code: `
+$ch = curl_init('https://api.paychain.co.ke/api/developer/webhooks');
+curl_setopt_array($ch, [
+    CURLOPT_POST => true,
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_HTTPHEADER => [
+        'Authorization: Bearer <developer-jwt>',
+        'Content-Type: application/json',
+    ],
+    CURLOPT_POSTFIELDS => json_encode([
+        'url' => 'https://your-server.com/webhooks/paychain',
+        'events' => ['*'],
+    ]),
+]);
+
+$webhook = json_decode(curl_exec($ch), true)['webhook'];
+echo $webhook['secret']; // whsec_..., shown once, store it now`,
+          },
+          {
+            id: "ruby", label: "Ruby", lang: "ruby", code: `
+require 'net/http'
+require 'json'
+
+uri = URI('https://api.paychain.co.ke/api/developer/webhooks')
+req = Net::HTTP::Post.new(uri, {
+  'Authorization' => 'Bearer <developer-jwt>',
+  'Content-Type' => 'application/json',
+})
+req.body = { url: 'https://your-server.com/webhooks/paychain', events: ['*'] }.to_json
+
+res = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) { |http| http.request(req) }
+webhook = JSON.parse(res.body)['webhook']
+puts webhook['secret'] # whsec_..., shown once, store it now`,
+          },
         ]}
         className="mb-4"
       />
@@ -210,6 +245,49 @@ def paychain_webhook():
     event = request.get_json()
     # ...handle event['event'] / event['data']['payment']
     return '', 200`,
+          },
+          {
+            id: "php", label: "PHP", lang: "php", code: `
+function isValidSignature(string $rawBody, string $signatureHeader, string $secret): bool {
+    $expected = hash_hmac('sha256', $rawBody, $secret);
+    return hash_equals($expected, $signatureHeader);
+}
+
+// Read the RAW request body, not $_POST, or the signature will never match.
+$rawBody = file_get_contents('php://input');
+$signature = $_SERVER['HTTP_X_PAYCHAIN_SIGNATURE'] ?? '';
+
+if (!isValidSignature($rawBody, $signature, getenv('PAYCHAIN_WEBHOOK_SECRET'))) {
+    http_response_code(401);
+    exit;
+}
+
+$event = json_decode($rawBody, true);
+// ...handle $event['event'] / $event['data']['payment']
+http_response_code(200);`,
+          },
+          {
+            id: "ruby", label: "Ruby", lang: "ruby", code: `
+require 'openssl'
+require 'json'
+
+def valid_signature?(raw_body, signature_header, secret)
+  expected = OpenSSL::HMAC.hexdigest('sha256', secret, raw_body)
+  ActiveSupport::SecurityUtils.secure_compare(expected, signature_header)
+end
+
+# Rails example: request.raw_post is the RAW body, not params, or the
+# signature will never match.
+post '/webhooks/paychain' do
+  signature = request.headers['X-PayChain-Signature'].to_s
+  unless valid_signature?(request.raw_post, signature, ENV['PAYCHAIN_WEBHOOK_SECRET'])
+    halt 401
+  end
+
+  event = JSON.parse(request.raw_post)
+  # ...handle event['event'] / event['data']['payment']
+  status 200
+end`,
           },
         ]}
       />

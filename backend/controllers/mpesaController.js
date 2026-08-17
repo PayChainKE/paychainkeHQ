@@ -16,7 +16,7 @@ import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard
 import { getLipaNaMpesaTariff } from '../config/lipaNaMpesaTariffCard.js';
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay.js';
 import { AUTO_INFLATION_SHIELD_ENABLED } from '../config/inflationShieldFlag.js';
-import { buildPaymentReceivedSms, buildCustomerPaidSms } from '../utils/paymentSmsTemplates.js';
+import { buildPaymentReceivedSms, buildCustomerPaidSms, buildPaymentRequestSms } from '../utils/paymentSmsTemplates.js';
 import { initiateStkPush as ncbaInitiateStkPush, queryStkPush as ncbaQueryStkPush, generateQrCode as ncbaGenerateQrCode } from '../services/ncbaStkPushService.js';
 import { validateMobileWalletNumber as ncbaValidateMobileWalletNumber, submitMobileB2wPayment as ncbaSubmitMobileB2wPayment, validateLipaNaMpesaAccount as ncbaValidateLnmAccount, submitLipaNaMpesaPayment as ncbaSubmitLnmPayment, NcbaOpenBankingValidationError } from '../services/ncbaOpenBankingService.js';
 import { validatePhoneNumber, NcbaValidationError, getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
@@ -67,6 +67,33 @@ export const initiateSTKPush = async (req, res) => {
     const kind = purpose === 'request_money' ? 'request_money' : 'topup';
     const checkoutTotal = getCheckoutTotal(intAmount);
 
+    // Request Money is the one STK flow where the customer never lands on
+    // any PayChain page first — Payment Links / Pay Account already show
+    // the fee breakdown on-screen before the customer submits, but here the
+    // M-PESA prompt (fixed Safaricom template, total only, no free-text
+    // field) is their very first and only signal. Without this, a merchant
+    // requesting KES 100 has their customer see a prompt for KES 113 with
+    // no explanation — reads as an overcharge.
+    //
+    // Awaited (not fire-and-forget) so the SMS is actually dispatched to
+    // Africa's Talking BEFORE NCBA is ever asked to send the prompt — the
+    // whole point is the customer reads the context first. safeSendSMS
+    // never throws (documented contract), so this can't fail the request;
+    // it only adds the SMS dispatch time (typically under a second) to the
+    // response, in exchange for a real ordering guarantee instead of a
+    // race between two independent delivery pipelines.
+    if (kind === 'request_money') {
+      const result = await safeSendSMS({
+        to: formattedPhone,
+        message: buildPaymentRequestSms({
+          businessName: req.merchant.businessName,
+          baseAmount: intAmount,
+          fee: Math.round((checkoutTotal - intAmount) * 100) / 100,
+        }).message,
+      });
+      if (!result.success) console.error(`Pre-push request SMS failed for ${formattedPhone}:`, result.error);
+    }
+
     // Real STK Push via NCBA's shared Paybill 880100 (or simulated — see
     // services/ncbaStkPushService.js's NCBA_STK_LIVE_ENABLED gate).
     const checkoutRequestId = await initiateAndTrackNcbaStk({
@@ -92,7 +119,7 @@ export const initiateSTKPush = async (req, res) => {
 // surcharge split, SMS) for a resolved STK Push outcome, called by the NCBA
 // poll loop (pollAndResolveNcbaStkPush, below) once queryStkPush reports
 // SUCCESS or FAILED.
-export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc, transTime }) {
+export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc, transTime, allowFailedRetry = false }) {
   // NCBA's poll and the separate generic account-notification webhook can
   // both observe the same underlying transaction. Everything below this
   // point credits a merchant's balance, so once a request has already
@@ -107,8 +134,20 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
   // status:'pending' filter in this findOneAndUpdate is what actually makes
   // only one caller ever win the transition; everyone else gets null back
   // and returns without touching the ledger.
+  //
+  // allowFailedRetry widens that filter to also match an existing 'failed'
+  // row — the one deliberate exception, used only by the NCBA account-
+  // notification/reconciliation webhooks to correct a false failure: NCBA's
+  // STK Query endpoint can report FAILED for a transaction that was still
+  // genuinely in flight (see TRANSIENT_FAILURE_PATTERN below), and once
+  // pollAndResolveNcbaStkPush gives up after REQUIRED_CONSECUTIVE_FAILURES,
+  // nothing polls again — so if the customer's PIN entry actually succeeds
+  // moments later, the only remaining signal is NCBA's own webhook telling
+  // us the money landed. Callers must only ever pass this alongside
+  // succeeded:true — there is no legitimate case for a confirmed 'success'
+  // to later flip back to 'failed' on a webhook replay.
   const claimed = await STKRequest.findOneAndUpdate(
-    { _id: stkReq._id, status: 'pending' },
+    { _id: stkReq._id, status: allowFailedRetry ? { $in: ['pending', 'failed'] } : 'pending' },
     { $set: { status: succeeded ? 'success' : 'failed', resultDesc } },
     { returnDocument: 'after' }
   );
@@ -429,11 +468,24 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
             message: `KES ${merchantCredit.toLocaleString()} was added to your balance via M-PESA.`,
           });
 
-          // 'topup' — the merchant funding their own wallet, no separate
-          // "customer" to name — keeps a plain wallet-top-up message.
-          // 'request_money' / 'pay_account' — a real customer paid, so this
-          // uses the same professional "payment received" format as every
-          // other collection rail.
+          // Self-funding — the merchant paying into their own wallet —
+          // isn't only kind==='topup' (the dedicated Fund Account modal).
+          // It also happens through the open "Pay Account"/Settlement QR
+          // link (kind==='pay_account') whenever the merchant uses their
+          // own link/QR to top up, and through Request Money if a merchant
+          // tests their own request-money prompt (kind==='request_money').
+          // Neither of those carries a distinct kind, so the only reliable
+          // signal is the payer's number matching the merchant's own — this
+          // used to be assumed equivalent to kind==='topup' (see the SMS
+          // skip below), which isn't true for the QR/link case, and
+          // produced a "you have received a payment from [your own number]"
+          // SMS for what was really just a deposit.
+          const isSelfFunding = kind === 'topup' || (merchant.phone && stkReq.phone && merchant.phone === stkReq.phone);
+
+          // Self-funding — no separate "customer" to name — keeps a plain
+          // wallet-top-up/deposit message. A real customer paying uses the
+          // same professional "payment received" format as every other
+          // collection rail.
           // Staggered (see sendStaggeredSms's doc comment in
           // utils/smsSanitizer.js — also covers why "same recipient" cases,
           // like a merchant testing their own request-money link, need this
@@ -447,8 +499,8 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
           if (merchant.phone) {
             topupSends.push({
               to: merchant.phone,
-              message: kind === 'topup'
-                ? `${receipt} Confirmed. KES ${merchantCredit.toLocaleString()} added to your PayChain wallet via M-PESA on ${date} at ${time}. Your updated available balance is KES ${(updatedMerchant.kesBalance || 0).toLocaleString()}.`
+              message: isSelfFunding
+                ? `${receipt} Confirmed. KES ${merchantCredit.toLocaleString()} deposited to your PayChain wallet via M-PESA on ${date} at ${time}. Your updated available balance is KES ${(updatedMerchant.kesBalance || 0).toLocaleString()}.`
                 : buildPaymentReceivedSms({
                     ref: receipt,
                     amount: merchantCredit,
@@ -464,10 +516,9 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
           // The customer/payer side of this — previously missing entirely
           // for 'request_money' and 'pay_account': Payment Links and C2B
           // both already confirm to the payer, this branch never did.
-          // Self-funding top-ups skip this (merchant.phone === stkReq.phone
-          // there in practice, and the merchant SMS above already IS their
+          // Self-funding skips this (the deposit SMS above already IS their
           // confirmation — a second copy would be redundant, not useful).
-          if (kind !== 'topup' && stkReq.phone) {
+          if (!isSelfFunding && stkReq.phone) {
             topupSends.push({
               to: stkReq.phone,
               message: buildCustomerPaidSms({
@@ -487,7 +538,7 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
               const r = results[idx++];
               if (!r.success) console.error(`Wallet top-up SMS failed for merchant ${merchant._id}:`, r.error);
             }
-            if (kind !== 'topup' && stkReq.phone) {
+            if (!isSelfFunding && stkReq.phone) {
               const r = results[idx++];
               if (!r.success) console.error(`STK ${kind} customer SMS failed for ${receipt}:`, r.error);
             }

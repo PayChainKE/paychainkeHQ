@@ -21,6 +21,32 @@ export default function PayAccountPage() {
   const [paymentStatus, setPaymentStatus] = useState('');
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const pollIntervalRef = useRef(null);
+  const [feePreview, setFeePreview] = useState(null); // { baseAmount, fee, total } | null
+
+  // The M-PESA prompt itself has no room for a fee breakdown — NCBA's STK
+  // Push API only accepts TelephoneNo/Amount/PayBillNo/AccountNo/Network/
+  // TransactionType, no free-text field, so the phone just shows one total.
+  // This shows the same breakdown here instead, live as the customer types,
+  // debounced so we're not hitting the API on every keystroke. Always
+  // computed server-side (never duplicated here) so it can never drift from
+  // what's actually charged.
+  useEffect(() => {
+    const numericAmount = Number(amount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      setFeePreview(null);
+      return;
+    }
+    const timeout = setTimeout(async () => {
+      try {
+        const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+        const res = await axios.get(`${API_URL}/api/transactions/checkout-preview`, { params: { amount: numericAmount } });
+        if (res.data?.success) setFeePreview(res.data);
+      } catch {
+        setFeePreview(null); // non-critical — the amount is still shown plainly on the button either way
+      }
+    }, 400);
+    return () => clearTimeout(timeout);
+  }, [amount]);
 
   useEffect(() => {
     return () => {
@@ -155,6 +181,24 @@ export default function PayAccountPage() {
                   className="w-full bg-surface-container-low border border-outline-variant/5 rounded-2xl md:rounded-3xl py-4 md:py-5 pl-16 pr-6 text-xl md:text-2xl font-headline text-primary focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
                 />
               </div>
+              {feePreview && (
+                <div className="flex flex-col gap-1 px-1 text-xs font-medium text-on-surface-variant">
+                  <div className="flex justify-between">
+                    <span>Amount</span>
+                    <span className="tabular-nums">KES {feePreview.baseAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  {feePreview.fee > 0 && (
+                    <div className="flex justify-between">
+                      <span>Transaction fee</span>
+                      <span className="tabular-nums">KES {feePreview.fee.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-black text-primary pt-1 border-t border-outline-variant/10">
+                    <span>Total to pay</span>
+                    <span className="tabular-nums">KES {feePreview.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="space-y-3">

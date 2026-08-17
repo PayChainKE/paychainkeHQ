@@ -26,6 +26,33 @@ export async function wasAlreadySettledByStkPush(merchant, grossAmount) {
   return !!match;
 }
 
+// Finds an STKRequest that pollAndResolveNcbaStkPush (mpesaController.js)
+// already gave up on and marked 'failed' — but that NCBA's own account-
+// notification/reconciliation webhook now shows actually landed. NCBA's STK
+// Query endpoint can report FAILED for a transaction still genuinely in
+// flight (see TRANSIENT_FAILURE_PATTERN in mpesaController.js); once the
+// poll loop's confirmation threshold is hit, nothing polls again, so a
+// customer who pays a few seconds later leaves the STKRequest permanently
+// wrong — the admin STK monitor would show 'failed' for a payment that
+// actually succeeded, and the merchant would only ever get credited via the
+// generic (wrong fee-split) path below instead of the STK-aware one.
+//
+// A wider window than wasAlreadySettledByStkPush's 10 minutes on purpose —
+// this is catching a poll loop that already exhausted its own multi-minute
+// retry budget before giving up, so the webhook confirming success can
+// legitimately arrive well after that.
+const FALSE_FAILURE_RECHECK_WINDOW_MS = 30 * 60 * 1000;
+
+export async function findFalselyFailedStkRequest(merchant, grossAmount) {
+  return STKRequest.findOne({
+    merchantId: merchant._id,
+    channel: 'stk',
+    status: 'failed',
+    amount: grossAmount,
+    updatedAt: { $gte: new Date(Date.now() - FALSE_FAILURE_RECHECK_WINDOW_MS) },
+  });
+}
+
 export class DuplicateCollectionError extends Error {
   constructor(bankRef) {
     super(`NCBA collection ${bankRef} was already processed`);

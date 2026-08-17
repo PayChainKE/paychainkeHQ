@@ -14,7 +14,8 @@ import {
   NcbaValidationError,
 } from '../utils/ncbaValidators.js';
 import { toE164Kenyan } from '../utils/notificationService.js';
-import { creditNcbaCollection, DuplicateCollectionError, wasAlreadySettledByStkPush } from '../services/ncbaLedgerService.js';
+import { creditNcbaCollection, DuplicateCollectionError, wasAlreadySettledByStkPush, findFalselyFailedStkRequest } from '../services/ncbaLedgerService.js';
+import { resolveStkOutcome } from './mpesaController.js';
 import { NcbaTariffBoundsError } from '../config/ncbaTariffCard.js';
 import {
   initiateBulkPayment,
@@ -90,6 +91,23 @@ export const handleNcbaReconciliationWebhook = async (req, res) => {
     // credit below would.
     if (await wasAlreadySettledByStkPush(merchant, grossAmount)) {
       logEvent('info', 'ncba_reconciliation_already_settled_via_stk', { transactionReference, merchantId: merchant._id.toString(), grossAmount });
+      return accept(res, transactionReference);
+    }
+
+    // See findFalselyFailedStkRequest's doc comment (services/ncbaLedgerService.js)
+    // — corrects an STKRequest the poll loop wrongly gave up on as 'failed'
+    // once this webhook confirms the payment actually landed, instead of
+    // leaving the admin STK monitor wrong and crediting via the generic
+    // (wrong fee-split) path below.
+    const falselyFailedStk = await findFalselyFailedStkRequest(merchant, grossAmount);
+    if (falselyFailedStk) {
+      await resolveStkOutcome(falselyFailedStk, {
+        succeeded: true,
+        receipt: transactionReference,
+        resultDesc: 'Corrected: NCBA reconciliation confirmed this payment actually succeeded',
+        allowFailedRetry: true,
+      });
+      logEvent('info', 'ncba_reconciliation_corrected_false_stk_failure', { transactionReference, merchantId: merchant._id.toString(), grossAmount, stkRequestId: falselyFailedStk._id.toString() });
       return accept(res, transactionReference);
     }
 

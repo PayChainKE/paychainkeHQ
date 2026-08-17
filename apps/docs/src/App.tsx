@@ -13,6 +13,7 @@ import Checkout from "@/pages/Checkout";
 import Webhooks from "@/pages/Webhooks";
 import Errors from "@/pages/Errors";
 import Guides from "@/pages/Guides";
+import Help from "@/pages/Help";
 import Signup from "@/pages/auth/Signup";
 import Login from "@/pages/auth/Login";
 import VerifyOtp from "@/pages/auth/VerifyOtp";
@@ -53,6 +54,7 @@ export default function App() {
               <Route path="/webhooks" element={<Webhooks />} />
               <Route path="/errors" element={<Errors />} />
               <Route path="/guides" element={<Guides />} />
+              <Route path="/help" element={<Help />} />
             </Route>
 
             <Route path="/signup" element={<Signup />} />

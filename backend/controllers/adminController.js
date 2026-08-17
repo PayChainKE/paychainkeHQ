@@ -11,6 +11,7 @@ import RetiredMerchantCode from '../models/RetiredMerchantCode.js';
 import Waitlist from '../models/Waitlist.js';
 import Contact from '../models/Contact.js';
 import Communication from '../models/Communication.js';
+import SmsLog from '../models/SmsLog.js';
 import { sendMerchantInvite, sendAdminActionOTP, sendContactDetailsChangedEmail } from '../utils/resend.js';
 import { logAudit } from '../utils/auditLog.js';
 import { getNcbaVirtualAccountNumber, generateRandomMerchantCode, validatePhoneNumber, NcbaValidationError } from '../utils/ncbaValidators.js';
@@ -1793,6 +1794,173 @@ export const getStkRequests = async (req, res) => {
     res.json({ success: true, count: requests.length, data: requests });
   } catch (error) {
     console.error('Get STK Requests Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// ── Transaction Audit ────────────────────────────────────────────────────
+// Bank cash-management-team style: given a dispute ("customer says they
+// paid but the merchant says nothing arrived"), an admin needs to find the
+// exact transaction across ANY merchant and see everything that happened
+// around it — not just the settled Transaction row. Search is intentionally
+// broad (reference, either counterparty's phone/name, account number,
+// merchant business name/email) since a merchant or customer disputing a
+// transaction rarely has the exact reference on hand.
+// @route   GET /api/admin/transaction-audit
+// @access  Private (Admin)
+export const searchTransactionAudit = async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(5, parseInt(req.query.limit, 10) || 25));
+    const type = req.query.type && req.query.type !== 'all' ? req.query.type : null;
+    const status = req.query.status && req.query.status !== 'all' ? req.query.status : null;
+    const q = (req.query.q || '').trim();
+    const from = req.query.from ? new Date(req.query.from) : null;
+    const to = req.query.to ? new Date(req.query.to) : null;
+
+    const filter = {};
+    if (type) filter.type = type;
+    if (status) filter.status = status;
+    if ((from && !isNaN(from)) || (to && !isNaN(to))) {
+      filter.createdAt = {};
+      if (from && !isNaN(from)) filter.createdAt.$gte = from;
+      if (to && !isNaN(to)) filter.createdAt.$lte = to;
+    }
+
+    if (q) {
+      // Escape regex specials — an unescaped user-controlled pattern here is
+      // a ReDoS vector against the event loop (same guard as getLedger).
+      const safeQ = String(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const rx = { $regex: safeQ, $options: 'i' };
+      const matchingMerchants = await Merchant.find({
+        $or: [{ businessName: rx }, { email: rx }, { ncbaMerchantCode: rx }],
+      }).select('_id').lean();
+      const merchantIds = matchingMerchants.map((m) => m._id);
+
+      filter.$or = [
+        { reference: rx },
+        { accountNumber: rx },
+        { 'sender.name': rx },
+        { 'sender.id': rx },
+        { 'recipient.name': rx },
+        { 'recipient.id': rx },
+        ...(merchantIds.length ? [{ merchantId: { $in: merchantIds } }] : []),
+      ];
+    }
+
+    const [total, txns] = await Promise.all([
+      Transaction.countDocuments(filter),
+      Transaction.find(filter)
+        .sort('-createdAt')
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .populate('merchantId', 'businessName email phone ncbaMerchantCode status flagged')
+        .lean(),
+    ]);
+
+    res.json({
+      success: true,
+      data: txns.map((t) => ({
+        _id: t._id,
+        reference: t.reference,
+        createdAt: t.createdAt,
+        updatedAt: t.updatedAt,
+        type: t.type,
+        status: t.status,
+        currency: t.currency,
+        amount: t.amount,
+        kesAmount: t.kesAmount,
+        usdcAmount: t.usdcAmount,
+        accountNumber: t.accountNumber,
+        sender: t.sender,
+        recipient: t.recipient,
+        settlementRail: t.settlementRail,
+        mobileNetwork: t.mobileNetwork,
+        merchant: t.merchantId
+          ? {
+              _id: t.merchantId._id,
+              businessName: t.merchantId.businessName,
+              email: t.merchantId.email,
+              status: t.merchantId.status,
+              flagged: t.merchantId.flagged,
+            }
+          : null,
+      })),
+      pagination: { page, limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) },
+    });
+  } catch (error) {
+    console.error('Search Transaction Audit Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// Full forensic detail for one transaction — the drill-down a dispute
+// investigation actually needs: every field on the transaction itself, the
+// merchant it belongs to, and a best-effort correlated timeline built from
+// records that carry no direct foreign key back to this Transaction
+// (STKRequest, SmsLog) but can be matched closely enough by merchant +
+// amount + a tight time window to be useful for support/ops. Anything
+// correlated this way is labeled as such in the response — never presented
+// as a guaranteed link, since there is no hard FK to prove it.
+// @route   GET /api/admin/transaction-audit/:id
+// @access  Private (Admin)
+export const getTransactionAuditDetail = async (req, res) => {
+  try {
+    const txn = await Transaction.findById(req.params.id)
+      .populate('merchantId', 'businessName email phone ncbaMerchantCode status flagged kesBalance')
+      .lean();
+    if (!txn) return res.status(404).json({ success: false, error: 'Transaction not found' });
+
+    const createdAtMs = new Date(txn.createdAt).getTime();
+    const windowMs = 20 * 60 * 1000;
+    const windowStart = new Date(createdAtMs - windowMs);
+    const windowEnd = new Date(createdAtMs + windowMs);
+    const candidateAmounts = [txn.amount, txn.kesAmount].filter((n) => typeof n === 'number' && n > 0);
+
+    const [stkCandidates, smsCandidates] = await Promise.all([
+      txn.merchantId
+        ? STKRequest.find({
+            merchantId: txn.merchantId._id,
+            ...(candidateAmounts.length ? { amount: { $in: candidateAmounts } } : {}),
+            createdAt: { $gte: windowStart, $lte: windowEnd },
+          }).sort('-createdAt').limit(5).lean()
+        : [],
+      SmsLog.find({
+        to: { $in: [txn.sender?.id, txn.recipient?.id, txn.merchantId?.phone].filter(Boolean) },
+        sentAt: { $gte: windowStart, $lte: windowEnd },
+      }).sort('sentAt').limit(10).lean(),
+    ]);
+
+    // Synthesized timeline — every timestamped fact gathered above, sorted
+    // chronologically, so an admin can read what happened in order without
+    // mentally cross-referencing three separate record types.
+    const timeline = [];
+    timeline.push({ at: txn.createdAt, label: 'Transaction created', detail: `${txn.type} · ${txn.status}` });
+    if (txn.updatedAt && new Date(txn.updatedAt).getTime() !== createdAtMs) {
+      timeline.push({ at: txn.updatedAt, label: 'Transaction last updated', detail: `status: ${txn.status}` });
+    }
+    stkCandidates.forEach((s) => {
+      timeline.push({ at: s.createdAt, label: 'STK Push initiated', detail: `${s.phone || 'unknown phone'} · KES ${s.amount}` });
+      timeline.push({ at: s.updatedAt, label: `STK Push resolved: ${s.status}`, detail: s.resultDesc || '—' });
+    });
+    smsCandidates.forEach((s) => {
+      timeline.push({ at: s.sentAt, label: `SMS sent to ${s.to}`, detail: `${s.deliveryStatus}${s.failureReason ? ' — ' + s.failureReason : ''}` });
+      if (s.deliveredAt) timeline.push({ at: s.deliveredAt, label: `SMS delivered to ${s.to}`, detail: s.messageId || '—' });
+    });
+    timeline.sort((a, b) => new Date(a.at) - new Date(b.at));
+
+    res.json({
+      success: true,
+      data: {
+        transaction: txn,
+        merchant: txn.merchantId || null,
+        relatedStkRequests: stkCandidates,
+        relatedSms: smsCandidates,
+        timeline,
+      },
+    });
+  } catch (error) {
+    console.error('Get Transaction Audit Detail Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };

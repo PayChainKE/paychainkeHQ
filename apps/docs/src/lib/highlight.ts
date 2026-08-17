@@ -95,6 +95,45 @@ function highlightPython(code: string): string {
   });
 }
 
+const PHP_KEYWORDS = "function|return|if|else|elseif|foreach|as|new|echo|use|require|require_once|namespace|class|public|private|static|true|false|null|throw|try|catch";
+
+function highlightPhp(code: string): string {
+  const esc = escapeHtml(code);
+  // $variable gets its own capture (PHP's defining visual tic) ahead of the
+  // generic keyword/string/comment pass, same one-pass-over-plain-text
+  // reasoning as every other highlighter here.
+  const re = new RegExp(
+    `(//.*$|#(?!\\[).*$)|('[^']*'|"[^"]*")|(\\$[A-Za-z_]\\w*)|\\b(${PHP_KEYWORDS})\\b|\\b(\\d+)\\b`,
+    "gm"
+  );
+  return esc.replace(re, (match, comment, str, variable, kw, num) => {
+    if (comment !== undefined) return wrap(comment, cls.comment);
+    if (str !== undefined) return wrap(str, cls.string);
+    if (variable !== undefined) return wrap(variable, cls.key);
+    if (kw !== undefined) return wrap(kw, cls.keyword);
+    if (num !== undefined) return wrap(num, cls.number);
+    return match;
+  });
+}
+
+const RUBY_KEYWORDS = "def|end|do|require|class|module|return|if|elsif|else|unless|while|puts|new|raise|begin|rescue|true|false|nil|and|or|not|in";
+
+function highlightRuby(code: string): string {
+  const esc = escapeHtml(code);
+  const re = new RegExp(
+    `(#.*$)|('[^']*'|"[^"]*")|(:[A-Za-z_]\\w*)|\\b(${RUBY_KEYWORDS})\\b|\\b(\\d+)\\b`,
+    "gm"
+  );
+  return esc.replace(re, (match, comment, str, symbol, kw, num) => {
+    if (comment !== undefined) return wrap(comment, cls.comment);
+    if (str !== undefined) return wrap(str, cls.string);
+    if (symbol !== undefined) return wrap(symbol, cls.key);
+    if (kw !== undefined) return wrap(kw, cls.keyword);
+    if (num !== undefined) return wrap(num, cls.number);
+    return match;
+  });
+}
+
 export function highlight(code: string, lang: string): string {
   switch (lang) {
     case "bash":
@@ -107,6 +146,10 @@ export function highlight(code: string, lang: string): string {
       return highlightJs(code);
     case "python":
       return highlightPython(code);
+    case "php":
+      return highlightPhp(code);
+    case "ruby":
+      return highlightRuby(code);
     default:
       return escapeHtml(code);
   }

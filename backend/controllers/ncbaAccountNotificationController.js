@@ -15,7 +15,7 @@ import { isReconcilableTxnType } from '../config/ncbaAccountNotificationCodes.js
 import { verifyNcbaHashVal } from '../utils/ncbaHashVal.js';
 import { timingSafeStringEqual } from '../utils/timingSafeCompare.js';
 import { buildNcbaOkResult, buildNcbaFailResult } from '../utils/ncbaSoapResponses.js';
-import { creditNcbaCollection, DuplicateCollectionError, wasAlreadySettledByStkPush } from '../services/ncbaLedgerService.js';
+import { creditNcbaCollection, DuplicateCollectionError, wasAlreadySettledByStkPush, findFalselyFailedStkRequest } from '../services/ncbaLedgerService.js';
 import { resolveStkOutcome } from './mpesaController.js';
 import STKRequest from '../models/STKRequest.js';
 import { NcbaTariffBoundsError } from '../config/ncbaTariffCard.js';
@@ -217,6 +217,26 @@ export const handleNcbaAccountNotification = async (req, res) => {
     if (await wasAlreadySettledByStkPush(merchant, transAmount)) {
       logEvent('info', 'ncba_account_notification_already_settled_via_stk', { transId, merchantId: merchant._id.toString(), transAmount });
       return respondOk(res, 'Already settled via STK Push');
+    }
+
+    // See findFalselyFailedStkRequest's doc comment (services/ncbaLedgerService.js)
+    // — NCBA's STK query endpoint can report a transient FAILED for a
+    // payment that was still in flight; once the poll loop gives up, this
+    // webhook is the only remaining signal that it actually succeeded.
+    // Corrects the STKRequest itself (so the admin STK monitor reads
+    // accurately) and settles through the same app-aware split STK/QR use,
+    // instead of falling through to the generic credit below.
+    const falselyFailedStk = await findFalselyFailedStkRequest(merchant, transAmount);
+    if (falselyFailedStk) {
+      await resolveStkOutcome(falselyFailedStk, {
+        succeeded: true,
+        receipt: transId,
+        resultDesc: 'Corrected: NCBA account notification confirmed this payment actually succeeded',
+        transTime: rawTransTime,
+        allowFailedRetry: true,
+      });
+      logEvent('info', 'ncba_account_notification_corrected_false_stk_failure', { transId, merchantId: merchant._id.toString(), transAmount, stkRequestId: falselyFailedStk._id.toString() });
+      return respondOk(res, 'Settled via STK Push (corrected from false failure)');
     }
 
     // Dynamic QR Code collections have no NCBA transaction ID to poll

@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 
-export type CodeLangId = "curl" | "node" | "python";
+export type CodeLangId = "curl" | "node" | "python" | "php" | "ruby";
+
+const VALID_LANG_IDS: CodeLangId[] = ["curl", "node", "python", "php", "ruby"];
 
 const STORAGE_KEY = "paychain-docs-lang";
 
@@ -19,7 +21,7 @@ export function CodeLangProvider({ children }: { children: React.ReactNode }) {
   const [lang, setLangState] = useState<CodeLangId>(() => {
     if (typeof window === "undefined") return "curl";
     const stored = window.localStorage.getItem(STORAGE_KEY);
-    return stored === "node" || stored === "python" || stored === "curl" ? stored : "curl";
+    return VALID_LANG_IDS.includes(stored as CodeLangId) ? (stored as CodeLangId) : "curl";
   });
 
   useEffect(() => {

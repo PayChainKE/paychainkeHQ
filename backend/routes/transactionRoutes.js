@@ -1,6 +1,6 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
-import { getTransactions, simulateIncomingPayment, swapKesToUsdc, activateWallet, getLiveRate, sendMoney, syncWalletBalance, generatePaymentLink, listPaymentLinks, getPaymentLink, processPaymentLink, getMerchantByAccount, payToMerchantAccount, emailStatement, downloadSticker, getPublicSTKStatus } from '../controllers/transactionController.js';
+import { getTransactions, simulateIncomingPayment, swapKesToUsdc, activateWallet, getLiveRate, sendMoney, syncWalletBalance, generatePaymentLink, listPaymentLinks, getPaymentLink, processPaymentLink, getMerchantByAccount, payToMerchantAccount, emailStatement, downloadSticker, getPublicSTKStatus, getCheckoutPreview } from '../controllers/transactionController.js';
 import { protectMerchant } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -60,6 +60,11 @@ router.post('/payment-link/:linkId/pay', payAccountLimiter, processPaymentLink);
 // to the fixed-amount PaymentLink routes above.
 router.get('/pay-account/:account', lookupLimiter, getMerchantByAccount);
 router.post('/pay-account/:account', payAccountLimiter, payToMerchantAccount);
+
+// Fee-breakdown preview shown on the checkout page before the STK prompt
+// fires — see getCheckoutPreview's doc comment for why this can't live
+// inside the M-PESA prompt itself.
+router.get('/checkout-preview', lookupLimiter, getCheckoutPreview);
 
 // Public STK status poll — the checkout pages above hit this every ~3s for
 // up to a minute after triggering a push, so it needs its own more generous
