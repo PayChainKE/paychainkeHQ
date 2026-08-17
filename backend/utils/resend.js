@@ -1572,13 +1572,13 @@ export const sendRevenueSweepNotification = async (email, sweep) => {
       subject: `[PayChain Revenue] ${theme.label} — KES ${amount}`,
       html: `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 560px; margin: auto; background: #ffffff; border: 1px solid #eef0ee; border-radius: 18px; overflow: hidden;">
-          <div style="background: linear-gradient(135deg, #06201B 0%, #0a3029 100%); padding: 32px 32px 36px;">
+          <div style="background-color: #06201B; background: linear-gradient(135deg, #06201B 0%, #0a3029 100%); padding: 32px 32px 36px;">
             <div style="margin-bottom: 20px;">${logoImgWhite(108, 'left')}</div>
             <div style="display: inline-flex; align-items: center; gap: 10px;">
               <span style="display: inline-block; width: 36px; height: 36px; border-radius: 999px; background: ${theme.dotBg}; text-align: center; line-height: 36px; color: ${theme.dot}; font-size: 18px; font-weight: 800;">${theme.icon}</span>
               <div>
                 <p style="margin: 0; color: ${theme.accent}; font-size: 11px; font-weight: 800; letter-spacing: 2.5px; text-transform: uppercase;">Revenue Sweep</p>
-                <h1 style="margin: 4px 0 0; color: #fff; font-size: 22px; font-weight: 800; letter-spacing: -0.3px;">${theme.headline}</h1>
+                <h1 style="margin: 4px 0 0; color: ${theme.accent}; font-size: 22px; font-weight: 800; letter-spacing: -0.3px;">${theme.headline}</h1>
               </div>
             </div>
           </div>

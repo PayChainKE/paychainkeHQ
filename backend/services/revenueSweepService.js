@@ -14,9 +14,29 @@ import { LIVE_DATA_CUTOFF } from '../config/liveDataCutoff.js';
 const MAX_TRANSFER_AMOUNT = 999999;
 const MIN_TRANSFER_AMOUNT = 50;
 
-const destinationBankCode     = process.env.PAYCHAIN_REVENUE_BANK_CODE || null;
-const destinationAccountNumber = process.env.PAYCHAIN_REVENUE_ACCOUNT_NUMBER || null;
-const destinationAccountName  = process.env.PAYCHAIN_REVENUE_ACCOUNT_NAME || 'PayChain Revenue Account';
+// Sole authorized destination for PayChain's revenue sweep — Paychain
+// Financial Services Ltd's settlement account at NCBA. Fixed in code, not
+// env-configurable: this used to be read from PAYCHAIN_REVENUE_BANK_CODE /
+// PAYCHAIN_REVENUE_ACCOUNT_NUMBER, which meant a missing or wrong env var on
+// the host could silently misroute or fail the sweep. Hardcoding it removes
+// that failure class entirely — there is exactly one place this can ever
+// point, and it can't drift between deploys or environments.
+//
+// bankCode '07000' is NCBA's own bank code (see NCBA_OWN_BANK_CODE in
+// controllers/ncbaOpenBankingController.js) — this account lives at NCBA
+// itself, so submitNcbaBankTransfer automatically routes it over NCBA's
+// Internal Funds Transfer rail rather than PesaLink.
+export const REVENUE_SWEEP_DESTINATION = Object.freeze({
+  accountName: 'Paychain Financial Services Ltd',
+  accountNumber: '1011252669',
+  bankCode: '07000',
+  branchCode: '129',
+  swiftCode: 'CBAFKENX',
+});
+
+const destinationBankCode = REVENUE_SWEEP_DESTINATION.bankCode;
+const destinationAccountNumber = REVENUE_SWEEP_DESTINATION.accountNumber;
+const destinationAccountName = REVENUE_SWEEP_DESTINATION.accountName;
 
 // Day sweeps are meant to land on — mirrors PAYCHAIN_REVENUE_SWEEP_DAY,
 // 0=Sunday..6=Saturday, default Monday. Shared by runWeeklyRevenueSweepIfDue
@@ -151,19 +171,17 @@ export async function runRevenueSweep() {
   const { unswept, transactionCount } = await computeUnsweptRevenue();
   const attemptedAmount = Math.min(unswept, MAX_TRANSFER_AMOUNT);
 
-  if (!destinationBankCode || !destinationAccountNumber) {
-    logEvent('warn', 'revenue_sweep_skipped_unconfigured', { unswept });
-    return recordSweep({
-      periodStart, periodEnd, attemptedAmount, transactionCount, status: 'skipped',
-      failureReason: 'PAYCHAIN_REVENUE_BANK_CODE / PAYCHAIN_REVENUE_ACCOUNT_NUMBER not set yet — open the destination account first.',
-    });
-  }
+  const destinationAudit = {
+    destinationBankCode, destinationAccountNumber,
+    destinationBranchCode: REVENUE_SWEEP_DESTINATION.branchCode,
+    destinationSwiftCode: REVENUE_SWEEP_DESTINATION.swiftCode,
+  };
 
   if (attemptedAmount < MIN_TRANSFER_AMOUNT) {
     logEvent('info', 'revenue_sweep_skipped_below_minimum', { unswept });
     return recordSweep({
       periodStart, periodEnd, attemptedAmount, transactionCount, status: 'skipped',
-      destinationBankCode, destinationAccountNumber,
+      ...destinationAudit,
       failureReason: unswept <= 0
         ? 'No revenue accrued since the last sweep.'
         : `Accrued revenue (KES ${unswept}) is below NCBA's KES ${MIN_TRANSFER_AMOUNT} minimum transfer.`,
@@ -184,13 +202,13 @@ export async function runRevenueSweep() {
     logEvent('info', 'revenue_sweep_completed', { amount: attemptedAmount, transactionId, simulated });
     return recordSweep({
       periodStart, periodEnd, attemptedAmount, amount: attemptedAmount, transactionCount,
-      status: 'completed', destinationBankCode, destinationAccountNumber, ncbaReference: transactionId, simulated,
+      status: 'completed', ...destinationAudit, ncbaReference: transactionId, simulated,
     });
   } catch (err) {
     logEvent('error', 'revenue_sweep_failed', { amount: attemptedAmount, error: err.message });
     return recordSweep({
       periodStart, periodEnd, attemptedAmount, transactionCount, status: 'failed',
-      destinationBankCode, destinationAccountNumber, failureReason: err.message,
+      ...destinationAudit, failureReason: err.message,
     });
   }
 }
