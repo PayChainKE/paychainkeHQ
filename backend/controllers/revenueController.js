@@ -3,7 +3,7 @@ import RevenueSweep from '../models/RevenueSweep.js';
 import BankReconciliation from '../models/BankReconciliation.js';
 import { REVENUE_STREAMS, SAFARICOM_TARIFF } from '../config/revenueRateCard.js';
 import { LIVE_DATA_CUTOFF } from '../config/liveDataCutoff.js';
-import { runRevenueSweep } from '../services/revenueSweepService.js';
+import { runRevenueSweep, REVENUE_SWEEP_DESTINATION } from '../services/revenueSweepService.js';
 import { recordReconciliation } from '../services/reconciliationService.js';
 
 // ── Helpers ─────────────────────────────────────────────────────────────
@@ -21,12 +21,13 @@ const TYPE_TO_CHANNEL = {
   mpesa_b2c:  'Mobile Money',
 };
 
-// Corporate operating account where accumulated fees sweep to. Was a
-// fabricated placeholder ("Standard Chartered — OpEx ·4829") — PayChain
-// doesn't have this account. Now env-configurable like every other real
-// destination account in this codebase (e.g. NCBA_SETTLEMENT_ACCOUNT);
-// shows an honest pending state until the real one is set.
-const CORPORATE_DESTINATION = process.env.PAYCHAIN_CORPORATE_SWEEP_ACCOUNT || 'Not configured';
+// Corporate operating account where accumulated fees sweep to, shown on the
+// admin Revenue page's settlement-batch log. Was a fabricated placeholder
+// ("Standard Chartered — OpEx ·4829"), then an env var that could silently
+// drift from the real sweep destination — now sourced from the same
+// hardcoded REVENUE_SWEEP_DESTINATION the sweep itself uses, so the display
+// can never disagree with where the money actually goes.
+const CORPORATE_DESTINATION = `${REVENUE_SWEEP_DESTINATION.accountName} — NCBA •••${REVENUE_SWEEP_DESTINATION.accountNumber.slice(-4)}`;
 
 // Every window this resolves to is clamped to LIVE_DATA_CUTOFF — the
 // five weeks of pre-production sandbox/simulated transactions before that

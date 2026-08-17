@@ -21,6 +21,11 @@ const revenueSweepSchema = new mongoose.Schema({
   },
   destinationBankCode: { type: String, default: null },
   destinationAccountNumber: { type: String, default: null },
+  // Recorded for the audit trail / an NCBA support ticket, not used to place
+  // the transfer itself (NCBA's Internal Funds Transfer API takes only the
+  // account number — see services/ncbaOpenBankingService.js).
+  destinationBranchCode: { type: String, default: null },
+  destinationSwiftCode: { type: String, default: null },
   // NCBA's TransactionID for a completed PesaLink transfer — the audit
   // trail linking this row to the real bank-side movement.
   ncbaReference: { type: String, default: null },

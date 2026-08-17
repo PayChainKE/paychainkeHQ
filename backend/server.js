@@ -371,9 +371,8 @@ async function bootstrap() {
 
   // Weekly PayChain revenue sweep — checks daily, only actually attempts a
   // transfer on the configured weekday (PAYCHAIN_REVENUE_SWEEP_DAY, default
-  // Monday). No-ops safely until PAYCHAIN_REVENUE_BANK_CODE /
-  // PAYCHAIN_REVENUE_ACCOUNT_NUMBER are set, and until then just logs a
-  // 'skipped' record each week so the gap is visible, not silent.
+  // Monday), always to the single hardcoded destination account in
+  // revenueSweepService.js's REVENUE_SWEEP_DESTINATION.
   runWeeklyRevenueSweepIfDue().catch((e) => console.error('Revenue sweep check failed:', e));
   setInterval(() => {
     runWeeklyRevenueSweepIfDue().catch((e) => console.error('Revenue sweep check failed:', e));
