@@ -73,19 +73,25 @@ export const initiateSTKPush = async (req, res) => {
     // M-PESA prompt (fixed Safaricom template, total only, no free-text
     // field) is their very first and only signal. Without this, a merchant
     // requesting KES 100 has their customer see a prompt for KES 113 with
-    // no explanation — reads as an overcharge. Fire-and-forget, best-effort:
-    // never blocks or fails the actual push if SMS is slow or down.
+    // no explanation — reads as an overcharge.
+    //
+    // Awaited (not fire-and-forget) so the SMS is actually dispatched to
+    // Africa's Talking BEFORE NCBA is ever asked to send the prompt — the
+    // whole point is the customer reads the context first. safeSendSMS
+    // never throws (documented contract), so this can't fail the request;
+    // it only adds the SMS dispatch time (typically under a second) to the
+    // response, in exchange for a real ordering guarantee instead of a
+    // race between two independent delivery pipelines.
     if (kind === 'request_money') {
-      safeSendSMS({
+      const result = await safeSendSMS({
         to: formattedPhone,
         message: buildPaymentRequestSms({
           businessName: req.merchant.businessName,
           baseAmount: intAmount,
           fee: Math.round((checkoutTotal - intAmount) * 100) / 100,
         }).message,
-      }).then((result) => {
-        if (!result.success) console.error(`Pre-push request SMS failed for ${formattedPhone}:`, result.error);
       });
+      if (!result.success) console.error(`Pre-push request SMS failed for ${formattedPhone}:`, result.error);
     }
 
     // Real STK Push via NCBA's shared Paybill 880100 (or simulated — see
