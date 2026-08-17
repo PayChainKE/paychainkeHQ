@@ -39,7 +39,6 @@ const Footer: React.FC = () => {
               <li><Link to="/blog" className="hover:text-emerald-400 transition-colors">Blog</Link></li>
               <li><Link to="/contact" className="hover:text-emerald-400 transition-colors">Contact Us</Link></li>
               <li><Link to="/book-demo" className="hover:text-emerald-400 transition-colors">Book a Demo</Link></li>
-              <li><a href="https://developer.paychain.co.ke" target="_blank" rel="noopener noreferrer" className="hover:text-emerald-400 transition-colors">API Docs</a></li>
             </ul>
           </div>
 
@@ -51,6 +50,12 @@ const Footer: React.FC = () => {
               <li><Link to="/products/inflation-shield" className="hover:text-emerald-400 transition-colors">Inflation Shield</Link></li>
               <li><Link to="/products/bulk-pay" className="hover:text-emerald-400 transition-colors">Bulk Payments</Link></li>
               <li><Link to="/products/cash-advance" className="hover:text-emerald-400 transition-colors">Cash Advance</Link></li>
+              <li>
+                <Link to="/docs" className="flex items-center gap-2 hover:text-emerald-400 transition-colors">
+                  <span>Developer API</span>
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-400/70 border border-emerald-400/30 rounded-full px-2 py-0.5">Coming Soon</span>
+                </Link>
+              </li>
             </ul>
           </div>
 
@@ -74,7 +79,7 @@ const Footer: React.FC = () => {
                 <div className="flex items-center gap-2 text-xs text-emerald-100/40">
                   <Mail className="w-3 h-3" />
                   <span className="font-bold text-emerald-400/60 uppercase text-[9px] tracking-wider">Support:</span>
-                  <span>support@pychain.co.ke</span>
+                  <span>support@paychain.co.ke</span>
                 </div>
               </div>
             </div>

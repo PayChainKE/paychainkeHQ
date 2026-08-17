@@ -1,167 +1,58 @@
 import React from 'react';
-import { Book, Zap, Shield, Database, Code, Server } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Webhook, CreditCard, Link2, FileCheck2 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import { cn } from '@/lib/utils';
 
-const docSections = [
-  {
-    icon: Zap,
-    title: 'Quick Start',
-    description: 'Get up and running with payChainKE in under 5 minutes.',
-    items: [
-      'Create a merchant account',
-      'Register your Virtual Account',
-      'Install the POS SDK',
-      'Receive your first Truth Ping',
-    ],
-  },
-  {
-    icon: Server,
-    title: 'Webhook Integration',
-    description: 'Configure M-Pesa callbacks to route through payChainKE.',
-    items: [
-      'M-Pesa API setup',
-      'Callback URL configuration',
-      'Signature verification',
-      'Error handling',
-    ],
-  },
-  {
-    icon: Shield,
-    title: 'Fraud Detection',
-    description: 'Understanding the AI-powered fraud scoring system.',
-    items: [
-      'How fraud scores work',
-      'Behavioral pattern analysis',
-      'Custom thresholds',
-      'Alert configuration',
-    ],
-  },
-  {
-    icon: Database,
-    title: 'Data & Compliance',
-    description: 'KRA eTIMS integration and data handling policies.',
-    items: [
-      'eTIMS reporting setup',
-      'Transaction export',
-      'Data retention policy',
-      'GDPR compliance',
-    ],
-  },
-  {
-    icon: Code,
-    title: 'API Reference',
-    description: 'Complete REST and WebSocket API documentation.',
-    items: [
-      'Authentication',
-      'Transaction endpoints',
-      'WebSocket events',
-      'Rate limits',
-    ],
-  },
-  {
-    icon: Book,
-    title: 'SDK Libraries',
-    description: 'Client libraries for popular languages and frameworks.',
-    items: [
-      'JavaScript/TypeScript',
-      'Python',
-      'Kotlin (Android)',
-      'Swift (iOS)',
-    ],
-  },
+// This route used to render a self-contained mock docs page (fake base URL,
+// fake "Truth Ping"/"POS SDK" endpoints, an M-Pesa-callback framing that
+// doesn't match the real NCBA-rail integration) — content that was simply
+// wrong. The real Developer API isn't publicly self-serve yet, so rather
+// than fake or pre-announce docs that don't exist for outside developers
+// yet, this is a straightforward "coming soon" page.
+const upcoming = [
+  { icon: CreditCard, title: 'Collections & payouts', description: 'Trigger M-Pesa/Airtel collections and send payouts to mobile money, bank, Paybill, or Till — all programmatically.' },
+  { icon: Webhook, title: 'Real-time webhooks', description: 'Subscribe to payment and payout events instead of polling for status.' },
+  { icon: Link2, title: 'Hosted checkout', description: 'Generate a payment page for any order without building your own checkout UI.' },
+  { icon: FileCheck2, title: 'KRA-compliant receipts', description: 'Fiscal receipts signed through KRA eTIMS on every sale, ready for tax compliance.' },
 ];
 
 const Docs: React.FC = () => {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-white">
       <Navbar />
-      
-      <main className="container mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-12">
-        <div className="max-w-4xl mx-auto">
-          <div className="mb-12">
-            <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-              Documentation
-            </h1>
-            <p className="text-lg text-muted-foreground">
-              Everything you need to integrate payChainKE into your payment workflow.
-            </p>
-          </div>
+      <main className="pt-32 pb-24 px-6">
+        <div className="max-w-3xl mx-auto text-center">
+          <p className="text-sm font-semibold uppercase tracking-widest text-[#00bf63] mb-4">Coming Soon</p>
+          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">The PayChain API</h1>
+          <p className="text-lg text-gray-600 leading-relaxed">
+            A developer API for building custom payment flows directly on PayChain's infrastructure —
+            not yet publicly available, but on its way.
+          </p>
+        </div>
 
-          <div className="grid sm:grid-cols-2 gap-6">
-            {docSections.map((section) => {
-              const Icon = section.icon;
-              return (
-                <div
-                  key={section.title}
-                  className="group p-6 rounded-2xl border border-border bg-card hover:border-primary/50 transition-all duration-300 cursor-pointer card-shadow"
-                >
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
-                      <Icon className="w-6 h-6 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-bold text-foreground mb-1 group-hover:text-primary transition-colors">
-                        {section.title}
-                      </h3>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        {section.description}
-                      </p>
-                      <ul className="space-y-1.5">
-                        {section.items.map((item) => (
-                          <li
-                            key={item}
-                            className="flex items-center gap-2 text-sm text-muted-foreground"
-                          >
-                            <span className="w-1 h-1 rounded-full bg-primary" />
-                            {item}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* API Endpoint Preview */}
-          <div className="mt-12 p-6 rounded-2xl border border-border bg-card">
-            <h3 className="text-lg font-bold text-foreground mb-4">
-              Base URL
-            </h3>
-            <code className="block p-4 rounded-xl bg-secondary font-mono text-sm text-primary">
-              https://api.paychainke.io/v1
-            </code>
-
-            <div className="mt-6 grid gap-4">
-              <div className="flex items-center gap-4 p-4 rounded-xl bg-secondary/50">
-                <span className="px-2 py-1 rounded bg-success/20 text-success text-xs font-bold">
-                  GET
-                </span>
-                <code className="font-mono text-sm text-foreground">/transactions/{'{id}'}</code>
-                <span className="text-xs text-muted-foreground ml-auto">Get transaction by ID</span>
+        <div className="max-w-3xl mx-auto mt-16 grid grid-cols-1 sm:grid-cols-2 gap-6">
+          {upcoming.map(({ icon: Icon, title, description }) => (
+            <div key={title} className="p-6 rounded-2xl border border-gray-100 bg-gray-50/60">
+              <div className="w-10 h-10 rounded-xl bg-[#00bf63]/10 flex items-center justify-center mb-4">
+                <Icon className="w-5 h-5 text-[#00bf63]" />
               </div>
-              <div className="flex items-center gap-4 p-4 rounded-xl bg-secondary/50">
-                <span className="px-2 py-1 rounded bg-accent/20 text-accent text-xs font-bold">
-                  POST
-                </span>
-                <code className="font-mono text-sm text-foreground">/webhook/mpesa</code>
-                <span className="text-xs text-muted-foreground ml-auto">M-Pesa callback endpoint</span>
-              </div>
-              <div className="flex items-center gap-4 p-4 rounded-xl bg-secondary/50">
-                <span className="px-2 py-1 rounded bg-warning/20 text-warning text-xs font-bold">
-                  WS
-                </span>
-                <code className="font-mono text-sm text-foreground">/ws/transactions</code>
-                <span className="text-xs text-muted-foreground ml-auto">Real-time Truth Ping stream</span>
-              </div>
+              <h3 className="font-bold text-gray-900 mb-1.5">{title}</h3>
+              <p className="text-sm text-gray-600 leading-relaxed">{description}</p>
             </div>
-          </div>
+          ))}
+        </div>
+
+        <div className="max-w-3xl mx-auto mt-16 text-center">
+          <p className="text-gray-600 mb-6">Want early access when it launches?</p>
+          <Link
+            to="/contact"
+            className="inline-flex items-center justify-center px-6 py-3 text-sm font-bold text-white bg-[#00bf63] hover:bg-[#00a857] rounded-lg transition-colors shadow-sm"
+          >
+            Get in touch
+          </Link>
         </div>
       </main>
-
       <Footer />
     </div>
   );

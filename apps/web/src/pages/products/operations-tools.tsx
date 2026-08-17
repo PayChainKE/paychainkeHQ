@@ -18,7 +18,7 @@ import Breadcrumbs from '@/components/Breadcrumbs';
 
 const features = [
   { icon: LayoutDashboard, title: 'Real-Time Merchant Dashboard', body: 'Every transaction — collections, payments, FX swaps, cash advance activity — updated in real time. Your full financial picture, always current.' },
-  { icon: FileCheck, title: 'KRA e-TIMS Tax Compliance', body: 'Automatically generates KRA e-TIMS compliant tax records from your transaction history. Clean records for KRA. One click download for your accountant.' },
+  { icon: FileCheck, title: 'KRA e-TIMS Tax Compliance', body: 'Every sale is signed as a real KRA fiscal receipt through eTIMS OSCU the moment it happens — with a verifiable QR code, not a batch report reconstructed later.' },
   { icon: TrendingUp, title: 'Trust Score Monitor', body: 'Track your Trust Score in real time — see exactly how close you are to unlocking your next Cash Advance tier.' },
   { icon: Users, title: 'Team Access & Spending Controls', body: 'Add team members with defined roles, set spending limits, require approval for large transactions — without giving up full account access.' },
   { icon: BarChart2, title: 'Business Analytics & Insights', body: 'Revenue trends, peak payment periods, top customers by volume, month-on-month growth — all visualized clearly. Decisions based on data, not guesswork.' },
@@ -221,7 +221,7 @@ const OperationsTools = () => {
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="max-w-5xl mx-auto bg-white rounded-3xl border border-gray-200 shadow-sm p-8 lg:p-12">
             <h3 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">Tax Compliance Without the Headache.</h3>
             <p className="text-gray-600 leading-relaxed max-w-3xl mb-10">
-              KRA's e-TIMS system requires merchants to electronically submit transaction records for tax purposes. For most Kenyan businesses, this means manual data entry, spreadsheets, and accountants charging by the hour. PayChain eliminates all of that. Every verified transaction is automatically formatted for e-TIMS compliance, organized by period, and available for download with one click. Your accountant gets clean records. KRA gets what it needs. You get to run your business.
+              KRA's eTIMS system requires a signed fiscal receipt for every taxable sale. For most Kenyan businesses, this means manual data entry, spreadsheets, and accountants charging by the hour. PayChain eliminates all of that: every sale is signed through KRA's eTIMS OSCU in real time, with a verifiable QR receipt and full VAT breakdown, no manual submission step. Period summaries are ready for download whenever you or your accountant need them.
             </p>
 
             <div className="grid lg:grid-cols-3 gap-4 items-stretch">

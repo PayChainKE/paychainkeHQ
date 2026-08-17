@@ -69,8 +69,8 @@ const VideoSection: React.FC = () => {
             </motion.h2>
             
             <motion.p variants={itemVariants} className="text-lg text-gray-600 mb-10 leading-relaxed">
-              Tired of SMS payment fraud and shilling depreciation eating your profits? 
-              PayChain is a unified dashboard that gives you everything you need to collect, pay, swap, and grow built on Safaricom M-PESA infrastructure and blockchain rails.
+              Tired of SMS payment fraud and shilling depreciation eating your profits?
+              PayChain is a unified dashboard that gives you everything you need to collect, pay, swap, and grow built on bank-grade NCBA rails and blockchain infrastructure.
             </motion.p>
 
             <div className="grid grid-cols-2 gap-3 sm:gap-6">
