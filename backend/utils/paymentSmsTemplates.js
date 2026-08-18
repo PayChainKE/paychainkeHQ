@@ -101,12 +101,25 @@ export function buildPaymentRequestSms({ businessName, baseAmount, fee }) {
   );
 }
 
-export function buildCustomerPaidSms({ ref, amount, businessName, accountRef, date, time }) {
+export function buildCustomerPaidSms({ ref, amount, businessName, accountRef, date, time, fee }) {
+  const showFee = typeof fee === 'number' && Number.isFinite(fee) && fee > 0;
   return buildStrictSms(
-    ({ ref, amt, name, acct, date, time }) =>
-      `${ref} Confirmed. KES ${amt} paid to ${name}${acct ? ` for account ${acct}` : ''} on ${date} at ${time}. Thank you for your payment.`,
+    ({ ref, amt, name, acct, date, time, feeLine }) =>
+      `${ref} Confirmed. KES ${amt} paid to ${name}${acct ? ` for account ${acct}` : ''} on ${date} at ${time}.${feeLine} Thank you for your payment.`,
     {
-      fixed: { ref, amt: amount.toLocaleString(), acct: accountRef || '', date, time },
+      fixed: {
+        ref,
+        amt: amount.toLocaleString(),
+        acct: accountRef || '',
+        date,
+        time,
+        // Same rationale as buildPaymentSentSms's feeLine: this SMS is the
+        // payer's own receipt, so the total it confirms (amount) already
+        // includes PayChain's customer surcharge — showing the fee here
+        // (not just the total) is what lets them check "base + fee" adds
+        // up, the same way an M-Pesa "Transaction cost" line does.
+        feeLine: showFee ? ` Includes KES ${fee.toLocaleString()} transaction fee.` : '',
+      },
       truncatable: [{ key: 'name', value: businessName || 'PayChain', minLength: 5 }],
     }
   );

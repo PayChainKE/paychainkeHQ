@@ -356,6 +356,7 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
                   accountRef,
                   date,
                   time,
+                  fee: customerFee,
                 }).message,
               });
             }
@@ -528,6 +529,7 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
                 accountRef: merchant.ncbaMerchantCode,
                 date,
                 time,
+                fee: customerFee,
               }).message,
             });
           }
