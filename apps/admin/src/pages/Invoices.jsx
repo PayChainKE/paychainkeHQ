@@ -1,12 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Layout from '../components/layout/Layout';
 import api from '../api/api';
-
-const fmtKES = (n) => {
-  const v = typeof n === 'string' ? parseFloat(n) : n;
-  if (!Number.isFinite(v)) return '0.00';
-  return v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-};
+import { formatKES } from '../utils/formatCurrency';
 
 const fmtDate = (iso) => iso
   ? new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -114,14 +109,14 @@ const Invoices = () => {
           />
           <SummaryCard
             label="Awaiting Payment"
-            value={`KES ${fmtKES(summary.sent.totalAmount)}`}
+            value={formatKES(summary.sent.totalAmount)}
             subtitle={`${summary.sent.count} sent invoice${summary.sent.count === 1 ? '' : 's'}`}
             icon="schedule_send"
             tone="sky"
           />
           <SummaryCard
             label="Overdue"
-            value={`KES ${fmtKES(summary.overdue.totalAmount)}`}
+            value={formatKES(summary.overdue.totalAmount)}
             subtitle={`${summary.overdue.count} past due date`}
             icon="warning"
             tone="rose"
@@ -247,7 +242,7 @@ const InvoiceRow = ({ inv }) => {
         <p className="text-2xs text-on-surface-variant/50 truncate max-w-[180px]">{inv.customer?.email || '—'}</p>
       </td>
       <td className="px-3 py-4 text-right">
-        <span className="text-sm font-bold text-on-surface tabular-nums">{inv.currency} {fmtKES(inv.total)}</span>
+        <span className="text-sm font-bold text-on-surface tabular-nums">{formatKES(inv.total)}</span>
       </td>
       <td className="px-3 py-4">
         <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-2xs font-bold uppercase tracking-widest border ${meta.tone}`}>

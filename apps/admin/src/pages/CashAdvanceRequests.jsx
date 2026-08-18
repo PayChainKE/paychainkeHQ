@@ -396,7 +396,7 @@ export default function CashAdvanceRequests() {
                         Grade {riskGradeFor(selectedRequest.trustScore).grade} · {riskGradeFor(selectedRequest.trustScore).label}
                       </span>
                       <p className="mt-2 text-2xs text-on-surface-variant/60 leading-relaxed">
-                        {selectedRequest.settlementRate}% settlement rate on {fmtNum(selectedRequest.collections30d)} KES collected in the last 30 days.
+                        {selectedRequest.settlementRate}% settlement rate on {formatKES(selectedRequest.collections30d)} collected in the last 30 days.
                       </p>
                     </div>
                   </div>

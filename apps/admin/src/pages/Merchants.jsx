@@ -5,6 +5,7 @@ import TablePagination from '../components/ui/TablePagination';
 import MerchantsMap from '../components/merchants-map/MerchantsMap';
 import LocationPickerModal from '../components/merchants-map/LocationPickerModal';
 import { formatAccountNumber } from '../utils/formatAccountNumber';
+import { formatKES } from '../utils/formatCurrency';
 
 const PAGE_SIZE = 20;
 
@@ -1340,7 +1341,7 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
                   : '— wallet not provisioned —'}
               />
               <Row label="USDC Balance" value={`${(m.usdcBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDC`} />
-              <Row label="KES Balance" value={`KES ${(m.kesBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
+              <Row label="KES Balance" value={formatKES(m.kesBalance || 0)} />
               <Row label="Encrypted Secret" value={m.hasStellarKey ? <Badge tone="emerald" icon="check">Stored (encrypted)</Badge> : <Badge tone="gray" icon="remove">Not set</Badge>} />
             </Section>
 
@@ -1354,16 +1355,16 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
               <Row label="Transactions (30d)" value={(m.txnCount30d ?? 0).toLocaleString()} />
               {m.lastTransaction && (
                 <Row label="Last Transaction" value={
-                  <span>KES {Number(m.lastTransaction.amount || 0).toLocaleString()} · <span className="text-on-surface-variant/60">{fmtDate(m.lastTransaction.createdAt)}</span> · <span className="uppercase text-[10px] font-bold tracking-widest text-on-surface-variant/60">{m.lastTransaction.status}</span></span>
+                  <span>{formatKES(m.lastTransaction.amount || 0)} · <span className="text-on-surface-variant/60">{fmtDate(m.lastTransaction.createdAt)}</span> · <span className="uppercase text-[10px] font-bold tracking-widest text-on-surface-variant/60">{m.lastTransaction.status}</span></span>
                 } />
               )}
             </Section>
 
             {/* Volume */}
             <Section title="Transaction Volume" icon="monitoring">
-              <Row label="KES Volume (30d)" value={`KES ${(m.volume30d ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`} />
+              <Row label="KES Volume (30d)" value={formatKES(m.volume30d ?? 0)} />
               <Row label="USDC Volume (30d)" value={`${(m.usdcVolume30d ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC`} />
-              <Row label="Lifetime KES Volume" value={`KES ${(m.totalVolume ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`} />
+              <Row label="Lifetime KES Volume" value={formatKES(m.totalVolume ?? 0)} />
               <Row label="Lifetime USDC Volume" value={`${(m.totalUsdcVolume ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC`} />
             </Section>
 

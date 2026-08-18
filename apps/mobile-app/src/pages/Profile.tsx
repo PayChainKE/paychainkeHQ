@@ -110,7 +110,7 @@ function PaymentLinkPanel() {
   const shareLink = async () => {
     if (!generatedLink) return;
     try {
-      await Share.share({ message: `Please pay me KES ${amount} via PayChain: ${generatedLink}` });
+      await Share.share({ message: `Please pay me Ksh ${Number(amount || 0).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} via PayChain: ${generatedLink}` });
     } catch {
       // user dismissed the share sheet
     }
@@ -125,7 +125,7 @@ function PaymentLinkPanel() {
   const shareHistoryLink = async (item: any) => {
     try {
       await Share.share({
-        message: `Please pay me KES ${item.amount.toLocaleString()} via PayChain: ${getAppUrl()}/pay/${item.linkId}`,
+        message: `Please pay me Ksh ${Number(item.amount || 0).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} via PayChain: ${getAppUrl()}/pay/${item.linkId}`,
       });
     } catch {
       // user dismissed the share sheet
@@ -233,7 +233,9 @@ function PaymentLinkPanel() {
                   >
                     <View className="flex-row items-center justify-between mb-1">
                       <Text className="text-[17px] font-jakarta-extrabold text-[#00351d] tracking-tight">
-                        {item.currency} {item.amount.toLocaleString()}
+                        {item.currency === 'KES'
+                          ? `Ksh ${Number(item.amount || 0).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          : `${item.currency} ${item.amount.toLocaleString()}`}
                       </Text>
                       <View style={{ backgroundColor: meta.bg }} className="px-2.5 py-1 rounded-full">
                         <Text style={{ color: meta.color }} className="text-[9px] font-jakarta-bold uppercase tracking-widest">{meta.label}</Text>

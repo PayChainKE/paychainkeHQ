@@ -13,8 +13,8 @@ const PAYCHAIN_PHONE = '+254 743 283 782';
 const PAYCHAIN_SLOGAN = 'Collect, Pay, Protect, Grow';
 
 function formatKES(n: number | string | null | undefined) {
-  if (n == null) return 'KES 0.00';
-  return `KES ${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  if (n == null) return 'Ksh 0.00';
+  return `Ksh ${Number(n).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 const STATUS_LABEL: Record<string, string> = { completed: 'Completed', success: 'Completed', pending: 'Processing' };

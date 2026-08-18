@@ -1007,7 +1007,7 @@ export default function Wallet() {
                                Copy
                             </button>
                             <button 
-                               onClick={() => window.open(`whatsapp://send?text=${encodeURIComponent(`Please pay me KES ${paymentLinkAmount} via PayChain: ${generatedLink}`)}`)}
+                               onClick={() => window.open(`whatsapp://send?text=${encodeURIComponent(`Please pay me ${formatKES(paymentLinkAmount)} via PayChain: ${generatedLink}`)}`)}
                                className="px-5 py-3 bg-[#25D366] text-white rounded-xl text-[10px] font-bold hover:bg-[#1DA851] transition-all shadow-md flex items-center justify-center gap-2"
                             >
                                <span className="material-symbols-outlined text-[14px]" style={{fontVariationSettings: "'FILL' 1"}}>send</span>
@@ -1288,7 +1288,7 @@ export default function Wallet() {
                 </div>
                 <div className="text-right">
                   <p className="text-[10px] font-black uppercase tracking-widest text-emerald-800/60 mb-1">Live Rate</p>
-                  <p className="text-sm font-bold text-emerald-900">1 USDC = KES {liveRate.toFixed(2)}</p>
+                  <p className="text-sm font-bold text-emerald-900">1 USDC = {formatKES(liveRate)}</p>
                 </div>
               </div>
 

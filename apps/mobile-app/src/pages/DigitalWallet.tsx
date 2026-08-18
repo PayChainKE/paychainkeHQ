@@ -19,8 +19,8 @@ import TransactionSuccessCard, { PayeeDraft } from '../components/ui/Transaction
 import FundAccountModal from '../components/FundAccountModal';
 
 function formatKES(n: number | null | undefined) {
-  if (n == null) return 'KES 0.00';
-  return `KES ${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  if (n == null) return 'Ksh 0.00';
+  return `Ksh ${Number(n).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 type Destination = 'bank' | 'mpesa';
@@ -300,7 +300,7 @@ export default function DigitalWallet({ navigation }: any) {
   // which left the merchant to paste into WhatsApp themselves.
   const shareLinkOnWhatsApp = async () => {
     if (!generatedLink) return;
-    const text = `Please pay me KES ${linkAmount} via PayChain: ${generatedLink}`;
+    const text = `Please pay me ${formatKES(Number(linkAmount))} via PayChain: ${generatedLink}`;
     const url = `whatsapp://send?text=${encodeURIComponent(text)}`;
     try {
       const canOpen = await Linking.canOpenURL(url);

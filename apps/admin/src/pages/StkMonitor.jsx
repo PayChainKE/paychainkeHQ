@@ -2,12 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Layout from '../components/layout/Layout';
 import api from '../api/api';
 import TablePagination from '../components/ui/TablePagination';
-
-const fmtKES = (n) => {
-  const v = typeof n === 'string' ? parseFloat(n) : n;
-  if (!Number.isFinite(v)) return '0.00';
-  return v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-};
+import { formatKES } from '../utils/formatCurrency';
 
 function relTime(iso) {
   if (!iso) return null;
@@ -208,7 +203,7 @@ const StkRow = ({ row }) => {
         {row.merchantId?.email && <p className="text-2xs text-on-surface-variant/50">{row.merchantId.email}</p>}
       </td>
       <td className="px-3 py-4 text-xs font-mono text-slate-500">{row.phone || '—'}</td>
-      <td className="px-3 py-4 text-right text-sm font-bold text-on-surface tabular-nums">KES {fmtKES(row.amount)}</td>
+      <td className="px-3 py-4 text-right text-sm font-bold text-on-surface tabular-nums">{formatKES(row.amount)}</td>
       <td className="px-3 py-4 text-xs font-medium text-slate-500">{KIND_LABELS[row.kind] || row.kind}{row.channel === 'qr' ? ' (QR)' : ''}</td>
       <td className="px-3 py-4">
         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-2xs font-bold uppercase tracking-widest border ${styles}`}>

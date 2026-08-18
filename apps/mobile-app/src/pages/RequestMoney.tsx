@@ -20,6 +20,11 @@ function OptionIcon({ icon, size, color }: { icon: string; size: number; color: 
   return <Feather name={icon as keyof typeof Feather.glyphMap} size={size} color={color} />;
 }
 
+function formatKES(amount: number | string | null | undefined) {
+  const n = Number(amount) || 0;
+  return `Ksh ${n.toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 export default function RequestMoney({ navigation, route }: any) {
   const { merchant, refreshSession } = useAuth();
   const [step, setStep] = useState(1);
@@ -268,11 +273,11 @@ export default function RequestMoney({ navigation, route }: any) {
                 <View className="mb-5 px-1">
                   <View className="flex-row justify-between">
                     <Text className="text-[12px] text-[#707971] font-jakarta-medium">They'll be asked to pay</Text>
-                    <Text className="text-[12px] font-jakarta-extrabold text-[#00351d]">KES {feePreview.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
+                    <Text className="text-[12px] font-jakarta-extrabold text-[#00351d]">{formatKES(feePreview.total)}</Text>
                   </View>
                   {feePreview.fee > 0 && (
                     <Text className="text-[10px] text-[#707971] font-jakarta-medium opacity-70 mt-0.5">
-                      Includes a KES {feePreview.fee.toLocaleString(undefined, { minimumFractionDigits: 2 })} transaction fee on top of your KES {feePreview.baseAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })} request.
+                      Includes a {formatKES(feePreview.fee)} transaction fee on top of your {formatKES(feePreview.baseAmount)} request.
                     </Text>
                   )}
                 </View>
@@ -313,7 +318,7 @@ export default function RequestMoney({ navigation, route }: any) {
                   <>
                     <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#00351d] mb-2 text-center">Payment Received</Text>
                     <Text className="text-[13px] text-[#707971] font-jakarta-medium text-center leading-relaxed px-4 mb-8">
-                      KES {Number(amount).toLocaleString()} has been credited to your PayChain balance.
+                      {formatKES(amount)} has been credited to your PayChain balance.
                     </Text>
                   </>
                 )
@@ -321,7 +326,7 @@ export default function RequestMoney({ navigation, route }: any) {
                 <>
                   <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#00351d] mb-2 text-center">Link Ready to Share</Text>
                   <Text className="text-[13px] text-[#707971] font-jakarta-medium text-center leading-relaxed px-4 mb-5">
-                    Share this link to collect KES {Number(amount).toLocaleString()}.
+                    Share this link to collect {formatKES(amount)}.
                   </Text>
                   <View className="w-full bg-white border border-[#eff4ef] rounded-2xl p-4 mb-5">
                     <Text className="text-[13px] font-jakarta-bold text-[#00351d]" numberOfLines={1}>{generatedLink}</Text>

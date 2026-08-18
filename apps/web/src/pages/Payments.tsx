@@ -9,11 +9,11 @@ const Payments: React.FC = () => (
       <ul className="space-y-2">
         <li className="flex items-center justify-between border-b py-2">
           <span>Payment to John Doe</span>
-          <span className="text-xs text-gray-500">KES 5,000</span>
+          <span className="text-xs text-gray-500">Ksh 5,000.00</span>
         </li>
         <li className="flex items-center justify-between border-b py-2">
           <span>Payment to Jane Smith</span>
-          <span className="text-xs text-gray-500">KES 2,500</span>
+          <span className="text-xs text-gray-500">Ksh 2,500.00</span>
         </li>
       </ul>
     </div>

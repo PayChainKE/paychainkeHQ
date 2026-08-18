@@ -87,8 +87,8 @@ function PinBounceBoxes() {
 }
 
 function formatKES(n: number | null | undefined) {
-  if (n == null) return 'KES 0.00';
-  return `KES ${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  if (n == null) return 'Ksh 0.00';
+  return `Ksh ${Number(n).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 type Destination = 'mpesa-primary' | 'mobile' | 'bank' | 'till' | 'paybill';

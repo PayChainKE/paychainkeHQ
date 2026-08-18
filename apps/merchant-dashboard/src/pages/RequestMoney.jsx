@@ -6,6 +6,7 @@ import { ValidatedInput } from '../components/ValidatedInput'
 import { useNotification } from '../context/NotificationContext'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { getAppUrl } from '../utils/appUrl'
+import { formatKES } from '../utils/formatCurrency'
 
 const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
 
@@ -156,7 +157,7 @@ export default function RequestMoney() {
             setIsSubmitting(false)
             setStatusText('')
             await refreshSession()
-            addNotification({ title: 'Payment Received', message: `KES ${Number(amount).toLocaleString()} has been received.`, type: 'success' })
+            addNotification({ title: 'Payment Received', message: `${formatKES(amount)} has been received.`, type: 'success' })
             setStep(3)
           } else if (statusRes.data.status === 'failed') {
             clearInterval(pollIntervalRef.current)
@@ -348,10 +349,10 @@ export default function RequestMoney() {
                   <div className="flex flex-col gap-1 px-1 text-xs font-medium text-on-surface-variant">
                     <div className="flex justify-between">
                       <span>They'll be asked to pay</span>
-                      <span className="tabular-nums font-black text-primary">KES {feePreview.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                      <span className="tabular-nums font-black text-primary">{formatKES(feePreview.total)}</span>
                     </div>
                     {feePreview.fee > 0 && (
-                      <span className="text-[11px] opacity-70">Includes a KES {feePreview.fee.toLocaleString(undefined, { minimumFractionDigits: 2 })} transaction fee on top of your KES {feePreview.baseAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })} request.</span>
+                      <span className="text-[11px] opacity-70">Includes a {formatKES(feePreview.fee)} transaction fee on top of your {formatKES(feePreview.baseAmount)} request.</span>
                     )}
                   </div>
                 )}
@@ -412,7 +413,7 @@ export default function RequestMoney() {
                   <>
                     <h3 className="text-2xl font-headline font-bold text-primary mb-3">Payment Received</h3>
                     <p className="text-on-surface-variant font-medium max-w-sm mx-auto opacity-70 leading-relaxed mb-10">
-                      KES {Number(amount).toLocaleString()} has been credited to your PayChain balance.
+                      {formatKES(amount)} has been credited to your PayChain balance.
                     </p>
                   </>
                 )
@@ -420,7 +421,7 @@ export default function RequestMoney() {
                 <>
                   <h3 className="text-2xl font-headline font-bold text-primary mb-3">Link Ready to Share</h3>
                   <p className="text-on-surface-variant font-medium max-w-sm mx-auto opacity-70 leading-relaxed mb-6">
-                    Share this link with your customer to collect KES {Number(amount).toLocaleString()}.
+                    Share this link with your customer to collect {formatKES(amount)}.
                   </p>
                   <div className="bg-surface-container-low border border-outline-variant/10 rounded-2xl p-4 mb-6 break-all text-sm font-medium text-primary">
                     {generatedLink}

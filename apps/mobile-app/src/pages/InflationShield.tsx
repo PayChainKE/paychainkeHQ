@@ -11,7 +11,7 @@ import TopBar from '../components/layout/TopBar';
 type SwapDirection = 'KES_TO_USDC' | 'USDC_TO_KES';
 
 function formatKES(amount: number) {
-  return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(amount || 0);
+  return `Ksh ${Number(amount || 0).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export default function InflationShield({ navigation }: any) {

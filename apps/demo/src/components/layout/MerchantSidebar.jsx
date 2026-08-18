@@ -2,6 +2,7 @@ import React from 'react'
 import { NavLink } from 'react-router-dom'
 import { mockMerchant } from '../../mockData/merchant'
 import { usePrivacyMode } from '../../hooks/usePrivacyMode'
+import { formatKES } from '../../utils/formatCurrency'
 import userIcon from '../../assets/user-icon.png'
 import logo from '../../assets/logo2.png'
 
@@ -189,7 +190,7 @@ export default function MerchantSidebar({ isOpen, onClose }) {
       <div className="p-6 mt-auto">
         <div className="bg-[#0D241E] rounded-[16px] p-5 mb-8 border border-white/5">
           <p className="text-[#5EFEB3] text-[9px] font-bold uppercase tracking-widest mb-2">Available Funds</p>
-          <p className={`text-white font-headline text-2xl tracking-tight mb-0.5 transition-all duration-300 ${!showAmounts && 'blur-md'}`}>KES {new Intl.NumberFormat().format(mockMerchant.financials.kesBalance)}</p>
+          <p className={`text-white font-headline text-2xl tracking-tight mb-0.5 transition-all duration-300 ${!showAmounts && 'blur-md'}`}>{formatKES(mockMerchant.financials.kesBalance)}</p>
           <p className={`text-[#a8b3a8] text-[10px] transition-all duration-300 ${!showAmounts && 'blur-sm'}`}>{mockMerchant.financials.usdcBalance.toFixed(2)} USDC</p>
         </div>
         

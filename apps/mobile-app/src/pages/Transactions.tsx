@@ -32,11 +32,7 @@ type FilterTab = typeof FILTER_TABS[number];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function formatKES(amount: number) {
-  return new Intl.NumberFormat('en-KE', {
-    style: 'currency',
-    currency: 'KES',
-    minimumFractionDigits: 2,
-  }).format(amount);
+  return `Ksh ${Number(amount || 0).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 // ─── Summary stat cards config ────────────────────────────────────────────────

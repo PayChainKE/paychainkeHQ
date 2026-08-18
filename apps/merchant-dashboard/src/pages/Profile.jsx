@@ -5,6 +5,7 @@ import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { ValidatedInput } from '../components/ValidatedInput'
 import { formatAccountNumber } from '../utils/formatAccountNumber'
+import { formatKES } from '../utils/formatCurrency'
 import { BiometricRegisterButton } from '../components/BiometricButton'
 import { useNavigate, useLocation } from 'react-router-dom'
 import axios from 'axios'
@@ -1154,7 +1155,7 @@ function ApiPayoutPanel({ token, toast }) {
       {status?.apiPayoutEnabled ? (
         <>
           <p className="text-[11px] text-white/50">
-            Per-transaction cap: <span className="text-white font-bold">KES {status.caps?.perTransactionKes?.toLocaleString()}</span> · Daily cap: <span className="text-white font-bold">KES {status.caps?.dailyKes?.toLocaleString()}</span>
+            Per-transaction cap: <span className="text-white font-bold">{formatKES(status.caps?.perTransactionKes)}</span> · Daily cap: <span className="text-white font-bold">{formatKES(status.caps?.dailyKes)}</span>
           </p>
           <ValidatedInput
             kind="pin4"

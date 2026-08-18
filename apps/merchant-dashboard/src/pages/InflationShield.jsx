@@ -203,7 +203,7 @@ export default function InflationShield() {
             </div>
             <div>
               <p className="text-[9px] md:text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">Live Exchange Rate</p>
-              <p className="font-headline text-base md:text-lg text-primary leading-tight">1 USDC = KES {rate.toFixed(2)}</p>
+              <p className="font-headline text-base md:text-lg text-primary leading-tight">1 USDC = {formatKES(rate)}</p>
             </div>
           </div>
         </div>

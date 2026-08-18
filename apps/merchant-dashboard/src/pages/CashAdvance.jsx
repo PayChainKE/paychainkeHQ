@@ -262,7 +262,7 @@ export default function CashAdvance() {
   function validateStep1() {
     const amount = Number(requestedAmount)
     if (!Number.isFinite(amount) || amount < 1000) {
-      addNotification({ title: 'Invalid Amount', message: 'Enter a requested amount of at least KES 1,000.', type: 'error' })
+      addNotification({ title: 'Invalid Amount', message: `Enter a requested amount of at least ${formatKES(1000)}.`, type: 'error' })
       return false
     }
     if (purpose.trim().length < 10) {

@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import { ValidatedInput } from '../components/ValidatedInput';
 import paychainLogoWhite from '../assets/paychain-logo-white.png';
+import { formatKES } from '../utils/formatCurrency';
 
 const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
@@ -40,7 +41,11 @@ export default function InvoiceView() {
   }, [publicToken]);
 
   const isPaid = invoice?.status === 'paid' || invoice?.paymentLinkStatus === 'paid';
-  const fmt = (n) => `${invoice?.currency || 'KES'} ${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const fmt = (n) => {
+    const currency = invoice?.currency || 'KES';
+    if (currency === 'KES') return formatKES(n);
+    return `${currency} ${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
 
   const handlePayment = async (e) => {
     e.preventDefault();

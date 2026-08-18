@@ -22,17 +22,17 @@ const TruthPing: React.FC<TruthPingProps> = ({
   const messages = [
     {
       header: "PAYCHAINKE",
-      content: "Confirmed. You have received KES 1,250.00 from Brandon Omutiti on 20/1/2026 at 14:32:05 Ref UAKJP46MS6. Status: Anchored | Blockchain ID: #789",
+      content: "Confirmed. You have received Ksh 1,250.00 from Brandon Omutiti on 20/1/2026 at 14:32:05 Ref UAKJP46MS6. Status: Anchored | Blockchain ID: #789",
       footer: "This transaction is secured by PayChainKE."
     },
     {
       header: "PAYCHAINKE",
-      content: "Confirmed. You have received KES 2,500.00 from Sarah Wanjiku on 20/1/2026 at 14:45:12 Ref MPX8N9K2L. Status: Anchored | Blockchain ID: #456",
+      content: "Confirmed. You have received Ksh 2,500.00 from Sarah Wanjiku on 20/1/2026 at 14:45:12 Ref MPX8N9K2L. Status: Anchored | Blockchain ID: #456",
       footer: "This transaction is secured by PayChainKE."
     },
     {
       header: "PAYCHAINKE",
-      content: "Confirmed. You have received KES 750.00 from David Kiprop on 20/1/2026 at 15:02:33 Ref TXN7M4P9Q. Status: Anchored | Blockchain ID: #321",
+      content: "Confirmed. You have received Ksh 750.00 from David Kiprop on 20/1/2026 at 15:02:33 Ref TXN7M4P9Q. Status: Anchored | Blockchain ID: #321",
       footer: "This transaction is secured by PayChainKE."
     }
   ];

@@ -86,10 +86,10 @@ export default function Overview() {
             </div>
             
             <div className="flex-1">
-              <h3 className={`font-headline font-bold text-3xl lg:text-4xl tracking-tighter tabular-nums mb-1 transition-all duration-300 ${!showAmounts && 'blur-lg grayscale'}`}>KES 184,250</h3>
+              <h3 className={`font-headline font-bold text-3xl lg:text-4xl tracking-tighter tabular-nums mb-1 transition-all duration-300 ${!showAmounts && 'blur-lg grayscale'}`}>{formatKES(184250)}</h3>
               <div className={`flex items-center gap-2 text-[#5EFEB3] font-bold text-[9px] lg:text-[10px] tracking-wide transition-all duration-300 ${!showAmounts && 'blur-sm grayscale'}`}>
                 <span className="material-symbols-outlined text-[10px]" style={{ fontVariationSettings: "'FILL' 1" }}>trending_up</span>
-                <span>+KES 18,450 today</span>
+                <span>+{formatKES(18450)} today</span>
               </div>
             </div>
 
@@ -158,7 +158,7 @@ export default function Overview() {
                     </div>
                     
                     <div className="px-4 py-2 bg-slate-50/50 border-t border-slate-100 text-center">
-                       <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest leading-none">Limit: KES 250,000</p>
+                       <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest leading-none">Limit: {formatKES(250000)}</p>
                     </div>
                   </div>
                 </>
@@ -201,8 +201,8 @@ export default function Overview() {
       {/* Section 2: Stats Row */}
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 animate-fade-in-up [animation-delay:200ms] relative z-10">
         {[
-          { label: "Today's Revenue", value: "KES 18,450", trend: "12 payments", trendColor: "text-on-surface-variant" },
-          { label: "This Month", value: "KES 284,500", trend: "↓ 14% vs last", trendColor: "text-red-500" },
+          { label: "Today's Revenue", value: formatKES(18450), trend: "12 payments", trendColor: "text-on-surface-variant" },
+          { label: "This Month", value: formatKES(284500), trend: "↓ 14% vs last", trendColor: "text-red-500" },
           { label: "Total Transactions", value: "847", trend: "Since Oct 2025", trendColor: "text-on-surface-variant" },
           { label: "Trust Score", value: "74/100", trend: "Eligible ✔", trendColor: "text-emerald-600", showBadge: true }
         ].map((stat, i) => (
@@ -305,13 +305,13 @@ export default function Overview() {
               <p className="text-primary text-[10px] font-black uppercase tracking-[0.2em]">Active Cash Advance</p>
               <span className="material-symbols-outlined text-primary text-lg" style={{ fontVariationSettings: "'wght' 300" }}>account_balance_wallet</span>
             </div>
-            <h4 className="font-headline text-4xl text-primary mb-8">KES 150,000</h4>
+            <h4 className="font-headline text-4xl text-primary mb-8">{formatKES(150000)}</h4>
             <div className="space-y-6">
               <div className="w-full bg-[#F0FDF4] h-2 rounded-full overflow-hidden border border-emerald-50">
                 <div className="bg-emerald-500 h-full rounded-full transition-all duration-1000 ease-out" style={{ width: '45%' }}></div>
               </div>
               <div className="flex justify-between items-center">
-                <p className="text-[10px] font-bold text-on-surface-variant opacity-70">KES 67,500 repaid</p>
+                <p className="text-[10px] font-bold text-on-surface-variant opacity-70">{formatKES(67500)} repaid</p>
                 <p className="text-[10px] font-extrabold text-emerald-700 uppercase tracking-wider">45% complete</p>
               </div>
               <div className="p-4 bg-[#F0FDF4]/50 rounded-xl border border-emerald-100/50">
@@ -331,7 +331,7 @@ export default function Overview() {
             </div>
             <div>
               <p className="text-[9px] font-bold text-emerald-800 uppercase tracking-[0.2em] mb-1">Growth Tip</p>
-              <p className="text-[11px] text-emerald-900 leading-snug font-medium opacity-80">Boost your trust score to 80 to unlock KES 250,000 limits.</p>
+              <p className="text-[11px] text-emerald-900 leading-snug font-medium opacity-80">Boost your trust score to 80 to unlock {formatKES(250000)} limits.</p>
             </div>
           </section>
         </div>

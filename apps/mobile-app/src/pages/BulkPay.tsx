@@ -113,7 +113,7 @@ const initials = (name: string) =>
 
 const formatKES = (amount?: number) => {
   const n = amount || 0;
-  return `KES ${n.toLocaleString('en-KE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+  return `Ksh ${n.toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 const validatePhone = (phone: string) =>
@@ -309,7 +309,9 @@ export default function BulkPay() {
   const totalInvoicePages = Math.max(1, Math.ceil(filteredInvoicesList.length / invoicesPerPage));
   const paginatedInvoicesList = filteredInvoicesList.slice((invoicePage - 1) * invoicesPerPage, invoicePage * invoicesPerPage);
   const invoiceSubtotal = invoiceDetails.items.reduce((sum, item) => sum + (item.qty * item.price), 0);
-  const fmtInvoiceCurrency = (n: number) => `${invoiceDetails.currency} ${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const fmtInvoiceCurrency = (n: number) => invoiceDetails.currency === 'KES'
+    ? `Ksh ${Number(n || 0).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    : `${invoiceDetails.currency} ${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   useEffect(() => {
     setInvoicePage(prev => Math.min(prev, totalInvoicePages));
@@ -1352,7 +1354,11 @@ export default function BulkPay() {
                         ) : (
                           <View className="flex-row items-center justify-between">
                             <View>
-                              <Text className="text-[13px] font-jakarta-bold text-[#00351d]">{inv.currency} {(inv.total || 0).toLocaleString()}</Text>
+                              <Text className="text-[13px] font-jakarta-bold text-[#00351d]">
+                                {inv.currency === 'KES'
+                                  ? `Ksh ${Number(inv.total || 0).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                  : `${inv.currency} ${Number(inv.total || 0).toLocaleString()}`}
+                              </Text>
                               <Text className="text-[9px] text-[#707971] font-jakarta-medium uppercase tracking-widest">Total value</Text>
                             </View>
                             <View className="flex-row gap-2">
@@ -2236,7 +2242,7 @@ export default function BulkPay() {
                         </View>
                         <View className="flex-1">
                           <Text className="text-[8px] font-jakarta-bold uppercase tracking-widest text-[#707971] mb-1">Total</Text>
-                          <Text className="text-[12px] font-jakarta-bold text-[#00351d] text-right py-2">{(item.qty * item.price).toLocaleString()}</Text>
+                          <Text className="text-[12px] font-jakarta-bold text-[#00351d] text-right py-2">{fmtInvoiceCurrency(item.qty * item.price)}</Text>
                         </View>
                         <TouchableOpacity onPress={() => handleRemoveInvoiceItem(index)} className="w-8 h-8 rounded-lg bg-red-50 items-center justify-center mt-4">
                           <Feather name="trash-2" size={13} color="#ef4444" />

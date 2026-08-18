@@ -193,7 +193,7 @@ const CashAdvance: React.FC = () => {
                     <span className="text-xs font-bold uppercase tracking-widest text-gray-500">Cash Advance Offer</span>
                     <span className="text-[10px] font-bold uppercase tracking-widest bg-emerald-50 text-emerald-700 px-2 py-1 rounded-full">Ready</span>
                   </div>
-                  <div className="text-3xl font-extrabold text-gray-900 mb-1">KES 150,000</div>
+                  <div className="text-3xl font-extrabold text-gray-900 mb-1">Ksh 150,000.00</div>
                   <div className="text-sm text-gray-500 mb-4">Repayment: 6% of daily collections</div>
                   <button className="w-full bg-[#0a0a0a] text-white text-sm font-bold py-3 rounded-lg">Accept Offer</button>
                 </motion.div>
@@ -240,14 +240,14 @@ const CashAdvance: React.FC = () => {
               <div className="flex justify-between items-center mb-4">
                 <div>
                   <div className="text-sm text-gray-500">Approved limit</div>
-                  <div className="text-2xl font-bold text-gray-900">KES 150,000</div>
+                  <div className="text-2xl font-bold text-gray-900">Ksh 150,000.00</div>
                 </div>
                 <div className="text-right">
                   <div className="text-sm text-gray-500">Repayment</div>
                   <div className="font-semibold text-gray-900">6% daily</div>
                 </div>
               </div>
-              <div className="text-sm text-gray-500 mb-4 pb-4 border-b border-gray-100">Origination fee: KES 4,500</div>
+              <div className="text-sm text-gray-500 mb-4 pb-4 border-b border-gray-100">Origination fee: Ksh 4,500.00</div>
               <button className="w-full bg-[#00bf63] text-black font-bold py-3 rounded-lg">Accept</button>
             </motion.div>
           </div>

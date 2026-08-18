@@ -989,7 +989,7 @@ export default function BulkPay() {
         y += 8;
         pdf.text(`Total Recipients: ${authorizedReceipts.length}`, 20, y);
         y += 8;
-        pdf.text(`Total Payout: KES ${batchTotal.toLocaleString()}`, 20, y);
+        pdf.text(`Total Payout: ${formatKES(batchTotal)}`, 20, y);
         y += 15;
         
         pdf.setDrawColor(150);
@@ -1011,7 +1011,7 @@ export default function BulkPay() {
           y += 8;
           pdf.text(`Account/Phone: ${r.phone}`, 20, y);
           y += 8;
-          pdf.text(`Amount: KES ${r.amount.toLocaleString()}`, 20, y);
+          pdf.text(`Amount: ${formatKES(r.amount)}`, 20, y);
           y += 8;
           pdf.text(`Reference: ${r.reference}`, 20, y);
           y += 8;
@@ -1284,7 +1284,7 @@ export default function BulkPay() {
                                   <p className="text-sm font-bold text-primary truncate">{utilityCheck.customerName || 'Meter verified'}</p>
                                   <p className="text-[11px] text-on-surface-variant font-medium opacity-70">
                                     {utilityCheck.serviceName || (isPrepaid ? 'Kplc Prepaid' : isKplc ? 'Kplc Postpaid' : 'Nairobi Water')}
-                                    {typeof utilityCheck.balance === 'number' ? ` · Balance due: KES ${utilityCheck.balance.toLocaleString()}` : ''}
+                                    {typeof utilityCheck.balance === 'number' ? ` · Balance due: ${formatKES(utilityCheck.balance)}` : ''}
                                   </p>
                                 </div>
                               </div>
