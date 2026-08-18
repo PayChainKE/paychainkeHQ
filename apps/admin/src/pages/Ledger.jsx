@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Layout from '../components/layout/Layout';
 import api from '../api/api';
+import { formatKES } from '../utils/formatCurrency';
 
 // ── Constants ─────────────────────────────────────────────────────────
 const RANGES = [
@@ -38,17 +39,8 @@ const QUICK_FILTERS = [
   { id: 'today',     label: 'Today',         range: '24h', type: null,        status: null },
 ];
 
-const fmtKES = (n) => {
-  if (n == null || isNaN(n)) return 'KES 0';
-  if (n >= 1_000_000_000) return `KES ${(n / 1_000_000_000).toFixed(2)}B`;
-  if (n >= 1_000_000)     return `KES ${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000)         return `KES ${(n / 1_000).toFixed(1)}K`;
-  return `KES ${Math.round(n).toLocaleString()}`;
-};
-const fmtKESFull = (n) => {
-  if (n == null || isNaN(n)) return 'KES 0';
-  return `KES ${Math.round(n).toLocaleString()}`;
-};
+const fmtKES = formatKES;
+const fmtKESFull = formatKES;
 const fmtUSDC = (n) => {
   if (n == null || isNaN(n)) return '0';
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;

@@ -10,7 +10,7 @@ const POLL_INTERVAL_MS = 3000;
 const AUTO_REDIRECT_DELAY_MS = 2500;
 
 function formatKes(amount: number) {
-  return `KES ${amount.toLocaleString()}`;
+  return `Ksh ${amount.toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export default function Pay() {

@@ -309,7 +309,7 @@ export default function BulkPay() {
   const handleFundAccount = () => {
     addNotification({
       title: 'Funding Initiated',
-      message: `Your deposit of KES ${fundDetails.amount} via ${fundDetails.method} is being processed.`,
+      message: `Your deposit of ${formatKES(Number(fundDetails.amount) || 0)} via ${fundDetails.method} is being processed.`,
       type: 'success'
     });
     setShowFundModal(false);
@@ -350,7 +350,7 @@ export default function BulkPay() {
     setStep(4);
     addNotification({
       title: 'Batch Processed',
-      message: `Successfully disbursed KES ${batchTotal.toLocaleString()} to ${newReceipts.length} recipients.`,
+      message: `Successfully disbursed ${formatKES(batchTotal)} to ${newReceipts.length} recipients.`,
       type: 'success'
     });
   }
@@ -397,7 +397,7 @@ export default function BulkPay() {
         y += 8;
         pdf.text(`Total Recipients: ${authorizedReceipts.length}`, 20, y);
         y += 8;
-        pdf.text(`Total Payout: KES ${batchTotal.toLocaleString()}`, 20, y);
+        pdf.text(`Total Payout: ${formatKES(batchTotal)}`, 20, y);
         y += 15;
         
         pdf.setDrawColor(150);
@@ -419,7 +419,7 @@ export default function BulkPay() {
           y += 8;
           pdf.text(`Account/Phone: ${r.phone}`, 20, y);
           y += 8;
-          pdf.text(`Amount: KES ${r.amount.toLocaleString()}`, 20, y);
+          pdf.text(`Amount: ${formatKES(r.amount)}`, 20, y);
           y += 8;
           pdf.text(`Reference: ${r.reference}`, 20, y);
           y += 8;
@@ -837,9 +837,8 @@ export default function BulkPay() {
                 <div className="flex flex-col md:flex-row md:items-baseline gap-1 md:gap-3 text-right md:text-left group cursor-default">
                   <p className="text-[7px] md:text-[9px] text-on-surface-variant uppercase font-black tracking-widest leading-none opacity-50 group-hover:opacity-100 transition-opacity">Liquidity</p>
                   <div className="flex items-baseline gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/[0.03] border border-emerald-500/10 group-hover:bg-emerald-500/[0.07] group-hover:border-emerald-500/30 transition-all">
-                    <span className="text-[8px] md:text-[10px] font-bold text-emerald-600">KES</span>
                     <p className={`font-headline text-xs md:text-lg text-primary leading-none transition-all duration-300 font-bold ${!showAmounts && 'blur-md'}`}>
-                      {balance.toLocaleString()}
+                      {formatKES(balance)}
                     </p>
                   </div>
                 </div>
@@ -906,15 +905,17 @@ export default function BulkPay() {
                           </td>
                           <td className="px-6 py-4 text-right">
                             <div className="flex items-center justify-end gap-2">
-                              <span className="text-[8px] text-on-surface-variant font-black uppercase tracking-widest opacity-20">KES</span>
                               {step === 2 ? (
-                                <input 
-                                  className="bg-transparent border-none text-right font-headline text-lg text-primary focus:ring-0 p-0 w-24 tabular-nums" 
-                                  value={(payoutAmounts[p.id] || 0).toLocaleString()}
-                                  onChange={(e) => updateAmount(p.id, e.target.value)}
-                                />
+                                <>
+                                  <span className="text-[8px] text-on-surface-variant font-black uppercase tracking-widest opacity-20">KES</span>
+                                  <input
+                                    className="bg-transparent border-none text-right font-headline text-lg text-primary focus:ring-0 p-0 w-24 tabular-nums"
+                                    value={(payoutAmounts[p.id] || 0).toLocaleString()}
+                                    onChange={(e) => updateAmount(p.id, e.target.value)}
+                                  />
+                                </>
                               ) : (
-                                <span className="font-headline text-lg text-primary/40 tabular-nums">{(payoutAmounts[p.id] || 0).toLocaleString()}</span>
+                                <span className="font-headline text-lg text-primary/40 tabular-nums">{formatKES(payoutAmounts[p.id] || 0)}</span>
                               )}
                             </div>
                           </td>
@@ -959,13 +960,13 @@ export default function BulkPay() {
                         <div className="text-right space-y-1">
                           <label className="text-[7px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-30">Amount (KES)</label>
                           {step === 2 ? (
-                            <input 
-                              className="w-full bg-surface-container-low/50 border-none text-right font-headline text-sm text-primary rounded-lg px-2 py-1 tabular-nums" 
+                            <input
+                              className="w-full bg-surface-container-low/50 border-none text-right font-headline text-sm text-primary rounded-lg px-2 py-1 tabular-nums"
                               value={(payoutAmounts[p.id] || 0).toLocaleString()}
                               onChange={(e) => updateAmount(p.id, e.target.value)}
                             />
                           ) : (
-                            <p className="text-xs font-headline font-bold text-primary">{(payoutAmounts[p.id] || 0).toLocaleString()}</p>
+                            <p className="text-xs font-headline font-bold text-primary">{formatKES(payoutAmounts[p.id] || 0)}</p>
                           )}
                         </div>
                       </div>
@@ -1101,8 +1102,7 @@ export default function BulkPay() {
                     <div className="flex flex-col min-w-fit">
                       <span className="text-[8px] text-emerald-300 font-bold uppercase tracking-[0.2em] mb-0.5">Total Payout</span>
                       <div className="flex items-baseline gap-1.5">
-                        <span className="text-[9px] md:text-xs font-bold text-emerald-400">KES</span>
-                        <span className={`font-headline text-lg md:text-2xl tracking-tighter tabular-nums transition-all duration-300 ${!showAmounts && 'blur-md'}`}>{batchTotal.toLocaleString()}</span>
+                        <span className={`font-headline text-lg md:text-2xl tracking-tighter tabular-nums transition-all duration-300 ${!showAmounts && 'blur-md'}`}>{formatKES(batchTotal)}</span>
                       </div>
                     </div>
                   </div>
@@ -1231,7 +1231,7 @@ export default function BulkPay() {
                        
                        <div className="flex items-center justify-between sm:gap-6 pl-14 sm:pl-0">
                          <div className="text-left sm:text-right">
-                           <p className="text-xs font-bold text-primary">KES {inv.amount.toLocaleString()}</p>
+                           <p className="text-xs font-bold text-primary">{formatKES(inv.amount)}</p>
                            <p className="text-[9px] text-on-surface-variant font-medium opacity-50 italic uppercase tracking-widest">Total value</p>
                          </div>
                          <button 
@@ -1368,7 +1368,7 @@ export default function BulkPay() {
                         onClick={() => {
                           setBalance(prev => prev + (parseFloat(fundDetails.amount) || 0));
                           setFundStep(3);
-                          addNotification({ title: 'Account Funded', message: `KES ${fundDetails.amount} added to your balance.`, type: 'success' });
+                          addNotification({ title: 'Account Funded', message: `${formatKES(parseFloat(fundDetails.amount) || 0)} added to your balance.`, type: 'success' });
                         }}
                         className="flex-[2] py-3.5 rounded-2xl bg-[#00351D] text-white font-bold text-sm shadow-xl animate-bounce-slow"
                       >
@@ -1389,7 +1389,7 @@ export default function BulkPay() {
                       <p className="text-sm text-on-surface-variant font-medium mt-2">Your liquidity has been topped up successfully.</p>
                       <div className="mt-6 p-4 rounded-3xl bg-emerald-50 border border-emerald-500/10 inline-block">
                         <p className="text-[10px] text-emerald-700 font-bold uppercase tracking-widest leading-none mb-1">New Balance</p>
-                        <p className="font-headline text-2xl font-black text-emerald-800">KES {(balance + (parseFloat(fundDetails.amount) || 0)).toLocaleString()}</p>
+                        <p className="font-headline text-2xl font-black text-emerald-800">{formatKES(balance + (parseFloat(fundDetails.amount) || 0))}</p>
                       </div>
                     </div>
                     <button 

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Layout from '../components/layout/Layout';
 import api from '../api/api';
 import TablePagination from '../components/ui/TablePagination';
+import { formatKES } from '../utils/formatCurrency';
 
 const PAGE_SIZE = 25;
 
@@ -32,10 +33,7 @@ const STATUS_META = {
   failed:    { label: 'Failed',    pill: 'bg-red-50 text-red-700 border-red-200',             dot: 'bg-red-500' },
 };
 
-const fmtKES = (n) => {
-  if (n == null || isNaN(n)) return 'KES 0';
-  return `KES ${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-};
+const fmtKES = formatKES;
 const fmtTime = (iso) => {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -360,7 +358,7 @@ const AuditDrawer = ({ id, onClose }) => {
                           <span className="text-xs font-bold text-on-surface font-mono">{s.checkoutRequestId}</span>
                           <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-2xs font-bold uppercase border ${ssm.pill}`}>{s.status}</span>
                         </div>
-                        <p className="text-2xs text-on-surface-variant/70">{s.phone || 'unknown phone'} · KES {s.amount} · {s.kind}{s.channel === 'qr' ? ' (QR)' : ''}</p>
+                        <p className="text-2xs text-on-surface-variant/70">{s.phone || 'unknown phone'} · {formatKES(s.amount)} · {s.kind}{s.channel === 'qr' ? ' (QR)' : ''}</p>
                         {s.resultDesc && <p className="text-2xs text-on-surface-variant/50 mt-1 italic">{s.resultDesc}</p>}
                       </div>
                     );

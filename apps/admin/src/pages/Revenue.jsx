@@ -4,6 +4,7 @@ import Layout from '../components/layout/Layout';
 import api from '../api/api';
 import { useAuth } from '../context/AuthContext';
 import TablePagination from '../components/ui/TablePagination';
+import { formatKES } from '../utils/formatCurrency';
 
 const PAGE_SIZE = 25;
 
@@ -88,17 +89,8 @@ const STATUS_META = {
 };
 
 // ── Formatters ────────────────────────────────────────────────────────
-const fmtKES = (n) => {
-  if (n == null || isNaN(n)) return 'KES 0';
-  if (n >= 1_000_000_000) return `KES ${(n / 1_000_000_000).toFixed(2)}B`;
-  if (n >= 1_000_000)     return `KES ${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000)         return `KES ${(n / 1_000).toFixed(1)}K`;
-  return `KES ${Math.round(n).toLocaleString()}`;
-};
-const fmtKESPrecise = (n) => {
-  if (n == null || isNaN(n)) return 'KES 0.00';
-  return `KES ${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-};
+const fmtKES = formatKES;
+const fmtKESPrecise = formatKES;
 const fmtUSDC = (n) => {
   if (n == null || isNaN(n)) return '0.00 USDC';
   return `${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDC`;
@@ -453,7 +445,7 @@ const Revenue = () => {
         showToast('Sweep request failed — no response data.');
       } else if (sweep.status === 'completed') {
         showToast(
-          `${sweep.simulated ? 'Simulated' : 'Real'} sweep completed: KES ${Number(sweep.amount || 0).toLocaleString()} ${sweep.simulated ? '(no funds moved)' : `→ ${sweep.destinationAccountNumber}`}`
+          `${sweep.simulated ? 'Simulated' : 'Real'} sweep completed: ${formatKES(sweep.amount || 0)} ${sweep.simulated ? '(no funds moved)' : `→ ${sweep.destinationAccountNumber}`}`
         );
       } else if (sweep.status === 'skipped') {
         showToast(`Sweep skipped: ${sweep.failureReason || 'nothing to sweep.'}`);

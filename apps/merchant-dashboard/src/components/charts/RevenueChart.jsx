@@ -5,9 +5,9 @@ ChartJS.register(LinearScale, CategoryScale, PointElement, LineElement, Tooltip,
 
 const fmtCompactKES = (value) => {
   const abs = Math.abs(value)
-  if (abs >= 1_000_000) return `KSh ${(value / 1_000_000).toFixed(abs % 1_000_000 === 0 ? 0 : 1)}M`
-  if (abs >= 1_000) return `KSh ${(value / 1_000).toFixed(abs % 1_000 === 0 ? 0 : 1)}k`
-  return `KSh ${value.toLocaleString('en-KE')}`
+  if (abs >= 1_000_000) return `Ksh ${(value / 1_000_000).toFixed(abs % 1_000_000 === 0 ? 0 : 1)}M`
+  if (abs >= 1_000) return `Ksh ${(value / 1_000).toFixed(abs % 1_000 === 0 ? 0 : 1)}k`
+  return `Ksh ${value.toLocaleString('en-KE')}`
 }
 
 // Dual-series (money in / money out) line chart for the Overview page's

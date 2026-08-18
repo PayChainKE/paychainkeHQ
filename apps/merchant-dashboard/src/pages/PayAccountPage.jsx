@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import paychainLogo from '../../images/logo.png';
 import { ValidatedInput } from '../components/ValidatedInput';
+import { formatKES } from '../utils/formatCurrency';
 
 // Counterpart to PaymentPage.jsx (/pay/:linkId, one fixed-amount link).
 // This is the open-amount flow behind a merchant's static "Settlement QR"
@@ -185,17 +186,17 @@ export default function PayAccountPage() {
                 <div className="flex flex-col gap-1 px-1 text-xs font-medium text-on-surface-variant">
                   <div className="flex justify-between">
                     <span>Amount</span>
-                    <span className="tabular-nums">KES {feePreview.baseAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    <span className="tabular-nums">{formatKES(feePreview.baseAmount)}</span>
                   </div>
                   {feePreview.fee > 0 && (
                     <div className="flex justify-between">
                       <span>Transaction fee</span>
-                      <span className="tabular-nums">KES {feePreview.fee.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                      <span className="tabular-nums">{formatKES(feePreview.fee)}</span>
                     </div>
                   )}
                   <div className="flex justify-between font-black text-primary pt-1 border-t border-outline-variant/10">
                     <span>Total to pay</span>
-                    <span className="tabular-nums">KES {feePreview.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    <span className="tabular-nums">{formatKES(feePreview.total)}</span>
                   </div>
                 </div>
               )}

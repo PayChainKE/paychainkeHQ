@@ -21,7 +21,7 @@ const PAYBILL_BUSINESS_NUMBER = '880100';
 
 const formatKES = (amount: number | string) => {
   const n = Number(amount) || 0;
-  return `KES ${n.toLocaleString('en-KE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+  return `Ksh ${n.toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 export default function FundAccountModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {

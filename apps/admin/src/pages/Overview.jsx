@@ -2,19 +2,12 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import api from '../api/api';
+import { formatKES as fmtKES } from '../utils/formatCurrency';
 
 // Skeleton bar — mimics text height/width while data loads. No 0 → real flicker.
 const Skel = ({ className = 'w-12 h-7' }) => (
   <span className={`inline-block ${className} bg-on-surface/10 rounded animate-pulse align-middle`} aria-hidden="true" />
 );
-
-const fmtKES = (n) => {
-  if (n == null || isNaN(n)) return 'KES 0';
-  if (n >= 1_000_000_000) return `KES ${(n / 1_000_000_000).toFixed(2)}B`;
-  if (n >= 1_000_000)     return `KES ${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000)         return `KES ${(n / 1_000).toFixed(1)}K`;
-  return `KES ${Math.round(n).toLocaleString()}`;
-};
 
 // ── Client-side signup bucketer ──────────────────────────────────────
 // Mirrors the backend's densified daily/weekly/monthly/yearly aggregations
@@ -426,8 +419,8 @@ const Overview = () => {
                   ? merchantAnalytics.totalUsdcLocked * fx.usdcKes
                   : null
               }
-              digits={0}
-              prefix="KES "
+              digits={2}
+              prefix="Ksh "
               hint="Total USDC locked × USDC/KES"
               loading={fxLoading || loading}
             />

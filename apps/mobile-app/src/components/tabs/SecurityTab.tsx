@@ -758,7 +758,7 @@ function ApiPayoutPanel() {
       {status?.apiPayoutEnabled ? (
         <View className="gap-3">
           <Text className="text-[11px] text-white/60">
-            Per-transaction cap: KES {status.caps?.perTransactionKes?.toLocaleString()} · Daily cap: KES {status.caps?.dailyKes?.toLocaleString()}
+            Per-transaction cap: Ksh {Number(status.caps?.perTransactionKes ?? 0).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · Daily cap: Ksh {Number(status.caps?.dailyKes ?? 0).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </Text>
           <ValidatedTextInput kind="pin4" secureTextEntry placeholder="Current payment PIN (4 digits)" placeholderTextColor="rgba(255,255,255,0.2)"
             value={currentPin} onChangeText={setCurrentPin}

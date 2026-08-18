@@ -50,7 +50,7 @@ export default function RevenueChart({ labels, data, accentColor = '#1d9e75' }) 
         ticks: { 
           font: { family: 'Plus Jakarta Sans', size: 10 }, 
           color: '#404942',
-          callback: (value) => `KSh ${value/1000}k`
+          callback: (value) => `Ksh ${value/1000}k`
         }
       }
     },

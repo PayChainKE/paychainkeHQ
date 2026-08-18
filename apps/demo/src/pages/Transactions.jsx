@@ -87,9 +87,9 @@ export default function Transactions() {
       startY: 75,
       head: [['TOTAL MONEY IN', 'TOTAL MONEY OUT', 'TOTAL SWAPPED']],
       body: [[
-        `KES ${totalIn.toLocaleString()}`,
-        `KES ${totalOut.toLocaleString()}`,
-        `KES ${swpKES.toLocaleString()} / ${swpUSDC} USDC`
+        formatKES(totalIn),
+        formatKES(totalOut),
+        `${formatKES(swpKES)} / ${swpUSDC} USDC`
       ]],
       theme: 'plain',
       headStyles: { 
@@ -116,9 +116,9 @@ export default function Transactions() {
     const tableData = filteredRows.map(tx => {
       const dateTime = formatDateISO(tx.timestamp).split(',')
       const party = tx.sender?.name || tx.recipient?.name || 'Treasury'
-      const amount = tx.type === 'fx_swap' 
-        ? `${tx.usdcAmount} USDC` 
-        : `KES ${(tx.amount || tx.kesAmount || 0).toLocaleString()}`
+      const amount = tx.type === 'fx_swap'
+        ? `${tx.usdcAmount} USDC`
+        : formatKES(tx.amount || tx.kesAmount || 0)
         
       return [
         dateTime[0].trim(),
@@ -240,9 +240,9 @@ export default function Transactions() {
     doc.setFontSize(18)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(22, 39, 35)
-    const amountStr = tx.type === 'fx_swap' 
-      ? `${tx.usdcAmount} USDC` 
-      : `${(tx.amount || tx.kesAmount || 0).toLocaleString()} KES`
+    const amountStr = tx.type === 'fx_swap'
+      ? `${tx.usdcAmount} USDC`
+      : formatKES(tx.amount || tx.kesAmount || 0)
     doc.text(amountStr, 85, valueY + 2)
 
     // Verification Note
@@ -288,10 +288,10 @@ export default function Transactions() {
         {/* Section 1: Summary Strip */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6 mb-8 lg:mb-12 animate-fade-in-up [animation-delay:100ms]">
           {[
-            { label: 'Today', value: 'KES 12,450.00', text: 'text-emerald-700 font-bold' },
-            { label: 'This Week', value: 'KES 84,920.50', text: 'text-emerald-700 font-bold' },
-            { label: 'This Month', value: 'KES 245,100.00', text: 'text-emerald-700 font-bold' },
-            { label: 'All Time', value: 'KES 1.84M', text: 'text-emerald-700 font-bold' },
+            { label: 'Today', value: 'Ksh 12,450.00', text: 'text-emerald-700 font-bold' },
+            { label: 'This Week', value: 'Ksh 84,920.50', text: 'text-emerald-700 font-bold' },
+            { label: 'This Month', value: 'Ksh 245,100.00', text: 'text-emerald-700 font-bold' },
+            { label: 'All Time', value: 'Ksh 1,840,000.00', text: 'text-emerald-700 font-bold' },
           ].map((stat, i) => (
             <div key={i} className="bg-white p-6 lg:p-8 rounded-[24px] lg:rounded-[32px] border border-outline-variant/10 shadow-sm transition-transform hover:scale-105 group">
               <p className="text-[9px] lg:text-[10px] text-on-surface-variant font-black uppercase tracking-widest mb-1 lg:mb-2">{stat.label}</p>

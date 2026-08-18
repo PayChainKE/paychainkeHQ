@@ -36,8 +36,8 @@ const STATUS_META: Record<string, { label: string; sub: string; icon: keyof type
 };
 
 function formatKES(n: number | null | undefined) {
-  if (n == null) return 'KES 0.00';
-  return `KES ${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  if (n == null) return 'Ksh 0.00';
+  return `Ksh ${Number(n).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function UnavailableNotice() {
@@ -228,7 +228,7 @@ export default function CashAdvance({ navigation }: any) {
   const validateStep1 = () => {
     const amount = Number(requestedAmount);
     if (!Number.isFinite(amount) || amount < 1000) {
-      setFormError('Enter a requested amount of at least KES 1,000.');
+      setFormError('Enter a requested amount of at least Ksh 1,000.00.');
       return false;
     }
     if (purpose.trim().length < 10) {

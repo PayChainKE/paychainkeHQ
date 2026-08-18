@@ -15,10 +15,10 @@ export default function SendMoney() {
 
   const destinations = [
     { id: 'mpesa-primary', label: 'Send to primary mpesa phone', fee: 'Free' },
-    { id: 'bank', label: 'Send to Bank account', fee: 'KSh 50.00' },
-    { id: 'till', label: 'Send to Till', fee: 'KSh 50.00' },
-    { id: 'paybill', label: 'Send to paybill', fee: 'KSh 50.00' },
-    { id: 'mobile', label: 'Send to Mobile phone', fee: 'KSh 50.00' }
+    { id: 'bank', label: 'Send to Bank account', fee: 'Ksh 50.00' },
+    { id: 'till', label: 'Send to Till', fee: 'Ksh 50.00' },
+    { id: 'paybill', label: 'Send to paybill', fee: 'Ksh 50.00' },
+    { id: 'mobile', label: 'Send to Mobile phone', fee: 'Ksh 50.00' }
   ]
 
   return (
@@ -68,7 +68,7 @@ export default function SendMoney() {
                     </div>
                     <div className="min-w-0">
                       <p className="text-[10px] lg:text-xs font-black text-primary uppercase tracking-wider truncate">Available balance</p>
-                      <p className="text-lg lg:text-xl font-headline text-emerald-700 mt-0.5">KSh 10.00</p>
+                      <p className="text-lg lg:text-xl font-headline text-emerald-700 mt-0.5">Ksh 10.00</p>
                     </div>
                   </div>
                   <span className="material-symbols-outlined text-slate-300 group-hover:text-emerald-600 transition-colors shrink-0">check_circle</span>

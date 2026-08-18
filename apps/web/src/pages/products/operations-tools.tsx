@@ -103,11 +103,11 @@ const OperationsTools = () => {
                     <div className="flex gap-3 mb-4">
                       <div className="flex-1 bg-white/5 border border-white/5 rounded-xl p-3">
                         <div className="text-[10px] uppercase tracking-widest text-gray-500 mb-1">Balance</div>
-                        <div className="text-base font-bold text-white">KES 1,254,300</div>
+                        <div className="text-base font-bold text-white">Ksh 1,254,300.00</div>
                       </div>
                       <div className="flex-1 bg-white/5 border border-white/5 rounded-xl p-3">
                         <div className="text-[10px] uppercase tracking-widest text-gray-500 mb-1">Today</div>
-                        <div className="text-base font-bold text-white">KES 42,300</div>
+                        <div className="text-base font-bold text-white">Ksh 42,300.00</div>
                       </div>
                     </div>
                     <div className="bg-white/5 border border-white/5 rounded-xl p-3 h-[140px]">
@@ -143,9 +143,9 @@ const OperationsTools = () => {
                   <div className="text-[10px] uppercase tracking-widest text-gray-500 mb-2">Recent transactions</div>
                   <div className="space-y-1.5">
                     {[
-                      ['INV-001234', 'Card • KES 4,200', '2h ago'],
-                      ['INV-001233', 'M-PESA • KES 12,400', '5h ago'],
-                      ['INV-001232', 'Card • KES 2,800', '1d ago'],
+                      ['INV-001234', 'Card • Ksh 4,200.00', '2h ago'],
+                      ['INV-001233', 'M-PESA • Ksh 12,400.00', '5h ago'],
+                      ['INV-001232', 'Card • Ksh 2,800.00', '1d ago'],
                     ].map(([id, meta, time]) => (
                       <div key={id} className="flex items-center justify-between text-[11px] py-1">
                         <span className="text-white font-medium">{id}</span>
@@ -239,11 +239,11 @@ const OperationsTools = () => {
                 <div className="grid grid-cols-2 gap-6">
                   <div>
                     <div className="text-xs uppercase tracking-widest text-gray-500 mb-1">Total revenue</div>
-                    <div className="text-xl font-extrabold text-gray-900">KES 3,412,800</div>
+                    <div className="text-xl font-extrabold text-gray-900">Ksh 3,412,800.00</div>
                   </div>
                   <div>
                     <div className="text-xs uppercase tracking-widest text-gray-500 mb-1">VAT summary</div>
-                    <div className="text-xl font-extrabold text-gray-900">KES 280,400</div>
+                    <div className="text-xl font-extrabold text-gray-900">Ksh 280,400.00</div>
                   </div>
                 </div>
               </div>

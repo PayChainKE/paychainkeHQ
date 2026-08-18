@@ -55,7 +55,7 @@ export default function Wallet() {
       setIsWithdrawing(false)
       addToast({
         title: 'Withdrawal Initiated',
-        message: `KES ${Number(withdrawAmount).toLocaleString()} is being sent to your selected destination.`,
+        message: `${formatKES(Number(withdrawAmount))} is being sent to your selected destination.`,
         type: 'success'
       })
       setWithdrawAmount('')
@@ -511,7 +511,7 @@ export default function Wallet() {
                                    Copy
                                 </button>
                                 <button 
-                                   onClick={() => window.open(`whatsapp://send?text=${encodeURIComponent(`Please pay me KES ${paymentLinkAmount} via PayChain: ${generatedLink}`)}`)}
+                                   onClick={() => window.open(`whatsapp://send?text=${encodeURIComponent(`Please pay me ${formatKES(Number(paymentLinkAmount) || 0)} via PayChain: ${generatedLink}`)}`)}
                                    className="px-5 py-3 bg-[#25D366] text-white rounded-xl text-[10px] font-bold hover:bg-[#1DA851] transition-all shadow-md flex items-center justify-center gap-2"
                                 >
                                    <span className="material-symbols-outlined text-[14px]" style={{fontVariationSettings: "'FILL' 1"}}>send</span>
@@ -812,7 +812,7 @@ export default function Wallet() {
                       onClick={() => setShowTopUpSelection(false)}
                       className="w-full bg-primary text-white py-5 rounded-3xl font-bold text-lg shadow-xl hover:bg-primary-dark transition-all"
                     >
-                      Top Up KES {topUpAmount ? Number(topUpAmount).toLocaleString() : '0'}
+                      Top Up {formatKES(topUpAmount ? Number(topUpAmount) : 0)}
                     </button>
                   </div>
                 </div>

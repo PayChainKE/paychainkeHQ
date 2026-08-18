@@ -37,9 +37,9 @@ const comparisonRows = [
 ];
 
 const batch = [
-  { name: 'Aisha N.', amount: 'KES 12,000', status: 'paid' },
-  { name: 'James K.', amount: 'KES 8,500', status: 'paid' },
-  { name: 'Mercy O.', amount: 'KES 10,200', status: 'pending' },
+  { name: 'Aisha N.', amount: 'Ksh 12,000.00', status: 'paid' },
+  { name: 'James K.', amount: 'Ksh 8,500.00', status: 'paid' },
+  { name: 'Mercy O.', amount: 'Ksh 10,200.00', status: 'pending' },
 ];
 
 const PaychainBulkPay: React.FC = () => {

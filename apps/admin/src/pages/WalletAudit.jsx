@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Layout from '../components/layout/Layout';
 import api from '../api/api';
 import TablePagination from '../components/ui/TablePagination';
+import { formatKES } from '../utils/formatCurrency';
 
 const fmtUSDC = (n) => {
   const v = typeof n === 'string' ? parseFloat(n) : n;
@@ -13,12 +14,6 @@ const fmtXLM = (n) => {
   const v = typeof n === 'string' ? parseFloat(n) : n;
   if (!Number.isFinite(v)) return '0.0000';
   return v.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 });
-};
-
-const fmtKES = (n) => {
-  const v = typeof n === 'string' ? parseFloat(n) : n;
-  if (!Number.isFinite(v)) return '0.00';
-  return v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
 function relTime(iso) {
@@ -154,7 +149,7 @@ const WalletAudit = () => {
               </span>
               <p className="text-xs uppercase tracking-widest text-emerald-100/50 font-bold mb-1">Total KES Network Volume</p>
               <h3 className="text-3xl md:text-5xl font-black text-white tracking-tighter tabular-nums">
-                KES <span className="text-emerald-400">{fmtKES(summary.totalKesVolume)}</span>
+                <span className="text-emerald-400">{formatKES(summary.totalKesVolume)}</span>
               </h3>
             </div>
           </div>
@@ -342,7 +337,7 @@ const AuditRow = ({ row, network, copiedKey, onCopy }) => {
       </td>
       <td className="px-3 py-4 text-right">
         <span className="text-xs font-bold text-emerald-600 tabular-nums">
-          {fmtKES(row.lifetimeKesVolume || 0)}
+          {formatKES(row.lifetimeKesVolume || 0)}
         </span>
       </td>
       <td className="px-3 py-4 text-right">

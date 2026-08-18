@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Layout from '../components/layout/Layout';
 import api from '../api/api';
+import { formatKES as fmtKES } from '../utils/formatCurrency';
 
 // ── Constants ─────────────────────────────────────────────────────────
 const RANGES = [
@@ -19,13 +20,6 @@ const TXN_TYPE_LABEL = {
   other:      'Other',
 };
 
-const fmtKES = (n) => {
-  if (n == null || isNaN(n)) return 'KES 0';
-  if (n >= 1_000_000_000) return `KES ${(n / 1_000_000_000).toFixed(2)}B`;
-  if (n >= 1_000_000)     return `KES ${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000)         return `KES ${(n / 1_000).toFixed(1)}k`;
-  return `KES ${Math.round(n).toLocaleString()}`;
-};
 const fmtNum = (n) => {
   if (n == null || isNaN(n)) return '0';
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;

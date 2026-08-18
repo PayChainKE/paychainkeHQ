@@ -86,7 +86,7 @@ const VirtualAccount: React.FC = () => {
                   transition={{ duration: 0.5, delay: 0.4 }}
                   className="bg-white rounded-xl p-5 shadow-xl mb-4"
                 >
-                  <div className="text-2xl font-extrabold text-gray-900 mb-1">+ KES 4,500.00</div>
+                  <div className="text-2xl font-extrabold text-gray-900 mb-1">+ Ksh 4,500.00</div>
                   <div className="text-xs text-gray-500">From Aisha N. · Ref QGH7X9K2M</div>
                 </motion.div>
                 <div className="space-y-2">

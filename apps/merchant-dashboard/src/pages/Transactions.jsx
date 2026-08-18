@@ -260,7 +260,7 @@ export default function Transactions() {
     // ── SUMMARY STRIP ────────────────────────────────────────────────────────
     const totalIn   = rows.filter(t => isCreditTransaction(t.type)).reduce((s, o) => s + (o.kesAmount || o.amount || 0), 0)
     const totalOut  = rows.filter(t => isDebitTransaction(t.type)).reduce((s, o) => s + (o.kesAmount || o.amount || 0), 0)
-    const fmtKES    = (n) => `KES ${Number(n).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    const fmtKES    = (n) => formatKES(n)
     const fmtNum    = (n) => Number(n).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
     // ── OPENING BALANCE ──────────────────────────────────────────────────────
@@ -513,7 +513,7 @@ export default function Transactions() {
     doc.setTextColor(22, 39, 35)
     const amountStr = tx.type === 'fx_swap'
       ? `${tx.usdcAmount} USDC`
-      : `${(tx.amount || tx.kesAmount || 0).toLocaleString()} KES`
+      : formatKES(tx.amount || tx.kesAmount || 0)
     doc.text(amountStr, 85, labelY + 10)
 
     const gridBottom = labelY + rowH * 4 + 7

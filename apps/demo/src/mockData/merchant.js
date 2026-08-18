@@ -62,6 +62,6 @@ export const mockMerchant = {
   notifications: [
     { id: 'n1', type: 'advance', message: 'Your Cash Advance repayment is 45% complete.', isRead: false, createdAt: new Date(Date.now() - 3600000).toISOString() },
     { id: 'n2', type: 'trust_score', message: 'Your Trust Score increased to 74. You are 6 points from your next milestone.', isRead: false, createdAt: new Date(Date.now() - 86400000).toISOString() },
-    { id: 'n3', type: 'payment', message: 'Bulk Pay of KES 45,000 to 3 employees completed successfully.', isRead: true, createdAt: new Date(Date.now() - 172800000).toISOString() }
+    { id: 'n3', type: 'payment', message: 'Bulk Pay of Ksh 45,000.00 to 3 employees completed successfully.', isRead: true, createdAt: new Date(Date.now() - 172800000).toISOString() }
   ]
 }

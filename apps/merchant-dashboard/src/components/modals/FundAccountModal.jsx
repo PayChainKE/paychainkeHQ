@@ -73,7 +73,7 @@ export default function FundAccountModal({ method, onClose }) {
             stopPolling();
             setPhase('success');
             setStatusText('');
-            addToast({ title: 'Top-Up Successful', message: `KES ${Number(amount).toLocaleString()} has been added to your account.`, type: 'success' });
+            addToast({ title: 'Top-Up Successful', message: `${formatKES(amount)} has been added to your account.`, type: 'success' });
             await refreshSession();
             setTimeout(onClose, 1800);
           } else if (statusRes.data.status === 'failed') {

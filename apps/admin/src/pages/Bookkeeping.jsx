@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Layout from '../components/layout/Layout';
 import api from '../api/api';
 import { useToast } from '../context/ToastContext';
+import { formatKES } from '../utils/formatCurrency';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 // Mirrors backend/models/Expense.js EXPENSE_CATEGORIES / PAYMENT_METHODS —
@@ -42,19 +43,8 @@ const PERIODS = [
   { v: 'all',          l: 'All Time' },
 ];
 
-const fmtKES = (n) => {
-  if (n == null || isNaN(n)) return 'KES 0';
-  const abs = Math.abs(n);
-  const sign = n < 0 ? '-' : '';
-  if (abs >= 1_000_000_000) return `${sign}KES ${(abs / 1_000_000_000).toFixed(2)}B`;
-  if (abs >= 1_000_000)     return `${sign}KES ${(abs / 1_000_000).toFixed(2)}M`;
-  if (abs >= 1_000)         return `${sign}KES ${(abs / 1_000).toFixed(1)}K`;
-  return `${sign}KES ${Math.round(abs).toLocaleString()}`;
-};
-const fmtKESFull = (n) => {
-  if (n == null || isNaN(n)) return 'KES 0';
-  return `${n < 0 ? '-' : ''}KES ${Math.round(Math.abs(n)).toLocaleString()}`;
-};
+const fmtKES = formatKES;
+const fmtKESFull = formatKES;
 const fmtDate = (iso) => {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('en-KE', { day: '2-digit', month: 'short', year: 'numeric' });

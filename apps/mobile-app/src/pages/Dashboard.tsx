@@ -178,7 +178,7 @@ export default function Dashboard({ navigation }: any) {
     : '??';
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(amount);
+    return `Ksh ${Number(amount || 0).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
   const hour = now.getHours();
@@ -721,7 +721,7 @@ export default function Dashboard({ navigation }: any) {
                       <Text className="text-3xl font-jakarta-bold tracking-tight text-[#0c2010]">Apply to see your limit</Text>
                     )
                   ) : (
-                    <Text className="text-3xl font-jakarta-bold tracking-tight text-[#707971]">KES 0</Text>
+                    <Text className="text-3xl font-jakarta-bold tracking-tight text-[#707971]">Ksh 0.00</Text>
                   )}
                 </View>
                 <View className="w-14 h-14 rounded-full border-4 border-[#006c4e] items-center justify-center border-r-[#eff4ef] rotate-45">

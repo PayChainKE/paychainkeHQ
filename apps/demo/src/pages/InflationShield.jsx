@@ -94,7 +94,7 @@ export default function InflationShield() {
             <div>
               <p className="text-[9px] md:text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">Live Exchange Rate</p>
               <p className="font-headline text-base md:text-lg text-primary leading-tight">
-                {rate ? `1 USDC = KES ${rate.toFixed(2)}` : hasRealWallet ? 'Loading…' : '—'}
+                {rate ? `1 USDC = ${formatKES(rate)}` : hasRealWallet ? 'Loading…' : '—'}
               </p>
             </div>
           </div>
