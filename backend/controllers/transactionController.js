@@ -11,7 +11,7 @@ import { getLiveKesToUsdcRate } from '../utils/rateEngine.js';
 import { sendWalletActivationEmail, sendStatementEmail } from '../utils/resend.js';
 import { createNotification } from './notificationController.js';
 import { getCheckoutTotal, getInvoiceCheckoutTotal, calculateCustomerSurcharge, calculateInvoiceClientMarkup, PricingEngineError } from '../utils/pricingEngine.js';
-import { safeSendSMS } from '../utils/smsSanitizer.js';
+import { safeSendSMS, formatKes } from '../utils/smsSanitizer.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { getNcbaVirtualAccountNumber, validatePhoneNumber, NcbaValidationError } from '../utils/ncbaValidators.js';
@@ -251,7 +251,7 @@ export const swapKesToUsdc = async (req, res) => {
           const { date, time } = formatTransactionDateTime();
           safeSendSMS({
             to: merchant.phone,
-            message: `Swap Confirmed. KES ${Number(amount).toLocaleString()} converted to ${usdcPayoutValue} USDC on ${date} at ${time}. New KES balance: KES ${debited.kesBalance.toLocaleString()}.`,
+            message: `Swap Confirmed. Ksh ${formatKes(amount)} converted to ${usdcPayoutValue} USDC on ${date} at ${time}. New KES balance: Ksh ${formatKes(debited.kesBalance)}.`,
           }).then((result) => {
             if (!result.success) console.error(`Swap SMS failed for merchant ${merchant._id}:`, result.error);
           });
@@ -311,7 +311,7 @@ export const swapKesToUsdc = async (req, res) => {
           const { date, time } = formatTransactionDateTime();
           safeSendSMS({
             to: merchant.phone,
-            message: `Swap Confirmed. ${Number(amount).toLocaleString()} USDC converted to KES ${kesPayoutValue.toLocaleString(undefined, { maximumFractionDigits: 2 })} on ${date} at ${time}. New KES balance: KES ${merchant.kesBalance.toLocaleString()}.`,
+            message: `Swap Confirmed. ${Number(amount).toLocaleString()} USDC converted to Ksh ${formatKes(kesPayoutValue)} on ${date} at ${time}. New KES balance: Ksh ${formatKes(merchant.kesBalance)}.`,
           }).then((result) => {
             if (!result.success) console.error(`Swap SMS failed for merchant ${merchant._id}:`, result.error);
           });
@@ -506,7 +506,7 @@ export const sendMoney = async (req, res) => {
       const { date, time } = formatTransactionDateTime();
       safeSendSMS({
         to: merchant.phone,
-        message: `${ref} Sent. KES ${totalDeduction.toLocaleString()} sent to ${reference || destination || 'recipient'} on ${date} at ${time}. New balance: KES ${merchant.kesBalance.toLocaleString()}.`,
+        message: `${ref} Sent. Ksh ${formatKes(totalDeduction)} sent to ${reference || destination || 'recipient'} on ${date} at ${time}. New balance: Ksh ${formatKes(merchant.kesBalance)}.`,
       }).then((result) => {
         if (!result.success) console.error(`Send-money SMS failed for merchant ${merchant._id}:`, result.error);
       });

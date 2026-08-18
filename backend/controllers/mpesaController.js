@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import Transaction from '../models/Transaction.js';
 import Merchant from '../models/Merchant.js';
-import { safeSendSMS, sendStaggeredSms } from '../utils/smsSanitizer.js';
+import { safeSendSMS, sendStaggeredSms, formatKes } from '../utils/smsSanitizer.js';
 import { processSplitTransaction, processInvoiceSplitTransaction, splitCustomerSurcharge, getCheckoutTotal, PricingEngineError } from '../utils/pricingEngine.js';
 import { sendInvoicePaidReceiptEmail } from '../utils/resend.js';
 import STKRequest from '../models/STKRequest.js';
@@ -501,7 +501,7 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
             topupSends.push({
               to: merchant.phone,
               message: isSelfFunding
-                ? `${receipt} Confirmed. KES ${merchantCredit.toLocaleString()} deposited to your PayChain wallet via M-PESA on ${date} at ${time}. Your updated available balance is KES ${(updatedMerchant.kesBalance || 0).toLocaleString()}.`
+                ? `${receipt} Confirmed. Ksh ${formatKes(merchantCredit)} deposited to your PayChain wallet via M-PESA on ${date} at ${time}. Your updated available balance is Ksh ${formatKes(updatedMerchant.kesBalance || 0)}.`
                 : buildPaymentReceivedSms({
                     ref: receipt,
                     amount: merchantCredit,

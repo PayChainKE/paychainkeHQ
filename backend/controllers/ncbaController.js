@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import Merchant from '../models/Merchant.js';
 import { createNotification } from './notificationController.js';
-import { safeSendSMS, sendStaggeredSms } from '../utils/smsSanitizer.js';
+import { safeSendSMS, sendStaggeredSms, formatKes } from '../utils/smsSanitizer.js';
 import { buildCustomerPaidSms, buildPaymentReceivedSms } from '../utils/paymentSmsTemplates.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
@@ -250,7 +250,7 @@ export const handleInitiateBulkPayment = async (req, res) => {
       const { date, time } = formatTransactionDateTime();
       safeSendSMS({
         to: result.merchant.phone,
-        message: `${result.batch.batchReference} Bulk Payout Submitted. KES ${result.totalAmount.toLocaleString()} to ${payoutItems.length} recipient${payoutItems.length === 1 ? '' : 's'} on ${date} at ${time}. New balance: KES ${result.merchant.kesBalance.toLocaleString()}.`,
+        message: `${result.batch.batchReference} Bulk Payout Submitted. Ksh ${formatKes(result.totalAmount)} to ${payoutItems.length} recipient${payoutItems.length === 1 ? '' : 's'} on ${date} at ${time}. New balance: Ksh ${formatKes(result.merchant.kesBalance)}.`,
       }).then((r) => {
         if (!r.success) console.error(`Bulk payment SMS failed for merchant ${req.merchant._id}:`, r.error);
       });

@@ -24,7 +24,7 @@ import { dispatchDeveloperEvent } from '../services/webhookDeliveryService.js';
 // decline even on a real, correct account number (observed live: "RC01").
 export const NCBA_OWN_BANK_CODE = '07000';
 import { createNotification } from './notificationController.js';
-import { safeSendSMS } from '../utils/smsSanitizer.js';
+import { safeSendSMS, formatKes } from '../utils/smsSanitizer.js';
 import { buildPayoutSentSms, buildPayoutFailedSms, buildPayoutRecipientReceivedSms } from '../utils/paymentSmsTemplates.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
@@ -727,7 +727,7 @@ export async function resolvePendingOpenBankingTransaction({ reference, succeede
           const succeededCount = statuses.filter((s) => s === 'completed').length;
           const failedCount = statuses.filter((s) => s === 'failed').length;
           const { date: batchDate, time: batchTime } = formatTransactionDateTime();
-          const batchMessage = `${batch.batchReference} Bulk Payout ${newBatchStatus} on ${batchDate} at ${batchTime}. ${succeededCount} of ${batch.transactions.length} payout(s) completed (KES ${batch.totalNetAmount.toLocaleString()} total)${failedCount > 0 ? `; ${failedCount} failed and refunded` : ''}.`;
+          const batchMessage = `${batch.batchReference} Bulk Payout ${newBatchStatus} on ${batchDate} at ${batchTime}. ${succeededCount} of ${batch.transactions.length} payout(s) completed (Ksh ${formatKes(batch.totalNetAmount)} total)${failedCount > 0 ? `; ${failedCount} failed and refunded` : ''}.`;
           safeSendSMS({ to: batchMerchant.phone, message: batchMessage }).then((r) => {
             if (!r.success) logEvent('error', 'ncba_openbanking_batch_sms_failed', { batchId: batch._id.toString(), error: r.error });
           });

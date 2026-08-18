@@ -7,7 +7,7 @@
 // not ours, so they're intentionally left out rather than copied verbatim).
 // Single source of truth so every collection/payout rail (STK, C2B, NCBA,
 // B2C) sends the same professional, consistent message shape.
-import { buildStrictSms } from './smsSanitizer.js';
+import { buildStrictSms, formatKes } from './smsSanitizer.js';
 import { formatPhoneDisplay } from './formatPhoneDisplay.js';
 
 /**
@@ -18,9 +18,9 @@ export function buildPaymentReceivedSms({ ref, amount, payerName, payerPhone, da
   const phone = payerPhone ? formatPhoneDisplay(payerPhone) : null;
   return buildStrictSms(
     ({ ref, amt, name, phone, channel, date, time, balance }) =>
-      `${ref} Confirmed. You have received KES ${amt} from ${name}${phone ? ` ${phone}` : ''} via ${channel} on ${date} at ${time}. New PayChain balance is KES ${balance}.`,
+      `${ref} Confirmed. You have received Ksh ${amt} from ${name}${phone ? ` ${phone}` : ''} via ${channel} on ${date} at ${time}. New PayChain balance is Ksh ${balance}.`,
     {
-      fixed: { ref, amt: amount.toLocaleString(), phone: phone || '', channel, date, time, balance: balance.toLocaleString() },
+      fixed: { ref, amt: formatKes(amount), phone: phone || '', channel, date, time, balance: formatKes(balance) },
       truncatable: [{ key: 'name', value: payerName || 'a customer', minLength: 6 }],
     }
   );
@@ -35,16 +35,16 @@ export function buildPaymentSentSms({ ref, amount, recipientName, recipientPhone
   const showFee = typeof fee === 'number' && Number.isFinite(fee);
   return buildStrictSms(
     ({ ref, amt, name, phone, date, time, balance, feeLine }) =>
-      `${ref} Confirmed. KES ${amt} sent to ${name}${phone ? ` ${phone}` : ''} on ${date} at ${time}. New PayChain balance is KES ${balance}.${feeLine}`,
+      `${ref} Confirmed. Ksh ${amt} sent to ${name}${phone ? ` ${phone}` : ''} on ${date} at ${time}. New PayChain balance is Ksh ${balance}.${feeLine}`,
     {
       fixed: {
         ref,
-        amt: amount.toLocaleString(),
+        amt: formatKes(amount),
         phone: phone || '',
         date,
         time,
-        balance: balance.toLocaleString(),
-        feeLine: showFee ? ` Transaction cost, KES ${fee.toLocaleString()}.` : '',
+        balance: formatKes(balance),
+        feeLine: showFee ? ` Transaction cost Ksh ${formatKes(fee)}.` : '',
       },
       truncatable: [{ key: 'name', value: recipientName || 'the recipient', minLength: 8 }],
     }
@@ -82,10 +82,10 @@ export function buildPaymentRequestSms({ businessName, baseAmount, fee }) {
   const showFee = fee > 0;
   return buildStrictSms(
     ({ name, amt, feeLine, total }) =>
-      `${name} is requesting KES ${amt} via PayChain.${feeLine} You'll get an M-PESA prompt for KES ${total} shortly — enter your PIN to pay.`,
+      `${name} is requesting Ksh ${amt} via PayChain.${feeLine} You'll get an M-PESA prompt for Ksh ${total} shortly — enter your PIN to pay.`,
     {
       fixed: {
-        amt: baseAmount.toLocaleString(),
+        amt: formatKes(baseAmount),
         // Deliberately no fee figure here — a specific KES amount reads as
         // a surprise/hidden cost even though it's small, whereas "small
         // transaction fee" sets the same honest expectation (the total
@@ -94,7 +94,7 @@ export function buildPaymentRequestSms({ businessName, baseAmount, fee }) {
         // merchant/customer is looking at a screen, not just an SMS —
         // see checkout-preview in transactionController.js.
         feeLine: showFee ? ' Includes a small transaction fee.' : '',
-        total: total.toLocaleString(),
+        total: formatKes(total),
       },
       truncatable: [{ key: 'name', value: businessName || 'A PayChain business', minLength: 6 }],
     }
@@ -105,11 +105,11 @@ export function buildCustomerPaidSms({ ref, amount, businessName, accountRef, da
   const showFee = typeof fee === 'number' && Number.isFinite(fee) && fee > 0;
   return buildStrictSms(
     ({ ref, amt, name, acct, date, time, feeLine }) =>
-      `${ref} Confirmed. KES ${amt} paid to ${name}${acct ? ` for account ${acct}` : ''} on ${date} at ${time}.${feeLine} Thank you for your payment.`,
+      `${ref} Confirmed. Ksh ${amt} paid to ${name}${acct ? ` for account ${acct}` : ''} on ${date} at ${time}.${feeLine} Thank you for your payment.`,
     {
       fixed: {
         ref,
-        amt: amount.toLocaleString(),
+        amt: formatKes(amount),
         acct: accountRef || '',
         date,
         time,
@@ -118,7 +118,7 @@ export function buildCustomerPaidSms({ ref, amount, businessName, accountRef, da
         // includes PayChain's customer surcharge — showing the fee here
         // (not just the total) is what lets them check "base + fee" adds
         // up, the same way an M-Pesa "Transaction cost" line does.
-        feeLine: showFee ? ` Includes KES ${fee.toLocaleString()} transaction fee.` : '',
+        feeLine: showFee ? ` Transaction cost Ksh ${formatKes(fee)}.` : '',
       },
       truncatable: [{ key: 'name', value: businessName || 'PayChain', minLength: 5 }],
     }
@@ -147,9 +147,9 @@ export function buildPayoutSentSms({ ref, label, amount, recipientName, date, ti
   const showBalance = typeof balance === 'number' && Number.isFinite(balance);
   return buildStrictSms(
     ({ ref, label, amt, name, date, time, balanceLine }) =>
-      `${ref} ${label} Sent. KES ${amt} paid to ${name} on ${date} at ${time}.${balanceLine}`,
+      `${ref} ${label} Sent. Ksh ${amt} paid to ${name} on ${date} at ${time}.${balanceLine}`,
     {
-      fixed: { ref, label, amt: amount.toLocaleString(), date, time, balanceLine: showBalance ? ` New balance: KES ${balance.toLocaleString()}.` : '' },
+      fixed: { ref, label, amt: formatKes(amount), date, time, balanceLine: showBalance ? ` New balance: Ksh ${formatKes(balance)}.` : '' },
       truncatable: [{ key: 'name', value: recipientName || 'the recipient', minLength: 6 }],
     }
   );
@@ -172,9 +172,9 @@ export function buildPayoutSentSms({ ref, label, amount, recipientName, date, ti
 export function buildPayoutFailedSms({ ref, label, amount, recipientName, balance }) {
   return buildStrictSms(
     ({ ref, label, amt, name, balance }) =>
-      `${ref} ${label} Failed. KES ${amt} to ${name} refunded. New PayChain balance: KES ${balance}.`,
+      `${ref} ${label} Failed. Ksh ${amt} to ${name} refunded. New PayChain balance: Ksh ${balance}.`,
     {
-      fixed: { ref, label, amt: amount.toLocaleString(), balance: balance.toLocaleString() },
+      fixed: { ref, label, amt: formatKes(amount), balance: formatKes(balance) },
       truncatable: [{ key: 'name', value: recipientName || 'the recipient', minLength: 6 }],
     }
   );
@@ -195,9 +195,9 @@ export function buildPayoutFailedSms({ ref, label, amount, recipientName, balanc
 export function buildPayoutRecipientReceivedSms({ ref, amount, businessName, date, time }) {
   return buildStrictSms(
     ({ ref, amt, name, date, time }) =>
-      `${ref} Confirmed. You have received KES ${amt} from ${name} via PayChain on ${date} at ${time}.`,
+      `${ref} Confirmed. You have received Ksh ${amt} from ${name} via PayChain on ${date} at ${time}.`,
     {
-      fixed: { ref, amt: amount.toLocaleString(), date, time },
+      fixed: { ref, amt: formatKes(amount), date, time },
       truncatable: [{ key: 'name', value: businessName || 'a PayChain business', minLength: 6 }],
     }
   );

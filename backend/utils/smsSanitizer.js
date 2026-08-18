@@ -17,6 +17,13 @@ import { sendSMS } from './sms.js';
 
 const SINGLE_SEGMENT_LIMIT = 160;
 
+// Every KES figure quoted in an SMS goes through this — "Ksh 1,500.00", always
+// two decimal places, never a bare "KES 1,500" — so a customer can add up a
+// base amount + fee themselves and get exactly what's shown as the total.
+export function formatKes(amount) {
+  return Number(amount).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 // GSM 03.38 default alphabet (basic table only — the extension table
 // characters like ^ { } \ [ ~ ] | € are deliberately excluded here too,
 // since each one silently costs 2 characters of the 160 budget). Anything

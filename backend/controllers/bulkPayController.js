@@ -11,7 +11,7 @@ import fs from 'fs';
 import bcrypt from 'bcryptjs';
 import { sendBatchReceiptEmail } from '../utils/resend.js';
 import { createNotification } from './notificationController.js';
-import { safeSendSMS } from '../utils/smsSanitizer.js';
+import { safeSendSMS, formatKes } from '../utils/smsSanitizer.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { claimPayoutSubmission, DuplicateSubmissionError } from '../utils/idempotencyGuard.js';
@@ -953,7 +953,7 @@ export const authorizeBatch = async (req, res) => {
       const { date, time } = formatTransactionDateTime();
       safeSendSMS({
         to: merchant.phone,
-        message: `${savedBatch.batchReference} Bulk Payout Submitted. KES ${totalNet.toLocaleString()} to ${transactions.length} recipient${transactions.length === 1 ? '' : 's'} on ${date} at ${time}.${failedCount > 0 ? ` ${failedCount} failed and were refunded.` : ''} New balance: KES ${merchant.kesBalance.toLocaleString()}.`,
+        message: `${savedBatch.batchReference} Bulk Payout Submitted. Ksh ${formatKes(totalNet)} to ${transactions.length} recipient${transactions.length === 1 ? '' : 's'} on ${date} at ${time}.${failedCount > 0 ? ` ${failedCount} failed and were refunded.` : ''} New balance: Ksh ${formatKes(merchant.kesBalance)}.`,
       }).then((result) => {
         if (!result.success) console.error(`Bulk payout SMS failed for merchant ${merchant._id}:`, result.error);
       });
