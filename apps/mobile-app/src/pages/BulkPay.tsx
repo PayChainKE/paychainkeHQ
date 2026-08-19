@@ -14,6 +14,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api/config';
 import TopBar from '../components/layout/TopBar';
 import { formatAccountNumber } from '../utils/formatAccountNumber';
+import { formatPhoneDisplay } from '../utils/formatPhoneDisplay';
 import { isValidKraPin } from '../utils/validators';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -890,7 +891,7 @@ export default function BulkPay() {
     const rows = receipts.map((r, i) => `
       <tr>
         <td class="num">${i + 1}</td>
-        <td><div class="primary">${esc(r.name)}</div><div class="muted">${esc(r.phone || '—')}</div></td>
+        <td><div class="primary">${esc(r.name)}</div><div class="muted">${esc(formatPhoneDisplay(r.phone) || '—')}</div></td>
         <td class="ref">${esc(r.id)}</td>
         <td class="amount">${formatKES(r.amount)}</td>
       </tr>`).join('');
@@ -1103,7 +1104,7 @@ export default function BulkPay() {
                           <Text className="text-[8px] font-jakarta-bold uppercase tracking-[0.1em]" style={{ color: meta.badgeText }}>{meta.label}</Text>
                         </View>
                         <Text className="text-[#707971] font-jakarta-medium text-[10px] ml-2" numberOfLines={1}>
-                          {p.paymentMethod === 'Bank' ? p.bankName : p.phone || p.paybillNumber || p.tillNumber || '—'}
+                          {p.paymentMethod === 'Bank' ? p.bankName : formatPhoneDisplay(p.phone) || p.paybillNumber || p.tillNumber || '—'}
                         </Text>
                       </View>
                     </View>

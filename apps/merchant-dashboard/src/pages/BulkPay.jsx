@@ -1009,7 +1009,7 @@ export default function BulkPay() {
           pdf.setFont("helvetica", "normal");
           pdf.text(`Recipient: ${r.name}`, 20, y);
           y += 8;
-          pdf.text(`Account/Phone: ${r.phone}`, 20, y);
+          pdf.text(`Account/Phone: ${formatPhoneDisplay(r.phone) || r.phone}`, 20, y);
           y += 8;
           pdf.text(`Amount: ${formatKES(r.amount)}`, 20, y);
           y += 8;
@@ -1753,7 +1753,7 @@ export default function BulkPay() {
                           <td className="px-6 py-4 border-r border-outline-variant/5">
                             <div className="flex flex-col">
                               <span className="text-[10px] font-black text-primary/80 uppercase tracking-wider">{p.paymentMethod}</span>
-                              <span className="text-[10px] font-medium text-on-surface-variant opacity-60 tabular-nums">{p.phone || p.paybillNumber || p.accountNumber}</span>
+                              <span className="text-[10px] font-medium text-on-surface-variant opacity-60 tabular-nums">{formatPhoneDisplay(p.phone) || p.paybillNumber || p.accountNumber}</span>
                             </div>
                           </td>
                           <td className="px-6 py-4 border-r border-outline-variant/5">
@@ -1817,7 +1817,7 @@ export default function BulkPay() {
                       <div className="grid grid-cols-2 gap-4 border-t border-outline-variant/5 pt-3">
                         <div className="space-y-1">
                           <label className="text-[7px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-30">Account / Ref</label>
-                          <p className="text-[9px] font-medium text-on-surface-variant leading-none">{p.phone || p.paybillNumber || p.accountNumber}</p>
+                          <p className="text-[9px] font-medium text-on-surface-variant leading-none">{formatPhoneDisplay(p.phone) || p.paybillNumber || p.accountNumber}</p>
                         </div>
                         <div className="text-right space-y-1">
                           <label className="text-[7px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-30">Amount (KES)</label>
@@ -1947,7 +1947,7 @@ export default function BulkPay() {
                             <div className="bg-white p-4 sm:p-0 rounded-xl sm:rounded-none border sm:border-0 border-outline-variant/10">
                               <p className="text-[8px] sm:text-[9px] text-on-surface-variant font-black uppercase tracking-widest opacity-40 mb-1.5">Recipient</p>
                               <p className="text-[12px] sm:text-[13px] font-bold text-primary mb-0.5">{receipt.name}</p>
-                              <p className="text-[10px] sm:text-[11px] font-medium text-on-surface-variant opacity-60">{receipt.phone}</p>
+                              <p className="text-[10px] sm:text-[11px] font-medium text-on-surface-variant opacity-60">{formatPhoneDisplay(receipt.phone) || receipt.phone}</p>
                             </div>
                             <div className="bg-white p-4 sm:p-0 rounded-xl sm:rounded-none border sm:border-0 border-outline-variant/10 text-left sm:text-right">
                               <p className="text-[8px] sm:text-[9px] text-on-surface-variant font-black uppercase tracking-widest opacity-40 mb-1.5">Reference</p>
