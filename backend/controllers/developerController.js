@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import Developer from '../models/Developer.js';
 import ApiKey from '../models/ApiKey.js';
 import { logAudit } from '../utils/auditLog.js';
-import { notifyAdmins } from '../utils/securityAlerts.js';
+import { notifyAdmins, escapeHtml } from '../utils/securityAlerts.js';
 
 const publicApiKey = (key) => ({
   _id: key._id,
@@ -145,7 +145,7 @@ export const requestLiveAccess = async (req, res) => {
       severity: 'info',
       subject: 'Developer requested live API access',
       heading: 'Live API Access Requested',
-      details: `<strong>${developer.companyName}</strong> (${developer.email}) requested approval for live-mode API keys.`,
+      details: `<strong>${escapeHtml(developer.companyName)}</strong> (${escapeHtml(developer.email)}) requested approval for live-mode API keys.`,
       metadata: { developerId: String(developer._id), companyName: developer.companyName, email: developer.email },
     });
 

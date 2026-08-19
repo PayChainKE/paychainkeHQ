@@ -58,7 +58,7 @@ const PrivacyPolicy: React.FC = () => {
             <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-4 py-1.5 mb-6">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
               <span className="text-[11px] font-bold tracking-widest uppercase text-emerald-400">
-                Data Protection Act, 2019 (Kenya) Compliant
+                Registered Data Controller · ODPC Kenya
               </span>
             </div>
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-4 tracking-tight">
@@ -71,7 +71,7 @@ const PrivacyPolicy: React.FC = () => {
             <div className="mt-8 flex flex-col sm:flex-row items-center gap-x-8 gap-y-2 text-xs text-emerald-100/50">
               <span><span className="font-bold text-white">Effective Date:</span> July 13, 2026</span>
               <span className="hidden sm:inline text-emerald-400/30">|</span>
-              <span><span className="font-bold text-white">Last Updated:</span> July 13, 2026</span>
+              <span><span className="font-bold text-white">Last Updated:</span> August 18, 2026</span>
             </div>
           </div>
         </div>
@@ -84,6 +84,7 @@ const PrivacyPolicy: React.FC = () => {
             <div className="font-bold text-gray-900 tracking-tight">
               PAYCHAIN FINANCIAL SERVICES LTD
               <span className="ml-3 font-normal text-gray-400">Company No. PVT-9L1QY658</span>
+              <span className="ml-3 font-normal text-gray-400">ODPC Data Controller No. 927-3386-5943</span>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-gray-500">
               <span className="inline-flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-emerald-600" /> Nairobi, Kenya</span>
@@ -158,14 +159,18 @@ const PrivacyPolicy: React.FC = () => {
                 <p>Contact details for data protection matters:</p>
                 <div className="not-prose rounded-xl border border-gray-200 bg-gray-50 p-5 my-4 text-sm space-y-1.5">
                   <p><strong className="text-gray-800">Data Controller:</strong> <span className="text-gray-600">PayChain Financial Services Ltd</span></p>
-                  <p><strong className="text-gray-800">Registration No.:</strong> <span className="text-gray-600">PVT-9L1QY658</span></p>
+                  <p><strong className="text-gray-800">Company Registration No.:</strong> <span className="text-gray-600">PVT-9L1QY658</span></p>
+                  <p><strong className="text-gray-800">ODPC Data Controller Registration No.:</strong> <span className="text-gray-600">927-3386-5943</span></p>
                   <p><strong className="text-gray-800">Address:</strong> <span className="text-gray-600">Nairobi, Kenya</span></p>
                   <p><strong className="text-gray-800">Email:</strong> <span className="text-gray-600">info@paychain.co.ke</span></p>
                   <p><strong className="text-gray-800">Phone:</strong> <span className="text-gray-600">+254 743 283 782</span></p>
                 </div>
                 <p>
-                  We are in the process of registering with the Office of the Data Protection
-                  Commissioner (ODPC) as required under Section 17 of the DPA 2019.
+                  PayChain Financial Services Ltd is registered with the Office of the Data
+                  Protection Commissioner (ODPC) of Kenya as a Data Controller under registration
+                  number <strong>927-3386-5943</strong>, in accordance with Section 18 of the DPA
+                  2019. Our registration status can be independently verified with the ODPC at{' '}
+                  <a href="https://odpc.go.ke" target="_blank" rel="noopener noreferrer">odpc.go.ke</a>.
                 </p>
               </section>
 

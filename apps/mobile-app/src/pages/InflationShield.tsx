@@ -21,7 +21,8 @@ export default function InflationShield({ navigation }: any) {
   const [isActivating, setIsActivating] = useState(false);
   const [activateError, setActivateError] = useState('');
 
-  const [rate, setRate] = useState(130);
+  const [rate, setRate] = useState(132.45);
+  const [rateLoaded, setRateLoaded] = useState(false);
   const [usdcBalance, setUsdcBalance] = useState(0);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -49,6 +50,7 @@ export default function InflationShield({ navigation }: any) {
       ]);
       if (rateRes.status === 'fulfilled' && rateRes.value.data?.rate) {
         setRate(rateRes.value.data.rate);
+        setRateLoaded(true);
       }
       if (txRes.status === 'fulfilled') {
         const list = Array.isArray(txRes.value.data)
@@ -91,6 +93,10 @@ export default function InflationShield({ navigation }: any) {
   };
 
   const handleSwap = async () => {
+    if (!rateLoaded) {
+      setSwapError('Live exchange rate unavailable right now. Please try again shortly.');
+      return;
+    }
     const amount = Number(inputAmount);
     if (!amount || amount <= 0) {
       setSwapError('Enter a valid amount to swap.');
@@ -219,8 +225,8 @@ export default function InflationShield({ navigation }: any) {
           <View className="flex-row items-center justify-between mb-8">
             <Text style={{ fontFamily: 'DMSerifDisplay_400Regular_Italic' }} className="text-3xl text-[#00351d] leading-tight tracking-tight">Protect your revenue.</Text>
             <View className="items-end">
-              <Text className="text-[9px] font-jakarta-bold text-[#707971] uppercase tracking-widest mb-0.5">Live Rate</Text>
-              <Text className="text-[13px] font-jakarta-extrabold text-[#00351d]">1 USDC = {formatKES(rate)}</Text>
+              <Text className="text-[9px] font-jakarta-bold text-[#707971] uppercase tracking-widest mb-0.5">{rateLoaded ? 'Live Rate' : 'Rate unavailable'}</Text>
+              <Text className="text-[13px] font-jakarta-extrabold text-[#00351d]">{rateLoaded ? `1 USDC = ${formatKES(rate)}` : '—'}</Text>
             </View>
           </View>
 
@@ -312,7 +318,7 @@ export default function InflationShield({ navigation }: any) {
             <View className="bg-white rounded-2xl p-5 mt-3 mb-5">
               <View className="flex-row justify-between items-center mb-3">
                 <Text className="text-[10px] text-[#707971] font-jakarta-bold uppercase tracking-widest">You Receive</Text>
-                <Text className="text-[10px] text-[#707971] font-jakarta-medium">Slippage: 0.1%</Text>
+                <Text className="text-[10px] text-[#707971] font-jakarta-medium">Fixed rate — no slippage</Text>
               </View>
               <View className="flex-row items-center gap-3">
                 <View className="flex-row items-center gap-1.5 bg-[#f0fdf4] px-3 py-1.5 rounded-full border border-[#eff4ef]">
@@ -329,11 +335,6 @@ export default function InflationShield({ navigation }: any) {
               <Text className="text-[11px] text-white/50 font-jakarta-medium">Fee</Text>
               <Text className="text-[11px] text-white/80 font-jakarta-bold">None — no PayChain fee on swaps today</Text>
             </View>
-            <View className="flex-row justify-between">
-              <Text className="text-[11px] text-white/70 font-jakarta-bold">Estimated Value Protection</Text>
-              <Text className="text-[11px] text-[#5efeb3] font-jakarta-extrabold">+12.4% / yr</Text>
-            </View>
-
             {!!swapError && (
               <View className="bg-white/10 border border-red-400/30 rounded-xl px-4 py-2.5 mt-4">
                 <Text className="text-red-300 text-[12px] font-jakarta-semibold">{swapError}</Text>
@@ -342,14 +343,16 @@ export default function InflationShield({ navigation }: any) {
 
             <TouchableOpacity
               onPress={handleSwap}
-              disabled={isSwapping}
+              disabled={isSwapping || !rateLoaded}
               activeOpacity={0.85}
-              className="bg-[#10b981] py-4 rounded-2xl flex-row items-center justify-center gap-2 shadow-lg mt-5"
+              className={`py-4 rounded-2xl flex-row items-center justify-center gap-2 shadow-lg mt-5 ${!rateLoaded ? 'bg-[#10b981]/40' : 'bg-[#10b981]'}`}
             >
               {isSwapping ? (
                 <ActivityIndicator color="#031813" size="small" />
               ) : (
-                <Text className="text-[#031813] font-jakarta-extrabold text-[13px] uppercase tracking-widest">Confirm Protection Swap</Text>
+                <Text className="text-[#031813] font-jakarta-extrabold text-[13px] uppercase tracking-widest">
+                  {rateLoaded ? 'Confirm Protection Swap' : 'Rate Unavailable'}
+                </Text>
               )}
             </TouchableOpacity>
           </View>

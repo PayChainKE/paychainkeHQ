@@ -4,7 +4,7 @@
 // route stops a single-IP brute force but not a botnet/proxy-distributed
 // one, which could otherwise spread guesses across many IPs against one
 // account within the OTP's validity window. This closes that gap.
-import { notifyAdmins } from './securityAlerts.js';
+import { notifyAdmins, escapeHtml } from './securityAlerts.js';
 
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_MS = 15 * 60 * 1000;
@@ -46,7 +46,7 @@ export async function recordFailedOtpAttempt(Model, id) {
       severity: 'warning',
       subject: 'Account locked — repeated failed OTP attempts',
       heading: 'OTP Lockout Triggered',
-      details: `A ${Model.modelName} account <strong>${label}</strong> (id: ${id}) was locked for 15 minutes after ${MAX_ATTEMPTS} incorrect OTP attempts in a row.`,
+      details: `A ${Model.modelName} account <strong>${escapeHtml(label)}</strong> (id: ${id}) was locked for 15 minutes after ${MAX_ATTEMPTS} incorrect OTP attempts in a row.`,
       metadata: { model: Model.modelName, id: String(id), label },
     });
   }

@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { serverError } from '../utils/serverError.js';
 import Merchant from '../models/Merchant.js';
 import AuditLog from '../models/AuditLog.js';
 import { sendOTP, sendWelcomeEmail, sendPasswordResetConfirmation } from '../utils/resend.js';
@@ -238,7 +239,12 @@ export const registerMerchant = async (req, res) => {
 export const verifyMerchantOTP = async (req, res) => {
   try {
     const { email, otp } = req.body || {};
-    const merchant = await Merchant.findOne({ email }).select('+password +otp +otpExpires');
+    // String() coercion matters here — without it, an object payload like
+    // {"$ne": null} would be handed straight to Mongo as a query operator
+    // instead of a literal value, matching an arbitrary merchant instead of
+    // a specific one. Mirrors the same guard verifyResetOTP already applies.
+    const lookup = String(email || '').trim();
+    const merchant = await Merchant.findOne({ email: lookup }).select('+password +otp +otpExpires');
 
     if (!merchant) {
       return res.status(401).json({ error: 'Invalid request' });
@@ -319,8 +325,7 @@ export const verifyMerchantOTP = async (req, res) => {
       token: generateToken(merchant._id, '30d', { tokenVersion: merchant.tokenVersion || 0 })
     });
   } catch (error) {
-    console.error('Verify Merchant OTP Error:', error);
-    res.status(500).json({ error: error.message || 'Server Error' });
+    serverError(res, 500, 'Server Error', error, 'Verify Merchant OTP Error:');
   }
 };
 
@@ -416,8 +421,7 @@ export const loginMerchant = async (req, res) => {
       message: channel === 'sms' ? 'OTP sent to your phone. Proceed to Stage 2.' : 'OTP sent to your email. Proceed to Stage 2.'
     });
   } catch (error) {
-    console.error('Login Merchant Error:', error);
-    res.status(500).json({ error: error.message || 'Server Error' });
+    serverError(res, 500, 'Server Error', error, 'Login Merchant Error:');
   }
 };
 
@@ -427,7 +431,10 @@ export const loginMerchant = async (req, res) => {
 export const resendMerchantOTP = async (req, res) => {
   try {
     const { email } = req.body || {};
-    const merchant = await Merchant.findOne({ email }).select('+otpChannel');
+    // Same NoSQL-injection guard as verifyMerchantOTP above — String()
+    // coercion so an object payload can't be evaluated as a Mongo operator.
+    const lookup = String(email || '').trim();
+    const merchant = await Merchant.findOne({ email: lookup }).select('+otpChannel');
 
     if (!merchant) {
       return res.status(401).json({ error: 'Invalid request' });
@@ -449,8 +456,7 @@ export const resendMerchantOTP = async (req, res) => {
       message: channel === 'sms' ? 'New security code sent to your phone.' : 'New security code sent successfully.'
     });
   } catch (error) {
-    console.error('Resend OTP Error:', error);
-    res.status(500).json({ error: error.message || 'Server Error' });
+    serverError(res, 500, 'Server Error', error, 'Resend OTP Error:');
   }
 };
 

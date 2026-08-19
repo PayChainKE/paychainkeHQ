@@ -17,7 +17,7 @@ import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLocked
 import { getNcbaVirtualAccountNumber, validatePhoneNumber, NcbaValidationError } from '../utils/ncbaValidators.js';
 import { generateMerchantStickerPdf } from '../utils/stickerGenerator.js';
 import { claimPayoutSubmission, DuplicateSubmissionError } from '../utils/idempotencyGuard.js';
-import { notifyAdmins } from '../utils/securityAlerts.js';
+import { notifyAdmins, escapeHtml } from '../utils/securityAlerts.js';
 
 // Transfers at or above this amount get an admin visibility alert — not a
 // block, just a heads-up. Configurable since "large" depends on the
@@ -483,7 +483,7 @@ export const sendMoney = async (req, res) => {
         severity: 'info',
         subject: 'Large transfer sent',
         heading: 'Large Transaction Alert',
-        details: `Merchant <strong>${merchant.businessName || merchant.phone}</strong> sent <strong>KES ${totalDeduction.toLocaleString()}</strong> to ${reference || destination || 'a recipient'}.`,
+        details: `Merchant <strong>${escapeHtml(merchant.businessName || merchant.phone)}</strong> sent <strong>KES ${totalDeduction.toLocaleString()}</strong> to ${escapeHtml(reference || destination || 'a recipient')}.`,
         metadata: { merchantId: String(merchant._id), amount: totalDeduction, destination: reference || destination || null },
       });
     }

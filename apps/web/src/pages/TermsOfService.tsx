@@ -71,7 +71,7 @@ const TermsOfService: React.FC = () => {
             <div className="mt-8 flex flex-col sm:flex-row items-center gap-x-8 gap-y-2 text-xs text-emerald-100/50">
               <span><span className="font-bold text-white">Effective Date:</span> July 13, 2026</span>
               <span className="hidden sm:inline text-emerald-400/30">|</span>
-              <span><span className="font-bold text-white">Last Updated:</span> July 13, 2026</span>
+              <span><span className="font-bold text-white">Last Updated:</span> August 18, 2026</span>
             </div>
           </div>
         </div>
@@ -84,6 +84,7 @@ const TermsOfService: React.FC = () => {
             <div className="font-bold text-gray-900 tracking-tight">
               PAYCHAIN FINANCIAL SERVICES LTD
               <span className="ml-3 font-normal text-gray-400">Company No. PVT-9L1QY658</span>
+              <span className="ml-3 font-normal text-gray-400">ODPC Data Controller No. 927-3386-5943</span>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-gray-500">
               <span className="inline-flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-emerald-600" /> Nairobi, Kenya</span>
@@ -286,7 +287,10 @@ const TermsOfService: React.FC = () => {
                 <p>
                   7.1 The Company processes personal and business data in accordance with the Data
                   Protection Act, 2019 (Kenya) and our{' '}
-                  <Link to="/privacy-policy">Privacy Policy</Link> (paychain.co.ke/privacy).
+                  <Link to="/privacy-policy">Privacy Policy</Link> (paychain.co.ke/privacy). PayChain
+                  Financial Services Ltd is registered with the Office of the Data Protection
+                  Commissioner (ODPC) of Kenya as a Data Controller under registration number
+                  927-3386-5943.
                 </p>
                 <p>
                   7.2 By using the Platform, you consent to the collection, processing, and use of

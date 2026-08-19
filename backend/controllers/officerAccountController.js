@@ -6,7 +6,7 @@ import { logAudit } from '../utils/auditLog.js';
 import { adminActor } from './adminController.js';
 import { sendOfficerCredentials } from '../utils/resend.js';
 import { toE164Kenyan } from '../utils/notificationService.js';
-import { notifyAdmins } from '../utils/securityAlerts.js';
+import { notifyAdmins, escapeHtml } from '../utils/securityAlerts.js';
 
 // Onboarding-officer account management — admin/owner only. Deliberately a
 // separate controller from teamController.js: team members (owner/admin/
@@ -125,7 +125,7 @@ export const createOfficer = async (req, res) => {
       severity: 'info',
       subject: 'New officer account created',
       heading: 'New Officer Account',
-      details: `<strong>${adminName}</strong> created an officer account for <strong>${email}</strong>.`,
+      details: `<strong>${escapeHtml(adminName)}</strong> created an officer account for <strong>${escapeHtml(email)}</strong>.`,
       metadata: { email, createdBy: adminName },
     });
 

@@ -5,7 +5,7 @@ import Merchant from '../models/Merchant.js';
 import Contact from '../models/Contact.js';
 import Communication from '../models/Communication.js';
 import { sendTeamInvite } from '../utils/resend.js';
-import { notifyAdmins } from '../utils/securityAlerts.js';
+import { notifyAdmins, escapeHtml } from '../utils/securityAlerts.js';
 
 const ADMIN_DASHBOARD_URL =
   process.env.ADMIN_DASHBOARD_URL || 'https://admin.paychain.co.ke';
@@ -138,7 +138,7 @@ export const inviteTeamMember = async (req, res) => {
       severity: 'info',
       subject: 'New admin account invited',
       heading: 'New Admin Console Account',
-      details: `<strong>${inviterName}</strong> invited <strong>${email}</strong> as <strong>${role}</strong>.`,
+      details: `<strong>${escapeHtml(inviterName)}</strong> invited <strong>${escapeHtml(email)}</strong> as <strong>${escapeHtml(role)}</strong>.`,
       metadata: { email, role, invitedBy: inviterName },
     });
 

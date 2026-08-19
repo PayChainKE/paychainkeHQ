@@ -3,6 +3,7 @@ import DeveloperWebhook from '../models/DeveloperWebhook.js';
 import WebhookDelivery from '../models/WebhookDelivery.js';
 import { WEBHOOK_EVENT_TYPES, sendTestWebhook } from '../services/webhookDeliveryService.js';
 import { logAudit } from '../utils/auditLog.js';
+import { assertPublicHttpsUrl } from '../utils/urlSsrfGuard.js';
 
 const publicWebhook = (w) => ({
   _id: w._id,
@@ -39,8 +40,13 @@ export const listWebhooks = async (req, res) => {
 export const createWebhook = async (req, res) => {
   try {
     const { url, events } = req.body || {};
-    if (!url || typeof url !== 'string' || !/^https:\/\//.test(url.trim())) {
+    if (!url || typeof url !== 'string') {
       return res.status(400).json({ error: 'A valid https:// url is required.' });
+    }
+    try {
+      await assertPublicHttpsUrl(url.trim());
+    } catch (validationError) {
+      return res.status(400).json({ error: validationError.message });
     }
 
     const selectedEvents = parseEvents(events) || ['*'];
@@ -80,8 +86,13 @@ export const updateWebhook = async (req, res) => {
     const { url, events, status } = req.body || {};
 
     if (url !== undefined) {
-      if (typeof url !== 'string' || !/^https:\/\//.test(url.trim())) {
+      if (typeof url !== 'string') {
         return res.status(400).json({ error: 'A valid https:// url is required.' });
+      }
+      try {
+        await assertPublicHttpsUrl(url.trim());
+      } catch (validationError) {
+        return res.status(400).json({ error: validationError.message });
       }
       webhook.url = url.trim();
     }
