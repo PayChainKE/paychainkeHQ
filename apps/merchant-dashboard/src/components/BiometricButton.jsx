@@ -95,16 +95,6 @@ export function BiometricLoginButton({ email, onSuccess, onError }) {
           </>
         )}
       </button>
-
-      {/* Subtle security badge */}
-      <div className="flex items-center justify-center gap-1.5 mt-2 opacity-40">
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" className="text-emerald-700">
-          <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/>
-        </svg>
-        <span className="text-[8px] font-black uppercase tracking-[0.2em] text-emerald-700">
-          WebAuthn · FIDO2 · Bank-grade security
-        </span>
-      </div>
     </div>
   )
 }

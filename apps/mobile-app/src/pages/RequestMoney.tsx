@@ -25,6 +25,26 @@ function formatKES(amount: number | string | null | undefined) {
   return `Ksh ${n.toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+// NCBA's STK status query passes through Safaricom's own free-text
+// resultDesc verbatim — there's no separate "rejected"/"timeout" status
+// field, just this string. Safaricom's wording is consistent enough
+// ("cancelled", "timeout" / "cannot be reached", "insufficient") to
+// classify into a more specific outcome than one generic "Failed" screen —
+// purely presentational, the underlying stored status is still 'failed'.
+function classifyStkFailure(reason: string) {
+  const r = (reason || '').toLowerCase();
+  if (r.includes('cancel')) {
+    return { label: 'Request Rejected', bg: '#fdf3e3', border: '#f6e2b8', fg: '#a16207', icon: 'slash' as const, detail: 'They declined the M-PESA prompt.' };
+  }
+  if (r.includes('timeout') || r.includes('timed out') || r.includes('cannot be reached')) {
+    return { label: 'No Response', bg: '#fdf3e3', border: '#f6e2b8', fg: '#a16207', icon: 'clock' as const, detail: reason };
+  }
+  if (r.includes('insufficient')) {
+    return { label: 'Insufficient Funds', bg: '#fdeaea', border: '#f8d2d2', fg: '#c0392b', icon: 'credit-card' as const, detail: reason };
+  }
+  return { label: 'Request Failed', bg: '#fdeaea', border: '#f8d2d2', fg: '#c0392b', icon: 'x-circle' as const, detail: reason };
+}
+
 export default function RequestMoney({ navigation, route }: any) {
   const { merchant, refreshSession } = useAuth();
   const [step, setStep] = useState(1);
@@ -246,8 +266,38 @@ export default function RequestMoney({ navigation, route }: any) {
             </View>
           )}
 
-          {/* Step 2 — Details */}
-          {step === 2 && selected && (
+          {/* Step 2 — Details, or a live status panel while an M-PESA push is in flight */}
+          {step === 2 && selected && isSubmitting && selected.id === 'mpesa' ? (
+            <View className="items-center pt-4">
+              <View className="w-20 h-20 rounded-3xl bg-[#00351d] items-center justify-center mb-6">
+                <Feather name="smartphone" size={32} color="#5efeb3" />
+              </View>
+              <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#006c4e] mb-2">STK Push Sent · Live Status</Text>
+              <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[22px] text-[#00351d] mb-2 text-center">{statusText || 'Processing...'}</Text>
+              <Text className="text-[13px] text-[#707971] font-jakarta-medium text-center leading-relaxed px-4 mb-8">
+                We're tracking this request in real time. This page updates the moment they respond.
+              </Text>
+
+              <View className="w-full gap-3">
+                <View className="flex-row items-center gap-3">
+                  <Feather name="check-circle" size={16} color="#10b981" />
+                  <Text className="text-[12px] font-jakarta-bold text-[#00351d]">STK push sent to {phone || 'their phone'}</Text>
+                </View>
+                <View className="flex-row items-center gap-3">
+                  {statusText.includes('Awaiting') ? (
+                    <ActivityIndicator size="small" color="#10b981" />
+                  ) : (
+                    <Feather name="circle" size={16} color="#d4d4d8" />
+                  )}
+                  <Text className={`text-[12px] font-jakarta-bold ${statusText.includes('Awaiting') ? 'text-[#00351d]' : 'text-[#d4d4d8]'}`}>Awaiting their PIN entry</Text>
+                </View>
+                <View className="flex-row items-center gap-3">
+                  <Feather name="circle" size={16} color="#d4d4d8" />
+                  <Text className="text-[12px] font-jakarta-bold text-[#d4d4d8]">Confirming with M-PESA</Text>
+                </View>
+              </View>
+            </View>
+          ) : step === 2 && selected && (
             <View>
               <View className="items-center mb-8">
                 <View className="w-16 h-16 rounded-2xl bg-[#00351d] items-center justify-center mb-4">
@@ -302,21 +352,35 @@ export default function RequestMoney({ navigation, route }: any) {
           {/* Step 3 — Result */}
           {step === 3 && selected && (
             <View className="items-center pt-4">
-              <View className={`w-20 h-20 rounded-full items-center justify-center mb-6 border-4 ${selected.id === 'mpesa' && requestFailed ? 'bg-[#fdeaea] border-[#f8d2d2]' : 'bg-[#e7f8ef] border-[#d5f3e4]'}`}>
-                <Feather name={selected.id === 'mpesa' && requestFailed ? 'x-circle' : 'check-circle'} size={36} color={selected.id === 'mpesa' && requestFailed ? '#c0392b' : '#006c4e'} />
-              </View>
+              {selected.id === 'mpesa' && requestFailed ? (() => {
+                const outcome = classifyStkFailure(failureReason);
+                return (
+                  <View className="w-20 h-20 rounded-full items-center justify-center mb-6 border-4" style={{ backgroundColor: outcome.bg, borderColor: outcome.border }}>
+                    <Feather name={outcome.icon} size={36} color={outcome.fg} />
+                  </View>
+                );
+              })() : (
+                <View className="w-20 h-20 rounded-full items-center justify-center mb-6 border-4 bg-[#e7f8ef] border-[#d5f3e4]">
+                  <Feather name="check-circle" size={36} color="#006c4e" />
+                </View>
+              )}
 
               {selected.id === 'mpesa' ? (
-                requestFailed ? (
+                requestFailed ? (() => {
+                  const outcome = classifyStkFailure(failureReason);
+                  return (
+                    <>
+                      <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#a1a1aa] mb-1.5">STK Push Status</Text>
+                      <Text style={{ fontFamily: 'DMSerifDisplay_400Regular', color: outcome.fg }} className="text-[24px] mb-2 text-center">{outcome.label}</Text>
+                      <Text className="text-[13px] text-[#707971] font-jakarta-medium text-center leading-relaxed px-4 mb-8">
+                        {failureReason}
+                      </Text>
+                    </>
+                  );
+                })() : (
                   <>
-                    <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#c0392b] mb-2 text-center">Request Failed</Text>
-                    <Text className="text-[13px] text-[#707971] font-jakarta-medium text-center leading-relaxed px-4 mb-8">
-                      {failureReason}
-                    </Text>
-                  </>
-                ) : (
-                  <>
-                    <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#00351d] mb-2 text-center">Payment Received</Text>
+                    <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#006c4e] mb-1.5">STK Push Status</Text>
+                    <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#00351d] mb-2 text-center">Paid</Text>
                     <Text className="text-[13px] text-[#707971] font-jakarta-medium text-center leading-relaxed px-4 mb-8">
                       {formatKES(amount)} has been credited to your PayChain balance.
                     </Text>
@@ -369,8 +433,8 @@ export default function RequestMoney({ navigation, route }: any) {
         </View>
       </ScrollView>
 
-      {/* CTA (step 2 only) */}
-      {step === 2 && (
+      {/* CTA (step 2 only) — hidden once the live status panel above takes over */}
+      {step === 2 && !(isSubmitting && selectedOption === 'mpesa') && (
         <View className="px-6 pb-6 pt-3 bg-[#f0fdf4] border-t border-[#eff4ef]">
           <TouchableOpacity
             onPress={handlePrimaryAction}

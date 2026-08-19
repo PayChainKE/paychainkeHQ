@@ -10,6 +10,32 @@ import { formatKES } from '../utils/formatCurrency'
 
 const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
 
+// NCBA's STK status query passes through Safaricom's own free-text
+// resultDesc verbatim (see queryStkPush in backend/services/ncbaStkPushService.js)
+// — there's no separate "rejected"/"timeout" status field, just this string.
+// Safaricom's own wording is consistent enough ("cancelled", "timeout" /
+// "cannot be reached", "insufficient") to classify into a more specific
+// outcome than a single generic "Failed" card, purely for how it's
+// presented here — the underlying stored status is still just 'failed'.
+function classifyStkFailure(reason) {
+  const r = (reason || '').toLowerCase()
+  if (r.includes('cancel')) {
+    return { label: 'Request Rejected', tone: 'amber', icon: 'block', detail: 'They declined the M-PESA prompt.' }
+  }
+  if (r.includes('timeout') || r.includes('timed out') || r.includes('cannot be reached')) {
+    return { label: 'No Response', tone: 'amber', icon: 'schedule_send', detail: reason }
+  }
+  if (r.includes('insufficient')) {
+    return { label: 'Insufficient Funds', tone: 'rose', icon: 'account_balance_wallet', detail: reason }
+  }
+  return { label: 'Request Failed', tone: 'rose', icon: 'error', detail: reason }
+}
+
+const STK_OUTCOME_TONE = {
+  amber: { bg: 'bg-amber-500', text: 'text-amber-600' },
+  rose: { bg: 'bg-rose-500', text: 'text-rose-600' },
+}
+
 export default function RequestMoney() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -322,96 +348,156 @@ export default function RequestMoney() {
           </div>
         ) : step === 2 ? (
           <div className="bg-white rounded-[32px] border border-slate-200 shadow-2xl p-8 lg:p-12 relative max-w-2xl mx-auto lg:mx-0">
-            <div className="flex flex-col items-center text-center mb-10">
-              <div className={`w-16 h-16 rounded-3xl flex items-center justify-center mb-6 shadow-xl ${selectedOption?.color} ${selectedOption?.textColor}`}>
-                <span className="material-symbols-outlined text-3xl">{selectedOption?.icon}</span>
-              </div>
-              <h3 className="text-2xl font-headline font-bold text-primary mb-2">Payment Details</h3>
-              <p className="text-on-surface-variant font-medium max-w-sm mx-auto opacity-70 leading-relaxed">
-                {selectedOption?.id === 'mpesa'
-                  ? "We'll send an M-PESA prompt to this number for them to complete."
-                  : 'Set an amount and we\'ll generate a secure, shareable link.'}
-              </p>
-            </div>
+            {isSubmitting && selectedOption?.id === 'mpesa' ? (
+              // Live status while the push is in flight — replaces the form
+              // entirely (rather than leaving it sitting there with just a
+              // spinner in the button) so it's obvious this is a real-time,
+              // tracked request and not a fire-and-forget action.
+              <div className="py-6 text-center">
+                <div className="relative w-20 h-20 mx-auto mb-8">
+                  <div className="absolute inset-0 rounded-3xl bg-[#5EFEB3]/25 animate-ping" />
+                  <div className="relative w-20 h-20 rounded-3xl bg-[#00351D] text-[#5EFEB3] flex items-center justify-center shadow-xl">
+                    <span className="material-symbols-outlined text-4xl">smartphone</span>
+                  </div>
+                </div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-2">STK Push Sent · Live Status</p>
+                <h3 className="text-2xl font-headline font-bold text-primary mb-3">{statusText || 'Processing...'}</h3>
+                <p className="text-on-surface-variant font-medium max-w-sm mx-auto opacity-70 leading-relaxed">
+                  We're tracking this request in real time. This page updates the moment they respond.
+                </p>
 
-            <div className="space-y-6 max-w-sm mx-auto">
-              <div className="space-y-3">
-                <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Amount (KES)</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="1,000"
-                  className="w-full bg-surface-container-low border border-outline-variant/5 rounded-3xl py-5 px-6 text-2xl font-headline text-primary focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
-                />
-                {feePreview && (
-                  <div className="flex flex-col gap-1 px-1 text-xs font-medium text-on-surface-variant">
-                    <div className="flex justify-between">
-                      <span>They'll be asked to pay</span>
-                      <span className="tabular-nums font-black text-primary">{formatKES(feePreview.total)}</span>
-                    </div>
-                    {feePreview.fee > 0 && (
-                      <span className="text-[11px] opacity-70">Includes a {formatKES(feePreview.fee)} transaction fee on top of your {formatKES(feePreview.baseAmount)} request.</span>
+                <div className="mt-9 max-w-xs mx-auto space-y-3 text-left">
+                  <div className="flex items-center gap-3">
+                    <span className="material-symbols-outlined text-emerald-500 text-lg shrink-0">check_circle</span>
+                    <span className="text-xs font-bold text-primary">STK push sent to {phone || 'their phone'}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {statusText.includes('Awaiting') ? (
+                      <div className="w-4 h-4 border-2 border-emerald-200 border-t-emerald-600 rounded-full animate-spin shrink-0" />
+                    ) : (
+                      <span className="material-symbols-outlined text-slate-200 text-lg shrink-0">radio_button_unchecked</span>
+                    )}
+                    <span className={`text-xs font-bold ${statusText.includes('Awaiting') ? 'text-primary' : 'text-slate-300'}`}>Awaiting their PIN entry</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="material-symbols-outlined text-slate-200 text-lg shrink-0">radio_button_unchecked</span>
+                    <span className="text-xs font-bold text-slate-300">Confirming with M-PESA</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-col items-center text-center mb-10">
+                  <div className={`w-16 h-16 rounded-3xl flex items-center justify-center mb-6 shadow-xl ${selectedOption?.color} ${selectedOption?.textColor}`}>
+                    <span className="material-symbols-outlined text-3xl">{selectedOption?.icon}</span>
+                  </div>
+                  <h3 className="text-2xl font-headline font-bold text-primary mb-2">Payment Details</h3>
+                  <p className="text-on-surface-variant font-medium max-w-sm mx-auto opacity-70 leading-relaxed">
+                    {selectedOption?.id === 'mpesa'
+                      ? "We'll send an M-PESA prompt to this number for them to complete."
+                      : 'Set an amount and we\'ll generate a secure, shareable link.'}
+                  </p>
+                </div>
+
+                <div className="space-y-6 max-w-sm mx-auto">
+                  <div className="space-y-3">
+                    <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Amount (KES)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      placeholder="1,000"
+                      className="w-full bg-surface-container-low border border-outline-variant/5 rounded-3xl py-5 px-6 text-2xl font-headline text-primary focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
+                    />
+                    {feePreview && (
+                      <div className="flex flex-col gap-1 px-1 text-xs font-medium text-on-surface-variant">
+                        <div className="flex justify-between">
+                          <span>They'll be asked to pay</span>
+                          <span className="tabular-nums font-black text-primary">{formatKES(feePreview.total)}</span>
+                        </div>
+                        {feePreview.fee > 0 && (
+                          <span className="text-[11px] opacity-70">Includes a {formatKES(feePreview.fee)} transaction fee on top of your {formatKES(feePreview.baseAmount)} request.</span>
+                        )}
+                      </div>
                     )}
                   </div>
-                )}
-              </div>
 
-              {selectedOption?.id === 'mpesa' && (
-                <div className="space-y-3">
-                  <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Customer's M-PESA Number</label>
-                  <ValidatedInput
-                    kind="phoneKE"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="0712 345 678"
-                    className="w-full bg-surface-container-low border border-outline-variant/5 rounded-3xl py-5 px-6 text-lg font-headline text-primary focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
-                  />
+                  {selectedOption?.id === 'mpesa' && (
+                    <div className="space-y-3">
+                      <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Customer's M-PESA Number</label>
+                      <ValidatedInput
+                        kind="phoneKE"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="0712 345 678"
+                        className="w-full bg-surface-container-low border border-outline-variant/5 rounded-3xl py-5 px-6 text-lg font-headline text-primary focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
+                      />
+                    </div>
+                  )}
+
+                  <div className="flex gap-4 pt-4">
+                    <button
+                      onClick={() => setStep(1)}
+                      disabled={isSubmitting}
+                      className="flex-1 py-4 bg-slate-50 rounded-2xl text-[11px] font-black uppercase tracking-widest text-slate-400 hover:bg-slate-100 transition-all border border-slate-100 disabled:opacity-40"
+                    >
+                      Back
+                    </button>
+                    <button
+                      onClick={handlePrimaryAction}
+                      disabled={isSubmitting || !amount || (selectedOption?.id === 'mpesa' && !phone)}
+                      className="flex-1 py-4 bg-[#00351D] text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:brightness-110 transition-all shadow-xl disabled:opacity-30 flex items-center justify-center gap-2"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                          {statusText || 'Processing...'}
+                        </>
+                      ) : selectedOption?.id === 'mpesa' ? 'Send Prompt' : 'Generate Link'}
+                    </button>
+                  </div>
                 </div>
-              )}
-
-              <div className="flex gap-4 pt-4">
-                <button
-                  onClick={() => setStep(1)}
-                  disabled={isSubmitting}
-                  className="flex-1 py-4 bg-slate-50 rounded-2xl text-[11px] font-black uppercase tracking-widest text-slate-400 hover:bg-slate-100 transition-all border border-slate-100 disabled:opacity-40"
-                >
-                  Back
-                </button>
-                <button
-                  onClick={handlePrimaryAction}
-                  disabled={isSubmitting || !amount || (selectedOption?.id === 'mpesa' && !phone)}
-                  className="flex-1 py-4 bg-[#00351D] text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:brightness-110 transition-all shadow-xl disabled:opacity-30 flex items-center justify-center gap-2"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                      {statusText || 'Processing...'}
-                    </>
-                  ) : selectedOption?.id === 'mpesa' ? 'Send Prompt' : 'Generate Link'}
-                </button>
-              </div>
-            </div>
+              </>
+            )}
           </div>
         ) : (
           <div className="bg-white rounded-[32px] border border-slate-200 shadow-2xl p-8 lg:p-12 relative max-w-2xl mx-auto lg:mx-0">
             <div className="py-10 text-center">
-              <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-xl text-white ${selectedOption?.id === 'mpesa' && requestFailed ? 'bg-rose-500' : 'bg-emerald-500'}`}>
-                <span className="material-symbols-outlined text-4xl">{selectedOption?.id === 'mpesa' && requestFailed ? 'error' : 'check_circle'}</span>
-              </div>
+              {(() => {
+                if (!(selectedOption?.id === 'mpesa' && requestFailed)) {
+                  return (
+                    <div className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-xl text-white bg-emerald-500">
+                      <span className="material-symbols-outlined text-4xl">check_circle</span>
+                    </div>
+                  )
+                }
+                const outcome = classifyStkFailure(failureReason)
+                const tone = STK_OUTCOME_TONE[outcome.tone]
+                return (
+                  <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-xl text-white ${tone.bg}`}>
+                    <span className="material-symbols-outlined text-4xl">{outcome.icon}</span>
+                  </div>
+                )
+              })()}
 
               {selectedOption?.id === 'mpesa' ? (
-                requestFailed ? (
+                requestFailed ? (() => {
+                  const outcome = classifyStkFailure(failureReason)
+                  const tone = STK_OUTCOME_TONE[outcome.tone]
+                  return (
+                    <>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">STK Push Status</p>
+                      <h3 className={`text-2xl font-headline font-bold mb-3 ${tone.text}`}>{outcome.label}</h3>
+                      <p className="text-on-surface-variant font-medium max-w-sm mx-auto opacity-70 leading-relaxed mb-10">
+                        {failureReason}
+                      </p>
+                    </>
+                  )
+                })() : (
                   <>
-                    <h3 className="text-2xl font-headline font-bold text-rose-600 mb-3">Request Failed</h3>
-                    <p className="text-on-surface-variant font-medium max-w-sm mx-auto opacity-70 leading-relaxed mb-10">
-                      {failureReason}
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <h3 className="text-2xl font-headline font-bold text-primary mb-3">Payment Received</h3>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-2">STK Push Status</p>
+                    <h3 className="text-2xl font-headline font-bold text-primary mb-3">Paid</h3>
                     <p className="text-on-surface-variant font-medium max-w-sm mx-auto opacity-70 leading-relaxed mb-10">
                       {formatKES(amount)} has been credited to your PayChain balance.
                     </p>
