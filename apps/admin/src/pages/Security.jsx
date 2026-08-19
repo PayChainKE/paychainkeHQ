@@ -5,6 +5,13 @@ import TablePagination from '../components/ui/TablePagination';
 
 const PAGE_SIZE = 25;
 
+// Strips markup for plain-text display — safe regardless of what it leaves
+// behind, since the result is only ever rendered as a normal React text
+// child (always escaped on output), never via dangerouslySetInnerHTML.
+function stripHtmlTags(value) {
+  return String(value ?? '').replace(/<[^>]*>/g, '');
+}
+
 const ALERT_TYPE_META = {
   otp_lockout:         { label: 'OTP Lockout',            icon: 'lock_clock' },
   pin_lockout:          { label: 'PIN Lockout',            icon: 'pin' },
@@ -306,7 +313,14 @@ const AlertDrawer = ({ entry, onClose, onAcknowledge, acking }) => {
         <div className="px-6 py-5 space-y-5">
           <div>
             <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1">Details</p>
-            <p className="text-sm text-on-surface leading-relaxed" dangerouslySetInnerHTML={{ __html: entry.details }} />
+            {/* entry.details is stored as an HTML string (bold-tagged names/
+                amounts) built server-side from merchant/user-supplied free
+                text — plain-text rendering here means this stays safe even
+                if a future backend call site forgets to escape its input,
+                rather than trusting dangerouslySetInnerHTML on data that
+                ultimately originates from things like a merchant's own
+                business name. */}
+            <p className="text-sm text-on-surface leading-relaxed">{stripHtmlTags(entry.details)}</p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <DrawerField label="Severity" value={entry.severity} mono />

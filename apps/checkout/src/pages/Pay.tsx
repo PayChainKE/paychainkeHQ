@@ -49,7 +49,12 @@ export default function Pay() {
       if (!ok) return;
       if (data.status === "success") {
         setView("success");
-        if (data.callbackUrl) {
+        // callbackUrl is already validated as https:// server-side at
+        // session creation (developerCheckoutController.js), but this
+        // navigates the customer's browser right after a real payment, so
+        // re-checking the scheme here too costs nothing and means this
+        // redirect can never fire for anything other than http(s):.
+        if (data.callbackUrl && /^https?:\/\//i.test(data.callbackUrl)) {
           setTimeout(() => { window.location.href = data.callbackUrl!; }, AUTO_REDIRECT_DELAY_MS);
         }
         return;

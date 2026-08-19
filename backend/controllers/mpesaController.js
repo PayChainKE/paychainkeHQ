@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import { serverError } from '../utils/serverError.js';
 import Transaction from '../models/Transaction.js';
 import Merchant from '../models/Merchant.js';
 import { safeSendSMS, sendStaggeredSms, formatKes } from '../utils/smsSanitizer.js';
@@ -978,7 +979,6 @@ export const initiateB2C = async (req, res) => {
     res.status(200).json({ success: true, message: 'Transfer initiated successfully', transaction: tx });
 
   } catch (error) {
-    console.error('❌ B2C Transfer Error:', error.response?.data || error);
     // Refund the merchant only if the deduction actually happened — an
     // earlier failure (e.g. PIN check) never touched the balance. Refunds
     // the full totalDebit (amount + B2C fee), matching what was actually
@@ -986,7 +986,8 @@ export const initiateB2C = async (req, res) => {
     if (debited && totalDebit > 0) {
       await Merchant.findByIdAndUpdate(req.merchant._id, { $inc: { kesBalance: totalDebit } });
     }
-    res.status(500).json({ error: error.response?.data?.errorMessage || error.message || 'Failed to initiate transfer' });
+    if (error.response?.data) console.error('❌ B2C Transfer Error (NCBA response):', error.response.data);
+    serverError(res, 500, 'Failed to initiate transfer', error, '❌ B2C Transfer Error:');
   }
 };
 
@@ -1119,11 +1120,11 @@ export const initiateB2B = async (req, res) => {
     res.status(200).json({ success: true, message: 'Transfer initiated successfully', transaction: tx });
 
   } catch (error) {
-    console.error('❌ B2B Transfer Error:', error.response?.data || error);
+    if (error.response?.data) console.error('❌ B2B Transfer Error (NCBA response):', error.response.data);
     // Refund the merchant only if the deduction actually happened.
     if (debited && totalDebit > 0) {
       await Merchant.findByIdAndUpdate(req.merchant._id, { $inc: { kesBalance: totalDebit } });
     }
-    res.status(500).json({ error: error.message || 'Failed to initiate transfer' });
+    serverError(res, 500, 'Failed to initiate transfer', error, '❌ B2B Transfer Error:');
   }
 };

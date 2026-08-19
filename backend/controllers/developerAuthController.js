@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import Developer from '../models/Developer.js';
+import { serverError } from '../utils/serverError.js';
 import { sendOTP } from '../utils/resend.js';
 import { logAudit } from '../utils/auditLog.js';
 import generateToken from '../utils/generateToken.js';
@@ -68,8 +69,7 @@ export const registerDeveloper = async (req, res) => {
       email: developer.email,
     });
   } catch (error) {
-    console.error('Register Developer Error:', error);
-    res.status(500).json({ error: error.message || 'Server Error' });
+    serverError(res, 500, 'Server Error', error, 'Register Developer Error:');
   }
 };
 
@@ -121,8 +121,7 @@ export const verifyDeveloperOtp = async (req, res) => {
       token: generateToken(developer._id, '30d', { tokenVersion: developer.tokenVersion || 0 }),
     });
   } catch (error) {
-    console.error('Verify Developer OTP Error:', error);
-    res.status(500).json({ error: error.message || 'Server Error' });
+    serverError(res, 500, 'Server Error', error, 'Verify Developer OTP Error:');
   }
 };
 
@@ -144,8 +143,7 @@ export const resendDeveloperOtp = async (req, res) => {
     await issueOtp(developer);
     res.json({ success: true, message: 'A new verification code has been sent.' });
   } catch (error) {
-    console.error('Resend Developer OTP Error:', error);
-    res.status(500).json({ error: error.message || 'Server Error' });
+    serverError(res, 500, 'Server Error', error, 'Resend Developer OTP Error:');
   }
 };
 
@@ -215,8 +213,7 @@ export const loginDeveloper = async (req, res) => {
       token: generateToken(developer._id, '30d', { tokenVersion: developer.tokenVersion || 0 }),
     });
   } catch (error) {
-    console.error('Login Developer Error:', error);
-    res.status(500).json({ error: error.message || 'Server Error' });
+    serverError(res, 500, 'Server Error', error, 'Login Developer Error:');
   }
 };
 
@@ -228,7 +225,6 @@ export const logoutDeveloper = async (req, res) => {
     await Developer.updateOne({ _id: req.developer._id }, { $inc: { tokenVersion: 1 } });
     res.json({ success: true });
   } catch (error) {
-    console.error('Logout Developer Error:', error);
-    res.status(500).json({ error: error.message || 'Server Error' });
+    serverError(res, 500, 'Server Error', error, 'Logout Developer Error:');
   }
 };

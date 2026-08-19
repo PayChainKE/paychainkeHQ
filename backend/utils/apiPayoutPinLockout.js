@@ -1,5 +1,5 @@
 import Merchant from '../models/Merchant.js';
-import { notifyAdmins } from './securityAlerts.js';
+import { notifyAdmins, escapeHtml } from './securityAlerts.js';
 
 // Account-level lockout for the API Payout PIN — same shape as
 // pinLockout.js (which guards appPin), but pinLockout.js is hardcoded to
@@ -43,7 +43,7 @@ export async function recordFailedApiPayoutPinAttempt(merchantId) {
       severity: 'critical',
       subject: 'Merchant API payout locked — repeated failed PIN attempts',
       heading: 'API Payout PIN Lockout Triggered',
-      details: `Merchant <strong>${label}</strong> (id: ${merchantId}) was locked out of Developer API payouts for 15 minutes after ${MAX_ATTEMPTS} incorrect API payout PIN attempts in a row.`,
+      details: `Merchant <strong>${escapeHtml(label)}</strong> (id: ${merchantId}) was locked out of Developer API payouts for 15 minutes after ${MAX_ATTEMPTS} incorrect API payout PIN attempts in a row.`,
       metadata: { merchantId: String(merchantId), label },
     });
   }
