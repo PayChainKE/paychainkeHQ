@@ -198,6 +198,14 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
           let paidInvoice = null;
           if (link.invoiceId) {
             paidInvoice = await Invoice.findByIdAndUpdate(link.invoiceId, { status: 'paid', paidAt: new Date() }, { returnDocument: 'after' });
+            // Only invoices created via the Developer API (developerInvoiceController.js)
+            // carry createdViaDeveloperId — a dashboard-created invoice has
+            // no developer to notify, so this is a no-op for those.
+            if (paidInvoice?.createdViaDeveloperId) {
+              dispatchDeveloperEvent(paidInvoice.createdViaDeveloperId, 'invoice.paid', {
+                invoice: { id: paidInvoice._id, invoiceNumber: paidInvoice.invoiceNumber, status: paidInvoice.status, paidAt: paidInvoice.paidAt },
+              });
+            }
           }
 
           const merchant = link.merchantId;

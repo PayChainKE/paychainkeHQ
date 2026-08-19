@@ -6,14 +6,14 @@ import Counter from '../models/Counter.js';
 import { sendInvoiceEmail } from '../utils/resend.js';
 import { generateQrDataUri } from '../utils/qrCode.js';
 
-const FRONTEND_URL = process.env.MERCHANT_DASHBOARD_URL || 'https://app.paychain.co.ke';
+export const FRONTEND_URL = process.env.MERCHANT_DASHBOARD_URL || 'https://app.paychain.co.ke';
 
-const computeTotals = (items = []) => {
+export const computeTotals = (items = []) => {
   const subtotal = items.reduce((sum, i) => sum + (Number(i.qty) || 0) * (Number(i.price) || 0), 0);
   return { subtotal, total: subtotal };
 };
 
-const sanitizeItems = (items) =>
+export const sanitizeItems = (items) =>
   (Array.isArray(items) ? items : []).map((i) => ({
     description: String(i.description || '').slice(0, 200),
     qty: Math.max(0, Number(i.qty) || 0),
@@ -23,7 +23,7 @@ const sanitizeItems = (items) =>
 // Atomically reserves the next number in a single global sequence — this is
 // what guarantees invoice numbers are unique across every merchant, not just
 // within one account, and reads as a clean sequential "INV-000042" series.
-const getNextInvoiceNumber = async () => {
+export const getNextInvoiceNumber = async () => {
   const counter = await Counter.findByIdAndUpdate(
     'invoiceNumber',
     { $inc: { seq: 1 } },
@@ -37,7 +37,7 @@ const getNextInvoiceNumber = async () => {
 // "790889066", "254790889066" and "+254790889066" all normalize the same way.
 // Anything that isn't a recognisable KE mobile shape is left untouched
 // rather than silently corrupted.
-const normalizePhoneKE = (raw) => {
+export const normalizePhoneKE = (raw) => {
   if (!raw) return null;
   let digits = String(raw).replace(/\D/g, '');
   if (digits.startsWith('254')) digits = digits.slice(3);
@@ -47,7 +47,7 @@ const normalizePhoneKE = (raw) => {
   return trimmed || null;
 };
 
-const sanitizeCustomer = (customer) => ({
+export const sanitizeCustomer = (customer) => ({
   name: customer.name.trim(),
   email: customer.email?.trim() || null,
   phone: normalizePhoneKE(customer.phone),
@@ -59,10 +59,10 @@ const sanitizeCustomer = (customer) => ({
 // else the invoice's own view page. Drafts still get one (it just 404s
 // until sent, same as the draft's public link itself) so the PDF/preview
 // doesn't have to special-case "no QR yet".
-const invoiceShareUrl = (inv, link) =>
+export const invoiceShareUrl = (inv, link) =>
   link ? `${FRONTEND_URL}/pay/${link.linkId}` : `${FRONTEND_URL}/invoice/${inv.publicToken}`;
 
-const serializeInvoice = async (inv) => {
+export const serializeInvoice = async (inv) => {
   const { subtotal, total } = computeTotals(inv.items);
   const link = inv.paymentLinkId && inv.paymentLinkId.linkId ? inv.paymentLinkId : null;
   const shareUrl = invoiceShareUrl(inv, link);

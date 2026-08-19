@@ -1,5 +1,6 @@
 import CheckoutSession from '../models/CheckoutSession.js';
 import { syncCheckoutSessionStatus } from '../services/checkoutSessionService.js';
+import { generateBrandedQrDataUri } from '../utils/qrCode.js';
 
 // checkout.paychain.co.ke is a separate hosted surface (like
 // checkout.paystack.com) — no API key ever reaches it, only this session id.
@@ -15,7 +16,14 @@ const DEFAULT_SESSION_TTL_MINUTES = 30;
 const MIN_SESSION_TTL_MINUTES = 5;
 const MAX_SESSION_TTL_MINUTES = 7 * 24 * 60;
 
-function publicSession(session) {
+// checkoutUrl is what a customer opens in a browser; qrCodeDataUri encodes
+// that exact same URL as a scannable PNG (data URI, no separate download
+// step) — the "dynamic" part is that it's generated fresh per session/
+// amount, unlike a static till QR. Reuses the same branded-QR generator
+// already used for merchant account/checkout QRs elsewhere in the product,
+// so it's visually consistent with every other PayChain QR a customer sees.
+async function publicSession(session) {
+  const checkoutUrl = `${CHECKOUT_BASE_URL}/pay/${session._id}`;
   return {
     id: session._id,
     mode: session.mode,
@@ -25,7 +33,8 @@ function publicSession(session) {
     description: session.description,
     status: session.status,
     callbackUrl: session.callbackUrl,
-    checkoutUrl: `${CHECKOUT_BASE_URL}/pay/${session._id}`,
+    checkoutUrl,
+    qrCodeDataUri: await generateBrandedQrDataUri(checkoutUrl),
     expiresAt: session.expiresAt,
     createdAt: session.createdAt,
   };
@@ -79,7 +88,7 @@ export const createCheckoutSession = async (req, res) => {
       expiresAt: new Date(Date.now() + ttlMinutes * 60 * 1000),
     });
 
-    res.status(201).json({ success: true, session: publicSession(session) });
+    res.status(201).json({ success: true, session: await publicSession(session) });
   } catch (error) {
     console.error('Create Checkout Session Error:', error);
     res.status(500).json({ error: 'Server Error' });
@@ -97,7 +106,7 @@ export const getCheckoutSession = async (req, res) => {
 
     await syncCheckoutSessionStatus(session);
 
-    res.json({ success: true, session: publicSession(session) });
+    res.json({ success: true, session: await publicSession(session) });
   } catch (error) {
     console.error('Get Checkout Session Error:', error);
     res.status(500).json({ error: 'Server Error' });

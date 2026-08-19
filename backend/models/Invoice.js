@@ -84,6 +84,16 @@ const invoiceSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  // Set only when this invoice was created via the Developer API
+  // (developerInvoiceController.js) — how resolveStkOutcome
+  // (mpesaController.js) knows which developer's webhooks to fire
+  // `invoice.paid` to. Dashboard-created invoices leave this null and
+  // never trigger a developer webhook, since no developer created them.
+  createdViaDeveloperId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Developer',
+    default: null,
+  },
 }, { timestamps: true });
 
 invoiceSchema.index({ merchantId: 1, createdAt: -1 });

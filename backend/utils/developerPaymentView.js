@@ -13,6 +13,12 @@ export function publicDeveloperPayment(payment) {
     failureReason: payment.failureReason,
     reference: payment.reference,
     counterparty: payment.counterparty,
+    // Only populated for a row created via POST /bulk-payments — null for a
+    // standalone POST /payments/payout or /payments/collect.
+    batchId: payment.batchId || null,
+    payeeType: payment.payeeType || null,
+    grossAmount: payment.grossAmount ?? null,
+    taxDeductions: payment.grossAmount != null ? payment.taxDeductions : null,
     createdAt: payment.createdAt,
     updatedAt: payment.updatedAt,
   };
