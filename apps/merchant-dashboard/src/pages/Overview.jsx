@@ -436,7 +436,7 @@ export default function Overview() {
                   {formatUSDC(merchant?.usdcBalance || 0)}
                 </h3>
                 <p className={`text-white/40 text-[9px] lg:text-[10px] font-bold tracking-tight opacity-70 uppercase transition-all duration-300 ${!showAmounts && 'blur-sm grayscale'}`}>
-                  ≈ {formatKES((merchant?.usdcBalance || 0) * 130)}
+                  ≈ {formatKES((merchant?.usdcBalance || 0) * liveRate)}
                 </p>
               </div>
               <div className="flex gap-3 lg:gap-4 mt-8">

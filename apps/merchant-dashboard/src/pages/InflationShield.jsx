@@ -17,6 +17,7 @@ export default function InflationShield() {
   const [inputAmount, setInputAmount] = useState('')
   const [swapDirection, setSwapDirection] = useState('KES_TO_USDC')
   const [rate, setRate] = useState(132.45)
+  const [rateLoaded, setRateLoaded] = useState(false)
   // Swap execution (transactionController.js's KES_TO_USDC/USDC_TO_KES
   // branches) charges no fee at all today — it credits amount * liveRate
   // with no deduction (see revenueRateCard.js's FX_SPREAD_RATE comment:
@@ -40,6 +41,7 @@ export default function InflationShield() {
         })
         if (res.data.success && res.data.rate) {
           setRate(res.data.rate)
+          setRateLoaded(true)
         }
       } catch (err) {
         console.error('Failed to fetch live exchange rate', err)
@@ -94,6 +96,9 @@ export default function InflationShield() {
     }
     if (!merchant?.stellarPublicKey) {
       return addToast({ title: 'Wallet Not Activated', message: 'Please activate your Digital Wallet first.', type: 'error' });
+    }
+    if (!rateLoaded) {
+      return addToast({ title: 'Rate Unavailable', message: 'Live exchange rate unavailable right now. Please try again shortly.', type: 'error' });
     }
 
     setIsSwapping(true);
@@ -202,8 +207,8 @@ export default function InflationShield() {
               <span className="material-symbols-outlined text-lg pulse">monitoring</span>
             </div>
             <div>
-              <p className="text-[9px] md:text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">Live Exchange Rate</p>
-              <p className="font-headline text-base md:text-lg text-primary leading-tight">1 USDC = {formatKES(rate)}</p>
+              <p className="text-[9px] md:text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">{rateLoaded ? 'Live Exchange Rate' : 'Rate Unavailable'}</p>
+              <p className="font-headline text-base md:text-lg text-primary leading-tight">{rateLoaded ? `1 USDC = ${formatKES(rate)}` : '—'}</p>
             </div>
           </div>
         </div>
@@ -322,7 +327,7 @@ export default function InflationShield() {
               <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:border-blue-500/30 transition-colors">
                 <div className="flex justify-between items-center mb-4">
                   <span className="text-[11px] text-gray-500 font-bold uppercase tracking-widest">You Receive</span>
-                  <span className="text-[11px] text-gray-500 font-medium">Slippage: 0.1%</span>
+                  <span className="text-[11px] text-gray-500 font-medium">Fixed rate — no slippage</span>
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="flex shrink-0 items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-200">
@@ -342,18 +347,14 @@ export default function InflationShield() {
                 <span className="text-white/50">Fee</span>
                 <span className="text-white/80">None — no PayChain fee on swaps today</span>
               </div>
-              <div className="flex justify-between text-xs font-bold">
-                <span className="text-white/70">Estimated Value Protection</span>
-                <span className="text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]">+12.4% / yr</span>
-              </div>
             </div>
 
-            <button 
+            <button
               onClick={handleSwap}
-              disabled={isSwapping}
+              disabled={isSwapping || !rateLoaded}
               className="relative z-10 w-full bg-gradient-to-r from-emerald-600 to-emerald-400 text-white py-5 rounded-2xl font-bold text-lg shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] active:scale-[0.98] transition-all mt-8 flex items-center justify-center gap-3 group border border-emerald-400/20 disabled:opacity-50 disabled:grayscale"
             >
-              {isSwapping ? 'Processing Swap...' : 'Confirm Protection Swap'}
+              {isSwapping ? 'Processing Swap...' : rateLoaded ? 'Confirm Protection Swap' : 'Rate Unavailable'}
               <span className={`material-symbols-outlined transition-transform duration-700 ${isSwapping ? 'animate-spin' : 'group-hover:rotate-180'}`}>sync</span>
             </button>
           </div>

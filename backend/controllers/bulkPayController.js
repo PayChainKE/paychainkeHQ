@@ -492,6 +492,20 @@ export const authorizeBatch = async (req, res) => {
       }
       row._payee = payee;
 
+      // Statutory deductions must be computed authoritatively here, not
+      // trusted from the client. uploadCSV's preview does run calculatePAYE,
+      // but batchRows built from the manually-added payee list (BulkPay.jsx's
+      // non-CSV path) never goes through that preview — it was sending
+      // netAmount === grossAmount with no PAYE/NSSF/SHIF withheld at all for
+      // "Employee" payees. Recomputing from grossAmount here means no
+      // submission path, past or future, can skip the deduction.
+      if (payee.type === 'employee') {
+        const taxes = calculatePAYE(row.grossAmount);
+        row.grossAmount = taxes.grossPay;
+        row.netAmount = taxes.netPay;
+        row.taxDeductions = { paye: taxes.paye, nssf: taxes.nssf, shif: taxes.shif };
+      }
+
       totalGross += row.grossAmount;
       totalNet += row.netAmount;
       if (row.taxDeductions) {

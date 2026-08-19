@@ -543,7 +543,7 @@ export default function BulkPay() {
             type: p.type,
             phone: p.phone,
             grossAmount: payoutAmounts[p.id] || 0,
-            netAmount: payoutAmounts[p.id] || 0, // Mocked for UI, actual tax comes from backend on real employee runs
+            netAmount: payoutAmounts[p.id] || 0, // Preview only — for Employee payees the backend recalculates PAYE/NSSF/SHIF authoritatively in authorizeBatch and overrides this
           }));
       }
 
