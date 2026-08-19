@@ -19,10 +19,13 @@ export default function Webhooks() {
       <h2>Event types</h2>
       <ParamsTable
         params={[
-          { name: "payment.collect.succeeded", type: "event", description: "An STK push collection cleared. The usual trigger for \"lift the suspension\" / \"mark the invoice paid\" logic." },
+          { name: "payment.collect.succeeded", type: "event", description: "An STK push, checkout session, payment link, or QR-code collection cleared." },
           { name: "payment.collect.failed", type: "event", description: "The customer cancelled, the prompt timed out, or the collection otherwise failed." },
-          { name: "payment.payout.succeeded", type: "event", description: "A payout was sent successfully." },
-          { name: "payment.payout.failed", type: "event", description: "A payout failed: insufficient funds, an invalid account, etc." },
+          { name: "payment.payout.succeeded", type: "event", description: "A Send Money payout, or one row of a bulk payment batch, was sent successfully." },
+          { name: "payment.payout.failed", type: "event", description: "A payout (or one bulk-payment row) failed: insufficient funds, an invalid account, etc." },
+          { name: "bulk_payment.completed", type: "event", description: "Every row in a POST /bulk-payments batch has resolved — fires once per batch with the final succeeded/pending/failed tally. See Bulk Payments." },
+          { name: "invoice.sent", type: "event", description: "An invoice created via POST /invoices was emailed to its customer. See Invoices." },
+          { name: "invoice.paid", type: "event", description: "A customer paid an API-created invoice via its payment link or QR code." },
         ]}
       />
 

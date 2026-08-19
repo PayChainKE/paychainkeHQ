@@ -72,6 +72,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<{ ok: boole
   return { ok: res.ok, status: res.status, data };
 }
 
+// --- Contact (public) ---
+
+export function submitContactMessage(body: { name: string; email: string; phone?: string; subject: string; message: string }) {
+  return request<{ success: boolean; message: string }>("/api/contact", {
+    method: "POST",
+    body: JSON.stringify({ ...body, contactType: "developer" }),
+  });
+}
+
 // --- Auth (public) ---
 
 export function registerDeveloper(body: { name: string; companyName: string; email: string; phone?: string; password: string }) {

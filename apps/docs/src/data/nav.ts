@@ -19,18 +19,27 @@ export const nav: NavGroup[] = [
     ],
   },
   {
-    label: "Core API",
+    label: "Products",
     items: [
-      { title: "Payments", path: "/payments", description: "Collect via STK push, pay out, and check status." },
-      { title: "Checkout", path: "/checkout", description: "A hosted payment page to redirect customers to, or share directly as a payment link. No card/phone data touches your servers." },
-      { title: "Webhooks", path: "/webhooks", description: "Get notified the instant a payment resolves." },
+      { title: "Payment collection", path: "/payment-collection", description: "STK push, hosted checkout, payment links, and dynamic QR codes." },
+      { title: "Send money", path: "/send-money", description: "Pay out to mobile wallets, Paybills, Tills, and bank accounts." },
+      { title: "Invoices", path: "/invoices", description: "Create, send, and track real, payable invoices." },
+      { title: "Bulk payments", path: "/bulk-payments", description: "Payroll, contractor, and vendor payments in one batch call." },
+      { title: "Webhooks", path: "/webhooks", description: "Push notifications the instant a payment, invoice, or bulk batch resolves." },
+    ],
+  },
+  {
+    label: "Resources",
+    items: [
+      { title: "Guides", path: "/guides", description: "ISP auto-reconnection and CRM sync, end to end." },
       { title: "Errors & idempotency", path: "/errors", description: "Error shape, status codes, and safe retries." },
     ],
   },
   {
-    label: "Guides",
+    label: "Support",
     items: [
-      { title: "Integration patterns", path: "/guides", description: "ISP auto-reconnection and CRM sync, end to end." },
+      { title: "Help & support", path: "/help", description: "Troubleshooting, FAQs, and how to reach a human." },
+      { title: "Contact us", path: "/contact", description: "Sales, support, and general enquiries." },
     ],
   },
 ];
