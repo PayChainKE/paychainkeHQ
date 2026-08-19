@@ -64,7 +64,7 @@ import {
 import { runWalletAudit } from '../controllers/walletAuditController.js';
 import { adminListInvoices } from '../controllers/invoiceController.js';
 import { sendSmsBroadcast, getSmsBroadcasts, deleteSmsBroadcast, clearSmsBroadcasts } from '../controllers/smsBroadcastController.js';
-import { getRevenue, getRevenueSweeps, triggerRevenueSweep, getReconciliations, submitReconciliation } from '../controllers/revenueController.js';
+import { getRevenue, getRevenueSweeps, archiveRevenueSweep, unarchiveRevenueSweep, exportRevenueSweeps, triggerRevenueSweep, getReconciliations, submitReconciliation } from '../controllers/revenueController.js';
 import { adminListCashAdvanceRequests, adminUpdateCashAdvanceRequest } from '../controllers/cashAdvanceController.js';
 import {
   listExpenses,
@@ -157,7 +157,10 @@ router.get('/revenue', protect, excludeOfficer, getRevenue);
 // Real weekly sweep history (actual PesaLink transfers of accrued fee
 // revenue to PayChain's own account) + a manual "run now" trigger.
 router.get('/revenue/sweeps', protect, excludeOfficer, getRevenueSweeps);
+router.get('/revenue/sweeps/export', protect, excludeOfficer, exportRevenueSweeps);
 router.post('/revenue/sweeps/run', protect, requireMutator, sensitiveActionLimiter, triggerRevenueSweep);
+router.patch('/revenue/sweeps/:id/archive', protect, requireMutator, sensitiveActionLimiter, archiveRevenueSweep);
+router.patch('/revenue/sweeps/:id/unarchive', protect, requireMutator, sensitiveActionLimiter, unarchiveRevenueSweep);
 
 // Manual bank reconciliation — no NCBA API exists to pull the real pooled
 // account balance automatically, so an admin pastes it in periodically and

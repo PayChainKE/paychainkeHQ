@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import Transaction from '../models/Transaction.js';
 import RevenueSweep from '../models/RevenueSweep.js';
 import BankReconciliation from '../models/BankReconciliation.js';
@@ -5,6 +6,8 @@ import { REVENUE_STREAMS, SAFARICOM_TARIFF } from '../config/revenueRateCard.js'
 import { LIVE_DATA_CUTOFF } from '../config/liveDataCutoff.js';
 import { runRevenueSweep, REVENUE_SWEEP_DESTINATION } from '../services/revenueSweepService.js';
 import { recordReconciliation } from '../services/reconciliationService.js';
+import { logAudit } from '../utils/auditLog.js';
+import { adminActor } from './adminController.js';
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 const RANGES = ['24h', '7d', '30d', '90d', 'ytd', 'all'];
@@ -598,10 +601,132 @@ export const getRevenueSweeps = async (req, res) => {
     // Now" attempts and every redeploy landing on the configured sweep day
     // each add their own row, so a busy week alone can produce several.
     // Client paginates this at 25/page; querying more up front is cheap.
-    const sweeps = await RevenueSweep.find({}).sort('-createdAt').limit(500).lean();
+    // Archived rows are excluded from this list view only — they're never
+    // deleted, still count in every real sweep computation, and still
+    // appear in the full CSV export below.
+    const sweeps = await RevenueSweep.find({ archived: { $ne: true } }).sort('-createdAt').limit(500).lean();
     res.json({ success: true, count: sweeps.length, data: sweeps });
   } catch (error) {
     console.error('Get Revenue Sweeps Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Hide a sweep history row from the admin Revenue page's list —
+//          the record itself is untouched (still a real audit row, still
+//          counted by revenueSweepService.js) and can be restored.
+// @route   PATCH /api/admin/revenue/sweeps/:id/archive
+// @access  Private (Admin, owner/admin only)
+export const archiveRevenueSweep = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid sweep id.' });
+    }
+    const sweep = await RevenueSweep.findByIdAndUpdate(
+      id,
+      { $set: { archived: true, archivedAt: new Date(), archivedBy: req.admin._id } },
+      { new: true }
+    );
+    if (!sweep) return res.status(404).json({ error: 'Sweep record not found.' });
+
+    logAudit({
+      action: 'admin.revenue_sweep.archived', category: 'admin', severity: 'info',
+      message: `Sweep record ${sweep._id} cleared from the Revenue page list`,
+      actor: adminActor(req.admin), req,
+      metadata: { sweepId: String(sweep._id), status: sweep.status, amount: sweep.amount },
+    });
+
+    res.json({ success: true, data: sweep });
+  } catch (error) {
+    console.error('Archive Revenue Sweep Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Undo an accidental "clear" — restores a sweep row to the list.
+// @route   PATCH /api/admin/revenue/sweeps/:id/unarchive
+// @access  Private (Admin, owner/admin only)
+export const unarchiveRevenueSweep = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid sweep id.' });
+    }
+    const sweep = await RevenueSweep.findByIdAndUpdate(
+      id,
+      { $set: { archived: false, archivedAt: null, archivedBy: null } },
+      { new: true }
+    );
+    if (!sweep) return res.status(404).json({ error: 'Sweep record not found.' });
+
+    logAudit({
+      action: 'admin.revenue_sweep.unarchived', category: 'admin', severity: 'info',
+      message: `Sweep record ${sweep._id} restored to the Revenue page list`,
+      actor: adminActor(req.admin), req,
+      metadata: { sweepId: String(sweep._id) },
+    });
+
+    res.json({ success: true, data: sweep });
+  } catch (error) {
+    console.error('Unarchive Revenue Sweep Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Full sweep history as CSV, for offline record-keeping /
+//          reconciliation against the real bank statement. Always the
+//          complete set — including rows an admin has "cleared" from the
+//          list view above — since archiving is display-only and this
+//          export exists specifically so nothing is ever actually lost.
+// @route   GET /api/admin/revenue/sweeps/export
+// @access  Private (Admin)
+export const exportRevenueSweeps = async (req, res) => {
+  try {
+    const sweeps = await RevenueSweep.find({}).sort('-createdAt').lean();
+
+    const header = [
+      'Ran At', 'Period Start', 'Period End', 'Status', 'Amount (KES)',
+      'Attempted Amount (KES)', 'Transactions', 'Destination Bank Code',
+      'Destination Account Number', 'NCBA Reference', 'Simulated',
+      'Failure Reason', 'Archived',
+    ];
+    // Excel/Sheets-safe CSV cell — quotes any value containing a comma,
+    // quote, or newline, and doubles internal quotes per RFC 4180.
+    const cell = (v) => {
+      const s = v === null || v === undefined ? '' : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const rows = sweeps.map((s) => [
+      s.createdAt?.toISOString() || '',
+      s.periodStart?.toISOString() || '',
+      s.periodEnd?.toISOString() || '',
+      s.status,
+      s.status === 'completed' ? s.amount : 0,
+      s.attemptedAmount,
+      s.transactionCount,
+      s.destinationBankCode || '',
+      s.destinationAccountNumber || '',
+      s.ncbaReference || '',
+      s.simulated ? 'yes' : 'no',
+      s.failureReason || '',
+      s.archived ? 'yes' : 'no',
+    ].map(cell).join(','));
+
+    const csv = [header.map(cell).join(','), ...rows].join('\r\n');
+
+    logAudit({
+      action: 'admin.revenue_sweep.exported', category: 'admin', severity: 'info',
+      message: `Exported ${sweeps.length} sweep records as CSV`,
+      actor: adminActor(req.admin), req,
+      metadata: { count: sweeps.length },
+    });
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="paychain-sweep-history-${new Date().toISOString().slice(0, 10)}.csv"`);
+    res.send(csv);
+  } catch (error) {
+    console.error('Export Revenue Sweeps Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };

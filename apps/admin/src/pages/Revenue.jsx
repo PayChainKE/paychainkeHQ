@@ -478,6 +478,51 @@ const Revenue = () => {
     }
   }, [showToast, fetchRevenue, fetchSweepHistory]);
 
+  // "Clear" a sweep history row — archives it (hides from this list) rather
+  // than deleting the real record. The underlying RevenueSweep document is
+  // untouched, still counts in the real sweep math, and still appears in
+  // the CSV export below — this only affects what's visible here.
+  const [archiveTarget, setArchiveTarget] = useState(null); // the sweep row pending confirmation
+  const [archiveBusy, setArchiveBusy] = useState(false);
+
+  const confirmArchiveSweep = useCallback(async () => {
+    if (!archiveTarget) return;
+    setArchiveBusy(true);
+    try {
+      await api.patch(`/api/admin/revenue/sweeps/${archiveTarget._id}/archive`);
+      setSweepHistory((prev) => prev.filter((s) => s._id !== archiveTarget._id));
+      showToast('Sweep record cleared from this list.');
+    } catch (e) {
+      showToast(e?.response?.data?.error || 'Could not clear that record.');
+    } finally {
+      setArchiveBusy(false);
+      setArchiveTarget(null);
+    }
+  }, [archiveTarget, showToast]);
+
+  // Full sweep history as a CSV statement, for offline record-keeping —
+  // always the complete set (including anything cleared above), since
+  // archiving only hides rows from the list, never deletes them.
+  const [exportingCsv, setExportingCsv] = useState(false);
+  const exportSweepHistoryCsv = useCallback(async () => {
+    setExportingCsv(true);
+    try {
+      const res = await api.get('/api/admin/revenue/sweeps/export', { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `paychain-sweep-history-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      showToast('Could not download sweep history.');
+    } finally {
+      setExportingCsv(false);
+    }
+  }, [showToast]);
+
   const kpis     = data?.kpis     || {};
   const channels = data?.channels || [];
   const sweeps   = data?.sweepBatches || [];
@@ -1027,6 +1072,15 @@ const Revenue = () => {
                 Every real sweep attempt on record — what actually ran, not a projection. Independent of the date range above.
               </p>
             </div>
+            <button
+              onClick={exportSweepHistoryCsv}
+              disabled={exportingCsv}
+              title="Download the complete sweep history (including cleared rows) as CSV"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-surface-container border border-outline-variant/40 text-on-surface text-2xs font-bold uppercase tracking-widest hover:bg-surface-container-high transition-colors disabled:opacity-50"
+            >
+              <span className="material-symbols-outlined text-sm">{exportingCsv ? 'progress_activity' : 'download'}</span>
+              {exportingCsv ? 'Preparing…' : 'Download CSV'}
+            </button>
           </div>
           <div className="bg-surface-container-lowest border border-outline-variant/40 rounded-lg overflow-hidden">
             {sweepHistoryLoading ? (
@@ -1047,6 +1101,7 @@ const Revenue = () => {
                       <th className="text-right px-3 py-3">Txns</th>
                       <th className="text-left px-3 py-3">Destination</th>
                       <th className="text-left px-5 py-3">Reference / Reason</th>
+                      {canRunSweep && <th className="text-right px-5 py-3">Clear</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -1090,6 +1145,17 @@ const Revenue = () => {
                               <span>{s.failureReason || '—'}</span>
                             )}
                           </td>
+                          {canRunSweep && (
+                            <td className="px-5 py-3.5 text-right">
+                              <button
+                                onClick={() => setArchiveTarget(s)}
+                                title="Clear from this list — the real record is kept, and still included in the CSV export"
+                                className="text-on-surface-variant/60 hover:text-red-600 transition-colors"
+                              >
+                                <span className="material-symbols-outlined text-lg">clear</span>
+                              </button>
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
@@ -1197,6 +1263,29 @@ const Revenue = () => {
                 <button onClick={() => setSweepConfirmOpen(false)} disabled={sweepBusy} className="flex-1 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40">Cancel</button>
                 <button onClick={runSweepNow} disabled={sweepBusy} className="flex-1 py-2.5 rounded-lg bg-on-surface text-surface-container-lowest text-sm font-semibold uppercase tracking-widest hover:opacity-90 disabled:opacity-50">
                   {sweepBusy ? 'Running…' : 'Run Sweep'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Clear sweep row — confirmation */}
+      {archiveTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => !archiveBusy && setArchiveTarget(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="p-7">
+              <div className="w-14 h-14 rounded-full bg-surface-container text-on-surface-variant flex items-center justify-center mb-4">
+                <span className="material-symbols-outlined text-3xl">clear</span>
+              </div>
+              <h3 className="text-xl font-bold text-on-surface mb-1">Clear this sweep record?</h3>
+              <p className="text-sm text-on-surface-variant mb-5">
+                Removes it from this list only — the real record ({fmtDateTime(archiveTarget.createdAt)}, {fmtKESPrecise(archiveTarget.status === 'completed' ? archiveTarget.amount : archiveTarget.attemptedAmount)}) is kept, still counts toward the real sweep totals, and still appears in the CSV download. Nothing is deleted.
+              </p>
+              <div className="flex gap-3">
+                <button onClick={() => setArchiveTarget(null)} disabled={archiveBusy} className="flex-1 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40">Cancel</button>
+                <button onClick={confirmArchiveSweep} disabled={archiveBusy} className="flex-1 py-2.5 rounded-lg bg-on-surface text-surface-container-lowest text-sm font-semibold uppercase tracking-widest hover:opacity-90 disabled:opacity-50">
+                  {archiveBusy ? 'Clearing…' : 'Clear'}
                 </button>
               </div>
             </div>
