@@ -26,6 +26,7 @@ const NAV_SECTIONS = [
   {
     title: 'Financials & Compliance',
     items: [
+      { icon: 'verified_user',   label: 'KYC/KYB Verification',   path: '/kyc-verification'       },
       { icon: 'account_balance', label: 'Ledger',                 path: '/ledger'                 },
       { icon: 'point_of_sale',   label: 'STK Monitor',            path: '/stk-monitor'            },
       { icon: 'gavel',           label: 'Transaction Audit',      path: '/transaction-audit'      },

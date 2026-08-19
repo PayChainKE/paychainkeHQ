@@ -137,6 +137,22 @@ const RAW_STATUS_META = {
   failed:    { dot: 'bg-red-500',     text: 'text-red-700',     border: 'border-red-200',     bg: 'bg-red-50'     },
 };
 
+// Tailwind classes per REVENUE_STREAMS[].accent (config/revenueRateCard.js)
+// — one categorical slot per real revenue stream, stable regardless of
+// which streams happen to have nonzero revenue this period.
+const STREAM_ACCENT = {
+  emerald: { dot: 'bg-emerald-500', bar: 'bg-emerald-500', text: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200' },
+  pink:    { dot: 'bg-pink-500',    bar: 'bg-pink-500',    text: 'text-pink-700',    bg: 'bg-pink-50',    border: 'border-pink-200'    },
+  blue:    { dot: 'bg-blue-500',    bar: 'bg-blue-500',    text: 'text-blue-700',    bg: 'bg-blue-50',    border: 'border-blue-200'    },
+  amber:   { dot: 'bg-amber-500',   bar: 'bg-amber-500',   text: 'text-amber-700',   bg: 'bg-amber-50',   border: 'border-amber-200'   },
+  teal:    { dot: 'bg-teal-500',    bar: 'bg-teal-500',    text: 'text-teal-700',    bg: 'bg-teal-50',    border: 'border-teal-200'    },
+  rose:    { dot: 'bg-rose-500',    bar: 'bg-rose-500',    text: 'text-rose-700',    bg: 'bg-rose-50',    border: 'border-rose-200'    },
+  indigo:  { dot: 'bg-indigo-500',  bar: 'bg-indigo-500',  text: 'text-indigo-700',  bg: 'bg-indigo-50',  border: 'border-indigo-200'  },
+  sky:     { dot: 'bg-sky-500',     bar: 'bg-sky-500',     text: 'text-sky-700',     bg: 'bg-sky-50',     border: 'border-sky-200'     },
+  violet:  { dot: 'bg-violet-500',  bar: 'bg-violet-500',  text: 'text-violet-700',  bg: 'bg-violet-50',  border: 'border-violet-200'  },
+};
+const DEFAULT_STREAM_ACCENT = { dot: 'bg-slate-400', bar: 'bg-slate-400', text: 'text-slate-700', bg: 'bg-slate-50', border: 'border-slate-200' };
+
 // ── Time-series re-bucketing — daily series → weekly / monthly. ───────
 function rebucketSeries(series, granularity) {
   if (granularity === 'daily' || !series?.length) return series || [];
@@ -466,6 +482,27 @@ const Revenue = () => {
   const channels = data?.channels || [];
   const sweeps   = data?.sweepBatches || [];
   const series   = data?.series   || [];
+  const streams  = useMemo(
+    () => [...(data?.streams || [])].sort((a, b) => b.revenue - a.revenue),
+    [data]
+  );
+
+  // Real cash movement for the selected period — distinct from the fee
+  // economics above (Gross/Net/Take Rate). Money In is what was actually
+  // collected into the pooled FBO account (kpis.grossRevenue, already
+  // period-scoped); Money Out is what real RevenueSweep attempts (not the
+  // projected sweepBatches estimate) actually moved out of it into the
+  // corporate account within that same window — sourced from the full
+  // sweep log already loaded below, filtered to the period.
+  const moneyOut = useMemo(() => {
+    if (!data?.windowStart) return 0;
+    const since = new Date(data.windowStart).getTime();
+    return sweepHistory
+      .filter((s) => s.status === 'completed' && new Date(s.createdAt).getTime() >= since)
+      .reduce((sum, s) => sum + (s.amount || 0), 0);
+  }, [sweepHistory, data]);
+  const moneyIn = kpis.grossRevenue || 0;
+  const heldInFbo = Math.max(0, Math.round((moneyIn - moneyOut) * 100) / 100);
 
   // The backend's own bucket resolution already varies by range (hourly for
   // 24h, daily for 7d/30d, monthly for 90d/ytd/all — see
@@ -642,6 +679,42 @@ const Revenue = () => {
           </div>
         </section>
 
+        {/* ── A2. Cash Position — real money movement, not fee economics ── */}
+        <section>
+          <div className="flex items-end justify-between mb-4">
+            <div>
+              <h3 className="text-base font-bold text-on-surface tracking-tight font-headline">Cash Position — This Period</h3>
+              <p className="text-xs text-on-surface-variant mt-1">
+                What actually moved. Money In is fees collected into the pooled FBO account; Money Out is what real sweep attempts
+                (below) actually transferred to the corporate account in this window — not a projection.
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-outline-variant/40 border border-outline-variant/40 rounded-lg overflow-hidden">
+            <div className="bg-surface-container-lowest p-5 flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className="text-2xs font-bold text-on-surface-variant uppercase tracking-[0.18em]">Money In · Collected</span>
+                <span className="material-symbols-outlined text-emerald-600 text-sm" title="Fees collected into the pooled FBO account this period">south_west</span>
+              </div>
+              {loading ? <Skel className="w-28 h-8" /> : <span className="text-2xl font-bold text-on-surface tracking-tighter tabular-nums">{fmtKES(moneyIn)}</span>}
+            </div>
+            <div className="bg-surface-container-lowest p-5 flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className="text-2xs font-bold text-on-surface-variant uppercase tracking-[0.18em]">Money Out · Swept to Corporate</span>
+                <span className="material-symbols-outlined text-blue-600 text-sm" title="Real completed RevenueSweep transfers out of the FBO account this period">north_east</span>
+              </div>
+              {sweepHistoryLoading ? <Skel className="w-28 h-8" /> : <span className="text-2xl font-bold text-on-surface tracking-tighter tabular-nums">{fmtKES(moneyOut)}</span>}
+            </div>
+            <div className="bg-surface-container-lowest p-5 flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className="text-2xs font-bold text-on-surface-variant uppercase tracking-[0.18em]">Held in FBO · Unswept</span>
+                <span className="material-symbols-outlined text-on-surface-variant/60 text-sm" title="Collected but not yet swept out — Money In minus Money Out">account_balance</span>
+              </div>
+              {loading || sweepHistoryLoading ? <Skel className="w-28 h-8" /> : <span className="text-2xl font-bold text-on-surface tracking-tighter tabular-nums">{fmtKES(heldInFbo)}</span>}
+            </div>
+          </div>
+        </section>
+
         {/* ── B. Volume vs Net Revenue chart + Channel breakdown ─── */}
         <section className="grid grid-cols-1 xl:grid-cols-5 gap-4">
           {/* Chart */}
@@ -756,6 +829,68 @@ const Revenue = () => {
                       <div className="flex items-center justify-between mt-2 text-2xs text-on-surface-variant tabular-nums">
                         <span>Gross {fmtKES(c.gross)}</span>
                         <span>Costs −{fmtKES(c.costs)}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* ── B2. Revenue Streams — every real channel PayChain earns on ── */}
+        <section>
+          <div className="flex items-end justify-between mb-4">
+            <div>
+              <h3 className="text-base font-bold text-on-surface tracking-tight font-headline">Revenue Streams</h3>
+              <p className="text-xs text-on-surface-variant mt-1">
+                Every fee PayChain earns, by source — computed from the same persisted per-transaction fee this KPI strip reconciles to
+                (config/revenueRateCard.js is the single rate-card source of truth). "Pilot" streams are priced but not yet wired to a real charge.
+              </p>
+            </div>
+          </div>
+          <div className="bg-surface-container-lowest border border-outline-variant/40 rounded-lg overflow-hidden">
+            {loading ? (
+              <div className="p-8"><Skel className="w-full h-40" /></div>
+            ) : streams.length === 0 ? (
+              <div className="p-12 text-center text-on-surface-variant text-xs">No revenue streams configured.</div>
+            ) : (
+              <div className="divide-y divide-outline-variant/40">
+                {streams.map((s) => {
+                  const accent = STREAM_ACCENT[s.accent] || DEFAULT_STREAM_ACCENT;
+                  const maxRevenue = Math.max(...streams.map((x) => x.revenue), 1);
+                  const pct = (s.revenue / maxRevenue) * 100;
+                  return (
+                    <div key={s.id} className="p-4 md:p-5">
+                      <div className="flex items-start justify-between gap-3 mb-2">
+                        <div className="flex items-start gap-3 min-w-0">
+                          <span className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${accent.bg}`}>
+                            <span className={`material-symbols-outlined text-lg ${accent.text}`}>{s.icon || 'category'}</span>
+                          </span>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-bold text-on-surface">{s.label}</span>
+                              {s.pilot && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded border border-outline-variant/40 text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">Pilot</span>
+                              )}
+                              {s.tiered && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded border border-outline-variant/40 text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">Tiered</span>
+                              )}
+                            </div>
+                            <p className="text-2xs text-on-surface-variant mt-1 leading-relaxed max-w-2xl">{s.description}</p>
+                            <p className="text-2xs text-on-surface-variant/70 mt-1 tabular-nums">{fmtNum(s.count)} txns · Volume {fmtKES(s.volume)}</p>
+                          </div>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <div className="text-sm font-bold text-on-surface tabular-nums">{fmtKESPrecise(s.revenue)}</div>
+                          <div className="flex items-center justify-end gap-1.5 text-2xs tabular-nums mt-0.5">
+                            <span className={`font-bold ${(s.change || 0) >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{fmtChange(s.change)}</span>
+                            <span className="text-on-surface-variant">· {fmtPct(s.share, 1)} of total</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="h-1 bg-surface-container/70 rounded-full overflow-hidden ml-12">
+                        <div className={`h-full transition-all duration-500 ${accent.bar}`} style={{ width: `${pct}%` }} />
                       </div>
                     </div>
                   );
