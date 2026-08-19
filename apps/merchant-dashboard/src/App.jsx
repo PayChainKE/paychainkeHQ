@@ -8,6 +8,7 @@ import SetupPassword from './pages/SetupPassword'
 import Overview from './pages/Overview'
 import Transactions from './pages/Transactions'
 import BulkPay from './pages/BulkPay'
+import Invoices from './pages/Invoices'
 import InflationShield from './pages/InflationShield'
 import CashAdvance from './pages/CashAdvance'
 import Profile from './pages/Profile'
@@ -82,6 +83,7 @@ export default function App(){
             <Route path="/overview" element={<Protected><Overview/></Protected>} />
             <Route path="/transactions" element={<Protected><Transactions/></Protected>} />
             <Route path="/bulk-pay" element={<Protected><BulkPay/></Protected>} />
+            <Route path="/invoices" element={<Protected><Invoices/></Protected>} />
             <Route path="/inflation-shield" element={<Protected><FeatureGuard featureName="inflationShield"><InflationShield/></FeatureGuard></Protected>} />
             <Route path="/cash-advance" element={<Protected><CashAdvance/></Protected>} />
             <Route path="/accounts" element={<Protected><MyAccounts/></Protected>} />

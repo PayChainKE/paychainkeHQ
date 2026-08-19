@@ -12,6 +12,7 @@ const baseNavItems = [
   { name: 'Overview', icon: 'dashboard', path: '/overview' },
   { name: 'Transactions', icon: 'receipt_long', path: '/transactions' },
   { name: 'Bulk Payments', icon: 'group_add', path: '/bulk-pay' },
+  { name: 'Invoices', icon: 'receipt_long', path: '/invoices' },
   { 
     name: 'Digital Wallet', 
     icon: 'account_balance_wallet', 
