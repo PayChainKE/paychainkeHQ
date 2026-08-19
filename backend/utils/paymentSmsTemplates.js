@@ -82,21 +82,18 @@ export function buildPaymentRequestSms({ businessName, baseAmount, fee }) {
   const showFee = fee > 0;
   return buildStrictSms(
     ({ name, amt, feeLine, total }) =>
-      `${name} is requesting Ksh ${amt} via PayChain.${feeLine} You'll get an M-PESA prompt for Ksh ${total} shortly — enter your PIN to pay.`,
+      `${name} is requesting Ksh ${amt} via PayChain.${feeLine} You'll get an M-PESA prompt for Ksh ${total} shortly, enter your PIN to pay.`,
     {
       fixed: {
+        // Fixed (not truncatable) — the business name must always show in
+        // full, even if that pushes the message past one GSM-7 segment;
+        // safeSendSMS's hard-truncate backstop is still the last resort if
+        // it ever does.
+        name: businessName || 'A PayChain business',
         amt: formatKes(baseAmount),
-        // Deliberately no fee figure here — a specific KES amount reads as
-        // a surprise/hidden cost even though it's small, whereas "small
-        // transaction fee" sets the same honest expectation (the total
-        // below is still exact) without drawing attention to the number
-        // itself. The exact fee is still shown in full wherever the
-        // merchant/customer is looking at a screen, not just an SMS —
-        // see checkout-preview in transactionController.js.
-        feeLine: showFee ? ' Includes a small transaction fee.' : '',
+        feeLine: showFee ? ` Transaction cost, Ksh ${formatKes(fee)}.` : '',
         total: formatKes(total),
       },
-      truncatable: [{ key: 'name', value: businessName || 'A PayChain business', minLength: 6 }],
     }
   );
 }
