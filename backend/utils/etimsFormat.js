@@ -63,6 +63,13 @@ export function paymentMethodToKraCode(paymentMethod) {
   return PAYMENT_METHOD_TO_KRA_CODE[paymentMethod] || PAYMENT_METHOD_TO_KRA_CODE.other;
 }
 
+// Human-readable label for a KRA pmtTyCd — TIS spec item 3.k requires
+// "means of payment" appear on the receipt itself, not just be stored.
+const PMT_TY_LABELS = { '01': 'Cash', '02': 'Credit', '03': 'Cash/Credit', '04': 'Bank Cheque', '05': 'Card', '06': 'Mobile Money', '07': 'Other' };
+export function pmtTyCdLabel(pmtTyCd) {
+  return PMT_TY_LABELS[pmtTyCd] || 'Other';
+}
+
 export const TAX_TYPE_CODES = ['A', 'B', 'C', 'D', 'E'];
 
 // Short display labels for each tax type code — shared by every place that

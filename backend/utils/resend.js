@@ -2,6 +2,7 @@ import { Resend } from 'resend';
 import dotenv from 'dotenv';
 import { formatAccountNumberDisplay } from './ncbaValidators.js';
 import { generateMerchantStickerPdf } from './stickerGenerator.js';
+import { kraLogoDataUri } from './kraLogo.js';
 
 dotenv.config();
 
@@ -1184,6 +1185,7 @@ export const sendInvoiceEmail = async ({
     // whenever this invoice was actually signed by KRA.
     const kraBlockHTML = kraSigned ? `
       <div style="border: 2px solid #06201B; border-radius: 10px; padding: 20px 24px; margin-bottom: 30px;">
+        ${kraLogoDataUri() ? `<div style="text-align:center;margin-bottom:8px;"><img src="${kraLogoDataUri()}" alt="KRA" width="40" height="38" /></div>` : ''}
         <div style="text-align:center;font-size:11px;font-weight:800;letter-spacing:2px;color:#06201B;margin-bottom:14px;">KRA ELECTRONIC TAX INVOICE</div>
         <table style="width:100%;font-size:12px;color:#334155;border-collapse:collapse;margin-bottom:12px;">
           <tr><td style="padding:2px 0;">Trader</td><td style="text-align:right;font-weight:700;">${escapeHtml(trader?.name || businessName)}</td></tr>
@@ -1191,6 +1193,8 @@ export const sendInvoiceEmail = async ({
           ${trader?.address ? `<tr><td style="padding:2px 0;">Address</td><td style="text-align:right;">${escapeHtml(trader.address)}</td></tr>` : ''}
           <tr><td style="padding:2px 0;">CU Invoice No.</td><td style="text-align:right;font-weight:700;">${escapeHtml(etims.cuInvoiceNumber)}</td></tr>
           <tr><td style="padding:2px 0;">Items</td><td style="text-align:right;">${etims.totItemCnt ?? items.length}</td></tr>
+          <tr><td style="padding:2px 0;">Means of Payment</td><td style="text-align:right;">${escapeHtml(etims.pmtTyLabel || 'Other')}</td></tr>
+          ${etims.signedAt ? `<tr><td style="padding:2px 0;">Signed</td><td style="text-align:right;">${escapeHtml(new Date(etims.signedAt).toLocaleString('en-KE', { dateStyle: 'medium', timeStyle: 'medium' }))}</td></tr>` : ''}
         </table>
         ${(etims.taxBreakdown || []).length ? `
         <table style="width:100%;font-size:11px;color:#475569;border-collapse:collapse;margin-bottom:12px;border-top:1px dashed #cbd5e1;padding-top:6px;">

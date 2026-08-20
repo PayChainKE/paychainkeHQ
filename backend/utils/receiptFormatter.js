@@ -1,4 +1,5 @@
 import { hyphenateEvery4, money2dpString, TAX_TYPE_CODES, TAX_LABELS } from './etimsFormat.js';
+import { kraLogoDataUri } from './kraLogo.js';
 
 function formatDisplayDateTime(date) {
   const d = new Date(date);
@@ -97,7 +98,9 @@ export function renderReceiptHtml(invoice, merchant) {
   return `
 <div style="width:302px;font-family:'Courier New',monospace;font-size:12px;color:#111;padding:12px;background:#fff;">
   <div style="text-align:center;margin-bottom:8px;">
-    <div style="width:48px;height:48px;margin:0 auto 4px;border:2px solid #111;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:10px;">KRA</div>
+    ${kraLogoDataUri()
+      ? `<img src="${kraLogoDataUri()}" alt="KRA" width="48" height="46" style="display:block;margin:0 auto 4px;" />`
+      : `<div style="width:48px;height:48px;margin:0 auto 4px;border:2px solid #111;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:10px;">KRA</div>`}
     <div style="font-weight:bold;font-size:14px;">${escapeHtml(r.trader.name)}</div>
     <div>${escapeHtml(r.trader.address)}</div>
     <div>PIN: ${escapeHtml(r.trader.pin)}</div>

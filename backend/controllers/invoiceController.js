@@ -5,7 +5,7 @@ import Merchant from '../models/Merchant.js';
 import Counter from '../models/Counter.js';
 import { sendInvoiceEmail } from '../utils/resend.js';
 import { generateQrDataUri } from '../utils/qrCode.js';
-import { TAX_TYPE_CODES, TAX_LABELS, money2dpString } from '../utils/etimsFormat.js';
+import { TAX_TYPE_CODES, TAX_LABELS, money2dpString, pmtTyCdLabel } from '../utils/etimsFormat.js';
 import {
   createNormalSale,
   ensureEtimsDevice,
@@ -109,6 +109,7 @@ export function serializeEtims(inv) {
     signedAt: etims.updatedAt,
     totItemCnt: etims.totItemCnt,
     pmtTyCd: etims.pmtTyCd,
+    pmtTyLabel: pmtTyCdLabel(etims.pmtTyCd),
     taxBreakdown: taxBreakdownFor(etims),
     totTaxblAmt: money2dpString(etims.totTaxblAmt),
     totTaxAmt: money2dpString(etims.totTaxAmt),
