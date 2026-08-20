@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 import Topbar from "./Topbar";
 import Sidebar from "./Sidebar";
 import PageNav from "./PageNav";
+import Footer from "./Footer";
 
 interface TocEntry {
   id: string;
@@ -88,6 +89,7 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
           </aside>
         )}
       </div>
+      <Footer />
     </div>
   );
 }

@@ -37,6 +37,23 @@ const developerPaymentSchema = new mongoose.Schema({
   // sweep) actually resolves it. Same matching idiom as linkedStkCheckoutId
   // above, just for a different async rail.
   linkedPayoutReference: { type: String, default: null },
+  // Only set for a payout created via POST /bulk-payments (developerBulkPayController.js)
+  // — groups every row from the same batch request together for
+  // GET /bulk-payments/:batchId. A single POST /payments/payout leaves this null.
+  batchId: { type: String, default: null, index: true },
+  // 'employee' rows are priced as gross payroll (see grossAmount/taxDeductions
+  // below) and PAYE/NSSF/SHIF-deducted the same way bulkPayController.js's
+  // authorizeBatch does for the merchant dashboard's own Bulk Pay — `amount`
+  // above is always the real net amount actually paid, same meaning it has
+  // everywhere else in this model. 'contract' rows pay `amount` as-is, no
+  // tax withheld (a vendor/supplier settlement, not payroll).
+  payeeType: { type: String, enum: ['employee', 'contract'], default: 'contract' },
+  grossAmount: { type: Number, default: null },
+  taxDeductions: {
+    paye: { type: Number, default: null },
+    nssf: { type: Number, default: null },
+    shif: { type: Number, default: null },
+  },
 }, {
   timestamps: true,
 });

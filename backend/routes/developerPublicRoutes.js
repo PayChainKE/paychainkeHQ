@@ -11,6 +11,16 @@ import {
   createCheckoutSession,
   getCheckoutSession,
 } from '../controllers/developerCheckoutController.js';
+import {
+  createDeveloperInvoice,
+  sendDeveloperInvoice,
+  getDeveloperInvoice,
+  listDeveloperInvoices,
+} from '../controllers/developerInvoiceController.js';
+import {
+  createDeveloperBulkPayment,
+  getDeveloperBulkPaymentBatch,
+} from '../controllers/developerBulkPayController.js';
 
 const router = express.Router();
 
@@ -46,5 +56,19 @@ router.get('/payments/:id', publicApiLimiter, authenticateApiKey, getPaymentStat
 // /api/public/checkout, see publicCheckoutRoutes.js).
 router.post('/checkout', paymentLimiter, authenticateApiKey, createCheckoutSession);
 router.get('/checkout/:id', publicApiLimiter, authenticateApiKey, getCheckoutSession);
+
+// Invoices — create/send a real, payable invoice. Not money-moving at
+// creation time (only the customer actually paying it is), so these share
+// the lighter publicApiLimiter rather than paymentLimiter.
+router.post('/invoices', publicApiLimiter, authenticateApiKey, createDeveloperInvoice);
+router.get('/invoices', publicApiLimiter, authenticateApiKey, listDeveloperInvoices);
+router.get('/invoices/:id', publicApiLimiter, authenticateApiKey, getDeveloperInvoice);
+router.post('/invoices/:id/send', paymentLimiter, authenticateApiKey, sendDeveloperInvoice);
+
+// Bulk payments — many payouts (payroll and/or contract/vendor
+// settlements) in one call. Real money movement, so it shares
+// paymentLimiter same as a single payout.
+router.post('/bulk-payments', paymentLimiter, authenticateApiKey, createDeveloperBulkPayment);
+router.get('/bulk-payments/:batchId', publicApiLimiter, authenticateApiKey, getDeveloperBulkPaymentBatch);
 
 export default router;

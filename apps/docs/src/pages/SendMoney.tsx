@@ -1,163 +1,27 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import Endpoint from "@/components/Endpoint";
 import CodeBlock from "@/components/CodeBlock";
 import CodeGroup from "@/components/CodeGroup";
 import Callout from "@/components/Callout";
 import ParamsTable from "@/components/ParamsTable";
 
-export default function Payments() {
+export default function SendMoney() {
   return (
     <>
-      <h1 className="text-3xl font-extrabold text-ink tracking-tight mb-4">Payments</h1>
+      <h1 className="text-3xl font-extrabold text-ink tracking-tight mb-4">Send Money</h1>
       <p>
-        Three endpoints: trigger a collection, send a payout, and check on either. Base path{" "}
+        Pay out from your linked merchant's wallet to a bank account, an M-Pesa/Airtel Money
+        number, a Paybill, or a Till (Buy Goods) — the same rails the merchant dashboard's own
+        "Send Money" already uses. Base path{" "}
         <code>https://api.paychain.co.ke/api/v1/developer</code>.
       </p>
 
-      <Callout variant="tip" title="Idempotency-Key is required on every write">
-        Generate one unique value per logical attempt (a UUID is fine) and send it as the{" "}
-        <code>Idempotency-Key</code> header. Retry with the <em>same</em> key after a timeout or
-        network error and you'll get the original payment back (<code>replayed: true</code>)
-        instead of a duplicate charge.
+      <Callout variant="tip" title="Paying more than one destination at once?">
+        Use <Link to="/bulk-payments">Bulk Payments</Link> instead — payroll, contractors, or
+        vendors, all in a single call, with a single PIN entry and a per-row result.
       </Callout>
 
-      <h2>Collect a payment</h2>
-      <p>Sends an STK push to a customer's phone. Money lands in your linked merchant's wallet.</p>
-      <Endpoint method="POST" path="/payments/collect" auth="API key" />
-
-      <ParamsTable
-        params={[
-          { name: "amount", type: "number", required: true, description: "Amount in KES, rounded up to the nearest shilling." },
-          { name: "phone", type: "string", required: true, description: "A Kenyan phone number, any common format (0712345678, 254712345678, +254712345678)." },
-          { name: "reference", type: "string", description: "Your own identifier: a CRM contact ID, an ISP subscriber account number. Echoed back on the payment object and every webhook event for it, so you can match without a lookup." },
-        ]}
-      />
-
-      <CodeGroup
-        tabs={[
-          {
-            id: "curl", label: "cURL", lang: "bash", code: `
-curl -X POST https://api.paychain.co.ke/api/v1/developer/payments/collect \\
-  -H "Authorization: Bearer pc_live_..." \\
-  -H "Idempotency-Key: 8f14e45f-...-4321" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "amount": 500,
-    "phone": "0712345678",
-    "reference": "subscriber-4821"
-  }'`,
-          },
-          {
-            id: "node", label: "Node.js", lang: "js", code: `
-const res = await fetch('https://api.paychain.co.ke/api/v1/developer/payments/collect', {
-  method: 'POST',
-  headers: {
-    'Authorization': 'Bearer pc_live_...',
-    'Idempotency-Key': '8f14e45f-...-4321',
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({
-    amount: 500,
-    phone: '0712345678',
-    reference: 'subscriber-4821',
-  }),
-});
-
-const { payment } = await res.json();
-console.log(payment.status); // "pending"`,
-          },
-          {
-            id: "python", label: "Python", lang: "python", code: `
-import requests
-
-res = requests.post(
-    'https://api.paychain.co.ke/api/v1/developer/payments/collect',
-    headers={
-        'Authorization': 'Bearer pc_live_...',
-        'Idempotency-Key': '8f14e45f-...-4321',
-    },
-    json={
-        'amount': 500,
-        'phone': '0712345678',
-        'reference': 'subscriber-4821',
-    },
-)
-
-payment = res.json()['payment']
-print(payment['status'])  # "pending"`,
-          },
-          {
-            id: "php", label: "PHP", lang: "php", code: `
-$ch = curl_init('https://api.paychain.co.ke/api/v1/developer/payments/collect');
-curl_setopt_array($ch, [
-    CURLOPT_POST => true,
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_HTTPHEADER => [
-        'Authorization: Bearer pc_live_...',
-        'Idempotency-Key: 8f14e45f-...-4321',
-        'Content-Type: application/json',
-    ],
-    CURLOPT_POSTFIELDS => json_encode([
-        'amount' => 500,
-        'phone' => '0712345678',
-        'reference' => 'subscriber-4821',
-    ]),
-]);
-
-$payment = json_decode(curl_exec($ch), true)['payment'];
-echo $payment['status']; // "pending"`,
-          },
-          {
-            id: "ruby", label: "Ruby", lang: "ruby", code: `
-require 'net/http'
-require 'json'
-
-uri = URI('https://api.paychain.co.ke/api/v1/developer/payments/collect')
-req = Net::HTTP::Post.new(uri, {
-  'Authorization' => 'Bearer pc_live_...',
-  'Idempotency-Key' => '8f14e45f-...-4321',
-  'Content-Type' => 'application/json',
-})
-req.body = { amount: 500, phone: '0712345678', reference: 'subscriber-4821' }.to_json
-
-res = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) { |http| http.request(req) }
-payment = JSON.parse(res.body)['payment']
-puts payment['status'] # "pending"`,
-          },
-        ]}
-        className="mb-4"
-      />
-      <CodeBlock
-        lang="json"
-        label="Response · 201"
-        code={`{
-  "success": true,
-  "payment": {
-    "id": "65f3a1e2c9d4e1a2b3c4d5e6",
-    "mode": "live",
-    "kind": "collect",
-    "amount": 500,
-    "currency": "KES",
-    "status": "pending",
-    "reference": "subscriber-4821",
-    "counterparty": { "phone": "254712345678" },
-    "createdAt": "2026-08-16T09:00:00.000Z",
-    "updatedAt": "2026-08-16T09:00:00.000Z"
-  }
-}`}
-      />
-      <p>
-        <code>status</code> starts <code>pending</code> and resolves asynchronously once the
-        customer responds to the prompt. Don't poll in a tight loop for this. Subscribe a{" "}
-        <a href="/webhooks">webhook</a> instead.
-      </p>
-
-      <h2>Pay out</h2>
-      <p>
-        Sends money from your linked merchant's wallet to a bank account, an M-Pesa/Airtel Money
-        number, a Paybill, or a Till (Buy Goods): the same rails the merchant dashboard's own
-        "Send Money" already uses.
-      </p>
       <Endpoint method="POST" path="/payments/payout" auth="API key" />
 
       <ParamsTable
@@ -296,9 +160,9 @@ payment = JSON.parse(res.body)['payment']`,
         A live bank payout's outcome is known before the response is sent: you'll get back{" "}
         <code>status: "success"</code> or a <code>402</code> with the failure reason immediately.
         Mobile money, Paybill, and Till only confirm PayChain <em>submitted</em> the payout in that
-        same response (<code>status: "pending"</code>). The actual outcome lands slightly later,
-        the same asynchronous way a collect does. Subscribe a{" "}
-        <a href="/webhooks">webhook</a> rather than assuming a 201 means the money arrived.
+        same response (<code>status: "pending"</code>). The actual outcome lands slightly later.
+        Subscribe a <Link to="/webhooks">webhook</Link> rather than assuming a 201 means the money
+        arrived.
       </Callout>
 
       <h3>Other destinations</h3>
@@ -354,70 +218,26 @@ payment = JSON.parse(res.body)['payment']`,
         <code>{`{ paybillNumber, accountReference }`}</code>, or <code>{`{ tillNumber }`}</code>.
       </p>
 
-      <h2>Check a payment's status</h2>
+      <h2>Check a payout's status</h2>
       <Endpoint method="GET" path="/payments/:id" auth="API key" />
-      <CodeGroup
-        tabs={[
-          {
-            id: "curl", label: "cURL", lang: "bash", code: `
-curl https://api.paychain.co.ke/api/v1/developer/payments/65f3a1e2c9d4e1a2b3c4d5e6 \\
-  -H "Authorization: Bearer pc_live_..."`,
-          },
-          {
-            id: "node", label: "Node.js", lang: "js", code: `
-const res = await fetch('https://api.paychain.co.ke/api/v1/developer/payments/65f3a1e2c9d4e1a2b3c4d5e6', {
-  headers: { 'Authorization': 'Bearer pc_live_...' },
-});
-
-const { payment } = await res.json();`,
-          },
-          {
-            id: "python", label: "Python", lang: "python", code: `
-import requests
-
-res = requests.get(
-    'https://api.paychain.co.ke/api/v1/developer/payments/65f3a1e2c9d4e1a2b3c4d5e6',
-    headers={'Authorization': 'Bearer pc_live_...'},
-)
-
-payment = res.json()['payment']`,
-          },
-          {
-            id: "php", label: "PHP", lang: "php", code: `
-$ch = curl_init('https://api.paychain.co.ke/api/v1/developer/payments/65f3a1e2c9d4e1a2b3c4d5e6');
-curl_setopt_array($ch, [
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_HTTPHEADER => ['Authorization: Bearer pc_live_...'],
-]);
-
-$payment = json_decode(curl_exec($ch), true)['payment'];`,
-          },
-          {
-            id: "ruby", label: "Ruby", lang: "ruby", code: `
-require 'net/http'
-require 'json'
-
-uri = URI('https://api.paychain.co.ke/api/v1/developer/payments/65f3a1e2c9d4e1a2b3c4d5e6')
-req = Net::HTTP::Get.new(uri, { 'Authorization' => 'Bearer pc_live_...' })
-
-res = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) { |http| http.request(req) }
-payment = JSON.parse(res.body)['payment']`,
-          },
-        ]}
+      <CodeBlock
+        lang="bash"
+        label="Request"
+        code={`curl https://api.paychain.co.ke/api/v1/developer/payments/65f3a1e2c9d4e1a2b3c4d5e6 \\
+  -H "Authorization: Bearer pc_live_..."`}
       />
-      <p>Returns the same payment object shape shown above, with whatever <code>status</code> currently applies. This is a safe fallback to poll, but a webhook subscription is the faster, cheaper way to find out.</p>
+      <p>Returns the same payment object shape as a collect, with whatever <code>status</code> currently applies.</p>
 
       <h2>The payment object</h2>
       <ParamsTable
         params={[
           { name: "id", type: "string", description: "This payment's unique ID." },
           { name: "mode", type: "\"test\" | \"live\"", description: "Which key created it." },
-          { name: "kind", type: "\"collect\" | \"payout\"", description: "" },
+          { name: "kind", type: "\"payout\"", description: "" },
           { name: "amount", type: "number", description: "In KES." },
           { name: "status", type: "\"pending\" | \"success\" | \"failed\"", description: "" },
           { name: "failureReason", type: "string | null", description: "Human-readable, present only when status is \"failed\"." },
-          { name: "reference", type: "string | null", description: "Whatever you passed at creation." },
-          { name: "counterparty", type: "object", description: "{ phone } for a collect. For a payout: { bankCode, accountNumber, accountName }, { phone, network }, { paybillNumber, accountReference }, or { tillNumber }, matching whichever destination you sent." },
+          { name: "counterparty", type: "object", description: "{ bankCode, accountNumber, accountName }, { phone, network }, { paybillNumber, accountReference }, or { tillNumber }, matching whichever destination you sent." },
         ]}
       />
     </>

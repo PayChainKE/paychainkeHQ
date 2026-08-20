@@ -3,6 +3,12 @@ import Merchant from '../models/Merchant.js';
 import { initiateCollectPayment, CollectValidationError } from '../services/developerCollectService.js';
 import { DuplicateSubmissionError } from '../utils/idempotencyGuard.js';
 import { isCheckoutSessionExpired, syncCheckoutSessionStatus } from '../services/checkoutSessionService.js';
+import { generateBrandedQrDataUri } from '../utils/qrCode.js';
+
+// Same convention as developerCheckoutController.js's CHECKOUT_BASE_URL —
+// kept as a separate constant rather than a shared import so this public,
+// unauthenticated controller has zero coupling to the API-key-gated one.
+const CHECKOUT_BASE_URL = process.env.CHECKOUT_BASE_URL || 'https://checkout.paychain.co.ke';
 
 // @desc    Public-safe checkout session details, for rendering the hosted
 //          payment page. No API key involved — the session id itself is
@@ -16,6 +22,7 @@ export const getPublicCheckoutSession = async (req, res) => {
     if (!session) return res.status(404).json({ error: 'Checkout link not found or no longer valid.' });
 
     const merchant = await Merchant.findById(session.merchantId).select('businessName');
+    const checkoutUrl = `${CHECKOUT_BASE_URL}/pay/${session._id}`;
 
     res.json({
       success: true,
@@ -29,6 +36,11 @@ export const getPublicCheckoutSession = async (req, res) => {
         status: isCheckoutSessionExpired(session) ? 'expired' : session.status,
         merchantName: merchant?.businessName || 'PayChain Merchant',
         prefillPhone: session.customer?.phone || null,
+        // Encodes this exact page's own URL — lets a merchant display this
+        // page on a desktop/kiosk screen and have the customer scan with
+        // their own phone camera to open the identical payment page there,
+        // rather than typing their M-Pesa number into a shared device.
+        qrCodeDataUri: await generateBrandedQrDataUri(checkoutUrl),
       },
     });
   } catch (error) {

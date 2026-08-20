@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { ShieldCheck, Loader2, CheckCircle2, XCircle, Clock, Smartphone } from "lucide-react";
+import { ShieldCheck, Loader2, CheckCircle2, XCircle, Clock, Smartphone, QrCode } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { fetchCheckoutSession, payCheckoutSession, fetchCheckoutStatus, CheckoutSession } from "@/lib/api";
 
@@ -20,6 +20,7 @@ export default function Pay() {
   const [phone, setPhone] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [showQr, setShowQr] = useState(false);
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -188,6 +189,39 @@ export default function Pay() {
                   {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Smartphone className="w-4 h-4" />}
                   {submitting ? "Sending prompt…" : `Pay ${formatKes(session.amount)}`}
                 </button>
+
+                {session.qrCodeDataUri && (
+                  <div className="mt-5 pt-4 border-t border-border-subtle">
+                    {showQr ? (
+                      <div className="flex flex-col items-center">
+                        <img
+                          src={session.qrCodeDataUri}
+                          alt="Scan to open this payment page on your phone"
+                          className="w-36 h-36 rounded-lg border border-border p-1.5 bg-white"
+                        />
+                        <p className="text-[11.5px] text-ink-faint text-center mt-2.5 max-w-[220px]">
+                          Scan with your phone's camera to open this same payment page there
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setShowQr(false)}
+                          className="text-[11.5px] font-semibold text-ink-faint hover:text-ink-muted mt-2 transition-colors"
+                        >
+                          Hide QR code
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setShowQr(true)}
+                        className="w-full flex items-center justify-center gap-1.5 text-[12.5px] font-semibold text-ink-faint hover:text-ink-muted transition-colors"
+                      >
+                        <QrCode className="w-3.5 h-3.5" />
+                        On a shared or public screen? Scan with your phone instead
+                      </button>
+                    )}
+                  </div>
+                )}
               </form>
             </>
           )}

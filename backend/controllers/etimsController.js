@@ -31,6 +31,40 @@ function serializeInvoice(invoice) {
   };
 }
 
+// GET /api/v1/etims/config — whether this merchant has (or will silently
+// get, on their next invoice send) an active eTIMS device for the default
+// branch ("00"). Non-sensitive summary only, no cmcKey. There's no
+// merchant-facing "enable eTIMS" action — invoiceController.fiscalizeWithEtims
+// auto-activates a device the moment it's needed — so `eligible` (a
+// plausible-format KRA PIN on file) is what the dashboard uses to decide
+// whether to show KRA-specific invoice fields, not `isInitialized`: a
+// merchant needs to be able to fill in item classification codes on their
+// very first invoice, before any send has had the chance to activate
+// anything. The ~99% of merchants with no KRA PIN never see these fields.
+export async function getConfig(req, res) {
+  try {
+    const { bhfId = '00' } = req.query;
+    const merchant = req.merchant;
+    const eligible = !!(merchant.kraPin && merchant.isKRAVerified);
+    const config = await EtimsConfig.findOne({ merchantId: merchant._id, bhfId });
+    if (!config || !config.isInitialized) {
+      return res.json({ success: true, eligible, isInitialized: false });
+    }
+    return res.json({
+      success: true,
+      eligible,
+      isInitialized: true,
+      tin: config.tin,
+      bhfId: config.bhfId,
+      environment: config.environment,
+      initializedAt: config.initializedAt,
+    });
+  } catch (err) {
+    console.error('etims.getConfig failed:', err);
+    return res.status(500).json({ success: false, error: 'Failed to fetch eTIMS status' });
+  }
+}
+
 // POST /api/v1/etims/init — device handshake + cmcKey registration.
 export async function initDevice(req, res) {
   try {
@@ -141,7 +175,7 @@ export async function signInvoice(req, res) {
 // POST /api/v1/etims/invoices/credit-note — issues a fiscal credit note.
 export async function issueCreditNote(req, res) {
   try {
-    const { originalInvoiceId, refundReason, refundItems } = req.body || {};
+    const { originalInvoiceId, refundReason, refundItems, refundReasonCode } = req.body || {};
     if (!originalInvoiceId) return res.status(400).json({ success: false, error: 'originalInvoiceId is required' });
 
     const original = await EtimsInvoice.findById(originalInvoiceId);
@@ -149,7 +183,7 @@ export async function issueCreditNote(req, res) {
       return res.status(404).json({ success: false, error: 'Original invoice not found' });
     }
 
-    const creditNote = await createCreditNote(originalInvoiceId, refundReason, refundItems);
+    const creditNote = await createCreditNote(originalInvoiceId, refundReason, refundItems, refundReasonCode);
     const signed = creditNote.status === 'signed';
     return res.status(signed ? 201 : 502).json({ success: signed, invoice: serializeInvoice(creditNote) });
   } catch (err) {

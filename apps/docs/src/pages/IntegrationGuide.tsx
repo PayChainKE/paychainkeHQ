@@ -77,8 +77,8 @@ export default function IntegrationGuide() {
       <p>
         In other words: you can build and fully exercise your entire integration (collect, payout,
         webhook delivery, retry handling, idempotency replay) without ever touching live access.
-        Full parameter reference on the <Link to="/payments">Payments</Link> and{" "}
-        <Link to="/webhooks">Webhooks</Link> pages.
+        Full parameter reference on the <Link to="/payment-collection">Payment Collection</Link>,{" "}
+        <Link to="/send-money">Send Money</Link>, and <Link to="/webhooks">Webhooks</Link> pages.
       </p>
 
       <h2>The full path, step by step</h2>
@@ -134,8 +134,8 @@ curl -X POST https://api.paychain.co.ke/api/auth/developer/verify-otp \\
       <h3>4. Build against it</h3>
       <p className="text-[13.5px] text-ink-muted leading-6 mb-6">
         Collect, payout, register a webhook, verify signatures, handle retries: all fully
-        simulated, zero real money. See <Link to="/payments">Payments</Link> and{" "}
-        <Link to="/webhooks">Webhooks</Link> for the full reference.
+        simulated, zero real money. See <Link to="/payment-collection">Payment Collection</Link>,{" "}
+        <Link to="/send-money">Send Money</Link>, and <Link to="/webhooks">Webhooks</Link> for the full reference.
       </p>
 
       <h3>5. Request live access</h3>

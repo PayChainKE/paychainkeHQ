@@ -115,9 +115,9 @@ export const collectPayment = async (req, res) => {
 // this is deliberately a validation error, not a silent "first one wins",
 // since a caller who accidentally sends both a phone and a bankCode almost
 // certainly made a mistake worth surfacing rather than guessing past.
-class PayoutDestinationError extends Error {}
+export class PayoutDestinationError extends Error {}
 
-function parsePayoutDestination(body) {
+export function parsePayoutDestination(body) {
   const { bankCode, accountNumber, accountName, phone, mobileNetwork, paybillNumber, tillNumber, accountReference } = body || {};
 
   const provided = [];

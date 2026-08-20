@@ -1,12 +1,68 @@
 import EtimsConfig from '../models/EtimsConfig.js';
 import EtimsInvoice from '../models/EtimsInvoice.js';
 import Merchant from '../models/Merchant.js';
-import { saveSalesTransaction, getCmcKeyPlain, EtimsApiError, EtimsConfigError } from './etimsClient.js';
+import { saveSalesTransaction, initializeDevice, getCmcKeyPlain, EtimsApiError, EtimsConfigError } from './etimsClient.js';
 import { generateQrDataUri } from '../utils/qrCode.js';
+import { encryptKey } from '../utils/cryptoHelper.js';
+import { isValidKraPin } from '../utils/kraPinValidator.js';
 import {
   money2dp, hyphenateEvery4, buildQrVerificationUrl,
-  formatKraDate, formatKraDateTime, paymentMethodToKraCode, TAX_RATES, TAX_TYPE_CODES,
+  formatKraDate, formatKraDateTime, paymentMethodToKraCode, TAX_RATES, TAX_RATE_PERCENT, TAX_TYPE_CODES,
+  DEFAULT_REFUND_REASON_CODE,
 } from '../utils/etimsFormat.js';
+
+// A PayChain merchant never registers a physical/virtual "device" with
+// KRA themselves — OSCU has no real hardware to name, so PayChain (as the
+// Trader Invoicing System) mints a stable, deterministic device identity on
+// their behalf. No merchant-facing field, ever.
+const AUTO_DEVICE_SERIAL = (merchantId, bhfId) => `PAYCHAIN-${bhfId}-${merchantId}`;
+
+// How long to back off after a failed auto-activation attempt before
+// trying again. A merchant with a KRA-PIN on file but no completed OSCU
+// approval from KRA yet would otherwise cause every single invoice send to
+// re-hit KRA's real infrastructure with a call that's going to fail again.
+const AUTO_INIT_COOLDOWN_MS = 60 * 60 * 1000;
+
+// Makes sure this merchant+branch has an activated OSCU device, activating
+// one silently if not — no dashboard screen, no serial number, no
+// environment picker. Returns the initialized config, or null when eTIMS
+// isn't (yet, or ever) available for this merchant: no plausible-format KRA
+// PIN on file, or KRA itself hasn't approved OSCU for this taxpayer yet
+// (a real external approval process — see the OSCU sign-up guide — that no
+// amount of PayChain-side automation can skip). Callers must treat null as
+// "send the invoice normally, unfiscalized" and never as an error.
+export async function ensureEtimsDevice(merchant, bhfId = '00') {
+  if (!merchant.kraPin || !merchant.isKRAVerified || !isValidKraPin(merchant.kraPin)) return null;
+
+  let config = await EtimsConfig.findOne({ merchantId: merchant._id, bhfId }).select('+cmcKeyEncrypted');
+  if (config?.isInitialized) return config;
+  if (config?.lastAttemptAt && Date.now() - config.lastAttemptAt.getTime() < AUTO_INIT_COOLDOWN_MS) return null;
+
+  const dvcSrlNo = AUTO_DEVICE_SERIAL(merchant._id, bhfId);
+  const environment = process.env.ETIMS_DEFAULT_ENVIRONMENT === 'production' ? 'production' : 'sandbox';
+
+  try {
+    const { cmcKey } = await initializeDevice({ tin: merchant.kraPin, bhfId, dvcSrlNo, environment });
+    if (!config) config = new EtimsConfig({ merchantId: merchant._id, bhfId });
+    config.tin = merchant.kraPin;
+    config.dvcSrlNo = dvcSrlNo;
+    config.environment = environment;
+    config.cmcKeyEncrypted = encryptKey(cmcKey);
+    config.isInitialized = true;
+    config.initializedAt = new Date();
+    config.lastError = null;
+    config.lastAttemptAt = new Date();
+    await config.save();
+    return config;
+  } catch (err) {
+    if (!config) config = new EtimsConfig({ merchantId: merchant._id, bhfId, tin: merchant.kraPin, dvcSrlNo, environment });
+    config.lastError = err.message;
+    config.lastAttemptAt = new Date();
+    await config.save();
+    console.error('etims.autoActivate failed:', JSON.stringify({ merchantId: String(merchant._id), bhfId, message: err.message }));
+    return null;
+  }
+}
 
 export class InsufficientStockError extends Error {
   constructor(message, details) {
@@ -87,6 +143,44 @@ function totalsByCode(totals) {
   return out;
 }
 
+// KRA's taxRtA..taxRtE fields — the whole-number rate KRA has on file for
+// each tax type ("B" is 16 regardless of whether this particular sale used
+// it), not just the rates actually present on this sale. TIS spec item
+// 6.20.4/6.21: every programmed rate is sent/printed on every receipt.
+function ratesByCode() {
+  const out = {};
+  for (const c of TAX_TYPE_CODES) out[`taxRt${c}`] = TAX_RATE_PERCENT[c];
+  return out;
+}
+
+// Identifies who registered/last modified this fiscal record, per KRA's
+// regrId/regrNm/modrId/modrNm fields. PayChain has no separate per-staff
+// login for a merchant account, so the merchant account itself is the
+// registrant — the same identity for both regr* and modr* on a brand-new
+// record (nothing has been amended after the fact).
+function registrantFields(merchant) {
+  const id = merchant.kraPin || merchant.email || String(merchant._id);
+  const name = merchant.businessName || merchant.name || id;
+  return { regrId: id, regrNm: name, modrId: id, modrNm: name };
+}
+
+// The printed-receipt header/footer block every /saveTrnsSalesOsdc call
+// must carry alongside the transaction totals — TIS spec's worked receipt
+// example (Trade Name / Address / PIN / "TAX INVOICE" / Buyer PIN / thank-you
+// footer, p.8).
+function buildReceiptBlock({ merchant, custTin, custMblNo }) {
+  return {
+    custTin: custTin || null,
+    custMblNo: custMblNo || null,
+    rptNo: 1, // 1 = original; only a reprint/copy flow would ever send >1
+    trdeNm: merchant.businessName || merchant.name || null,
+    adrs: [merchant.businessArea, merchant.county].filter(Boolean).join(', ') || null,
+    topMsg: 'TAX INVOICE',
+    btmMsg: 'THANK YOU FOR YOUR BUSINESS',
+    prchrAcptcYn: 'N',
+  };
+}
+
 // Atomic per-branch sequence claim — never read-then-write, so two
 // concurrent sales on the same branch can't collide on invcNo.
 async function claimNextInvcNo(configId) {
@@ -134,6 +228,7 @@ function buildKraItemList(computedItems) {
     itemCd: it.itemCd || null,
     itemClsCd: it.itemClsCd,
     itemNm: it.itemNm,
+    bcd: it.bcd || null,
     qty: it.qty,
     qtyUnitCd: it.qtyUnitCd || 'U',
     pkg: it.pkg || 1,
@@ -142,6 +237,9 @@ function buildKraItemList(computedItems) {
     splyAmt: it.grossAmt,
     dcRt: it.dcRt || 0,
     dcAmt: it.dcAmt,
+    isrccCd: it.isrccCd || null,
+    isrcRt: it.isrcRt ?? null,
+    isrcAmt: it.isrcAmt ?? null,
     taxTyCd: it.taxTyCd,
     taxblAmt: it.taxblAmt,
     taxAmt: it.taxAmt,
@@ -174,7 +272,9 @@ export async function createNormalSale(orderData) {
 
   const invcNo = await claimNextInvcNo(config._id);
   const salesDt = formatKraDate();
+  const cfmDt = formatKraDateTime();
   const pmtTyCd = paymentMethodToKraCode(paymentMethod);
+  const regFields = registrantFields(merchant);
 
   const salesPayload = {
     invcNo,
@@ -184,11 +284,21 @@ export async function createNormalSale(orderData) {
     rcptTyCd: 'S',
     pmtTyCd,
     salesSttsCd: '02', // KRA: 02 = approved/complete
-    cfmDt: formatKraDateTime(),
+    cfmDt,
     salesDt,
+    stockRlsDt: cfmDt, // goods/service released at the moment of sale — PayChain has no separate fulfillment step
+    cnclReqDt: null,
+    cnclDt: null,
+    rfdDt: null,
+    rfdRsnCd: null,
     totItemCnt: kraItems.length,
     ...totalsByCode(totals),
+    ...ratesByCode(),
     totTaxblAmt, totTaxAmt, totAmt,
+    prchrAcptcYn: 'N',
+    remark: null,
+    ...regFields,
+    receipt: buildReceiptBlock({ merchant, custTin }),
     itemList: kraItems,
   };
 
@@ -198,6 +308,8 @@ export async function createNormalSale(orderData) {
     custTin, custNm, salesDt, items: kraItems,
     ...totalsByCode(totals), totTaxblAmt, totTaxAmt, totAmt,
     totItemCnt: kraItems.length, paymentMethod, status: 'pending',
+    prchrAcptcYn: 'N', stockRlsDt: cfmDt, ...regFields,
+    kraRequestPayload: salesPayload,
   });
 
   try {
@@ -218,7 +330,7 @@ export async function createNormalSale(orderData) {
 // 3. transmits and stores the credit note. Every amount on a credit note is
 // transmitted as a negative adjustment against the original sale — that's
 // what distinguishes rcptTyCd:'R' from simply resubmitting the same sale.
-export async function createCreditNote(originalInvoiceId, refundReason, refundItems) {
+export async function createCreditNote(originalInvoiceId, refundReason, refundItems, refundReasonCode = DEFAULT_REFUND_REASON_CODE) {
   if (!refundReason) throw new InvoiceValidationError('refundReason is required');
 
   const original = await EtimsInvoice.findById(originalInvoiceId);
@@ -232,6 +344,8 @@ export async function createCreditNote(originalInvoiceId, refundReason, refundIt
     throw new EtimsConfigError('The eTIMS device for this invoice is no longer initialized');
   }
   const cmcKeyPlain = getCmcKeyPlain(config);
+  const merchant = await Merchant.findById(original.merchantId);
+  if (!merchant) throw new InvoiceValidationError('Merchant not found');
 
   const requested = Array.isArray(refundItems) && refundItems.length ? refundItems : null;
   const sourceItems = (requested || original.items).map((refundItem) => {
@@ -272,6 +386,8 @@ export async function createCreditNote(originalInvoiceId, refundReason, refundIt
 
   const invcNo = await claimNextInvcNo(config._id);
   const salesDt = formatKraDate();
+  const cfmDt = formatKraDateTime();
+  const regFields = registrantFields(merchant);
 
   const salesPayload = {
     invcNo,
@@ -281,13 +397,22 @@ export async function createCreditNote(originalInvoiceId, refundReason, refundIt
     rcptTyCd: 'R',
     pmtTyCd: original.pmtTyCd,
     salesSttsCd: '02',
-    cfmDt: formatKraDateTime(),
+    cfmDt,
     salesDt,
+    stockRlsDt: cfmDt,
+    cnclReqDt: null,
+    cnclDt: null,
+    rfdDt: cfmDt,
+    rfdRsnCd: refundReasonCode,
     totItemCnt: sourceItems.length,
     ...totalsByCode(totals),
+    ...ratesByCode(),
     totTaxblAmt, totTaxAmt, totAmt,
-    itemList: sourceItems,
+    prchrAcptcYn: 'N',
     remark: refundReason,
+    ...regFields,
+    receipt: buildReceiptBlock({ merchant, custTin: original.custTin }),
+    itemList: sourceItems,
   };
 
   const invoiceDoc = await EtimsInvoice.create({
@@ -297,7 +422,9 @@ export async function createCreditNote(originalInvoiceId, refundReason, refundIt
     custTin: original.custTin, custNm: original.custNm, salesDt, items: sourceItems,
     ...totalsByCode(totals), totTaxblAmt, totTaxAmt, totAmt,
     totItemCnt: sourceItems.length, paymentMethod: original.paymentMethod,
-    status: 'pending', refundReason,
+    status: 'pending', refundReason, rfdRsnCd: refundReasonCode,
+    prchrAcptcYn: 'N', stockRlsDt: cfmDt, ...regFields,
+    kraRequestPayload: salesPayload,
   });
 
   try {

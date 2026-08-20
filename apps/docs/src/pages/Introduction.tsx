@@ -1,15 +1,16 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { KeyRound, Webhook, Banknote, ArrowRight, Radio, Users, CheckCircle2 } from "lucide-react";
+import { QrCode, Banknote, Receipt, Users2, Webhook, ArrowRight, Radio, CheckCircle2 } from "lucide-react";
 import CodeGroup from "@/components/CodeGroup";
 import Callout from "@/components/Callout";
 import { useDeveloperAuth } from "@/context/DeveloperAuthContext";
 
 const CARDS = [
-  { icon: KeyRound, title: "Authentication", desc: "Test and live API keys, and how to send them.", to: "/authentication" },
-  { icon: Banknote, title: "Payments", desc: "Collect via STK push, pay out, check status.", to: "/payments" },
-  { icon: Webhook, title: "Webhooks", desc: "Get notified the instant a payment resolves.", to: "/webhooks" },
-  { icon: Users, title: "Integration guides", desc: "ISP reconnection & CRM sync, end to end.", to: "/guides" },
+  { icon: QrCode, title: "Payment collection", desc: "STK push, hosted checkout, payment links, and dynamic QR codes.", to: "/payment-collection" },
+  { icon: Banknote, title: "Send money", desc: "Pay out to mobile wallets, Paybills, Tills, and banks.", to: "/send-money" },
+  { icon: Receipt, title: "Invoices", desc: "Create, send, and track real, payable invoices.", to: "/invoices" },
+  { icon: Users2, title: "Bulk payments", desc: "Payroll, contractor, and vendor payments in one batch.", to: "/bulk-payments" },
+  { icon: Webhook, title: "Webhooks", desc: "Get notified the instant anything above resolves.", to: "/webhooks" },
 ];
 
 const TRUST_STRIP = [
@@ -135,7 +136,7 @@ payment = JSON.parse(res.body)['payment']`,
       />
       <p className="text-[13px] text-ink-faint mb-6">
         That's a real request shape. Drop in a test key from the section below and it runs, no
-        real money involved. <Link to="/payments">Full reference →</Link>
+        real money involved. <Link to="/payment-collection">Full reference →</Link>
       </p>
 
       <Callout variant="info" title="New here? Start with the Integration Guide">

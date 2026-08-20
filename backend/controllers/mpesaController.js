@@ -5,6 +5,7 @@ import Merchant from '../models/Merchant.js';
 import { safeSendSMS, sendStaggeredSms, formatKes } from '../utils/smsSanitizer.js';
 import { processSplitTransaction, processInvoiceSplitTransaction, splitCustomerSurcharge, getCheckoutTotal, PricingEngineError } from '../utils/pricingEngine.js';
 import { sendInvoicePaidReceiptEmail } from '../utils/resend.js';
+import { computeTotals } from './invoiceController.js';
 import STKRequest from '../models/STKRequest.js';
 import PayoutBatch from '../models/PayoutBatch.js';
 import PaymentLink from '../models/PaymentLink.js';
@@ -76,23 +77,29 @@ export const initiateSTKPush = async (req, res) => {
     // requesting KES 100 has their customer see a prompt for KES 113 with
     // no explanation — reads as an overcharge.
     //
-    // Awaited (not fire-and-forget) so the SMS is actually dispatched to
-    // Africa's Talking BEFORE NCBA is ever asked to send the prompt — the
-    // whole point is the customer reads the context first. safeSendSMS
-    // never throws (documented contract), so this can't fail the request;
-    // it only adds the SMS dispatch time (typically under a second) to the
-    // response, in exchange for a real ordering guarantee instead of a
-    // race between two independent delivery pipelines.
+    // Fired here, before the STK push call below, but deliberately NOT
+    // awaited — safeSendSMS funnels through utils/sms.js's shared, app-wide
+    // send queue (a strict 2s minimum gap between ANY two SMS dispatches,
+    // to avoid Africa's Talking rate-limiting — see that file's doc
+    // comment), which can be arbitrarily backed up by unrelated traffic
+    // (other merchants' transactions, a broadcast). Awaiting it here used
+    // to make the actual M-PESA prompt wait behind that same backlog before
+    // NCBA was ever even asked to send it — the prompt is the time-critical
+    // side of this pair (the customer is staring at their phone for it), so
+    // it must never be delayed by SMS delivery. This still kicks the SMS
+    // off first, in the same tick, so it's queued ahead of the prompt
+    // whenever there's no backlog — just without blocking on it.
     if (kind === 'request_money') {
-      const result = await safeSendSMS({
+      safeSendSMS({
         to: formattedPhone,
         message: buildPaymentRequestSms({
           businessName: req.merchant.businessName,
           baseAmount: intAmount,
           fee: Math.round((checkoutTotal - intAmount) * 100) / 100,
         }).message,
+      }).then((result) => {
+        if (!result.success) console.error(`Pre-push request SMS failed for ${formattedPhone}:`, result.error);
       });
-      if (!result.success) console.error(`Pre-push request SMS failed for ${formattedPhone}:`, result.error);
     }
 
     // Real STK Push via NCBA's shared Paybill 880100 (or simulated — see
@@ -198,6 +205,14 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
           let paidInvoice = null;
           if (link.invoiceId) {
             paidInvoice = await Invoice.findByIdAndUpdate(link.invoiceId, { status: 'paid', paidAt: new Date() }, { returnDocument: 'after' });
+            // Only invoices created via the Developer API (developerInvoiceController.js)
+            // carry createdViaDeveloperId — a dashboard-created invoice has
+            // no developer to notify, so this is a no-op for those.
+            if (paidInvoice?.createdViaDeveloperId) {
+              dispatchDeveloperEvent(paidInvoice.createdViaDeveloperId, 'invoice.paid', {
+                invoice: { id: paidInvoice._id, invoiceNumber: paidInvoice.invoiceNumber, status: paidInvoice.status, paidAt: paidInvoice.paidAt },
+              });
+            }
           }
 
           const merchant = link.merchantId;
@@ -316,7 +331,7 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
             });
 
             if (paidInvoice && merchant.email) {
-              const paidSubtotal = (paidInvoice.items || []).reduce((sum, i) => sum + i.qty * i.price, 0);
+              const { subtotal: paidSubtotal, total: paidTotal } = computeTotals(paidInvoice.items);
               sendInvoicePaidReceiptEmail({
                 to: merchant.email,
                 businessName: merchant.businessName,
@@ -325,7 +340,7 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
                 items: paidInvoice.items,
                 currency: paidInvoice.currency,
                 subtotal: paidSubtotal,
-                total: paidSubtotal,
+                total: paidTotal,
                 paidAt: paidInvoice.paidAt,
                 mpesaReceipt: receipt,
                 payerPhone: stkReq.phone,
@@ -607,6 +622,25 @@ const NCBA_STK_POLL_MAX_ATTEMPTS = 60; // ~2 minutes — typical STK prompt vali
 const TRANSIENT_FAILURE_PATTERN = /processing|internal error|system error/i;
 const REQUIRED_CONSECUTIVE_FAILURES = 2;
 
+// Belt-and-braces alongside TRANSIENT_FAILURE_PATTERN above: that regex only
+// catches the two exact phrasings we've seen NCBA use for "still in flight" —
+// any OTHER wording on a FAILED response (a third phrasing we haven't
+// observed yet, an empty description, etc.) fell straight through to
+// REQUIRED_CONSECUTIVE_FAILURES and resolved as a final decline on the very
+// first poll, 2 seconds after the prompt was sent — long before a real
+// customer could have even seen it, let alone answered it. That produced a
+// "Request Failed" a merchant would see while the customer was still
+// looking at their phone, followed by a real SUCCESS moments later that
+// only ever got reconciled quietly in the database (via the account-
+// notification webhook's allowFailedRetry) — never back to the merchant's
+// screen, since the frontend had already stopped polling on the false
+// failure. No FAILED response is honored as final before this many polls
+// have passed, regardless of its wording — a real decline (wrong PIN,
+// cancelled, insufficient funds) still resolves right after the grace
+// period ends; this only removes the false positives during the window a
+// customer couldn't plausibly have responded yet.
+const MIN_ATTEMPTS_BEFORE_FAILURE = 5; // 5 * NCBA_STK_POLL_INTERVAL_MS = 10s
+
 // Fire-and-forget: intentionally not awaited by callers, mirroring how every
 // other webhook-driven settlement in this codebase (Daraja's own callbacks,
 // the NCBA reconciliation webhooks) never blocks the HTTP response that
@@ -631,7 +665,7 @@ export function pollAndResolveNcbaStkPush(checkoutRequestId, transactionId) {
       }
 
       if (status === 'FAILED') {
-        const looksTransient = TRANSIENT_FAILURE_PATTERN.test(description || '');
+        const looksTransient = TRANSIENT_FAILURE_PATTERN.test(description || '') || attempts < MIN_ATTEMPTS_BEFORE_FAILURE;
         consecutiveFailures = looksTransient ? consecutiveFailures + 1 : REQUIRED_CONSECUTIVE_FAILURES;
         if (consecutiveFailures < REQUIRED_CONSECUTIVE_FAILURES) {
           // Not logged as an error — see doc comment above, this is the

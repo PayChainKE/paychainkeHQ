@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import { ValidatedInput } from '../components/ValidatedInput';
 import paychainLogoWhite from '../assets/paychain-logo-white.png';
+import kraLogo from '../assets/kra-logo.png';
 import { formatKES } from '../utils/formatCurrency';
 
 const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
@@ -137,6 +138,11 @@ export default function InvoiceView() {
             </div>
           </div>
           <h2 className="relative z-10 font-headline text-2xl text-white mb-1">{invoice.businessName}</h2>
+          {(invoice.trader?.address || invoice.trader?.email || invoice.trader?.phone) && (
+            <p className="relative z-10 text-[11px] text-white/40 font-medium mb-2">
+              {[invoice.trader.address, invoice.trader.email, invoice.trader.phone].filter(Boolean).join(' · ')}
+            </p>
+          )}
           <p className="relative z-10 text-sm text-white/50 font-medium">Billed to {invoice.customer?.name}</p>
         </div>
 
@@ -165,19 +171,46 @@ export default function InvoiceView() {
         <div className="p-8 md:p-10 border-b border-outline-variant/10">
           <h3 className="text-[10px] text-on-surface-variant font-black uppercase tracking-widest opacity-60 mb-4">Itemized Breakdown</h3>
           <div className="space-y-3">
-            {(invoice.items || []).map((item, i) => (
+            {(invoice.items || []).map((item, i) => {
+              const gross = (item.qty || 0) * (item.price || 0);
+              const rate = item.discountRate || 0;
+              const lineDiscount = rate > 0 ? gross * (rate / 100) : 0;
+              return (
               <div key={i} className="flex items-center justify-between gap-4 py-2 border-b border-outline-variant/5 last:border-0">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-primary truncate">{item.description || '—'}</p>
+                  <p className="text-sm font-bold text-primary truncate">
+                    {item.description || '—'}
+                    {invoice.etims?.status === 'signed' && item.taxTyCd && (
+                      <span className="ml-1.5 text-[9px] font-black text-emerald-700/70 align-middle">[{item.taxTyCd}]</span>
+                    )}
+                  </p>
                   <p className="text-[11px] text-on-surface-variant opacity-60">{item.qty} × {fmt(item.price)}</p>
+                  {rate > 0 && (
+                    <p className="text-[11px] text-emerald-700/70 font-medium">Discount {rate}% (-{fmt(lineDiscount)})</p>
+                  )}
                 </div>
-                <p className="text-sm font-bold text-primary shrink-0">{fmt(item.qty * item.price)}</p>
+                <p className="text-sm font-bold text-primary shrink-0">{fmt(gross - lineDiscount)}</p>
               </div>
-            ))}
+              );
+            })}
           </div>
-          <div className="flex items-center justify-between pt-4 mt-2 border-t-2 border-outline-variant/10">
-            <p className="text-sm font-black text-primary uppercase tracking-widest">Total</p>
-            <p className="font-headline text-xl font-black text-primary">{fmt(invoice.total)}</p>
+          <div className="pt-4 mt-2 border-t-2 border-outline-variant/10 space-y-1.5">
+            {invoice.discount > 0 && (
+              <>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold text-on-surface-variant opacity-60">Subtotal</p>
+                  <p className="text-sm font-bold text-primary">{fmt(invoice.subtotal)}</p>
+                </div>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold text-on-surface-variant opacity-60">Discount</p>
+                  <p className="text-sm font-bold text-primary">-{fmt(invoice.discount)}</p>
+                </div>
+              </>
+            )}
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-black text-primary uppercase tracking-widest">Total</p>
+              <p className="font-headline text-xl font-black text-primary">{fmt(invoice.total)}</p>
+            </div>
           </div>
           {invoice.notes && (
             <div className="mt-6 p-4 rounded-2xl bg-surface-container-lowest border border-outline-variant/10">
@@ -194,6 +227,60 @@ export default function InvoiceView() {
             </div>
           )}
         </div>
+
+        {/* KRA eTIMS fiscal receipt — required content per the OSCU/VSCU
+            Technical Specification (items 3 and 6.23): trader PIN, buyer
+            PIN, tax-rate breakdown, and the SCU's own signature/QR must all
+            appear on the document the buyer receives. Only rendered when
+            this invoice was actually signed by KRA — untouched otherwise. */}
+        {invoice.etims?.status === 'signed' && (
+          <div className="p-8 md:p-10 border-b border-outline-variant/10 bg-emerald-50/40">
+            <div className="flex items-center justify-center gap-2 mb-5">
+              <img src={kraLogo} alt="KRA" className="h-6 w-auto object-contain" />
+              <h3 className="text-xs font-black uppercase tracking-widest text-emerald-800">KRA Electronic Tax Invoice</h3>
+            </div>
+            <div className="space-y-1.5 text-xs text-on-surface-variant mb-4">
+              <div className="flex justify-between"><span>Trader</span><span className="font-bold text-primary">{invoice.trader?.name}</span></div>
+              <div className="flex justify-between"><span>Trader PIN</span><span className="font-bold text-primary">{invoice.trader?.pin}</span></div>
+              {invoice.trader?.address && <div className="flex justify-between"><span>Address</span><span className="font-medium">{invoice.trader.address}</span></div>}
+              {invoice.customer?.kraPin && <div className="flex justify-between"><span>Buyer PIN</span><span className="font-bold text-primary">{invoice.customer.kraPin}</span></div>}
+              <div className="flex justify-between"><span>CU Invoice No.</span><span className="font-bold text-primary">{invoice.etims.cuInvoiceNumber}</span></div>
+              <div className="flex justify-between"><span>Items</span><span className="font-medium">{invoice.etims.totItemCnt}</span></div>
+              <div className="flex justify-between"><span>Means of Payment</span><span className="font-medium">{invoice.etims.pmtTyLabel}</span></div>
+              {invoice.etims.signedAt && (
+                <div className="flex justify-between"><span>Signed</span><span className="font-medium">{new Date(invoice.etims.signedAt).toLocaleString('en-KE', { dateStyle: 'medium', timeStyle: 'medium' })}</span></div>
+              )}
+            </div>
+            {invoice.etims.taxBreakdown?.length > 0 && (
+              <table className="w-full text-[11px] mb-4 border-t border-emerald-900/10 pt-2">
+                <thead>
+                  <tr className="text-emerald-900/60 font-black uppercase tracking-wider">
+                    <td className="py-1">Rate</td><td className="py-1 text-right">Taxable</td><td className="py-1 text-right">Tax</td>
+                  </tr>
+                </thead>
+                <tbody>
+                  {invoice.etims.taxBreakdown.map((row) => (
+                    <tr key={row.code} className="text-on-surface-variant">
+                      <td className="py-0.5">{row.label}</td>
+                      <td className="py-0.5 text-right">{fmt(row.taxblAmt)}</td>
+                      <td className="py-0.5 text-right">{fmt(row.taxAmt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            <div className="text-[10px] text-on-surface-variant/70 leading-relaxed border-t border-emerald-900/10 pt-3 break-all">
+              <div>Internal Data: {invoice.etims.formattedInternalData}</div>
+              <div>Receipt Signature: {invoice.etims.formattedSignature}</div>
+            </div>
+            {invoice.etims.qrDataUri && (
+              <div className="mt-4 flex flex-col items-center gap-1.5">
+                <img src={invoice.etims.qrDataUri} alt="KRA receipt verification QR" className="w-24 h-24 object-contain bg-white p-1.5 rounded-xl border border-emerald-900/10" />
+                <p className="text-[9px] text-emerald-800/60 font-bold uppercase tracking-widest">Scan to verify with KRA</p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Pay */}
         {!isPaid && !justPaid && invoice.payLinkId && (

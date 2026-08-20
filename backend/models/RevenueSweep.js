@@ -35,6 +35,15 @@ const revenueSweepSchema = new mongoose.Schema({
   // from "already swept" or a test run permanently (and silently) writes off
   // real revenue as transferred when it never left the pooled account.
   simulated: { type: Boolean, default: false },
+  // Admin "clear" on the Revenue page — hides the row from the sweep
+  // history list without touching the underlying data. Deliberately never
+  // read by revenueSweepService.js's computeUnsweptRevenue() or anything
+  // else that sums real sweep amounts — archiving is a display-only filter,
+  // the row still counts as a real completed/failed/skipped attempt. The
+  // full CSV export ignores this flag too, so nothing is ever actually lost.
+  archived:   { type: Boolean, default: false },
+  archivedAt: { type: Date, default: null },
+  archivedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },
 }, {
   timestamps: true,
 });

@@ -1,7 +1,7 @@
 import express from 'express';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { protectMerchant } from '../middleware/authMiddleware.js';
-import { initDevice, syncItems, signInvoice, issueCreditNote, dailyZReport } from '../controllers/etimsController.js';
+import { getConfig, initDevice, syncItems, signInvoice, issueCreditNote, dailyZReport } from '../controllers/etimsController.js';
 
 const router = express.Router();
 
@@ -19,6 +19,7 @@ const signLimiter = rateLimit({
   message: { success: false, error: 'Too many eTIMS signing requests. Slow down.' },
 });
 
+router.get('/config', protectMerchant, getConfig);
 router.post('/init', protectMerchant, initDevice);
 router.post('/items/sync', protectMerchant, syncItems);
 router.post('/invoices/sign', protectMerchant, signLimiter, signInvoice);

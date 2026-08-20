@@ -2,8 +2,11 @@ import axios from 'axios';
 import { decryptKey } from '../utils/cryptoHelper.js';
 
 // ── KRA eTIMS OSCU configuration ────────────────────────────────────────
-const SANDBOX_BASE_URL = process.env.ETIMS_SANDBOX_BASE_URL || 'https://etims-api-sbx.kra.go.ke/etims-api';
-const PRODUCTION_BASE_URL = process.env.ETIMS_PRODUCTION_BASE_URL || 'https://etims-api.kra.go.ke/etims-api';
+// Per KRA's own OSCU/VSCU Step-by-Step sign-up guide (Section C): the base
+// host has no "/etims-api" path segment — the example given there is
+// straight from host to endpoint, e.g. https://etims-api-sbx.kra.go.ke/selectInitOsdcInfo.
+const SANDBOX_BASE_URL = process.env.ETIMS_SANDBOX_BASE_URL || 'https://etims-api-sbx.kra.go.ke';
+const PRODUCTION_BASE_URL = process.env.ETIMS_PRODUCTION_BASE_URL || 'https://etims-api.kra.go.ke';
 const REQUEST_TIMEOUT_MS = Number(process.env.ETIMS_TIMEOUT_MS) || 20000;
 
 // Real calls to KRA's live tax infrastructure only happen when this is

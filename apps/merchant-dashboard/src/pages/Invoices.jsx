@@ -19,17 +19,18 @@ export default function Invoices() {
   const { merchant } = useMerchantAuth()
 
   const blankInvoice = () => ({
-    customer: { name: '', email: '', phone: '', address: '' },
+    customer: { name: '', email: '', phone: '', address: '', kraPin: '' },
     invoiceNumber: null, // assigned by the server on first save
     issueDate: new Date().toISOString().slice(0, 10),
     dueDate: '',
     currency: 'KES',
     notes: '',
     recurring: false,
-    items: [{ description: '', qty: 1, price: 0 }],
+    items: [{ description: '', qty: 1, price: 0, discountRate: 0, taxTyCd: 'B', itemClsCd: '' }],
     payUrl: null,
     status: 'draft',
     qrCodeDataUri: null,
+    etims: null,
   });
 
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -37,6 +38,19 @@ export default function Invoices() {
   const [isSavingInvoice, setIsSavingInvoice] = useState(false);
   const [isSendingInvoice, setIsSendingInvoice] = useState(false);
   const [invoiceDetails, setInvoiceDetails] = useState(blankInvoice());
+
+  // Whether this merchant has an initialized KRA eTIMS OSCU device — the
+  // per-item tax/classification fields and buyer PIN only render at all when
+  // this is true, so the vast majority of merchants (no OSCU registered)
+  // never see fields that don't apply to them.
+  const [etimsEnabled, setEtimsEnabled] = useState(false);
+  const TAX_TYPE_OPTIONS = [
+    { code: 'A', label: 'A — Exempt' },
+    { code: 'B', label: 'B — 16% VAT' },
+    { code: 'C', label: 'C — Zero-rated' },
+    { code: 'D', label: 'D — Non-VAT' },
+    { code: 'E', label: 'E — 8% VAT' },
+  ];
 
   const [invoicesList, setInvoicesList] = useState([]);
   const [invoiceFilter, setInvoiceFilter] = useState('All');
@@ -60,8 +74,13 @@ export default function Invoices() {
     return acc;
   }, {});
 
-  const invoiceSubtotal = invoiceDetails.items.reduce((sum, item) => sum + (item.qty * item.price), 0);
-  const invoiceTotal = invoiceSubtotal; // Assuming no tax right now
+  const lineGross = (item) => (item.qty || 0) * (item.price || 0);
+  const lineDiscount = (item) => lineGross(item) * (Math.min(100, Math.max(0, Number(item.discountRate) || 0)) / 100);
+  const lineNet = (item) => lineGross(item) - lineDiscount(item);
+
+  const invoiceSubtotal = invoiceDetails.items.reduce((sum, item) => sum + lineGross(item), 0);
+  const invoiceDiscountTotal = invoiceDetails.items.reduce((sum, item) => sum + lineDiscount(item), 0);
+  const invoiceTotal = invoiceSubtotal - invoiceDiscountTotal;
   const invoiceHasRealItems = invoiceDetails.items.some(i => i.description.trim() || i.price > 0);
 
   const fmtInvoiceCurrency = (n) => `${invoiceDetails.currency} ${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -93,7 +112,25 @@ export default function Invoices() {
     }
   }, []);
 
+  const fetchEtimsStatus = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('paychain_merchant_token');
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      const res = await axios.get(`${API_URL}/api/v1/etims/config`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      // `eligible` (a KRA PIN on file), not `isInitialized` — there's no
+      // "enable eTIMS" action for a merchant to take, activation happens
+      // silently on first send, so the fields need to be visible before
+      // that ever happens, not after.
+      setEtimsEnabled(!!(res.data.eligible || res.data.isInitialized));
+    } catch (err) {
+      // Non-fatal — just means the KRA-specific fields stay hidden
+    }
+  }, []);
+
   useEffect(() => { fetchInvoices() }, [fetchInvoices]);
+  useEffect(() => { fetchEtimsStatus() }, [fetchEtimsStatus]);
 
   // Keep the current page in range as the (filtered) list shrinks — e.g.
   // deleting the last invoice on the final page.
@@ -104,7 +141,7 @@ export default function Invoices() {
   const handleAddInvoiceItem = () => {
     setInvoiceDetails(prev => ({
       ...prev,
-      items: [...prev.items, { description: '', qty: 1, price: 0 }]
+      items: [...prev.items, { description: '', qty: 1, price: 0, discountRate: 0, taxTyCd: 'B', itemClsCd: '' }]
     }))
   };
 
@@ -192,7 +229,7 @@ export default function Invoices() {
 
       const saved = res.data.invoice;
       setActiveInvoiceId(saved._id);
-      setInvoiceDetails(prev => ({ ...prev, invoiceNumber: saved.invoiceNumber, payUrl: saved.payUrl, status: saved.status, qrCodeDataUri: saved.qrCodeDataUri }));
+      setInvoiceDetails(prev => ({ ...prev, invoiceNumber: saved.invoiceNumber, payUrl: saved.payUrl, status: saved.status, qrCodeDataUri: saved.qrCodeDataUri, etims: saved.etims }));
       upsertInvoiceInList(saved);
 
       setShowInvoiceModal(false);
@@ -236,7 +273,7 @@ export default function Invoices() {
       const sendRes = await axios.post(`${API_URL}/api/invoices/${invoiceId}/send`, {}, { headers: { Authorization: `Bearer ${token}` } });
       const sent = sendRes.data.invoice;
 
-      setInvoiceDetails(prev => ({ ...prev, invoiceNumber: sent.invoiceNumber, payUrl: sent.payUrl, status: sent.status, qrCodeDataUri: sent.qrCodeDataUri }));
+      setInvoiceDetails(prev => ({ ...prev, invoiceNumber: sent.invoiceNumber, payUrl: sent.payUrl, status: sent.status, qrCodeDataUri: sent.qrCodeDataUri, etims: sent.etims }));
       upsertInvoiceInList(sent);
 
       setShowInvoiceModal(false);
@@ -456,17 +493,18 @@ export default function Invoices() {
                        onClick={() => {
                           setActiveInvoiceId(inv._id);
                           setInvoiceDetails({
-                            customer: inv.customer,
+                            customer: { kraPin: '', ...inv.customer },
                             invoiceNumber: inv.invoiceNumber,
                             issueDate: inv.issueDate ? inv.issueDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
                             dueDate: inv.dueDate ? inv.dueDate.slice(0, 10) : '',
                             currency: inv.currency,
                             notes: inv.notes,
                             recurring: inv.recurring,
-                            items: inv.items?.length ? inv.items : [{ description: '', qty: 1, price: 0 }],
+                            items: inv.items?.length ? inv.items.map(i => ({ taxTyCd: 'B', itemClsCd: '', discountRate: 0, ...i })) : [{ description: '', qty: 1, price: 0, discountRate: 0, taxTyCd: 'B', itemClsCd: '' }],
                             payUrl: inv.payUrl,
                             status: inv.status,
                             qrCodeDataUri: inv.qrCodeDataUri,
+                            etims: inv.etims,
                           });
                           setShowInvoiceModal(true);
                        }}
@@ -590,6 +628,19 @@ export default function Invoices() {
                      />
                   </div>
 
+                  {etimsEnabled && (
+                    <div className="space-y-2">
+                       <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60">Buyer KRA PIN (optional)</label>
+                       <input
+                         type="text"
+                         value={invoiceDetails.customer.kraPin || ''}
+                         onChange={e => setInvoiceDetails({...invoiceDetails, customer: { ...invoiceDetails.customer, kraPin: e.target.value.toUpperCase() }})}
+                         placeholder="P051892647A"
+                         className="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-2xl px-5 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 uppercase"
+                       />
+                    </div>
+                  )}
+
                   <div className="space-y-2">
                     <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60 pr-1 flex items-center gap-1">
                       Invoice Number
@@ -617,17 +668,19 @@ export default function Invoices() {
                 <div className="mb-10">
                   <h4 className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60 mb-4">Items</h4>
 
-                  <div className="hidden md:grid grid-cols-[1fr_80px_100px_100px_40px] gap-4 mb-2 px-2">
+                  <div className="hidden md:grid grid-cols-[1fr_70px_90px_70px_90px_40px] gap-4 mb-2 px-2">
                     <span className="text-[9px] text-on-surface-variant font-bold uppercase tracking-widest">Description</span>
                     <span className="text-[9px] text-on-surface-variant font-bold uppercase tracking-widest text-center">Qty</span>
                     <span className="text-[9px] text-on-surface-variant font-bold uppercase tracking-widest text-right">Price</span>
+                    <span className="text-[9px] text-on-surface-variant font-bold uppercase tracking-widest text-right">Disc %</span>
                     <span className="text-[9px] text-on-surface-variant font-bold uppercase tracking-widest text-right">Amount</span>
                     <span></span>
                   </div>
 
                   <div className="space-y-4 mb-5">
                     {invoiceDetails.items.map((item, index) => (
-                      <div key={index} className="grid grid-cols-1 md:grid-cols-[1fr_80px_100px_100px_40px] gap-3 md:gap-4 items-center bg-surface-container-lowest border md:border-0 border-outline-variant/10 p-4 md:p-0 rounded-[24px] md:bg-transparent shadow-sm md:shadow-none">
+                      <div key={index} className="bg-surface-container-lowest border md:border-0 border-outline-variant/10 p-4 md:p-0 rounded-[24px] md:bg-transparent shadow-sm md:shadow-none">
+                      <div className="grid grid-cols-1 md:grid-cols-[1fr_70px_90px_70px_90px_40px] gap-3 md:gap-4 items-center">
                         <input type="text" value={item.description} onChange={e => handleUpdateInvoiceItem(index, 'description', e.target.value)} placeholder="Item description" className="w-full bg-white border border-outline-variant/20 rounded-xl px-3 py-2.5 text-xs font-medium text-primary focus:ring-0 focus:border-emerald-500/50" />
                         <div className="flex items-center gap-2">
                           <span className="md:hidden text-[9px] font-bold text-on-surface-variant uppercase tracking-widest">Qty</span>
@@ -637,16 +690,50 @@ export default function Invoices() {
                           <span className="md:hidden text-[9px] font-bold text-on-surface-variant uppercase tracking-widest">Price</span>
                           <input type="number" value={item.price} onChange={e => handleUpdateInvoiceItem(index, 'price', parseFloat(e.target.value) || 0)} className="w-full bg-white border border-outline-variant/20 rounded-xl px-3 py-2.5 text-xs font-medium text-right text-primary focus:ring-0 focus:border-emerald-500/50" />
                         </div>
+                        <div className="flex items-center gap-2">
+                          <span className="md:hidden text-[9px] font-bold text-on-surface-variant uppercase tracking-widest">Disc %</span>
+                          <input type="number" min="0" max="100" value={item.discountRate || 0} onChange={e => handleUpdateInvoiceItem(index, 'discountRate', Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))} className="w-full bg-white border border-outline-variant/20 rounded-xl px-3 py-2.5 text-xs font-medium text-right text-primary focus:ring-0 focus:border-emerald-500/50" />
+                        </div>
                         <div className="text-right text-xs font-bold text-primary flex justify-between items-center md:items-end md:block">
                           <span className="md:hidden text-[9px] font-bold text-on-surface-variant uppercase tracking-widest">Total</span>
-                          {(item.qty * item.price).toLocaleString()}
+                          {lineNet(item).toLocaleString()}
                         </div>
                        <button onClick={() => handleRemoveInvoiceItem(index)} className="w-8 h-8 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 flex items-center justify-center transition-colors">
                          <span className="material-symbols-outlined text-sm">delete</span>
                        </button>
                       </div>
+                      {etimsEnabled && (
+                        <div className="grid grid-cols-2 gap-3 mt-2.5 pt-2.5 border-t border-dashed border-outline-variant/15">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[9px] font-bold text-on-surface-variant uppercase tracking-widest shrink-0">Tax</span>
+                            <select
+                              value={item.taxTyCd || 'B'}
+                              onChange={e => handleUpdateInvoiceItem(index, 'taxTyCd', e.target.value)}
+                              className="w-full bg-white border border-outline-variant/20 rounded-xl px-2 py-2 text-[11px] font-medium text-primary focus:ring-0 focus:border-emerald-500/50"
+                            >
+                              {TAX_TYPE_OPTIONS.map(opt => <option key={opt.code} value={opt.code}>{opt.label}</option>)}
+                            </select>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[9px] font-bold text-on-surface-variant uppercase tracking-widest shrink-0">KRA Code</span>
+                            <input
+                              type="text"
+                              value={item.itemClsCd || ''}
+                              onChange={e => handleUpdateInvoiceItem(index, 'itemClsCd', e.target.value)}
+                              placeholder="e.g. 8399120000"
+                              className="w-full bg-white border border-outline-variant/20 rounded-xl px-2 py-2 text-[11px] font-medium text-primary focus:ring-0 focus:border-emerald-500/50"
+                            />
+                          </div>
+                        </div>
+                      )}
+                      </div>
                     ))}
                   </div>
+                  {etimsEnabled && (
+                    <p className="text-[10.5px] text-on-surface-variant opacity-60 -mt-3 mb-4">
+                      KRA eTIMS is enabled on this account — every item needs a classification code before this invoice can be sent.
+                    </p>
+                  )}
 
                   <button onClick={handleAddInvoiceItem} className="w-full py-3 border-2 border-dashed border-outline-variant/20 rounded-2xl text-xs font-bold text-primary hover:border-emerald-500/30 hover:bg-emerald-50 transition-all">+ Add Item</button>
 
@@ -658,6 +745,12 @@ export default function Invoices() {
                       <span className="text-xs font-bold text-on-surface-variant opacity-60">Subtotal</span>
                       <span className="text-sm font-bold text-primary">{invoiceDetails.currency} {invoiceSubtotal.toLocaleString()}</span>
                    </div>
+                   {invoiceDiscountTotal > 0 && (
+                     <div className="flex items-center justify-between w-full max-w-xs">
+                        <span className="text-xs font-bold text-on-surface-variant opacity-60">Discount</span>
+                        <span className="text-sm font-bold text-primary">-{invoiceDetails.currency} {invoiceDiscountTotal.toLocaleString()}</span>
+                     </div>
+                   )}
                    <div className="flex items-center justify-between w-full max-w-xs">
                       <span className="text-xs text-on-surface-variant font-black uppercase tracking-widest">Total</span>
                       <span className="font-headline text-2xl font-bold text-primary">{invoiceDetails.currency} {invoiceTotal.toLocaleString()}</span>
@@ -768,10 +861,15 @@ export default function Invoices() {
                            <div className="border border-t-0 border-outline-variant/10 rounded-b-2xl overflow-hidden">
                              {invoiceDetails.items.filter(item => item.description.trim() || item.price > 0).map((item, index) => (
                                <div key={index} className={`grid grid-cols-[1fr_80px_100px_100px] gap-4 items-center px-5 py-4 ${index % 2 === 1 ? 'bg-surface-container-lowest/50' : ''}`}>
-                                  <span className="text-sm font-bold text-primary truncate">{item.description || 'Untitled item'}</span>
+                                  <div className="min-w-0">
+                                    <span className="text-sm font-bold text-primary truncate block">{item.description || 'Untitled item'}</span>
+                                    {item.discountRate > 0 && (
+                                      <span className="text-[11px] text-emerald-700/70 font-medium">Discount {item.discountRate}% (-{fmtInvoiceCurrency(lineDiscount(item))})</span>
+                                    )}
+                                  </div>
                                   <span className="text-sm text-on-surface-variant text-center">{item.qty}</span>
                                   <span className="text-sm text-on-surface-variant text-right whitespace-nowrap">{fmtInvoiceCurrency(item.price)}</span>
-                                  <span className="text-sm font-bold text-primary text-right whitespace-nowrap">{fmtInvoiceCurrency(item.qty * item.price)}</span>
+                                  <span className="text-sm font-bold text-primary text-right whitespace-nowrap">{fmtInvoiceCurrency(lineNet(item))}</span>
                                </div>
                              ))}
                            </div>
@@ -789,12 +887,32 @@ export default function Invoices() {
                                <p className="text-xs font-bold text-on-surface-variant opacity-60">Subtotal</p>
                                <p className="text-sm font-bold text-primary">{fmtInvoiceCurrency(invoiceSubtotal)}</p>
                             </div>
+                            {invoiceDiscountTotal > 0 && (
+                              <div className="flex justify-between items-center px-1">
+                                 <p className="text-xs font-bold text-on-surface-variant opacity-60">Discount</p>
+                                 <p className="text-sm font-bold text-primary">-{fmtInvoiceCurrency(invoiceDiscountTotal)}</p>
+                              </div>
+                            )}
                             <div className="flex justify-between items-center mt-1 px-5 py-4 rounded-2xl bg-[#06201B]">
                                <p className="text-[10px] text-[#5EFEB3] font-black uppercase tracking-widest">Total</p>
                                <p className="font-headline text-xl font-black text-white">{fmtInvoiceCurrency(invoiceTotal)}</p>
                             </div>
                          </div>
                       </div>
+
+                      {/* KRA eTIMS fiscal marks — only present once this invoice has actually been signed by KRA */}
+                      {invoiceDetails.etims?.status === 'signed' && (
+                        <div className="mb-10 p-5 rounded-2xl bg-emerald-50 border border-emerald-200 flex flex-col sm:flex-row items-center gap-4">
+                          {invoiceDetails.etims.qrDataUri && (
+                            <img src={invoiceDetails.etims.qrDataUri} alt="KRA eTIMS verification QR" className="w-20 h-20 object-contain shrink-0" />
+                          )}
+                          <div className="min-w-0">
+                            <p className="text-[9px] text-emerald-700 font-black uppercase tracking-widest mb-1">KRA e-Invoice — Signed</p>
+                            <p className="text-xs font-bold text-emerald-900 break-all">{invoiceDetails.etims.cuInvoiceNumber}</p>
+                            <p className="text-[10px] text-emerald-800/70 break-all mt-1">{invoiceDetails.etims.formattedSignature}</p>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Footer Notes */}
                       {invoiceDetails.notes && (
