@@ -6,7 +6,7 @@ import Counter from '../models/Counter.js';
 import EtimsConfig from '../models/EtimsConfig.js';
 import { sendInvoiceEmail } from '../utils/resend.js';
 import { generateQrDataUri } from '../utils/qrCode.js';
-import { TAX_TYPE_CODES } from '../utils/etimsFormat.js';
+import { TAX_TYPE_CODES, TAX_LABELS, money2dpString } from '../utils/etimsFormat.js';
 import {
   createNormalSale,
   InvoiceValidationError as EtimsInvoiceValidationError,
@@ -78,7 +78,22 @@ export const invoiceShareUrl = (inv, link) =>
 // .populate() it) or just left as an ObjectId/null (callers that don't) —
 // either way this only surfaces the KRA fiscal fields when it's actually
 // the populated document, never partial/wrong data.
-function serializeEtims(inv) {
+// KRA requires the tax-rate breakdown (item 3.i/6.21) and item count (item
+// 6.25) appear on the receipt handed to the buyer, not just the total —
+// this is what lets serializeEtims carry that straight from the signed
+// EtimsInvoice without the caller re-deriving it.
+function taxBreakdownFor(etims) {
+  return TAX_TYPE_CODES
+    .map((code) => ({
+      code,
+      label: TAX_LABELS[code],
+      taxblAmt: money2dpString(etims[`taxblAmt${code}`] || 0),
+      taxAmt: money2dpString(etims[`taxAmt${code}`] || 0),
+    }))
+    .filter((row) => Number(row.taxblAmt) !== 0 || Number(row.taxAmt) !== 0);
+}
+
+export function serializeEtims(inv) {
   const etims = inv.etimsInvoiceId;
   if (inv.etimsStatus !== 'signed' || !etims || typeof etims !== 'object' || !etims.sdcId) {
     return { status: inv.etimsStatus || 'not_applicable' };
@@ -92,6 +107,11 @@ function serializeEtims(inv) {
     qrUrl: etims.qrUrl,
     qrDataUri: etims.qrDataUri,
     signedAt: etims.updatedAt,
+    totItemCnt: etims.totItemCnt,
+    pmtTyCd: etims.pmtTyCd,
+    taxBreakdown: taxBreakdownFor(etims),
+    totTaxblAmt: money2dpString(etims.totTaxblAmt),
+    totTaxAmt: money2dpString(etims.totTaxAmt),
   };
 }
 
@@ -318,6 +338,7 @@ export const sendInvoice = async (req, res) => {
       }
       return res.status(502).json({ error: 'Failed to sign this invoice with KRA eTIMS. Please try again.' });
     }
+    if (invoice.etimsInvoiceId) await invoice.populate('etimsInvoiceId');
 
     // Reuse an existing active payment link if one is still valid, otherwise mint a fresh one.
     // Invoice-backed links get 90 days — invoices are often issued against
@@ -351,13 +372,14 @@ export const sendInvoice = async (req, res) => {
       dueDate: invoice.dueDate,
       notes: invoice.notes,
       payUrl: `${FRONTEND_URL}/pay/${link.linkId}`,
+      trader: { name: merchant.businessName, pin: merchant.kraPin, address: [merchant.businessArea, merchant.county].filter(Boolean).join(', ') || null },
+      etims: serializeEtims(invoice),
     });
 
     invoice.status = 'sent';
     invoice.sentAt = new Date();
     await invoice.save();
     await invoice.populate('paymentLinkId', 'linkId status');
-    await invoice.populate('etimsInvoiceId');
 
     res.json({ success: true, invoice: await serializeInvoice(invoice) });
   } catch (error) {
@@ -396,7 +418,7 @@ export const getPublicInvoice = async (req, res) => {
   try {
     const invoice = await Invoice.findOne({ publicToken: req.params.publicToken })
       .populate('paymentLinkId')
-      .populate('merchantId', 'businessName')
+      .populate('merchantId', 'businessName kraPin businessArea county')
       .populate('etimsInvoiceId');
 
     if (!invoice || invoice.status === 'draft') {
@@ -405,6 +427,7 @@ export const getPublicInvoice = async (req, res) => {
 
     const { subtotal, total } = computeTotals(invoice.items);
     const shareUrl = invoiceShareUrl(invoice, invoice.paymentLinkId);
+    const etims = serializeEtims(invoice);
 
     res.json({
       success: true,
@@ -423,9 +446,19 @@ export const getPublicInvoice = async (req, res) => {
         payLinkId: invoice.paymentLinkId?.linkId || null,
         paymentLinkStatus: invoice.paymentLinkId?.status || null,
         qrCodeDataUri: await generateQrDataUri(shareUrl),
-        // KRA requires the fiscal signature/QR appear on the actual receipt
-        // handed to the buyer — this public page is that receipt.
-        etims: serializeEtims(invoice),
+        // KRA requires the trader's name/PIN/address, the buyer's PIN (if
+        // given), the tax-rate breakdown and the fiscal signature/QR all
+        // appear on the actual receipt handed to the buyer (TIS spec item
+        // 3, 6.23) — this public page IS that receipt, so it needs all of
+        // it, not just the total.
+        trader: etims.status === 'signed'
+          ? {
+            name: invoice.merchantId?.businessName || null,
+            pin: invoice.merchantId?.kraPin || null,
+            address: [invoice.merchantId?.businessArea, invoice.merchantId?.county].filter(Boolean).join(', ') || null,
+          }
+          : null,
+        etims,
       },
     });
   } catch (error) {

@@ -9,6 +9,7 @@ import {
   sanitizeCustomer,
   getNextInvoiceNumber,
   serializeInvoice,
+  serializeEtims,
   fiscalizeWithEtims,
   FRONTEND_URL,
 } from './invoiceController.js';
@@ -105,6 +106,7 @@ export const sendDeveloperInvoice = async (req, res) => {
       }
       return res.status(502).json({ error: 'Failed to sign this invoice with KRA eTIMS. Please try again.' });
     }
+    if (invoice.etimsInvoiceId) await invoice.populate('etimsInvoiceId');
 
     let link = invoice.paymentLinkId;
     if (!link || link.status !== 'active') {
@@ -134,13 +136,14 @@ export const sendDeveloperInvoice = async (req, res) => {
       dueDate: invoice.dueDate,
       notes: invoice.notes,
       payUrl: `${FRONTEND_URL}/pay/${link.linkId}`,
+      trader: { name: merchant.businessName, pin: merchant.kraPin, address: [merchant.businessArea, merchant.county].filter(Boolean).join(', ') || null },
+      etims: serializeEtims(invoice),
     });
 
     invoice.status = 'sent';
     invoice.sentAt = new Date();
     await invoice.save();
     await invoice.populate('paymentLinkId', 'linkId status');
-    await invoice.populate('etimsInvoiceId');
 
     const serialized = await serializeInvoice(invoice);
     dispatchDeveloperEvent(developer._id, 'invoice.sent', { invoice: serialized });

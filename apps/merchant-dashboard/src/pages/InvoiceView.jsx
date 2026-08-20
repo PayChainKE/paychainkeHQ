@@ -195,6 +195,56 @@ export default function InvoiceView() {
           )}
         </div>
 
+        {/* KRA eTIMS fiscal receipt — required content per the OSCU/VSCU
+            Technical Specification (items 3 and 6.23): trader PIN, buyer
+            PIN, tax-rate breakdown, and the SCU's own signature/QR must all
+            appear on the document the buyer receives. Only rendered when
+            this invoice was actually signed by KRA — untouched otherwise. */}
+        {invoice.etims?.status === 'signed' && (
+          <div className="p-8 md:p-10 border-b border-outline-variant/10 bg-emerald-50/40">
+            <div className="flex items-center justify-center gap-2 mb-5">
+              <span className="material-symbols-outlined text-emerald-700 text-lg">verified</span>
+              <h3 className="text-xs font-black uppercase tracking-widest text-emerald-800">KRA Electronic Tax Invoice</h3>
+            </div>
+            <div className="space-y-1.5 text-xs text-on-surface-variant mb-4">
+              <div className="flex justify-between"><span>Trader</span><span className="font-bold text-primary">{invoice.trader?.name}</span></div>
+              <div className="flex justify-between"><span>Trader PIN</span><span className="font-bold text-primary">{invoice.trader?.pin}</span></div>
+              {invoice.trader?.address && <div className="flex justify-between"><span>Address</span><span className="font-medium">{invoice.trader.address}</span></div>}
+              {invoice.customer?.kraPin && <div className="flex justify-between"><span>Buyer PIN</span><span className="font-bold text-primary">{invoice.customer.kraPin}</span></div>}
+              <div className="flex justify-between"><span>CU Invoice No.</span><span className="font-bold text-primary">{invoice.etims.cuInvoiceNumber}</span></div>
+              <div className="flex justify-between"><span>Items</span><span className="font-medium">{invoice.etims.totItemCnt}</span></div>
+            </div>
+            {invoice.etims.taxBreakdown?.length > 0 && (
+              <table className="w-full text-[11px] mb-4 border-t border-emerald-900/10 pt-2">
+                <thead>
+                  <tr className="text-emerald-900/60 font-black uppercase tracking-wider">
+                    <td className="py-1">Rate</td><td className="py-1 text-right">Taxable</td><td className="py-1 text-right">Tax</td>
+                  </tr>
+                </thead>
+                <tbody>
+                  {invoice.etims.taxBreakdown.map((row) => (
+                    <tr key={row.code} className="text-on-surface-variant">
+                      <td className="py-0.5">{row.label}</td>
+                      <td className="py-0.5 text-right">{fmt(row.taxblAmt)}</td>
+                      <td className="py-0.5 text-right">{fmt(row.taxAmt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            <div className="text-[10px] text-on-surface-variant/70 leading-relaxed border-t border-emerald-900/10 pt-3 break-all">
+              <div>Internal Data: {invoice.etims.formattedInternalData}</div>
+              <div>Receipt Signature: {invoice.etims.formattedSignature}</div>
+            </div>
+            {invoice.etims.qrDataUri && (
+              <div className="mt-4 flex flex-col items-center gap-1.5">
+                <img src={invoice.etims.qrDataUri} alt="KRA receipt verification QR" className="w-24 h-24 object-contain bg-white p-1.5 rounded-xl border border-emerald-900/10" />
+                <p className="text-[9px] text-emerald-800/60 font-bold uppercase tracking-widest">Scan to verify with KRA</p>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Pay */}
         {!isPaid && !justPaid && invoice.payLinkId && (
           <div className="p-8 md:p-10">

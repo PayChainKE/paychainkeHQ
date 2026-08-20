@@ -1152,15 +1152,23 @@ export const sendBatchReceiptEmail = async (email, businessName, batchRows, tota
 // Called from invoiceController.sendInvoice — the real delivery channel
 // backing the Bulk Pay "Invoicing" feature (no SMS provider is configured
 // in this project yet, so email is the only real channel here).
+function escapeHtml(str) {
+  return String(str ?? '').replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+
 export const sendInvoiceEmail = async ({
   to, customerName, businessName, invoiceNumber, items, currency, subtotal, total, dueDate, notes, payUrl,
+  trader, etims,
 }) => {
   try {
     const fmt = (n) => `${currency} ${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const kraSigned = etims?.status === 'signed';
 
     const rowHTML = (items || []).map((item, index) => `
       <tr style="background-color: ${index % 2 === 0 ? '#f8f9fa' : '#ffffff'}; border-bottom: 1px solid #e9ecef;">
-        <td style="padding: 12px 15px; color: #333; font-size: 13px;">${item.description || '—'}</td>
+        <td style="padding: 12px 15px; color: #333; font-size: 13px;">${item.description || '—'}${kraSigned && item.taxTyCd ? ` <span style="color:#94a3b8;font-size:11px;">[${escapeHtml(item.taxTyCd)}]</span>` : ''}</td>
         <td style="padding: 12px 15px; color: #555; font-size: 13px; text-align: center;">${item.qty}</td>
         <td style="padding: 12px 15px; color: #555; font-size: 13px; text-align: right;">${fmt(item.price)}</td>
         <td style="padding: 12px 15px; color: #111; font-weight: 600; font-size: 13px; text-align: right;">${fmt(item.qty * item.price)}</td>
@@ -1168,6 +1176,33 @@ export const sendInvoiceEmail = async ({
     `).join('');
 
     const dueDateStr = dueDate ? new Date(dueDate).toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' }) : 'On receipt';
+
+    // KRA eTIMS OSCU requires the fiscal signature/QR, the trader & buyer
+    // PIN, and the tax-rate breakdown appear on the actual document handed
+    // to the buyer (TIS spec item 3, 6.23) — this email IS that document
+    // for every invoice sent through PayChain, so it's rendered here
+    // whenever this invoice was actually signed by KRA.
+    const kraBlockHTML = kraSigned ? `
+      <div style="border: 2px solid #06201B; border-radius: 10px; padding: 20px 24px; margin-bottom: 30px;">
+        <div style="text-align:center;font-size:11px;font-weight:800;letter-spacing:2px;color:#06201B;margin-bottom:14px;">KRA ELECTRONIC TAX INVOICE</div>
+        <table style="width:100%;font-size:12px;color:#334155;border-collapse:collapse;margin-bottom:12px;">
+          <tr><td style="padding:2px 0;">Trader</td><td style="text-align:right;font-weight:700;">${escapeHtml(trader?.name || businessName)}</td></tr>
+          <tr><td style="padding:2px 0;">Trader PIN</td><td style="text-align:right;font-weight:700;">${escapeHtml(trader?.pin || '')}</td></tr>
+          ${trader?.address ? `<tr><td style="padding:2px 0;">Address</td><td style="text-align:right;">${escapeHtml(trader.address)}</td></tr>` : ''}
+          <tr><td style="padding:2px 0;">CU Invoice No.</td><td style="text-align:right;font-weight:700;">${escapeHtml(etims.cuInvoiceNumber)}</td></tr>
+          <tr><td style="padding:2px 0;">Items</td><td style="text-align:right;">${etims.totItemCnt ?? items.length}</td></tr>
+        </table>
+        ${(etims.taxBreakdown || []).length ? `
+        <table style="width:100%;font-size:11px;color:#475569;border-collapse:collapse;margin-bottom:12px;border-top:1px dashed #cbd5e1;padding-top:6px;">
+          <tr style="font-weight:700;color:#06201B;"><td style="padding:6px 0 2px;">Rate</td><td style="text-align:right;">Taxable</td><td style="text-align:right;">Tax</td></tr>
+          ${etims.taxBreakdown.map((row) => `<tr><td>${escapeHtml(row.label)}</td><td style="text-align:right;">${fmt(row.taxblAmt)}</td><td style="text-align:right;">${fmt(row.taxAmt)}</td></tr>`).join('')}
+        </table>` : ''}
+        <div style="font-size:10.5px;color:#64748b;line-height:1.6;border-top:1px dashed #cbd5e1;padding-top:10px;">
+          <div>Internal Data: ${escapeHtml(etims.formattedInternalData)}</div>
+          <div>Receipt Signature: ${escapeHtml(etims.formattedSignature)}</div>
+        </div>
+        ${etims.qrDataUri ? `<div style="text-align:center;margin-top:14px;"><img src="${etims.qrDataUri}" width="110" height="110" alt="KRA receipt verification QR" /><div style="font-size:9px;color:#94a3b8;margin-top:4px;">Scan to verify with KRA</div></div>` : ''}
+      </div>` : '';
 
     const data = await resend.emails.send({
       from: 'PayChain Billing <info@paychain.co.ke>',
@@ -1238,6 +1273,8 @@ export const sendInvoiceEmail = async ({
               <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">Notes</div>
               <div style="font-size: 13px; color: #475569; white-space: pre-wrap;">${notes}</div>
             </div>` : ''}
+
+            ${kraBlockHTML}
 
             <div style="text-align: center; margin-top: 10px;">
               <a href="${payUrl}" style="display: inline-block; background-color: #06201B; color: #5EFEB3; text-decoration: none; font-weight: 800; font-size: 14px; padding: 16px 40px; border-radius: 10px; letter-spacing: 0.4px;">

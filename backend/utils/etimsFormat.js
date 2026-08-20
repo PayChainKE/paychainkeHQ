@@ -65,5 +65,28 @@ export function paymentMethodToKraCode(paymentMethod) {
 
 export const TAX_TYPE_CODES = ['A', 'B', 'C', 'D', 'E'];
 
+// Short display labels for each tax type code — shared by every place that
+// renders a receipt/invoice's tax-rate breakdown to a human.
+export const TAX_LABELS = { A: 'EX', B: 'VAT16', C: 'ZERO', D: 'NON-VAT', E: 'VAT8' };
+
 // KRA's fixed rate per tax type code, per the integration spec.
 export const TAX_RATES = { A: 0, B: 0.16, C: 0, D: 0, E: 0.08 };
+
+// Same rates, as the whole-number percentages KRA's taxRtA..taxRtE sales
+// payload fields expect (16, not 0.16) — TIS spec item 6.20.4 requires the
+// TIS be programmed with rates "A".."E" and print each on every receipt.
+export const TAX_RATE_PERCENT = Object.fromEntries(
+  TAX_TYPE_CODES.map((c) => [c, Math.round(TAX_RATES[c] * 100)])
+);
+
+// KRA's standard credit-note refund-reason codes (selectCodeList
+// classification "06"). Only exposed as a named default here — a caller with
+// a more specific reason can still pass their own code.
+export const REFUND_REASON_CODES = {
+  MISSING_QUANTITY: '01',
+  MISSING_ITEM: '02',
+  DAMAGED: '03',
+  WRONG_TAX_TYPE: '04',
+  OTHER: '05',
+};
+export const DEFAULT_REFUND_REASON_CODE = REFUND_REASON_CODES.OTHER;

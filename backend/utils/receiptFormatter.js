@@ -1,6 +1,4 @@
-import { hyphenateEvery4, money2dpString, TAX_TYPE_CODES } from './etimsFormat.js';
-
-const TAX_LABELS = { A: 'EX', B: 'VAT16', C: 'ZERO', D: 'NON-VAT', E: 'VAT8' };
+import { hyphenateEvery4, money2dpString, TAX_TYPE_CODES, TAX_LABELS } from './etimsFormat.js';
 
 function formatDisplayDateTime(date) {
   const d = new Date(date);
@@ -32,7 +30,7 @@ export function buildReceiptData(invoice, merchant) {
   return {
     trader: {
       name: merchant?.businessName || merchant?.name || '',
-      address: [merchant?.area, merchant?.county].filter(Boolean).join(', '),
+      address: [merchant?.businessArea, merchant?.county].filter(Boolean).join(', '),
       pin: merchant?.kraPin || '',
     },
     buyer: (invoice.custTin || invoice.custNm)

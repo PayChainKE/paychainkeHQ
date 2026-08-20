@@ -166,7 +166,7 @@ export async function signInvoice(req, res) {
 // POST /api/v1/etims/invoices/credit-note — issues a fiscal credit note.
 export async function issueCreditNote(req, res) {
   try {
-    const { originalInvoiceId, refundReason, refundItems } = req.body || {};
+    const { originalInvoiceId, refundReason, refundItems, refundReasonCode } = req.body || {};
     if (!originalInvoiceId) return res.status(400).json({ success: false, error: 'originalInvoiceId is required' });
 
     const original = await EtimsInvoice.findById(originalInvoiceId);
@@ -174,7 +174,7 @@ export async function issueCreditNote(req, res) {
       return res.status(404).json({ success: false, error: 'Original invoice not found' });
     }
 
-    const creditNote = await createCreditNote(originalInvoiceId, refundReason, refundItems);
+    const creditNote = await createCreditNote(originalInvoiceId, refundReason, refundItems, refundReasonCode);
     const signed = creditNote.status === 'signed';
     return res.status(signed ? 201 : 502).json({ success: signed, invoice: serializeInvoice(creditNote) });
   } catch (err) {
