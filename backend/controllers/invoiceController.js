@@ -3,8 +3,17 @@ import Invoice from '../models/Invoice.js';
 import PaymentLink from '../models/PaymentLink.js';
 import Merchant from '../models/Merchant.js';
 import Counter from '../models/Counter.js';
+import EtimsConfig from '../models/EtimsConfig.js';
 import { sendInvoiceEmail } from '../utils/resend.js';
 import { generateQrDataUri } from '../utils/qrCode.js';
+import { TAX_TYPE_CODES } from '../utils/etimsFormat.js';
+import {
+  createNormalSale,
+  InvoiceValidationError as EtimsInvoiceValidationError,
+  InsufficientStockError,
+  EtimsApiError,
+  EtimsConfigError,
+} from '../services/invoicingService.js';
 
 export const FRONTEND_URL = process.env.MERCHANT_DASHBOARD_URL || 'https://app.paychain.co.ke';
 
@@ -18,6 +27,8 @@ export const sanitizeItems = (items) =>
     description: String(i.description || '').slice(0, 200),
     qty: Math.max(0, Number(i.qty) || 0),
     price: Math.max(0, Number(i.price) || 0),
+    taxTyCd: TAX_TYPE_CODES.includes(i.taxTyCd) ? i.taxTyCd : 'B',
+    itemClsCd: i.itemClsCd ? String(i.itemClsCd).trim().slice(0, 20) : null,
   }));
 
 // Atomically reserves the next number in a single global sequence — this is
@@ -52,6 +63,7 @@ export const sanitizeCustomer = (customer) => ({
   email: customer.email?.trim() || null,
   phone: normalizePhoneKE(customer.phone),
   address: customer.address?.trim() || null,
+  kraPin: customer.kraPin ? String(customer.kraPin).trim().toUpperCase().slice(0, 20) : null,
 });
 
 // Unique per invoice, one QR encoding the same link a merchant would
@@ -61,6 +73,27 @@ export const sanitizeCustomer = (customer) => ({
 // doesn't have to special-case "no QR yet".
 export const invoiceShareUrl = (inv, link) =>
   link ? `${FRONTEND_URL}/pay/${link.linkId}` : `${FRONTEND_URL}/invoice/${inv.publicToken}`;
+
+// inv.etimsInvoiceId may be a populated EtimsInvoice doc (callers that
+// .populate() it) or just left as an ObjectId/null (callers that don't) —
+// either way this only surfaces the KRA fiscal fields when it's actually
+// the populated document, never partial/wrong data.
+function serializeEtims(inv) {
+  const etims = inv.etimsInvoiceId;
+  if (inv.etimsStatus !== 'signed' || !etims || typeof etims !== 'object' || !etims.sdcId) {
+    return { status: inv.etimsStatus || 'not_applicable' };
+  }
+  return {
+    status: 'signed',
+    cuInvoiceNumber: `${etims.sdcId}/${etims.rcptNo}`,
+    invcNo: etims.invcNo,
+    formattedInternalData: etims.formattedInternalData,
+    formattedSignature: etims.formattedSignature,
+    qrUrl: etims.qrUrl,
+    qrDataUri: etims.qrDataUri,
+    signedAt: etims.updatedAt,
+  };
+}
 
 export const serializeInvoice = async (inv) => {
   const { subtotal, total } = computeTotals(inv.items);
@@ -86,8 +119,56 @@ export const serializeInvoice = async (inv) => {
     payUrl: link ? `${FRONTEND_URL}/pay/${link.linkId}` : null,
     paymentLinkStatus: link ? link.status : null,
     qrCodeDataUri: await generateQrDataUri(shareUrl),
+    etims: serializeEtims(inv),
   };
 };
+
+// Signs this invoice with KRA eTIMS OSCU before it's ever handed to the
+// customer — mirroring the OSCU/VSCU spec's own hard requirement that a
+// receipt cannot be printed/issued until the signing round-trip finishes
+// (Technical Specification v2.0, item 10). Only runs at all when the
+// merchant has an initialized eTIMS device for the default branch ("00");
+// the vast majority of merchants (no OSCU registration yet) are completely
+// unaffected — this returns immediately and the invoice sends exactly as it
+// always has. Throws (never silently marks "sent") if eTIMS is configured
+// but signing fails, since a merchant who registered for OSCU is legally
+// required to fiscalize every tax invoice they issue.
+export async function fiscalizeWithEtims(invoice, merchant) {
+  // Already signed (e.g. a merchant re-triggering "send" on an already-sent
+  // invoice) — never re-fiscalize the same supply a second time.
+  if (invoice.etimsStatus === 'signed') return;
+
+  const bhfId = '00';
+  const config = await EtimsConfig.findOne({ merchantId: merchant._id, bhfId });
+  if (!config || !config.isInitialized) return;
+
+  const missingCls = invoice.items
+    .map((it, idx) => ({ idx, description: it.description }))
+    .filter((_, idx) => !invoice.items[idx].itemClsCd);
+  if (missingCls.length) {
+    throw new EtimsInvoiceValidationError(
+      `This account has KRA eTIMS enabled — every line item needs a KRA item classification code before this invoice can be sent. Missing on: ${missingCls.map((m) => m.description || `item ${m.idx + 1}`).join(', ')}.`
+    );
+  }
+
+  const etimsInvoice = await createNormalSale({
+    merchantId: merchant._id,
+    bhfId,
+    custTin: invoice.customer.kraPin || null,
+    custNm: invoice.customer.name,
+    paymentMethod: 'other',
+    items: invoice.items.map((it) => ({
+      itemNm: it.description,
+      qty: it.qty,
+      unitPrice: it.price,
+      taxTyCd: it.taxTyCd,
+      itemClsCd: it.itemClsCd,
+    })),
+  });
+
+  invoice.etimsInvoiceId = etimsInvoice._id;
+  invoice.etimsStatus = 'signed';
+}
 
 // @desc    List merchant's invoices
 // @route   GET /api/invoices
@@ -97,7 +178,8 @@ export const listInvoices = async (req, res) => {
     const invoices = await Invoice.find({ merchantId: req.merchant._id })
       .sort({ createdAt: -1 })
       .limit(100)
-      .populate('paymentLinkId', 'linkId status');
+      .populate('paymentLinkId', 'linkId status')
+      .populate('etimsInvoiceId');
 
     res.json({ success: true, invoices: await Promise.all(invoices.map(serializeInvoice)) });
   } catch (error) {
@@ -195,6 +277,7 @@ export const updateInvoice = async (req, res) => {
 
     await invoice.save();
     await invoice.populate('paymentLinkId', 'linkId status');
+    await invoice.populate('etimsInvoiceId');
     res.json({ success: true, invoice: await serializeInvoice(invoice) });
   } catch (error) {
     console.error('❌ Error updating invoice:', error);
@@ -220,6 +303,21 @@ export const sendInvoice = async (req, res) => {
     if (total <= 0) return res.status(400).json({ error: 'Invoice total must be greater than zero.' });
 
     const merchant = await Merchant.findById(req.merchant._id);
+
+    // Must happen before the receipt is ever handed to the customer — see
+    // fiscalizeWithEtims's own comment. A no-op for the majority of
+    // merchants who haven't registered for OSCU.
+    try {
+      await fiscalizeWithEtims(invoice, merchant);
+    } catch (err) {
+      console.error('❌ eTIMS fiscalization failed while sending invoice:', err);
+      if (err instanceof EtimsInvoiceValidationError) return res.status(400).json({ error: err.message });
+      if (err instanceof EtimsConfigError) return res.status(400).json({ error: err.message });
+      if (err instanceof EtimsApiError) {
+        return res.status(502).json({ error: `KRA eTIMS rejected this invoice: ${err.message}` });
+      }
+      return res.status(502).json({ error: 'Failed to sign this invoice with KRA eTIMS. Please try again.' });
+    }
 
     // Reuse an existing active payment link if one is still valid, otherwise mint a fresh one.
     // Invoice-backed links get 90 days — invoices are often issued against
@@ -259,6 +357,7 @@ export const sendInvoice = async (req, res) => {
     invoice.sentAt = new Date();
     await invoice.save();
     await invoice.populate('paymentLinkId', 'linkId status');
+    await invoice.populate('etimsInvoiceId');
 
     res.json({ success: true, invoice: await serializeInvoice(invoice) });
   } catch (error) {
@@ -297,7 +396,8 @@ export const getPublicInvoice = async (req, res) => {
   try {
     const invoice = await Invoice.findOne({ publicToken: req.params.publicToken })
       .populate('paymentLinkId')
-      .populate('merchantId', 'businessName');
+      .populate('merchantId', 'businessName')
+      .populate('etimsInvoiceId');
 
     if (!invoice || invoice.status === 'draft') {
       return res.status(404).json({ error: 'Invoice not found.' });
@@ -323,6 +423,9 @@ export const getPublicInvoice = async (req, res) => {
         payLinkId: invoice.paymentLinkId?.linkId || null,
         paymentLinkStatus: invoice.paymentLinkId?.status || null,
         qrCodeDataUri: await generateQrDataUri(shareUrl),
+        // KRA requires the fiscal signature/QR appear on the actual receipt
+        // handed to the buyer — this public page is that receipt.
+        etims: serializeEtims(invoice),
       },
     });
   } catch (error) {

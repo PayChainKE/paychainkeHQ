@@ -9,6 +9,16 @@ const invoiceItemSchema = new mongoose.Schema({
   description: { type: String, default: '' },
   qty: { type: Number, required: true, default: 1 },
   price: { type: Number, required: true, default: 0 },
+  // KRA eTIMS OSCU fields — only enforced (in invoiceController.js) when
+  // the merchant actually has an initialized eTIMS device; a merchant who
+  // hasn't registered for OSCU never has to fill these in. taxTyCd defaults
+  // to 'B' (16% standard VAT), KRA's most common rate — 'A'/'C'/'D'/'E' cover
+  // exempt/zero-rated/non-VAT/8% goods (see utils/etimsFormat.js TAX_RATES).
+  taxTyCd: { type: String, enum: ['A', 'B', 'C', 'D', 'E'], default: 'B' },
+  // KRA UNSPSC item classification code — no safe generic default exists
+  // (guessing one risks misclassifying a real supply), so this stays null
+  // until the merchant sets it; required at send time only if eTIMS applies.
+  itemClsCd: { type: String, default: null },
 }, { _id: false });
 
 const invoiceSchema = new mongoose.Schema({
@@ -39,6 +49,9 @@ const invoiceSchema = new mongoose.Schema({
     email:   { type: String, default: null },
     phone:   { type: String, default: null },
     address: { type: String, default: null },
+    // Buyer's KRA PIN — optional per the OSCU spec ("Buyer's PIN (Optional)"),
+    // sent to KRA as custTin when this invoice is fiscalized.
+    kraPin:  { type: String, default: null },
   },
   items: {
     type: [invoiceItemSchema],
@@ -93,6 +106,27 @@ const invoiceSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Developer',
     default: null,
+  },
+  // Set only when this merchant has an initialized eTIMS OSCU device and
+  // this invoice was actually signed by KRA at send time — see
+  // fiscalizeWithEtims() in invoiceController.js. Left null for every
+  // merchant not registered for OSCU (the large majority today), so this
+  // is purely additive and never blocks the existing invoice flow.
+  etimsInvoiceId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'EtimsInvoice',
+    default: null,
+  },
+  // 'not_applicable': merchant has no initialized eTIMS device (default,
+  // unaffected flow). 'signed': KRA accepted and signed this invoice at
+  // send time. A send that would otherwise produce 'failed' is instead
+  // rejected outright (see sendInvoice) — KRA's own spec requires a receipt
+  // be signed before it's ever handed to the customer, so a fiscalization
+  // failure must block delivery, not silently mark the invoice sent anyway.
+  etimsStatus: {
+    type: String,
+    enum: ['not_applicable', 'signed'],
+    default: 'not_applicable',
   },
 }, { timestamps: true });
 

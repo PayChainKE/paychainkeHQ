@@ -9,9 +9,15 @@ import {
   sanitizeCustomer,
   getNextInvoiceNumber,
   serializeInvoice,
+  fiscalizeWithEtims,
   FRONTEND_URL,
 } from './invoiceController.js';
 import { dispatchDeveloperEvent } from '../services/webhookDeliveryService.js';
+import {
+  InvoiceValidationError as EtimsInvoiceValidationError,
+  EtimsApiError,
+  EtimsConfigError,
+} from '../services/invoicingService.js';
 
 // Developer-API mirror of invoiceController.js's createInvoice/sendInvoice —
 // reuses the exact same helpers (sanitizeCustomer, serializeInvoice, the
@@ -85,6 +91,21 @@ export const sendDeveloperInvoice = async (req, res) => {
 
     const merchant = await Merchant.findById(merchantId);
 
+    // Must happen before the receipt is ever handed to the customer — see
+    // fiscalizeWithEtims's own comment in invoiceController.js. A no-op for
+    // the majority of merchants who haven't registered for KRA OSCU.
+    try {
+      await fiscalizeWithEtims(invoice, merchant);
+    } catch (err) {
+      console.error('❌ eTIMS fiscalization failed while sending developer-created invoice:', err);
+      if (err instanceof EtimsInvoiceValidationError) return res.status(400).json({ error: err.message });
+      if (err instanceof EtimsConfigError) return res.status(400).json({ error: err.message });
+      if (err instanceof EtimsApiError) {
+        return res.status(502).json({ error: `KRA eTIMS rejected this invoice: ${err.message}` });
+      }
+      return res.status(502).json({ error: 'Failed to sign this invoice with KRA eTIMS. Please try again.' });
+    }
+
     let link = invoice.paymentLinkId;
     if (!link || link.status !== 'active') {
       link = await PaymentLink.create({
@@ -119,6 +140,7 @@ export const sendDeveloperInvoice = async (req, res) => {
     invoice.sentAt = new Date();
     await invoice.save();
     await invoice.populate('paymentLinkId', 'linkId status');
+    await invoice.populate('etimsInvoiceId');
 
     const serialized = await serializeInvoice(invoice);
     dispatchDeveloperEvent(developer._id, 'invoice.sent', { invoice: serialized });
@@ -139,7 +161,9 @@ export const getDeveloperInvoice = async (req, res) => {
     // it's only ever set to the developer that created the invoice in the
     // first place, so it already excludes every other developer and every
     // dashboard-created invoice with no possible cross-tenant overlap.
-    const invoice = await Invoice.findOne({ _id: req.params.id, createdViaDeveloperId: req.developer._id }).populate('paymentLinkId', 'linkId status');
+    const invoice = await Invoice.findOne({ _id: req.params.id, createdViaDeveloperId: req.developer._id })
+      .populate('paymentLinkId', 'linkId status')
+      .populate('etimsInvoiceId');
     if (!invoice) return res.status(404).json({ error: 'Invoice not found.' });
     res.json({ success: true, invoice: await serializeInvoice(invoice) });
   } catch (error) {
@@ -156,7 +180,8 @@ export const listDeveloperInvoices = async (req, res) => {
     const invoices = await Invoice.find({ createdViaDeveloperId: req.developer._id })
       .sort({ createdAt: -1 })
       .limit(100)
-      .populate('paymentLinkId', 'linkId status');
+      .populate('paymentLinkId', 'linkId status')
+      .populate('etimsInvoiceId');
     res.json({ success: true, invoices: await Promise.all(invoices.map(serializeInvoice)) });
   } catch (error) {
     console.error('List Developer Invoices Error:', error);

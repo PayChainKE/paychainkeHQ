@@ -25,11 +25,14 @@ export function hyphenateEvery4(raw) {
   return String(raw).match(/.{1,4}/g).join('-');
 }
 
-// Per the integration spec: tin, bhfId, and the raw (unhyphenated) rcptSign
-// are concatenated directly into the query string, not passed as separate
-// key=value pairs.
+// Per the Technical Specification of TIS for OSCU/VSCU v2.0 (worked receipt
+// examples, p.8/p.10): tin, bhfId, and the raw (unhyphenated) rcptSign are
+// concatenated directly into the query string, not passed as separate
+// key=value pairs. The path segment is "indexEtimsReceptData" (missing the
+// "i" in "Receipt") in KRA's own published examples — not a typo to "fix",
+// since a corrected spelling would 404 against KRA's real, deployed URL.
 export function buildQrVerificationUrl(tin, bhfId, rcptSignRaw) {
-  return `https://etims.kra.go.ke/common/link/etims/receipt/indexEtimsReceiptData?${tin}${bhfId}${rcptSignRaw || ''}`;
+  return `https://etims.kra.go.ke/common/link/etims/receipt/indexEtimsReceptData?${tin}${bhfId}${rcptSignRaw || ''}`;
 }
 
 // KRA date fields are plain YYYYMMDD strings, not ISO timestamps.

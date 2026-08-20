@@ -45,7 +45,7 @@ describe('etimsFormat helpers', () => {
 
   test('buildQrVerificationUrl concatenates tin+bhfId+rcptSign into the query string', () => {
     const url = buildQrVerificationUrl('P123456789X', '00', 'TE68SLA234J5');
-    expect(url).toBe('https://etims.kra.go.ke/common/link/etims/receipt/indexEtimsReceiptData?P123456789X00TE68SLA234J5');
+    expect(url).toBe('https://etims.kra.go.ke/common/link/etims/receipt/indexEtimsReceptData?P123456789X00TE68SLA234J5');
   });
 
   test('formatKraDate / formatKraDateTime use KRA numeric formats', () => {
@@ -136,7 +136,7 @@ describe('receiptFormatter', () => {
     rcptSign: 'SIM0000000042RCPTSIGN00000000000',
     intrlData: 'SIM0000000042INTRLDATA0000000000',
     formattedSignature: null, formattedInternalData: null,
-    qrUrl: 'https://etims.kra.go.ke/common/link/etims/receipt/indexEtimsReceiptData?P123456789X00SIM',
+    qrUrl: 'https://etims.kra.go.ke/common/link/etims/receipt/indexEtimsReceptData?P123456789X00SIM',
     qrDataUri: null, createdAt: new Date('2026-08-17T09:00:00Z'),
   };
   const merchant = { businessName: 'PayChain QA Biz', kraPin: 'P123456789X', area: 'CBD', county: 'Nairobi' };
