@@ -166,7 +166,11 @@ export default function InvoiceView() {
         <div className="p-8 md:p-10 border-b border-outline-variant/10">
           <h3 className="text-[10px] text-on-surface-variant font-black uppercase tracking-widest opacity-60 mb-4">Itemized Breakdown</h3>
           <div className="space-y-3">
-            {(invoice.items || []).map((item, i) => (
+            {(invoice.items || []).map((item, i) => {
+              const gross = (item.qty || 0) * (item.price || 0);
+              const rate = item.discountRate || 0;
+              const lineDiscount = rate > 0 ? gross * (rate / 100) : 0;
+              return (
               <div key={i} className="flex items-center justify-between gap-4 py-2 border-b border-outline-variant/5 last:border-0">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-primary truncate">
@@ -176,14 +180,32 @@ export default function InvoiceView() {
                     )}
                   </p>
                   <p className="text-[11px] text-on-surface-variant opacity-60">{item.qty} × {fmt(item.price)}</p>
+                  {rate > 0 && (
+                    <p className="text-[11px] text-emerald-700/70 font-medium">Discount {rate}% (-{fmt(lineDiscount)})</p>
+                  )}
                 </div>
-                <p className="text-sm font-bold text-primary shrink-0">{fmt(item.qty * item.price)}</p>
+                <p className="text-sm font-bold text-primary shrink-0">{fmt(gross - lineDiscount)}</p>
               </div>
-            ))}
+              );
+            })}
           </div>
-          <div className="flex items-center justify-between pt-4 mt-2 border-t-2 border-outline-variant/10">
-            <p className="text-sm font-black text-primary uppercase tracking-widest">Total</p>
-            <p className="font-headline text-xl font-black text-primary">{fmt(invoice.total)}</p>
+          <div className="pt-4 mt-2 border-t-2 border-outline-variant/10 space-y-1.5">
+            {invoice.discount > 0 && (
+              <>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold text-on-surface-variant opacity-60">Subtotal</p>
+                  <p className="text-sm font-bold text-primary">{fmt(invoice.subtotal)}</p>
+                </div>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold text-on-surface-variant opacity-60">Discount</p>
+                  <p className="text-sm font-bold text-primary">-{fmt(invoice.discount)}</p>
+                </div>
+              </>
+            )}
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-black text-primary uppercase tracking-widest">Total</p>
+              <p className="font-headline text-xl font-black text-primary">{fmt(invoice.total)}</p>
+            </div>
           </div>
           {invoice.notes && (
             <div className="mt-6 p-4 rounded-2xl bg-surface-container-lowest border border-outline-variant/10">

@@ -9,6 +9,12 @@ const invoiceItemSchema = new mongoose.Schema({
   description: { type: String, default: '' },
   qty: { type: Number, required: true, default: 1 },
   price: { type: Number, required: true, default: 0 },
+  // Percentage off this line's gross (qty * price), 0-100. Applies to every
+  // invoice regardless of eTIMS status — a general billing feature, not a
+  // KRA-only one — but it's also what lets a fiscalized invoice carry KRA's
+  // required "discount narration and value" per line (TIS spec's worked
+  // receipt example).
+  discountRate: { type: Number, default: 0, min: 0, max: 100 },
   // KRA eTIMS OSCU fields — only enforced (in invoiceController.js) when
   // the merchant actually has an initialized eTIMS device; a merchant who
   // hasn't registered for OSCU never has to fill these in. taxTyCd defaults

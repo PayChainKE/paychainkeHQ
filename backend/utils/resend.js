@@ -1160,21 +1160,28 @@ function escapeHtml(str) {
 }
 
 export const sendInvoiceEmail = async ({
-  to, customerName, businessName, invoiceNumber, items, currency, subtotal, total, dueDate, notes, payUrl,
+  to, customerName, businessName, invoiceNumber, items, currency, subtotal, discount, total, dueDate, notes, payUrl,
   trader, etims,
 }) => {
   try {
     const fmt = (n) => `${currency} ${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     const kraSigned = etims?.status === 'signed';
 
-    const rowHTML = (items || []).map((item, index) => `
+    const rowHTML = (items || []).map((item, index) => {
+      const gross = (Number(item.qty) || 0) * (Number(item.price) || 0);
+      const rate = Number(item.discountRate) || 0;
+      const lineDiscountAmt = rate > 0 ? gross * (rate / 100) : 0;
+      return `
       <tr style="background-color: ${index % 2 === 0 ? '#f8f9fa' : '#ffffff'}; border-bottom: 1px solid #e9ecef;">
-        <td style="padding: 12px 15px; color: #333; font-size: 13px;">${item.description || '—'}${kraSigned && item.taxTyCd ? ` <span style="color:#94a3b8;font-size:11px;">[${escapeHtml(item.taxTyCd)}]</span>` : ''}</td>
+        <td style="padding: 12px 15px; color: #333; font-size: 13px;">${item.description || '—'}${kraSigned && item.taxTyCd ? ` <span style="color:#94a3b8;font-size:11px;">[${escapeHtml(item.taxTyCd)}]</span>` : ''}
+          ${rate > 0 ? `<div style="color:#94a3b8;font-size:11px;margin-top:2px;">Discount ${rate}% (-${fmt(lineDiscountAmt)})</div>` : ''}
+        </td>
         <td style="padding: 12px 15px; color: #555; font-size: 13px; text-align: center;">${item.qty}</td>
         <td style="padding: 12px 15px; color: #555; font-size: 13px; text-align: right;">${fmt(item.price)}</td>
-        <td style="padding: 12px 15px; color: #111; font-weight: 600; font-size: 13px; text-align: right;">${fmt(item.qty * item.price)}</td>
+        <td style="padding: 12px 15px; color: #111; font-weight: 600; font-size: 13px; text-align: right;">${fmt(gross - lineDiscountAmt)}</td>
       </tr>
-    `).join('');
+    `;
+    }).join('');
 
     const dueDateStr = dueDate ? new Date(dueDate).toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' }) : 'On receipt';
 
@@ -1266,6 +1273,10 @@ export const sendInvoiceEmail = async ({
                 <div style="display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px; color: #64748b;">
                   <span>Subtotal</span><span>${fmt(subtotal)}</span>
                 </div>
+                ${discount > 0 ? `
+                <div style="display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px; color: #64748b;">
+                  <span>Discount</span><span>-${fmt(discount)}</span>
+                </div>` : ''}
                 <div style="display: flex; justify-content: space-between; padding: 12px 0; border-top: 2px solid #e2e8f0; font-size: 15px; font-weight: 800; color: #06201B;">
                   <span>Total</span><span>${fmt(total)}</span>
                 </div>

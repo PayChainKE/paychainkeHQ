@@ -5,6 +5,7 @@ import Merchant from '../models/Merchant.js';
 import { safeSendSMS, sendStaggeredSms, formatKes } from '../utils/smsSanitizer.js';
 import { processSplitTransaction, processInvoiceSplitTransaction, splitCustomerSurcharge, getCheckoutTotal, PricingEngineError } from '../utils/pricingEngine.js';
 import { sendInvoicePaidReceiptEmail } from '../utils/resend.js';
+import { computeTotals } from './invoiceController.js';
 import STKRequest from '../models/STKRequest.js';
 import PayoutBatch from '../models/PayoutBatch.js';
 import PaymentLink from '../models/PaymentLink.js';
@@ -324,7 +325,7 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
             });
 
             if (paidInvoice && merchant.email) {
-              const paidSubtotal = (paidInvoice.items || []).reduce((sum, i) => sum + i.qty * i.price, 0);
+              const { subtotal: paidSubtotal, total: paidTotal } = computeTotals(paidInvoice.items);
               sendInvoicePaidReceiptEmail({
                 to: merchant.email,
                 businessName: merchant.businessName,
@@ -333,7 +334,7 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
                 items: paidInvoice.items,
                 currency: paidInvoice.currency,
                 subtotal: paidSubtotal,
-                total: paidSubtotal,
+                total: paidTotal,
                 paidAt: paidInvoice.paidAt,
                 mpesaReceipt: receipt,
                 payerPhone: stkReq.phone,

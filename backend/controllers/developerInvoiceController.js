@@ -87,7 +87,7 @@ export const sendDeveloperInvoice = async (req, res) => {
       return res.status(400).json({ error: 'Every line item needs a description before sending.' });
     }
 
-    const { total } = computeTotals(invoice.items);
+    const { subtotal, discount, total } = computeTotals(invoice.items);
     if (total <= 0) return res.status(400).json({ error: 'Invoice total must be greater than zero.' });
 
     const merchant = await Merchant.findById(merchantId);
@@ -131,7 +131,8 @@ export const sendDeveloperInvoice = async (req, res) => {
       invoiceNumber: invoice.invoiceNumber,
       items: invoice.items,
       currency: invoice.currency,
-      subtotal: total,
+      subtotal,
+      discount,
       total,
       dueDate: invoice.dueDate,
       notes: invoice.notes,

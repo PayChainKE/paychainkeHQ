@@ -17,9 +17,18 @@ import {
 
 export const FRONTEND_URL = process.env.MERCHANT_DASHBOARD_URL || 'https://app.paychain.co.ke';
 
+// Per-item discount comes off the line's gross (qty * price) before it's
+// added into the invoice total — same math the KRA fiscalization path
+// already does per-item (invoicingService.computeItemTax), just without the
+// tax step, since a plain (non-eTIMS) invoice has none.
+const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+const lineDiscount = (i) => round2((Number(i.qty) || 0) * (Number(i.price) || 0) * (Math.min(100, Math.max(0, Number(i.discountRate) || 0)) / 100));
+
 export const computeTotals = (items = []) => {
-  const subtotal = items.reduce((sum, i) => sum + (Number(i.qty) || 0) * (Number(i.price) || 0), 0);
-  return { subtotal, total: subtotal };
+  const gross = items.reduce((sum, i) => sum + (Number(i.qty) || 0) * (Number(i.price) || 0), 0);
+  const discount = items.reduce((sum, i) => sum + lineDiscount(i), 0);
+  const subtotal = round2(gross);
+  return { subtotal, discount: round2(discount), total: round2(gross - discount) };
 };
 
 export const sanitizeItems = (items) =>
@@ -27,6 +36,7 @@ export const sanitizeItems = (items) =>
     description: String(i.description || '').slice(0, 200),
     qty: Math.max(0, Number(i.qty) || 0),
     price: Math.max(0, Number(i.price) || 0),
+    discountRate: Math.min(100, Math.max(0, Number(i.discountRate) || 0)),
     taxTyCd: TAX_TYPE_CODES.includes(i.taxTyCd) ? i.taxTyCd : 'B',
     itemClsCd: i.itemClsCd ? String(i.itemClsCd).trim().slice(0, 20) : null,
   }));
@@ -117,7 +127,7 @@ export function serializeEtims(inv) {
 }
 
 export const serializeInvoice = async (inv) => {
-  const { subtotal, total } = computeTotals(inv.items);
+  const { subtotal, discount, total } = computeTotals(inv.items);
   const link = inv.paymentLinkId && inv.paymentLinkId.linkId ? inv.paymentLinkId : null;
   const shareUrl = invoiceShareUrl(inv, link);
   return {
@@ -133,6 +143,7 @@ export const serializeInvoice = async (inv) => {
     recurring: inv.recurring,
     status: inv.status,
     subtotal,
+    discount,
     total,
     sentAt: inv.sentAt,
     paidAt: inv.paidAt,
@@ -186,6 +197,12 @@ export async function fiscalizeWithEtims(invoice, merchant) {
       unitPrice: it.price,
       taxTyCd: it.taxTyCd,
       itemClsCd: it.itemClsCd,
+      // computeItemTax (invoicingService.js) takes the discount as an
+      // absolute currency amount off the gross; dcRt is carried alongside
+      // purely as the informational rate KRA's own receipt layout prints
+      // next to it ("Discount narration and value: 25%").
+      discountAmt: lineDiscount(it),
+      dcRt: it.discountRate || 0,
     })),
   });
 
@@ -322,7 +339,7 @@ export const sendInvoice = async (req, res) => {
       return res.status(400).json({ error: 'Every line item needs a description before sending.' });
     }
 
-    const { subtotal, total } = computeTotals(invoice.items);
+    const { subtotal, discount, total } = computeTotals(invoice.items);
     if (total <= 0) return res.status(400).json({ error: 'Invoice total must be greater than zero.' });
 
     const merchant = await Merchant.findById(req.merchant._id);
@@ -371,6 +388,7 @@ export const sendInvoice = async (req, res) => {
       items: invoice.items,
       currency: invoice.currency,
       subtotal,
+      discount,
       total,
       dueDate: invoice.dueDate,
       notes: invoice.notes,
@@ -428,7 +446,7 @@ export const getPublicInvoice = async (req, res) => {
       return res.status(404).json({ error: 'Invoice not found.' });
     }
 
-    const { subtotal, total } = computeTotals(invoice.items);
+    const { subtotal, discount, total } = computeTotals(invoice.items);
     const shareUrl = invoiceShareUrl(invoice, invoice.paymentLinkId);
     const etims = serializeEtims(invoice);
 
@@ -444,6 +462,7 @@ export const getPublicInvoice = async (req, res) => {
         dueDate: invoice.dueDate,
         notes: invoice.notes,
         subtotal,
+        discount,
         total,
         status: invoice.status,
         payLinkId: invoice.paymentLinkId?.linkId || null,
