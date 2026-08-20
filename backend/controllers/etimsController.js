@@ -31,19 +31,28 @@ function serializeInvoice(invoice) {
   };
 }
 
-// GET /api/v1/etims/config — whether this merchant has an initialized eTIMS
-// device (default branch "00"). Non-sensitive summary only, no cmcKey — the
-// dashboard uses this to decide whether to show KRA-specific invoice fields
-// at all, so the ~99% of merchants without OSCU never see them.
+// GET /api/v1/etims/config — whether this merchant has (or will silently
+// get, on their next invoice send) an active eTIMS device for the default
+// branch ("00"). Non-sensitive summary only, no cmcKey. There's no
+// merchant-facing "enable eTIMS" action — invoiceController.fiscalizeWithEtims
+// auto-activates a device the moment it's needed — so `eligible` (a
+// plausible-format KRA PIN on file) is what the dashboard uses to decide
+// whether to show KRA-specific invoice fields, not `isInitialized`: a
+// merchant needs to be able to fill in item classification codes on their
+// very first invoice, before any send has had the chance to activate
+// anything. The ~99% of merchants with no KRA PIN never see these fields.
 export async function getConfig(req, res) {
   try {
     const { bhfId = '00' } = req.query;
-    const config = await EtimsConfig.findOne({ merchantId: req.merchant._id, bhfId });
+    const merchant = req.merchant;
+    const eligible = !!(merchant.kraPin && merchant.isKRAVerified);
+    const config = await EtimsConfig.findOne({ merchantId: merchant._id, bhfId });
     if (!config || !config.isInitialized) {
-      return res.json({ success: true, isInitialized: false });
+      return res.json({ success: true, eligible, isInitialized: false });
     }
     return res.json({
       success: true,
+      eligible,
       isInitialized: true,
       tin: config.tin,
       bhfId: config.bhfId,

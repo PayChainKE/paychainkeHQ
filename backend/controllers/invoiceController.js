@@ -3,12 +3,12 @@ import Invoice from '../models/Invoice.js';
 import PaymentLink from '../models/PaymentLink.js';
 import Merchant from '../models/Merchant.js';
 import Counter from '../models/Counter.js';
-import EtimsConfig from '../models/EtimsConfig.js';
 import { sendInvoiceEmail } from '../utils/resend.js';
 import { generateQrDataUri } from '../utils/qrCode.js';
 import { TAX_TYPE_CODES, TAX_LABELS, money2dpString } from '../utils/etimsFormat.js';
 import {
   createNormalSale,
+  ensureEtimsDevice,
   InvoiceValidationError as EtimsInvoiceValidationError,
   InsufficientStockError,
   EtimsApiError,
@@ -146,21 +146,23 @@ export const serializeInvoice = async (inv) => {
 // Signs this invoice with KRA eTIMS OSCU before it's ever handed to the
 // customer — mirroring the OSCU/VSCU spec's own hard requirement that a
 // receipt cannot be printed/issued until the signing round-trip finishes
-// (Technical Specification v2.0, item 10). Only runs at all when the
-// merchant has an initialized eTIMS device for the default branch ("00");
-// the vast majority of merchants (no OSCU registration yet) are completely
-// unaffected — this returns immediately and the invoice sends exactly as it
-// always has. Throws (never silently marks "sent") if eTIMS is configured
-// but signing fails, since a merchant who registered for OSCU is legally
-// required to fiscalize every tax invoice they issue.
+// (Technical Specification v2.0, item 10). No merchant ever flips an
+// "enable eTIMS" switch — ensureEtimsDevice silently activates OSCU the
+// first time it's needed for any merchant with a KRA PIN on file, so this
+// just runs on every send. The vast majority of merchants (no verified KRA
+// PIN, or KRA hasn't approved OSCU for them yet) are completely unaffected
+// — ensureEtimsDevice returns null and the invoice sends exactly as it
+// always has. Once a device IS active, though, this throws (never silently
+// marks "sent") if signing fails, since a merchant KRA already recognizes
+// for OSCU is legally required to fiscalize every tax invoice they issue.
 export async function fiscalizeWithEtims(invoice, merchant) {
   // Already signed (e.g. a merchant re-triggering "send" on an already-sent
   // invoice) — never re-fiscalize the same supply a second time.
   if (invoice.etimsStatus === 'signed') return;
 
   const bhfId = '00';
-  const config = await EtimsConfig.findOne({ merchantId: merchant._id, bhfId });
-  if (!config || !config.isInitialized) return;
+  const config = await ensureEtimsDevice(merchant, bhfId);
+  if (!config) return;
 
   const missingCls = invoice.items
     .map((it, idx) => ({ idx, description: it.description }))

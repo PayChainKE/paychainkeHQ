@@ -35,6 +35,12 @@ const etimsConfigSchema = new mongoose.Schema({
   environment: { type: String, enum: ['sandbox', 'production'], default: 'sandbox' },
   initializedAt: { type: Date, default: null },
   lastError: { type: String, default: null },
+  // Set every time an activation attempt runs — including a failed one.
+  // Lets the automatic (no-merchant-action) activation in
+  // invoicingService.ensureEtimsDevice back off after a failure instead of
+  // re-hitting KRA's real infrastructure on every single invoice a
+  // not-yet-OSCU-approved merchant sends.
+  lastAttemptAt: { type: Date, default: null },
 }, { timestamps: true });
 
 etimsConfigSchema.index({ merchantId: 1, bhfId: 1 }, { unique: true });

@@ -114,7 +114,11 @@ export default function Invoices() {
       const res = await axios.get(`${API_URL}/api/v1/etims/config`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setEtimsEnabled(!!res.data.isInitialized);
+      // `eligible` (a KRA PIN on file), not `isInitialized` — there's no
+      // "enable eTIMS" action for a merchant to take, activation happens
+      // silently on first send, so the fields need to be visible before
+      // that ever happens, not after.
+      setEtimsEnabled(!!(res.data.eligible || res.data.isInitialized));
     } catch (err) {
       // Non-fatal — just means the KRA-specific fields stay hidden
     }

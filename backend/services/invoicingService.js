@@ -1,13 +1,68 @@
 import EtimsConfig from '../models/EtimsConfig.js';
 import EtimsInvoice from '../models/EtimsInvoice.js';
 import Merchant from '../models/Merchant.js';
-import { saveSalesTransaction, getCmcKeyPlain, EtimsApiError, EtimsConfigError } from './etimsClient.js';
+import { saveSalesTransaction, initializeDevice, getCmcKeyPlain, EtimsApiError, EtimsConfigError } from './etimsClient.js';
 import { generateQrDataUri } from '../utils/qrCode.js';
+import { encryptKey } from '../utils/cryptoHelper.js';
+import { isValidKraPin } from '../utils/kraPinValidator.js';
 import {
   money2dp, hyphenateEvery4, buildQrVerificationUrl,
   formatKraDate, formatKraDateTime, paymentMethodToKraCode, TAX_RATES, TAX_RATE_PERCENT, TAX_TYPE_CODES,
   DEFAULT_REFUND_REASON_CODE,
 } from '../utils/etimsFormat.js';
+
+// A PayChain merchant never registers a physical/virtual "device" with
+// KRA themselves — OSCU has no real hardware to name, so PayChain (as the
+// Trader Invoicing System) mints a stable, deterministic device identity on
+// their behalf. No merchant-facing field, ever.
+const AUTO_DEVICE_SERIAL = (merchantId, bhfId) => `PAYCHAIN-${bhfId}-${merchantId}`;
+
+// How long to back off after a failed auto-activation attempt before
+// trying again. A merchant with a KRA-PIN on file but no completed OSCU
+// approval from KRA yet would otherwise cause every single invoice send to
+// re-hit KRA's real infrastructure with a call that's going to fail again.
+const AUTO_INIT_COOLDOWN_MS = 60 * 60 * 1000;
+
+// Makes sure this merchant+branch has an activated OSCU device, activating
+// one silently if not — no dashboard screen, no serial number, no
+// environment picker. Returns the initialized config, or null when eTIMS
+// isn't (yet, or ever) available for this merchant: no plausible-format KRA
+// PIN on file, or KRA itself hasn't approved OSCU for this taxpayer yet
+// (a real external approval process — see the OSCU sign-up guide — that no
+// amount of PayChain-side automation can skip). Callers must treat null as
+// "send the invoice normally, unfiscalized" and never as an error.
+export async function ensureEtimsDevice(merchant, bhfId = '00') {
+  if (!merchant.kraPin || !merchant.isKRAVerified || !isValidKraPin(merchant.kraPin)) return null;
+
+  let config = await EtimsConfig.findOne({ merchantId: merchant._id, bhfId }).select('+cmcKeyEncrypted');
+  if (config?.isInitialized) return config;
+  if (config?.lastAttemptAt && Date.now() - config.lastAttemptAt.getTime() < AUTO_INIT_COOLDOWN_MS) return null;
+
+  const dvcSrlNo = AUTO_DEVICE_SERIAL(merchant._id, bhfId);
+  const environment = process.env.ETIMS_DEFAULT_ENVIRONMENT === 'production' ? 'production' : 'sandbox';
+
+  try {
+    const { cmcKey } = await initializeDevice({ tin: merchant.kraPin, bhfId, dvcSrlNo, environment });
+    if (!config) config = new EtimsConfig({ merchantId: merchant._id, bhfId });
+    config.tin = merchant.kraPin;
+    config.dvcSrlNo = dvcSrlNo;
+    config.environment = environment;
+    config.cmcKeyEncrypted = encryptKey(cmcKey);
+    config.isInitialized = true;
+    config.initializedAt = new Date();
+    config.lastError = null;
+    config.lastAttemptAt = new Date();
+    await config.save();
+    return config;
+  } catch (err) {
+    if (!config) config = new EtimsConfig({ merchantId: merchant._id, bhfId, tin: merchant.kraPin, dvcSrlNo, environment });
+    config.lastError = err.message;
+    config.lastAttemptAt = new Date();
+    await config.save();
+    console.error('etims.autoActivate failed:', JSON.stringify({ merchantId: String(merchant._id), bhfId, message: err.message }));
+    return null;
+  }
+}
 
 export class InsufficientStockError extends Error {
   constructor(message, details) {
