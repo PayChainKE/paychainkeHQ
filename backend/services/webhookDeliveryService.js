@@ -12,6 +12,9 @@ export const WEBHOOK_EVENT_TYPES = [
   'payment.collect.failed',
   'payment.payout.succeeded',
   'payment.payout.failed',
+  'invoice.sent',
+  'invoice.paid',
+  'bulk_payment.completed',
 ];
 
 const DELIVERY_TIMEOUT_MS = 10_000;

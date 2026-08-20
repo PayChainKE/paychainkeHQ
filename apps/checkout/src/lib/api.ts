@@ -23,6 +23,7 @@ export interface CheckoutSession {
   status: "pending" | "processing" | "success" | "expired";
   merchantName: string;
   prefillPhone: string | null;
+  qrCodeDataUri: string;
 }
 
 export interface CheckoutStatus {
