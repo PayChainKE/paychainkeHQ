@@ -138,6 +138,11 @@ export default function InvoiceView() {
             </div>
           </div>
           <h2 className="relative z-10 font-headline text-2xl text-white mb-1">{invoice.businessName}</h2>
+          {(invoice.trader?.address || invoice.trader?.email || invoice.trader?.phone) && (
+            <p className="relative z-10 text-[11px] text-white/40 font-medium mb-2">
+              {[invoice.trader.address, invoice.trader.email, invoice.trader.phone].filter(Boolean).join(' · ')}
+            </p>
+          )}
           <p className="relative z-10 text-sm text-white/50 font-medium">Billed to {invoice.customer?.name}</p>
         </div>
 

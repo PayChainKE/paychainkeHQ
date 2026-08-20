@@ -393,7 +393,7 @@ export const sendInvoice = async (req, res) => {
       dueDate: invoice.dueDate,
       notes: invoice.notes,
       payUrl: `${FRONTEND_URL}/pay/${link.linkId}`,
-      trader: { name: merchant.businessName, pin: merchant.kraPin, address: [merchant.businessArea, merchant.county].filter(Boolean).join(', ') || null },
+      trader: { name: merchant.businessName, email: merchant.email, phone: merchant.phone, pin: merchant.kraPin, address: [merchant.businessArea, merchant.county].filter(Boolean).join(', ') || null },
       etims: serializeEtims(invoice),
     });
 
@@ -439,7 +439,7 @@ export const getPublicInvoice = async (req, res) => {
   try {
     const invoice = await Invoice.findOne({ publicToken: req.params.publicToken })
       .populate('paymentLinkId')
-      .populate('merchantId', 'businessName kraPin businessArea county')
+      .populate('merchantId', 'businessName kraPin businessArea county email phone')
       .populate('etimsInvoiceId');
 
     if (!invoice || invoice.status === 'draft') {
@@ -468,18 +468,18 @@ export const getPublicInvoice = async (req, res) => {
         payLinkId: invoice.paymentLinkId?.linkId || null,
         paymentLinkStatus: invoice.paymentLinkId?.status || null,
         qrCodeDataUri: await generateQrDataUri(shareUrl),
-        // KRA requires the trader's name/PIN/address, the buyer's PIN (if
-        // given), the tax-rate breakdown and the fiscal signature/QR all
-        // appear on the actual receipt handed to the buyer (TIS spec item
-        // 3, 6.23) — this public page IS that receipt, so it needs all of
-        // it, not just the total.
-        trader: etims.status === 'signed'
-          ? {
-            name: invoice.merchantId?.businessName || null,
-            pin: invoice.merchantId?.kraPin || null,
-            address: [invoice.merchantId?.businessArea, invoice.merchantId?.county].filter(Boolean).join(', ') || null,
-          }
-          : null,
+        // Every invoice — eTIMS-fiscalized or not — should identify who's
+        // actually billing the customer, the way any credible invoice does.
+        // KRA additionally requires the trader's PIN/address specifically
+        // appear once this receipt is fiscalized (TIS spec item 3, 6.23),
+        // but the contact block itself isn't a KRA-only concern.
+        trader: {
+          name: invoice.merchantId?.businessName || null,
+          email: invoice.merchantId?.email || null,
+          phone: invoice.merchantId?.phone || null,
+          pin: invoice.merchantId?.kraPin || null,
+          address: [invoice.merchantId?.businessArea, invoice.merchantId?.county].filter(Boolean).join(', ') || null,
+        },
         etims,
       },
     });

@@ -137,7 +137,7 @@ export const sendDeveloperInvoice = async (req, res) => {
       dueDate: invoice.dueDate,
       notes: invoice.notes,
       payUrl: `${FRONTEND_URL}/pay/${link.linkId}`,
-      trader: { name: merchant.businessName, pin: merchant.kraPin, address: [merchant.businessArea, merchant.county].filter(Boolean).join(', ') || null },
+      trader: { name: merchant.businessName, email: merchant.email, phone: merchant.phone, pin: merchant.kraPin, address: [merchant.businessArea, merchant.county].filter(Boolean).join(', ') || null },
       etims: serializeEtims(invoice),
     });
 

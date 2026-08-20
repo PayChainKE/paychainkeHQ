@@ -1233,10 +1233,14 @@ export const sendInvoiceEmail = async ({
           <!-- Body -->
           <div style="padding: 40px;">
             <h1 style="font-size: 20px; font-weight: 700; color: #111; margin: 0 0 10px 0;">You have a new invoice from ${businessName}</h1>
-            <p style="font-size: 14px; line-height: 1.6; color: #555; margin: 0 0 30px 0;">
+            <p style="font-size: 14px; line-height: 1.6; color: #555; margin: 0 0 12px 0;">
               Hello <strong>${customerName}</strong>,<br>
               ${businessName} has sent you an invoice for ${fmt(total)}, due <strong>${dueDateStr}</strong>. You can review the full breakdown below and pay securely online.
             </p>
+            ${(trader?.address || trader?.email || trader?.phone) ? `
+            <p style="font-size: 12px; line-height: 1.7; color: #94a3b8; margin: 0 0 30px 0;">
+              ${escapeHtml(trader.name || businessName)}${trader.address ? ` · ${escapeHtml(trader.address)}` : ''}${trader.email ? ` · ${escapeHtml(trader.email)}` : ''}${trader.phone ? ` · ${escapeHtml(trader.phone)}` : ''}
+            </p>` : `<div style="margin-bottom:18px;"></div>`}
 
             <!-- Summary Cards -->
             <div style="display: flex; gap: 15px; margin-bottom: 30px;">
