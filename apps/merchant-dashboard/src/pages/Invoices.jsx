@@ -19,17 +19,18 @@ export default function Invoices() {
   const { merchant } = useMerchantAuth()
 
   const blankInvoice = () => ({
-    customer: { name: '', email: '', phone: '', address: '' },
+    customer: { name: '', email: '', phone: '', address: '', kraPin: '' },
     invoiceNumber: null, // assigned by the server on first save
     issueDate: new Date().toISOString().slice(0, 10),
     dueDate: '',
     currency: 'KES',
     notes: '',
     recurring: false,
-    items: [{ description: '', qty: 1, price: 0 }],
+    items: [{ description: '', qty: 1, price: 0, taxTyCd: 'B', itemClsCd: '' }],
     payUrl: null,
     status: 'draft',
     qrCodeDataUri: null,
+    etims: null,
   });
 
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -37,6 +38,19 @@ export default function Invoices() {
   const [isSavingInvoice, setIsSavingInvoice] = useState(false);
   const [isSendingInvoice, setIsSendingInvoice] = useState(false);
   const [invoiceDetails, setInvoiceDetails] = useState(blankInvoice());
+
+  // Whether this merchant has an initialized KRA eTIMS OSCU device — the
+  // per-item tax/classification fields and buyer PIN only render at all when
+  // this is true, so the vast majority of merchants (no OSCU registered)
+  // never see fields that don't apply to them.
+  const [etimsEnabled, setEtimsEnabled] = useState(false);
+  const TAX_TYPE_OPTIONS = [
+    { code: 'A', label: 'A — Exempt' },
+    { code: 'B', label: 'B — 16% VAT' },
+    { code: 'C', label: 'C — Zero-rated' },
+    { code: 'D', label: 'D — Non-VAT' },
+    { code: 'E', label: 'E — 8% VAT' },
+  ];
 
   const [invoicesList, setInvoicesList] = useState([]);
   const [invoiceFilter, setInvoiceFilter] = useState('All');
@@ -93,7 +107,21 @@ export default function Invoices() {
     }
   }, []);
 
+  const fetchEtimsStatus = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('paychain_merchant_token');
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      const res = await axios.get(`${API_URL}/api/v1/etims/config`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setEtimsEnabled(!!res.data.isInitialized);
+    } catch (err) {
+      // Non-fatal — just means the KRA-specific fields stay hidden
+    }
+  }, []);
+
   useEffect(() => { fetchInvoices() }, [fetchInvoices]);
+  useEffect(() => { fetchEtimsStatus() }, [fetchEtimsStatus]);
 
   // Keep the current page in range as the (filtered) list shrinks — e.g.
   // deleting the last invoice on the final page.
@@ -104,7 +132,7 @@ export default function Invoices() {
   const handleAddInvoiceItem = () => {
     setInvoiceDetails(prev => ({
       ...prev,
-      items: [...prev.items, { description: '', qty: 1, price: 0 }]
+      items: [...prev.items, { description: '', qty: 1, price: 0, taxTyCd: 'B', itemClsCd: '' }]
     }))
   };
 
@@ -192,7 +220,7 @@ export default function Invoices() {
 
       const saved = res.data.invoice;
       setActiveInvoiceId(saved._id);
-      setInvoiceDetails(prev => ({ ...prev, invoiceNumber: saved.invoiceNumber, payUrl: saved.payUrl, status: saved.status, qrCodeDataUri: saved.qrCodeDataUri }));
+      setInvoiceDetails(prev => ({ ...prev, invoiceNumber: saved.invoiceNumber, payUrl: saved.payUrl, status: saved.status, qrCodeDataUri: saved.qrCodeDataUri, etims: saved.etims }));
       upsertInvoiceInList(saved);
 
       setShowInvoiceModal(false);
@@ -236,7 +264,7 @@ export default function Invoices() {
       const sendRes = await axios.post(`${API_URL}/api/invoices/${invoiceId}/send`, {}, { headers: { Authorization: `Bearer ${token}` } });
       const sent = sendRes.data.invoice;
 
-      setInvoiceDetails(prev => ({ ...prev, invoiceNumber: sent.invoiceNumber, payUrl: sent.payUrl, status: sent.status, qrCodeDataUri: sent.qrCodeDataUri }));
+      setInvoiceDetails(prev => ({ ...prev, invoiceNumber: sent.invoiceNumber, payUrl: sent.payUrl, status: sent.status, qrCodeDataUri: sent.qrCodeDataUri, etims: sent.etims }));
       upsertInvoiceInList(sent);
 
       setShowInvoiceModal(false);
@@ -456,17 +484,18 @@ export default function Invoices() {
                        onClick={() => {
                           setActiveInvoiceId(inv._id);
                           setInvoiceDetails({
-                            customer: inv.customer,
+                            customer: { kraPin: '', ...inv.customer },
                             invoiceNumber: inv.invoiceNumber,
                             issueDate: inv.issueDate ? inv.issueDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
                             dueDate: inv.dueDate ? inv.dueDate.slice(0, 10) : '',
                             currency: inv.currency,
                             notes: inv.notes,
                             recurring: inv.recurring,
-                            items: inv.items?.length ? inv.items : [{ description: '', qty: 1, price: 0 }],
+                            items: inv.items?.length ? inv.items.map(i => ({ taxTyCd: 'B', itemClsCd: '', ...i })) : [{ description: '', qty: 1, price: 0, taxTyCd: 'B', itemClsCd: '' }],
                             payUrl: inv.payUrl,
                             status: inv.status,
                             qrCodeDataUri: inv.qrCodeDataUri,
+                            etims: inv.etims,
                           });
                           setShowInvoiceModal(true);
                        }}
@@ -590,6 +619,19 @@ export default function Invoices() {
                      />
                   </div>
 
+                  {etimsEnabled && (
+                    <div className="space-y-2">
+                       <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60">Buyer KRA PIN (optional)</label>
+                       <input
+                         type="text"
+                         value={invoiceDetails.customer.kraPin || ''}
+                         onChange={e => setInvoiceDetails({...invoiceDetails, customer: { ...invoiceDetails.customer, kraPin: e.target.value.toUpperCase() }})}
+                         placeholder="P051892647A"
+                         className="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-2xl px-5 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 uppercase"
+                       />
+                    </div>
+                  )}
+
                   <div className="space-y-2">
                     <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60 pr-1 flex items-center gap-1">
                       Invoice Number
@@ -627,7 +669,8 @@ export default function Invoices() {
 
                   <div className="space-y-4 mb-5">
                     {invoiceDetails.items.map((item, index) => (
-                      <div key={index} className="grid grid-cols-1 md:grid-cols-[1fr_80px_100px_100px_40px] gap-3 md:gap-4 items-center bg-surface-container-lowest border md:border-0 border-outline-variant/10 p-4 md:p-0 rounded-[24px] md:bg-transparent shadow-sm md:shadow-none">
+                      <div key={index} className="bg-surface-container-lowest border md:border-0 border-outline-variant/10 p-4 md:p-0 rounded-[24px] md:bg-transparent shadow-sm md:shadow-none">
+                      <div className="grid grid-cols-1 md:grid-cols-[1fr_80px_100px_100px_40px] gap-3 md:gap-4 items-center">
                         <input type="text" value={item.description} onChange={e => handleUpdateInvoiceItem(index, 'description', e.target.value)} placeholder="Item description" className="w-full bg-white border border-outline-variant/20 rounded-xl px-3 py-2.5 text-xs font-medium text-primary focus:ring-0 focus:border-emerald-500/50" />
                         <div className="flex items-center gap-2">
                           <span className="md:hidden text-[9px] font-bold text-on-surface-variant uppercase tracking-widest">Qty</span>
@@ -645,8 +688,38 @@ export default function Invoices() {
                          <span className="material-symbols-outlined text-sm">delete</span>
                        </button>
                       </div>
+                      {etimsEnabled && (
+                        <div className="grid grid-cols-2 gap-3 mt-2.5 pt-2.5 border-t border-dashed border-outline-variant/15">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[9px] font-bold text-on-surface-variant uppercase tracking-widest shrink-0">Tax</span>
+                            <select
+                              value={item.taxTyCd || 'B'}
+                              onChange={e => handleUpdateInvoiceItem(index, 'taxTyCd', e.target.value)}
+                              className="w-full bg-white border border-outline-variant/20 rounded-xl px-2 py-2 text-[11px] font-medium text-primary focus:ring-0 focus:border-emerald-500/50"
+                            >
+                              {TAX_TYPE_OPTIONS.map(opt => <option key={opt.code} value={opt.code}>{opt.label}</option>)}
+                            </select>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[9px] font-bold text-on-surface-variant uppercase tracking-widest shrink-0">KRA Code</span>
+                            <input
+                              type="text"
+                              value={item.itemClsCd || ''}
+                              onChange={e => handleUpdateInvoiceItem(index, 'itemClsCd', e.target.value)}
+                              placeholder="e.g. 8399120000"
+                              className="w-full bg-white border border-outline-variant/20 rounded-xl px-2 py-2 text-[11px] font-medium text-primary focus:ring-0 focus:border-emerald-500/50"
+                            />
+                          </div>
+                        </div>
+                      )}
+                      </div>
                     ))}
                   </div>
+                  {etimsEnabled && (
+                    <p className="text-[10.5px] text-on-surface-variant opacity-60 -mt-3 mb-4">
+                      KRA eTIMS is enabled on this account — every item needs a classification code before this invoice can be sent.
+                    </p>
+                  )}
 
                   <button onClick={handleAddInvoiceItem} className="w-full py-3 border-2 border-dashed border-outline-variant/20 rounded-2xl text-xs font-bold text-primary hover:border-emerald-500/30 hover:bg-emerald-50 transition-all">+ Add Item</button>
 
@@ -795,6 +868,20 @@ export default function Invoices() {
                             </div>
                          </div>
                       </div>
+
+                      {/* KRA eTIMS fiscal marks — only present once this invoice has actually been signed by KRA */}
+                      {invoiceDetails.etims?.status === 'signed' && (
+                        <div className="mb-10 p-5 rounded-2xl bg-emerald-50 border border-emerald-200 flex flex-col sm:flex-row items-center gap-4">
+                          {invoiceDetails.etims.qrDataUri && (
+                            <img src={invoiceDetails.etims.qrDataUri} alt="KRA eTIMS verification QR" className="w-20 h-20 object-contain shrink-0" />
+                          )}
+                          <div className="min-w-0">
+                            <p className="text-[9px] text-emerald-700 font-black uppercase tracking-widest mb-1">KRA e-Invoice — Signed</p>
+                            <p className="text-xs font-bold text-emerald-900 break-all">{invoiceDetails.etims.cuInvoiceNumber}</p>
+                            <p className="text-[10px] text-emerald-800/70 break-all mt-1">{invoiceDetails.etims.formattedSignature}</p>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Footer Notes */}
                       {invoiceDetails.notes && (

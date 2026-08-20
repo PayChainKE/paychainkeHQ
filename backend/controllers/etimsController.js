@@ -31,6 +31,31 @@ function serializeInvoice(invoice) {
   };
 }
 
+// GET /api/v1/etims/config — whether this merchant has an initialized eTIMS
+// device (default branch "00"). Non-sensitive summary only, no cmcKey — the
+// dashboard uses this to decide whether to show KRA-specific invoice fields
+// at all, so the ~99% of merchants without OSCU never see them.
+export async function getConfig(req, res) {
+  try {
+    const { bhfId = '00' } = req.query;
+    const config = await EtimsConfig.findOne({ merchantId: req.merchant._id, bhfId });
+    if (!config || !config.isInitialized) {
+      return res.json({ success: true, isInitialized: false });
+    }
+    return res.json({
+      success: true,
+      isInitialized: true,
+      tin: config.tin,
+      bhfId: config.bhfId,
+      environment: config.environment,
+      initializedAt: config.initializedAt,
+    });
+  } catch (err) {
+    console.error('etims.getConfig failed:', err);
+    return res.status(500).json({ success: false, error: 'Failed to fetch eTIMS status' });
+  }
+}
+
 // POST /api/v1/etims/init — device handshake + cmcKey registration.
 export async function initDevice(req, res) {
   try {
