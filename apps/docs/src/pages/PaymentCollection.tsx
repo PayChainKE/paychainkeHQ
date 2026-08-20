@@ -371,7 +371,7 @@ redirect_to session['checkoutUrl'] # send the customer here`,
         specific amount into that one specific session.
       </p>
       <CodeBlock
-        lang="html"
+        lang="text"
         label="Render it directly — no extra request needed"
         code={`<img src="{session.qrCodeDataUri}" alt="Scan to pay" width="240" height="240" />`}
       />
