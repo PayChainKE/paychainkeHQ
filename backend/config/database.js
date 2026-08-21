@@ -13,17 +13,20 @@ mongoose.set('bufferCommands', false);
 // ahead of payment-webhook writes (M-Pesa confirmation, NCBA collection),
 // delaying the merchant's own SMS/notification behind a wait for a free
 // connection. Raised to 20, then temporarily dropped to 8 (2026-08-03) —
-// Atlas hit 458/500 (92%) on the free cluster despite near-zero real query
-// traffic (0.5 ops/sec), climbing even after two suspected-leak fixes
-// (deploy-time shutdown, stale-client-on-reconnect) were deployed. Root
-// cause isn't confirmed yet, so this is a safety buffer to reduce how much
-// damage any still-unknown leak can do per instance while that's
-// diagnosed — not a real fix. At today's near-zero traffic this shouldn't
-// reintroduce the original polling-contention problem; revert toward 20
-// once the real cause is found and connections have stabilized.
+// Atlas hit 458/500 (92%) on the free M0 tier's 500-connection ceiling
+// despite near-zero real query traffic (0.5 ops/sec), climbing even after
+// two suspected-leak fixes (deploy-time shutdown, stale-client-on-reconnect)
+// were deployed. That 500-connection ceiling was the actual constraint, not
+// this app's own pool usage — the cluster has since been upgraded to M10
+// (2026-08-21), whose ceiling is 1,500, well clear of anything this app or
+// its polling could realistically drive it to. Restored to 20 (the last
+// known-good value before the free-tier stopgap) now that the ceiling that
+// forced it down is gone — the original polling-vs-webhook contention this
+// comment opens with is the thing to watch for if delays reappear, not a
+// repeat of the connection-ceiling incident.
 const CONNECT_OPTS = {
   serverSelectionTimeoutMS: 12_000,
-  maxPoolSize: 8,
+  maxPoolSize: 20,
   heartbeatFrequencyMS: 10_000,
   // Backstop against the exact leak scheduleReconnect() below guards
   // against structurally: if a pooled socket ever does go stale without
