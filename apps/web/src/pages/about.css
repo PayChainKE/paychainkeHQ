@@ -15,8 +15,8 @@
   --section-pad-desktop:120px;
   --section-pad-tablet:80px;
   --section-pad-mobile:60px;
-  --display-font: 'Fraunces', serif;
-  --body-font: 'Plus Jakarta Sans', 'Outfit', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+  --display-font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --body-font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
 /* Page root */

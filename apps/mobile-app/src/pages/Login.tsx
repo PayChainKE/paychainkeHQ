@@ -357,10 +357,10 @@ export default function Login({ route }: any) {
                 )}
 
                 <View className="mb-6">
-                  <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Email or Phone Number</Text>
-                  <TextInput 
+                  <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Phone Number or Email</Text>
+                  <TextInput
                     className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-4 px-5 text-[16px] font-jakarta-medium text-[#0c2010]"
-                    placeholder="john@example.com or 0712..."
+                    placeholder="0712345678 or john@example.com"
                     placeholderTextColor="#9ca3af"
                     value={phone}
                     onChangeText={setPhone}
@@ -410,10 +410,10 @@ export default function Login({ route }: any) {
                 <Text className="text-[#707971] text-[14px] font-jakarta-medium mb-6">Enter your registered phone number or email address to receive a recovery code.</Text>
 
                 <View className="mb-6">
-                  <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Email or Phone Number</Text>
-                  <TextInput 
+                  <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Phone Number or Email</Text>
+                  <TextInput
                     className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-4 px-5 text-[16px] font-jakarta-medium text-[#0c2010]"
-                    placeholder="john@example.com or 0712..."
+                    placeholder="0712345678 or john@example.com"
                     placeholderTextColor="#9ca3af"
                     value={phone}
                     onChangeText={setPhone}
@@ -421,7 +421,7 @@ export default function Login({ route }: any) {
                   />
                 </View>
 
-                <TouchableOpacity 
+                <TouchableOpacity
                   onPress={handleForgotPassword} disabled={loading}
                   className="w-full bg-[#06201b] py-4 rounded-2xl flex-row justify-center items-center"
                 >

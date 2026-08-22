@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { MerchantAuthProvider, useMerchantAuth } from './context/MerchantAuthContext'
 import { NotificationProvider } from './context/NotificationContext'
 import ScrollToTop from './components/utils/ScrollToTop'
+import AppErrorBoundary from './components/AppErrorBoundary'
 import Login from './pages/Login'
 import SetupPassword from './pages/SetupPassword'
 import Overview from './pages/Overview'
@@ -73,35 +74,37 @@ export default function App(){
       <ScrollToTop />
       <MerchantAuthProvider>
         <NotificationProvider>
-          <Routes>
-            <Route path="/login" element={<LoginGuard><Login/></LoginGuard>} />
-            <Route path="/setup-password" element={<SetupPassword/>} />
-            <Route path="/pay/account/:account" element={<PayAccountPage />} />
-            <Route path="/pay/:linkId" element={<PaymentPage />} />
-            <Route path="/invoice/:publicToken" element={<InvoiceView />} />
-            <Route path="/" element={<Navigate to="/overview" replace />} />
-            <Route path="/overview" element={<Protected><Overview/></Protected>} />
-            <Route path="/transactions" element={<Protected><Transactions/></Protected>} />
-            <Route path="/bulk-pay" element={<Protected><BulkPay/></Protected>} />
-            <Route path="/invoices" element={<Protected><Invoices/></Protected>} />
-            <Route path="/inflation-shield" element={<Protected><FeatureGuard featureName="inflationShield"><InflationShield/></FeatureGuard></Protected>} />
-            <Route path="/cash-advance" element={<Protected><CashAdvance/></Protected>} />
-            <Route path="/accounts" element={<Protected><MyAccounts/></Protected>} />
-            {/* Old page URL — keep resolving so existing bookmarks/shared links don't break */}
-            <Route path="/tills" element={<Navigate to="/accounts" replace />} />
-            <Route path="/profile" element={<Protected><Profile/></Protected>} />
-            <Route path="/support" element={<Protected><Support/></Protected>} />
-            <Route path="/notifications" element={<Protected><Notifications/></Protected>} />
-            <Route path="/wallet" element={<Protected><FeatureGuard featureName="digitalWallet"><Wallet/></FeatureGuard></Protected>} />
-            {/* Send/Request Money are plain KES mobile-money features, unrelated to
-                the crypto/Stellar "digitalWallet" feature — they were previously
-                gated behind that same flag by mistake, silently breaking these
-                buttons for any merchant with digitalWallet disabled. */}
-            <Route path="/send-money" element={<Protected><SendMoney/></Protected>} />
-            <Route path="/request-money" element={<Protected><RequestMoney/></Protected>} />
-            {/* Catch-all route for 404s and refreshes */}
-            <Route path="*" element={<Navigate to="/overview" replace />} />
-          </Routes>
+          <AppErrorBoundary>
+            <Routes>
+              <Route path="/login" element={<LoginGuard><Login/></LoginGuard>} />
+              <Route path="/setup-password" element={<SetupPassword/>} />
+              <Route path="/pay/account/:account" element={<PayAccountPage />} />
+              <Route path="/pay/:linkId" element={<PaymentPage />} />
+              <Route path="/invoice/:publicToken" element={<InvoiceView />} />
+              <Route path="/" element={<Navigate to="/overview" replace />} />
+              <Route path="/overview" element={<Protected><Overview/></Protected>} />
+              <Route path="/transactions" element={<Protected><Transactions/></Protected>} />
+              <Route path="/bulk-pay" element={<Protected><BulkPay/></Protected>} />
+              <Route path="/invoices" element={<Protected><Invoices/></Protected>} />
+              <Route path="/inflation-shield" element={<Protected><FeatureGuard featureName="inflationShield"><InflationShield/></FeatureGuard></Protected>} />
+              <Route path="/cash-advance" element={<Protected><CashAdvance/></Protected>} />
+              <Route path="/accounts" element={<Protected><MyAccounts/></Protected>} />
+              {/* Old page URL — keep resolving so existing bookmarks/shared links don't break */}
+              <Route path="/tills" element={<Navigate to="/accounts" replace />} />
+              <Route path="/profile" element={<Protected><Profile/></Protected>} />
+              <Route path="/support" element={<Protected><Support/></Protected>} />
+              <Route path="/notifications" element={<Protected><Notifications/></Protected>} />
+              <Route path="/wallet" element={<Protected><FeatureGuard featureName="digitalWallet"><Wallet/></FeatureGuard></Protected>} />
+              {/* Send/Request Money are plain KES mobile-money features, unrelated to
+                  the crypto/Stellar "digitalWallet" feature — they were previously
+                  gated behind that same flag by mistake, silently breaking these
+                  buttons for any merchant with digitalWallet disabled. */}
+              <Route path="/send-money" element={<Protected><SendMoney/></Protected>} />
+              <Route path="/request-money" element={<Protected><RequestMoney/></Protected>} />
+              {/* Catch-all route for 404s and refreshes */}
+              <Route path="*" element={<Navigate to="/overview" replace />} />
+            </Routes>
+          </AppErrorBoundary>
           <ToastHost />
         </NotificationProvider>
       </MerchantAuthProvider>

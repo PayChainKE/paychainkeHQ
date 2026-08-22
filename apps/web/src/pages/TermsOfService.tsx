@@ -200,7 +200,7 @@ const TermsOfService: React.FC = () => {
               <section id="s3" className="scroll-mt-24 mb-10">
                 <h2 className="text-2xl mb-4">3. The Services</h2>
 
-                <h3 className="text-lg mt-6 mb-2">3.1 COLLECT — Verified Payment Collection</h3>
+                <h3 className="text-lg mt-6 mb-2">3.1 COLLECT: Verified Payment Collection</h3>
                 <ul className="list-disc pl-6 space-y-1">
                   <li>(a) PayChain assigns Merchants a verified PayChain Virtual Account linked to the PayChain blockchain-anchored verification system.</li>
                   <li>(b) The COLLECT service enables Merchants to receive M-PESA payments with real-time transaction verification, eliminating fake-SMS payment fraud.</li>
@@ -208,7 +208,7 @@ const TermsOfService: React.FC = () => {
                   <li>(d) Merchants must not modify, replicate, or misrepresent their verified PayChain Virtual Account.</li>
                 </ul>
 
-                <h3 className="text-lg mt-6 mb-2">3.2 PAY — Bulk Payroll and Supplier Settlements</h3>
+                <h3 className="text-lg mt-6 mb-2">3.2 PAY: Bulk Payroll and Supplier Settlements</h3>
                 <ul className="list-disc pl-6 space-y-1">
                   <li>(a) The PAY service enables Merchants to execute bulk payments to employees, suppliers, and counterparties via the M-PESA B2C gateway.</li>
                   <li>(b) Once a payment instruction is confirmed by you on the Platform, it is irrevocable. You are solely responsible for verifying recipient details before confirming any Transaction.</li>
@@ -217,7 +217,7 @@ const TermsOfService: React.FC = () => {
                   <li>(e) Bulk payment limits are subject to the Central Bank of Kenya regulations and our banking partner NCBA's payout limits in force from time to time.</li>
                 </ul>
 
-                <h3 className="text-lg mt-6 mb-2">3.3 PROTECT — Inflation Shield (KES to USDC)</h3>
+                <h3 className="text-lg mt-6 mb-2">3.3 PROTECT: Inflation Shield (KES to USDC)</h3>
                 <ul className="list-disc pl-6 space-y-1">
                   <li>(a) The PROTECT service enables Merchants to convert KES balances to USDC (USD Coin), a stablecoin pegged to the US Dollar, via our blockchain infrastructure.</li>
                   <li>
@@ -232,7 +232,7 @@ const TermsOfService: React.FC = () => {
                   <li>(e) You are responsible for your own tax compliance with respect to currency conversions, including any gains or losses.</li>
                 </ul>
 
-                <h3 className="text-lg mt-6 mb-2">3.4 GROW — Trust Score and Working Capital</h3>
+                <h3 className="text-lg mt-6 mb-2">3.4 GROW: Trust Score and Working Capital</h3>
                 <ul className="list-disc pl-6 space-y-1">
                   <li>(a) After maintaining a minimum of three (3) months of active transactional history on the Platform, Merchants may be eligible to apply for collateral-free working capital facilities.</li>
                   <li>(b) The Trust Score is a proprietary algorithm and PayChain does not warrant any specific credit outcome. Eligibility for and terms of any working capital facility are at the sole discretion of the Company and/or its lending partners.</li>

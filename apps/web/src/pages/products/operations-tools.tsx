@@ -17,20 +17,20 @@ import 'chart.js/auto';
 import Breadcrumbs from '@/components/Breadcrumbs';
 
 const features = [
-  { icon: LayoutDashboard, title: 'Real-Time Merchant Dashboard', body: 'Every transaction — collections, payments, FX swaps, cash advance activity — updated in real time. Your full financial picture, always current.' },
-  { icon: FileCheck, title: 'KRA e-TIMS Tax Compliance', body: 'Every sale is signed as a real KRA fiscal receipt through eTIMS OSCU the moment it happens — with a verifiable QR code, not a batch report reconstructed later.' },
-  { icon: TrendingUp, title: 'Trust Score Monitor', body: 'Track your Trust Score in real time — see exactly how close you are to unlocking your next Cash Advance tier.' },
-  { icon: Users, title: 'Team Access & Spending Controls', body: 'Add team members with defined roles, set spending limits, require approval for large transactions — without giving up full account access.' },
-  { icon: BarChart2, title: 'Business Analytics & Insights', body: 'Revenue trends, peak payment periods, top customers by volume, month-on-month growth — all visualized clearly. Decisions based on data, not guesswork.' },
-  { icon: Download, title: 'Downloadable Financial Reports', body: 'Export transaction histories, payroll records, FX logs, and tax summaries — formatted for your accountant, investors, or your own records.' },
+  { icon: LayoutDashboard, title: 'Real-Time Merchant Dashboard', body: 'Every transaction (collections, payments, FX swaps, cash advance activity) updated in real time. Your full financial picture, always current.' },
+  { icon: FileCheck, title: 'KRA e-TIMS Tax Compliance', body: 'Every sale is signed as a real KRA fiscal receipt through eTIMS OSCU the moment it happens, with a verifiable QR code, not a batch report reconstructed later.' },
+  { icon: TrendingUp, title: 'Trust Score Monitor', body: 'Track your Trust Score in real time: see exactly how close you are to unlocking your next Cash Advance tier.' },
+  { icon: Users, title: 'Team Access & Spending Controls', body: 'Add team members with defined roles, set spending limits, require approval for large transactions, without giving up full account access.' },
+  { icon: BarChart2, title: 'Business Analytics & Insights', body: 'Revenue trends, peak payment periods, top customers by volume, month-on-month growth, all visualized clearly. Decisions based on data, not guesswork.' },
+  { icon: Download, title: 'Downloadable Financial Reports', body: 'Export transaction histories, payroll records, FX logs, and tax summaries, formatted for your accountant, investors, or your own records.' },
   { icon: Bell, title: 'Smart Notifications & Alerts', body: 'Custom alerts for large inflows, low balances, upcoming payments, and Trust Score milestones. Stay in control without watching the dashboard all day.' },
   { icon: Layers, title: 'Multi-Account Management', body: 'Multiple business locations or entities? Manage separate dashboards with consolidated reporting and shared team access under one login.' },
 ];
 
 const useCases = [
   { title: 'Retail & Hospitality', desc: 'Monitor daily revenue in real time, track peak hours, and run end-of-day reconciliation automatically.' },
-  { title: 'Service Agencies', desc: 'Generate records, track payments, run payroll, and download clean tax records — all from one place.' },
-  { title: 'Import/Export Traders', desc: 'Monitor KES and USDC balances simultaneously, track FX history, manage supplier payment schedules.' },
+  { title: 'Service Agencies', desc: 'Generate records, track payments, run payroll, and download clean tax records, all from one place.' },
+  { title: 'Import/Export Traders', desc: 'Monitor collections in real time, reconcile Paybill and invoice payments, manage supplier payment schedules.' },
   { title: 'Multi-Location Businesses', desc: 'Manage multiple merchant accounts under one login with consolidated reporting across all locations.' },
 ];
 
@@ -61,7 +61,7 @@ const chartOptions = {
 
 const OperationsTools = () => {
   return (
-    <div className="min-h-screen bg-white font-sans">
+    <div className="min-h-screen bg-white">
       <Navbar />
 
       {/* Breadcrumb strip */}
@@ -89,7 +89,7 @@ const OperationsTools = () => {
                 Run Your Business from <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00bf63] to-emerald-300">One Intelligent Dashboard.</span>
               </h1>
               <p className="text-lg text-gray-400 mb-8 max-w-xl leading-relaxed">
-                PayChain Operations Tools gives you real-time visibility, financial controls, compliance automation, and team management — everything you need to run a modern Kenyan business, without the complexity.
+                PayChain Operations Tools gives you real-time visibility, financial controls, compliance automation, and team management: everything you need to run a modern Kenyan business, without the complexity.
               </p>
               <a href="https://app.paychain.co.ke" className="inline-flex items-center justify-center px-8 py-4 text-base font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_20px_rgba(0,191,99,0.3)]">
                 See It in Action
@@ -126,14 +126,14 @@ const OperationsTools = () => {
                           transition={{ duration: 1, delay: 0.6 }}
                         />
                       </div>
-                      <div className="text-xs font-semibold text-white">72 — Good</div>
+                      <div className="text-xs font-semibold text-white">72 (Good)</div>
                     </div>
                     <div className="bg-white/5 border border-white/5 rounded-xl p-3 flex-1">
                       <div className="text-[10px] uppercase tracking-widest text-gray-500 mb-2">Team activity</div>
                       <ul className="text-[11px] text-gray-300 space-y-1.5 leading-relaxed">
-                        <li>Mary approved payout — 10m ago</li>
-                        <li>Ken requested FX swap — 1h ago</li>
-                        <li>New user added: John — today</li>
+                        <li>Mary approved payout (10m ago)</li>
+                        <li>Ken requested FX swap (1h ago)</li>
+                        <li>New user added: John (today)</li>
                       </ul>
                     </div>
                   </aside>
@@ -179,7 +179,7 @@ const OperationsTools = () => {
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6 }}>
             <h3 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">The Control Center Your Business Has Always Needed.</h3>
             <p className="text-lg text-gray-600 leading-relaxed">
-              PayChain Operations Tools is the intelligence layer across all four PayChain products — a unified command center giving you real-time data, automated compliance, team controls, and business insights on one dashboard built for Kenyan SMEs.
+              PayChain Operations Tools is the intelligence layer across all four PayChain products, a unified command center giving you real-time data, automated compliance, team controls, and business insights on one dashboard built for Kenyan SMEs.
             </p>
           </motion.div>
         </div>
@@ -229,7 +229,7 @@ const OperationsTools = () => {
                 <div className="flex justify-between items-center mb-6">
                   <div>
                     <div className="text-xs uppercase tracking-widest text-gray-500 mb-1">Period</div>
-                    <div className="font-bold text-gray-900">Jan 2026 — Mar 2026</div>
+                    <div className="font-bold text-gray-900">Jan 2026–Mar 2026</div>
                   </div>
                   <div className="text-right">
                     <div className="text-xs uppercase tracking-widest text-gray-500 mb-1">Total transactions</div>
@@ -252,7 +252,7 @@ const OperationsTools = () => {
                 <button className="w-full inline-flex items-center justify-center gap-2 bg-[#0a0a0a] text-white font-bold px-4 py-3 rounded-xl hover:bg-gray-800 transition-colors">
                   <Download className="w-4 h-4" /> Download e-TIMS report
                 </button>
-                <div className="text-xs text-gray-500 text-center">Official format — ready for KRA</div>
+                <div className="text-xs text-gray-500 text-center">Official format, ready for KRA</div>
               </div>
             </div>
           </motion.div>

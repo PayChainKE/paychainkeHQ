@@ -11,7 +11,7 @@ import Footer from '@/components/Footer';
 // than fake or pre-announce docs that don't exist for outside developers
 // yet, this is a straightforward "coming soon" page.
 const upcoming = [
-  { icon: CreditCard, title: 'Collections & payouts', description: 'Trigger M-Pesa/Airtel collections and send payouts to mobile money, bank, Paybill, or Till — all programmatically.' },
+  { icon: CreditCard, title: 'Collections & payouts', description: 'Trigger M-Pesa/Airtel collections and send payouts to mobile money, bank, Paybill, or Till, all programmatically.' },
   { icon: Webhook, title: 'Real-time webhooks', description: 'Subscribe to payment and payout events instead of polling for status.' },
   { icon: Link2, title: 'Hosted checkout', description: 'Generate a payment page for any order without building your own checkout UI.' },
   { icon: FileCheck2, title: 'KRA-compliant receipts', description: 'Fiscal receipts signed through KRA eTIMS on every sale, ready for tax compliance.' },
@@ -26,7 +26,7 @@ const Docs: React.FC = () => {
           <p className="text-sm font-semibold uppercase tracking-widest text-[#00bf63] mb-4">Coming Soon</p>
           <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">The PayChain API</h1>
           <p className="text-lg text-gray-600 leading-relaxed">
-            A developer API for building custom payment flows directly on PayChain's infrastructure —
+            A developer API for building custom payment flows directly on PayChain's infrastructure,
             not yet publicly available, but on its way.
           </p>
         </div>

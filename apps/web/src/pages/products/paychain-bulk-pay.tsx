@@ -7,29 +7,29 @@ import Breadcrumbs from '@/components/Breadcrumbs';
 
 const features = [
   { title: 'Batch Payroll', icon: Users, desc: 'Upload staff list via CSV or build on dashboard. Run payroll for your entire team in one click with individual M-PESA confirmations sent automatically.' },
-  { title: 'Supplier Payments', icon: Package, desc: 'Save supplier details once — bank account, mobile money, Paybill, or Till. Pay them all simultaneously when invoices are due. No manual transfers, no errors, no delays.' },
-  { title: 'Utility Bill Settlement', icon: Zap, desc: 'Connect recurring utility accounts and settle electricity, water, and internet from one dashboard. Never miss a bill again.' },
-  { title: 'Scheduled & Recurring Payments', icon: Calendar, desc: 'Set payments to run automatically — weekly wages, monthly rent, recurring orders. PayChain executes on time, every time.' },
+  { title: 'Suppliers & Contractors', icon: Package, desc: 'Save supplier and contractor details once: bank account, mobile money, Paybill, or Till. Pay them all simultaneously when invoices are due. No manual transfers, no errors, no delays.' },
+  { title: 'Utility Bill Settlement', icon: Zap, desc: 'Settle KPLC tokens (prepaid or postpaid), water, internet, and other utilities from one dashboard. Never miss a bill again.' },
+  { title: 'Scheduled & Recurring Payments', icon: Calendar, desc: 'Set payments to run automatically: weekly wages, monthly rent, recurring orders. PayChain executes on time, every time.' },
   { title: 'Full Audit Trail', icon: FileText, desc: 'Every payment logged with amount, recipient, timestamp, and reference. Download full reports for accounting and KRA eTIMS compliance.' },
   { title: 'Payment Approval Workflow', icon: CheckCircle, desc: 'Require a second sign-off before large payments are released. Protect your business from unauthorized transfers.' },
 ];
 
 const steps = [
-  { title: 'Build Your Payment List', desc: 'Add employees, suppliers, and utility accounts — upload CSV or enter manually. Save for reuse every month.' },
+  { title: 'Build Your Payment List', desc: 'Add employees, suppliers, and utility accounts, upload CSV or enter manually. Save for reuse every month.' },
   { title: 'Schedule or Execute', desc: 'Choose amounts, set dates, run immediately or schedule for later. Review everything before confirming.' },
   { title: 'Confirm Once. Done.', desc: 'PayChain processes every payment simultaneously, sends individual M-PESA confirmations, and logs the full batch.' },
 ];
 
 const useCases = [
-  { title: 'Retail & Hospitality', desc: 'Run weekly casual wages and monthly permanent payroll from the same dashboard — without touching a phone.' },
+  { title: 'Retail & Hospitality', desc: 'Run weekly casual wages and monthly permanent payroll from the same dashboard, without touching a phone.' },
   { title: 'Service Agencies', desc: 'Pay freelancers, contractors, and staff in one batch. Download full payroll reports for HR.' },
   { title: 'Import/Export Traders', desc: 'Pay multiple suppliers simultaneously on invoice due dates. Never delay a supplier relationship.' },
-  { title: 'Any Business with Bills', desc: 'Electricity. Internet. Water. Rent. Schedule and forget.' },
+  { title: 'Any Business with Bills', desc: 'KPLC tokens, prepaid or postpaid. Internet. Water. Rent. Schedule and forget.' },
 ];
 
 const comparisonRows = [
   ['Time to pay 20 staff', '40–60 minutes', 'Under 2 minutes'],
-  ['Error risk', 'High — manual entry', 'Zero — saved lists'],
+  ['Error risk', 'High (manual entry)', 'Zero (saved lists)'],
   ['Audit trail', 'None', 'Full downloadable report'],
   ['Scheduling', 'Manual every time', 'Automated recurring'],
   ['Approval controls', 'None', 'Multi-level authorization'],
@@ -44,7 +44,7 @@ const batch = [
 
 const PaychainBulkPay: React.FC = () => {
   return (
-    <div className="min-h-screen bg-white font-sans">
+    <div className="min-h-screen bg-white">
       <Navbar />
 
       {/* Breadcrumb strip */}
@@ -72,7 +72,7 @@ const PaychainBulkPay: React.FC = () => {
                 Pay Everyone. <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00bf63] to-emerald-300">In One Click.</span>
               </h1>
               <p className="text-lg text-gray-400 mb-8 max-w-xl leading-relaxed">
-                PayChain Bulk Pay lets you run payroll, pay suppliers, and settle utility bills directly from your merchant dashboard — no more app switching, no more manual transfers, no more end-of-month chaos.
+                Run payroll, pay suppliers, contractors, and employees, and settle KPLC tokens (prepaid or postpaid), water, internet, and other utilities, all directly from your merchant dashboard, all in one click. No more app switching, no more manual transfers, no more end-of-month chaos.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <a href="https://app.paychain.co.ke" className="inline-flex items-center justify-center px-8 py-4 text-base font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_20px_rgba(0,191,99,0.3)]">
@@ -84,7 +84,7 @@ const PaychainBulkPay: React.FC = () => {
             <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.8, delay: 0.2 }} className="relative">
               <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl">
                 <div className="flex items-center justify-between mb-5">
-                  <span className="text-sm font-semibold text-gray-200">Payroll batch — March</span>
+                  <span className="text-sm font-semibold text-gray-200">Payroll batch: March</span>
                   <span className="text-[10px] font-bold uppercase tracking-widest bg-[#00bf63]/15 text-[#00bf63] px-2.5 py-1 rounded-full">Confirm All</span>
                 </div>
                 <div className="space-y-3">
@@ -130,7 +130,7 @@ const PaychainBulkPay: React.FC = () => {
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6 }} className="max-w-3xl mx-auto text-center">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">Running Payroll Shouldn't Feel Like a Second Job.</h2>
             <p className="text-lg text-gray-600 leading-relaxed">
-              Every month, Kenyan business owners spend hours making individual M-PESA transfers — one by one, employee by employee, supplier by supplier. One wrong number. One network error. One missed payment. And the damage to trust takes weeks to repair.
+              Every month, Kenyan business owners spend hours making individual M-PESA transfers: one by one, employee by employee, supplier by supplier. One wrong number. One network error. One missed payment. And the damage to trust takes weeks to repair.
             </p>
           </motion.div>
         </div>
@@ -143,7 +143,7 @@ const PaychainBulkPay: React.FC = () => {
             <motion.div initial={{ opacity: 0, x: -20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.6 }}>
               <h3 className="text-3xl font-bold text-gray-900 mb-6">All Your Outbound Payments. One Dashboard. Zero Chaos.</h3>
               <p className="text-lg text-gray-600 leading-relaxed">
-                PayChain Bulk Pay is a centralized outbound payment engine built into your merchant dashboard. Upload your payroll list, add supplier accounts, schedule utility bills — and execute all of them simultaneously with a single confirmation. Every payment is logged, timestamped, and receipted automatically.
+                PayChain Bulk Pay is a centralized outbound payment engine built into your merchant dashboard. Upload your payroll list, add supplier accounts, schedule utility bills, and execute all of them simultaneously with a single confirmation. Every payment is logged, timestamped, and receipted automatically.
               </p>
             </motion.div>
 
@@ -169,7 +169,7 @@ const PaychainBulkPay: React.FC = () => {
       <section className="py-20 bg-white">
         <div className="container mx-auto px-6 lg:px-8">
           <motion.h3 initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-3xl md:text-4xl font-bold text-gray-900 mb-12 text-center">
-            Everything You Need to Move Money Out — Without the Mess
+            Everything You Need to Move Money Out, Without the Mess
           </motion.h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
             {features.map((f, i) => {

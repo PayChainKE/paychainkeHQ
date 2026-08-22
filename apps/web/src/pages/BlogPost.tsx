@@ -33,7 +33,7 @@ const allArticlesData: Record<string, ArticleData> = {
     },
     image: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&q=80&w=1200',
     content: `
-      <p class="lead">The retail landscape in East Africa is undergoing a profound transformation. As internet penetration deepens and mobile-first populations mature, the expectation for seamless, instant transactions is no longer a luxury—it's the baseline.</p>
+      <p class="lead">The retail landscape in East Africa is undergoing a profound transformation. As internet penetration deepens and mobile-first populations mature, the expectation for seamless, instant transactions is no longer a luxury. It's the baseline.</p>
       
       <h2>The Evolution of Point of Sale</h2>
       <p>Historically, merchants relied on fragmented systems: a traditional cash register, a separate card terminal, and a personal phone for mobile money transfers. This fragmentation led to reconciliation nightmares at the end of every business day.</p>
@@ -47,9 +47,37 @@ const allArticlesData: Record<string, ArticleData> = {
       <p>Despite rapid digitization, infrastructure reliability remains a challenge. Power outages and internet connectivity drops can halt business operations instantly. This is why <strong>offline-first architecture</strong> has become the critical differentiator for payment solutions in emerging markets.</p>
       <p>When a system can securely queue transactions locally and sync automatically when connectivity is restored, merchants never have to turn away a customer. It provides the reliability of cash with the security of digital rails.</p>
 
-      <h2>Looking Ahead: Stablecoins and Settlement</h2>
-      <p>Perhaps the most exciting development on the horizon is the integration of stablecoin settlements. By bypassing traditional correspondent banking networks, cross-border commerce becomes instantaneous and significantly cheaper.</p>
+      <h2>Looking Ahead: What Comes After Verified Collections</h2>
+      <p>Once a merchant has verified, instantly-settled collections, the next frontier is protecting the value of that revenue. Stablecoin-backed settlement, still early and largely in development across the industry, is one option being explored to hedge against currency depreciation without requiring merchants to understand crypto.</p>
       <p>As we move towards 2027, the focus will shift from consumer adoption to merchant empowerment. The platforms that win will be those that abstract the complexity of money movement and simply give business owners their time back.</p>
+    `,
+  },
+  'paychain-data-controller-registration': {
+    id: 'paychain-data-controller-registration',
+    title: 'PayChain Registers as a Data Controller with the ODPC',
+    category: 'Compliance',
+    date: 'Jul 14, 2026',
+    readTime: '3 min read',
+    author: {
+      name: 'Corporate Communications',
+      role: 'PayChain KE',
+      avatar: '/avator.png',
+    },
+    image: '/happy_kenyan_merchant.png',
+    content: `
+      <p class="lead"><strong>NAIROBI, KENYA, July 14, 2026</strong>: PayChain Financial Services Ltd has officially registered as a Data Controller with Kenya's Office of the Data Protection Commissioner (ODPC), formalizing the company's obligations under the Data Protection Act 2019 for every merchant and customer whose data passes through the platform.</p>
+
+      <h2>Why Data Controller Registration Matters</h2>
+      <p>Every PayChain merchant handles sensitive information: customer phone numbers, transaction histories, KYC documents, and revenue data. Registering as a Data Controller with the ODPC means PayChain has formally committed to the Act's core principles: lawful and transparent processing, purpose limitation, data minimization, and appropriate technical and organizational security measures.</p>
+      <p>In practice, this means merchant and customer data on PayChain is processed only for the purposes disclosed at signup, protected with 256-bit AES encryption, and never transferred outside Kenya without a clear legal basis.</p>
+
+      <blockquote>
+        "Merchants trust us with the financial lifeblood of their business. Registering as a Data Controller with the ODPC is a formal, verifiable commitment to protect that trust, not just a compliance checkbox."
+      </blockquote>
+
+      <h2>What This Means for Merchants</h2>
+      <p>PayChain merchants don't need to do anything differently. This registration sits behind the scenes, alongside PayChain's existing NCBA Bank-backed verification and KRA eTIMS integration, as part of a broader commitment to operating as a fully compliant financial infrastructure provider in Kenya.</p>
+      <p>Merchants can request a full export of their data at any time, and PayChain does not sell or share merchant or customer data with advertisers or third parties.</p>
     `,
   },
   'paychain-official-registration': {
@@ -65,7 +93,7 @@ const allArticlesData: Record<string, ArticleData> = {
     },
     image: '/merchant-dashboard-teaser.png',
     content: `
-      <p class="lead"><strong>NAIROBI, KENYA — May 28, 2026</strong> — PayChain Financial Services Ltd today announced its official registration and incorporation in Kenya, marking a pivotal moment in the company's mission to revolutionize the financial infrastructure for merchants across East Africa.</p>
+      <p class="lead"><strong>NAIROBI, KENYA, May 28, 2026</strong>: PayChain Financial Services Ltd today announced its official registration and incorporation in Kenya, marking a pivotal moment in the company's mission to revolutionize the financial infrastructure for merchants across East Africa.</p>
       
       <h2>A New Era for Merchant Services</h2>
       <p>The official registration solidifies PayChain's position as a compliant and forward-thinking financial technology provider. This milestone empowers the company to accelerate the deployment of its unified merchant operating system, designed to seamlessly integrate payments, point-of-sale management, and capital advancement.</p>
@@ -76,7 +104,7 @@ const allArticlesData: Record<string, ArticleData> = {
 
       <h2>Commitment to the Kenyan Market</h2>
       <p>Kenya remains one of the most dynamic and innovative fintech markets globally. By establishing a formalized presence, PayChain Financial Services Ltd is uniquely positioned to address the complex challenges faced by modern merchants, including high transaction costs, currency volatility, and lack of access to working capital.</p>
-      <p>With this regulatory milestone achieved, PayChain will begin scaling its flagship products, including the PayChain Virtual Account and the Inflation Shield, providing Kenyan businesses with the robust, secure, and offline-capable tools they need to thrive.</p>
+      <p>With this regulatory milestone achieved, PayChain will begin scaling its flagship products, including the PayChain Virtual Account, Payment Links, STK Push, and Bulk Pay, providing Kenyan businesses with the secure, verified tools they need to thrive, with the Inflation Shield currently in development.</p>
     `,
   }
 };
@@ -91,7 +119,7 @@ const BlogPost = () => {
   }, [id]);
 
   return (
-    <div className="min-h-screen bg-white flex flex-col font-sans">
+    <div className="min-h-screen bg-white flex flex-col">
       <Navbar />
       
       <main className="flex-grow pt-24 pb-20">

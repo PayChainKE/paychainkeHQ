@@ -27,7 +27,7 @@ const features = [
     borderColor: 'border-emerald-100',
     title: 'Easy and safe way to accept payments',
     description:
-      'With a PayChain merchant account, go fully cashless and make it easy for your customers to pay via Lipa Na M-Pesa, USDC on Base, card, or bank transfer, all verified on-chain in under 100ms.',
+      'Get a PayChain Paybill and a dedicated virtual account for your business, then collect however suits you: in person, via a payment link sent even over WhatsApp, or by sending an STK push straight to your customer\'s phone. Every payment verified and settled instantly.',
   },
   {
     icon: 'manage',
@@ -39,7 +39,7 @@ const features = [
     borderColor: 'border-blue-100',
     title: 'Manage your business anywhere, anytime',
     description:
-      'Our dedicated merchant dashboard gives you real-time visibility into transactions, customer payments, e-TIMS receipts, and analytics, from any device, at any time.',
+      'Our dedicated merchant dashboard gives you real-time visibility into transactions, customer payments, and analytics, plus professional invoicing and e-TIMS receipts, from any device, at any time.',
   },
   {
     icon: 'cash-grow',
@@ -63,7 +63,7 @@ const features = [
     borderColor: 'border-orange-100',
     title: 'Conveniently pay your suppliers or employees',
     description:
-      'Use PayChain Bulk Pay to batch-disburse salaries, supplier invoices, and utility bills in one click, directly to M-Pesa or bank. PAYE auto-calculated.',
+      'Use PayChain Bulk Pay to settle salaries, suppliers, contractors, KPLC tokens (prepaid or postpaid), water, internet, and other utilities, all in one click, directly to M-Pesa or bank. PAYE auto-calculated.',
   },
 ];
 
@@ -90,9 +90,10 @@ const Features: React.FC = () => (
             Key tools to drive your<br className="hidden sm:block" /> business forward
           </h2>
           <p className="text-base sm:text-lg text-gray-500 leading-relaxed mb-8 max-w-xl">
-            We understand that you want more customers coming through the door. That is why PayChain's
-            tools seamlessly weave into how your business operates, making it easier than ever to run,
-            grow, and prosper.
+            A PayChain Paybill and virtual account to collect payments, invoicing and STK push to
+            get paid faster, Bulk Pay to settle staff, suppliers, and utilities in one click, and
+            data-driven credit when you need working capital. Everything a growing Kenyan business
+            needs, in one dashboard.
           </p>
           <a
             href="/how-it-works"

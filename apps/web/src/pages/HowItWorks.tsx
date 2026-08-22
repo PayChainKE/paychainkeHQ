@@ -3,7 +3,7 @@ import React, { useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import '@/pages/how-it-works.css';
-import { UserCheck, ShieldCheck, CreditCard, Zap, Users, Repeat, BarChart3, Star } from 'lucide-react';
+import { UserCheck, ShieldCheck, CreditCard, Zap, Users, Send, BarChart3, Star } from 'lucide-react';
 
 // Lucide icons via CDN in index.html or use inline SVGs for production
 // All animations and Trust Score handled in how-it-works.js
@@ -11,41 +11,41 @@ import { UserCheck, ShieldCheck, CreditCard, Zap, Users, Repeat, BarChart3, Star
 const steps = [
   {
     title: 'Sign Up & Get Verified',
-    desc: 'Create your PayChain merchant account and complete a simple KYC verification. Once approved, you receive your registered PayChain Virtual Account — a dedicated, aggregator-backed M-PESA channel that is fully secure and verified. No queues. No paperwork. Verification is digital, fast, and done entirely on your dashboard.',
+    desc: 'Create your PayChain merchant account and complete a simple KYC verification. Once approved, you receive your own PayChain Paybill and a registered virtual account, a dedicated, aggregator-backed M-PESA channel that is fully secure and verified. No queues. No paperwork. Verification is digital, fast, and done entirely on your dashboard.',
     Icon: UserCheck,
   },
   {
     title: 'Start Collecting Payments Securely',
-    desc: 'Share your PayChain Virtual Account with customers and start receiving verified inbound payments instantly. Every transaction is logged, timestamped, and stored in your merchant ledger — creating an unbreakable record of your real business activity. No more fake screenshots. No more SMS fraud.',
+    desc: 'Collect however suits your customer: in person via your Paybill and virtual account, a payment link sent even over WhatsApp, an STK push straight to their phone, or a professional invoice. Every payment is verified instantly, settled immediately, and logged in your merchant ledger. No more fake screenshots. No more SMS fraud.',
     Icon: ShieldCheck,
   },
   {
-    title: 'Pay, Convert & Manage Your Money',
-    desc: 'From one dashboard, run payroll via Bulk Pay, swap KES to USDC to protect against shilling depreciation, pay international suppliers in stablecoin, and manage team spending — all in one verified, auditable system.',
+    title: 'Pay & Manage Your Money',
+    desc: 'From one dashboard, run payroll via Bulk Pay, settle suppliers, contractors, and utility bills (KPLC tokens, water, internet), all in one click, and manage team spending in one verified, auditable system.',
     Icon: CreditCard,
   },
   {
     title: 'Unlock Your Cash Advance',
-    desc: 'After 3 months of verified PayChain transaction history, your business automatically qualifies for a PayChain Cash Advance. We use your real transaction data — not collateral, not land titles — to determine your working capital limit.',
+    desc: 'After 3 months of verified PayChain transaction history, your business automatically qualifies for a PayChain Cash Advance. We use your real transaction data, not collateral, not land titles, to determine your working capital limit.',
     Icon: Zap,
   },
 ];
 
 const features = [
   {
-    title: 'Verified Virtual Account',
+    title: 'Paybill & Virtual Account',
     desc: 'Fraud-proof M-PESA collections, every time',
     Icon: ShieldCheck,
   },
   {
-    title: 'Bulk Pay',
-    desc: 'Payroll & supplier payments in one click',
-    Icon: Users,
+    title: 'Payment Links & STK Push',
+    desc: 'Get paid instantly, even over WhatsApp',
+    Icon: Send,
   },
   {
-    title: 'KES → USDC Swap',
-    desc: 'Protect purchasing power from shilling drops',
-    Icon: Repeat,
+    title: 'Bulk Pay',
+    desc: 'Payroll, suppliers & utilities in one click',
+    Icon: Users,
   },
   {
     title: 'Real-Time Dashboard',
@@ -65,7 +65,7 @@ const features = [
 ];
 
 const timeline = [
-  { label: 'Day 1', desc: 'Verified Collections + Bulk Pay + FX Swaps unlocked' },
+  { label: 'Day 1', desc: 'Verified Collections + Payment Links + Bulk Pay unlocked' },
   { label: 'Month 3', desc: 'Cash Advance eligibility unlocked' },
   { label: 'Ongoing', desc: 'Trust Score grows, credit limits increase' },
 ];
@@ -143,11 +143,11 @@ const HowItWorks: React.FC = () => {
       <main className="howitworks-main mx-auto max-w-[1200px] px-4 sm:px-8">
         {/* HERO SECTION */}
         <section className="howitworks-hero pt-24 pb-20 flex flex-col items-center text-center fadein-up">
-          <h1 className="font-serif text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-primary-foreground leading-tight">
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-primary-foreground leading-tight">
             One Dashboard. Everything Your Business Needs to Move Money.
           </h1>
-          <p className="font-sans text-lg md:text-xl max-w-2xl mb-8 text-muted-foreground">
-            PayChain replaces five fragmented tools with one verified, intelligent merchant operating system — built on M-PESA infrastructure and blockchain rails.
+          <p className="text-lg md:text-xl max-w-2xl mb-8 text-muted-foreground">
+            PayChain replaces five fragmented tools with one verified, intelligent merchant operating system, built on M-PESA and NCBA Bank infrastructure.
           </p>
           <a href="https://app.paychain.co.ke" className="howitworks-cta-btn inline-block px-8 py-4 rounded-lg font-semibold text-lg bg-primary text-primary-foreground shadow-lg transition-all focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 hover:scale-105 hover:shadow-xl hover:glow-green" aria-label="Sign Up">
             Sign Up
@@ -167,8 +167,8 @@ const HowItWorks: React.FC = () => {
                       <Icon size={32} strokeWidth={2.2} className="text-primary" />
                     </span>
                   </div>
-                  <h3 className="font-serif text-2xl font-bold mb-3 text-primary-foreground">{step.title}</h3>
-                  <p className="font-sans text-base text-muted-foreground max-w-xs">{step.desc}</p>
+                  <h3 className="text-2xl font-bold mb-3 text-primary-foreground">{step.title}</h3>
+                  <p className="text-base text-muted-foreground max-w-xs">{step.desc}</p>
                   {i < steps.length - 1 && (
                     <span className="howitworks-step-connector md:block hidden absolute top-8 right-0 left-auto w-[calc(100%+32px)] h-1 bg-gradient-to-r from-primary/30 to-primary/80 z-0" aria-hidden="true"></span>
                   )}
@@ -180,9 +180,9 @@ const HowItWorks: React.FC = () => {
 
         {/* TRUST SCORE CALLOUT SECTION */}
         <section className="howitworks-trustscore py-24 bg-secondary text-secondary-foreground text-center fadein-up">
-          <h2 className="font-serif text-3xl md:text-4xl font-bold mb-4">Every Transaction Builds Your Trust Score</h2>
-          <p className="font-sans text-lg max-w-2xl mx-auto mb-10">
-            PayChain converts your verified payment history into a proprietary Trust Score — a real-time measure of your business's financial health and creditworthiness. The longer you use PayChain, the more working capital you can unlock. This is credit built on truth — not collateral.
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">Every Transaction Builds Your Trust Score</h2>
+          <p className="text-lg max-w-2xl mx-auto mb-10">
+            PayChain converts your verified payment history into a proprietary Trust Score, a real-time measure of your business's financial health and creditworthiness. The longer you use PayChain, the more working capital you can unlock. This is credit built on truth, not collateral.
           </p>
           <div className="howitworks-trustscore-meter mx-auto my-8" aria-label="Trust Score Meter">
             <div className="trustscore-meter-bg">
@@ -202,8 +202,8 @@ const HowItWorks: React.FC = () => {
                   <span className="feature-icon mb-4">
                     <Icon size={32} strokeWidth={2.2} className="text-primary" />
                   </span>
-                  <h3 className="font-serif text-xl font-bold mb-2 text-primary-foreground">{f.title}</h3>
-                  <p className="font-sans text-base text-muted-foreground">{f.desc}</p>
+                  <h3 className="text-xl font-bold mb-2 text-primary-foreground">{f.title}</h3>
+                  <p className="text-base text-muted-foreground">{f.desc}</p>
                 </article>
               );
             })}
@@ -215,8 +215,8 @@ const HowItWorks: React.FC = () => {
           <div className="timeline-container flex flex-col md:flex-row items-center justify-center gap-12 md:gap-0">
             {timeline.map((t, i) => (
               <div key={t.label} className="timeline-step flex flex-col items-center md:items-start text-center md:text-left relative">
-                <span className="timeline-label font-serif text-lg font-bold mb-2 text-primary-foreground">{t.label}</span>
-                <span className="timeline-desc font-sans text-base text-muted-foreground mb-2">{t.desc}</span>
+                <span className="timeline-label text-lg font-bold mb-2 text-primary-foreground">{t.label}</span>
+                <span className="timeline-desc text-base text-muted-foreground mb-2">{t.desc}</span>
                 {i < timeline.length - 1 && (
                   <span className="timeline-connector hidden md:block absolute top-4 right-[-60px] w-[120px] h-1 bg-gradient-to-r from-primary/30 to-primary/80 z-0" aria-hidden="true"></span>
                 )}
@@ -227,8 +227,8 @@ const HowItWorks: React.FC = () => {
 
         {/* CTA SECTION */}
         <section className="howitworks-cta py-24 text-center fadein-up">
-          <h2 className="font-serif text-3xl md:text-4xl font-bold mb-4">Ready to Run Your Business on Better Infrastructure?</h2>
-          <p className="font-sans text-lg max-w-2xl mx-auto mb-8">Sign up in minutes and start accepting payments today.</p>
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to Run Your Business on Better Infrastructure?</h2>
+          <p className="text-lg max-w-2xl mx-auto mb-8">Sign up in minutes and start accepting payments today.</p>
           <a href="https://app.paychain.co.ke" className="howitworks-cta-btn inline-block px-8 py-4 rounded-lg font-semibold text-lg bg-primary text-primary-foreground shadow-lg transition-all focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 hover:scale-105 hover:shadow-xl hover:glow-green" aria-label="Sign Up">
             Sign Up
           </a>

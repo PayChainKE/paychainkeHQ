@@ -454,10 +454,31 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
             { returnDocument: 'after' }
           );
 
+          // Self-funding — the merchant paying into their own wallet —
+          // isn't only kind==='topup' (the dedicated Fund Account modal).
+          // It also happens through the open "Pay Account"/Settlement QR
+          // link (kind==='pay_account') whenever the merchant uses their
+          // own link/QR to top up, and through Request Money if a merchant
+          // tests their own request-money prompt (kind==='request_money').
+          // Neither of those carries a distinct kind, so the only reliable
+          // signal is the payer's number matching the merchant's own — this
+          // used to be assumed equivalent to kind==='topup' (see the SMS
+          // skip below), which isn't true for the QR/link case, and
+          // produced a "you have received a payment from [your own number]"
+          // SMS for what was really just a deposit. Computed before the
+          // Transaction below (not after, like before) so it can also
+          // decide `type`: 'top_up' is a merchant depositing their own
+          // money; a real customer paying via Request Money/QR/Pay Account
+          // is 'inbound', the same type every other customer-paid-merchant
+          // flow in this file uses (see the PaymentLink branch above) —
+          // it was previously hardcoded to 'top_up' for all three, which
+          // miscategorized every customer STK payment as a merchant deposit.
+          const isSelfFunding = kind === 'topup' || (merchant.phone && stkReq.phone && merchant.phone === stkReq.phone);
+
           const transaction = await Transaction.create({
             merchantId: merchant._id,
             accountNumber: merchant.ncbaMerchantCode || 'WALLET_FUND',
-            type: 'top_up',
+            type: isSelfFunding ? 'top_up' : 'inbound',
             amount: merchantCredit,
             kesAmount: merchantCredit,
             currency: 'KES',
@@ -481,23 +502,11 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
           createNotification({
             merchantId: merchant._id,
             kind: 'wallet',
-            title: 'Wallet topped up',
-            message: `KES ${merchantCredit.toLocaleString()} was added to your balance via M-PESA.`,
+            title: isSelfFunding ? 'Wallet topped up' : 'Payment received',
+            message: isSelfFunding
+              ? `KES ${merchantCredit.toLocaleString()} was added to your balance via M-PESA.`
+              : `KES ${merchantCredit.toLocaleString()} was received via M-PESA.`,
           });
-
-          // Self-funding — the merchant paying into their own wallet —
-          // isn't only kind==='topup' (the dedicated Fund Account modal).
-          // It also happens through the open "Pay Account"/Settlement QR
-          // link (kind==='pay_account') whenever the merchant uses their
-          // own link/QR to top up, and through Request Money if a merchant
-          // tests their own request-money prompt (kind==='request_money').
-          // Neither of those carries a distinct kind, so the only reliable
-          // signal is the payer's number matching the merchant's own — this
-          // used to be assumed equivalent to kind==='topup' (see the SMS
-          // skip below), which isn't true for the QR/link case, and
-          // produced a "you have received a payment from [your own number]"
-          // SMS for what was really just a deposit.
-          const isSelfFunding = kind === 'topup' || (merchant.phone && stkReq.phone && merchant.phone === stkReq.phone);
 
           // Self-funding — no separate "customer" to name — keeps a plain
           // wallet-top-up/deposit message. A real customer paying uses the
@@ -602,43 +611,35 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
 const NCBA_STK_POLL_INTERVAL_MS = 2000;
 const NCBA_STK_POLL_MAX_ATTEMPTS = 60; // ~2 minutes — typical STK prompt validity window, unchanged
 
-// Observed live, twice, with different wording: NCBA's query endpoint can
-// return status:'FAILED' with a generic description ("Error occured while
-// processing the query", "The transaction is still under processing") for
-// a transaction that's still genuinely in flight — the customer hasn't
-// answered the prompt yet — not an actual decline. Resolving on a single
-// such response prematurely marked real, still-pending payments as failed
-// and stopped polling before the customer's later real SUCCESS could ever
-// be seen.
+// Observed live, repeatedly, with different wording each time: NCBA's query
+// endpoint can return status:'FAILED' with a generic/unrecognized
+// description for a transaction that's still genuinely in flight — the
+// customer hasn't answered the prompt yet — not an actual decline.
+// Resolving on that prematurely marked real, still-pending payments as
+// failed and stopped polling before the customer's later real SUCCESS could
+// ever be seen — a "Request Failed" the merchant would read as "the
+// customer cancelled", when nothing of the sort happened.
 //
-// Both real examples above contain "processing" — a strong, specific
-// signal for "still working on it" rather than a genuine customer-facing
-// decline (wrong PIN, insufficient funds, cancelled — none of which read
-// like this). Only descriptions matching this pattern get the extra
-// confirmation below; anything else (a real decline reason) still resolves
-// on the very first FAILED response, same as before — this only slows down
-// the specific case that was wrongly resolving too fast, not every
-// failure.
-const TRANSIENT_FAILURE_PATTERN = /processing|internal error|system error/i;
+// Blocklisting the specific transient phrasings we'd seen ("processing",
+// "internal error", etc.) turned out not to be safe — NCBA sends *other*
+// wording for the same still-in-flight case too, and every phrasing not on
+// the blocklist fell straight through as a confirmed decline. Flipped to an
+// allowlist instead: a FAILED response is only ever treated as a genuine
+// decline if its wording actually matches a real, customer-caused reason
+// (cancelled/rejected the prompt, wrong PIN, insufficient funds). Anything
+// else — including wording never seen before — is treated as still-pending
+// and just keeps polling. If it never legitimately resolves, the
+// NCBA_STK_POLL_MAX_ATTEMPTS timeout branch below still closes it out
+// honestly ("timed out waiting for a response") instead of asserting a
+// decline that may never have happened.
+const KNOWN_DECLINE_PATTERN = /cancel|reject|declin|insufficient|wrong pin|incorrect pin|invalid pin|wrong password|incorrect password/i;
 const REQUIRED_CONSECUTIVE_FAILURES = 2;
 
-// Belt-and-braces alongside TRANSIENT_FAILURE_PATTERN above: that regex only
-// catches the two exact phrasings we've seen NCBA use for "still in flight" —
-// any OTHER wording on a FAILED response (a third phrasing we haven't
-// observed yet, an empty description, etc.) fell straight through to
-// REQUIRED_CONSECUTIVE_FAILURES and resolved as a final decline on the very
-// first poll, 2 seconds after the prompt was sent — long before a real
-// customer could have even seen it, let alone answered it. That produced a
-// "Request Failed" a merchant would see while the customer was still
-// looking at their phone, followed by a real SUCCESS moments later that
-// only ever got reconciled quietly in the database (via the account-
-// notification webhook's allowFailedRetry) — never back to the merchant's
-// screen, since the frontend had already stopped polling on the false
-// failure. No FAILED response is honored as final before this many polls
-// have passed, regardless of its wording — a real decline (wrong PIN,
-// cancelled, insufficient funds) still resolves right after the grace
-// period ends; this only removes the false positives during the window a
-// customer couldn't plausibly have responded yet.
+// Extra safety margin on top of the wording allowlist above: even a
+// response that DOES match a known-decline phrasing is never honored as
+// final within this many polls of the prompt being sent — a customer needs
+// realistic time to even see the prompt, let alone decline it, so anything
+// this early is far more likely a race/misreport than a real answer.
 const MIN_ATTEMPTS_BEFORE_FAILURE = 5; // 5 * NCBA_STK_POLL_INTERVAL_MS = 10s
 
 // Fire-and-forget: intentionally not awaited by callers, mirroring how every
@@ -665,12 +666,12 @@ export function pollAndResolveNcbaStkPush(checkoutRequestId, transactionId) {
       }
 
       if (status === 'FAILED') {
-        const looksTransient = TRANSIENT_FAILURE_PATTERN.test(description || '') || attempts < MIN_ATTEMPTS_BEFORE_FAILURE;
-        consecutiveFailures = looksTransient ? consecutiveFailures + 1 : REQUIRED_CONSECUTIVE_FAILURES;
+        const isCredibleDecline = KNOWN_DECLINE_PATTERN.test(description || '') && attempts >= MIN_ATTEMPTS_BEFORE_FAILURE;
+        consecutiveFailures = isCredibleDecline ? consecutiveFailures + 1 : 0;
         if (consecutiveFailures < REQUIRED_CONSECUTIVE_FAILURES) {
           // Not logged as an error — see doc comment above, this is the
-          // expected transient shape, not a real problem yet.
-          console.log(`ℹ️ NCBA STK query reported FAILED for ${checkoutRequestId} (attempt ${consecutiveFailures}/${REQUIRED_CONSECUTIVE_FAILURES}) — confirming before treating as final:`, description);
+          // expected transient/unrecognized shape, not a real problem yet.
+          console.log(`ℹ️ NCBA STK query reported FAILED for ${checkoutRequestId} (attempt ${attempts}, confirmed declines ${consecutiveFailures}/${REQUIRED_CONSECUTIVE_FAILURES}) — not treating as final:`, description);
         } else {
           const stkReq = await STKRequest.findOne({ checkoutRequestId });
           if (!stkReq) {
@@ -681,7 +682,7 @@ export function pollAndResolveNcbaStkPush(checkoutRequestId, transactionId) {
           return;
         }
       } else {
-        consecutiveFailures = 0; // a genuine PENDING response clears any prior transient FAILED
+        consecutiveFailures = 0; // a genuine PENDING response clears any prior tentative decline count
       }
     } catch (err) {
       // Transient query failure — keep polling rather than failing the

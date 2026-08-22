@@ -20,10 +20,10 @@ export default function About(): JSX.Element {
     const cleanup = initAbout()
 
     // Inject OG meta tags and JSON-LD for Organization (idempotent)
-    if (!document.querySelector('meta[property="og:title"][content="About PayChain — Built in Kenya for Kenya\'s Merchants"]')) {
+    if (!document.querySelector('meta[property="og:title"][content="About PayChain: Built in Kenya for Kenya\'s Merchants"]')) {
       const ogs: { rel?: string; prop?: string; content: string }[] = [
-        { prop: 'og:title', content: "About PayChain — Built in Kenya's Merchants" },
-        { prop: 'og:description', content: 'PayChain is a Nairobi-born fintech company building Kenya\'s most trusted merchant OS — verified payments, bulk pay, KES→USDC swaps, and data-driven cash advances.' },
+        { prop: 'og:title', content: "About PayChain: Built in Kenya's Merchants" },
+        { prop: 'og:description', content: 'PayChain is a Nairobi-born fintech company building Kenya\'s most trusted merchant OS: verified payments, payment links, bulk pay, and data-driven cash advances.' },
         { prop: 'og:url', content: 'https://www.paychain.co.ke/about' },
         { prop: 'og:image', content: '/assets/og-about.jpg' }
       ]
@@ -101,8 +101,8 @@ export default function About(): JSX.Element {
 
           <div className="about__opening-body">
             <p>That is the sentence that started PayChain. Not a market report. Not a pitch deck. Not a slide about TAM. A simple, uncomfortable truth that anyone who has spent time in Kenyan markets already knew.</p>
-            <p>The SMS verification system is broken. The shilling keeps sliding. The banks keep saying no. Every tool a Kenyan merchant needs lives in a different app — fragmented, inefficient, and designed for someone else.</p>
-            <p>PayChain was not born in a boardroom. It was born out of proximity to that frustration. And it is being built to eliminate it — permanently.</p>
+            <p>The SMS verification system is broken. The shilling keeps sliding. The banks keep saying no. Every tool a Kenyan merchant needs lives in a different app: fragmented, inefficient, and designed for someone else.</p>
+            <p>PayChain was not born in a boardroom. It was born out of proximity to that frustration. And it is being built to eliminate it, permanently.</p>
           </div>
         </section>
 
@@ -163,17 +163,17 @@ export default function About(): JSX.Element {
 
               <article className="about__story-block" data-anim>
                 <div className="about__eyebrow-small">The Observation</div>
-                <p>The starting point was not a technology. It was an observation — that the merchants running Kenya's most active markets were being failed, quietly and consistently, by the infrastructure that was supposed to help them. M-PESA changed everything. And then it stopped. The SMS confirmation that was revolutionary in 2007 is now the most exploited vulnerability in Kenyan commerce. Verification technology exists to fix it. Nobody had fixed it.</p>
+                <p>The starting point was not a technology. It was an observation that the merchants running Kenya's most active markets were being failed, quietly and consistently, by the infrastructure that was supposed to help them. M-PESA changed everything. And then it stopped. The SMS confirmation that was revolutionary in 2007 is now the most exploited vulnerability in Kenyan commerce. Verification technology exists to fix it. Nobody had fixed it.</p>
               </article>
 
               <article className="about__story-block" data-anim>
                 <div className="about__eyebrow-small">The Decision</div>
-                <p>The decision to build PayChain was simple: the tools exist, the infrastructure exists, the market exists — the only thing missing was a team willing to put them together specifically for the Kenyan merchant. Not a watered-down version of a product designed for London or San Francisco. Something designed from the ground up for Nairobi, Juja, Mombasa, Kisumu, and every market in between.</p>
+                <p>The decision to build PayChain was simple: the tools exist, the infrastructure exists, the market exists. The only thing missing was a team willing to put them together specifically for the Kenyan merchant. Not a watered-down version of a product designed for London or San Francisco. Something designed from the ground up for Nairobi, Juja, Mombasa, Kisumu, and every market in between.</p>
               </article>
 
               <article className="about__story-block" data-anim>
                 <div className="about__eyebrow-small">The Build</div>
-                <p>We started with verified payment collection and built outward. Bulk Pay, because merchants drowning in manual transfers needed relief. The Inflation Shield, because watching the shilling depreciate while holding KES is a tax on hard work nobody signed up for. Cash Advance, because the most powerful thing you can do for a growing business is give it access to its own future revenue — based on what it earns, not the paperwork it can produce.</p>
+                <p>We started with verified payment collection and built outward. Bulk Pay, because merchants drowning in manual transfers needed relief. The Inflation Shield, because watching the shilling depreciate while holding KES is a tax on hard work nobody signed up for. Cash Advance, because the most powerful thing you can do for a growing business is give it access to its own future revenue, based on what it earns, not the paperwork it can produce.</p>
               </article>
             </div>
 
@@ -189,11 +189,11 @@ export default function About(): JSX.Element {
           <div className="about__mv-grid">
             <div className="about__mv-card about__mv-card--mission">
               <div className="about__eyebrow-small">Our Mission</div>
-              <p>To eliminate financial fragmentation and the digital trust deficit holding Kenyan SMEs back — by building the most trusted, most intelligent, and most accessible merchant operating system in Kenya.</p>
+              <p>To eliminate financial fragmentation and the digital trust deficit holding Kenyan SMEs back, by building the most trusted, most intelligent, and most accessible merchant operating system in Kenya.</p>
             </div>
             <div className="about__mv-card about__mv-card--vision">
               <div className="about__eyebrow-small">Our Vision</div>
-              <p>A Kenya where every merchant — from the Jua Kali artisan in Gikomba to the import trader clearing goods at Mombasa port — has access to verified payments, stable financial tools, and credit built on the truth of their business. Not on who they know. Not on what they own. On what they have built.</p>
+              <p>A Kenya where every merchant, from the Jua Kali artisan in Gikomba to the import trader clearing goods at Mombasa port, has access to verified payments, stable financial tools, and credit built on the truth of their business. Not on who they know. Not on what they own. On what they have built.</p>
             </div>
           </div>
         </section>
@@ -208,7 +208,7 @@ export default function About(): JSX.Element {
               <div className="about__value-number">01</div>
               <div className="about__value-body">
                 <div className="about__value-title">Truth Over Everything</div>
-                <p>Every product we build is designed to surface the truth — the truth of a payment, the truth of a merchant's revenue, the truth of what credit should cost. In an environment where SMS fraud, opaque fees, and information asymmetry are standard practice, we have chosen to build the opposite. Transparency is not a feature. It is the architecture.</p>
+                <p>Every product we build is designed to surface the truth: the truth of a payment, the truth of a merchant's revenue, the truth of what credit should cost. In an environment where SMS fraud, opaque fees, and information asymmetry are standard practice, we have chosen to build the opposite. Transparency is not a feature. It is the architecture.</p>
               </div>
             </li>
 
@@ -232,7 +232,7 @@ export default function About(): JSX.Element {
               <div className="about__value-number">04</div>
               <div className="about__value-body">
                 <div className="about__value-title">Built Here. Built for Here.</div>
-                <p>Kenya is not a developing market version of somewhere else. It is a sophisticated, complex, fast-moving economy with its own infrastructure and its own needs. PayChain is not localized for Kenya. It was built in Kenya — from the first line of code — designed to reflect the reality of how business actually works here.</p>
+                <p>Kenya is not a developing market version of somewhere else. It is a sophisticated, complex, fast-moving economy with its own infrastructure and its own needs. PayChain is not localized for Kenya. It was built in Kenya, from the first line of code, designed to reflect the reality of how business actually works here.</p>
               </div>
             </li>
 
@@ -240,7 +240,7 @@ export default function About(): JSX.Element {
               <div className="about__value-number">05</div>
               <div className="about__value-body">
                 <div className="about__value-title">Data Belongs to the Merchant</div>
-                <p>The transaction history that flows through PayChain belongs to the merchant who earned it. We use it — with consent — to build their Trust Score and unlock their Cash Advance. We do not sell it, share it, or use it for anything the merchant has not agreed to. In a world where data is the new oil, we have chosen to put that oil in the merchant's own hands.</p>
+                <p>The transaction history that flows through PayChain belongs to the merchant who earned it. We use it, with consent, to build their Trust Score and unlock their Cash Advance. We do not sell it, share it, or use it for anything the merchant has not agreed to. In a world where data is the new oil, we have chosen to put that oil in the merchant's own hands.</p>
               </div>
             </li>
 
@@ -248,7 +248,7 @@ export default function About(): JSX.Element {
               <div className="about__value-number">06</div>
               <div className="about__value-body">
                 <div className="about__value-title">We Are Playing a Long Game</div>
-                <p>PayChain is not optimized for the next quarter. It is optimized for the next decade. Every merchant, every transaction, every Trust Score — these are the compounding foundations of something that will matter in Kenya for a very long time. We are building accordingly.</p>
+                <p>PayChain is not optimized for the next quarter. It is optimized for the next decade. Every merchant, every transaction, every Trust Score: these are the compounding foundations of something that will matter in Kenya for a very long time. We are building accordingly.</p>
               </div>
             </li>
           </ol>
@@ -260,7 +260,7 @@ export default function About(): JSX.Element {
         {/* CTA */}
         <section className="about__cta" aria-labelledby="cta-heading">
           <h2 id="cta-heading" className="about__cta-title">If You Believe Kenyan Merchants Deserve Better Infrastructure, We Should Talk.</h2>
-          <p className="about__cta-body">Whether you are a merchant ready for early access, an investor who sees what we see in this market, a strategic partner looking to plug into Kenya's next payment infrastructure, or a talented operator who wants to build something that matters — we want to hear from you.</p>
+          <p className="about__cta-body">Whether you are a merchant ready for early access, an investor who sees what we see in this market, a strategic partner looking to plug into Kenya's next payment infrastructure, or a talented operator who wants to build something that matters, we want to hear from you.</p>
 
           <div className="about__cta-actions">
             <a className="btn btn--primary" href="https://app.paychain.co.ke" aria-label="Sign Up">Sign Up →</a>

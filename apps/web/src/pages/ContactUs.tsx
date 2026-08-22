@@ -236,7 +236,7 @@ export default function ContactUs() {
   // Add OG meta tags (SPA-friendly approach)
   useEffect(() => {
     const metas = [
-      { property: "og:title", content: "Contact PayChain — Get in Touch" },
+      { property: "og:title", content: "Contact PayChain: Get in Touch" },
       { property: "og:description", content: "Reach the PayChain team directly. Phone: +254 743 283 782. Based in Nairobi, Kenya." },
       { property: "og:url", content: "https://www.paychain.co.ke/contact" },
       { name: "twitter:card", content: "summary" },
@@ -295,7 +295,7 @@ export default function ContactUs() {
               </div>
             );
             return d.href ? (
-              <a key={d.label} href={d.href} className={styles.detailLink} aria-label={`${d.label} — opens ${d.href.startsWith('mailto') ? 'email' : 'phone'}`}>
+              <a key={d.label} href={d.href} className={styles.detailLink} aria-label={`${d.label}, opens ${d.href.startsWith('mailto') ? 'email' : 'phone'}`}>
                 {content}
               </a>
             ) : (

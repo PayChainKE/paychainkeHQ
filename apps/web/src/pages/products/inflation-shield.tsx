@@ -18,11 +18,11 @@ const data = [
 
 const features = [
   { title: 'Instant KES → USDC Swaps', icon: Repeat, desc: 'Convert your KES balance to USDC in seconds from your dashboard. No queues, no negotiation.' },
-  { title: 'Transparent 0.5% FX Rate', icon: Percent, desc: 'Flat 0.5% spread on all conversions. You see the exact rate before you confirm — no hidden fees.' },
+  { title: 'Transparent 0.5% FX Rate', icon: Percent, desc: 'Flat 0.5% spread on all conversions. You see the exact rate before you confirm, no hidden fees.' },
   { title: 'Pay International Suppliers', icon: Send, desc: 'Send USDC directly to international suppliers. No wire transfers, no SWIFT fees, no bank delays.' },
-  { title: 'Auto-Hedge Thresholds', icon: Shield, desc: 'Set a KES threshold — PayChain automatically converts surplus to USDC, protecting your purchasing power.' },
+  { title: 'Auto-Hedge Thresholds', icon: Shield, desc: 'Set a KES threshold: PayChain automatically converts surplus to USDC, protecting your purchasing power.' },
   { title: 'Hybrid KES + USDC Balance', icon: Wallet, desc: 'See and manage both currencies on one dashboard. Switch between them instantly as needs change.' },
-  { title: 'Blockchain-Settled Transfers', icon: Zap, desc: 'All USDC transfers settle on Base Network — fast, cheap, and traceable under 10 seconds.' },
+  { title: 'Blockchain-Settled Transfers', icon: Zap, desc: 'All USDC transfers settle on Base Network: fast, cheap, and traceable under 10 seconds.' },
 ];
 
 const stats = [
@@ -43,7 +43,7 @@ const InflationShield: React.FC = () => {
   const [isUsdcOpen, setIsUsdcOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       <Navbar />
 
       {/* Breadcrumb strip */}
@@ -69,18 +69,18 @@ const InflationShield: React.FC = () => {
                 transition={{ duration: 0.6 }}
               >
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 backdrop-blur-md mb-6">
-                  <span className="w-2 h-2 rounded-full bg-[#00bf63] animate-pulse" />
-                  <span className="text-sm font-medium text-gray-200">Live on Base Network</span>
+                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                  <span className="text-sm font-medium text-gray-200">In development, coming soon</span>
                 </div>
                 <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-tight mb-6">
                   Stop Watching Your Profits <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-red-500">Disappear</span>.
                 </h1>
                 <p className="text-lg text-gray-400 mb-8 max-w-xl leading-relaxed">
-                  The PayChain Inflation Shield lets you swap KES to USDC instantly — protecting your purchasing power, paying international suppliers in stablecoin, and hedging shilling depreciation without ever visiting a forex bureau.
+                  We're building the PayChain Inflation Shield: a way to swap KES to USDC in seconds, protecting your purchasing power and hedging shilling depreciation without ever visiting a forex bureau. It's currently in development on Base Network; join the waitlist to be first in line when it opens up.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4">
                   <a href="https://app.paychain.co.ke" className="inline-flex items-center justify-center px-8 py-4 text-base font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_20px_rgba(0,191,99,0.3)]">
-                    Protect Your Money
+                    Join the Waitlist
                   </a>
                   <Link to="/contact" className="inline-flex items-center justify-center px-8 py-4 text-base font-bold text-white bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl transition-all duration-300 backdrop-blur-md">
                     Talk to Sales
@@ -135,7 +135,7 @@ const InflationShield: React.FC = () => {
             >
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">The Shilling Lost Over 30% of Its Value in 3 Years. Your Business Felt Every Drop.</h2>
               <p className="text-lg text-gray-600 leading-relaxed mb-10">
-                Kenyan merchants who import goods, pay international suppliers, or simply hold cash in KES are quietly losing wealth every month — not through bad decisions, but through currency depreciation they have no control over. The options have always been bad: visit a forex bureau with unpredictable rates, hold USD in a bank account with high minimums, or just absorb the loss. <strong className="text-gray-900">There is now a fourth option.</strong>
+                Kenyan merchants who import goods, pay international suppliers, or simply hold cash in KES are quietly losing wealth every month, not through bad decisions, but through currency depreciation they have no control over. The options have always been bad: visit a forex bureau with unpredictable rates, hold USD in a bank account with high minimums, or just absorb the loss. <strong className="text-gray-900">We're building a fourth option.</strong>
               </p>
             </motion.div>
           </div>
@@ -153,7 +153,7 @@ const InflationShield: React.FC = () => {
               >
                 <h3 className="text-3xl font-bold text-gray-900 mb-6">Your Purchasing Power, Protected.</h3>
                 <p className="text-lg text-gray-600 mb-8 leading-relaxed">
-                  The PayChain Inflation Shield is a built-in KES-to-USDC conversion engine that lets you swap your KES balance to USDC stablecoin directly from your dashboard — at a transparent 0.5% rate with no forex bureau, no bank minimum, no waiting.
+                  The PayChain Inflation Shield is a built-in KES-to-USDC conversion engine that lets you swap your KES balance to USDC stablecoin directly from your dashboard, at a transparent 0.5% rate with no forex bureau, no bank minimum, no waiting.
                 </p>
                 
                 <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm overflow-hidden transition-all duration-300">
@@ -306,11 +306,11 @@ const InflationShield: React.FC = () => {
               <div className="absolute top-0 right-0 w-64 h-64 bg-[#00bf63]/20 rounded-full blur-3xl" />
               <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/20 rounded-full blur-3xl" />
               
-              <h2 className="text-3xl md:text-4xl font-bold text-white mb-6 relative z-10">Your Money Should Hold Its Value. Now It Can.</h2>
-              <p className="text-xl text-gray-400 mb-10 relative z-10">Sign up in minutes and start protecting your money today.</p>
+              <h2 className="text-3xl md:text-4xl font-bold text-white mb-6 relative z-10">Your Money Should Hold Its Value. Soon, It Can.</h2>
+              <p className="text-xl text-gray-400 mb-10 relative z-10">Sign up to PayChain today, and we'll notify you the moment the Inflation Shield opens up.</p>
               <div className="relative z-10 inline-flex items-center justify-center">
                 <a href="https://app.paychain.co.ke" className="px-8 py-4 text-lg font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_30px_rgba(0,191,99,0.3)]">
-                  Sign Up
+                  Join the Waitlist
                 </a>
               </div>
             </motion.div>
