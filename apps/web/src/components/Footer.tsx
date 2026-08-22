@@ -47,9 +47,15 @@ const Footer: React.FC = () => {
             <h4 className="text-white font-bold text-xs mb-4 uppercase tracking-widest">Solutions</h4>
             <ul className="space-y-2 text-sm">
               <li><Link to="/products/virtual-account" className="hover:text-emerald-400 transition-colors">Virtual Account</Link></li>
-              <li><Link to="/products/inflation-shield" className="hover:text-emerald-400 transition-colors">Inflation Shield</Link></li>
               <li><Link to="/products/bulk-pay" className="hover:text-emerald-400 transition-colors">Bulk Payments</Link></li>
               <li><Link to="/products/cash-advance" className="hover:text-emerald-400 transition-colors">Cash Advance</Link></li>
+              <li><Link to="/products/operations-tools" className="hover:text-emerald-400 transition-colors">Operations Tools</Link></li>
+              <li>
+                <Link to="/products/inflation-shield" className="flex items-center gap-2 hover:text-emerald-400 transition-colors">
+                  <span>Inflation Shield</span>
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-400/70 border border-emerald-400/30 rounded-full px-2 py-0.5">Soon</span>
+                </Link>
+              </li>
               <li>
                 <Link to="/docs" className="flex items-center gap-2 hover:text-emerald-400 transition-colors">
                   <span>Developer API</span>
