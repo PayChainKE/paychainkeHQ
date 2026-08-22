@@ -120,14 +120,14 @@ const VideoSection: React.FC = () => {
           >
             <div className="absolute -inset-4 bg-emerald-500/10 rounded-3xl blur-2xl group-hover:bg-emerald-500/20 transition-all duration-500" />
             <div className="relative aspect-video rounded-2xl overflow-hidden shadow-2xl border-4 border-white">
-              <iframe 
-                width="100%" 
-                height="100%" 
-                src="https://www.youtube.com/embed/MaKDVkrlHqs?si=7h0nvdgTlKfdq0jB" 
-                title="YouTube video player" 
-                frameBorder="0" 
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
-                referrerPolicy="strict-origin-when-cross-origin" 
+              <iframe
+                width="100%"
+                height="100%"
+                src="https://www.youtube.com/embed/y2a7XuaQIfo?si=un4F7yA5yf-OYY81"
+                title="Introducing PayChain: The Merchant Operating System Built for African Businesses"
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                referrerPolicy="strict-origin-when-cross-origin"
                 allowFullScreen
                 className="w-full h-full"
               ></iframe>
