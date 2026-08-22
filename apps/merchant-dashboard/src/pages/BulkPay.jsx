@@ -405,6 +405,47 @@ export default function BulkPay() {
     }
   };
 
+  // Batch History — getBatches/getBatchById already existed on the backend
+  // but nothing in this app ever called them, so once a merchant left the
+  // post-authorize receipts screen there was no way to look up a past
+  // batch's real outcome. Mirrors the Invoice Tracking list's pattern
+  // (fetch, client-side filter/paginate, click a row for detail).
+  const [batchHistory, setBatchHistory] = useState([]);
+  const [batchHistoryFilter, setBatchHistoryFilter] = useState('All');
+  const [batchHistoryPage, setBatchHistoryPage] = useState(1);
+  const batchesPerPage = 5;
+  const [showBatchDetails, setShowBatchDetails] = useState(null);
+
+  const filteredBatchHistory = batchHistory.filter(b => batchHistoryFilter === 'All' || b.status === batchHistoryFilter);
+  const totalBatchHistoryPages = Math.max(1, Math.ceil(filteredBatchHistory.length / batchesPerPage));
+  const paginatedBatchHistory = filteredBatchHistory.slice((batchHistoryPage - 1) * batchesPerPage, batchHistoryPage * batchesPerPage);
+
+  const fetchBatchHistory = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('paychain_merchant_token');
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      const res = await axios.get(`${API_URL}/api/bulkpay/batches?limit=25`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setBatchHistory(res.data?.batches || []);
+    } catch (err) {
+      // Non-fatal — the list just shows its empty state
+    }
+  }, []);
+
+  useEffect(() => { fetchBatchHistory() }, [fetchBatchHistory]);
+
+  useEffect(() => {
+    setBatchHistoryPage(prev => Math.min(prev, totalBatchHistoryPages));
+  }, [totalBatchHistoryPages]);
+
+  const BATCH_STATUS_META = {
+    Processed: { label: 'Processed', icon: 'check_circle', tone: 'bg-emerald-50 text-emerald-600', badge: 'bg-emerald-100 text-emerald-800' },
+    Partial:   { label: 'Partial',   icon: 'warning',       tone: 'bg-amber-50 text-amber-600',   badge: 'bg-amber-100 text-amber-800' },
+    Failed:    { label: 'Failed',    icon: 'error',         tone: 'bg-red-50 text-red-600',       badge: 'bg-red-100 text-red-800' },
+    Pending:   { label: 'Pending',   icon: 'schedule',      tone: 'bg-slate-100 text-slate-500',  badge: 'bg-slate-200 text-slate-600' },
+  };
+
   // Fund Account — showFundModal opens a small method picker; picking one
   // hands off to the shared FundAccountModal (same component
   // Overview.jsx/Wallet.jsx use) for the actual STK-push/bank/paybill flow,

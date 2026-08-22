@@ -802,8 +802,8 @@ export default function Login() {
               </div>
                <form onSubmit={handleForgotPassword} className="space-y-5 lg:space-y-6">
                 <div className="space-y-2">
-                  <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Email or Phone Number</label>
-                  <input className="w-full bg-white border border-outline-variant/15 rounded-2xl py-3 lg:py-4 px-4 lg:px-5 text-lg font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" placeholder="john@example.com or 0712..." type="text" autoComplete="username" required />
+                  <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Phone Number or Email</label>
+                  <input className="w-full bg-white border border-outline-variant/15 rounded-2xl py-3 lg:py-4 px-4 lg:px-5 text-lg font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" placeholder="0712345678 or john@example.com" type="text" autoComplete="username" required />
                 </div>
                 <div className="space-y-4">
                   {err && (
@@ -859,7 +859,7 @@ export default function Login() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Email or Phone Number</label>
+                    <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Phone Number or Email</label>
                     <div className="flex group">
                       <div className="bg-surface-container-low border border-outline-variant/15 border-r-0 rounded-l-2xl px-4 lg:px-5 flex items-center justify-center text-primary/40 group-focus-within:border-primary transition-colors">
                         <span className="material-symbols-outlined text-xl">person</span>
@@ -868,7 +868,7 @@ export default function Login() {
                         className="flex-1 w-full bg-white border border-outline-variant/15 rounded-r-2xl py-3 lg:py-4 px-4 lg:px-5 text-lg font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40"
                         value={phone}
                         onChange={e => setPhone(e.target.value)}
-                        placeholder="john@example.com or 0712..."
+                        placeholder="0712345678 or john@example.com"
                         type="text"
                         autoComplete="username"
                         required
