@@ -108,7 +108,7 @@ const AboutProblemSolution: React.FC = () => {
                   <ShieldCheck className="w-6 h-6" />
                 </div>
                 <p className="text-base sm:text-lg leading-relaxed font-medium text-white/90">
-                  When you join PayChain you get a verified PayChain Virtual Account. Every customer payment is confirmed instantly on your dashboard, not by screenshot. <span className="font-bold text-emerald-400 block mt-3">Real verification. Fraud becomes impossible.</span>
+                  When you join PayChain you get a dedicated PayChain Paybill and virtual account for your business. Every customer payment is confirmed instantly on your dashboard, not by screenshot. <span className="font-bold text-emerald-400 block mt-3">Real verification. Fraud becomes impossible.</span>
                 </p>
               </motion.div>
 
@@ -120,7 +120,7 @@ const AboutProblemSolution: React.FC = () => {
                   <TrendingUp className="w-6 h-6" />
                 </div>
                 <p className="text-base sm:text-lg leading-relaxed font-medium text-white/90">
-                  From the same dashboard you can pay all your staff in one click, swap your KES to USDC to protect it from shilling drops, and after 3 months of using PayChain your transaction history automatically qualifies you for working capital/cash advance—<span className="font-bold text-emerald-400 block mt-3">no collateral, no bank queue, no title deed.</span>
+                  From the same dashboard you can pay all your staff, suppliers, and utility bills in one click, and after 3 months of using PayChain your transaction history automatically qualifies you for working capital/cash advance:<span className="font-bold text-emerald-400 block mt-3">no collateral, no bank queue, no title deed.</span>
                 </p>
               </motion.div>
             </div>

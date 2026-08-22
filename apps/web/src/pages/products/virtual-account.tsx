@@ -10,21 +10,32 @@ import {
   GitMerge,
   TrendingUp,
   Check,
+  Store,
+  Send,
+  Smartphone,
+  FileText,
 } from 'lucide-react';
 import Breadcrumbs from '@/components/Breadcrumbs';
+
+const waysToGetPaid = [
+  { title: 'Paybill & Virtual Account', icon: Store, desc: 'Your own dedicated PayChain Paybill and virtual account number, customers pay it exactly like any M-PESA till or Paybill, in person or at checkout.' },
+  { title: 'Payment Links', icon: Send, desc: 'Send a payment link to any customer (even over WhatsApp) for e-commerce, delivery orders, or one-off sales. Money settles instantly the moment they pay.' },
+  { title: 'STK Push', icon: Smartphone, desc: 'Prompt a customer to pay directly: send an M-PESA STK push straight to their phone and get paid the moment they enter their PIN. No till number to read out.' },
+  { title: 'Professional Invoicing', icon: FileText, desc: 'Create and send professional invoices to customers, with a payable link built in. Track Draft, Sent, and Paid status right from your dashboard.' },
+];
 
 const features = [
   { title: 'Verified Inbound Payments', icon: ShieldCheck, desc: 'Every payment verified through our NCBA Bank integration before confirmation. Fake screenshots are impossible.' },
   { title: 'Real-Time Dashboard Confirmation', icon: Activity, desc: 'The moment a customer pays, it appears on your dashboard with amount, timestamp, phone number, and reference.' },
-  { title: 'Immutable Transaction Ledger', icon: Database, desc: 'Every payment logged on blockchain rails — a permanent, tamper-proof record that builds your Trust Score.' },
-  { title: 'Aggregator-Backed Virtual Account', icon: Building2, desc: 'Registered through a licensed payment aggregator — institutional credibility behind every transaction.' },
+  { title: 'Immutable Transaction Ledger', icon: Database, desc: 'Every payment logged on blockchain rails, a permanent, tamper-proof record that builds your Trust Score.' },
+  { title: 'Aggregator-Backed Virtual Account', icon: Building2, desc: 'Registered through a licensed payment aggregator, institutional credibility behind every transaction.' },
   { title: 'Hybrid M-PESA + Blockchain Rails', icon: GitMerge, desc: 'M-PESA reach. Blockchain security. You get both without needing to understand either.' },
   { title: 'Automatic Trust Score Building', icon: TrendingUp, desc: 'Every verified collection builds your credit profile. 3 months unlocks your Cash Advance eligibility.' },
 ];
 
 const steps = [
-  { title: 'Get Verified', desc: 'Complete KYC and receive your dedicated PayChain Virtual Account — backed by a licensed aggregator.' },
-  { title: 'Share & Collect', desc: 'Customers pay via M-PESA as normal. You see confirmed payment on your dashboard instantly — no SMS needed.' },
+  { title: 'Get Verified', desc: 'Complete KYC and receive your dedicated PayChain Virtual Account, backed by a licensed aggregator.' },
+  { title: 'Share & Collect', desc: 'Customers pay via M-PESA as normal. You see confirmed payment on your dashboard instantly, no SMS needed.' },
   { title: 'Build & Grow', desc: 'Every transaction builds your Trust Score and working capital eligibility automatically.' },
 ];
 
@@ -32,14 +43,14 @@ const comparisonRows = [
   ['Payment verification', 'SMS confirmation', 'NCBA Bank integration + blockchain'],
   ['Fraud protection', 'None', 'Real-time fraud elimination'],
   ['Transaction records', 'SMS inbox', 'Immutable digital ledger'],
-  ['Business credit building', 'No', 'Yes — automatic Trust Score'],
+  ['Business credit building', 'No', 'Yes (automatic Trust Score)'],
   ['Dashboard visibility', 'No', 'Real-time, full history'],
   ['Regulatory backing', 'Basic', 'Licensed aggregator'],
 ];
 
 const VirtualAccount: React.FC = () => {
   return (
-    <div className="min-h-screen bg-white font-sans">
+    <div className="min-h-screen bg-white">
       <Navbar />
 
       {/* Breadcrumb strip */}
@@ -64,13 +75,13 @@ const VirtualAccount: React.FC = () => {
                 <span className="text-sm font-medium text-gray-200">Verified. Secured. Intelligent.</span>
               </div>
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.05] mb-6">
-                Your Account. <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00bf63] to-emerald-300">Verified.</span>
+                Your Paybill. <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00bf63] to-emerald-300">Verified.</span>
               </h1>
               <p className="text-lg text-gray-400 mb-8 max-w-xl leading-relaxed">
-                The PayChain Virtual Account replaces your basic M-PESA till with a registered, aggregator-backed payment channel that kills SMS fraud, logs every shilling, and builds your business credit — automatically.
+                Every PayChain merchant gets a dedicated PayChain Paybill and virtual account, a registered, aggregator-backed payment channel that replaces your basic M-PESA till, kills SMS fraud, logs every shilling, and builds your business credit automatically.
               </p>
               <a href="https://app.paychain.co.ke" className="inline-flex items-center justify-center px-8 py-4 text-base font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_20px_rgba(0,191,99,0.3)]">
-                Get Your Virtual Account
+                Get Your Paybill & Account
               </a>
             </motion.div>
 
@@ -121,9 +132,42 @@ const VirtualAccount: React.FC = () => {
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6 }} className="max-w-3xl mx-auto text-center">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">The SMS Till Is Broken. And Fraudsters Know It.</h2>
             <p className="text-lg text-gray-600 leading-relaxed">
-              Every day, Kenyan merchants lose money to one of the oldest tricks in the book — a fake M-PESA confirmation SMS. A customer shows a screenshot. You believe it. The money was never sent. Basic M-PESA tills were never designed to protect you. They were designed to move money. The PayChain Virtual Account was designed to do both.
+              Every day, Kenyan merchants lose money to one of the oldest tricks in the book: a fake M-PESA confirmation SMS. A customer shows a screenshot. You believe it. The money was never sent. Basic M-PESA tills were never designed to protect you. They were designed to move money. Your PayChain Paybill and Virtual Account were designed to do both.
             </p>
           </motion.div>
+        </div>
+      </section>
+
+      {/* WAYS TO GET PAID */}
+      <section className="py-20 bg-white border-t border-gray-100">
+        <div className="container mx-auto px-6 lg:px-8">
+          <motion.h2 initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 text-center">
+            One Account. Every Way to Get Paid.
+          </motion.h2>
+          <motion.p initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-lg text-gray-600 leading-relaxed text-center max-w-2xl mx-auto mb-12">
+            Every collection method below settles into the same Paybill and virtual account, verified instantly, no matter how the customer pays.
+          </motion.p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            {waysToGetPaid.map((f, i) => {
+              const Icon = f.icon;
+              return (
+                <motion.div
+                  key={f.title}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.5, delay: i * 0.08 }}
+                  className="bg-gray-50 border border-gray-100 rounded-2xl p-8 hover:shadow-lg transition-all duration-300 hover:border-[#00bf63]/30 group"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-white shadow-sm border border-gray-100 flex items-center justify-center mb-6 group-hover:bg-[#00bf63] transition-colors duration-300">
+                    <Icon className="w-6 h-6 text-gray-700 group-hover:text-white transition-colors duration-300" />
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900 mb-3">{f.title}</h3>
+                  <p className="text-gray-600 leading-relaxed text-sm">{f.desc}</p>
+                </motion.div>
+              );
+            })}
+          </div>
         </div>
       </section>
 
@@ -134,7 +178,7 @@ const VirtualAccount: React.FC = () => {
             <motion.div initial={{ opacity: 0, x: -20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.6 }}>
               <h3 className="text-3xl font-bold text-gray-900 mb-6">One Account. Two Rails. Zero Fraud.</h3>
               <p className="text-lg text-gray-600 leading-relaxed">
-                The PayChain Virtual Account operates across both M-PESA infrastructure and blockchain rails simultaneously — giving you the familiarity of M-PESA with the security of blockchain confirmation. Every inbound payment is confirmed through our NCBA Bank integration in real time, logged on-chain for a tamper-proof record, instantly visible on your dashboard, and automatically added to your Trust Score.
+                The PayChain Virtual Account operates across both M-PESA infrastructure and blockchain rails simultaneously, giving you the familiarity of M-PESA with the security of blockchain confirmation. Every inbound payment is confirmed through our NCBA Bank integration in real time, logged on-chain for a tamper-proof record, instantly visible on your dashboard, and automatically added to your Trust Score.
               </p>
             </motion.div>
 

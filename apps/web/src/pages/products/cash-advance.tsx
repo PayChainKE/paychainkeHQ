@@ -19,18 +19,18 @@ import Breadcrumbs from '@/components/Breadcrumbs';
 const features = [
   { title: 'Data-Driven Eligibility', icon: Database, desc: 'Advance limit calculated entirely from your verified PayChain transaction history. No collateral, guarantors, or credit bureaus.' },
   { title: 'Full Transparency Before You Commit', icon: Eye, desc: 'See your approved limit, origination fee, repayment %, and total cost before accepting. No surprises. No fine print that changes.' },
-  { title: 'Revenue-Based Repayment', icon: RefreshCw, desc: 'Repayments auto-collected as a % of daily collections. Adjusts with your revenue — no penalties for slow business cycles.' },
+  { title: 'Revenue-Based Repayment', icon: RefreshCw, desc: 'Repayments auto-collected as a % of daily collections. Adjusts with your revenue, no penalties for slow business cycles.' },
   { title: 'Instant Disbursement', icon: Zap, desc: 'Funds arrive in your PayChain balance immediately on acceptance. Available for Bulk Pay, suppliers, or M-PESA withdrawal.' },
   { title: 'Grows with Your Business', icon: TrendingUp, desc: 'Repay your first advance and your next offer comes faster, at a higher limit, and on better terms. Compounds with every cycle.' },
   { title: 'Zero Hidden Fees', icon: ShieldCheck, desc: 'Transparent origination fee + revenue share. That is the total cost. No late fees, penalty interest, or early repayment charges.' },
 ];
 
 const timeline = [
-  { title: 'Transact Through PayChain (Months 1–3)', desc: 'Every verified collection through your PayChain Virtual Account builds your merchant ledger — a tamper-proof record of your real business activity.' },
+  { title: 'Transact Through PayChain (Months 1–3)', desc: 'Every verified collection through your PayChain Virtual Account builds your merchant ledger, a tamper-proof record of your real business activity.' },
   { title: 'Your Trust Score Builds Automatically', desc: "PayChain's Trust Score algorithm analyzes your revenue consistency, transaction frequency, and growth trajectory. Watch it build in real time on your dashboard. No action required." },
-  { title: 'You Receive a Cash Advance Offer', desc: 'At month 3, if eligible, PayChain presents a personalized offer on your dashboard — approved limit, repayment terms, origination fee, and total cost. Fully visible before you commit.' },
-  { title: 'Accept and Receive Funds', desc: 'Accept your offer. Funds arrive in your PayChain merchant balance immediately — ready for Bulk Pay, supplier payments, or M-PESA withdrawal. No 3–5 day bank delays.' },
-  { title: 'Repay as You Earn', desc: 'Repayment is a fixed percentage of your daily PayChain collections — automatic, no manual transfers. Strong month = repay faster. Slow week = smaller repayment. Works with your cash flow, not against it.' },
+  { title: 'You Receive a Cash Advance Offer', desc: 'At month 3, if eligible, PayChain presents a personalized offer on your dashboard: approved limit, repayment terms, origination fee, and total cost. Fully visible before you commit.' },
+  { title: 'Accept and Receive Funds', desc: 'Accept your offer. Funds arrive in your PayChain merchant balance immediately, ready for Bulk Pay, supplier payments, or M-PESA withdrawal. No 3–5 day bank delays.' },
+  { title: 'Repay as You Earn', desc: 'Repayment is a fixed percentage of your daily PayChain collections: automatic, no manual transfers. Strong month = repay faster. Slow week = smaller repayment. Works with your cash flow, not against it.' },
 ];
 
 const comparisonRows = [
@@ -40,24 +40,24 @@ const comparisonRows = [
   ['Repayment', 'Fixed monthly installment', 'Fixed monthly installment', '% of daily collections'],
   ['Collateral', 'Required', 'Required', 'None'],
   ['Credit history', 'Required', 'Partial', 'Not required'],
-  ['Slow month penalty', 'Yes', 'Yes', 'No — auto-adjusts'],
+  ['Slow month penalty', 'Yes', 'Yes', 'No (auto-adjusts)'],
   ['Builds future access', 'Bank only', 'SACCO only', 'Strengthens Trust Score'],
 ];
 
 const useCases = [
   { title: 'Retail & Hospitality', desc: "Stock up before peak season without draining operational cash. Repay as the season's revenue comes in." },
-  { title: 'Import & Export Traders', desc: 'Bridge the gap between placing an international order and receiving inventory. Cover deposits, freight, and customs — repay as stock sells.' },
+  { title: 'Import & Export Traders', desc: 'Bridge the gap between placing an international order and receiving inventory. Cover deposits, freight, and customs, repay as stock sells.' },
   { title: 'Service Agencies', desc: 'Take on larger contracts than current cash flow allows. Cover upfront costs, repay from the contract revenue.' },
   { title: 'Any Cash Flow Gap', desc: "Delayed payment. Unexpected equipment. Seasonal trough before a peak. PayChain Cash Advance is for the moments that matter." },
 ];
 
 const faqs = [
   { q: 'How much can I borrow?', a: 'Your limit is calculated from your verified transaction history. Higher, more consistent revenue through PayChain = higher limit. Limits grow with each successfully repaid advance.' },
-  { q: 'What does it cost?', a: 'A transparent origination fee plus a repayment % of daily collections. The full cost is shown before you accept — no hidden fees, no penalty interest.' },
+  { q: 'What does it cost?', a: 'A transparent origination fee plus a repayment % of daily collections. The full cost is shown before you accept, no hidden fees, no penalty interest.' },
   { q: 'What if my business has a slow month?', a: 'Repayments are a fixed % of your actual daily collections. Slow month = smaller repayment. No missed payment penalties for normal revenue variation.' },
   { q: 'Can I get a second advance before repaying the first?', a: 'Once a significant portion is repaid, PayChain may present a top-up offer. Full second advances are available after full repayment.' },
-  { q: 'Does this affect my credit record?', a: 'PayChain operates on your internal Trust Score — a proprietary measure. It does not interact with external credit bureaus.' },
-  { q: 'Can I repay early?', a: 'Yes — with no penalty. Early repayment strengthens your Trust Score faster and accelerates your next offer.' },
+  { q: 'Does this affect my credit record?', a: 'PayChain operates on your internal Trust Score, a proprietary measure. It does not interact with external credit bureaus.' },
+  { q: 'Can I repay early?', a: 'Yes, with no penalty. Early repayment strengthens your Trust Score faster and accelerates your next offer.' },
 ];
 
 function TrustScoreRing() {
@@ -119,7 +119,7 @@ function FaqItem({ q, a }: { q: string; a: string }) {
 
 const CashAdvance: React.FC = () => {
   useEffect(() => {
-    document.title = 'PayChain Cash Advance — Working Capital for Kenyan Merchants';
+    document.title = 'PayChain Cash Advance: Working Capital for Kenyan Merchants';
     const setMeta = (prop: string, content: string) => {
       let el = document.querySelector(`meta[property="${prop}"]`);
       if (!el) {
@@ -129,13 +129,13 @@ const CashAdvance: React.FC = () => {
       }
       el.setAttribute('content', content);
     };
-    setMeta('og:title', 'PayChain Cash Advance — Working Capital for Kenyan Merchants');
-    setMeta('og:description', 'Access working capital based on your real M-PESA transaction history — no collateral, no bank queues, no credit history needed. Join the PayChain beta.');
+    setMeta('og:title', 'PayChain Cash Advance: Working Capital for Kenyan Merchants');
+    setMeta('og:description', 'Access working capital based on your real M-PESA transaction history, no collateral, no bank queues, no credit history needed. Join the PayChain beta.');
     setMeta('og:url', 'https://www.paychain.co.ke/products/cash-advance');
   }, []);
 
   return (
-    <div className="min-h-screen bg-white font-sans">
+    <div className="min-h-screen bg-white">
       <Navbar />
 
       {/* Breadcrumb strip */}
@@ -163,7 +163,7 @@ const CashAdvance: React.FC = () => {
                 Your Transaction History <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00bf63] to-emerald-300">Is Your Collateral.</span>
               </h1>
               <p className="text-lg text-gray-400 mb-8 max-w-xl leading-relaxed">
-                PayChain Cash Advance gives Kenyan merchants access to working capital based on real verified business data — not land titles, not guarantors, not bank relationships. Just the truth of how your business moves money.
+                PayChain Cash Advance gives Kenyan merchants access to working capital based on real verified business data, not land titles, not guarantors, not bank relationships. Just the truth of how your business moves money.
               </p>
               <div className="flex flex-wrap gap-3 mb-6">
                 {['No collateral required', 'No credit history needed', 'No bank queues'].map((pill) => (
@@ -212,10 +212,10 @@ const CashAdvance: React.FC = () => {
             </div>
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">Kenya's Banks Were Not Built for Kenya's Merchants.</h2>
             <blockquote className="text-xl italic font-semibold text-gray-700 mb-8 leading-relaxed">
-              "The bank asked for a title deed. You left empty-handed — not because your business isn't real, but because their system was never designed to see it."
+              "The bank asked for a title deed. You left empty-handed, not because your business isn't real, but because their system was never designed to see it."
             </blockquote>
             <p className="text-lg text-gray-600 leading-relaxed mb-4">
-              Every Kenyan SME owner knows this story. Business is good. Orders are coming in. You have the customers, the suppliers, the reputation — but not the cash right now to fulfill the opportunity in front of you.
+              Every Kenyan SME owner knows this story. Business is good. Orders are coming in. You have the customers, the suppliers, the reputation, but not the cash right now to fulfill the opportunity in front of you.
             </p>
             <p className="text-lg text-gray-600 leading-relaxed mb-4">
               So you go to the bank. They ask for a title deed. A guarantor. Three years of audited accounts. You leave empty-handed. You go to a SACCO. The rates are punishing. You borrow from family. It works until it doesn't. Meanwhile, the opportunity is gone.
@@ -232,7 +232,7 @@ const CashAdvance: React.FC = () => {
             <motion.div initial={{ opacity: 0, x: -20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.6 }}>
               <h3 className="text-3xl font-bold text-gray-900 mb-6">Working Capital That Understands Your Business.</h3>
               <p className="text-lg text-gray-600 leading-relaxed">
-                PayChain Cash Advance is a data-driven working capital facility embedded in your merchant dashboard. After 3 months of verified transaction history through your PayChain Virtual Account, your business automatically becomes eligible — with a limit determined entirely by your real revenue data. No application forms. No collateral valuation. No credit committee. Just your data, a transparent offer, and funds in your account.
+                PayChain Cash Advance is a data-driven working capital facility embedded in your merchant dashboard. After 3 months of verified transaction history through your PayChain Virtual Account, your business automatically becomes eligible, with a limit determined entirely by your real revenue data. No application forms. No collateral valuation. No credit committee. Just your data, a transparent offer, and funds in your account.
               </p>
             </motion.div>
 
@@ -294,7 +294,7 @@ const CashAdvance: React.FC = () => {
                 <div>
                   <h4 className="text-sm font-bold uppercase tracking-widest text-[#00bf63] mb-4">What builds your Trust Score</h4>
                   <ul className="space-y-3">
-                    {['Transaction Volume — total verified inbound collections', 'Transaction Consistency — regularity of payments received', 'Revenue Trajectory — growth, stability, or fluctuation pattern', 'Average Transaction Size — typical customer payment value', 'Merchant Tenure — time active on PayChain', 'Repayment History — reliability on previous advances'].map((item) => (
+                    {['Transaction Volume: total verified inbound collections', 'Transaction Consistency: regularity of payments received', 'Revenue Trajectory: growth, stability, or fluctuation pattern', 'Average Transaction Size: typical customer payment value', 'Merchant Tenure: time active on PayChain', 'Repayment History: reliability on previous advances'].map((item) => (
                       <li key={item} className="flex items-start gap-2.5 text-sm text-gray-300 leading-relaxed">
                         <Check className="w-4 h-4 text-[#00bf63] mt-0.5 shrink-0" /> {item}
                       </li>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ShieldCheck, Zap, Globe, Wallet } from 'lucide-react';
+import { ShieldCheck, Zap, Send, Wallet } from 'lucide-react';
 
 const VideoSection: React.FC = () => {
   const [activeCardIndex, setActiveCardIndex] = useState<number>(0);
@@ -39,9 +39,9 @@ const VideoSection: React.FC = () => {
       icon: Zap,
     },
     {
-      title: "FX & Stablecoins",
-      description: "Receive global payments in stablecoins and swap KES to USDC instantly to hedge shilling depreciation.",
-      icon: Globe,
+      title: "Payment Links",
+      description: "Send a payment link straight to a customer's phone, even over WhatsApp, and get settled instantly when they pay.",
+      icon: Send,
     },
     {
       title: "Cash Advance",
@@ -69,8 +69,7 @@ const VideoSection: React.FC = () => {
             </motion.h2>
             
             <motion.p variants={itemVariants} className="text-lg text-gray-600 mb-10 leading-relaxed">
-              Tired of SMS payment fraud and shilling depreciation eating your profits?
-              PayChain is a unified dashboard that gives you everything you need to collect, pay, swap, and grow built on bank-grade NCBA rails and blockchain infrastructure.
+              PayChain is a financial operating system built for Kenyan merchants: one verified dashboard that replaces the fragmented, manual tools most businesses run on today. Collect payments through your own PayChain Paybill and virtual account, a payment link sent even over WhatsApp, an STK push straight to your customer's phone, or a professional invoice. Every payment is verified and settled instantly, with zero fake-screenshot fraud. Pay your staff, suppliers, contractors, and utility bills in one click with Bulk Pay. And as your verified transaction history builds, unlock working capital with Cash Advance, with no collateral and no bank queues.
             </motion.p>
 
             <div className="grid grid-cols-2 gap-3 sm:gap-6">

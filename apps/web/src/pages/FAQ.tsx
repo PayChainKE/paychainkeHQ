@@ -188,7 +188,7 @@ export default function FAQPage(): JSX.Element {
               <input 
                 aria-label="Search knowledge base" 
                 className="search-input" 
-                placeholder="Search e.g. 'Cash Advance eligibility' or 'USDC swaps'..." 
+                placeholder="Search e.g. 'Cash Advance eligibility' or 'Payment Links'..."
                 onChange={e => onSearch(e.target.value)} 
               />
               <AnimatePresence>

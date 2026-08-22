@@ -98,11 +98,11 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
       icon: ShoppingCart,
       hasDropdown: true,
         dropdownItems: [
-        { path: '/products/virtual-account', label: 'PayChain Virtual Account', emoji: '🧾', description: 'A dedicated, verified account for every payment you collect' },
-        { path: '/products/inflation-shield', label: 'The Inflation Shield', emoji: '🛡️', description: 'Stablecoin vaults and auto-swap' },
-        { path: '/products/bulk-pay', label: 'Paychain Bulk Pay', emoji: '📤', description: 'Batch payroll and mass payouts' },
-        { path: '/products/cash-advance', label: 'Cash Advance', emoji: '💸', description: 'Working capital and short-term advances' },
-        { path: '/products/operations-tools', label: 'Operations tools', emoji: '🧰', description: 'Reconciliation, disputes, and dashboards' },
+        { path: '/products/virtual-account', label: 'PayChain Virtual Account', description: 'Paybill, payment links, STK push, and invoicing, all verified instantly' },
+        { path: '/products/inflation-shield', label: 'The Inflation Shield', description: 'Stablecoin protection (in development)', soon: true },
+        { path: '/products/bulk-pay', label: 'Paychain Bulk Pay', description: 'Payroll, suppliers, and utility bills in one click' },
+        { path: '/products/cash-advance', label: 'Cash Advance', description: 'Working capital and short-term advances' },
+        { path: '/products/operations-tools', label: 'Operations tools', description: 'Reconciliation, disputes, and dashboards' },
       ],
     },
     // Removed Dashboard from nav bar
@@ -175,7 +175,12 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
                               onClick={() => setIsResourcesDropdownOpen(false)}
                             >
                               <div>
-                                <div className="font-bold text-gray-900">{dropdownItem.label}</div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-gray-900">{dropdownItem.label}</span>
+                                  {dropdownItem.soon && (
+                                    <span className="text-[9px] font-bold uppercase tracking-wider text-[#00bf63] border border-[#00bf63]/30 rounded-full px-2 py-0.5">Soon</span>
+                                  )}
+                                </div>
                                 {dropdownItem.description && (
                                   <div className="text-sm text-gray-600">{dropdownItem.description}</div>
                                 )}
@@ -386,10 +391,14 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
                                       onClick={closeMobileMenu}
                                       className="flex items-start gap-2.5 py-2.5 px-2 rounded-lg hover:bg-gray-50 transition-colors group"
                                     >
-                                      <span className="text-base leading-none mt-0.5">{dropdownItem.emoji}</span>
                                       <span>
-                                        <span className="block text-sm font-semibold text-gray-800 group-hover:text-[#00351d]">
-                                          {dropdownItem.label}
+                                        <span className="flex items-center gap-2">
+                                          <span className="block text-sm font-semibold text-gray-800 group-hover:text-[#00351d]">
+                                            {dropdownItem.label}
+                                          </span>
+                                          {dropdownItem.soon && (
+                                            <span className="text-[9px] font-bold uppercase tracking-wider text-[#00bf63] border border-[#00bf63]/30 rounded-full px-1.5 py-0.5">Soon</span>
+                                          )}
                                         </span>
                                         {dropdownItem.description && (
                                           <span className="block text-xs text-gray-500 mt-0.5 leading-snug">

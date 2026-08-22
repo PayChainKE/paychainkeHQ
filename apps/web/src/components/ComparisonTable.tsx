@@ -30,7 +30,7 @@ const ComparisonTable: React.FC = () => (
             .
           </h2>
           <p className="text-white/60 text-base sm:text-lg leading-relaxed mb-8 max-w-lg">
-            Legacy tools leave you fighting fraud, inflation, and payroll chaos. PayChain is a unified OS that secures your business with a dedicated bank account number, and collateral-free credit based on your real performance.
+            Legacy tills leave you fighting SMS fraud, slow settlement, and payroll chaos. PayChain gives you a verified Paybill and virtual account, instant settlement on every payment link and STK push, one-click Bulk Pay for staff and suppliers, and collateral-free credit based on your real transaction history.
           </p>
           <a 
             href="/about#the-problem"

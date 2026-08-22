@@ -66,7 +66,7 @@ const Hero: React.FC = () => {
           </motion.h1>
 
           <motion.p variants={itemVariants} className="mt-6 text-base sm:text-lg text-[#FBF8F1] leading-relaxed max-w-lg font-medium">
-            <strong className="text-[#FBF8F1] font-bold">Paychain</strong> makes it simple to accept secure payments while providing inflation protection, global bulk payouts, and automated business tools.
+            <strong className="text-[#FBF8F1] font-bold">Paychain</strong> makes it simple to accept secure payments (via Paybill, payment links, or STK push), pay staff and suppliers in bulk, and run your business on automated tools built for Kenyan merchants.
           </motion.p>
 
           {/* Call to Actions */}
@@ -103,7 +103,7 @@ const Hero: React.FC = () => {
                     ))}
                   </div>
                   <span className="text-sm font-medium text-[#FBF8F1]">
-                    <span className="font-bold text-emerald-400">500+</span> merchants
+                    <span className="font-bold text-emerald-400">3,000+</span> merchants
                   </span>
                 </div>
               </div>

@@ -11,29 +11,29 @@ const products = [
     path: '/products/virtual-account',
     icon: FileText,
     name: 'PayChain Virtual Account',
-    tagline: 'Your Account. Verified.',
-    desc: 'A dedicated, aggregator-backed payment channel that kills SMS fraud, logs every shilling on-chain, and builds your Trust Score automatically.',
+    tagline: 'A Paybill and account. Verified.',
+    desc: 'A dedicated PayChain Paybill and virtual account for your business: collect in person, via payment link (even over WhatsApp), STK push, or invoice, all verified and settled instantly.',
   },
   {
     path: '/products/inflation-shield',
     icon: Shield,
     name: 'The Inflation Shield',
-    tagline: 'Protect your purchasing power.',
-    desc: 'Swap KES to USDC instantly — hedge shilling depreciation and pay international suppliers in stablecoin without visiting a forex bureau.',
+    tagline: 'Coming soon.',
+    desc: 'A stablecoin protection feature we\'re currently building, to hedge shilling depreciation without visiting a forex bureau. In development.',
   },
   {
     path: '/products/bulk-pay',
     icon: Send,
     name: 'PayChain Bulk Pay',
     tagline: 'Batch payroll and mass payouts.',
-    desc: 'Run payroll, pay suppliers, and settle utility bills directly from your merchant dashboard, with PAYE auto-calculated, in one click.',
+    desc: 'Pay employees, suppliers, and contractors, and settle KPLC tokens (prepaid or postpaid), water, internet, and other utilities, all in one click.',
   },
   {
     path: '/products/cash-advance',
     icon: Wallet,
     name: 'Cash Advance',
     tagline: 'Working capital, no collateral.',
-    desc: 'Access capital based on your verified PayChain transaction history — not land titles, guarantors, or bank relationships.',
+    desc: 'Access capital based on your verified PayChain transaction history, not land titles, guarantors, or bank relationships.',
   },
   {
     path: '/products/operations-tools',
@@ -46,7 +46,7 @@ const products = [
 
 export default function Products() {
   return (
-    <div className="min-h-screen bg-white text-[#0A192F] font-sans">
+    <div className="min-h-screen bg-white text-[#0A192F]">
       <Navbar />
 
       <main className="max-w-6xl mx-auto px-6 pt-28 pb-24">

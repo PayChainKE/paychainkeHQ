@@ -5,7 +5,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
 const SECTIONS = [
-  { id: 's1', title: '1. Who We Are — Data Controller' },
+  { id: 's1', title: '1. Who We Are: Data Controller' },
   { id: 's2', title: '2. Personal Data We Collect' },
   { id: 's3', title: '3. How We Collect Personal Data' },
   { id: 's4', title: '4. Legal Basis for Processing' },
@@ -151,7 +151,7 @@ const PrivacyPolicy: React.FC = () => {
               <hr className="my-10 border-gray-200" />
 
               <section id="s1" className="scroll-mt-24 mb-10">
-                <h2 className="text-2xl mb-4">1. Who We Are — Data Controller</h2>
+                <h2 className="text-2xl mb-4">1. Who We Are: Data Controller</h2>
                 <p>
                   PayChain Financial Services Ltd is the Data Controller in respect of personal data
                   processed through the Platform.
@@ -332,7 +332,7 @@ const PrivacyPolicy: React.FC = () => {
 
                 <h3 className="text-lg mt-6 mb-2">5.5 Marketing and Communications</h3>
                 <ul className="list-disc pl-6 space-y-1">
-                  <li>(a) Sending you product updates, new feature announcements, and relevant offers — only where you have given your explicit consent;</li>
+                  <li>(a) Sending you product updates, new feature announcements, and relevant offers, only where you have given your explicit consent;</li>
                   <li>(b) Responding to your support enquiries and feedback.</li>
                 </ul>
 
@@ -380,7 +380,7 @@ const PrivacyPolicy: React.FC = () => {
                   <li>The Financial Reporting Centre (FRC)</li>
                   <li>Kenya Revenue Authority (KRA)</li>
                   <li>The Office of the Data Protection Commissioner (ODPC)</li>
-                  <li>Law enforcement agencies — when required by law, court order, or legal process.</li>
+                  <li>Law enforcement agencies, when required by law, court order, or legal process.</li>
                 </ul>
 
                 <h3 className="text-lg mt-6 mb-2">6.4 Business Transfers</h3>

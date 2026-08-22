@@ -27,9 +27,18 @@ const articles = [
     featured: false,
   },
   {
+    id: 'paychain-data-controller-registration',
+    title: 'PayChain Registers as a Data Controller with the ODPC',
+    excerpt: 'PayChain Financial Services Ltd is now a registered Data Controller with Kenya\'s Office of the Data Protection Commissioner, formalizing how merchant and customer data is protected under the Data Protection Act 2019.',
+    category: 'Compliance',
+    date: 'Jul 14, 2026',
+    readTime: '3 min read',
+    image: '/happy_kenyan_merchant.png',
+  },
+  {
     id: 'inflation-shield-stablecoins',
-    title: 'Shielding Your Business from Currency Volatility',
-    excerpt: 'Understanding how stablecoin-backed tills can protect your margins during economic uncertainty.',
+    title: 'The Inflation Shield: What We\'re Building and Why',
+    excerpt: 'A look at the stablecoin protection feature currently in development, and how it will help merchants hedge shilling depreciation once it launches.',
     category: 'Product Updates',
     date: 'Oct 10, 2026',
     readTime: '4 min read',
@@ -55,7 +64,7 @@ const articles = [
   }
 ];
 
-const categories = ['All', 'Company News', 'Industry Insights', 'Product Updates', 'Technology'];
+const categories = ['All', 'Company News', 'Compliance', 'Industry Insights', 'Product Updates', 'Technology'];
 
 const Blog = () => {
   const [activeCategory, setActiveCategory] = React.useState('All');
@@ -65,7 +74,7 @@ const Blog = () => {
   const gridArticles = filteredArticles.filter(a => !a.featured || activeCategory !== 'All');
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       <Navbar />
       
       <main className="flex-grow p-0 m-0">
@@ -214,7 +223,7 @@ const Blog = () => {
                 <div className="p-6">
                   <h3 className="text-lg font-bold text-gray-900 mb-3 group-hover:text-[#00bf63] transition-colors">Kenya's merchant financial operating system built for serious business owners.</h3>
                   <p className="text-gray-600 text-sm leading-relaxed">
-                    From Verified Collections to Bulk Pay, KES/USDC FX swaps, and Cash Advances, PayChain gives your business the financial infrastructure it deserves.
+                    From Verified Collections to Payment Links, STK Push, Bulk Pay, and Cash Advances, PayChain gives your business the financial infrastructure it deserves.
                   </p>
                 </div>
               </div>
