@@ -62,11 +62,19 @@ const liveCallsEnabled = process.env.NCBA_OPENBANKING_LIVE_ENABLED === 'true';
 
 // Hakikisha/Airtel Money mobile-number validation path — a prerequisite for
 // submitMobileB2wPayment below. Not shown in the UAT Guide's text (only its
-// request/response JSON was) — confirmed instead from NCBA's own "Open
-// Banking V2 - Callback Enabled" Postman collection (the /MpesaB2WValidation
-// folder's saved request actually targets /MobileB2WValidation — the
-// collection's own folder name is just stale/mismatched). Still
-// env-overridable in case NCBA changes it.
+// request/response JSON was) — the default below is NCBA's own "Open
+// Banking V2 - Callback Enabled" Postman collection's saved request path,
+// which matches what UAT actually accepts.
+//
+// Confirmed live 2026-08-26: production does NOT accept this same path —
+// it 404s. Probing NCBA's own production gateway directly found production
+// instead uses /api/v1/MpesaB2WValidation/validate-account — the literal
+// name of the Postman collection's folder, which its own saved request
+// (and therefore this default) does NOT use. So UAT and production
+// genuinely use two different paths for this one call; this isn't
+// documented anywhere NCBA gave us. Set NCBA_MOBILE_WALLET_VALIDATION_PATH
+// on Render for live traffic — do not change the default below, it's still
+// correct for sandbox/UAT.
 const ncbaMobileWalletValidationPath = process.env.NCBA_MOBILE_WALLET_VALIDATION_PATH || '/api/v1/MobileB2WValidation/validate-account';
 
 export class NcbaOpenBankingAuthError extends Error {
