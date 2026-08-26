@@ -28,8 +28,8 @@ if (!baseUrl || !subscriptionKey || !userId || !password) {
 
 // EDIT THESE before running for a meaningful result.
 const TEST_MSISDN = '254700000000';
-const KPLC_METER = '00000000000';
-const KPLC_PREPAID_METER = '00000000000';
+const KPLC_METER = '37186830040'; // real meter, supplied for retest
+const KPLC_PREPAID_METER = '37186830040'; // same meter, tested against the prepaid product too
 const NCWSC_METER = '00000000000';
 
 const checks = [
