@@ -1,7 +1,8 @@
 import { Resend } from 'resend';
 import dotenv from 'dotenv';
 import { formatAccountNumberDisplay } from './ncbaValidators.js';
-import { generateMerchantStickerPdf } from './stickerGenerator.js';
+import { generateMerchantStickerPdf, generateMerchantQrFlyerPdf } from './stickerGenerator.js';
+import { generateBrandedQrDataUri } from './qrCode.js';
 import { kraLogoDataUri } from './kraLogo.js';
 
 dotenv.config();
@@ -304,6 +305,7 @@ export const sendWelcomeEmail = async (email, name, password, phone, ncbaVirtual
   // merchant's real account. Generated best-effort: a PDF bug here should
   // never block the credentials/paybill-info email itself from sending.
   let stickerAttachment = null;
+  let qrAttachment = null;
   if (ncbaVirtualAccountNumber) {
     try {
       const pdfBytes = await generateMerchantStickerPdf({
@@ -318,14 +320,41 @@ export const sendWelcomeEmail = async (email, name, password, phone, ncbaVirtual
     } catch (err) {
       console.error('❌ Failed to generate welcome-email sticker attachment:', err.message);
     }
+
+    // Same "Scan to Pay" flyer (branded QR + bold business name/account
+    // number) as the admin dashboard's QR download — see
+    // adminController.js#downloadMerchantQrCode and
+    // stickerGenerator.js#generateMerchantQrFlyerPdf. Best-effort, same as
+    // the sticker above: a QR generation hiccup must never block the
+    // credentials email itself.
+    try {
+      const checkoutUrl = `${FRONTEND_URL.replace(/\/$/, '')}/pay/account/${ncbaMerchantCode}`;
+      const qrCodeDataUri = await generateBrandedQrDataUri(checkoutUrl);
+      if (qrCodeDataUri) {
+        const qrPngBytes = Buffer.from(qrCodeDataUri.replace(/^data:image\/png;base64,/, ''), 'base64');
+        const qrPdfBytes = await generateMerchantQrFlyerPdf({
+          businessName: businessName || name,
+          accountNumber: ncbaVirtualAccountNumber,
+          qrPngBytes,
+        });
+        qrAttachment = {
+          filename: 'PayChain-QR-Code.pdf',
+          content: Buffer.from(qrPdfBytes),
+          content_type: 'application/pdf',
+        };
+      }
+    } catch (err) {
+      console.error('❌ Failed to generate welcome-email QR attachment:', err.message);
+    }
   }
+  const emailAttachments = [stickerAttachment, qrAttachment].filter(Boolean);
 
   try {
     const data = await resend.emails.send({
       from: 'PayChain <info@paychain.co.ke>',
       to: [email],
       subject: `Welcome to PayChain, ${firstName} — Your Merchant Account is Active`,
-      ...(stickerAttachment ? { attachments: [stickerAttachment] } : {}),
+      ...(emailAttachments.length ? { attachments: emailAttachments } : {}),
       html: `
 <!DOCTYPE html>
 <html lang="en">
@@ -377,11 +406,11 @@ export const sendWelcomeEmail = async (email, name, password, phone, ncbaVirtual
           </tr>
         </table>
 
-        ${stickerAttachment ? `
+        ${emailAttachments.length ? `
         <table width="100%" cellpadding="0" cellspacing="0" style="background:#ECFDF5;border:1px solid #A7F3D0;border-radius:12px;margin-bottom:24px;overflow:hidden;">
           <tr><td style="padding:16px 20px;">
             <p style="margin:0;font-size:13px;color:#065F46;line-height:1.6;">
-              &#128206;&nbsp; We've attached a <strong>printable paybill sticker</strong> pre-filled with your account number — download, print, and stick it at your counter so customers can pay without asking for your details.
+              &#128206;&nbsp; We've attached${stickerAttachment ? ' a <strong>printable paybill sticker</strong>' : ''}${stickerAttachment && qrAttachment ? ' and a' : qrAttachment ? ' a' : ''}${qrAttachment ? ' <strong>QR code flyer</strong>' : ''}, both pre-filled with your account number — download, print, and display them at your counter so customers can pay without asking for your details.
             </p>
           </td></tr>
         </table>
