@@ -388,8 +388,17 @@ export async function executeNcbaLipaNaMpesaPayout({ merchantId, paymentType, pa
       narration: narration || 'Developer API payout',
     });
   } catch (err) {
-    await Merchant.findByIdAndUpdate(merchantId, { $inc: { kesBalance: totalDebit } });
-    throw err;
+    // NcbaOpenBankingRequestError means NCBA actually received the
+    // request — same reasoning as executeNcbaMobileMoneyPayout above:
+    // refunding on top of a transfer NCBA may have already processed would
+    // double-cost PayChain with no record of what happened, so this is left
+    // 'pending' (unrefunded) instead, same as every other caller of
+    // submitLipaNaMpesaPayment. Anything else (validation/config/auth) never
+    // reached NCBA, so refunding it is safe.
+    if (!(err instanceof NcbaOpenBankingRequestError)) {
+      await Merchant.findByIdAndUpdate(merchantId, { $inc: { kesBalance: totalDebit } });
+      throw err;
+    }
   }
 
   const transaction = await Transaction.create({

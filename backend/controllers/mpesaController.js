@@ -1180,18 +1180,53 @@ export const initiateB2B = async (req, res) => {
     const recipientName = reference || `${paymentType} ${partyB}`;
     const transactionId = `PAYOUT-B2B-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 
-    // Throws (caught by the outer catch below, which refunds) if NCBA
-    // rejects the instruction outright.
-    await ncbaSubmitLnmPayment({
-      transactionId,
-      paymentType,
-      payBillTillNo: partyB,
-      amount: numericAmount,
-      accountReference: paymentType === 'Paybill' ? accountReference : undefined,
-      recipientName,
-      notifyMobileNumber: merchant.phone,
-      narration: reference || `Payout to ${partyB}`,
-    });
+    try {
+      await ncbaSubmitLnmPayment({
+        transactionId,
+        paymentType,
+        payBillTillNo: partyB,
+        amount: numericAmount,
+        accountReference: paymentType === 'Paybill' ? accountReference : undefined,
+        recipientName,
+        notifyMobileNumber: merchant.phone,
+        narration: reference || `Payout to ${partyB}`,
+      });
+    } catch (ncbaErr) {
+      // Same reasoning as initiateB2C above: NcbaOpenBankingRequestError
+      // means NCBA actually received the request and responded with a
+      // rejection (e.g. "Insufficient Funds For Transaction") — but this
+      // integration has already proven live that an NCBA rejection
+      // response isn't a reliable signal the transfer never landed (see
+      // submitMobileB2wPayment's doc comment). Refunding here on top of a
+      // transfer NCBA actually processed would double-cost PayChain the
+      // same way. Recorded 'pending' instead of refunded — 'ncba_lipa_na_mpesa'
+      // is already covered by the reconciliation sweep
+      // (ncbaOpenBankingReconciliationService.js), which refunds it for
+      // real after STUCK_AFTER_MS only if no success callback ever arrives,
+      // so a genuine rejection like insufficient funds still gets refunded,
+      // just up to 20 minutes later instead of instantly.
+      if (ncbaErr instanceof NcbaOpenBankingRequestError) {
+        const tx = await Transaction.create({
+          merchantId: merchant._id,
+          accountNumber: merchant.ncbaMerchantCode || 'WALLET_FUND',
+          type: 'ncba_lipa_na_mpesa',
+          amount: numericAmount,
+          kesAmount: numericAmount,
+          currency: 'KES',
+          status: 'pending',
+          reference: transactionId,
+          sender: { name: merchant.businessName, id: merchant.ncbaMerchantCode },
+          recipient: { name: recipientName, id: partyB },
+        });
+        return res.status(202).json({
+          success: true,
+          pending: true,
+          message: "We've submitted your transfer but couldn't immediately confirm the outcome with NCBA. We'll update this transaction shortly — please don't retry with the same details in the meantime.",
+          transaction: tx,
+        });
+      }
+      throw ncbaErr;
+    }
 
     const tx = await Transaction.create({
       merchantId: merchant._id,
