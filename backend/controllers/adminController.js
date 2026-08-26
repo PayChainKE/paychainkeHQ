@@ -1050,6 +1050,15 @@ export const createMerchant = async (req, res) => {
       return res.status(400).json({ error: 'Name, email, phone and business name are required.' });
     }
 
+    try {
+      validatePhoneNumber(phone);
+    } catch (e) {
+      if (e instanceof NcbaValidationError) {
+        return res.status(400).json({ error: 'Enter a valid Kenyan mobile number (e.g. 0712 345 678).' });
+      }
+      throw e;
+    }
+
     email = String(email).trim().toLowerCase();
     phone = String(phone).replace(/\s+/g, '');
     name = String(name).trim();

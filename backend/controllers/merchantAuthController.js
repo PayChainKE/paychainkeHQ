@@ -9,7 +9,7 @@ import { provisionMerchantWallet, getWalletBalance } from '../utils/stellarHelpe
 import { encryptKey } from '../utils/cryptoHelper.js';
 import bcrypt from 'bcryptjs';
 import { createNotification } from './notificationController.js';
-import { getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
+import { getNcbaVirtualAccountNumber, validatePhoneNumber, NcbaValidationError } from '../utils/ncbaValidators.js';
 import { toE164Kenyan } from '../utils/notificationService.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
@@ -103,6 +103,20 @@ export const registerMerchant = async (req, res) => {
 
     if (!name?.trim() || !email || !phone || !businessName?.trim() || !password) {
       return res.status(400).json({ error: 'Name, email, phone, business name and password are all required.' });
+    }
+
+    // Reject anything that isn't a real Kenyan mobile number (e.g. a random
+    // string of digits like "14393360") before it ever reaches storage —
+    // this used to go straight through unvalidated, unlike every other
+    // money-movement destination in this codebase (see
+    // ncbaValidators.js#validatePhoneNumber's own doc comment).
+    try {
+      validatePhoneNumber(phone);
+    } catch (e) {
+      if (e instanceof NcbaValidationError) {
+        return res.status(400).json({ error: 'Enter a valid Kenyan mobile number (e.g. 0712 345 678).' });
+      }
+      throw e;
     }
 
     if (!businessType || !BUSINESS_TYPES.includes(businessType)) {

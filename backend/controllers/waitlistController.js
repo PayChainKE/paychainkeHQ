@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import Waitlist from '../models/Waitlist.js';
 import Merchant from '../models/Merchant.js';
 import { sendWaitlistConfirmation, sendMerchantInvite } from '../utils/resend.js';
-import { getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
+import { getNcbaVirtualAccountNumber, validatePhoneNumber, NcbaValidationError } from '../utils/ncbaValidators.js';
 
 const MERCHANT_DASHBOARD_URL =
   process.env.MERCHANT_DASHBOARD_URL || 'https://app.paychain.co.ke';
@@ -247,6 +247,16 @@ export const convertWaitlistEntry = async (req, res) => {
     // Reject if a merchant with this email/phone already exists — the admin
     // either onboarded them already or there's a data conflict.
     const phone = String(entry.phone || '').replace(/\s+/g, '');
+    if (phone) {
+      try {
+        validatePhoneNumber(phone);
+      } catch (e) {
+        if (e instanceof NcbaValidationError) {
+          return res.status(400).json({ error: `This entry's phone number ("${phone}") isn't a valid Kenyan mobile number — correct it on the waitlist entry before converting.` });
+        }
+        throw e;
+      }
+    }
     if (await Merchant.exists({ email: entry.email })) {
       return res.status(409).json({ error: 'A merchant with that email already exists.' });
     }

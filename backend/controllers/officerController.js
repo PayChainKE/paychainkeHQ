@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import Merchant from '../models/Merchant.js';
 import { logAudit } from '../utils/auditLog.js';
 import { phoneVariations } from './adminController.js';
-import { getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
+import { getNcbaVirtualAccountNumber, validatePhoneNumber, NcbaValidationError } from '../utils/ncbaValidators.js';
 import { sendMerchantInvite, sendKybRevisionRequest, sendKybRejection } from '../utils/resend.js';
 import { normalizeKraPin, isValidKraPin, KRA_PIN_FORMAT_HINT } from '../utils/kraPinValidator.js';
 
@@ -57,6 +57,15 @@ export const createApplication = async (req, res) => {
 
     if (!name || !email || !phone || !businessName) {
       return res.status(400).json({ error: 'Name, email, phone and business name are required.' });
+    }
+
+    try {
+      validatePhoneNumber(phone);
+    } catch (e) {
+      if (e instanceof NcbaValidationError) {
+        return res.status(400).json({ error: 'Enter a valid Kenyan mobile number (e.g. 0712 345 678).' });
+      }
+      throw e;
     }
 
     email = String(email).trim().toLowerCase();
