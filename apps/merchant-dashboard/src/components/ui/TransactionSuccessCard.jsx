@@ -164,10 +164,14 @@ export default function TransactionSuccessCard({
   return (
     <div className="bg-white rounded-[28px] border border-slate-100 shadow-[0_20px_60px_rgba(0,0,0,0.08)] overflow-hidden animate-fade-in-up">
       <div className="p-7 lg:p-9 text-center">
-        <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-5 shadow-lg border-4 border-emerald-200/40">
-          <span className="material-symbols-outlined text-emerald-600 text-4xl" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+        <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-5 shadow-lg border-4 ${
+          isPending ? 'bg-amber-100 border-amber-200/40' : 'bg-emerald-100 border-emerald-200/40'
+        }`}>
+          <span className={`material-symbols-outlined text-4xl ${isPending ? 'text-amber-600' : 'text-emerald-600'}`} style={{ fontVariationSettings: "'FILL' 1" }}>
+            {isPending ? 'schedule' : 'check_circle'}
+          </span>
         </div>
-        <h2 className="font-headline text-3xl font-bold text-primary tracking-tight mb-1">Transaction Successful</h2>
+        <h2 className="font-headline text-3xl font-bold text-primary tracking-tight mb-1">{isPending ? 'Payment Sent' : 'Transaction Successful'}</h2>
         <p className="font-headline text-4xl font-bold text-[#00351D] tracking-tight mt-3 mb-4">{formatKES(amount)}</p>
         <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
           isPending ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'

@@ -136,11 +136,13 @@ export default function TransactionSuccessCard({
   return (
     <View className="bg-white rounded-[28px] border border-[#00351d]/5 shadow-xl overflow-hidden">
       <View className="px-7 pt-8 pb-6 items-center">
-        <View className="w-20 h-20 rounded-full bg-[#e7f8ef] items-center justify-center mb-5 border-4 border-[#d5f3e4]">
-          <Feather name="check-circle" size={40} color="#006c4e" />
+        <View className={`w-20 h-20 rounded-full items-center justify-center mb-5 border-4 ${
+          isPending ? 'bg-amber-50 border-amber-200' : 'bg-[#e7f8ef] border-[#d5f3e4]'
+        }`}>
+          <Feather name={isPending ? 'clock' : 'check-circle'} size={40} color={isPending ? '#b45309' : '#006c4e'} />
         </View>
         <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[26px] text-[#00351d] mb-1 text-center">
-          Transaction Successful
+          {isPending ? 'Payment Sent' : 'Transaction Successful'}
         </Text>
         <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[32px] text-[#00351d] mt-2 mb-3 text-center">
           {formatKES(amount)}
