@@ -18,7 +18,7 @@ import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard
 import { getLipaNaMpesaTariff } from '../config/lipaNaMpesaTariffCard.js';
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay.js';
 import { AUTO_INFLATION_SHIELD_ENABLED } from '../config/inflationShieldFlag.js';
-import { buildPaymentReceivedSms, buildCustomerPaidSms, buildPaymentRequestSms, buildPayoutSentSms, buildPayoutRecipientReceivedSms } from '../utils/paymentSmsTemplates.js';
+import { buildPaymentReceivedSms, buildCustomerPaidSms, buildPaymentRequestSms, buildPayoutSentSms, buildPayoutRecipientReceivedSms, buildWalletTopUpSms } from '../utils/paymentSmsTemplates.js';
 import { initiateStkPush as ncbaInitiateStkPush, queryStkPush as ncbaQueryStkPush, generateQrCode as ncbaGenerateQrCode } from '../services/ncbaStkPushService.js';
 import { submitMobileB2wPayment as ncbaSubmitMobileB2wPayment, submitLipaNaMpesaPayment as ncbaSubmitLnmPayment, NcbaOpenBankingRequestError } from '../services/ncbaOpenBankingService.js';
 import { validatePhoneNumber, NcbaValidationError, getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
@@ -526,7 +526,13 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
             topupSends.push({
               to: merchant.phone,
               message: isSelfFunding
-                ? `${receipt} Confirmed. Ksh ${formatKes(merchantCredit)} deposited to your PayChain wallet via M-PESA on ${date} at ${time}. Your updated available balance is Ksh ${formatKes(updatedMerchant.kesBalance || 0)}.`
+                ? buildWalletTopUpSms({
+                    ref: receipt,
+                    amount: merchantCredit,
+                    date,
+                    time,
+                    balance: updatedMerchant.kesBalance || 0,
+                  }).message
                 : buildPaymentReceivedSms({
                     ref: receipt,
                     amount: merchantCredit,

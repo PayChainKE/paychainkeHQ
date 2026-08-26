@@ -144,7 +144,15 @@ export default function SendMoney() {
   // instant re-tap that sends a second real transfer.
   const [confirmLocked, setConfirmLocked]   = useState(false)
 
-  const hasPin       = !!merchant?.hasAppPin
+  // Snapshotted once at mount, not derived live from `merchant` — the PIN
+  // setup step below calls refreshSession() right after saving a first-time
+  // PIN, which flips merchant.hasAppPin to true mid-flow. If `hasPin` were
+  // live, that flip would recompute confirmStep from 4 down to 3 on the
+  // very render that also advances step to 4, leaving step=4 matching no
+  // render branch and turning Continue into a dead click for the rest of
+  // the wizard. Freezing it for the duration of this flow keeps the step
+  // machine consistent regardless of when the underlying record refreshes.
+  const [hasPin]      = useState(() => !!merchant?.hasAppPin)
   const selectedDest = DESTINATIONS.find(d => d.id === destination)
   const isMobileDest = destination === 'mpesa-primary' || destination === 'mobile'
   const isB2bDest     = destination === 'till' || destination === 'paybill'

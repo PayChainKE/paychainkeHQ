@@ -12,6 +12,7 @@ import { sendWalletActivationEmail, sendStatementEmail } from '../utils/resend.j
 import { createNotification } from './notificationController.js';
 import { getCheckoutTotal, getInvoiceCheckoutTotal, calculateCustomerSurcharge, calculateInvoiceClientMarkup, PricingEngineError } from '../utils/pricingEngine.js';
 import { safeSendSMS, formatKes } from '../utils/smsSanitizer.js';
+import { buildPaymentSentSms } from '../utils/paymentSmsTemplates.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { getNcbaVirtualAccountNumber, validatePhoneNumber, NcbaValidationError } from '../utils/ncbaValidators.js';
@@ -516,9 +517,17 @@ export const sendMoney = async (req, res) => {
 
     if (merchant.phone) {
       const { date, time } = formatTransactionDateTime();
+      const { message } = buildPaymentSentSms({
+        ref,
+        amount: totalDeduction,
+        recipientName: reference || destination,
+        date,
+        time,
+        balance: merchant.kesBalance,
+      });
       safeSendSMS({
         to: merchant.phone,
-        message: `${ref} Sent. Ksh ${formatKes(totalDeduction)} sent to ${reference || destination || 'recipient'} on ${date} at ${time}. New balance: Ksh ${formatKes(merchant.kesBalance)}.`,
+        message,
       }).then((result) => {
         if (!result.success) console.error(`Send-money SMS failed for merchant ${merchant._id}:`, result.error);
       });
