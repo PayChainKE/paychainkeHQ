@@ -9,7 +9,8 @@ import { provisionMerchantWallet, getWalletBalance } from '../utils/stellarHelpe
 import { encryptKey } from '../utils/cryptoHelper.js';
 import bcrypt from 'bcryptjs';
 import { createNotification } from './notificationController.js';
-import { getNcbaVirtualAccountNumber, validatePhoneNumber, NcbaValidationError } from '../utils/ncbaValidators.js';
+import { getNcbaVirtualAccountNumber, validatePhoneNumber, isValidPhoneInputFormat, NcbaValidationError } from '../utils/ncbaValidators.js';
+import { isValidEmail, EMAIL_FORMAT_HINT } from '../utils/emailValidator.js';
 import { toE164Kenyan } from '../utils/notificationService.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
@@ -105,11 +106,18 @@ export const registerMerchant = async (req, res) => {
       return res.status(400).json({ error: 'Name, email, phone, business name and password are all required.' });
     }
 
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ error: EMAIL_FORMAT_HINT });
+    }
+
     // Reject anything that isn't a real Kenyan mobile number (e.g. a random
     // string of digits like "14393360") before it ever reaches storage —
     // this used to go straight through unvalidated, unlike every other
     // money-movement destination in this codebase (see
     // ncbaValidators.js#validatePhoneNumber's own doc comment).
+    if (!isValidPhoneInputFormat(phone)) {
+      return res.status(400).json({ error: 'Enter a valid Kenyan mobile number starting with +254, 07, or 01 (e.g. 0712 345 678).' });
+    }
     try {
       validatePhoneNumber(phone);
     } catch (e) {
@@ -334,7 +342,12 @@ export const verifyMerchantOTP = async (req, res) => {
         hasAppPin: !!merchant.appPin,
         biometricsEnabled: merchant.biometricsEnabled,
         mobileBiometricUnlockEnabled: merchant.mobileBiometricUnlockEnabled,
-        features: merchant.features
+        features: merchant.features,
+        hasSeenOnboardingWalkthrough: merchant.hasSeenOnboardingWalkthrough,
+        hasSeenAccountsWalkthrough: merchant.hasSeenAccountsWalkthrough,
+        hasSeenSecurityWalkthrough: merchant.hasSeenSecurityWalkthrough,
+        hasSeenProfileWalkthrough: merchant.hasSeenProfileWalkthrough,
+        hasSeenTransactionsWalkthrough: merchant.hasSeenTransactionsWalkthrough
       },
       token: generateToken(merchant._id, '30d', { tokenVersion: merchant.tokenVersion || 0 })
     });
@@ -962,7 +975,12 @@ export const getMerchantMe = async (req, res) => {
         pinBlocked: !!(merchant.pinLockedUntil && merchant.pinLockedUntil > new Date()),
         biometricsEnabled: merchant.biometricsEnabled,
         mobileBiometricUnlockEnabled: merchant.mobileBiometricUnlockEnabled,
-        features: merchant.features
+        features: merchant.features,
+        hasSeenOnboardingWalkthrough: merchant.hasSeenOnboardingWalkthrough,
+        hasSeenAccountsWalkthrough: merchant.hasSeenAccountsWalkthrough,
+        hasSeenSecurityWalkthrough: merchant.hasSeenSecurityWalkthrough,
+        hasSeenProfileWalkthrough: merchant.hasSeenProfileWalkthrough,
+        hasSeenTransactionsWalkthrough: merchant.hasSeenTransactionsWalkthrough
       }
     });
   } catch (error) {
@@ -1060,6 +1078,11 @@ export const updateMerchantProfile = async (req, res) => {
         hasAppPin: !!merchant.appPin,
         biometricsEnabled: merchant.biometricsEnabled,
         mobileBiometricUnlockEnabled: merchant.mobileBiometricUnlockEnabled,
+        hasSeenOnboardingWalkthrough: merchant.hasSeenOnboardingWalkthrough,
+        hasSeenAccountsWalkthrough: merchant.hasSeenAccountsWalkthrough,
+        hasSeenSecurityWalkthrough: merchant.hasSeenSecurityWalkthrough,
+        hasSeenProfileWalkthrough: merchant.hasSeenProfileWalkthrough,
+        hasSeenTransactionsWalkthrough: merchant.hasSeenTransactionsWalkthrough,
       }
     });
   } catch (error) {
@@ -1106,6 +1129,82 @@ export const toggleBiometrics = async (req, res) => {
     });
   } catch (error) {
     console.error('Toggle Biometrics Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Mark the one-time feature walkthrough as seen. Idempotent — the
+//          frontend calls this once the merchant finishes or skips the tour,
+//          and never shows it again for this account regardless of device.
+// @route   PUT /api/auth/merchant/onboarding-walkthrough
+// @access  Private (Merchant)
+export const completeOnboardingWalkthrough = async (req, res) => {
+  try {
+    await Merchant.findByIdAndUpdate(req.merchant._id, { hasSeenOnboardingWalkthrough: true });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Complete Onboarding Walkthrough Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Mark the My Accounts page's Generate QR / Download Sticker
+//          walkthrough as seen. Same one-time pattern as
+//          completeOnboardingWalkthrough above, scoped to that page.
+// @route   PUT /api/auth/merchant/accounts-walkthrough
+// @access  Private (Merchant)
+export const completeAccountsWalkthrough = async (req, res) => {
+  try {
+    await Merchant.findByIdAndUpdate(req.merchant._id, { hasSeenAccountsWalkthrough: true });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Complete Accounts Walkthrough Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Mark the Security section's walkthrough (Enable Biometrics,
+//          Change Password, Change PIN) as seen. Same one-time pattern as
+//          completeOnboardingWalkthrough above, scoped to that section.
+// @route   PUT /api/auth/merchant/security-walkthrough
+// @access  Private (Merchant)
+export const completeSecurityWalkthrough = async (req, res) => {
+  try {
+    await Merchant.findByIdAndUpdate(req.merchant._id, { hasSeenSecurityWalkthrough: true });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Complete Security Walkthrough Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Mark the Profile section's walkthrough (Identity, KRA PIN &
+//          Business Number, Update Global Profile) as seen. Same one-time
+//          pattern as completeOnboardingWalkthrough above, scoped to that
+//          section.
+// @route   PUT /api/auth/merchant/profile-walkthrough
+// @access  Private (Merchant)
+export const completeProfileWalkthrough = async (req, res) => {
+  try {
+    await Merchant.findByIdAndUpdate(req.merchant._id, { hasSeenProfileWalkthrough: true });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Complete Profile Walkthrough Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Mark the Transactions page's statement-export walkthrough as
+//          seen. Same one-time pattern as completeOnboardingWalkthrough
+//          above, scoped to that page.
+// @route   PUT /api/auth/merchant/transactions-walkthrough
+// @access  Private (Merchant)
+export const completeTransactionsWalkthrough = async (req, res) => {
+  try {
+    await Merchant.findByIdAndUpdate(req.merchant._id, { hasSeenTransactionsWalkthrough: true });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Complete Transactions Walkthrough Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };

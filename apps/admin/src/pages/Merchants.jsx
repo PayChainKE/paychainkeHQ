@@ -5,7 +5,6 @@ import TablePagination from '../components/ui/TablePagination';
 import MerchantsMap from '../components/merchants-map/MerchantsMap';
 import LocationPickerModal from '../components/merchants-map/LocationPickerModal';
 import { formatAccountNumber } from '../utils/formatAccountNumber';
-import { formatKES } from '../utils/formatCurrency';
 
 const PAGE_SIZE = 20;
 
@@ -17,25 +16,6 @@ const normalizePhoneKE = (value) => {
 };
 
 const isValidPhoneKE = (value) => /^(?:7\d{8}|1\d{8})$/.test(normalizePhoneKE(value));
-
-// Mirrors backend/utils/kraPinValidator.js — same shape check (one leading
-// A/P, 9 digits, one trailing letter) plus the same obviously-fake-pattern
-// rejection (all nine digits identical, or a strictly ascending/descending
-// run like 123456789). Only saves the admin a round trip to the server —
-// the backend validator is the actual source of truth.
-const KRA_PIN_SHAPE_REGEX = /^([AP])(\d{9})([A-Z])$/i;
-const isValidKraPin = (value) => {
-  const match = KRA_PIN_SHAPE_REGEX.exec(String(value ?? '').trim());
-  if (!match) return false;
-  const digits = match[2].split('').map(Number);
-  if (digits.every((n) => n === digits[0])) return false;
-  let ascending = true, descending = true;
-  for (let i = 1; i < digits.length; i++) {
-    if (digits[i] !== digits[i - 1] + 1) ascending = false;
-    if (digits[i] !== digits[i - 1] - 1) descending = false;
-  }
-  return !ascending && !descending;
-};
 
 // Default filter state — every dimension at "all" means no filtering.
 const defaultFilters = {
@@ -83,7 +63,6 @@ const ACTION_META = {
   lock:   { label: 'Lock Account',   verb: 'lock',   tone: 'amber',   icon: 'lock',         copy: 'The merchant will be unable to sign in until unlocked. Funds and data remain intact.' },
   unlock: { label: 'Unlock Account', verb: 'unlock', tone: 'emerald', icon: 'lock_open',    copy: 'The merchant will regain access to their dashboard and mobile app.' },
   delete: { label: 'Delete Account', verb: 'delete', tone: 'red',     icon: 'delete_forever', copy: 'The merchant record and ALL related transactions, payouts, payees and payment links will be permanently removed. This cannot be undone.' },
-  reset_contact: { label: 'Reset Primary Details', verb: 'reset the primary email/phone for', tone: 'blue', icon: 'manage_accounts', copy: 'The merchant will be signed out of every device and must sign in again with the new details.' },
 };
 
 function relativeTime(iso) {
@@ -162,7 +141,7 @@ const Merchants = () => {
       // Search
       if (q) {
         const haystack = [
-          m.businessName, m.name, m.email, m.ncbaVirtualAccountNumber, m.ncbaMerchantCode,
+          m.businessName, m.name, m.email, m.paybillAccount, m.ncbaVirtualAccountNumber, m.ncbaMerchantCode,
         ].filter(Boolean).map((s) => String(s).toLowerCase());
         const phoneMatch = qPhone && normalizePhone(m.phone).includes(qPhone);
         const textMatch = haystack.some((s) => s.includes(q));
@@ -260,7 +239,7 @@ const Merchants = () => {
     if (!form.email.trim() || !/^\S+@\S+\.\S+$/.test(form.email)) return 'A valid email is required.';
     if (!isValidPhoneKE(form.phone)) return 'Enter a valid Kenyan phone number (07..., 01..., +2547..., +2541...).';
     if (!form.businessName.trim()) return 'Business name is required.';
-    if (form.kraPin && !isValidKraPin(form.kraPin)) return 'Enter a real KRA PIN — format A/P + 9 digits + a letter, e.g. P051892647A.';
+    if (form.kraPin && !/^[AP][0-9]{9}[A-Z]$/i.test(form.kraPin.trim())) return 'KRA PIN format invalid (e.g. P123456789A).';
     return null;
   }
 
@@ -283,7 +262,7 @@ const Merchants = () => {
       if (res.data?.success) {
         setSuccess({
           email: res.data.data.email,
-          accountNumber: res.data.data.ncbaVirtualAccountNumber || res.data.data.ncbaMerchantCode,
+          paybillAccount: res.data.data.paybillAccount,
           businessName: res.data.data.businessName,
         });
         fetchMerchants();
@@ -300,39 +279,16 @@ const Merchants = () => {
   // ── Sensitive actions ───────────────────────────────────────────────
   function startAction(merchant, action) {
     setOpenMenuId(null);
-    setActionState(
-      action === 'reset_contact'
-        ? { merchant, action, stage: 'input', newEmail: merchant.email || '', newPhone: merchant.phone || '', otp: '', error: '', busy: false }
-        : { merchant, action, stage: 'confirm', otp: '', error: '', busy: false }
-    );
+    setActionState({ merchant, action, stage: 'confirm', otp: '', error: '', busy: false });
   }
 
   async function requestActionOtp() {
     if (!actionState) return;
-
-    const body = { action: actionState.action };
-    if (actionState.action === 'reset_contact') {
-      const emailChanged = actionState.newEmail.trim().toLowerCase() !== (actionState.merchant.email || '').toLowerCase();
-      const phoneChanged = normalizePhoneKE(actionState.newPhone) !== normalizePhoneKE(actionState.merchant.phone);
-      if (!emailChanged && !phoneChanged) {
-        setActionState((s) => ({ ...s, error: 'Change the email and/or phone number first.' }));
-        return;
-      }
-      if (actionState.newEmail.trim() && !/^\S+@\S+\.\S+$/.test(actionState.newEmail.trim())) {
-        setActionState((s) => ({ ...s, error: 'Enter a valid email address.' }));
-        return;
-      }
-      if (actionState.newPhone.trim() && !isValidPhoneKE(actionState.newPhone)) {
-        setActionState((s) => ({ ...s, error: 'Enter a valid Kenyan phone number.' }));
-        return;
-      }
-      if (emailChanged) body.email = actionState.newEmail.trim();
-      if (phoneChanged) body.phone = actionState.newPhone.trim();
-    }
-
     setActionState((s) => ({ ...s, busy: true, error: '' }));
     try {
-      const res = await api.post(`/api/admin/merchants/${actionState.merchant._id}/request-action`, body);
+      const res = await api.post(`/api/admin/merchants/${actionState.merchant._id}/request-action`, {
+        action: actionState.action,
+      });
       if (res.data?.success) {
         setActionState((s) => ({ ...s, stage: 'otp', busy: false }));
       } else {
@@ -600,7 +556,7 @@ const Merchants = () => {
                   const riskSignals = m.riskSignals || [];
                   const highSeverity = riskSignals.some((s) => s.severity === 'high');
                   return (
-                    <tr key={m._id || i} className={`hover:bg-secondary-container/5 transition-colors group cursor-pointer ${locked ? 'opacity-70' : ''} ${flagged || highSeverity ? 'bg-red-50/30' : ''}`} onClick={() => openDetail(m._id)}>
+                    <tr key={m._id || i} className={`hover:bg-secondary-container/5 transition-colors group cursor-pointer ${locked ? 'opacity-70' : ''} ${flagged ? 'bg-red-50/30' : ''}`} onClick={() => openDetail(m._id)}>
                       <td className="py-2 px-3 text-on-surface-variant/40 border-b border-outline-variant/5 text-[11px] tabular-nums">{String((page - 1) * PAGE_SIZE + i + 1).padStart(2, '0')}</td>
                       <td className="py-2 px-3 border-b border-outline-variant/5">
                         <div className="flex items-center gap-2.5">
@@ -685,7 +641,6 @@ const Merchants = () => {
                             <MenuItem icon="location_on" tone="blue" onClick={() => { setOpenMenuId(null); setLocationPickerMerchant(m); }}>
                               {m.mapLocation?.lat != null ? 'Edit map location' : 'Set map location'}
                             </MenuItem>
-                            <MenuItem icon="manage_accounts" tone="blue" onClick={() => startAction(m, 'reset_contact')}>Reset primary details</MenuItem>
                             <div className="h-px bg-outline-variant/20"></div>
                             {flagged ? (
                               <MenuItem icon="outlined_flag" tone="emerald" onClick={() => unflag(m)}>Clear suspicious flag</MenuItem>
@@ -756,7 +711,7 @@ const Merchants = () => {
                 </p>
                 <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 mb-5 inline-block">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-700 mb-1">Account Number</p>
-                  <p className="font-mono text-xl font-bold text-emerald-900">{success.accountNumber || 'Pending assignment'}</p>
+                  <p className="font-mono text-xl font-bold text-emerald-900">{success.paybillAccount}</p>
                 </div>
                 <div className="flex gap-2 justify-center">
                   <button onClick={() => setShowModal(false)} className="px-5 py-2.5 rounded-lg bg-primary text-white text-sm font-semibold uppercase tracking-widest hover:shadow-lg active:scale-95 transition-all">Done</button>
@@ -791,7 +746,7 @@ const Merchants = () => {
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <Field label="KRA PIN (optional)">
-                      <input type="text" value={form.kraPin} onChange={(e) => update('kraPin', e.target.value.toUpperCase())} placeholder="P051892647A" className={`${fieldClass} font-mono`} />
+                      <input type="text" value={form.kraPin} onChange={(e) => update('kraPin', e.target.value.toUpperCase())} placeholder="P123456789A" className={`${fieldClass} font-mono`} />
                     </Field>
                     <Field label="Business Reg # (optional)">
                       <input type="text" value={form.businessNumber} onChange={(e) => update('businessNumber', e.target.value)} placeholder="BN-2024-12345" className={fieldClass} />
@@ -822,7 +777,6 @@ const Merchants = () => {
           onConfirm={requestActionOtp}
           onSubmitOtp={confirmActionOtp}
           onOtpChange={(v) => setActionState((s) => ({ ...s, otp: v }))}
-          onFieldChange={(patch) => setActionState((s) => ({ ...s, ...patch }))}
         />
       )}
 
@@ -897,67 +851,22 @@ const MenuItem = ({ icon, tone, onClick, children }) => {
   );
 };
 
-const ActionModal = ({ state, onClose, onConfirm, onSubmitOtp, onOtpChange, onFieldChange }) => {
+const ActionModal = ({ state, onClose, onConfirm, onSubmitOtp, onOtpChange }) => {
   const meta = ACTION_META[state.action];
   const toneRing = {
     amber:   'bg-amber-50 text-amber-600',
     emerald: 'bg-emerald-50 text-emerald-600',
     red:     'bg-red-50 text-red-600',
-    blue:    'bg-blue-50 text-blue-600',
   }[meta.tone];
   const toneBtn = {
     amber:   'bg-amber-600 hover:bg-amber-700',
     emerald: 'bg-emerald-600 hover:bg-emerald-700',
     red:     'bg-red-600 hover:bg-red-700',
-    blue:    'bg-blue-600 hover:bg-blue-700',
   }[meta.tone];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
-        {state.stage === 'input' && (
-          <div className="p-7">
-            <div className={`w-14 h-14 rounded-full flex items-center justify-center mb-4 ${toneRing}`}>
-              <span className="material-symbols-outlined text-3xl">{meta.icon}</span>
-            </div>
-            <h3 className="text-xl font-bold text-on-surface mb-1">{meta.label}</h3>
-            <p className="text-sm text-on-surface-variant mb-5">
-              Set new primary contact details for <strong>{state.merchant.businessName}</strong>. Leave a field unchanged to keep it as-is.
-            </p>
-            <div className="space-y-4 mb-5">
-              <Field label="Email">
-                <input
-                  type="email"
-                  value={state.newEmail}
-                  onChange={(e) => onFieldChange({ newEmail: e.target.value })}
-                  className={fieldClass}
-                  placeholder="merchant@example.com"
-                />
-              </Field>
-              <Field label="Phone">
-                <input
-                  type="text"
-                  value={state.newPhone}
-                  onChange={(e) => onFieldChange({ newPhone: e.target.value })}
-                  className={fieldClass}
-                  placeholder="0712345678"
-                />
-              </Field>
-            </div>
-            <div className={`text-[13px] px-3 py-2.5 rounded-lg mb-5 bg-amber-50 text-amber-800 border border-amber-100`}>
-              {meta.copy}
-            </div>
-            <p className="text-[12px] text-on-surface-variant/70 mb-5">For security, a 6-digit verification code will be sent to your admin email to confirm this change. Both the old email and old phone will also be notified.</p>
-            {state.error && <div className="text-[13px] text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium mb-3">{state.error}</div>}
-            <div className="flex gap-3">
-              <button onClick={onClose} disabled={state.busy} className="flex-1 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40 transition-all">Cancel</button>
-              <button onClick={onConfirm} disabled={state.busy} className={`flex-1 py-2.5 rounded-lg text-white text-sm font-semibold uppercase tracking-widest disabled:opacity-50 transition-all ${toneBtn}`}>
-                {state.busy ? 'Sending…' : 'Send Code'}
-              </button>
-            </div>
-          </div>
-        )}
-
         {state.stage === 'confirm' && (
           <div className="p-7">
             <div className={`w-14 h-14 rounded-full flex items-center justify-center mb-4 ${toneRing}`}>
@@ -1016,19 +925,14 @@ const ActionModal = ({ state, onClose, onConfirm, onSubmitOtp, onOtpChange, onFi
               <span className="material-symbols-outlined text-3xl">check_circle</span>
             </div>
             <h3 className="text-xl font-bold text-on-surface mb-1">
-              {state.action === 'delete' ? 'Merchant deleted'
-                : state.action === 'lock' ? 'Account locked'
-                  : state.action === 'reset_contact' ? 'Primary details reset'
-                    : 'Account reactivated'}
+              {state.action === 'delete' ? 'Merchant deleted' : state.action === 'freeze' ? 'Account frozen' : 'Account reactivated'}
             </h3>
             <p className="text-sm text-on-surface-variant mb-5">
               {state.action === 'delete'
                 ? `${state.merchant.businessName} and all related records have been permanently removed.`
-                : state.action === 'lock'
-                  ? `${state.merchant.businessName} can no longer sign in until unlocked.`
-                  : state.action === 'reset_contact'
-                    ? `${state.merchant.businessName}'s email and/or phone have been updated, and they've been signed out everywhere. The old contact details were notified.`
-                    : `${state.merchant.businessName} has regained dashboard access.`}
+                : state.action === 'freeze'
+                  ? `${state.merchant.businessName} can no longer sign in until reactivated.`
+                  : `${state.merchant.businessName} has regained dashboard access.`}
             </p>
             <button onClick={onClose} className="px-5 py-2.5 rounded-lg bg-primary text-white text-sm font-semibold uppercase tracking-widest hover:shadow-lg active:scale-95 transition-all">Done</button>
           </div>
@@ -1201,6 +1105,40 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
     }
   };
 
+  const [verification, setVerification] = React.useState({
+    kraAdminVerified: merchant?.kraAdminVerified || false,
+    businessNumberAdminVerified: merchant?.businessNumberAdminVerified || false,
+  });
+  const [updatingVerification, setUpdatingVerification] = React.useState(null); // 'kra' | 'businessNumber' | null
+
+  React.useEffect(() => {
+    if (merchant) {
+      setVerification({
+        kraAdminVerified: merchant.kraAdminVerified || false,
+        businessNumberAdminVerified: merchant.businessNumberAdminVerified || false,
+      });
+    }
+  }, [merchant]);
+
+  const handleToggleVerification = async (field, value) => {
+    try {
+      setUpdatingVerification(field === 'kraAdminVerified' ? 'kra' : 'businessNumber');
+      const res = await api.patch(`/api/admin/merchants/${merchant._id}/verification`, {
+        [field]: value,
+      });
+      if (res.data.success) {
+        setVerification({
+          kraAdminVerified: res.data.kraAdminVerified,
+          businessNumberAdminVerified: res.data.businessNumberAdminVerified,
+        });
+      }
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to update verification status.');
+    } finally {
+      setUpdatingVerification(null);
+    }
+  };
+
   const m = merchant;
   const ready = !loading && !error && m && m.email;
 
@@ -1252,9 +1190,11 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
                 {m.isVerified ? 'Account Verified' : 'Unverified'}
               </Badge>
               <Badge tone={m.isKRAVerified ? 'emerald' : 'gray'} icon={m.isKRAVerified ? 'verified_user' : 'help'}>
-                {m.isKRAVerified ? 'KRA Verified' : 'KRA Not Verified'}
+                {m.isKRAVerified ? 'KRA Format Valid' : 'KRA Format Not Checked'}
               </Badge>
-              <Badge tone={(ACTIVITY_STYLE[m.activityTier]?.dot || '').includes('emerald') ? 'emerald' : (ACTIVITY_STYLE[m.activityTier]?.dot || '').includes('amber') ? 'amber' : 'gray'} icon="bolt">
+              {m.kraAdminVerified && <Badge tone="emerald" icon="workspace_premium">KRA Admin Verified</Badge>}
+              {m.businessNumberAdminVerified && <Badge tone="emerald" icon="workspace_premium">Business # Admin Verified</Badge>}
+              <Badge tone={(ACTIVITY_STYLE[m.activityTier] || ACTIVITY_STYLE.dormant).pillTone || 'gray'} icon="bolt">
                 {ACTIVITY_STYLE[m.activityTier]?.label || 'Dormant'}
               </Badge>
             </div>
@@ -1296,8 +1236,53 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
             {/* Business Identity */}
             <Section title="Business Identity" icon="storefront">
               <Row label="Business Name" value={m.businessName} />
-              <Row label="KRA PIN" value={m.kraPin} mono badge={m.isKRAVerified ? { tone: 'emerald', text: 'Verified' } : { tone: 'gray', text: 'Not verified' }} />
-              <Row label="Business Reg #" value={m.businessNumber} mono />
+              <Row label="KRA PIN" value={
+                <span className="flex items-center gap-2 flex-wrap">
+                  <span className="font-mono">{m.kraPin || '—'}</span>
+                  <span className={`text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full border ${m.isKRAVerified ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+                    {m.isKRAVerified ? 'Format Valid' : 'Format Not Checked'}
+                  </span>
+                  {m.kraPin && (
+                    <button
+                      type="button"
+                      disabled={updatingVerification === 'kra'}
+                      onClick={() => handleToggleVerification('kraAdminVerified', !verification.kraAdminVerified)}
+                      className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-full border transition-all disabled:opacity-50 ${
+                        verification.kraAdminVerified
+                          ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700'
+                          : 'bg-white text-emerald-700 border-emerald-300 hover:bg-emerald-50'
+                      }`}
+                    >
+                      {updatingVerification === 'kra' ? 'Saving…' : verification.kraAdminVerified ? '✓ Admin Verified' : 'Mark Admin Verified'}
+                    </button>
+                  )}
+                  {verification.kraAdminVerified && m.kraAdminVerifiedAt && (
+                    <span className="text-[10px] text-on-surface-variant/60">since {fmtDate(m.kraAdminVerifiedAt)}</span>
+                  )}
+                </span>
+              } />
+              <Row label="Business Reg #" value={
+                <span className="flex items-center gap-2 flex-wrap">
+                  <span className="font-mono">{m.businessNumber || '—'}</span>
+                  {m.businessNumber && (
+                    <button
+                      type="button"
+                      disabled={updatingVerification === 'businessNumber'}
+                      onClick={() => handleToggleVerification('businessNumberAdminVerified', !verification.businessNumberAdminVerified)}
+                      className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-full border transition-all disabled:opacity-50 ${
+                        verification.businessNumberAdminVerified
+                          ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700'
+                          : 'bg-white text-emerald-700 border-emerald-300 hover:bg-emerald-50'
+                      }`}
+                    >
+                      {updatingVerification === 'businessNumber' ? 'Saving…' : verification.businessNumberAdminVerified ? '✓ Admin Verified' : 'Mark Admin Verified'}
+                    </button>
+                  )}
+                  {verification.businessNumberAdminVerified && m.businessNumberAdminVerifiedAt && (
+                    <span className="text-[10px] text-on-surface-variant/60">since {fmtDate(m.businessNumberAdminVerifiedAt)}</span>
+                  )}
+                </span>
+              } />
               <Row label="Certificate" value={m.certificateUrl
                 ? <a href={m.certificateUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-semibold underline">View document ↗</a>
                 : '— not uploaded —'} />
@@ -1341,7 +1326,7 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
                   : '— wallet not provisioned —'}
               />
               <Row label="USDC Balance" value={`${(m.usdcBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDC`} />
-              <Row label="KES Balance" value={formatKES(m.kesBalance || 0)} />
+              <Row label="KES Balance" value={`KES ${(m.kesBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
               <Row label="Encrypted Secret" value={m.hasStellarKey ? <Badge tone="emerald" icon="check">Stored (encrypted)</Badge> : <Badge tone="gray" icon="remove">Not set</Badge>} />
             </Section>
 
@@ -1355,16 +1340,16 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
               <Row label="Transactions (30d)" value={(m.txnCount30d ?? 0).toLocaleString()} />
               {m.lastTransaction && (
                 <Row label="Last Transaction" value={
-                  <span>{formatKES(m.lastTransaction.amount || 0)} · <span className="text-on-surface-variant/60">{fmtDate(m.lastTransaction.createdAt)}</span> · <span className="uppercase text-[10px] font-bold tracking-widest text-on-surface-variant/60">{m.lastTransaction.status}</span></span>
+                  <span>KES {Number(m.lastTransaction.amount || 0).toLocaleString()} · <span className="text-on-surface-variant/60">{fmtDate(m.lastTransaction.createdAt)}</span> · <span className="uppercase text-[10px] font-bold tracking-widest text-on-surface-variant/60">{m.lastTransaction.status}</span></span>
                 } />
               )}
             </Section>
 
             {/* Volume */}
             <Section title="Transaction Volume" icon="monitoring">
-              <Row label="KES Volume (30d)" value={formatKES(m.volume30d ?? 0)} />
+              <Row label="KES Volume (30d)" value={`KES ${(m.volume30d ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`} />
               <Row label="USDC Volume (30d)" value={`${(m.usdcVolume30d ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC`} />
-              <Row label="Lifetime KES Volume" value={formatKES(m.totalVolume ?? 0)} />
+              <Row label="Lifetime KES Volume" value={`KES ${(m.totalVolume ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`} />
               <Row label="Lifetime USDC Volume" value={`${(m.totalUsdcVolume ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC`} />
             </Section>
 

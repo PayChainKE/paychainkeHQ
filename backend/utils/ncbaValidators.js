@@ -125,6 +125,22 @@ export function validateCollectionAmount(amount) {
   return Math.round(value * 100) / 100;
 }
 
+// Strict shape check for a phone number a human just typed into a signup
+// form — used only at account-creation time. validatePhoneNumber() below is
+// intentionally more permissive (it also accepts a bare 9-digit MSISDN body
+// with no leading 0/254, to stay compatible with how some existing
+// merchant.phone values are already stored — see that function's own
+// comment). A brand new account should never be created from that bare
+// shape; it should always look like a real Kenyan mobile number the way
+// someone would actually type it: +254712345678, 254712345678, 0712345678,
+// or 0112345678.
+const PHONE_INPUT_SHAPE = /^(\+?254|0)[17]\d{8}$/;
+
+export function isValidPhoneInputFormat(phoneNumber) {
+  const trimmed = String(phoneNumber ?? '').replace(/\s+/g, '');
+  return PHONE_INPUT_SHAPE.test(trimmed);
+}
+
 export function validatePhoneNumber(phoneNumber) {
   const digits = String(phoneNumber ?? '').replace(/\D/g, '');
   // Kenyan MSISDN, normalised to 254XXXXXXXXX (matches the convention already

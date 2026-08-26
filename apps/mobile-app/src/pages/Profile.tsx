@@ -15,6 +15,7 @@ import MyAccountsTab from '../components/tabs/MyAccountsTab';
 import SupportTab from '../components/tabs/SupportTab';
 import SettingsTab from '../components/tabs/SettingsTab';
 import SecurityTab from '../components/tabs/SecurityTab';
+import ProfileWalkthrough from '../components/ProfileWalkthrough';
 
 type SectionKey = 'my-accounts' | 'support' | 'settings' | 'security' | 'wallet' | 'payment-link' | 'statement' | 'business-profile';
 
@@ -311,6 +312,7 @@ function AccountStatementPanel({ navigation, merchant }: { navigation: any; merc
 function BusinessProfilePanel({ merchant }: { merchant: any }) {
   return (
     <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+      <ProfileWalkthrough />
       <View className="w-full max-w-lg mx-auto px-6 pt-2 pb-12">
         <View className="mb-6">
           <Text className="font-jakarta-extrabold text-[28px] text-[#00351d] tracking-tight leading-tight mb-2">Business Profile</Text>
@@ -345,9 +347,13 @@ export default function Profile({ navigation }: any) {
   const { merchant, logout } = useAuth();
   const [activeSection, setActiveSection] = useState<SectionKey>('my-accounts');
 
-  const digitalWalletEnabled = merchant?.features?.digitalWallet !== false;
+  const digitalWalletEnabled = merchant?.features?.digitalWallet === true;
+  // Payment Link is a basic collection method (same tier as STK Push / QR),
+  // unrelated to the crypto/Stellar Digital Wallet feature flag — it was
+  // previously (and incorrectly) hidden alongside 'wallet' any time
+  // digitalWalletEnabled was false, which is the default for every merchant.
   const visibleMenuItems = useMemo(
-    () => MENU_ITEMS.filter((item) => digitalWalletEnabled || (item.key !== 'wallet' && item.key !== 'payment-link')),
+    () => MENU_ITEMS.filter((item) => item.key !== 'wallet' || digitalWalletEnabled),
     [digitalWalletEnabled]
   );
 

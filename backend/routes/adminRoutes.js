@@ -11,6 +11,7 @@ import {
   flagMerchant,
   unflagMerchant,
   updateMerchantFeatures,
+  updateMerchantVerification,
   getMerchantsMap,
   geocodeSearch,
   setMerchantLocation,
@@ -139,6 +140,7 @@ router.post('/merchants/:id/confirm-action', protect, requireMutator, sensitiveA
 router.post('/merchants/:id/flag', protect, requireMutator, sensitiveActionLimiter, flagMerchant);
 router.post('/merchants/:id/unflag', protect, requireMutator, sensitiveActionLimiter, unflagMerchant);
 router.patch('/merchants/:id/features', protect, requireMutator, sensitiveActionLimiter, updateMerchantFeatures);
+router.patch('/merchants/:id/verification', protect, requireMutator, sensitiveActionLimiter, updateMerchantVerification);
 router.patch('/merchants/:id/location', protect, requireMutator, sensitiveActionLimiter, setMerchantLocation);
 router.delete('/merchants/:id/location', protect, requireMutator, sensitiveActionLimiter, removeMerchantLocation);
 router.get('/merchants/:id/sticker', protect, excludeOfficer, downloadMerchantSticker);

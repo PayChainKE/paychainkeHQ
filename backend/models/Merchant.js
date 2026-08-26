@@ -63,6 +63,84 @@ const merchantSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  // Distinct from isKRAVerified above (which just means "the PIN's format
+  // passed validation" and auto-sets the moment a merchant types a
+  // well-formed one). This is an actual admin confirming the KRA PIN is
+  // real — set only via the admin panel, never automatically. Also
+  // distinct from kybChecklist.kraPinVerified below, which only exists on
+  // officer-submitted applications and gates that specific application's
+  // approval (controllers/officerController.js) — this field instead
+  // covers any merchant, including self-signup/admin-created/waitlist-
+  // converted ones that never go through that checklist at all.
+  kraAdminVerified: {
+    type: Boolean,
+    default: false,
+  },
+  kraAdminVerifiedAt: {
+    type: Date,
+    default: null,
+  },
+  kraAdminVerifiedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin',
+    default: null,
+  },
+  // Same idea for the Business/License Number — no automatic equivalent
+  // exists for this field, so this is purely admin-set.
+  businessNumberAdminVerified: {
+    type: Boolean,
+    default: false,
+  },
+  businessNumberAdminVerifiedAt: {
+    type: Date,
+    default: null,
+  },
+  businessNumberAdminVerifiedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin',
+    default: null,
+  },
+  // One-time feature walkthrough shown on a new merchant's first dashboard
+  // login, never again after. Defaults to false for every merchant Mongoose
+  // hydrates (including ones that predate this field) — scripts/backfill-
+  // onboarding-walkthrough-seen.js must be run once after this ships so
+  // existing merchants are marked as already seen and don't get surprised
+  // with a tour on their next login; only genuinely new signups should see
+  // it starting from a true false default.
+  hasSeenOnboardingWalkthrough: {
+    type: Boolean,
+    default: false,
+  },
+  // Same one-time-tour pattern, scoped to the My Accounts page (Generate QR
+  // + Download Sticker) instead of the whole dashboard. Also needs a
+  // backfill (see scripts/backfill-onboarding-walkthrough-seen.js) so
+  // existing merchants aren't shown it retroactively.
+  hasSeenAccountsWalkthrough: {
+    type: Boolean,
+    default: false,
+  },
+  // Same one-time-tour pattern, scoped to the Security section of Profile
+  // (Enable Biometrics, Change Password, Change PIN). Also needs a backfill
+  // (see scripts/backfill-onboarding-walkthrough-seen.js) so existing
+  // merchants aren't shown it retroactively.
+  hasSeenSecurityWalkthrough: {
+    type: Boolean,
+    default: false,
+  },
+  // Same pattern, scoped to the Profile/Identity section (name, phone,
+  // KRA PIN, Business Number, Update Global Profile) — on web this section
+  // shares a page with Security above, so the frontend sequences the two
+  // (Profile tour first, Security tour only once Profile's is done) rather
+  // than popping both at once.
+  hasSeenProfileWalkthrough: {
+    type: Boolean,
+    default: false,
+  },
+  // Same pattern, scoped to the Transactions page's statement export flow.
+  hasSeenTransactionsWalkthrough: {
+    type: Boolean,
+    default: false,
+  },
   password: {
     type: String,
     // Optional at create time so admin-onboarded merchants can be created

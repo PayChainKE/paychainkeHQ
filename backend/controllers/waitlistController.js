@@ -3,7 +3,8 @@ import mongoose from 'mongoose';
 import Waitlist from '../models/Waitlist.js';
 import Merchant from '../models/Merchant.js';
 import { sendWaitlistConfirmation, sendMerchantInvite } from '../utils/resend.js';
-import { getNcbaVirtualAccountNumber, validatePhoneNumber, NcbaValidationError } from '../utils/ncbaValidators.js';
+import { getNcbaVirtualAccountNumber, validatePhoneNumber, isValidPhoneInputFormat, NcbaValidationError } from '../utils/ncbaValidators.js';
+import { isValidEmail, EMAIL_FORMAT_HINT } from '../utils/emailValidator.js';
 
 const MERCHANT_DASHBOARD_URL =
   process.env.MERCHANT_DASHBOARD_URL || 'https://app.paychain.co.ke';
@@ -243,11 +244,17 @@ export const convertWaitlistEntry = async (req, res) => {
     if (!entry.email) {
       return res.status(400).json({ error: 'Cannot convert: this entry has no email address.' });
     }
+    if (!isValidEmail(entry.email)) {
+      return res.status(400).json({ error: `This entry's email ("${entry.email}") isn't a valid format — correct it on the waitlist entry before converting.` });
+    }
 
     // Reject if a merchant with this email/phone already exists — the admin
     // either onboarded them already or there's a data conflict.
     const phone = String(entry.phone || '').replace(/\s+/g, '');
     if (phone) {
+      if (!isValidPhoneInputFormat(phone)) {
+        return res.status(400).json({ error: `This entry's phone number ("${phone}") isn't a valid Kenyan mobile number format (+254, 07, or 01) — correct it on the waitlist entry before converting.` });
+      }
       try {
         validatePhoneNumber(phone);
       } catch (e) {

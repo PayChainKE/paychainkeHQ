@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import axios from 'axios'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import CalendarRangePicker from '../components/ui/CalendarRangePicker'
+import TransactionsWalkthrough from '../components/onboarding/TransactionsWalkthrough'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { formatDateISO, formatTxDate, formatTxTime } from '../utils/formatDate'
 import { formatKES, formatUSDC } from '../utils/formatCurrency'
@@ -631,6 +632,7 @@ export default function Transactions() {
 
   return (
     <MerchantLayout title="Transactions">
+      <TransactionsWalkthrough />
       <div className="px-1 lg:px-0 max-w-7xl mx-auto w-full">
         {/* Page Title & Subtext */}
         <div className="mb-6 lg:mb-8">
