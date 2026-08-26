@@ -19,7 +19,7 @@ import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard
 import { getKplcPostpaidTariff, getKplcPrepaidTariff, getNcwscTariff } from '../config/billPaymentTariffCard.js';
 import { getLipaNaMpesaTariff } from '../config/lipaNaMpesaTariffCard.js';
 import { validatePhoneNumber, NcbaValidationError } from '../utils/ncbaValidators.js';
-import { validateMobileWalletNumber, submitMobileB2wPayment, validateLipaNaMpesaAccount, submitLipaNaMpesaPayment, validateKplcAccount, submitKplcPayment, validateKplcPrepaidAccount, submitKplcPrepaidPayment, validateNcwscAccount, submitNcwscPayment, NcbaOpenBankingValidationError } from '../services/ncbaOpenBankingService.js';
+import { submitMobileB2wPayment, submitLipaNaMpesaPayment, validateKplcAccount, submitKplcPayment, validateKplcPrepaidAccount, submitKplcPrepaidPayment, validateNcwscAccount, submitNcwscPayment, NcbaOpenBankingValidationError } from '../services/ncbaOpenBankingService.js';
 import { buildPayoutSentSms } from '../utils/paymentSmsTemplates.js';
 import { normalizeKraPin, isValidKraPin, KRA_PIN_FORMAT_HINT } from '../utils/kraPinValidator.js';
 
@@ -630,14 +630,11 @@ export const authorizeBatch = async (req, res) => {
         } else {
           try {
             const transactionId = `PAYOUT-KPLC-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-            // Fresh validationId required at payment time — see
-            // validateKplcMeter's doc comment for why an Add-Payee-time one
-            // can't be reused here.
-            const validation = await validateKplcAccount({ meterNumber: payee.accountNumber, msisdn: ncbaMsisdn });
+            // No pre-payment meter validation — kept off even though the
+            // KPLC integration itself is back, per Brandon's explicit call.
             await submitKplcPayment({
               transactionId,
-              validationId: validation.validationId,
-              customerName: validation.customerName || payee.name,
+              customerName: payee.name,
               meterNumber: payee.accountNumber,
               msisdn: ncbaMsisdn,
               amount: row.netAmount,
@@ -663,11 +660,10 @@ export const authorizeBatch = async (req, res) => {
         } else {
           try {
             const transactionId = `PAYOUT-KPLCPP-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-            const validation = await validateKplcPrepaidAccount({ meterNumber: payee.accountNumber, msisdn: ncbaMsisdn });
+            // No pre-purchase meter validation — same as postpaid KPLC above.
             await submitKplcPrepaidPayment({
               transactionId,
-              validationId: validation.validationId,
-              customerName: validation.customerName || payee.name,
+              customerName: payee.name,
               meterNumber: payee.accountNumber,
               msisdn: ncbaMsisdn,
               amount: row.netAmount,
@@ -694,13 +690,11 @@ export const authorizeBatch = async (req, res) => {
         } else {
           try {
             const transactionId = `PAYOUT-NCWSC-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-            // Fresh validationId required at payment time — see
-            // validateNcwscMeter's doc comment.
-            const validation = await validateNcwscAccount({ meterNumber: payee.accountNumber, msisdn: ncbaMsisdn });
+            // No pre-payment meter validation — NCBA's NCWSC validation
+            // service isn't confirmed ready either, same as KPLC above.
             await submitNcwscPayment({
               transactionId,
-              validationId: validation.validationId,
-              customerName: validation.customerName || payee.name,
+              customerName: payee.name,
               meterNumber: payee.accountNumber,
               msisdn: ncbaMsisdn,
               amount: row.netAmount,
@@ -798,13 +792,10 @@ export const authorizeBatch = async (req, res) => {
         // (ncbaOpenBankingController.js), keyed by the reference this row is
         // stamped with below.
         try {
-          const network = payee.mobileNetwork === 'airtel' ? 'airtel' : 'safaricom';
           const transactionId = `PAYOUT-BULK-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-          const { validationId } = await validateMobileWalletNumber({ provider: network, msisdn: ncbaMsisdn });
           await submitMobileB2wPayment({
             transactionId,
-            validationId,
-            provider: network,
+            beneficiaryName: payee.name,
             amount: row.netAmount,
             recipientNumber: ncbaMsisdn,
             narration: `Bulk Payout to ${payee.name}`,
@@ -821,19 +812,16 @@ export const authorizeBatch = async (req, res) => {
         try {
           const payBillTillNo = payee.paybillNumber || payee.tillNumber;
           const transactionId = `PAYOUT-BULK-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-          // The saved payee's mobileMoneyType is only a starting guess — NCBA
-          // checks Till/Paybill against separate Safaricom registries, so
-          // validateLipaNaMpesaAccount retries under the other type on
-          // rejection and returns whichever one actually resolved.
-          const destination = await validateLipaNaMpesaAccount({ paymentType: payee.mobileMoneyType === 'Paybill' ? 'Paybill' : 'Till', payBillTillNo });
-          const paymentType = destination.paymentType;
+          // No pre-payout Till/Paybill validation — takes the saved payee's
+          // own mobileMoneyType selection as given.
+          const paymentType = payee.mobileMoneyType === 'Paybill' ? 'Paybill' : 'Till';
           await submitLipaNaMpesaPayment({
             transactionId,
             paymentType,
             payBillTillNo,
             amount: row.netAmount,
             accountReference: paymentType === 'Paybill' ? payee.businessAccount : undefined,
-            recipientName: destination.organizationName || payee.name,
+            recipientName: payee.name,
             notifyMobileNumber: merchant.phone,
             narration: `Bulk Payout to ${payee.name}`,
           });

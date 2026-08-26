@@ -62,12 +62,13 @@ const payeeSchema = new mongoose.Schema(
       default: null,
     },
     // Which utility category the merchant picked in the Add Payee UI (Water,
-    // Rent, Internet, or a custom "Other" utility) — purely for display/edit
-    // purposes. Doesn't affect routing: every utility payee now pays out
-    // through the same generic paymentMethod-driven rail (Mobile Money/Bank)
-    // as any other payee, same as Rent/Internet always have — utilityProvider
-    // above is left null except for the (currently unused, NCBA-side-broken)
-    // dedicated KPLC/NCWSC rails.
+    // Electricity, Rent, Internet, or a custom "Other" utility) — purely for
+    // display/edit purposes. Doesn't affect routing on its own: Water/Rent/
+    // Internet/Other pay out through the generic paymentMethod-driven rail
+    // (Mobile Money/Bank); Electricity instead sets utilityProvider above to
+    // 'KPLC'/'KPLC_PREPAID', routing through NCBA's dedicated KPLC rail
+    // (re-enabled 2026-08-26 — NCBA confirmed prior validation downtime is
+    // resolved). NCWSC's dedicated rail stays unused/unconfirmed for now.
     utilityType: {
       type: String,
       trim: true,

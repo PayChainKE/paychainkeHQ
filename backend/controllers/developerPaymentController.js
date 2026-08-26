@@ -150,7 +150,7 @@ export function parsePayoutDestination(body) {
     return { type, counterparty: { bankCode, accountNumber, accountName: accountName || null } };
   }
   if (type === 'mobile_money') {
-    return { type, counterparty: { phone, network: mobileNetwork === 'airtel' ? 'airtel' : 'safaricom' } };
+    return { type, counterparty: { phone, network: mobileNetwork === 'airtel' ? 'airtel' : 'safaricom', accountName: accountName || null } };
   }
   if (type === 'paybill') {
     if (!accountReference) throw new PayoutDestinationError('accountReference is required for a paybill payout.');
@@ -268,6 +268,7 @@ export const payoutPayment = async (req, res) => {
       } else if (destination.type === 'mobile_money') {
         ({ transaction } = await executeNcbaMobileMoneyPayout({
           merchantId, phone: destination.counterparty.phone, network: destination.counterparty.network,
+          beneficiaryName: destination.counterparty.accountName,
           amount: numericAmount, narration: narration || 'Developer API payout',
         }));
       } else {

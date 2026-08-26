@@ -212,6 +212,7 @@ export const createDeveloperBulkPayment = async (req, res) => {
         } else if (destination.type === 'mobile_money') {
           ({ transaction } = await executeNcbaMobileMoneyPayout({
             merchantId, phone: destination.counterparty.phone, network: destination.counterparty.network,
+            beneficiaryName: destination.counterparty.accountName,
             amount: payment.amount, narration: narration || 'Developer API bulk payout',
           }));
         } else {

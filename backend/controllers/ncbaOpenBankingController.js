@@ -3,13 +3,10 @@ import Merchant from '../models/Merchant.js';
 import Transaction from '../models/Transaction.js';
 import PayoutBatch from '../models/PayoutBatch.js';
 import {
-  validatePesaLinkAccount,
   submitPesaLinkTransfer,
   submitRtgsTransfer,
   submitInternalNcbaTransfer,
-  validateMobileWalletNumber,
   submitMobileB2wPayment,
-  validateLipaNaMpesaAccount,
   submitLipaNaMpesaPayment,
   NcbaOpenBankingValidationError,
 } from '../services/ncbaOpenBankingService.js';
@@ -75,11 +72,8 @@ function logEvent(level, event, fields) {
  *        UAT Guide, so this falls back to their own sample value ('MSC')
  *        when not provided — see submitRtgsTransfer.
  *
- * RTGS has no documented validation endpoint at all (its BeneficiaryBankBIC
- * is a real SWIFT code, not a CBK clearing code validatePesaLinkAccount
- * understands), so rail:'rtgs' skips the pre-flight validation check
- * entirely — submission is the only available correctness check for that
- * rail today.
+ * Neither rail has a pre-flight validation step anymore (see this
+ * function's body) — submission is the only correctness check for both now.
  *
  * Per NCBA's UAT Guide, both rails resolve synchronously — if this
  * resolves at all, the transfer succeeded (submitPesaLinkTransfer/
@@ -125,17 +119,11 @@ export async function submitNcbaBankTransfer({
   // and reports its own rejection, same as PesaLink would.
   const isNcbaOwnAccount = bankCode === NCBA_OWN_BANK_CODE;
 
-  // Fail fast on a bad destination account before touching balance — not
-  // possible for RTGS (no documented validation endpoint, see doc comment
-  // above) or for an NCBA-own-account transfer (validated via IFT itself).
-  if (rail !== 'rtgs' && !isNcbaOwnAccount) {
-    await validatePesaLinkAccount({
-      bankCode,
-      accountNumber,
-      debitAccount: process.env.NCBA_OPENBANKING_ACCOUNT_NUMBER,
-    });
-  }
-
+  // No pre-flight destination-account validation — NCBA validation
+  // endpoints across the platform have been unreliable enough to block
+  // real payouts (see Mobile B2W/KPLC history), so this now goes straight
+  // to submission for every rail; PesaLink/RTGS both resolve synchronously
+  // and report their own rejection if the destination is actually bad.
   const railPrefix = isNcbaOwnAccount ? 'IFT' : { pesalink: 'PL', rtgs: 'RTGS' }[rail];
   const transactionId = `NCBA-${railPrefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 
@@ -270,12 +258,19 @@ export async function executeNcbaBankPayout({
 }
 
 /**
- * Single-recipient payout to an M-Pesa/Airtel Money wallet via NCBA Mobile
- * B2W. Same reservation/refund-on-failure shape as executeNcbaBankPayout
- * above, extracted alongside it so the Developer API payout endpoint can
- * reuse the exact NCBA calls bulkPayController.js's Personal Number branch
- * already makes in production, rather than a second implementation of the
- * same integration drifting out of sync with it.
+ * Single-recipient payout to an M-Pesa wallet via NCBA's
+ * MobileMoneyTransfer rail (see submitMobileB2wPayment's own doc comment
+ * for the endpoint/payload history). Same reservation/refund-on-failure
+ * shape as executeNcbaBankPayout above, extracted alongside it so the
+ * Developer API payout endpoint can reuse the exact NCBA calls
+ * bulkPayController.js's Personal Number branch already makes in
+ * production, rather than a second implementation of the same integration
+ * drifting out of sync with it.
+ *
+ * beneficiaryName is required by NCBA's payload but the Developer API has
+ * no per-payee identity field for mobile money destinations (only bank
+ * payouts collect accountName) — falls back to a generic label rather than
+ * rejecting the request outright.
  *
  * Unlike a bank payout, this rail is asynchronous — NCBA confirms receipt,
  * not completion. The returned transaction is 'pending' and resolves later
@@ -286,19 +281,12 @@ export async function executeNcbaBankPayout({
  * whatever ncbaOpenBankingService throws on a submission failure (after
  * refunding the reservation).
  */
-export async function executeNcbaMobileMoneyPayout({ merchantId, phone, network, amount, narration }) {
+export async function executeNcbaMobileMoneyPayout({ merchantId, phone, network, beneficiaryName, amount, narration }) {
   const numericAmount = Number(amount);
   if (!phone || !Number.isFinite(numericAmount) || numericAmount <= 0) {
     throw new NcbaOpenBankingValidationError('phone and a positive amount are required for a mobile money payout');
   }
   const resolvedNetwork = network === 'airtel' ? 'airtel' : 'safaricom';
-
-  // Fail fast on a number NCBA doesn't recognize as a real wallet before
-  // ever reserving/debiting the merchant's balance — same ordering as
-  // initiateB2C (controllers/mpesaController.js). Previously this validated
-  // only after the reservation, so an invalid destination still cost a
-  // debit-then-refund round trip for no reason.
-  const { validationId } = await validateMobileWalletNumber({ provider: resolvedNetwork, msisdn: phone });
 
   const { totalFee } = getB2cTariff(numericAmount);
   const totalDebit = Math.round((numericAmount + totalFee) * 100) / 100;
@@ -316,7 +304,7 @@ export async function executeNcbaMobileMoneyPayout({ merchantId, phone, network,
   const transactionId = `PAYOUT-API-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
   try {
     await submitMobileB2wPayment({
-      transactionId, validationId, provider: resolvedNetwork, amount: numericAmount,
+      transactionId, beneficiaryName: beneficiaryName || 'PayChain Merchant', amount: numericAmount,
       recipientNumber: phone, narration: narration || 'Developer API payout',
     });
   } catch (err) {
@@ -349,10 +337,9 @@ export async function executeNcbaMobileMoneyPayout({ merchantId, phone, network,
  * async (resolves via resolvePendingOpenBankingTransaction), reservation +
  * refund-on-failure.
  *
- * paymentType is only a starting guess — NCBA validates Till/Paybill against
- * separate Safaricom registries and validateLipaNaMpesaAccount retries under
- * the other type on rejection, so the transaction is recorded under
- * whichever one actually resolved.
+ * paymentType is taken as given from the caller — no pre-flight
+ * Till/Paybill resolution against NCBA's own registries anymore (that
+ * validation call is one of the ones blocking payouts platform-wide).
  */
 export async function executeNcbaLipaNaMpesaPayout({ merchantId, paymentType, payBillTillNo, accountReference, amount, narration }) {
   const numericAmount = Number(amount);
@@ -374,13 +361,12 @@ export async function executeNcbaLipaNaMpesaPayout({ merchantId, paymentType, pa
   }
 
   const transactionId = `PAYOUT-API-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-  let resolvedDestination;
+  const resolvedPaymentType = paymentType === 'paybill' ? 'Paybill' : 'Till';
   try {
-    resolvedDestination = await validateLipaNaMpesaAccount({ paymentType: paymentType === 'paybill' ? 'Paybill' : 'Till', payBillTillNo });
     await submitLipaNaMpesaPayment({
-      transactionId, paymentType: resolvedDestination.paymentType, payBillTillNo, amount: numericAmount,
-      accountReference: resolvedDestination.paymentType === 'Paybill' ? accountReference : undefined,
-      recipientName: resolvedDestination.organizationName || null,
+      transactionId, paymentType: resolvedPaymentType, payBillTillNo, amount: numericAmount,
+      accountReference: resolvedPaymentType === 'Paybill' ? accountReference : undefined,
+      recipientName: null,
       notifyMobileNumber: reservedMerchant.phone,
       narration: narration || 'Developer API payout',
     });
@@ -400,10 +386,10 @@ export async function executeNcbaLipaNaMpesaPayout({ merchantId, paymentType, pa
     status: 'pending',
     reference: transactionId,
     sender: { name: reservedMerchant.businessName, id: process.env.NCBA_OPENBANKING_ACCOUNT_NUMBER || 'PAYCHAIN_NCBA_ACCOUNT' },
-    recipient: { name: resolvedDestination.organizationName || null, id: payBillTillNo },
+    recipient: { name: null, id: payBillTillNo },
   });
 
-  return { transaction, merchant: reservedMerchant, fee: totalFee, resolvedType: resolvedDestination.paymentType };
+  return { transaction, merchant: reservedMerchant, fee: totalFee, resolvedType: resolvedPaymentType };
 }
 
 // @desc    List NCBA-recognized bank clearing codes, for the merchant
