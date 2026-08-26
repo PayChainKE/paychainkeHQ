@@ -9,6 +9,7 @@ import {
   submitMobileB2wPayment,
   submitLipaNaMpesaPayment,
   NcbaOpenBankingValidationError,
+  NcbaOpenBankingRequestError,
 } from '../services/ncbaOpenBankingService.js';
 import DeveloperPayment from '../models/DeveloperPayment.js';
 import { publicDeveloperPayment } from '../utils/developerPaymentView.js';
@@ -302,16 +303,33 @@ export async function executeNcbaMobileMoneyPayout({ merchantId, phone, network,
   }
 
   const transactionId = `PAYOUT-API-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  let ncbaConfirmed = true;
   try {
     await submitMobileB2wPayment({
       transactionId, beneficiaryName: beneficiaryName || 'PayChain Merchant', amount: numericAmount,
       recipientNumber: phone, narration: narration || 'Developer API payout',
     });
   } catch (err) {
-    await Merchant.findByIdAndUpdate(merchantId, { $inc: { kesBalance: totalDebit } });
-    throw err;
+    // NcbaOpenBankingRequestError means NCBA actually received and
+    // processed the request — same reasoning as initiateB2C
+    // (mpesaController.js): refunding here on top of a transfer that may
+    // have already completed would double-cost PayChain with no record of
+    // what happened, so this is recorded 'pending' instead of refunded,
+    // not treated as a definite failure.
+    if (!(err instanceof NcbaOpenBankingRequestError)) {
+      await Merchant.findByIdAndUpdate(merchantId, { $inc: { kesBalance: totalDebit } });
+      throw err;
+    }
+    ncbaConfirmed = false;
   }
 
+  // status is 'completed' (not the historically-assumed 'pending') once
+  // submitMobileB2wPayment's own broadened success check actually confirms
+  // the transfer — NCBA's documented "resolves later via callback" has
+  // never been observed arriving for this rail in practice, so a real
+  // success left 'pending' would eventually get auto-marked 'failed' and
+  // refunded by the reconciliation sweep purely for lack of a callback
+  // that was never coming.
   const transaction = await Transaction.create({
     merchantId,
     accountNumber: reservedMerchant.ncbaMerchantCode || 'WALLET_FUND',
@@ -319,8 +337,7 @@ export async function executeNcbaMobileMoneyPayout({ merchantId, phone, network,
     amount: numericAmount,
     kesAmount: numericAmount,
     currency: 'KES',
-    // 'pending' — Mobile B2W confirms asynchronously, see doc comment above.
-    status: 'pending',
+    status: ncbaConfirmed ? 'completed' : 'pending',
     reference: transactionId,
     sender: { name: reservedMerchant.businessName, id: process.env.NCBA_OPENBANKING_ACCOUNT_NUMBER || 'PAYCHAIN_NCBA_ACCOUNT' },
     recipient: { name: null, id: phone },

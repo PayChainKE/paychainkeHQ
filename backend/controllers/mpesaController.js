@@ -1022,9 +1022,17 @@ export const initiateB2C = async (req, res) => {
       throw ncbaErr;
     }
 
-    // type: 'ncba_mobile_b2w' — see utils/feeCalculator.js for the matching
-    // fee branch and ncbaOpenBankingController.js's handlePesaLinkCallback
-    // for how this resolves from 'pending'.
+    // type: 'ncba_mobile_b2w' — status is 'completed', not 'pending':
+    // reaching this line means submitMobileB2wPayment's broadened success
+    // check actually confirmed the transfer (see that function's own doc
+    // comment) — NCBA's documented "resolves later via callback" shape
+    // has never actually been observed arriving for this rail in
+    // practice, so a real success left 'pending' here would eventually
+    // get auto-marked 'failed' and refunded by the reconciliation sweep
+    // (ncbaOpenBankingReconciliationService.js) purely because no callback
+    // ever came — the exact double-loss bug this rail already had once,
+    // just delayed 20 minutes instead of immediate. See utils/feeCalculator.js
+    // for the fee branch.
     const tx = await Transaction.create({
       merchantId: merchant._id,
       accountNumber: merchant.ncbaMerchantCode || 'WALLET_FUND',
@@ -1032,7 +1040,7 @@ export const initiateB2C = async (req, res) => {
       amount: amount,
       kesAmount: amount,
       currency: 'KES',
-      status: 'pending',
+      status: 'completed',
       reference: transactionId,
       sender: { name: merchant.businessName, id: merchant.ncbaMerchantCode },
       recipient: { name: destination, id: phone },

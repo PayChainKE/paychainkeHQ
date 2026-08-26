@@ -19,7 +19,7 @@ import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard
 import { getKplcPostpaidTariff, getKplcPrepaidTariff, getNcwscTariff } from '../config/billPaymentTariffCard.js';
 import { getLipaNaMpesaTariff } from '../config/lipaNaMpesaTariffCard.js';
 import { validatePhoneNumber, NcbaValidationError } from '../utils/ncbaValidators.js';
-import { submitMobileB2wPayment, submitLipaNaMpesaPayment, validateKplcAccount, submitKplcPayment, validateKplcPrepaidAccount, submitKplcPrepaidPayment, validateNcwscAccount, submitNcwscPayment, NcbaOpenBankingValidationError } from '../services/ncbaOpenBankingService.js';
+import { submitMobileB2wPayment, submitLipaNaMpesaPayment, validateKplcAccount, submitKplcPayment, validateKplcPrepaidAccount, submitKplcPrepaidPayment, validateNcwscAccount, submitNcwscPayment, NcbaOpenBankingValidationError, NcbaOpenBankingRequestError } from '../services/ncbaOpenBankingService.js';
 import { buildPayoutSentSms } from '../utils/paymentSmsTemplates.js';
 import { normalizeKraPin, isValidKraPin, KRA_PIN_FORMAT_HINT } from '../utils/kraPinValidator.js';
 
@@ -787,24 +787,40 @@ export const authorizeBatch = async (req, res) => {
           }
         }
       } else if (payee.paymentMethod === 'Mobile Money' && payee.mobileMoneyType === 'Personal Number') {
-        // NCBA Mobile B2W. Async rail — payoutStatus stays 'pending' (its
-        // default above), resolved later via handlePesaLinkCallback
-        // (ncbaOpenBankingController.js), keyed by the reference this row is
-        // stamped with below.
+        // NCBA Mobile B2W. Reaching past submitMobileB2wPayment without it
+        // throwing means its own broadened success check actually
+        // confirmed the transfer — NCBA's documented "resolves later via
+        // callback" has never been observed arriving for this rail in
+        // practice, so this is treated as synchronously resolved
+        // (payoutStatus = 'completed' below), not left 'pending' — a real
+        // success left 'pending' would otherwise get auto-marked 'failed'
+        // and refunded by the reconciliation sweep purely for lack of a
+        // callback that was never coming.
+        const mobileB2wTransactionId = `PAYOUT-BULK-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
         try {
-          const transactionId = `PAYOUT-BULK-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
           await submitMobileB2wPayment({
-            transactionId,
+            transactionId: mobileB2wTransactionId,
             beneficiaryName: payee.name,
             amount: row.netAmount,
             recipientNumber: ncbaMsisdn,
             narration: `Bulk Payout to ${payee.name}`,
           });
-          payoutRef = transactionId;
+          payoutRef = mobileB2wTransactionId;
+          payoutStatus = 'completed';
         } catch (err) {
           console.error(`❌ NCBA Mobile B2W rejected payout for ${payee.name}:`, err.message);
-          payoutStatus = 'failed';
-          refundAmount += row.netAmount + row.b2cFee;
+          if (err instanceof NcbaOpenBankingRequestError) {
+            // NCBA actually received and processed the request — same
+            // reasoning as initiateB2C (mpesaController.js): refunding on
+            // top of a transfer that may have already completed would
+            // double-cost PayChain with no record of what happened, so
+            // this row is left 'pending' under the same reference NCBA
+            // actually received, rather than marked failed/refunded here.
+            payoutRef = mobileB2wTransactionId;
+          } else {
+            payoutStatus = 'failed';
+            refundAmount += row.netAmount + row.b2cFee;
+          }
         }
       } else if (payee.paymentMethod === 'Mobile Money') {
         // Paybill/Till, via NCBA's Lipa na M-Pesa Payment API — NCBA's
