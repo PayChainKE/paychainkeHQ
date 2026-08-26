@@ -32,7 +32,9 @@ interface Payee {
   businessAccount?: string;
   tillNumber?: string;
   bankName?: string;
+  bankCode?: string;
   accountNumber?: string;
+  utilityProvider?: string;
   kraPin?: string;
   idNumber?: string;
   nssfNumber?: string;
@@ -40,6 +42,117 @@ interface Payee {
   etimsInvoiceNumber?: string;
   cuNumber?: string;
   defaultAmount?: number;
+}
+
+// ── Fee estimates for the client-side liquidity check ───────────────────
+// Mirror backend/config/mpesaB2cTariffCard.js#getB2cTariff and
+// backend/config/lipaNaMpesaTariffCard.js#getLipaNaMpesaTariff — same bands
+// already mirrored in the dashboard's SendMoney.jsx/BulkPay.jsx.
+const B2C_TARIFF_BANDS = [
+  { max: 49,      totalFee: 0   },
+  { max: 100,     totalFee: 5   },
+  { max: 500,     totalFee: 11  },
+  { max: 1_000,   totalFee: 17  },
+  { max: 1_500,   totalFee: 24  },
+  { max: 2_500,   totalFee: 29  },
+  { max: 3_500,   totalFee: 34  },
+  { max: 5_000,   totalFee: 37  },
+  { max: 7_500,   totalFee: 57  },
+  { max: 10_000,  totalFee: 67  },
+  { max: 20_000,  totalFee: 84  },
+  { max: 50_000,  totalFee: 113 },
+  { max: 100_000, totalFee: 163 },
+  { max: 250_000, totalFee: 213 },
+];
+function estimateB2cFee(amount: number): number {
+  if (!amount || amount <= 0) return 0;
+  const band = B2C_TARIFF_BANDS.find(b => amount <= b.max) || B2C_TARIFF_BANDS[B2C_TARIFF_BANDS.length - 1];
+  return band.totalFee;
+}
+
+const B2B_TARIFF_BANDS = [
+  { max: 100,      totalFee: 0   },
+  { max: 500,      totalFee: 10  },
+  { max: 1_000,    totalFee: 15  },
+  { max: 2_500,    totalFee: 23  },
+  { max: 5_000,    totalFee: 27  },
+  { max: 10_000,   totalFee: 35  },
+  { max: 20_000,   totalFee: 57  },
+  { max: 30_000,   totalFee: 64  },
+  { max: 40_000,   totalFee: 72  },
+  { max: 50_000,   totalFee: 79  },
+  { max: 100_000,  totalFee: 86  },
+  { max: 150_000,  totalFee: 104 },
+  { max: 200_000,  totalFee: 122 },
+  { max: 250_000,  totalFee: 140 },
+];
+function estimateB2bFee(amount: number): number {
+  if (!amount || amount <= 0) return 0;
+  const band = B2B_TARIFF_BANDS.find(b => amount <= b.max) || B2B_TARIFF_BANDS[B2B_TARIFF_BANDS.length - 1];
+  return band.totalFee;
+}
+
+// Mirrors backend/config/bankTransferTariffCard.js#getPesaLinkTariff —
+// Bulk Pay never requests RTGS, except a destination that's NCBA's own bank
+// code, forced onto the fee-exempt IFT rail instead.
+const PESALINK_BANDS = [
+  { max: 500,      totalFee: 50  },
+  { max: 3_500,    totalFee: 97  },
+  { max: 7_000,    totalFee: 122 },
+  { max: 10_000,   totalFee: 147 },
+  { max: 250_000,  totalFee: 210 },
+];
+const NCBA_OWN_BANK_CODE = '07000';
+function estimateBankFee(bankCode: string | undefined, amount: number): number {
+  if (bankCode === NCBA_OWN_BANK_CODE) return 0;
+  if (!amount || amount <= 0) return 0;
+  const band = PESALINK_BANDS.find(b => amount <= b.max) || PESALINK_BANDS[PESALINK_BANDS.length - 1];
+  return band.totalFee;
+}
+
+// Mirrors backend/config/billPaymentTariffCard.js — KPLC postpaid and
+// NCWSC are flat (baseCost 10 + serviceFee 27), KPLC prepaid is tiered.
+const KPLC_PREPAID_BANDS = [
+  { max: 500,      totalFee: 12 },
+  { max: 2_000,    totalFee: 17 },
+  { max: 4_000,    totalFee: 29 },
+  { max: 7_000,    totalFee: 39 },
+  { max: 10_000,   totalFee: 50 },
+  { max: 25_000,   totalFee: 57 },
+  { max: 50_000,   totalFee: 66 },
+  { max: 100_000,  totalFee: 75 },
+  { max: 250_000,  totalFee: 84 },
+];
+const KPLC_POSTPAID_FLAT_FEE = 37;
+const NCWSC_FLAT_FEE = 37;
+function estimateUtilityFee(utilityProvider: string | undefined, amount: number): number {
+  if (utilityProvider === 'KPLC') return KPLC_POSTPAID_FLAT_FEE;
+  if (utilityProvider === 'WATER') return NCWSC_FLAT_FEE;
+  if (utilityProvider === 'KPLC_PREPAID') {
+    if (!amount || amount <= 0) return 0;
+    const band = KPLC_PREPAID_BANDS.find(b => amount <= b.max) || KPLC_PREPAID_BANDS[KPLC_PREPAID_BANDS.length - 1];
+    return band.totalFee;
+  }
+  return 0;
+}
+
+// Dispatches a saved Payee to the right estimator above — mirrors
+// bulkPayController.js#authorizeBatch's own row.isB2cRow/isLnmRow/
+// isKplcRow/isKplcPrepaidRow/isNcwscRow/isBankRow branching.
+function estimatePayoutFee(payee: Payee, amount: number): number {
+  if (payee.type === 'utility' && payee.utilityProvider) {
+    return estimateUtilityFee(payee.utilityProvider, amount);
+  }
+  if (payee.paymentMethod === 'Mobile Money' && payee.mobileMoneyType === 'Personal Number') {
+    return estimateB2cFee(amount);
+  }
+  if (payee.paymentMethod === 'Mobile Money') {
+    return estimateB2bFee(amount);
+  }
+  if (payee.paymentMethod === 'Bank') {
+    return estimateBankFee(payee.bankCode, amount);
+  }
+  return 0;
 }
 
 interface Receipt {
@@ -300,8 +413,22 @@ export default function BulkPay() {
     [selectedIds, payoutAmounts]
   );
 
+  // Fee estimate for the liquidity check only — batchTotal (the figure
+  // shown to the merchant) stays principal-only; this widens what the
+  // balance is checked against so a batch that looks affordable on
+  // principal doesn't then fail server-side once real transfer fees are
+  // added on top.
+  const batchFees = useMemo(
+    () => selectedIds.reduce((sum, id) => {
+      const payee = payeesList.find(p => p._id === id);
+      if (!payee) return sum;
+      return sum + estimatePayoutFee(payee, payoutAmounts[id] || 0);
+    }, 0),
+    [selectedIds, payoutAmounts, payeesList]
+  );
+
   const balance = merchant?.kesBalance ?? 0;
-  const isLiquidityLow = batchTotal > balance && batchTotal > 0;
+  const isLiquidityLow = (batchTotal + batchFees) > balance && batchTotal > 0;
 
   // ── Selection ──
   const togglePayee = (id: string) => {
@@ -782,7 +909,7 @@ export default function BulkPay() {
               <View className="bg-[#fef2f2] border border-[#fecaca] rounded-2xl p-3.5 mb-4 flex-row items-center gap-2">
                 <Feather name="alert-triangle" size={16} color="#b91c1c" />
                 <Text className="text-[#b91c1c] font-jakarta-bold text-[12px] flex-1" numberOfLines={2}>
-                  Batch ({formatKES(batchTotal)}) exceeds balance ({formatKES(balance)}). Top up to proceed.
+                  Batch + fees ({formatKES(batchTotal + batchFees)}) exceeds balance ({formatKES(balance)}). Top up to proceed.
                 </Text>
               </View>
             )}
