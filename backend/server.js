@@ -1,5 +1,15 @@
 import dotenv from 'dotenv';
 dotenv.config();
+
+// Fail fast and loud rather than letting every JWT sign/verify call throw
+// individually later (or worse — some jwt libraries silently accept an
+// undefined secret). Every session token in the app (admin, merchant,
+// developer) depends on this being set to a real value.
+if (!process.env.JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET is not set. Refusing to start.');
+  process.exit(1);
+}
+
 // Imported before everything else so Sentry.init() runs (or safely no-ops)
 // before any route module that might throw during its own module-load.
 import Sentry from './utils/sentry.js';

@@ -1,29 +1,35 @@
-import React from 'react'
+import React, { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { MerchantAuthProvider, useMerchantAuth } from './context/MerchantAuthContext'
 import { NotificationProvider } from './context/NotificationContext'
 import ScrollToTop from './components/utils/ScrollToTop'
 import AppErrorBoundary from './components/AppErrorBoundary'
-import Login from './pages/Login'
-import SetupPassword from './pages/SetupPassword'
-import Overview from './pages/Overview'
-import Transactions from './pages/Transactions'
-import BulkPay from './pages/BulkPay'
-import Invoices from './pages/Invoices'
-import InflationShield from './pages/InflationShield'
-import CashAdvance from './pages/CashAdvance'
-import Profile from './pages/Profile'
-import Support from './pages/Support'
-import Notifications from './pages/Notifications'
-import MyAccounts from './pages/MyAccounts'
-import Wallet from './pages/Wallet'
-import SendMoney from './pages/SendMoney'
-import RequestMoney from './pages/RequestMoney'
-import PaymentPage from './pages/PaymentPage'
-import PayAccountPage from './pages/PayAccountPage'
-import InvoiceView from './pages/InvoiceView'
 import ToastHost from './components/ui/Toast'
 import { Analytics as VercelAnalytics } from '@vercel/analytics/react'
+
+// Route-level code splitting — every page used to be a static import here,
+// meaning the full bundle (all 18 pages, including Transactions' jsPDF/
+// jspdf-autotable, BulkPay's large batch-processing UI, etc.) downloaded
+// and parsed before even the Login screen could render. Each page now
+// loads its own chunk on first visit to that route instead of upfront.
+const Login = lazy(() => import('./pages/Login'))
+const SetupPassword = lazy(() => import('./pages/SetupPassword'))
+const Overview = lazy(() => import('./pages/Overview'))
+const Transactions = lazy(() => import('./pages/Transactions'))
+const BulkPay = lazy(() => import('./pages/BulkPay'))
+const Invoices = lazy(() => import('./pages/Invoices'))
+const InflationShield = lazy(() => import('./pages/InflationShield'))
+const CashAdvance = lazy(() => import('./pages/CashAdvance'))
+const Profile = lazy(() => import('./pages/Profile'))
+const Support = lazy(() => import('./pages/Support'))
+const Notifications = lazy(() => import('./pages/Notifications'))
+const MyAccounts = lazy(() => import('./pages/MyAccounts'))
+const Wallet = lazy(() => import('./pages/Wallet'))
+const SendMoney = lazy(() => import('./pages/SendMoney'))
+const RequestMoney = lazy(() => import('./pages/RequestMoney'))
+const PaymentPage = lazy(() => import('./pages/PaymentPage'))
+const PayAccountPage = lazy(() => import('./pages/PayAccountPage'))
+const InvoiceView = lazy(() => import('./pages/InvoiceView'))
 
 // Branded full-page loading spinner shown while session state is resolving
 function LoadingScreen() {
@@ -75,6 +81,7 @@ export default function App(){
       <MerchantAuthProvider>
         <NotificationProvider>
           <AppErrorBoundary>
+            <Suspense fallback={<LoadingScreen />}>
             <Routes>
               <Route path="/login" element={<LoginGuard><Login/></LoginGuard>} />
               <Route path="/setup-password" element={<SetupPassword/>} />
@@ -104,6 +111,7 @@ export default function App(){
               {/* Catch-all route for 404s and refreshes */}
               <Route path="*" element={<Navigate to="/overview" replace />} />
             </Routes>
+            </Suspense>
           </AppErrorBoundary>
           <ToastHost />
         </NotificationProvider>

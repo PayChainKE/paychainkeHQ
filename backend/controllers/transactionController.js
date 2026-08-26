@@ -107,21 +107,29 @@ export const downloadSticker = async (req, res) => {
 };
 
 // @desc    Simulate incoming M-PESA payment — dev/staging tool only, never
-//          reachable in production. Previously public with zero auth and a
-//          client-supplied accountNumber, which let anyone credit any
-//          merchant's real balance for free; now requires a session and can
-//          only ever credit the caller's own account.
+//          reachable in production. Gated on TWO independent checks, not
+//          one: NODE_ENV !== 'production' alone was a single point of
+//          failure (a misconfigured/missing env var on the live Render
+//          instance would silently re-open a route that fabricates real
+//          balance). ENABLE_PAYMENT_SIMULATOR must also be explicitly set
+//          to 'true' — something that should never exist in the production
+//          service's env vars — so one misconfiguration alone can't expose
+//          this. Previously public with zero auth and a client-supplied
+//          accountNumber, which let anyone credit any merchant's real
+//          balance for free; now requires a session and can only ever
+//          credit the caller's own account, via an atomic $inc rather than
+//          a read-modify-write (which was also a lost-update race).
 // @route   POST /api/transactions/simulate
-// @access  Private (non-production only)
+// @access  Private (non-production only, and only with the env flag set)
 export const simulateIncomingPayment = async (req, res) => {
   try {
-    if (process.env.NODE_ENV === 'production') {
+    if (process.env.NODE_ENV === 'production' || process.env.ENABLE_PAYMENT_SIMULATOR !== 'true') {
       return res.status(404).json({ error: 'Not found' });
     }
 
     const { amount, senderName, senderPhone } = req.body;
 
-    if (!amount) {
+    if (!amount || !(Number(amount) > 0)) {
       return res.status(400).json({ error: 'Amount is required' });
     }
 
@@ -155,9 +163,13 @@ export const simulateIncomingPayment = async (req, res) => {
       }
     });
 
-    // Update merchant's balance
-    merchant.kesBalance = (merchant.kesBalance || 0) + Number(amount);
-    await merchant.save();
+    // Atomic $inc — a read-modify-write here (fetch merchant.kesBalance,
+    // add in JS, save) is a lost-update race under concurrent calls.
+    const updatedMerchant = await Merchant.findByIdAndUpdate(
+      merchant._id,
+      { $inc: { kesBalance: Number(amount) } },
+      { new: true }
+    );
 
     createNotification({
       merchantId: merchant._id,
@@ -169,7 +181,7 @@ export const simulateIncomingPayment = async (req, res) => {
     res.status(201).json({
       message: 'Payment simulated successfully',
       transaction,
-      newBalance: merchant.kesBalance
+      newBalance: updatedMerchant.kesBalance
     });
   } catch (error) {
     console.error('❌ Error simulating payment:', error);
@@ -537,19 +549,31 @@ export const syncWalletBalance = async (req, res) => {
     }
 
     const liveBalance = await getWalletBalance(merchant.stellarPublicKey);
-    
+    const previousBalance = merchant.usdcBalance || 0;
+
     // If the live on-chain balance is strictly greater, it means an external deposit occurred.
     // If it's different in any way, sync the DB to match the chain.
-    if (liveBalance !== merchant.usdcBalance) {
-      console.log(`🔄 Syncing ledger for ${merchant.businessName}: ${merchant.usdcBalance} -> ${liveBalance}`);
-      
-      // Optionally log external deposits
-      if (liveBalance > (merchant.usdcBalance || 0)) {
+    if (liveBalance !== previousBalance) {
+      // Atomically claim the previousBalance -> liveBalance transition
+      // (conditional update, not a plain merchant.save() read-modify-write).
+      // If two syncs race, only the one that matches the balance it read
+      // succeeds — the loser's claim matches nothing and skips logging a
+      // duplicate "External Deposit" transaction for a credit the winner
+      // already recorded. The final usdcBalance is correct either way
+      // since both writes converge on the same liveBalance value.
+      const claimed = await Merchant.findOneAndUpdate(
+        { _id: merchant._id, usdcBalance: previousBalance },
+        { $set: { usdcBalance: liveBalance } },
+        { new: true }
+      );
+
+      if (claimed && liveBalance > previousBalance) {
+        console.log(`🔄 Syncing ledger for ${merchant.businessName}: ${previousBalance} -> ${liveBalance}`);
         await Transaction.create({
           merchantId: merchant._id,
           accountNumber: merchant.ncbaMerchantCode,
           type: 'inbound',
-          amount: liveBalance - (merchant.usdcBalance || 0),
+          amount: liveBalance - previousBalance,
           kesAmount: 0,
           currency: 'USDC',
           status: 'completed',
@@ -557,10 +581,9 @@ export const syncWalletBalance = async (req, res) => {
           sender: { name: 'External Wallet', id: 'Blockchain' },
           recipient: { name: merchant.businessName, id: merchant.stellarPublicKey }
         });
+      } else if (claimed) {
+        console.log(`🔄 Syncing ledger for ${merchant.businessName}: ${previousBalance} -> ${liveBalance}`);
       }
-
-      merchant.usdcBalance = liveBalance;
-      await merchant.save();
     }
 
     res.status(200).json({ success: true, usdcBalance: liveBalance });

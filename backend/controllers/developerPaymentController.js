@@ -30,10 +30,21 @@ const SIMULATED_SETTLE_MS = 4000;
 // API payouts. A rolling 24h window rather than a calendar-day reset —
 // equally effective at bounding blast radius, and avoids any ambiguity
 // over which timezone "midnight" means on a server that may not run in EAT.
+//
+// Includes 'pending' alongside 'success' — async payout rails (mobile
+// money/paybill/till) sit 'pending' until a later webhook resolves them, so
+// counting only 'success' meant several payouts fired in parallel, each
+// individually under perTransactionKes, could collectively blow through
+// dailyKes before any of them settled (none was ever double-counted once
+// resolved — 'pending' rows transition in place to 'success', they aren't
+// duplicated). This still isn't a fully atomic reservation (two requests
+// racing this exact read before either's row is written could still both
+// pass), but it closes the real exploitable gap: a payout sitting pending
+// for the settlement window no longer vanishes from the running total.
 async function sumLiveApiPayoutsLast24h(merchantId) {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const result = await DeveloperPayment.aggregate([
-    { $match: { merchantId, mode: 'live', kind: 'payout', status: 'success', createdAt: { $gte: since } } },
+    { $match: { merchantId, mode: 'live', kind: 'payout', status: { $in: ['success', 'pending'] }, createdAt: { $gte: since } } },
     { $group: { _id: null, total: { $sum: '$amount' } } },
   ]);
   return result[0]?.total || 0;

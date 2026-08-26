@@ -34,7 +34,14 @@ import SmsLog from '../models/SmsLog.js';
 // 'low' items only get pulled when nothing urgent is waiting, and a
 // broadcast that's mid-drain pauses the instant urgent traffic shows up
 // rather than finishing its own backlog first.
-const MIN_SEND_GAP_MS = 2000;
+// Configurable via SMS_MIN_SEND_GAP_MS so this can be tuned without a code
+// change once your Africa's Talking account's real per-account throughput
+// is confirmed with them — lowering it without confirming that risks the
+// exact MINUTES-long queuing this gate exists to prevent (see comment
+// above). Defaults to the confirmed-safe 2000ms if unset/invalid.
+const MIN_SEND_GAP_MS = Number(process.env.SMS_MIN_SEND_GAP_MS) > 0
+  ? Number(process.env.SMS_MIN_SEND_GAP_MS)
+  : 2000;
 let lastDispatchAt = 0;
 const normalQueue = [];
 const lowQueue = [];

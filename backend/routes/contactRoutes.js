@@ -33,8 +33,19 @@ const replyLimiter = rateLimit({
   message: { error: 'Too many replies. Slow down and try again later.' },
 });
 
+// Public, unauthenticated form — same throttle as the sibling public forms
+// (waitlist, newsletter), which had this and contact didn't; without it
+// this was only covered by the 600/15min global IP backstop.
+const submitLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Try again in 15 minutes.' },
+});
+
 // Public form submission
-router.post('/', createMessage);
+router.post('/', submitLimiter, createMessage);
 
 // Admin
 router.get('/', protect, getMessages);
