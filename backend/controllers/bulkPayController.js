@@ -2,7 +2,6 @@ import Payee from '../models/Payee.js';
 import PayoutBatch from '../models/PayoutBatch.js';
 import Merchant from '../models/Merchant.js';
 import Transaction from '../models/Transaction.js';
-import { calculatePAYE } from '../utils/kraCalculator.js';
 import { submitNcbaBankTransfer, NCBA_OWN_BANK_CODE } from './ncbaOpenBankingController.js';
 import { getBankTransferTariff } from '../config/bankTransferTariffCard.js';
 import { submitNcbaUtilityPayment } from '../services/ncbaBulkPaymentService.js';
@@ -69,12 +68,12 @@ export const addPayee = async (req, res) => {
       return res.status(400).json({ message: `Invalid KRA PIN format. ${KRA_PIN_FORMAT_HINT}` });
     }
 
-    // Strict KRA validations (Simulated for real-world robustness)
-    if (type === 'employee') {
-      if (!kraPin || !idNumber) {
-        return res.status(400).json({ message: 'KRA PIN and ID Number are strictly required for Employees.' });
-      }
-    } else if (type === 'supplier') {
+    // Employees no longer require KRA PIN/ID Number — PayChain has no live
+    // KRA payroll integration, so requiring them here only added friction
+    // with no compliance benefit (see the removed PAYE/NSSF/SHIF
+    // withholding below). kraPin/idNumber stay as optional fields on the
+    // model in case a merchant wants to record them for their own records.
+    if (type === 'supplier') {
       if (!kraPin || !etimsInvoiceNumber || !cuNumber) {
         return res.status(400).json({ message: 'KRA PIN, eTIMS Invoice Number, and CU Number are strictly required for Suppliers.' });
       }
@@ -110,10 +109,8 @@ export const updatePayee = async (req, res) => {
       return res.status(400).json({ message: `Invalid KRA PIN format. ${KRA_PIN_FORMAT_HINT}` });
     }
 
-    // KRA validations for updated type
-    if (type === 'employee' && (!kraPin || !idNumber)) {
-      return res.status(400).json({ message: 'KRA PIN and ID Number are required for Employees.' });
-    } else if (type === 'supplier' && (!kraPin || !etimsInvoiceNumber || !cuNumber)) {
+    // See addPayee's comment — employees no longer require KRA PIN/ID Number.
+    if (type === 'supplier' && (!kraPin || !etimsInvoiceNumber || !cuNumber)) {
       return res.status(400).json({ message: 'KRA PIN, eTIMS Invoice Number, and CU Number are required for Suppliers.' });
     }
 
@@ -340,18 +337,11 @@ export const uploadCSV = async (req, res) => {
           processedRow.status = 'Warning: New Payee (Will be created)';
         }
 
-        // Apply KRA Calculations if Employee
-        if (type === 'employee') {
-          const taxes = calculatePAYE(rawAmount);
-          processedRow.grossAmount = taxes.grossPay;
-          processedRow.netAmount = taxes.netPay;
-          processedRow.taxDeductions = {
-            paye: taxes.paye,
-            nssf: taxes.nssf,
-            shif: taxes.shif,
-          };
-        }
-
+        // No PAYE/NSSF/SHIF withholding — PayChain has no live KRA/NSSF/SHIF
+        // remittance integration, so simulating a deduction here only paid
+        // the employee less than the merchant intended with nothing actually
+        // remitted anywhere. Employees are paid the full stated amount, same
+        // as any other payee (see authorizeBatch's matching removal below).
         results.push(processedRow);
       })
       .on('end', () => {
@@ -492,19 +482,8 @@ export const authorizeBatch = async (req, res) => {
       }
       row._payee = payee;
 
-      // Statutory deductions must be computed authoritatively here, not
-      // trusted from the client. uploadCSV's preview does run calculatePAYE,
-      // but batchRows built from the manually-added payee list (BulkPay.jsx's
-      // non-CSV path) never goes through that preview — it was sending
-      // netAmount === grossAmount with no PAYE/NSSF/SHIF withheld at all for
-      // "Employee" payees. Recomputing from grossAmount here means no
-      // submission path, past or future, can skip the deduction.
-      if (payee.type === 'employee') {
-        const taxes = calculatePAYE(row.grossAmount);
-        row.grossAmount = taxes.grossPay;
-        row.netAmount = taxes.netPay;
-        row.taxDeductions = { paye: taxes.paye, nssf: taxes.nssf, shif: taxes.shif };
-      }
+      // Employees are paid the full stated amount, same as any other payee —
+      // no PAYE/NSSF/SHIF withheld (see uploadCSV's matching removal above).
 
       totalGross += row.grossAmount;
       totalNet += row.netAmount;

@@ -9,6 +9,12 @@ import api from '../api/api';
 // `viewOrAct` RBAC), independent of who claimed it. Claiming itself stays
 // officer-only, so unlike the officer version this page never prompts to
 // claim — it just shows who (if anyone) has, for context.
+//
+// Also resolves self-serve merchants (no kybStatus at all) — canDecide
+// below is naturally false for them (kybStatus isn't 'pending'/
+// 'requires_revision'), so every decision/checklist/document-status action
+// already hides itself with no extra guard needed. The Signup Details
+// section further down is what actually shows their collected info.
 const CHECKLIST_ITEMS = [
   { key: 'legalNameMatch', label: 'Legal business name matches registration documents' },
   { key: 'ubosIdentified', label: 'Directors / Ultimate Beneficial Owners (UBOs) identified' },
@@ -29,6 +35,7 @@ const STATUS_META = {
   requires_revision: { label: 'Requires Revision', pill: 'bg-orange-50 text-orange-700 border-orange-200' },
   approved: { label: 'Approved', pill: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
   rejected: { label: 'Rejected', pill: 'bg-red-50 text-red-700 border-red-200' },
+  self_serve: { label: 'Self-Serve Signup', pill: 'bg-slate-50 text-slate-600 border-slate-200' },
 };
 
 const KycApplicationDetail = () => {
@@ -125,7 +132,7 @@ const KycApplicationDetail = () => {
   if (loading) return <Layout><div className="p-12 text-center text-on-surface-variant/40 text-sm">Loading application…</div></Layout>;
   if (!app) return <Layout><div className="p-12 text-center text-on-surface-variant/40 text-sm">{error || 'Application not found.'}</div></Layout>;
 
-  const statusStyle = STATUS_META[app.kybStatus] || STATUS_META.pending;
+  const statusStyle = STATUS_META[app.kybStatus || 'self_serve'];
 
   return (
     <Layout>
@@ -153,7 +160,9 @@ const KycApplicationDetail = () => {
             </div>
             <div className="flex flex-col items-start md:items-end gap-2">
               <span className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50">
-                {app.claimedBy ? `Claimed by ${app.claimedBy.name || app.claimedBy.email}` : 'Unclaimed — awaiting an officer'}
+                {!app.kybStatus
+                  ? 'Self-serve signup — no officer review'
+                  : app.claimedBy ? `Claimed by ${app.claimedBy.name || app.claimedBy.email}` : 'Unclaimed — awaiting an officer'}
               </span>
               {app.resubmissionCount > 0 && <span className="text-2xs font-bold uppercase tracking-widest text-blue-700">Resubmitted {app.resubmissionCount}x</span>}
             </div>
@@ -161,9 +170,28 @@ const KycApplicationDetail = () => {
         </div>
 
         <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl p-6 shadow-editorial">
+          <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-3">Account &amp; Signup Details</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            <p><span className="text-on-surface-variant/50">Signed up:</span> {app.createdAt ? new Date(app.createdAt).toLocaleString() : '—'}</p>
+            <p><span className="text-on-surface-variant/50">Registration Source:</span> {app.registrationSource === 'mobile' ? 'Mobile App' : app.registrationSource === 'web' ? 'Web Dashboard' : (app.registrationSource || '—')}</p>
+            <p><span className="text-on-surface-variant/50">Account Status:</span> {app.status || '—'}{app.isVerified ? ' · Verified' : ''}</p>
+            <p><span className="text-on-surface-variant/50">Business Number:</span> {app.businessNumber || '—'}</p>
+            <p><span className="text-on-surface-variant/50">KRA PIN Format Check:</span> {app.isKRAVerified ? 'Passed' : 'Not verified'}</p>
+            <p>
+              <span className="text-on-surface-variant/50">Business Certificate:</span>{' '}
+              {app.certificateUrl
+                ? <a href={app.certificateUrl} target="_blank" rel="noreferrer" className="text-primary underline">Open document</a>
+                : '— not uploaded —'}
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl p-6 shadow-editorial">
           <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-3">KYC Documents</p>
           {app.kybDocuments?.length === 0 ? (
-            <p className="text-xs text-on-surface-variant/50">No documents uploaded yet.</p>
+            <p className="text-xs text-on-surface-variant/50">
+              {app.kybStatus ? 'No documents uploaded yet.' : 'Not applicable — this merchant signed up directly and was never routed through officer document review.'}
+            </p>
           ) : (
             <div className="space-y-2">
               {app.kybDocuments.map((doc) => (

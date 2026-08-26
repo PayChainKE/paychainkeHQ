@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { jsPDF } from 'jspdf'
 import domtoimage from 'dom-to-image'
 import { ValidatedInput } from '../components/ValidatedInput'
-import { useNavigate } from 'react-router-dom'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { formatKES } from '../utils/formatCurrency'
@@ -19,10 +18,7 @@ export default function BulkPay() {
   const { addNotification } = useNotification()
   const { merchant, refreshSession } = useMerchantAuth()
   const [payeesList, setPayeesList] = useState([])
-  const navigate = useNavigate()
-  
-  const isProfileComplete = Boolean(merchant?.kraPin && merchant?.businessNumber)
-  
+
   useEffect(() => {
     const fetchPayees = async () => {
       try {
@@ -1042,29 +1038,8 @@ export default function BulkPay() {
   return (
     <MerchantLayout title="Bulk Payments">
       <div className="relative">
-        {!isProfileComplete && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-[#0A2540]/90 backdrop-blur-xl p-8 md:p-12 rounded-[32px] md:rounded-[40px] text-center shadow-2xl max-w-lg w-full border border-white/10 animate-fade-in-up">
-              <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center mx-auto mb-6 text-white/50">
-                <span className="material-symbols-outlined text-3xl">lock</span>
-              </div>
-              <h2 className="font-headline text-2xl md:text-3xl font-bold text-white mb-3">Profile Incomplete</h2>
-              <p className="text-sm md:text-base text-white/70 mb-8 leading-relaxed">
-                To unlock Bulk Payments and ensure full regulatory compliance, please add your KRA PIN and Business License Number to your profile.
-              </p>
-              <button 
-                onClick={() => navigate('/profile')}
-                className="w-full bg-emerald-500 text-[#06201B] px-8 py-4 rounded-xl font-black text-[11px] uppercase tracking-widest shadow-xl hover:bg-white transition-all active:scale-95 flex items-center justify-center gap-2"
-              >
-                Complete Profile Now
-                <span className="material-symbols-outlined text-sm">arrow_forward</span>
-              </button>
-            </div>
-          </div>
-        )}
-        
-        <div className={`px-1 lg:px-0 max-w-7xl mx-auto flex flex-col lg:flex-row gap-6 lg:gap-8 relative transition-all duration-500 ${!isProfileComplete ? 'blur-md pointer-events-none opacity-40 select-none' : ''}`}>
-        
+        <div className="px-1 lg:px-0 max-w-7xl mx-auto flex flex-col lg:flex-row gap-6 lg:gap-8 relative">
+
         {/* Add/Edit Payee Modal Overlay */}
         {showAddModal && (
           <div className="fixed inset-0 bg-[#0A2540]/60 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
@@ -1294,32 +1269,6 @@ export default function BulkPay() {
                         )
                       })()}
 
-                      {newPayee.type === 'Employee' && (
-                        <div className="space-y-4 pt-4 animate-in fade-in duration-500 bg-emerald-50/30 p-4 rounded-2xl border border-emerald-500/10">
-                          <h4 className="text-[10px] text-emerald-700 font-black uppercase tracking-widest mb-2 flex items-center gap-2">
-                            <span className="material-symbols-outlined text-[14px]">badge</span>
-                            KRA Payroll Details
-                          </h4>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="space-y-1.5">
-                              <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">KRA PIN *</label>
-                              <ValidatedInput kind="kraPin" value={newPayee.kraPin} onChange={(e) => setNewPayee({...newPayee, kraPin: e.target.value})} placeholder="A000000000A" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 uppercase" />
-                            </div>
-                            <div className="space-y-1.5">
-                              <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">ID Number *</label>
-                              <ValidatedInput kind="nationalId" value={newPayee.idNumber} onChange={(e) => setNewPayee({...newPayee, idNumber: e.target.value})} placeholder="e.g. 12345678" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50" />
-                            </div>
-                            <div className="space-y-1.5">
-                              <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">NSSF Number</label>
-                              <ValidatedInput kind="nssf" optional value={newPayee.nssfNumber} onChange={(e) => setNewPayee({...newPayee, nssfNumber: e.target.value})} placeholder="e.g. 123456789" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50" />
-                            </div>
-                            <div className="space-y-1.5">
-                              <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">SHIF / NHIF Number</label>
-                              <ValidatedInput kind="shif" optional value={newPayee.shifNumber} onChange={(e) => setNewPayee({...newPayee, shifNumber: e.target.value})} placeholder="e.g. 1234567" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50" />
-                            </div>
-                          </div>
-                        </div>
-                      )}
 
                       {newPayee.type === 'Supplier' && (
                         <div className="space-y-4 pt-4 animate-in fade-in duration-500 bg-purple-50/30 p-4 rounded-2xl border border-purple-500/10">
