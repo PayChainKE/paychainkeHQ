@@ -549,6 +549,38 @@ export const handleBankPayout = async (req, res) => {
       return res.status(400).json({ error: err.message });
     }
     logEvent('error', 'ncba_openbanking_payout_error', { merchantId: merchantId.toString(), error: err.message, stack: err.stack });
+
+    // Reaching here (as opposed to the two branches above) means
+    // executeNcbaBankPayout got past its own pre-flight checks and actually
+    // reserved + refunded the merchant's balance before rethrowing — unlike
+    // B2C/B2W's ambiguous case, PesaLink/RTGS are genuinely synchronous
+    // (resultCode IS the final result, not just an accepted acknowledgement
+    // — see submitPesaLinkTransfer's own doc comment), so a rejection here
+    // is a real, confirmed failure and the refund that already happened is
+    // correct and final. The merchant just had no way to know any of that
+    // happened — handleBankPayout's success path already sends a "Bank
+    // Payout Sent" SMS, but nothing told them when it failed instead.
+    Merchant.findById(merchantId).select('phone kesBalance').then((merchant) => {
+      if (!merchant?.phone) return;
+      const RAIL_SMS_LABEL = { rtgs: 'Bank Payout (RTGS)', pesalink: 'Bank Payout', ift: 'Bank Payout' };
+      const { message } = buildPayoutFailedSms({
+        ref: `BANK-${Date.now()}`,
+        label: RAIL_SMS_LABEL[rail] || 'Bank Payout',
+        amount: Number(amount),
+        recipientName: accountName || 'your bank account',
+        balance: merchant.kesBalance,
+      });
+      safeSendSMS({ to: merchant.phone, message }).then((r) => {
+        if (!r.success) logEvent('error', 'ncba_openbanking_payout_failed_sms_failed', { merchantId: merchantId.toString(), error: r.error });
+      });
+      createNotification({
+        merchantId,
+        kind: 'payment',
+        title: 'Bank payout failed',
+        message: `KES ${Number(amount).toLocaleString()} bank payout to ${accountName || 'your destination account'} failed and was refunded to your balance.`,
+      }).catch((e) => logEvent('error', 'ncba_openbanking_payout_failed_notification_failed', { merchantId: merchantId.toString(), error: e.message }));
+    }).catch((e) => logEvent('error', 'ncba_openbanking_payout_failed_merchant_lookup_failed', { merchantId: merchantId.toString(), error: e.message }));
+
     res.status(502).json({ error: 'Failed to process bank payout. Please try again.' });
   }
 };
