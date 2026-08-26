@@ -11,9 +11,19 @@ import { normalizeKraPin, isValidKraPin, KRA_PIN_FORMAT_HINT } from '../utils/kr
 // Onboarding-officer application pipeline. Officers originate new merchant
 // applications (business details + KYC documents) and drive them through a
 // verification checklist; admins can view/act on the same queue per the
-// product's RBAC table. Self-serve merchant signup (authController.js /
-// merchantAuthController.js) is completely untouched by this file — it
-// never sets kybStatus, so it never enters this queue.
+// product's RBAC table.
+//
+// getQueue/getApplication below are NOT scoped to kybStatus existing —
+// admins/owners see every merchant (self-serve signups included), so the
+// KYC/KYB page is a single place to browse every detail a merchant has
+// ever provided, not just officer-originated applications. Officers still
+// only ever see merchants they personally onboarded (scopedToOfficer's
+// onboardingOfficerId filter), so this change is invisible to them — a
+// self-serve merchant never has onboardingOfficerId set, so it can never
+// match an officer's own scope regardless. Self-serve merchants have no
+// kybStatus, kybDocuments, or checklist — the frontend (KycVerification.jsx
+// / KycApplicationDetail.jsx) renders them read-only, with whatever signup
+// fields (kraPin, businessNumber, certificateUrl, etc.) they actually have.
 
 export const QUEUE_DOC_TYPES = ['business_registration', 'kra_pin', 'national_id', 'address_proof'];
 
@@ -41,7 +51,8 @@ const CHECKLIST_KEYS = ['legalNameMatch', 'ubosIdentified', 'kraPinVerified', 't
 
 const isChecklistComplete = (checklist) => CHECKLIST_KEYS.every((k) => checklist?.[k] === true);
 
-const QUEUE_LIST_FIELDS = 'name email phone businessName businessType submittedAt kybStatus riskTier claimedBy resubmissionCount kybDocuments';
+const QUEUE_LIST_FIELDS = 'name email phone businessName businessType submittedAt kybStatus riskTier claimedBy resubmissionCount kybDocuments ' +
+  'kraPin businessNumber certificateUrl registrationSource createdAt isVerified status isKRAVerified';
 
 // Officers are fully isolated to merchants they personally onboarded — no
 // shared queue between officers. Admins/owners (who never hit this, since
@@ -181,14 +192,18 @@ export const getQueue = async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 25));
 
-    const filter = { kybStatus: { $exists: true }, ...scopedToOfficer(req.admin) };
+    const filter = { ...scopedToOfficer(req.admin) };
     // Admin/owner-only drill-down (an officer is already fully scoped to
     // themselves above, so this would be a no-op — or worse, a way to peek
     // at another officer's queue — for them, hence gated to non-officers).
     if (officerId && req.admin?.role !== 'officer' && mongoose.isValidObjectId(officerId)) {
       filter.onboardingOfficerId = officerId;
     }
-    if (status) filter.kybStatus = status;
+    // 'self_serve' is a synthetic status the frontend offers alongside the
+    // real kybStatus enum, for filtering down to merchants who never went
+    // through officer review at all (see the file-level comment above).
+    if (status === 'self_serve') filter.kybStatus = { $exists: false };
+    else if (status) filter.kybStatus = status;
     if (riskTier) filter.riskTier = riskTier;
     if (from || to) {
       filter.submittedAt = {};
@@ -257,7 +272,10 @@ export const getApplication = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ error: 'Invalid id.' });
     }
-    const application = await Merchant.findOne({ _id: req.params.id, kybStatus: { $exists: true }, ...scopedToOfficer(req.admin) })
+    // No kybStatus existence check here (unlike every action endpoint below)
+    // — this is the read-only detail fetch, so it must also resolve
+    // self-serve merchants who were never in the officer pipeline at all.
+    const application = await Merchant.findOne({ _id: req.params.id, ...scopedToOfficer(req.admin) })
       .populate('claimedBy', 'name email')
       .populate('onboardingOfficerId', 'name email')
       .populate('reviewedBy', 'name email');

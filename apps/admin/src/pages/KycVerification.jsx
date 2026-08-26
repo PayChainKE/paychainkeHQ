@@ -12,16 +12,18 @@ import { useAuth } from '../context/AuthContext';
 // application or claiming one stays officer-only by design (that's the
 // officer's specific job), so this admin view is read/decide, not intake.
 //
-// Only merchants onboarded through an officer's KYC application carry the
-// multi-document kybStatus/kybDocuments review trail below. Self-serve
-// merchants (web/mobile signup) upload a single business certificate with
-// no review workflow — that one's viewed per-merchant in the Merchants
-// page's KYB Profile drawer, not duplicated here.
+// This list also includes every self-serve merchant (web/mobile signup) —
+// they carry no kybStatus/kybDocuments/checklist since they never entered
+// officer review, so they show with the synthetic 'self_serve' status below
+// and open into a read-only detail view (no approve/reject/checklist
+// actions — see KycApplicationDetail.jsx's canDecide) showing whatever
+// signup details they do have (KRA PIN, business number, certificate).
 const STATUS_META = {
   pending:            { label: 'Pending',            pill: 'bg-amber-50 text-amber-700 border-amber-200' },
   requires_revision:  { label: 'Requires Revision',  pill: 'bg-orange-50 text-orange-700 border-orange-200' },
   approved:           { label: 'Approved',           pill: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
   rejected:           { label: 'Rejected',           pill: 'bg-red-50 text-red-700 border-red-200' },
+  self_serve:         { label: 'Self-Serve Signup',  pill: 'bg-slate-50 text-slate-600 border-slate-200' },
 };
 
 const RISK_META = {
@@ -100,7 +102,7 @@ const KycVerification = () => {
                 KYC / KYB Verification
               </h1>
               <p className="text-emerald-100/60 mt-2 max-w-xl text-xs md:text-sm">
-                Welcome back, {admin?.name || admin?.email}. Review every uploaded business document, verification checklist, and risk tier for merchants onboarded through an officer's KYC application.
+                Welcome back, {admin?.name || admin?.email}. Every merchant's signup details in one place — documents, checklist, and risk tier for officer-reviewed applications, plus KRA PIN, business number, and certificate for self-serve signups.
               </p>
             </div>
           </div>
@@ -116,7 +118,7 @@ const KycVerification = () => {
         <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl p-4 shadow-editorial">
           <div className="flex flex-col gap-3">
             <div className="flex gap-1.5 flex-wrap">
-              {['all', 'pending', 'requires_revision', 'approved', 'rejected'].map((s) => (
+              {['all', 'pending', 'requires_revision', 'approved', 'rejected', 'self_serve'].map((s) => (
                 <button
                   key={s}
                   onClick={() => setStatus(s)}
@@ -236,7 +238,7 @@ const StatTile = ({ icon, label, value, tone }) => {
 };
 
 const QueueRow = ({ app, onOpen }) => {
-  const statusStyle = STATUS_META[app.kybStatus] || STATUS_META.pending;
+  const statusStyle = STATUS_META[app.kybStatus || 'self_serve'];
   return (
     <tr className="hover:bg-secondary-container/5 transition-colors cursor-pointer" onClick={onOpen}>
       <td className="px-3 py-2 border-b border-outline-variant/5">
@@ -263,7 +265,7 @@ const QueueRow = ({ app, onOpen }) => {
 };
 
 const QueueCard = ({ app, onOpen }) => {
-  const statusStyle = STATUS_META[app.kybStatus] || STATUS_META.pending;
+  const statusStyle = STATUS_META[app.kybStatus || 'self_serve'];
   return (
     <div
       role="button"
