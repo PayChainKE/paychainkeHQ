@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react'
-import axios from 'axios'
+import React from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { usePrivacyMode } from '../../hooks/usePrivacyMode'
 import { useMerchantAuth } from '../../context/MerchantAuthContext'
@@ -144,28 +143,6 @@ export default function MerchantSidebar({ isOpen, onClose }) {
   const { unreadCount } = useNotification()
   const navigate = useNavigate()
 
-  // USDC->KES estimate below was previously a hardcoded *130 multiplier —
-  // matches the live-rate fetch pattern already used on Overview/Wallet/
-  // Inflation Shield (GET /api/transactions/live-rate) instead of drifting
-  // from the real market rate shown on those pages.
-  const [liveRate, setLiveRate] = useState(132.45)
-  useEffect(() => {
-    if (!merchant) return
-    const fetchRate = async () => {
-      try {
-        const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
-        const token = localStorage.getItem('paychain_merchant_token')
-        const res = await axios.get(`${API_URL}/api/transactions/live-rate`, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        if (res.data?.rate) setLiveRate(res.data.rate)
-      } catch (err) {
-        console.error('Failed to fetch live rate', err)
-      }
-    }
-    fetchRate()
-  }, [merchant])
-
   const handleLogout = () => {
     logout()
     navigate('/login')
@@ -236,7 +213,6 @@ export default function MerchantSidebar({ isOpen, onClose }) {
         <div className="bg-[#0D241E] rounded-[16px] p-5 mb-8 border border-white/5">
           <p className="text-[#5EFEB3] text-[9px] font-bold uppercase tracking-widest mb-2">Available Funds</p>
           <p className={`text-white font-headline text-2xl tracking-tight mb-0.5 transition-all duration-300 ${!showAmounts && 'blur-md'}`}>{formatKES(merchant?.kesBalance ?? 0)}</p>
-          <p className={`text-[#a8b3a8] text-[10px] transition-all duration-300 ${!showAmounts && 'blur-sm'}`}>{(merchant?.kesBalance ? (merchant.kesBalance / liveRate).toFixed(2) : '0.00')} USDC</p>
         </div>
 
         <div className="space-y-1 pt-4 border-t border-white/5">
