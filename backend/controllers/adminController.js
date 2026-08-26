@@ -15,13 +15,14 @@ import SmsLog from '../models/SmsLog.js';
 import { sendMerchantInvite, sendAdminActionOTP, sendContactDetailsChangedEmail } from '../utils/resend.js';
 import { logAudit } from '../utils/auditLog.js';
 import { getNcbaVirtualAccountNumber, generateRandomMerchantCode, validatePhoneNumber, isValidPhoneInputFormat, NcbaValidationError } from '../utils/ncbaValidators.js';
-import { generateMerchantStickerPdf, generateBulkStickerPdf } from '../utils/stickerGenerator.js';
+import { generateMerchantStickerPdf, generateBulkStickerPdf, generateMerchantQrFlyerPdf } from '../utils/stickerGenerator.js';
 import { LIVE_DATA_CUTOFF } from '../config/liveDataCutoff.js';
 import { provisionMerchantWallet } from '../utils/stellarHelper.js';
 import { encryptKey } from '../utils/cryptoHelper.js';
 import { normalizeKraPin, isValidKraPin, KRA_PIN_FORMAT_HINT } from '../utils/kraPinValidator.js';
 import { isValidEmail, EMAIL_FORMAT_HINT } from '../utils/emailValidator.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
+import { generateBrandedQrDataUri } from '../utils/qrCode.js';
 
 // Build an `actor` shape from req.admin so audit rows attribute admin-initiated
 // actions to the right operator even when the merchant is the subject.
@@ -777,6 +778,58 @@ export const downloadMerchantSticker = async (req, res) => {
   }
 };
 
+// @desc    Download a merchant's checkout QR code as a labeled, print-ready
+//          PDF flyer — the same branded QR shown in the merchant dashboard
+//          (mpesaController.js#generateAccountQr, cached on
+//          merchant.checkoutQrCodeDataUri once first generated) composited
+//          into a one-page PDF with the business name and account number
+//          drawn in bold above/below it (generateMerchantQrFlyerPdf), so an
+//          admin-downloaded QR reads at a distance the same way the paybill
+//          sticker does — unlike the bare, unlabeled QR PNG a merchant can
+//          already pull straight from their own dashboard.
+// @route   GET /api/admin/merchants/:id/qr-code
+// @access  Private/Admin (owner, admin, analyst — not officer)
+export const downloadMerchantQrCode = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid merchant id.' });
+    }
+
+    const merchant = await Merchant.findById(id).select('businessName ncbaMerchantCode checkoutQrCodeDataUri');
+    if (!merchant) return res.status(404).json({ error: 'Merchant not found.' });
+    const accountNumber = getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode);
+    if (!accountNumber) {
+      return res.status(400).json({ error: 'This merchant\'s bank account number is still being assigned — the QR code will be available once that\'s complete.' });
+    }
+
+    let qrCodeDataUri = merchant.checkoutQrCodeDataUri;
+    if (!qrCodeDataUri) {
+      const checkoutUrl = `${MERCHANT_DASHBOARD_URL.replace(/\/$/, '')}/pay/account/${merchant.ncbaMerchantCode}`;
+      qrCodeDataUri = await generateBrandedQrDataUri(checkoutUrl);
+      if (!qrCodeDataUri) {
+        return res.status(502).json({ error: 'Failed to generate QR code — please try again.' });
+      }
+      await Merchant.updateOne({ _id: merchant._id }, { $set: { checkoutQrCodeDataUri: qrCodeDataUri } });
+    }
+
+    const qrPngBytes = Buffer.from(qrCodeDataUri.replace(/^data:image\/png;base64,/, ''), 'base64');
+    const pdfBytes = await generateMerchantQrFlyerPdf({
+      businessName: merchant.businessName,
+      accountNumber,
+      qrPngBytes,
+    });
+    const safeName = (merchant.businessName || 'merchant').replace(/[^\w\-]+/g, '-');
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="PayChain-QR-${safeName}.pdf"`);
+    res.send(Buffer.from(pdfBytes));
+  } catch (error) {
+    console.error('Download Merchant QR Code Error:', error);
+    res.status(500).json({ error: 'Failed to generate QR code.' });
+  }
+};
+
 /**
  * Download every eligible merchant's sticker merged into one printable
  * PDF (one page per merchant) — e.g. to print a batch before a round of
@@ -942,6 +995,128 @@ export const updateMerchantVerification = async (req, res) => {
   }
 };
 
+// Mirrors models/Merchant.js's kybDocuments.type enum and
+// officerController.js's QUEUE_DOC_TYPES — kept as a separate local copy
+// (not imported) since officerController.js already imports from this file,
+// and importing back would create a circular dependency.
+const KYC_DOC_TYPES = ['business_registration', 'kra_pin', 'national_id', 'address_proof'];
+
+// @desc    Admin adds or replaces one KYC/KYB document for a merchant — the
+//          same kybDocuments array the officer-onboarding pipeline and the
+//          KYC/KYB review page (KycApplicationDetail.jsx) read from. Unlike
+//          that pipeline, this endpoint isn't gated behind kybStatus, so it
+//          works for every merchant — self-serve signup, admin-created, or
+//          officer-onboarded — not just merchants already in the review
+//          queue. Replacing an existing document resets its status back to
+//          'pending' and clears any prior reviewer note, since a new file is
+//          a new thing to (re-)review, not an automatic re-approval.
+// @route   PATCH /api/admin/merchants/:id/kyc-documents
+// @access  Private (Admin, owner/admin only)
+export const updateMerchantKycDocument = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { type } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid merchant id.' });
+    }
+    if (!KYC_DOC_TYPES.includes(type)) {
+      return res.status(400).json({ error: `Invalid document type. Must be one of: ${KYC_DOC_TYPES.join(', ')}.` });
+    }
+    if (!req.file) {
+      return res.status(400).json({ error: 'No document file uploaded.' });
+    }
+
+    const merchant = await Merchant.findById(id);
+    if (!merchant) return res.status(404).json({ error: 'Merchant not found' });
+
+    const existing = merchant.kybDocuments.find((d) => d.type === type);
+    const isReplace = !!existing;
+    if (existing) {
+      existing.url = req.file.path;
+      existing.uploadedAt = new Date();
+      existing.status = 'pending';
+      existing.note = null;
+    } else {
+      merchant.kybDocuments.push({
+        type,
+        url: req.file.path,
+        uploadedAt: new Date(),
+        status: 'pending',
+      });
+    }
+
+    await merchant.save();
+
+    logAudit({
+      action: 'admin.merchant.kyc_document_updated', category: 'admin', severity: 'info',
+      message: `${isReplace ? 'Replaced' : 'Added'} KYC document (${type})`,
+      merchant, actor: adminActor(req.admin), req,
+      metadata: { type, replaced: isReplace },
+    });
+
+    res.json({
+      success: true,
+      kybDocuments: merchant.kybDocuments,
+      message: `Document ${isReplace ? 'replaced' : 'uploaded'} successfully.`,
+    });
+  } catch (error) {
+    console.error('Update Merchant KYC Document Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Admin corrects/updates the business name displayed for a
+//          merchant's account — the same field shown on their dashboard,
+//          paybill sticker, receipts, and outbound SMS (all read
+//          merchant.businessName live, nothing caches an old copy — see
+//          downloadMerchantSticker below for the sticker's own on-demand
+//          regeneration). Deliberately just a plain string update: unlike
+//          KRA PIN/Business Number, businessName has no separate "admin
+//          verified" flag to reconcile.
+// @route   PATCH /api/admin/merchants/:id/business-name
+// @access  Private (Admin, owner/admin only)
+export const updateMerchantBusinessName = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { businessName } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid merchant id.' });
+    }
+    const trimmed = String(businessName ?? '').trim();
+    if (!trimmed) {
+      return res.status(400).json({ error: 'Business name is required.' });
+    }
+    if (trimmed.length > 80) {
+      return res.status(400).json({ error: 'Business name must be 80 characters or fewer.' });
+    }
+
+    const merchant = await Merchant.findById(id);
+    if (!merchant) return res.status(404).json({ error: 'Merchant not found' });
+
+    const previousName = merchant.businessName;
+    if (previousName === trimmed) {
+      return res.json({ success: true, businessName: merchant.businessName, message: 'No change.' });
+    }
+
+    merchant.businessName = trimmed;
+    await merchant.save();
+
+    logAudit({
+      action: 'admin.merchant.business_name_updated', category: 'admin', severity: 'info',
+      message: `Business name changed from "${previousName}" to "${trimmed}"`,
+      merchant, actor: adminActor(req.admin), req,
+      metadata: { previousName, newName: trimmed },
+    });
+
+    res.json({ success: true, businessName: merchant.businessName, message: 'Business name updated successfully.' });
+  } catch (error) {
+    console.error('Update Merchant Business Name Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
 // @desc    Get a single merchant's full profile for KYB review. Returns every
 //          submitted field plus computed activity metrics. Sensitive material
 //          (password hash, stellar secret, PIN hashes) is converted to
@@ -1028,6 +1203,13 @@ export const getMerchantDetail = async (req, res) => {
         businessNumberAdminVerified: merchant.businessNumberAdminVerified,
         businessNumberAdminVerifiedAt: merchant.businessNumberAdminVerifiedAt,
         certificateUrl: merchant.certificateUrl,
+        // Typed, per-document KYC/KYB trail — populated via the officer
+        // onboarding pipeline, the applicant's public resubmit link, or an
+        // admin directly (updateMerchantKycDocument above). kybStatus stays
+        // undefined for merchants never routed through officer review, same
+        // as the schema default.
+        kybStatus: merchant.kybStatus || null,
+        kybDocuments: merchant.kybDocuments || [],
         // Account
         // The raw 8-digit code NCBA's Account-Level Notification webhook
         // matches against (extractMerchantCode in
