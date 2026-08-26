@@ -190,11 +190,7 @@ export default function BulkPay() {
 
   const handleSavePayee = async () => {
     if (!newPayee.name) {
-      addNotification({ title: 'Missing Info', message: 'Recipient name is required.', type: 'error' });
-      return;
-    }
-    if (newPayee.type === 'Utility' && newPayee.utilityType === 'Other' && !newPayee.name.trim()) {
-      addNotification({ title: 'Missing Info', message: 'Name this utility (e.g. Security Company, Gas Supplier).', type: 'error' });
+      addNotification({ title: 'Missing Info', message: newPayee.type === 'Utility' ? 'Utility name is required.' : 'Recipient name is required.', type: 'error' });
       return;
     }
 
@@ -1093,10 +1089,10 @@ export default function BulkPay() {
                           {newPayee.type === 'Utility' ? 'Utility Name' : 'Recipient Name'}
                         </label>
                         <ValidatedInput
-                          kind={newPayee.type === 'Utility' ? 'businessName' : 'personName'}
+                          kind={newPayee.type === 'Utility' ? 'utilityName' : 'personName'}
                           value={newPayee.name}
                           onChange={(e) => setNewPayee({...newPayee, name: e.target.value})}
-                          placeholder={newPayee.type === 'Utility' ? (newPayee.utilityType === 'Other' ? 'e.g. Security Company, Gas Supplier' : newPayee.utilityType === 'Rent' ? 'e.g. Landlord / Property Manager' : 'e.g. Nairobi Water') : 'e.g. John Kamau'}
+                          placeholder={newPayee.type === 'Utility' ? (newPayee.utilityType === 'Other' ? 'e.g. Security Company, Gas Supplier' : newPayee.utilityType === 'Rent' ? 'e.g. Landlord / Property Manager' : newPayee.utilityType === 'Internet' ? 'e.g. Safaricom Home Fibre, Zuku' : 'Water Bill') : 'e.g. John Kamau'}
                           className="w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 md:px-6 md:py-4 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none"
                         />
                       </div>

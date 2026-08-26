@@ -13,31 +13,6 @@ export const normalizePhoneKE = (raw) => {
 
 export const isValidPhoneKE = (raw) => /^(?:7\d{8}|1\d{8})$/.test(normalizePhoneKE(raw));
 
-// Mirrors backend/utils/kraPinValidator.js exactly — same shape check (one
-// leading A/P, 9 digits, one trailing letter) plus the same
-// obviously-fake-pattern rejection (all nine digits identical, or a
-// strictly ascending/descending run like 123456789). Keep both in sync if
-// either changes: this only saves a merchant a round trip to the server,
-// the backend validator is still the actual source of truth.
-const KRA_PIN_SHAPE_REGEX = /^([AP])(\d{9})([A-Z])$/i;
-
-const isPlausibleKraPinDigits = (digits) => {
-  const d = digits.split('').map(Number);
-  if (d.every((n) => n === d[0])) return false;
-  let ascending = true, descending = true;
-  for (let i = 1; i < d.length; i++) {
-    if (d[i] !== d[i - 1] + 1) ascending = false;
-    if (d[i] !== d[i - 1] - 1) descending = false;
-  }
-  return !ascending && !descending;
-};
-
-export const isValidKraPin = (raw) => {
-  const match = KRA_PIN_SHAPE_REGEX.exec(String(raw ?? ''));
-  if (!match) return false;
-  return isPlausibleKraPinDigits(match[2]);
-};
-
 export const formatters = {
   phoneKE: (raw) => {
     let d = raw.replace(/\D/g, '');
@@ -58,6 +33,7 @@ export const formatters = {
   integer:      (raw) => raw.replace(/\D/g, ''),
   personName:   (raw) => raw.replace(/[^A-Za-z\s'.\-]/g, '').slice(0, 60),
   businessName: (raw) => raw.replace(/[^\w\s&.,'()\-]/g, '').slice(0, 80),
+  utilityName:  (raw) => raw.replace(/[^\w\s&.,'()\-]/g, '').slice(0, 80),
   email:        (raw) => raw.toLowerCase().replace(/\s/g, '').slice(0, 100),
   nssf:         (raw) => raw.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12),
   shif:         (raw) => raw.replace(/\D/g, '').slice(0, 12),
@@ -89,12 +65,12 @@ export const validators = {
   },
   kraPin: (v) => {
     if (!v) return { valid: false, error: 'KRA PIN is required.' };
-    if (!isValidKraPin(v)) return { valid: false, error: 'Enter a real KRA PIN — format A/P + 9 digits + a letter, e.g. P051892647A.' };
+    if (!/^[A-Z]\d{9}[A-Z]$/.test(v)) return { valid: false, error: 'Format must be A123456789Z.' };
     return VALID;
   },
   nationalId: (v) => {
     if (!v) return { valid: false, error: 'National ID is required.' };
-    if (!/^\d{7,9}$/.test(v)) return { valid: false, error: 'ID must be 7 to 9 digits.' };
+    if (!/^\d{7,8}$/.test(v)) return { valid: false, error: 'ID must be 7 or 8 digits.' };
     return VALID;
   },
   paybill: (v) => {
@@ -131,6 +107,11 @@ export const validators = {
   },
   businessName: (v) => {
     if (!v) return { valid: false, error: 'Business name is required.' };
+    if (v.trim().length < 2) return { valid: false, error: 'Name must be at least 2 characters.' };
+    return VALID;
+  },
+  utilityName: (v) => {
+    if (!v) return { valid: false, error: 'Utility name is required.' };
     if (v.trim().length < 2) return { valid: false, error: 'Name must be at least 2 characters.' };
     return VALID;
   },
@@ -226,6 +207,7 @@ export const inputAttrs = {
   integer:      { type: 'text',   inputMode: 'numeric', autoComplete: 'off',          autoCapitalize: 'off' },
   personName:   { type: 'text',   inputMode: 'text',    autoComplete: 'name',         autoCapitalize: 'words' },
   businessName: { type: 'text',   inputMode: 'text',    autoComplete: 'organization', autoCapitalize: 'words' },
+  utilityName:  { type: 'text',   inputMode: 'text',    autoComplete: 'off',          autoCapitalize: 'words' },
   email:        { type: 'email',  inputMode: 'email',   autoComplete: 'email',        autoCapitalize: 'off' },
   nssf:         { type: 'text',   inputMode: 'text',    autoComplete: 'off',          autoCapitalize: 'characters' },
   shif:         { type: 'text',   inputMode: 'numeric', autoComplete: 'off',          autoCapitalize: 'off' },
