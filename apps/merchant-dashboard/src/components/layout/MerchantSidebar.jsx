@@ -14,17 +14,11 @@ const baseNavItems = [
   { name: 'Transactions', icon: 'receipt_long', path: '/transactions' },
   { name: 'Bulk Payments', icon: 'group_add', path: '/bulk-pay' },
   { name: 'Invoices', icon: 'receipt_long', path: '/invoices' },
-  { 
-    name: 'Digital Wallet', 
-    icon: 'account_balance_wallet', 
-    path: '/wallet',
-    showOverview: true,
-    overviewLabel: 'Wallet Overview',
-    featureKey: 'digitalWallet',
-    children: [
-      { name: 'Inflation Shield', icon: 'currency_exchange', path: '/inflation-shield', featureKey: 'inflationShield' },
-    ]
-  },
+  // Digital Wallet / Inflation Shield nav entry removed for now — the
+  // feature stays live only in apps/demo (the sandbox/prospect-facing
+  // showcase). Routes (/wallet, /inflation-shield) and their FeatureGuard
+  // are left in place so a re-enable is just adding this entry back, not a
+  // rebuild — see App.jsx.
   {
     name: 'Cash Advance',
     icon: 'payments',
@@ -216,7 +210,7 @@ export default function MerchantSidebar({ isOpen, onClose }) {
       {/* Primary Navigation */}
       <nav className="flex-1 mt-6">
         {(() => {
-          const merchantFeatures = merchant?.features || { digitalWallet: true, inflationShield: true };
+          const merchantFeatures = merchant?.features || {};
           
           return baseNavItems.map(item => {
             // Check parent feature flag

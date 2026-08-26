@@ -14,12 +14,13 @@ import Communication from '../models/Communication.js';
 import SmsLog from '../models/SmsLog.js';
 import { sendMerchantInvite, sendAdminActionOTP, sendContactDetailsChangedEmail } from '../utils/resend.js';
 import { logAudit } from '../utils/auditLog.js';
-import { getNcbaVirtualAccountNumber, generateRandomMerchantCode, validatePhoneNumber, NcbaValidationError } from '../utils/ncbaValidators.js';
+import { getNcbaVirtualAccountNumber, generateRandomMerchantCode, validatePhoneNumber, isValidPhoneInputFormat, NcbaValidationError } from '../utils/ncbaValidators.js';
 import { generateMerchantStickerPdf, generateBulkStickerPdf } from '../utils/stickerGenerator.js';
 import { LIVE_DATA_CUTOFF } from '../config/liveDataCutoff.js';
 import { provisionMerchantWallet } from '../utils/stellarHelper.js';
 import { encryptKey } from '../utils/cryptoHelper.js';
 import { normalizeKraPin, isValidKraPin, KRA_PIN_FORMAT_HINT } from '../utils/kraPinValidator.js';
+import { isValidEmail, EMAIL_FORMAT_HINT } from '../utils/emailValidator.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
 
 // Build an `actor` shape from req.admin so audit rows attribute admin-initiated
@@ -861,6 +862,75 @@ export const updateMerchantFeatures = async (req, res) => {
   }
 };
 
+// @desc    Admin manually confirms (or revokes) that a merchant's KRA PIN
+//          and/or Business/License Number are genuinely real — distinct
+//          from isKRAVerified, which only means the KRA PIN's format
+//          passed validation and auto-sets the moment a merchant types a
+//          well-formed one. Nothing sets kraAdminVerified/
+//          businessNumberAdminVerified automatically; this endpoint is the
+//          only way either becomes true.
+// @route   PATCH /api/admin/merchants/:id/verification
+// @access  Private (Admin)
+export const updateMerchantVerification = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { kraAdminVerified, businessNumberAdminVerified } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid merchant id.' });
+    }
+
+    const merchant = await Merchant.findById(id);
+    if (!merchant) {
+      return res.status(404).json({ error: 'Merchant not found' });
+    }
+
+    const changes = [];
+
+    if (kraAdminVerified !== undefined) {
+      if (kraAdminVerified && !merchant.kraPin) {
+        return res.status(400).json({ error: 'This merchant has no KRA PIN on file yet — cannot verify it.' });
+      }
+      merchant.kraAdminVerified = !!kraAdminVerified;
+      merchant.kraAdminVerifiedAt = kraAdminVerified ? new Date() : null;
+      merchant.kraAdminVerifiedBy = kraAdminVerified ? req.admin._id : null;
+      changes.push(`KRA PIN: ${kraAdminVerified ? 'verified' : 'unverified'}`);
+    }
+
+    if (businessNumberAdminVerified !== undefined) {
+      if (businessNumberAdminVerified && !merchant.businessNumber) {
+        return res.status(400).json({ error: 'This merchant has no Business/License Number on file yet — cannot verify it.' });
+      }
+      merchant.businessNumberAdminVerified = !!businessNumberAdminVerified;
+      merchant.businessNumberAdminVerifiedAt = businessNumberAdminVerified ? new Date() : null;
+      merchant.businessNumberAdminVerifiedBy = businessNumberAdminVerified ? req.admin._id : null;
+      changes.push(`Business Number: ${businessNumberAdminVerified ? 'verified' : 'unverified'}`);
+    }
+
+    if (changes.length === 0) {
+      return res.status(400).json({ error: 'Nothing to update — pass kraAdminVerified and/or businessNumberAdminVerified.' });
+    }
+
+    await merchant.save();
+
+    logAudit({
+      action: 'admin.merchant.verification_updated', category: 'admin', severity: 'info',
+      message: `Updated compliance verification (${changes.join(', ')})`,
+      merchant, actor: adminActor(req.admin), req,
+    });
+
+    res.json({
+      success: true,
+      kraAdminVerified: merchant.kraAdminVerified,
+      businessNumberAdminVerified: merchant.businessNumberAdminVerified,
+      message: 'Verification status updated successfully',
+    });
+  } catch (error) {
+    console.error('Update verification error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
 // @desc    Get a single merchant's full profile for KYB review. Returns every
 //          submitted field plus computed activity metrics. Sensitive material
 //          (password hash, stellar secret, PIN hashes) is converted to
@@ -941,7 +1011,11 @@ export const getMerchantDetail = async (req, res) => {
         // KYB
         kraPin: merchant.kraPin,
         isKRAVerified: merchant.isKRAVerified,
+        kraAdminVerified: merchant.kraAdminVerified,
+        kraAdminVerifiedAt: merchant.kraAdminVerifiedAt,
         businessNumber: merchant.businessNumber,
+        businessNumberAdminVerified: merchant.businessNumberAdminVerified,
+        businessNumberAdminVerifiedAt: merchant.businessNumberAdminVerifiedAt,
         certificateUrl: merchant.certificateUrl,
         // Account
         // The raw 8-digit code NCBA's Account-Level Notification webhook
@@ -1048,6 +1122,22 @@ export const createMerchant = async (req, res) => {
 
     if (!name || !email || !phone || !businessName) {
       return res.status(400).json({ error: 'Name, email, phone and business name are required.' });
+    }
+
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ error: EMAIL_FORMAT_HINT });
+    }
+
+    if (!isValidPhoneInputFormat(phone)) {
+      return res.status(400).json({ error: 'Enter a valid Kenyan mobile number starting with +254, 07, or 01 (e.g. 0712 345 678).' });
+    }
+    try {
+      validatePhoneNumber(phone);
+    } catch (e) {
+      if (e instanceof NcbaValidationError) {
+        return res.status(400).json({ error: 'Enter a valid Kenyan mobile number (e.g. 0712 345 678).' });
+      }
+      throw e;
     }
 
     email = String(email).trim().toLowerCase();

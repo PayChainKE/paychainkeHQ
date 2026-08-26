@@ -32,7 +32,12 @@ import {
   resetAppPin,
   verifyPaymentPin,
   validateSetupToken,
-  setupPassword
+  setupPassword,
+  completeOnboardingWalkthrough,
+  completeAccountsWalkthrough,
+  completeSecurityWalkthrough,
+  completeProfileWalkthrough,
+  completeTransactionsWalkthrough
 } from '../controllers/merchantAuthController.js';
 import { protectMerchant, protectDeveloper } from '../middleware/authMiddleware.js';
 import { upload } from '../utils/cloudinary.js';
@@ -195,6 +200,11 @@ router.post('/merchant/logout', protectMerchant, signOutAllDevices);
 router.get('/merchant/me', protectMerchant, getMerchantMe);
 router.put('/merchant/profile', protectMerchant, updateMerchantProfile);
 router.put('/merchant/biometrics', protectMerchant, toggleBiometrics);
+router.put('/merchant/onboarding-walkthrough', protectMerchant, completeOnboardingWalkthrough);
+router.put('/merchant/accounts-walkthrough', protectMerchant, completeAccountsWalkthrough);
+router.put('/merchant/security-walkthrough', protectMerchant, completeSecurityWalkthrough);
+router.put('/merchant/profile-walkthrough', protectMerchant, completeProfileWalkthrough);
+router.put('/merchant/transactions-walkthrough', protectMerchant, completeTransactionsWalkthrough);
 // setAppPin now also verifies the current password when a PIN already
 // exists (see merchantAuthController.js), so it needs the same throttle
 // verify-payment-pin gets below — it had none before. This is now THE

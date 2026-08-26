@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
@@ -106,6 +107,7 @@ const BATCH_STATUS_META: Record<string, { bg: string; text: string }> = {
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function BulkPay() {
   const { merchant, refreshSession } = useAuth();
+  const navigation = useNavigation();
 
   const [activeTab, setActiveTab] = useState<'Payees' | 'Batches'>('Payees');
   const [activeFilter, setActiveFilter] = useState<Filter>('All');
@@ -690,9 +692,16 @@ export default function BulkPay() {
             <Feather name="lock" size={32} color="#b87333" />
           </View>
           <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[28px] text-[#0c2010] text-center mb-3">Profile Incomplete</Text>
-          <Text className="text-[#707971] font-jakarta-medium text-[14px] text-center leading-relaxed max-w-[320px]">
+          <Text className="text-[#707971] font-jakarta-medium text-[14px] text-center leading-relaxed max-w-[320px] mb-6">
             To unlock Bulk Payments and stay KRA-compliant, add your KRA PIN and Business Number to your profile.
           </Text>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('More' as never)}
+            className="bg-[#00351d] px-8 py-4 rounded-2xl flex-row items-center gap-2"
+          >
+            <Text className="text-white font-jakarta-extrabold text-[11px] uppercase tracking-widest">Complete Profile Now</Text>
+            <Feather name="arrow-right" size={14} color="#fff" />
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );

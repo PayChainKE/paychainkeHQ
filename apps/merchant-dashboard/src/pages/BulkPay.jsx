@@ -13,7 +13,6 @@ import { formatPhoneDisplay } from '../utils/formatPhoneDisplay'
 import paychainLogo from '../assets/paychain-logo-dark.png'
 import paychainLogoWhite from '../assets/paychain-logo-white.png'
 import axios from 'axios'
-import FundAccountModal from '../components/modals/FundAccountModal'
 
 export default function BulkPay() {
   const { showAmounts } = usePrivacyMode()
@@ -153,11 +152,7 @@ export default function BulkPay() {
     setNewPayee({
       name: p.name,
       type: p.type.charAt(0).toUpperCase() + p.type.slice(1),
-      // Only meaningful for Utility payees — defaulting this to 'Electricity'
-      // for every payee regardless of type used to make the KPLC Postpaid/
-      // Prepaid toggle (gated on utilityType alone, not type) incorrectly
-      // appear while editing a Contractor/Employee/Supplier.
-      utilityType: p.utilityProvider === 'WATER' ? 'Water' : (p.utilityProvider === 'KPLC' || p.utilityProvider === 'KPLC_PREPAID') ? 'Electricity' : '',
+      utilityType: (p.utilityProvider === 'KPLC' || p.utilityProvider === 'KPLC_PREPAID') ? 'Electricity' : p.utilityProvider === 'WATER' ? 'Water' : 'Electricity',
       utilityProvider: p.utilityProvider || '',
       paymentMethod: p.paymentMethod || 'Mobile Money',
       mobileMoneyType: p.mobileMoneyType || 'Personal Number',
@@ -405,6 +400,89 @@ export default function BulkPay() {
     }
   };
 
+  // Invoice Feature State
+  const blankInvoice = () => ({
+    customer: { name: '', email: '', phone: '', address: '' },
+    invoiceNumber: null, // assigned by the server on first save
+    issueDate: new Date().toISOString().slice(0, 10),
+    dueDate: '',
+    currency: 'KES',
+    notes: '',
+    recurring: false,
+    items: [{ description: '', qty: 1, price: 0 }],
+    payUrl: null,
+    status: 'draft',
+  });
+
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [activeInvoiceId, setActiveInvoiceId] = useState(null);
+  const [isSavingInvoice, setIsSavingInvoice] = useState(false);
+  const [isSendingInvoice, setIsSendingInvoice] = useState(false);
+  const [invoiceDetails, setInvoiceDetails] = useState(blankInvoice());
+
+  const [invoicesList, setInvoicesList] = useState([]);
+  const [invoiceFilter, setInvoiceFilter] = useState('All');
+  const [invoicePage, setInvoicePage] = useState(1);
+  const invoicesPerPage = 5;
+
+  const filteredInvoicesList = invoicesList.filter(inv => invoiceFilter === 'All' || inv.status === (invoiceFilter === 'Drafts' ? 'draft' : invoiceFilter.toLowerCase()));
+  const totalInvoicePages = Math.max(1, Math.ceil(filteredInvoicesList.length / invoicesPerPage));
+  const paginatedInvoicesList = filteredInvoicesList.slice((invoicePage - 1) * invoicesPerPage, invoicePage * invoicesPerPage);
+
+  // Per-status breakdown for the stat tiles below — draft (still being
+  // prepared), sent (awaiting the customer's payment), paid (successfully
+  // collected). Monetary totals only sum KES invoices — `currency` is a
+  // free-text field on each invoice, so adding a USD total onto a KES one
+  // would silently misreport the figure; invoices in any other currency
+  // still count toward the tile's count, just not its KES total.
+  const invoiceStats = ['draft', 'sent', 'paid'].reduce((acc, s) => {
+    const rows = invoicesList.filter(inv => inv.status === s);
+    const kesTotal = rows.filter(inv => (inv.currency || 'KES') === 'KES').reduce((sum, inv) => sum + (inv.total || 0), 0);
+    acc[s] = { count: rows.length, kesTotal };
+    return acc;
+  }, {});
+
+  const invoiceSubtotal = invoiceDetails.items.reduce((sum, item) => sum + (item.qty * item.price), 0);
+  const invoiceTotal = invoiceSubtotal; // Assuming no tax right now
+  const invoiceHasRealItems = invoiceDetails.items.some(i => i.description.trim() || i.price > 0);
+
+  const fmtInvoiceCurrency = (n) => `${invoiceDetails.currency} ${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  // Always renders as the professional local format (0XXXXXXXXX) regardless
+  // of how the number is stored — mirrors the backend's normalizePhoneKE.
+  const displayPhoneKE = (raw) => {
+    if (!raw) return null;
+    let d = String(raw).replace(/\D/g, '');
+    if (d.startsWith('254')) d = d.slice(3);
+    if (d.startsWith('0')) d = d.slice(1);
+    return /^[71]\d{8}$/.test(d) ? `0${d}` : raw;
+  };
+
+  const fmtInvoiceDate = (value) => value
+    ? new Date(value).toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' })
+    : null;
+
+  const fetchInvoices = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('paychain_merchant_token');
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      const res = await axios.get(`${API_URL}/api/invoices`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setInvoicesList(res.data.invoices || []);
+    } catch (err) {
+      // Non-fatal — the list just shows its empty state
+    }
+  }, []);
+
+  useEffect(() => { fetchInvoices() }, [fetchInvoices]);
+
+  // Keep the current page in range as the (filtered) list shrinks — e.g.
+  // deleting the last invoice on the final page.
+  useEffect(() => {
+    setInvoicePage(prev => Math.min(prev, totalInvoicePages));
+  }, [totalInvoicePages]);
+
   // Batch History — getBatches/getBatchById already existed on the backend
   // but nothing in this app ever called them, so once a merchant left the
   // post-authorize receipts screen there was no way to look up a past
@@ -446,12 +524,218 @@ export default function BulkPay() {
     Pending:   { label: 'Pending',   icon: 'schedule',      tone: 'bg-slate-100 text-slate-500',  badge: 'bg-slate-200 text-slate-600' },
   };
 
-  // Fund Account — showFundModal opens a small method picker; picking one
-  // hands off to the shared FundAccountModal (same component
-  // Overview.jsx/Wallet.jsx use) for the actual STK-push/bank/paybill flow,
-  // instead of duplicating it here.
+  const handleAddInvoiceItem = () => {
+    setInvoiceDetails(prev => ({
+      ...prev,
+      items: [...prev.items, { description: '', qty: 1, price: 0 }]
+    }))
+  };
+
+  const handleUpdateInvoiceItem = (index, field, value) => {
+    setInvoiceDetails(prev => ({
+      ...prev,
+      items: prev.items.map((item, i) => i === index ? { ...item, [field]: value } : item)
+    }))
+  };
+
+  const handleRemoveInvoiceItem = (index) => {
+    setInvoiceDetails(prev => ({
+      ...prev,
+      items: prev.items.filter((_, i) => i !== index)
+    }))
+  };
+
+  const downloadInvoicePDF = async () => {
+    addNotification({ title: 'Processing', message: 'Generating professional invoice...', type: 'info' });
+    const element = document.getElementById('invoice-pdf-pane');
+    if (element) {
+      try {
+        // Capture the live preview at whatever pixel size it renders at, but
+        // always place it on a real, fixed A4 page (210x297mm) rather than
+        // sizing the PDF page itself off element.clientWidth/clientHeight —
+        // that previously made the "PDF" whatever arbitrary size the pane
+        // happened to render at, not actually A4.
+        const dataUrl = await domtoimage.toPng(element, { bgcolor: '#ffffff' });
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        const pageWidth = 210;
+        const pageHeight = 297;
+        const img = pdf.getImageProperties(dataUrl);
+        const imgRatio = img.height / img.width;
+        let renderWidth = pageWidth;
+        let renderHeight = pageWidth * imgRatio;
+        if (renderHeight > pageHeight) {
+          renderHeight = pageHeight;
+          renderWidth = pageHeight / imgRatio;
+        }
+        const offsetX = (pageWidth - renderWidth) / 2;
+        pdf.addImage(dataUrl, 'PNG', offsetX, 0, renderWidth, renderHeight);
+        pdf.save(`Invoice_${invoiceDetails.invoiceNumber || 'Draft'}.pdf`);
+        addNotification({ title: 'Download Complete', message: `Invoice saved successfully.`, type: 'success' });
+      } catch (err) {
+        addNotification({ title: 'Error', message: 'Failed to generate PDF: ' + err.message, type: 'error' });
+      }
+    }
+  };
+
+  const buildInvoicePayload = () => ({
+    customer: invoiceDetails.customer,
+    items: invoiceDetails.items,
+    currency: invoiceDetails.currency,
+    issueDate: invoiceDetails.issueDate,
+    dueDate: invoiceDetails.dueDate || null,
+    notes: invoiceDetails.notes,
+    recurring: invoiceDetails.recurring,
+    // Reuse the number already reserved when the modal opened, so the
+    // number shown in the editor is the exact one that gets saved.
+    invoiceNumber: invoiceDetails.invoiceNumber || undefined,
+  });
+
+  const upsertInvoiceInList = (saved) => {
+    setInvoicesList(prev => {
+      const exists = prev.some(inv => inv._id === saved._id);
+      return exists ? prev.map(inv => inv._id === saved._id ? saved : inv) : [saved, ...prev];
+    });
+  };
+
+  const handleSaveDraft = async () => {
+    if (!invoiceDetails.customer.name.trim()) {
+      addNotification({ title: 'Missing Customer', message: 'Enter a customer name first.', type: 'error' });
+      return;
+    }
+
+    setIsSavingInvoice(true);
+    try {
+      const token = localStorage.getItem('paychain_merchant_token');
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      const payload = buildInvoicePayload();
+
+      const res = activeInvoiceId
+        ? await axios.put(`${API_URL}/api/invoices/${activeInvoiceId}`, payload, { headers: { Authorization: `Bearer ${token}` } })
+        : await axios.post(`${API_URL}/api/invoices`, payload, { headers: { Authorization: `Bearer ${token}` } });
+
+      const saved = res.data.invoice;
+      setActiveInvoiceId(saved._id);
+      setInvoiceDetails(prev => ({ ...prev, invoiceNumber: saved.invoiceNumber, payUrl: saved.payUrl, status: saved.status }));
+      upsertInvoiceInList(saved);
+
+      setShowInvoiceModal(false);
+      addNotification({
+        title: 'Draft Saved',
+        message: `Invoice #${saved.invoiceNumber} safely stored in Invoices -> Drafts.`,
+        type: 'success'
+      });
+    } catch (err) {
+      addNotification({ title: 'Error', message: err.response?.data?.error || 'Failed to save invoice draft', type: 'error' });
+    } finally {
+      setIsSavingInvoice(false);
+    }
+  };
+
+  const handleSendInvoice = async () => {
+    if (!invoiceDetails.customer.name.trim()) {
+      addNotification({ title: 'Missing Customer', message: 'Enter a customer name first.', type: 'error' });
+      return;
+    }
+    if (!invoiceDetails.customer.email?.trim()) {
+      addNotification({ title: 'Missing Email', message: "Add the customer's email address to send this invoice.", type: 'error' });
+      return;
+    }
+
+    setIsSendingInvoice(true);
+    try {
+      const token = localStorage.getItem('paychain_merchant_token');
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      const payload = buildInvoicePayload();
+
+      let invoiceId = activeInvoiceId;
+      if (!invoiceId) {
+        const createRes = await axios.post(`${API_URL}/api/invoices`, payload, { headers: { Authorization: `Bearer ${token}` } });
+        invoiceId = createRes.data.invoice._id;
+        setActiveInvoiceId(invoiceId);
+      } else {
+        await axios.put(`${API_URL}/api/invoices/${invoiceId}`, payload, { headers: { Authorization: `Bearer ${token}` } });
+      }
+
+      const sendRes = await axios.post(`${API_URL}/api/invoices/${invoiceId}/send`, {}, { headers: { Authorization: `Bearer ${token}` } });
+      const sent = sendRes.data.invoice;
+
+      setInvoiceDetails(prev => ({ ...prev, invoiceNumber: sent.invoiceNumber, payUrl: sent.payUrl, status: sent.status }));
+      upsertInvoiceInList(sent);
+
+      setShowInvoiceModal(false);
+      addNotification({
+        title: 'Invoice Sent',
+        message: `Invoice #${sent.invoiceNumber} has been emailed to ${invoiceDetails.customer.email}.`,
+        type: 'success'
+      });
+    } catch (err) {
+      addNotification({ title: 'Error', message: err.response?.data?.error || 'Failed to send invoice', type: 'error' });
+    } finally {
+      setIsSendingInvoice(false);
+    }
+  };
+
+  const [confirmDeleteInvoiceId, setConfirmDeleteInvoiceId] = useState(null);
+
+  const handleDeleteInvoice = async (inv) => {
+    setConfirmDeleteInvoiceId(null);
+    try {
+      const token = localStorage.getItem('paychain_merchant_token');
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      await axios.delete(`${API_URL}/api/invoices/${inv._id}`, { headers: { Authorization: `Bearer ${token}` } });
+      setInvoicesList(prev => prev.filter(i => i._id !== inv._id));
+      addNotification({ title: 'Invoice Deleted', message: `Invoice #${inv.invoiceNumber} was removed.`, type: 'success' });
+    } catch (err) {
+      addNotification({ title: 'Error', message: err.response?.data?.error || 'Failed to delete invoice', type: 'error' });
+    }
+  };
+
+  const handleOpenInvoiceModal = async () => {
+    setActiveInvoiceId(null);
+    setInvoiceDetails(blankInvoice());
+    setShowInvoiceModal(true);
+    // Reserve a real, globally-unique invoice number immediately so the
+    // editor never shows a "DRAFT" placeholder — it shows the number that
+    // will actually be saved.
+    try {
+      const token = localStorage.getItem('paychain_merchant_token');
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      const res = await axios.get(`${API_URL}/api/invoices/next-number`, { headers: { Authorization: `Bearer ${token}` } });
+      setInvoiceDetails(prev => ({ ...prev, invoiceNumber: res.data.invoiceNumber }));
+    } catch (err) {
+      // Non-fatal — invoiceNumber stays null and gets assigned on save
+    }
+  };
+
+  const [showLinkModal, setShowLinkModal] = useState(false);
+
+  const handleGenerateLink = () => {
+    if (!invoiceDetails.payUrl) {
+      addNotification({ title: 'Send First', message: 'Send this invoice to generate its secure payment link.', type: 'error' });
+      return;
+    }
+    setShowLinkModal(true);
+  };
+
+  const handleCopyLink = () => {
+    if (!invoiceDetails.payUrl) return;
+    navigator.clipboard.writeText(invoiceDetails.payUrl);
+    addNotification({
+      title: 'Link Copied',
+      message: `Invoice link (${invoiceDetails.payUrl}) ready to share.`,
+      type: 'success'
+    });
+    setShowLinkModal(false);
+  };
+
+  // Fund Account Modal State
   const [showFundModal, setShowFundModal] = useState(false)
-  const [activeFundMethod, setActiveFundMethod] = useState(null)
+  const [fundStep, setFundStep] = useState(1)
+  const [fundDetails, setFundDetails] = useState({
+    amount: '',
+    method: 'Mobile Money',
+    phone: ''
+  })
   const [selectedTill, setSelectedTill] = useState(null)
 
   // Security Verification Modal State
@@ -555,6 +839,17 @@ export default function BulkPay() {
     }
   }
 
+  const handleFundAccount = () => {
+    addNotification({
+      title: 'Funding Initiated',
+      message: `Your deposit of KES ${fundDetails.amount} via ${fundDetails.method} is being processed.`,
+      type: 'success'
+    });
+    setShowFundModal(false);
+    setFundStep(1);
+    setFundDetails({ amount: '', method: 'Mobile Money', phone: '' });
+  }
+
   const batchTotal = Object.keys(selectedPayees)
     .filter((id) => selectedPayees[id])
     .reduce((sum, id) => sum + (payoutAmounts[id] || 0), 0)
@@ -563,11 +858,8 @@ export default function BulkPay() {
   const isLiquidityLow = batchTotal > balance
 
   const [authorizedReceipts, setAuthorizedReceipts] = useState([])
-  const [isAuthorizing, setIsAuthorizing] = useState(false)
 
   const handleAuthorize = async () => {
-    if (isAuthorizing) return
-    setIsAuthorizing(true)
     try {
       addNotification({ title: 'Processing', message: 'Authorizing batch...', type: 'info' });
       const token = localStorage.getItem('paychain_merchant_token');
@@ -584,7 +876,7 @@ export default function BulkPay() {
             type: p.type,
             phone: p.phone,
             grossAmount: payoutAmounts[p.id] || 0,
-            netAmount: payoutAmounts[p.id] || 0, // Preview only — for Employee payees the backend recalculates PAYE/NSSF/SHIF authoritatively in authorizeBatch and overrides this
+            netAmount: payoutAmounts[p.id] || 0, // Mocked for UI, actual tax comes from backend on real employee runs
           }));
       }
 
@@ -602,8 +894,8 @@ export default function BulkPay() {
       // Transform response to match frontend receipts. `status` is carried
       // through now — it used to be dropped here, so every receipt card
       // rendered as "Confirmed / Settled" even for rows that actually
-      // failed (blocked/rejected by NCBA) and were refunded back to the
-      // merchant's balance. See the status-aware rendering below.
+      // failed (blocked/rejected by Daraja or NCBA) and were refunded back
+      // to the merchant's balance. See the status-aware rendering below.
       const newReceipts = processedBatch.transactions.map(tx => ({
         id: tx.receiptNumber,
         name: tx.name,
@@ -649,8 +941,6 @@ export default function BulkPay() {
       } else {
          setShowSecurityModal(false);
       }
-    } finally {
-      setIsAuthorizing(false)
     }
   }
 
@@ -701,7 +991,7 @@ export default function BulkPay() {
         y += 8;
         pdf.text(`Total Recipients: ${authorizedReceipts.length}`, 20, y);
         y += 8;
-        pdf.text(`Total Payout: ${formatKES(batchTotal)}`, 20, y);
+        pdf.text(`Total Payout: KES ${batchTotal.toLocaleString()}`, 20, y);
         y += 15;
         
         pdf.setDrawColor(150);
@@ -721,9 +1011,9 @@ export default function BulkPay() {
           pdf.setFont("helvetica", "normal");
           pdf.text(`Recipient: ${r.name}`, 20, y);
           y += 8;
-          pdf.text(`Account/Phone: ${formatPhoneDisplay(r.phone) || r.phone}`, 20, y);
+          pdf.text(`Account/Phone: ${r.phone}`, 20, y);
           y += 8;
-          pdf.text(`Amount: ${formatKES(r.amount)}`, 20, y);
+          pdf.text(`Amount: KES ${r.amount.toLocaleString()}`, 20, y);
           y += 8;
           pdf.text(`Reference: ${r.reference}`, 20, y);
           y += 8;
@@ -753,7 +1043,7 @@ export default function BulkPay() {
     <MerchantLayout title="Bulk Payments">
       <div className="relative">
         {!isProfileComplete && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 z-30 flex items-center justify-center p-4">
             <div className="bg-[#0A2540]/90 backdrop-blur-xl p-8 md:p-12 rounded-[32px] md:rounded-[40px] text-center shadow-2xl max-w-lg w-full border border-white/10 animate-fade-in-up">
               <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center mx-auto mb-6 text-white/50">
                 <span className="material-symbols-outlined text-3xl">lock</span>
@@ -762,8 +1052,8 @@ export default function BulkPay() {
               <p className="text-sm md:text-base text-white/70 mb-8 leading-relaxed">
                 To unlock Bulk Payments and ensure full regulatory compliance, please add your KRA PIN and Business License Number to your profile.
               </p>
-              <button 
-                onClick={() => navigate('/profile')}
+              <button
+                onClick={() => navigate('/profile', { state: { focusFields: ['kraPin', 'businessNumber'] } })}
                 className="w-full bg-emerald-500 text-[#06201B] px-8 py-4 rounded-xl font-black text-[11px] uppercase tracking-widest shadow-xl hover:bg-white transition-all active:scale-95 flex items-center justify-center gap-2"
               >
                 Complete Profile Now
@@ -794,14 +1084,7 @@ export default function BulkPay() {
                 </div>
               </div>
 
-              {/* flex-1 min-h-0 is load-bearing here, not decorative — without it
-                  a flex child defaults to min-height:auto, so it grows to fit
-                  all its content instead of being capped at the space left
-                  under the header, and overflow-y-auto never gets a chance to
-                  kick in. That was silently clipping the Save button below
-                  the fold on long forms (e.g. Employee) with no way to
-                  scroll to it. */}
-              <div className="px-6 md:px-10 pb-6 md:pb-10 overflow-y-auto custom-scrollbar flex-1 min-h-0">
+              <div className="px-6 md:px-10 pb-6 md:pb-10 overflow-y-auto custom-scrollbar">
                 {addStep === 1 ? (
                   <div className="flex flex-col gap-3">
                     {[
@@ -895,7 +1178,7 @@ export default function BulkPay() {
                         </div>
                       )}
 
-                      {newPayee.type === 'Utility' && newPayee.utilityType === 'Electricity' && (
+                      {newPayee.utilityType === 'Electricity' && (
                         <div className="space-y-2 pt-2 animate-in fade-in duration-500">
                           <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Account Type</label>
                           <div className="flex gap-2 p-1.5 bg-surface-container-low/50 rounded-2xl border border-outline-variant/5">
@@ -919,7 +1202,7 @@ export default function BulkPay() {
                         </div>
                       )}
 
-                      {newPayee.type === 'Utility' && DEDICATED_RAIL_UTILITIES.includes(newPayee.utilityProvider) && (() => {
+                      {DEDICATED_RAIL_UTILITIES.includes(newPayee.utilityProvider) && (() => {
                         const isKplc = newPayee.utilityProvider === 'KPLC' || newPayee.utilityProvider === 'KPLC_PREPAID'
                         const isPrepaid = newPayee.utilityProvider === 'KPLC_PREPAID'
                         const logo = isKplc ? '/utilities%20logo/kplc.png' : '/utilities%20logo/ncwsc.png'
@@ -996,7 +1279,7 @@ export default function BulkPay() {
                                   <p className="text-sm font-bold text-primary truncate">{utilityCheck.customerName || 'Meter verified'}</p>
                                   <p className="text-[11px] text-on-surface-variant font-medium opacity-70">
                                     {utilityCheck.serviceName || (isPrepaid ? 'Kplc Prepaid' : isKplc ? 'Kplc Postpaid' : 'Nairobi Water')}
-                                    {typeof utilityCheck.balance === 'number' ? ` · Balance due: ${formatKES(utilityCheck.balance)}` : ''}
+                                    {typeof utilityCheck.balance === 'number' ? ` · Balance due: KES ${utilityCheck.balance.toLocaleString()}` : ''}
                                   </p>
                                 </div>
                               </div>
@@ -1019,16 +1302,12 @@ export default function BulkPay() {
                           </h4>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-1.5">
-                              <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">KRA PIN {newPayee.idNumber ? '' : '*'}</label>
-                              {/* Employees don't always have their KRA PIN on hand — ID Number
-                                  is an accepted alternative (matches Payee.js's original
-                                  intent: either identifier satisfies the payroll record), so
-                                  this becomes optional the moment an ID Number is entered. */}
-                              <ValidatedInput kind="kraPin" optional={Boolean(newPayee.idNumber)} value={newPayee.kraPin} onChange={(e) => setNewPayee({...newPayee, kraPin: e.target.value})} placeholder="A000000000A" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 uppercase" />
+                              <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">KRA PIN *</label>
+                              <ValidatedInput kind="kraPin" value={newPayee.kraPin} onChange={(e) => setNewPayee({...newPayee, kraPin: e.target.value})} placeholder="A000000000A" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 uppercase" />
                             </div>
                             <div className="space-y-1.5">
-                              <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">ID Number {newPayee.kraPin ? '' : '*'}</label>
-                              <ValidatedInput kind="nationalId" optional={Boolean(newPayee.kraPin)} value={newPayee.idNumber} onChange={(e) => setNewPayee({...newPayee, idNumber: e.target.value})} placeholder="e.g. 12345678" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50" />
+                              <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">ID Number *</label>
+                              <ValidatedInput kind="nationalId" value={newPayee.idNumber} onChange={(e) => setNewPayee({...newPayee, idNumber: e.target.value})} placeholder="e.g. 12345678" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50" />
                             </div>
                             <div className="space-y-1.5">
                               <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">NSSF Number</label>
@@ -1342,6 +1621,26 @@ export default function BulkPay() {
             ))}
           </div>
 
+          {/* Invoices (Billing & Drafts) - Sidebar version for desktop */}
+          <div className="hidden lg:block bg-white rounded-[32px] overflow-hidden shadow-[0_20px_80px_rgba(0,0,0,0.06)] border border-outline-variant/10 p-6 md:p-8 mt-2">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-emerald-50 text-emerald-700 rounded-xl flex items-center justify-center font-bold">
+                 <span className="material-symbols-outlined">receipt_long</span>
+              </div>
+              <div>
+                <h3 className="font-headline text-xl text-primary tracking-tight font-bold">Invoices</h3>
+                <p className="text-[10px] text-on-surface-variant font-medium mt-0.5 opacity-60 italic">Billing & Drafts</p>
+              </div>
+            </div>
+            <p className="text-xs text-on-surface-variant font-medium mb-6 leading-relaxed">Generate, send, and manage professional invoices directly to your clients.</p>
+            <button 
+              onClick={handleOpenInvoiceModal} 
+              className="w-full bg-[#00351D] text-white hover:bg-emerald-950 py-3.5 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-xl active:scale-[0.98]"
+            >
+              <span className="material-symbols-outlined text-sm">add</span>
+              Create Invoice
+            </button>
+          </div>
         </section>
 
         {/* Right Column: Create Payment Batch */}
@@ -1445,7 +1744,7 @@ export default function BulkPay() {
                           <td className="px-6 py-4 border-r border-outline-variant/5">
                             <div className="flex flex-col">
                               <span className="text-[10px] font-black text-primary/80 uppercase tracking-wider">{p.paymentMethod}</span>
-                              <span className="text-[10px] font-medium text-on-surface-variant opacity-60 tabular-nums">{formatPhoneDisplay(p.phone) || p.paybillNumber || p.accountNumber}</span>
+                              <span className="text-[10px] font-medium text-on-surface-variant opacity-60 tabular-nums">{p.phone || p.paybillNumber || p.accountNumber}</span>
                             </div>
                           </td>
                           <td className="px-6 py-4 border-r border-outline-variant/5">
@@ -1509,7 +1808,7 @@ export default function BulkPay() {
                       <div className="grid grid-cols-2 gap-4 border-t border-outline-variant/5 pt-3">
                         <div className="space-y-1">
                           <label className="text-[7px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-30">Account / Ref</label>
-                          <p className="text-[9px] font-medium text-on-surface-variant leading-none">{formatPhoneDisplay(p.phone) || p.paybillNumber || p.accountNumber}</p>
+                          <p className="text-[9px] font-medium text-on-surface-variant leading-none">{p.phone || p.paybillNumber || p.accountNumber}</p>
                         </div>
                         <div className="text-right space-y-1">
                           <label className="text-[7px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-30">Amount (KES)</label>
@@ -1535,7 +1834,7 @@ export default function BulkPay() {
                   <h4 className="text-sm font-bold text-primary uppercase tracking-widest mb-6">Select Funding Source</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {[
-                      { id: 'TILL_1', name: merchant?.businessName || 'Main Business Till', balance: merchant?.kesBalance ?? 0, number: '889066' },
+                      { id: 'TILL_1', name: merchant?.businessName || 'Main Business Till', balance: merchant?.kesBalance ?? 0, number: merchant?.paybillAccount || '852300' },
                     ].map(till => (
                       <div 
                         key={till.id}
@@ -1639,7 +1938,7 @@ export default function BulkPay() {
                             <div className="bg-white p-4 sm:p-0 rounded-xl sm:rounded-none border sm:border-0 border-outline-variant/10">
                               <p className="text-[8px] sm:text-[9px] text-on-surface-variant font-black uppercase tracking-widest opacity-40 mb-1.5">Recipient</p>
                               <p className="text-[12px] sm:text-[13px] font-bold text-primary mb-0.5">{receipt.name}</p>
-                              <p className="text-[10px] sm:text-[11px] font-medium text-on-surface-variant opacity-60">{formatPhoneDisplay(receipt.phone) || receipt.phone}</p>
+                              <p className="text-[10px] sm:text-[11px] font-medium text-on-surface-variant opacity-60">{receipt.phone}</p>
                             </div>
                             <div className="bg-white p-4 sm:p-0 rounded-xl sm:rounded-none border sm:border-0 border-outline-variant/10 text-left sm:text-right">
                               <p className="text-[8px] sm:text-[9px] text-on-surface-variant font-black uppercase tracking-widest opacity-40 mb-1.5">Reference</p>
@@ -1736,6 +2035,221 @@ export default function BulkPay() {
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Invoices (Billing & Drafts) - Sequential version for mobile */}
+          <div className="lg:hidden bg-white rounded-[32px] overflow-hidden shadow-[0_20px_80px_rgba(0,0,0,0.06)] border border-outline-variant/10 p-6 md:p-8">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-emerald-50 text-emerald-700 rounded-xl flex items-center justify-center font-bold">
+                 <span className="material-symbols-outlined">receipt_long</span>
+              </div>
+              <div>
+                <h3 className="font-headline text-xl text-primary tracking-tight font-bold">Invoices</h3>
+                <p className="text-[10px] text-on-surface-variant font-medium mt-0.5 opacity-60 italic">Billing & Drafts</p>
+              </div>
+            </div>
+            <p className="text-xs text-on-surface-variant font-medium mb-6 leading-relaxed">Generate, send, and manage professional invoices directly to your clients.</p>
+            <button 
+              onClick={handleOpenInvoiceModal} 
+              className="w-full bg-[#00351D] text-white hover:bg-emerald-950 py-3.5 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-xl active:scale-[0.98]"
+            >
+              <span className="material-symbols-outlined text-sm">add</span>
+              Create Invoice
+            </button>
+          </div>
+
+          {/* Invoice Statistics Container */}
+          <div className="md:px-0">
+            <div className="bg-white rounded-[32px] overflow-hidden shadow-[0_20px_80px_rgba(0,0,0,0.06)] border border-outline-variant/10 p-6 md:p-8">
+               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                  <div>
+                    <h3 className="font-headline text-xl text-primary tracking-tight font-bold">Invoice Tracking</h3>
+                    <p className="text-[10px] text-on-surface-variant font-medium mt-1 opacity-60 italic">Monitor the status of your issued billing.</p>
+                  </div>
+                  <div className="flex gap-2 p-1.5 bg-surface-container-lowest border border-outline-variant/5 rounded-xl self-start md:self-auto">
+                    {['All', 'Drafts', 'Sent', 'Paid'].map(f => (
+                      <button
+                        key={f}
+                        onClick={() => { setInvoiceFilter(f); setInvoicePage(1); }}
+                        className={`px-4 py-2 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${
+                          invoiceFilter === f
+                            ? 'bg-white text-primary shadow-[0_2px_10px_rgba(0,0,0,0.04)] border border-outline-variant/5'
+                            : 'text-on-surface-variant/60 hover:text-primary'
+                        }`}
+                      >
+                        {f}
+                      </button>
+                    ))}
+                  </div>
+               </div>
+
+               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                 <div className="p-4 rounded-[20px] bg-[#f8fafc] border border-outline-variant/5 flex items-center justify-between group hover:border-amber-500/10 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                        <span className="material-symbols-outlined text-[20px]">edit_document</span>
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50">Drafts</span>
+                        <p className="font-headline text-lg font-black text-primary leading-tight">{invoiceStats.draft.count}</p>
+                      </div>
+                    </div>
+                 </div>
+                 <div className="p-4 rounded-[20px] bg-[#f8fafc] border border-outline-variant/5 flex items-center justify-between group hover:border-blue-500/10 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                        <span className="material-symbols-outlined text-[20px]">send</span>
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50">Sent • Awaiting Payment</span>
+                        <p className="font-headline text-lg font-black text-primary leading-tight">{invoiceStats.sent.count}</p>
+                        {invoiceStats.sent.kesTotal > 0 && (
+                          <p className="text-[9px] font-bold text-blue-600 opacity-70">{formatKES(invoiceStats.sent.kesTotal)}</p>
+                        )}
+                      </div>
+                    </div>
+                 </div>
+                 <div className="p-4 rounded-[20px] bg-[#f8fafc] border border-outline-variant/5 flex items-center justify-between group hover:border-emerald-500/10 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                        <span className="material-symbols-outlined text-[20px]">check_circle</span>
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50">Paid • Collected</span>
+                        <p className="font-headline text-lg font-black text-primary leading-tight">{invoiceStats.paid.count}</p>
+                        {invoiceStats.paid.kesTotal > 0 && (
+                          <p className="text-[9px] font-bold text-emerald-600 opacity-70">{formatKES(invoiceStats.paid.kesTotal)}</p>
+                        )}
+                      </div>
+                    </div>
+                 </div>
+               </div>
+
+               {/* Recent Invoices List */}
+               <div className="mt-8">
+                 <h4 className="text-xs font-black uppercase tracking-widest text-on-surface-variant opacity-50 mb-4">Invoice History</h4>
+                 <div className="flex flex-col gap-3">
+                   {filteredInvoicesList.length === 0 ? (
+                     <div className="p-8 rounded-[20px] bg-surface-container-lowest border border-outline-variant/10 text-center flex flex-col items-center">
+                       <span className="material-symbols-outlined text-4xl text-on-surface-variant/40 mb-3">receipt_long</span>
+                       <p className="text-sm font-bold text-primary mb-1">No recent invoices</p>
+                       <p className="text-xs text-on-surface-variant opacity-70">Generate your first professional e-invoice to start getting paid.</p>
+                     </div>
+                   ) : paginatedInvoicesList.map(inv => {
+                     const statusMeta = {
+                       draft: { label: 'Draft', icon: 'edit_document', tone: 'bg-amber-50 text-amber-600', badge: 'bg-amber-100 text-amber-800' },
+                       sent:  { label: 'Sent',  icon: 'send',          tone: 'bg-emerald-50 text-emerald-600', badge: 'bg-emerald-100 text-emerald-800' },
+                       paid:  { label: 'Paid',  icon: 'check_circle',  tone: 'bg-blue-50 text-blue-600', badge: 'bg-blue-100 text-blue-800' },
+                       void:  { label: 'Void',  icon: 'block',         tone: 'bg-slate-100 text-slate-500', badge: 'bg-slate-200 text-slate-600' },
+                     }[inv.status] || { label: inv.status, icon: 'receipt_long', tone: 'bg-amber-50 text-amber-600', badge: 'bg-amber-100 text-amber-800' };
+                     const isConfirmingDelete = confirmDeleteInvoiceId === inv._id;
+
+                     return (
+                     <div key={inv._id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-[20px] bg-surface-container-lowest border border-outline-variant/10 shadow-sm hover:border-emerald-500/20 transition-all group gap-4">
+                       <div className="flex items-center gap-4">
+                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${statusMeta.tone}`}>
+                           <span className="material-symbols-outlined text-[18px]">{statusMeta.icon}</span>
+                         </div>
+                         <div>
+                           <p className="text-sm font-bold text-primary">{inv.customer?.name || 'Unnamed Customer'}</p>
+                           <div className="flex items-center gap-2 mt-0.5">
+                             <p className="text-[10px] text-on-surface-variant font-medium opacity-60">#{inv.invoiceNumber} • {new Date(inv.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                             <div className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-widest ${statusMeta.badge}`}>
+                               {statusMeta.label}
+                             </div>
+                           </div>
+                         </div>
+                       </div>
+
+                       {isConfirmingDelete ? (
+                         <div className="flex items-center justify-between gap-2 pl-14 sm:pl-0">
+                           <p className="text-[10px] text-red-600 font-bold leading-snug max-w-[180px]">
+                             {inv.status === 'sent' ? "This invoice's payment link will stop working. Delete anyway?" : 'Delete this draft?'}
+                           </p>
+                           <div className="flex items-center gap-2 shrink-0">
+                             <button
+                               onClick={() => setConfirmDeleteInvoiceId(null)}
+                               className="px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest text-on-surface-variant/60 hover:text-on-surface hover:bg-surface-container-low transition-colors"
+                             >
+                               Cancel
+                             </button>
+                             <button
+                               onClick={() => handleDeleteInvoice(inv)}
+                               className="px-3 py-2 rounded-xl bg-red-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-colors"
+                             >
+                               Delete
+                             </button>
+                           </div>
+                         </div>
+                       ) : (
+                       <div className="flex items-center justify-between sm:gap-3 pl-14 sm:pl-0">
+                         <div className="text-left sm:text-right">
+                           <p className="text-xs font-bold text-primary">{inv.currency} {inv.total.toLocaleString()}</p>
+                           <p className="text-[9px] text-on-surface-variant font-medium opacity-50 italic uppercase tracking-widest">Total value</p>
+                         </div>
+                         {inv.status !== 'paid' && (
+                           <button
+                             onClick={() => setConfirmDeleteInvoiceId(inv._id)}
+                             className="w-10 h-10 sm:w-8 sm:h-8 rounded-xl bg-red-50 text-red-500 hover:bg-red-100 flex items-center justify-center transition-colors shadow-sm active:scale-90"
+                           >
+                             <span className="material-symbols-outlined text-[18px] sm:text-sm">delete</span>
+                           </button>
+                         )}
+                         <button
+                           onClick={() => {
+                              setActiveInvoiceId(inv._id);
+                              setInvoiceDetails({
+                                customer: inv.customer,
+                                invoiceNumber: inv.invoiceNumber,
+                                issueDate: inv.issueDate ? inv.issueDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
+                                dueDate: inv.dueDate ? inv.dueDate.slice(0, 10) : '',
+                                currency: inv.currency,
+                                notes: inv.notes,
+                                recurring: inv.recurring,
+                                items: inv.items?.length ? inv.items : [{ description: '', qty: 1, price: 0 }],
+                                payUrl: inv.payUrl,
+                                status: inv.status,
+                              });
+                              setShowInvoiceModal(true);
+                           }}
+                           disabled={inv.status === 'paid'}
+                           className="w-10 h-10 sm:w-8 sm:h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center transition-colors shadow-sm active:scale-90 disabled:opacity-30 disabled:pointer-events-none"
+                         >
+                           <span className="material-symbols-outlined text-[18px] sm:text-sm">{inv.status === 'paid' ? 'visibility' : 'edit'}</span>
+                         </button>
+                       </div>
+                       )}
+                     </div>
+                   )})}
+                 </div>
+
+                 {filteredInvoicesList.length > invoicesPerPage && (
+                   <div className="mt-6 flex items-center justify-between">
+                     <p className="text-[10px] font-bold text-on-surface-variant opacity-60">
+                       Showing {paginatedInvoicesList.length} of {filteredInvoicesList.length}
+                     </p>
+                     <div className="flex items-center gap-2">
+                       <button
+                         onClick={() => setInvoicePage(prev => Math.max(1, prev - 1))}
+                         disabled={invoicePage === 1}
+                         className="w-8 h-8 rounded-full flex items-center justify-center bg-surface-container-lowest border border-outline-variant/10 text-primary shadow-sm hover:bg-primary hover:text-white disabled:opacity-20 disabled:hover:bg-surface-container-lowest disabled:hover:text-primary transition-all"
+                       >
+                         <span className="material-symbols-outlined text-lg">chevron_left</span>
+                       </button>
+                       <span className="text-[10px] font-bold text-primary px-1">{invoicePage} / {totalInvoicePages}</span>
+                       <button
+                         onClick={() => setInvoicePage(prev => Math.min(totalInvoicePages, prev + 1))}
+                         disabled={invoicePage >= totalInvoicePages}
+                         className="w-8 h-8 rounded-full flex items-center justify-center bg-surface-container-lowest border border-outline-variant/10 text-primary shadow-sm hover:bg-primary hover:text-white disabled:opacity-20 disabled:hover:bg-surface-container-lowest disabled:hover:text-primary transition-all"
+                       >
+                         <span className="material-symbols-outlined text-lg">chevron_right</span>
+                       </button>
+                     </div>
+                   </div>
+                 )}
+               </div>
+
             </div>
           </div>
 
@@ -1836,57 +2350,153 @@ export default function BulkPay() {
             </div>
           </div>
         </section>
-        {/* Fund Account — small method picker, then hands off to the shared
-            FundAccountModal (same component Overview.jsx/Wallet.jsx use)
-            for the actual STK-push/bank/paybill flow. This used to be its
-            own inline "Fund Account" modal whose Pay Now button called an
-            undefined setBalance(...) — dead/broken code that would throw
-            if clicked, never wired to any real deposit endpoint. */}
+        {/* Fund Account Modal Overlay */}
         {showFundModal && (
-          <div className="fixed inset-0 bg-[#0A2540]/60 backdrop-blur-md z-[110] flex items-center justify-center p-4 animate-in fade-in duration-300" onClick={() => setShowFundModal(false)}>
-            <div className="bg-white w-full max-w-md rounded-[32px] md:rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in duration-500 border border-white/20" onClick={(e) => e.stopPropagation()}>
+          <div className="fixed inset-0 bg-[#0A2540]/60 backdrop-blur-md z-[110] flex items-center justify-center p-4 animate-in fade-in duration-300">
+            <div className="bg-white w-full max-w-md rounded-[32px] md:rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in duration-500 border border-white/20">
               <div className="p-6 md:p-8">
                 <div className="flex items-center justify-between mb-8">
                   <div>
                     <h2 className="font-headline text-2xl text-primary tracking-tight font-bold">Fund Account</h2>
-                    <p className="text-[10px] text-on-surface-variant font-medium mt-1 opacity-60">Choose how to top up your balance</p>
+                    <p className="text-[10px] text-on-surface-variant font-medium mt-1 opacity-60">
+                      {fundStep === 1 ? 'Select Funding Method' : fundStep === 2 ? 'Enter Details' : 'Funding Successful'}
+                    </p>
                   </div>
-                  <button
-                    onClick={() => setShowFundModal(false)}
+                  <button 
+                    onClick={() => { setShowFundModal(false); setFundStep(1); }}
                     className="w-10 h-10 rounded-full bg-surface-container-low flex items-center justify-center text-primary/40 hover:text-primary transition-colors"
                   >
                     <span className="material-symbols-outlined text-xl">close</span>
                   </button>
                 </div>
 
-                <div className="flex flex-col gap-3">
-                  {[
-                    { id: 'mobile', label: 'Mobile Money', desc: 'M-Pesa, Airtel Money', icon: 'phone_iphone' },
-                    { id: 'bank', label: 'Bank Account', desc: 'Direct Bank Transfer', icon: 'account_balance' },
-                    { id: 'paybill', label: 'Paybill', desc: 'Lipa na M-Pesa instructions', icon: 'storefront' },
-                  ].map((method) => (
-                    <button
-                      key={method.id}
-                      onClick={() => { setActiveFundMethod(method.id); setShowFundModal(false); }}
-                      className="group flex items-center gap-4 p-4 rounded-2xl border border-outline-variant/10 hover:border-emerald-500/30 hover:bg-emerald-500/[0.01] transition-all"
+                {fundStep === 1 && (
+                  <div className="flex flex-col gap-3">
+                    {[
+                      { id: 'Virtual Account Transfer', label: 'Virtual Account Transfer', icon: 'account_balance', desc: 'Transfer to your dedicated USD/KES account' },
+                      { id: 'Mobile Money', label: 'Mobile Money', icon: 'smartphone', desc: 'M-Pesa, Airtel Money' },
+                      { id: 'Card Top-up', label: 'Card Top-up', icon: 'credit_card', desc: 'Visa / Mastercard' }
+                    ].map((method) => (
+                      <button
+                        key={method.id}
+                        onClick={() => { setFundDetails({...fundDetails, method: method.id}); setFundStep(2); }}
+                        className="group flex items-center gap-4 p-4 rounded-2xl border border-outline-variant/10 hover:border-emerald-500/30 hover:bg-emerald-500/[0.01] transition-all"
+                      >
+                        <div className="w-12 h-12 rounded-xl bg-surface-container-low flex items-center justify-center text-primary group-hover:bg-[#00351D] group-hover:text-white transition-all shrink-0">
+                          <span className="material-symbols-outlined text-2xl">{method.icon}</span>
+                        </div>
+                        <div className="text-left">
+                          <h4 className="font-bold text-sm text-primary">{method.label}</h4>
+                          <p className="text-[10px] text-on-surface-variant mt-0.5 opacity-60">{method.desc}</p>
+                        </div>
+                        <span className="material-symbols-outlined ml-auto text-primary/10 group-hover:text-emerald-500 transition-all">chevron_right</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {fundStep === 2 && (
+                  <div className="space-y-6 animate-in slide-in-from-right duration-500">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Amount (KES)</label>
+                      <input 
+                        type="text"
+                        value={fundDetails.amount}
+                        onChange={(e) => setFundDetails({...fundDetails, amount: e.target.value})}
+                        placeholder="e.g. 50,000"
+                        className="w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none"
+                      />
+                    </div>
+
+                    {fundDetails.method === 'Mobile Money' && (
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Phone Number</label>
+                        <input 
+                          type="text"
+                          value={fundDetails.phone}
+                          onChange={(e) => setFundDetails({...fundDetails, phone: e.target.value})}
+                          placeholder="07XX XXX XXX"
+                          className="w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none"
+                        />
+                      </div>
+                    )}
+
+                    <div className="flex gap-4 pt-4">
+                      <button 
+                        onClick={() => setFundStep(1)}
+                        className="flex-1 py-3.5 rounded-2xl border border-outline-variant/10 text-primary font-bold text-sm"
+                      >
+                        Back
+                      </button>
+                      <button 
+                        onClick={() => setFundStep(3)}
+                        className="flex-[2] py-3.5 rounded-2xl bg-[#00351D] text-white font-bold text-sm shadow-xl active:scale-[0.98]"
+                      >
+                        Next Step
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {fundStep === 3 && (
+                  <div className="animate-in zoom-in duration-500 text-center py-4">
+                    <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                      <span className="material-symbols-outlined text-4xl text-emerald-600">contactless</span>
+                    </div>
+                    <h3 className="font-headline text-xl text-primary font-bold mb-2">Confirm Funding</h3>
+                    <p className="text-sm text-on-surface-variant opacity-60 px-6">You are about to deposit</p>
+                    <div className="flex items-center justify-center gap-2 my-4">
+                      <span className="text-sm font-bold text-emerald-600">KES</span>
+                      <span className="font-headline text-4xl text-primary font-bold tracking-tighter">{fundDetails.amount || '0'}</span>
+                    </div>
+                    <p className="text-[10px] text-on-surface-variant font-black uppercase tracking-widest opacity-40">via {fundDetails.method}</p>
+
+                    <div className="flex gap-4 pt-10">
+                      <button 
+                        onClick={() => setFundStep(2)}
+                        className="flex-1 py-3.5 rounded-2xl border border-outline-variant/10 text-primary font-bold text-sm"
+                      >
+                        Back
+                      </button>
+                      <button 
+                        onClick={() => {
+                          setBalance(prev => prev + (parseFloat(fundDetails.amount) || 0));
+                          setFundStep(3);
+                          addNotification({ title: 'Account Funded', message: `KES ${fundDetails.amount} added to your balance.`, type: 'success' });
+                        }}
+                        className="flex-[2] py-3.5 rounded-2xl bg-[#00351D] text-white font-bold text-sm shadow-xl animate-bounce-slow"
+                      >
+                        Pay Now
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {fundStep === 3 && (
+                  <div className="py-12 flex flex-col items-center text-center space-y-6 animate-in zoom-in duration-700">
+                    <div className="w-24 h-24 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center relative">
+                      <div className="absolute inset-0 bg-emerald-400/20 rounded-full animate-ping"></div>
+                      <span className="material-symbols-outlined text-5xl font-black">check</span>
+                    </div>
+                    <div>
+                      <h3 className="font-headline text-2xl font-black text-primary">Funds Received!</h3>
+                      <p className="text-sm text-on-surface-variant font-medium mt-2">Your liquidity has been topped up successfully.</p>
+                      <div className="mt-6 p-4 rounded-3xl bg-emerald-50 border border-emerald-500/10 inline-block">
+                        <p className="text-[10px] text-emerald-700 font-bold uppercase tracking-widest leading-none mb-1">New Balance</p>
+                        <p className="font-headline text-2xl font-black text-emerald-800">KES {(balance + (parseFloat(fundDetails.amount) || 0)).toLocaleString()}</p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => { setShowFundModal(false); setFundStep(1); setFundDetails({...fundDetails, amount: ''}); }}
+                      className="w-full py-4 rounded-2xl bg-[#00351D] text-white font-bold text-sm transition-all shadow-xl"
                     >
-                      <div className="w-12 h-12 rounded-xl bg-surface-container-low flex items-center justify-center text-primary group-hover:bg-[#00351D] group-hover:text-white transition-all shrink-0">
-                        <span className="material-symbols-outlined text-2xl">{method.icon}</span>
-                      </div>
-                      <div className="text-left">
-                        <h4 className="font-bold text-sm text-primary">{method.label}</h4>
-                        <p className="text-[10px] text-on-surface-variant mt-0.5 opacity-60">{method.desc}</p>
-                      </div>
-                      <span className="material-symbols-outlined ml-auto text-primary/10 group-hover:text-emerald-500 transition-all">chevron_right</span>
+                      Continue to Bulk Pay
                     </button>
-                  ))}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
-        )}
-        {activeFundMethod && (
-          <FundAccountModal method={activeFundMethod} onClose={() => setActiveFundMethod(null)} />
         )}
         {/* Setup PIN Modal Overlay */}
         {showPinSetupModal && (
@@ -2022,17 +2632,12 @@ export default function BulkPay() {
                       className="w-full bg-surface-container-low/30 border border-outline-variant/20 rounded-2xl px-5 py-4 text-center font-headline tracking-[1em] text-xl font-bold text-primary focus:ring-0 focus:border-[#00351D]/50 transition-all outline-none"
                     />
 
-                    <button
+                    <button 
                       onClick={handleSecurityVerification}
-                      disabled={pin.length !== 4 || isAuthorizing}
-                      className="w-full py-4 rounded-2xl bg-[#00351D] text-white hover:bg-emerald-950 font-bold text-sm shadow-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                      disabled={pin.length !== 4}
+                      className="w-full py-4 rounded-2xl bg-[#00351D] text-white hover:bg-emerald-950 font-bold text-sm shadow-xl transition-all disabled:opacity-50"
                     >
-                      {isAuthorizing ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                          Authorizing...
-                        </>
-                      ) : 'Confirm & Pay'}
+                      Confirm & Pay
                     </button>
 
                   </div>
@@ -2041,6 +2646,353 @@ export default function BulkPay() {
             </div>
           </div>
         )}
+        {/* Invoice Modal Overlay */}
+        {showInvoiceModal && (
+          <div className="fixed inset-0 bg-primary/80 backdrop-blur-md z-[120] flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-300">
+            <div className="bg-surface-container-lowest w-full h-full max-h-full rounded-[32px] md:rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in duration-500 border border-white/20 flex flex-col">
+              
+              {/* Modal Header */}
+              <div className="px-6 py-4 md:px-8 md:py-6 border-b border-outline-variant/10 flex items-center justify-between bg-white shrink-0">
+                <div>
+                  <h2 className="font-headline text-xl md:text-2xl text-primary tracking-tight font-bold">Create Invoice</h2>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => setShowInvoiceModal(false)} className="px-4 py-2 text-xs font-bold text-on-surface-variant hover:text-primary transition-colors">Cancel</button>
+                  <button onClick={handleSaveDraft} disabled={isSavingInvoice || isSendingInvoice} className="px-4 py-2 text-xs font-bold text-primary border border-outline-variant/20 rounded-xl hover:bg-surface-container-low transition-all disabled:opacity-50">
+                    {isSavingInvoice ? 'Saving...' : 'Save Draft'}
+                  </button>
+                  <button onClick={handleSendInvoice} disabled={isSavingInvoice || isSendingInvoice} className="px-5 py-2 text-xs font-bold text-white bg-[#00351D] rounded-xl hover:bg-emerald-950 transition-all disabled:opacity-50 flex items-center gap-2">
+                    {isSendingInvoice ? (
+                      <>
+                        <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-sm">send</span>
+                        Send Invoice
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Dual Pane Layout */}
+              <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
+                
+                {/* Left Pane: Editor */}
+                <div className="w-full lg:w-1/2 overflow-y-auto p-5 md:p-10 border-r border-outline-variant/10 bg-white custom-scroll">
+                  
+                  {/* Meta Group */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+                    <div className="space-y-2">
+                       <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60">Customer Name</label>
+                       <input
+                         type="text"
+                         value={invoiceDetails.customer.name}
+                         onChange={e => setInvoiceDetails({...invoiceDetails, customer: { ...invoiceDetails.customer, name: e.target.value }})}
+                         className="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-2xl px-5 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50"
+                       />
+                    </div>
+                    <div className="space-y-2">
+                       <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60">Customer Email</label>
+                       <input
+                         type="email"
+                         value={invoiceDetails.customer.email}
+                         onChange={e => setInvoiceDetails({...invoiceDetails, customer: { ...invoiceDetails.customer, email: e.target.value }})}
+                         placeholder="billing@customer.com"
+                         className="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-2xl px-5 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50"
+                       />
+                    </div>
+                    <div className="space-y-2">
+                       <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60">Customer Phone</label>
+                       <ValidatedInput
+                         kind="phoneKE"
+                         optional
+                         value={invoiceDetails.customer.phone}
+                         onChange={e => setInvoiceDetails({...invoiceDetails, customer: { ...invoiceDetails.customer, phone: e.target.value }})}
+                         placeholder="0712 345 678"
+                         className="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-2xl px-5 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50"
+                       />
+                    </div>
+                    <div className="space-y-2">
+                       <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60">Customer Address</label>
+                       <input
+                         type="text"
+                         value={invoiceDetails.customer.address}
+                         onChange={e => setInvoiceDetails({...invoiceDetails, customer: { ...invoiceDetails.customer, address: e.target.value }})}
+                         placeholder="Nairobi, Kenya"
+                         className="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-2xl px-5 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50"
+                       />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60 pr-1 flex items-center gap-1">
+                        Invoice Number
+                      </label>
+                      <div className="w-full bg-surface-container-lowest/50 border border-outline-variant/10 rounded-xl px-4 py-2.5 flex items-center justify-between cursor-not-allowed">
+                         <span className="text-sm font-bold text-primary/70">{invoiceDetails.invoiceNumber || 'Assigned on save'}</span>
+                         <span className="material-symbols-outlined text-[14px] text-on-surface-variant/40">lock</span>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60">Currency</label>
+                      <input type="text" value={invoiceDetails.currency} onChange={e => setInvoiceDetails({...invoiceDetails, currency: e.target.value})} className="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-xl px-4 py-2.5 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60">Issue Date</label>
+                      <input type="date" value={invoiceDetails.issueDate} onChange={e => setInvoiceDetails({...invoiceDetails, issueDate: e.target.value})} className="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-xl px-4 py-2.5 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60">Due Date</label>
+                      <input type="date" value={invoiceDetails.dueDate} onChange={e => setInvoiceDetails({...invoiceDetails, dueDate: e.target.value})} className="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-xl px-4 py-2.5 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50" />
+                    </div>
+                  </div>
+
+                  {/* Items Array */}
+                  <div className="mb-10">
+                    <h4 className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60 mb-4">Items</h4>
+                    
+                    <div className="hidden md:grid grid-cols-[1fr_80px_100px_100px_40px] gap-4 mb-2 px-2">
+                      <span className="text-[9px] text-on-surface-variant font-bold uppercase tracking-widest">Description</span>
+                      <span className="text-[9px] text-on-surface-variant font-bold uppercase tracking-widest text-center">Qty</span>
+                      <span className="text-[9px] text-on-surface-variant font-bold uppercase tracking-widest text-right">Price</span>
+                      <span className="text-[9px] text-on-surface-variant font-bold uppercase tracking-widest text-right">Amount</span>
+                      <span></span>
+                    </div>
+
+                    <div className="space-y-4 mb-5">
+                      {invoiceDetails.items.map((item, index) => (
+                        <div key={index} className="grid grid-cols-1 md:grid-cols-[1fr_80px_100px_100px_40px] gap-3 md:gap-4 items-center bg-surface-container-lowest border md:border-0 border-outline-variant/10 p-4 md:p-0 rounded-[24px] md:bg-transparent shadow-sm md:shadow-none">
+                          <input type="text" value={item.description} onChange={e => handleUpdateInvoiceItem(index, 'description', e.target.value)} placeholder="Item description" className="w-full bg-white border border-outline-variant/20 rounded-xl px-3 py-2.5 text-xs font-medium text-primary focus:ring-0 focus:border-emerald-500/50" />
+                          <div className="flex items-center gap-2">
+                            <span className="md:hidden text-[9px] font-bold text-on-surface-variant uppercase tracking-widest">Qty</span>
+                            <input type="number" value={item.qty} onChange={e => handleUpdateInvoiceItem(index, 'qty', parseInt(e.target.value) || 0)} className="w-full bg-white border border-outline-variant/20 rounded-xl px-3 py-2.5 text-xs font-medium text-center text-primary focus:ring-0 focus:border-emerald-500/50" />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="md:hidden text-[9px] font-bold text-on-surface-variant uppercase tracking-widest">Price</span>
+                            <input type="number" value={item.price} onChange={e => handleUpdateInvoiceItem(index, 'price', parseFloat(e.target.value) || 0)} className="w-full bg-white border border-outline-variant/20 rounded-xl px-3 py-2.5 text-xs font-medium text-right text-primary focus:ring-0 focus:border-emerald-500/50" />
+                          </div>
+                          <div className="text-right text-xs font-bold text-primary flex justify-between items-center md:items-end md:block">
+                            <span className="md:hidden text-[9px] font-bold text-on-surface-variant uppercase tracking-widest">Total</span>
+                            {(item.qty * item.price).toLocaleString()}
+                          </div>
+                         <button onClick={() => handleRemoveInvoiceItem(index)} className="w-8 h-8 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 flex items-center justify-center transition-colors">
+                           <span className="material-symbols-outlined text-sm">delete</span>
+                         </button>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <button onClick={handleAddInvoiceItem} className="w-full py-3 border-2 border-dashed border-outline-variant/20 rounded-2xl text-xs font-bold text-primary hover:border-emerald-500/30 hover:bg-emerald-50 transition-all">+ Add Item</button>
+
+                  </div>
+
+                  {/* Totals */}
+                  <div className="flex flex-col items-end gap-3 mb-10 border-t border-outline-variant/10 pt-6">
+                     <div className="flex items-center justify-between w-full max-w-xs">
+                        <span className="text-xs font-bold text-on-surface-variant opacity-60">Subtotal</span>
+                        <span className="text-sm font-bold text-primary">{invoiceDetails.currency} {invoiceSubtotal.toLocaleString()}</span>
+                     </div>
+                     <div className="flex items-center justify-between w-full max-w-xs">
+                        <span className="text-xs text-on-surface-variant font-black uppercase tracking-widest">Total</span>
+                        <span className="font-headline text-2xl font-bold text-primary">{invoiceDetails.currency} {invoiceTotal.toLocaleString()}</span>
+                     </div>
+                  </div>
+
+                  {/* Settings */}
+                  <div className="space-y-4 pb-10">
+                    <h4 className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60">Settings</h4>
+                    <div className="space-y-2">
+                       <label className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest opacity-60">Notes / Terms</label>
+                       <textarea value={invoiceDetails.notes} onChange={e => setInvoiceDetails({...invoiceDetails, notes: e.target.value})} className="w-full h-24 bg-surface-container-lowest border border-outline-variant/20 rounded-2xl px-5 py-3 text-xs font-medium text-primary focus:ring-0 focus:border-emerald-500/50 resize-none" placeholder="Payment terms, thank you note..."></textarea>
+                    </div>
+                    <label className="flex items-center gap-3 cursor-pointer group">
+                      <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${invoiceDetails.recurring ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-outline-variant/30 text-transparent group-hover:border-emerald-500'}`}>
+                        <span className="material-symbols-outlined text-[12px] font-bold">check</span>
+                      </div>
+                      <input type="checkbox" className="hidden" checked={invoiceDetails.recurring} onChange={e => setInvoiceDetails({...invoiceDetails, recurring: e.target.checked})} />
+                      <span className="text-xs font-bold text-primary">Recurring Invoice</span>
+                    </label>
+                  </div>
+
+                </div>
+
+                {/* Right Pane: Live Preview */}
+                <div className="w-full lg:w-1/2 bg-surface-container-lowest flex flex-col h-full bg-[#f8fafc]">
+                  {/* Preview Actions */}
+                  <div className="p-4 flex items-center justify-end gap-3 shrink-0">
+                    <button onClick={downloadInvoicePDF} className="px-4 py-2 bg-white border border-outline-variant/10 rounded-xl text-xs font-bold text-primary hover:bg-emerald-50 transition-colors flex items-center gap-2">
+                       <span className="material-symbols-outlined text-sm">picture_as_pdf</span> PDF
+                    </button>
+                    <button onClick={handleGenerateLink} className="px-4 py-2 bg-white border border-outline-variant/10 rounded-xl text-xs font-bold text-primary hover:bg-emerald-50 transition-colors flex items-center gap-2">
+                       <span className="material-symbols-outlined text-sm">link</span> Link
+                    </button>
+                  </div>
+
+                  {/* Document Container */}
+                  <div className="flex-1 overflow-y-auto px-4 pb-12 pt-2 flex justify-center custom-scroll">
+                     {/* The Target PDF Area */}
+                     <div id="invoice-pdf-pane" className="w-[640px] md:w-[700px] min-h-[900px] bg-white shadow-[0_10px_40px_rgba(0,0,0,0.06)] flex flex-col relative scale-[0.48] xs:scale-[0.55] sm:scale-[0.8] md:scale-[0.9] lg:scale-100 origin-top shadow-2xl transition-transform duration-500 overflow-hidden">
+
+                        {/* Header Band */}
+                        <div className="bg-[#06201B] px-8 md:px-14 py-8 md:py-10 flex items-start justify-between relative overflow-hidden shrink-0">
+                           <div className="absolute top-0 right-0 w-72 h-72 bg-emerald-500/10 rounded-full -mr-24 -mt-24 blur-3xl pointer-events-none"></div>
+                           <div className="relative z-10 min-w-0 max-w-[340px]">
+                              <img src={paychainLogoWhite} alt="PayChain" className="h-7 mb-5 object-contain" />
+                              <h2 className="font-headline text-lg font-bold text-white truncate">{merchant?.businessName || 'PayChain'}</h2>
+                              <p className="text-xs text-white/50 mt-1.5 truncate">{merchant?.email}</p>
+                              {displayPhoneKE(merchant?.phone) && (
+                                <p className="text-xs text-white/50 truncate">{displayPhoneKE(merchant?.phone)}</p>
+                              )}
+                           </div>
+                           <div className="relative z-10 text-right shrink-0">
+                              <p className="text-[10px] text-[#5EFEB3] font-black uppercase tracking-[0.3em] mb-2">Invoice</p>
+                              <p className="font-headline text-2xl font-black text-white">#{invoiceDetails.invoiceNumber || '···'}</p>
+                              <span className={`inline-block mt-3 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest ${
+                                invoiceDetails.status === 'paid' ? 'bg-emerald-400/20 text-emerald-300' : 'bg-white/10 text-white/60'
+                              }`}>
+                                {invoiceDetails.status === 'paid' ? 'Paid' : 'Draft'}
+                              </span>
+                           </div>
+                        </div>
+
+                        <div className="p-8 md:p-14 pt-10 md:pt-12 flex flex-col flex-1">
+
+                        {/* Addresses & Dates */}
+                        <div className="flex justify-between items-start mb-12 gap-8">
+                           <div className="max-w-[300px] min-w-0">
+                              <p className="text-[9px] text-on-surface-variant font-black uppercase tracking-widest opacity-60 mb-2">Bill To</p>
+                              <h3 className="font-bold text-primary text-base mb-1 truncate">{invoiceDetails.customer.name || 'Unnamed Customer'}</h3>
+                              {invoiceDetails.customer.email && (
+                                <p className="text-xs text-on-surface-variant truncate">{invoiceDetails.customer.email}</p>
+                              )}
+                              {displayPhoneKE(invoiceDetails.customer.phone) && (
+                                <p className="text-xs text-on-surface-variant truncate">{displayPhoneKE(invoiceDetails.customer.phone)}</p>
+                              )}
+                              {invoiceDetails.customer.address && (
+                                <p className="text-xs text-on-surface-variant truncate">{invoiceDetails.customer.address}</p>
+                              )}
+                              {!invoiceDetails.customer.email && !invoiceDetails.customer.phone && !invoiceDetails.customer.address && (
+                                <p className="text-xs text-on-surface-variant/40 italic">No contact details on file</p>
+                              )}
+                           </div>
+                           <div className="text-right flex flex-col gap-4 shrink-0">
+                              <div>
+                                 <p className="text-[9px] text-on-surface-variant font-black uppercase tracking-widest opacity-60 mb-1">Issue Date</p>
+                                 <p className="font-bold text-sm text-primary whitespace-nowrap">{fmtInvoiceDate(invoiceDetails.issueDate) || '—'}</p>
+                              </div>
+                              {invoiceDetails.dueDate && (
+                                <div>
+                                  <p className="text-[9px] text-on-surface-variant font-black uppercase tracking-widest opacity-60 mb-1">Due Date</p>
+                                  <p className="font-bold text-sm text-primary whitespace-nowrap">{fmtInvoiceDate(invoiceDetails.dueDate)}</p>
+                                </div>
+                              )}
+                           </div>
+                        </div>
+
+                        {/* Table */}
+                        <div className="mb-12 flex-1">
+                           <div className="grid grid-cols-[1fr_80px_100px_100px] gap-4 bg-[#06201B] rounded-t-2xl px-5 py-3.5">
+                              <span className="text-[10px] text-white font-black uppercase tracking-widest">Description</span>
+                              <span className="text-[10px] text-white font-black uppercase tracking-widest text-center">Qty</span>
+                              <span className="text-[10px] text-white font-black uppercase tracking-widest text-right">Price</span>
+                              <span className="text-[10px] text-white font-black uppercase tracking-widest text-right">Amount</span>
+                           </div>
+
+                           {invoiceHasRealItems ? (
+                             <div className="border border-t-0 border-outline-variant/10 rounded-b-2xl overflow-hidden">
+                               {invoiceDetails.items.filter(item => item.description.trim() || item.price > 0).map((item, index) => (
+                                 <div key={index} className={`grid grid-cols-[1fr_80px_100px_100px] gap-4 items-center px-5 py-4 ${index % 2 === 1 ? 'bg-surface-container-lowest/50' : ''}`}>
+                                    <span className="text-sm font-bold text-primary truncate">{item.description || 'Untitled item'}</span>
+                                    <span className="text-sm text-on-surface-variant text-center">{item.qty}</span>
+                                    <span className="text-sm text-on-surface-variant text-right whitespace-nowrap">{fmtInvoiceCurrency(item.price)}</span>
+                                    <span className="text-sm font-bold text-primary text-right whitespace-nowrap">{fmtInvoiceCurrency(item.qty * item.price)}</span>
+                                 </div>
+                               ))}
+                             </div>
+                           ) : (
+                             <div className="border border-t-0 border-outline-variant/10 rounded-b-2xl px-5 py-10 text-center">
+                               <p className="text-xs text-on-surface-variant/40 italic">No line items added yet</p>
+                             </div>
+                           )}
+                        </div>
+
+                        {/* Totals */}
+                        <div className="flex justify-end mb-12">
+                           <div className="w-full max-w-[260px] flex flex-col gap-2">
+                              <div className="flex justify-between items-center px-1">
+                                 <p className="text-xs font-bold text-on-surface-variant opacity-60">Subtotal</p>
+                                 <p className="text-sm font-bold text-primary">{fmtInvoiceCurrency(invoiceSubtotal)}</p>
+                              </div>
+                              <div className="flex justify-between items-center mt-1 px-5 py-4 rounded-2xl bg-[#06201B]">
+                                 <p className="text-[10px] text-[#5EFEB3] font-black uppercase tracking-widest">Total</p>
+                                 <p className="font-headline text-xl font-black text-white">{fmtInvoiceCurrency(invoiceTotal)}</p>
+                              </div>
+                           </div>
+                        </div>
+
+                        {/* Footer Notes */}
+                        {invoiceDetails.notes && (
+                           <div className="mb-10 p-5 rounded-2xl bg-surface-container-lowest border border-outline-variant/10">
+                             <p className="text-[9px] text-on-surface-variant font-black uppercase tracking-widest opacity-60 mb-2">Notes / Terms</p>
+                             <p className="text-xs text-on-surface-variant whitespace-pre-wrap">{invoiceDetails.notes}</p>
+                           </div>
+                        )}
+
+                        <div className="mt-auto pt-6 border-t border-outline-variant/10 flex flex-col items-center gap-2">
+                           <img src={paychainLogo} alt="PayChain" className="h-4 object-contain opacity-40" />
+                           <p className="text-[9px] text-center text-on-surface-variant font-bold uppercase tracking-widest opacity-50">Powered by PayChain Finance • Nairobi, Kenya</p>
+                        </div>
+                        </div>
+                     </div>
+                     
+
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Invoice Link Sharing Modal */}
+        {showLinkModal && (
+          <div className="fixed inset-0 bg-[#0A2540]/60 backdrop-blur-md z-[130] flex items-center justify-center p-4 animate-in fade-in duration-300">
+            <div className="bg-white w-full max-w-sm rounded-[32px] md:rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in duration-500 border border-white/20">
+              <div className="p-6 md:p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="font-headline text-xl text-primary tracking-tight font-bold">Invoice Link</h2>
+                  </div>
+                  <button 
+                    onClick={() => setShowLinkModal(false)}
+                    className="w-8 h-8 rounded-full bg-surface-container-low flex items-center justify-center text-primary/40 hover:text-primary transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-sm">close</span>
+                  </button>
+                </div>
+                
+                <p className="text-xs text-on-surface-variant font-medium mb-6 leading-relaxed">
+                  Share this link with your customer to allow them to view and pay this invoice online.
+                </p>
+
+                <div className="bg-surface-container-lowest/50 border border-outline-variant/20 rounded-2xl p-4 flex items-center justify-between gap-3 mb-6">
+                   <p className="text-sm font-bold text-primary truncate flex-1">
+                     {invoiceDetails.payUrl}
+                   </p>
+                </div>
+
+                <button
+                  onClick={handleCopyLink}
+                  className="w-full py-3.5 rounded-2xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold text-sm transition-all"
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Batch Details Modal — real per-payout outcome for a past batch. */}
         {showBatchDetails && (() => {
           const meta = BATCH_STATUS_META[showBatchDetails.status] || BATCH_STATUS_META.Pending;

@@ -310,6 +310,11 @@ export const verifyLogin = async (req, res) => {
         biometricsEnabled: merchant.biometricsEnabled,
         mobileBiometricUnlockEnabled: merchant.mobileBiometricUnlockEnabled,
         hasAppPin:        !!merchant.appPin,
+        hasSeenOnboardingWalkthrough: merchant.hasSeenOnboardingWalkthrough,
+        hasSeenAccountsWalkthrough: merchant.hasSeenAccountsWalkthrough,
+        hasSeenSecurityWalkthrough: merchant.hasSeenSecurityWalkthrough,
+        hasSeenProfileWalkthrough: merchant.hasSeenProfileWalkthrough,
+        hasSeenTransactionsWalkthrough: merchant.hasSeenTransactionsWalkthrough,
       },
     });
   } catch (err) {

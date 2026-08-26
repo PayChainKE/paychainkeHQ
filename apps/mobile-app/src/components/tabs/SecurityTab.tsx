@@ -5,6 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ValidatedTextInput } from '../../components/ValidatedTextInput';
+import SecurityWalkthrough from '../SecurityWalkthrough';
 import api from '../../api/config';
 
 // Fixed set — same three questions the merchant-dashboard's Profile.jsx
@@ -290,6 +291,7 @@ export default function SecurityTab() {
 
   return (
     <ScrollView className="flex-1 bg-[#022415]" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+      <SecurityWalkthrough />
       <LinearGradient colors={['#00351d', '#022415']} className="absolute inset-0" />
 
       <View className="w-full max-w-lg mx-auto px-6 pt-2 pb-12 relative z-10">

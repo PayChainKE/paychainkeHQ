@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api/config';
 import PrivateValue from '../components/PrivateValue';
 import FundAccountModal from '../components/FundAccountModal';
+import MerchantWalkthrough from '../components/MerchantWalkthrough';
 import { isCreditTransaction, isDebitTransaction } from '../utils/transactionDirection';
 import { formatAccountNumber } from '../utils/formatAccountNumber';
 import { formatName } from '../utils/formatName';
@@ -203,8 +204,8 @@ export default function Dashboard({ navigation }: any) {
   // Admin-controlled per-merchant visibility (Merchants.jsx's "Feature
   // Access" panel) — hidden by default for new signups now, matches the
   // web dashboard's MerchantSidebar.jsx/Overview.jsx gating.
-  const digitalWalletEnabled = merchant?.features?.digitalWallet !== false;
-  const inflationShieldEnabled = merchant?.features?.inflationShield !== false;
+  const digitalWalletEnabled = merchant?.features?.digitalWallet === true;
+  const inflationShieldEnabled = merchant?.features?.inflationShield === true;
   const usdcBalance = merchant?.usdcBalance || 0;
   const usdcInKes = liveRate != null ? usdcBalance * liveRate : null;
 
@@ -308,6 +309,7 @@ export default function Dashboard({ navigation }: any) {
           </LinearGradient>
 
           <FundAccountModal visible={showFundAccount} onClose={() => setShowFundAccount(false)} />
+          <MerchantWalkthrough />
 
           {/* Action Buttons (overlapping) */}
           <View className="px-6 flex-row justify-between -mt-6 mb-10 z-10">
