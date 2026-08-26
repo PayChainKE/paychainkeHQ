@@ -10,7 +10,6 @@ import {
 } from './ncbaOpenBankingController.js';
 import { NcbaOpenBankingValidationError } from '../services/ncbaOpenBankingService.js';
 import { parsePayoutDestination, PayoutDestinationError } from './developerPaymentController.js';
-import { calculatePAYE } from '../utils/kraCalculator.js';
 import { claimClientIdempotencyKey, DuplicateSubmissionError } from '../utils/idempotencyGuard.js';
 import { assertApiPayoutPinNotLocked, recordFailedApiPayoutPinAttempt, resetApiPayoutPinAttempts, ApiPayoutPinLockedError } from '../utils/apiPayoutPinLockout.js';
 import { logAudit } from '../utils/auditLog.js';
@@ -68,21 +67,9 @@ function priceRows(rawPayments) {
     const destination = parsePayoutDestination(row);
     const payeeType = row?.payeeType === 'employee' ? 'employee' : 'contract';
 
-    if (payeeType === 'employee' && destination.type !== 'mobile_money') {
-      throw new PayoutDestinationError(`payments[${i}]: payeeType "employee" can only be paid to a mobile money number (phone) — payroll goes to a personal M-Pesa/Airtel number, not a bank/paybill/till.`);
-    }
-
-    if (payeeType === 'employee') {
-      // Caller-supplied amount is treated as gross payroll (same convention
-      // as the dashboard's Bulk Pay CSV upload) — netAmount is what's
-      // actually paid and what caps/balance checks below use.
-      const taxes = calculatePAYE(numericAmount);
-      return {
-        destination, payeeType, narration: row?.narration || null,
-        grossAmount: taxes.grossPay, netAmount: taxes.netPay,
-        taxDeductions: { paye: taxes.paye, nssf: taxes.nssf, shif: taxes.shif },
-      };
-    }
+    // No PAYE/NSSF/SHIF withholding for employeeType — PayChain has no live
+    // KRA/NSSF/SHIF remittance integration, so employees (like every other
+    // payee type) are paid the full caller-supplied amount.
     return {
       destination, payeeType, narration: row?.narration || null,
       grossAmount: null, netAmount: numericAmount, taxDeductions: null,

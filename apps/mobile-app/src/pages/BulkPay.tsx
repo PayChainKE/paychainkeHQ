@@ -5,7 +5,6 @@ import {
 } from 'react-native';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
@@ -109,7 +108,6 @@ const BATCH_STATUS_META: Record<string, { bg: string; text: string }> = {
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function BulkPay() {
   const { merchant, refreshSession } = useAuth();
-  const navigation = useNavigation();
 
   const [activeTab, setActiveTab] = useState<'Payees' | 'Batches'>('Payees');
   const [activeFilter, setActiveFilter] = useState<Filter>('All');
@@ -194,9 +192,6 @@ export default function BulkPay() {
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [lastBatchReference, setLastBatchReference] = useState<string>('');
   const [lastBatchStatus, setLastBatchStatus] = useState<string>('Processed');
-
-  // ── Profile gate ──
-  const isProfileComplete = Boolean(merchant?.kraPin && merchant?.businessNumber);
 
   // ── Fetch payees ──
   const fetchPayees = useCallback(async (refresh = false) => {
@@ -345,11 +340,8 @@ export default function BulkPay() {
 
   const validateNewPayee = (): string | null => {
     if (!newPayee.name.trim()) return 'Recipient name is required.';
-    // Employees don't always have their KRA PIN on hand — ID Number is an
-    // accepted alternative, matching the merchant dashboard's Add Payee form.
-    if (newPayee.type === 'employee' && !newPayee.kraPin && !newPayee.idNumber) {
-      return 'Enter either a KRA PIN or an ID Number for this employee.';
-    }
+    // Employees no longer require KRA PIN/ID Number — see the merchant
+    // dashboard's matching removal in BulkPay.jsx for why.
     if (newPayee.type === 'supplier' && (!newPayee.kraPin || !newPayee.etimsInvoiceNumber || !newPayee.cuNumber)) {
       return 'KRA PIN, eTIMS Invoice, and CU Number are required for suppliers.';
     }
@@ -679,31 +671,6 @@ export default function BulkPay() {
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#00351d" />
           <Text className="text-[#707971] font-jakarta-medium text-[14px] mt-4">Loading payees…</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  // Profile gate
-  if (!isProfileComplete) {
-    return (
-      <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
-        <TopBar title="Bulk Payments" subtitle="Profile required to unlock" showBack={false} />
-        <View className="flex-1 items-center justify-center px-8">
-          <View className="w-20 h-20 rounded-full bg-[#fef3e7] items-center justify-center mb-6">
-            <Feather name="lock" size={32} color="#b87333" />
-          </View>
-          <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[28px] text-[#0c2010] text-center mb-3">Profile Incomplete</Text>
-          <Text className="text-[#707971] font-jakarta-medium text-[14px] text-center leading-relaxed max-w-[320px] mb-6">
-            To unlock Bulk Payments and stay KRA-compliant, add your KRA PIN and Business Number to your profile.
-          </Text>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('More' as never)}
-            className="bg-[#00351d] px-8 py-4 rounded-2xl flex-row items-center gap-2"
-          >
-            <Text className="text-white font-jakarta-extrabold text-[11px] uppercase tracking-widest">Complete Profile Now</Text>
-            <Feather name="arrow-right" size={14} color="#fff" />
-          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -1488,56 +1455,6 @@ export default function BulkPay() {
                       placeholderTextColor="#a1a1aa"
                       className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-4 py-3.5 text-[#0c2010] font-jakarta-semibold text-[14px] mb-4"
                     />
-
-                    {/* KRA Employee fields */}
-                    {newPayee.type === 'employee' && (
-                      <View className="bg-[#f0fdf4] rounded-2xl p-4 mb-4 border border-[#bbf7d0]">
-                        <Text className="text-[10px] font-jakarta-bold text-[#006c4e] uppercase tracking-wider mb-3">KRA Payroll Details</Text>
-                        <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">KRA PIN {newPayee.idNumber ? '' : '*'}</Text>
-                        <TextInput
-                          value={newPayee.kraPin}
-                          onChangeText={(t) => setNewPayee({ ...newPayee, kraPin: t.toUpperCase() })}
-                          autoCapitalize="characters"
-                          placeholder="A000000000A"
-                          placeholderTextColor="#a1a1aa"
-                          className="bg-white border border-[#e7ece7] rounded-xl px-4 py-3 text-[#0c2010] font-jakarta-bold text-[14px] mb-3"
-                        />
-                        {/* Employees don't always have their KRA PIN on hand —
-                            ID Number is an accepted alternative (see
-                            validateNewPayee above). */}
-                        <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">ID Number {newPayee.kraPin ? '' : '*'}</Text>
-                        <TextInput
-                          value={newPayee.idNumber}
-                          onChangeText={(t) => setNewPayee({ ...newPayee, idNumber: t.replace(/\D/g, '') })}
-                          keyboardType="numeric"
-                          placeholder="12345678"
-                          placeholderTextColor="#a1a1aa"
-                          className="bg-white border border-[#e7ece7] rounded-xl px-4 py-3 text-[#0c2010] font-jakarta-bold text-[14px] mb-3"
-                        />
-                        <View className="flex-row gap-2">
-                          <View className="flex-1">
-                            <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">NSSF</Text>
-                            <TextInput
-                              value={newPayee.nssfNumber}
-                              onChangeText={(t) => setNewPayee({ ...newPayee, nssfNumber: t })}
-                              placeholder="123456789"
-                              placeholderTextColor="#a1a1aa"
-                              className="bg-white border border-[#e7ece7] rounded-xl px-3 py-3 text-[#0c2010] font-jakarta-bold text-[13px]"
-                            />
-                          </View>
-                          <View className="flex-1">
-                            <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">SHIF</Text>
-                            <TextInput
-                              value={newPayee.shifNumber}
-                              onChangeText={(t) => setNewPayee({ ...newPayee, shifNumber: t })}
-                              placeholder="1234567"
-                              placeholderTextColor="#a1a1aa"
-                              className="bg-white border border-[#e7ece7] rounded-xl px-3 py-3 text-[#0c2010] font-jakarta-bold text-[13px]"
-                            />
-                          </View>
-                        </View>
-                      </View>
-                    )}
 
                     {/* KRA Supplier fields */}
                     {newPayee.type === 'supplier' && (
