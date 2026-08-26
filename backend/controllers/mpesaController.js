@@ -1013,6 +1013,15 @@ export const initiateB2C = async (req, res) => {
           kesAmount: amount,
           currency: 'KES',
           status: 'pending',
+          // A clear "insufficient funds" rejection means nothing moved —
+          // safe for ncbaPayoutRetryService.js to actively resubmit later.
+          // Anything else stays 'ambiguous_response' (unchanged behaviour):
+          // never auto-retried, only ever resolved by a real callback or
+          // the stuck-payout reconciliation sweep.
+          pendingReason: ncbaErr.isInsufficientFunds ? 'insufficient_funds' : 'ambiguous_response',
+          retryPayload: ncbaErr.isInsufficientFunds
+            ? { rail: 'ncba_mobile_b2w', beneficiaryName, recipientNumber: phone, narration: `Withdrawal to ${destination}` }
+            : null,
           reference: transactionId,
           sender: { name: merchant.businessName, id: merchant.ncbaMerchantCode },
           recipient: { name: destination, id: phone },
@@ -1220,6 +1229,18 @@ export const initiateB2B = async (req, res) => {
           kesAmount: numericAmount,
           currency: 'KES',
           status: 'pending',
+          pendingReason: ncbaErr.isInsufficientFunds ? 'insufficient_funds' : 'ambiguous_response',
+          retryPayload: ncbaErr.isInsufficientFunds
+            ? {
+                rail: 'ncba_lipa_na_mpesa',
+                paymentType,
+                payBillTillNo: partyB,
+                accountReference: paymentType === 'Paybill' ? accountReference : undefined,
+                recipientName,
+                notifyMobileNumber: merchant.phone,
+                narration: reference || `Payout to ${partyB}`,
+              }
+            : null,
           reference: transactionId,
           sender: { name: merchant.businessName, id: merchant.ncbaMerchantCode },
           recipient: { name: recipientName, id: partyB },

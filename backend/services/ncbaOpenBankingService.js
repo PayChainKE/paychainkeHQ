@@ -71,10 +71,28 @@ export class NcbaOpenBankingValidationError extends Error {
 }
 
 export class NcbaOpenBankingRequestError extends Error {
-  constructor(message) {
+  constructor(message, { isInsufficientFunds = false } = {}) {
     super(message);
     this.name = 'NcbaOpenBankingRequestError';
+    // A clear, definitive "no" from NCBA — unlike a genuinely ambiguous
+    // rejection (mangled/unreadable response, where NCBA may have silently
+    // processed the transfer anyway), "insufficient funds" means nothing
+    // moved. Callers use this to safely retry the same request later
+    // (once the pooled account has more real liquidity) instead of just
+    // waiting out the reconciliation window and refunding — see
+    // isInsufficientFundsMessage below and
+    // services/ncbaPayoutRetryService.js.
+    this.isInsufficientFunds = isInsufficientFunds;
   }
+}
+
+// NCBA's own wording for this ("Insufficient Funds For Transaction.") is
+// the only real signal available that a rejection is specifically a
+// liquidity issue rather than a validation/config/recipient problem —
+// there's no separate errorCode field reliably present across every rail
+// (see findNcbaField's doc comment on field-name inconsistency).
+function isInsufficientFundsMessage(message) {
+  return /insufficient.{0,20}fund/i.test(String(message ?? ''));
 }
 
 function logEvent(level, event, fields) {
@@ -864,7 +882,8 @@ export async function submitLipaNaMpesaPayment({
 
   const result = await ncbaOpenBankingPost('/api/v1/LipaNaMpesa/lipanampesa', payload);
   if (result?.resErrorCode !== '000') {
-    throw new NcbaOpenBankingRequestError(result?.resErrorDesc || result?.resErrorMessage || 'This Lipa na M-Pesa payment was rejected');
+    const rejectionMessage = result?.resErrorDesc || result?.resErrorMessage || 'This Lipa na M-Pesa payment was rejected';
+    throw new NcbaOpenBankingRequestError(rejectionMessage, { isInsufficientFunds: isInsufficientFundsMessage(rejectionMessage) });
   }
   return result;
 }
@@ -961,7 +980,10 @@ export async function submitMobileB2wPayment({
     (successCode !== undefined && NCBA_SUCCESS_CODES.includes(String(successCode)));
   if (!succeeded) {
     logEvent('warn', 'ncba_openbanking_mobile_b2w_submit_rejected', { transactionId, response: result });
-    throw new NcbaOpenBankingRequestError(messageField ? String(messageField) : 'The payout could not be completed. Please try again.');
+    throw new NcbaOpenBankingRequestError(
+      messageField ? String(messageField) : 'The payout could not be completed. Please try again.',
+      { isInsufficientFunds: isInsufficientFundsMessage(messageField) }
+    );
   }
   return result;
 }

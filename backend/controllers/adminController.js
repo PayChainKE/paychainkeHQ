@@ -423,8 +423,21 @@ export const confirmMerchantAction = async (req, res) => {
         }).catch((err) => console.error('Contact-changed notification SMS failed:', err));
       }
     } else if (action === 'delete') {
-      // Hard delete: remove merchant + all owned records. We don't drop
-      // Transactions tied to other merchants — only this one's.
+      // Hard delete: remove the merchant + their non-financial owned
+      // records only. Transaction and PayoutBatch are real settled-money
+      // history — the platform's revenue page (GMV, GPR, gross platform
+      // volume, per-stream fees) and the admin Transactions list are both
+      // sourced directly from Transaction, so deleting a merchant's rows
+      // used to silently shrink every lifetime revenue figure the moment
+      // they were removed. Those two collections are deliberately excluded
+      // from this cascade now — real money moved, and that record has to
+      // survive the merchant who moved it (see the equivalent carve-out
+      // already in place for RevenueSweep, revenueController.js's
+      // getRevenueSweeps). Everything else here is pre-transaction
+      // merchant *configuration* (saved bulk-pay recipients, created
+      // payment link definitions, individual STK prompt attempts) with no
+      // standalone financial-reporting significance, so it's still fully
+      // removed.
       // Log BEFORE deletion so we keep the merchant denormalised metadata.
       logAudit({
         action: 'admin.merchant.deleted', category: 'admin', severity: 'critical',
@@ -441,8 +454,6 @@ export const confirmMerchantAction = async (req, res) => {
       }
 
       await Promise.all([
-        Transaction.deleteMany({ merchantId: merchant._id }),
-        PayoutBatch.deleteMany({ merchantId: merchant._id }),
         STKRequest.deleteMany({ merchantId: merchant._id }),
         Payee.deleteMany({ merchantId: merchant._id }),
         PaymentLink.deleteMany({ merchantId: merchant._id }),
@@ -1685,7 +1696,7 @@ export const getInsights = async (req, res) => {
       const doc = docMap.get(String(row._id)) || {};
       return {
         _id: row._id,
-        businessName: doc.businessName || '— Unknown —',
+        businessName: doc.businessName || 'Deleted Merchant',
         name: doc.name || '',
         status: doc.status || 'active',
         flagged: !!doc.flagged,

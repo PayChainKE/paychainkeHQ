@@ -293,11 +293,17 @@ export const handleNcbaAccountNotification = async (req, res) => {
       newBalance: ledgerResult.merchant.kesBalance,
     });
 
+    // Merchant-facing copy (notification + SMS below) shows netAmount, not
+    // transAmount — transAmount is the gross figure NCBA reported, which
+    // includes PayChain's fee and isn't what actually landed in kesBalance
+    // (see creditNcbaCollection's $inc: { kesBalance: netAmount }). The
+    // customer's own receipt further down correctly keeps transAmount,
+    // since that's genuinely what they paid.
     createNotification({
       merchantId: merchant._id,
       kind: 'payment',
       title: 'Payment received',
-      message: `You received KES ${transAmount.toLocaleString()} via your PayChain Virtual Account. Ref: ${transId}.`,
+      message: `You received KES ${ledgerResult.netAmount.toLocaleString()} via your PayChain Virtual Account. Ref: ${transId}.`,
     }).catch((e) => logEvent('error', 'ncba_account_notification_notification_failed', { transId, error: e.message }));
 
     // Non-blocking customer + merchant SMS — sendSMS never throws (see
@@ -370,7 +376,7 @@ export const handleNcbaAccountNotification = async (req, res) => {
         to: merchant.phone,
         message: buildPaymentReceivedSms({
           ref: transId,
-          amount: transAmount,
+          amount: ledgerResult.netAmount,
           payerName: customerDisplayName,
           payerPhone: validPayerPhone,
           date,

@@ -1,19 +1,27 @@
 import crypto from 'crypto';
 import { sendSMS } from './sms.js';
 
-// Defensive layer sitting in front of utils/sms.js#sendSMS — guarantees every
-// outbound message stays inside a single GSM-7 SMS segment (160 chars) so we
-// never get silently double/triple-billed by Africa's Talking for a
-// concatenated multi-part message. Three responsibilities, in order:
+// Defensive layer sitting in front of utils/sms.js#sendSMS. Every outbound
+// message is sent complete, exactly as composed — a real business name, a
+// real reference, a real "Thank you for your payment." close, never cut
+// short and never left dangling with "...". That's non-negotiable: a
+// merchant's or customer's name is part of what makes the message feel
+// like a real, professional confirmation (the standard every M-Pesa
+// payment SMS itself is held to), not an artifact to be sacrificed for a
+// billing optimization. Two responsibilities, in order:
 //   1. sanitizeGsmText   — strip anything that would force UCS-2 encoding
-//                          (which drops the per-segment budget from 160 to 70).
-//   2. buildStrictSms    — compile a template + trim only its *dynamic*
-//                          fields (store name, customer name, etc.) so the
-//                          final text fits 160 chars without ever touching
-//                          the amount, reference/token, date or time.
-//   3. safeSendSMS       — last-resort backstop wrapper around sendSMS() that
-//                          hard-truncates anything that still overflows and
-//                          logs a critical, trackable warning when it does.
+//                          (which drops the per-segment budget from 160 to
+//                          70) — a real encoding constraint, not a content
+//                          decision, so this one still applies.
+//   2. buildStrictSms    — compile a template from fixed + dynamic fields,
+//                          all rendered in full, and report (informational
+//                          only) whether the result exceeds one GSM-7
+//                          segment.
+// A message that runs past 160 chars still sends in full, as a standard
+// concatenated multi-part SMS — Africa's Talking (like every SMS gateway)
+// delivers that to the handset as one seamless message, just billed for
+// the extra segment. Template wording is kept as concise as possible
+// specifically so that stays the exception, not so content ever gets cut.
 
 const SINGLE_SEGMENT_LIMIT = 160;
 
@@ -81,20 +89,28 @@ export function sanitizeGsmText(rawText) {
 }
 
 /**
- * Compiles a message from a template function while guaranteeing the result
- * fits within `maxLength` (default 160 — one GSM-7 segment). Only the fields
- * listed in `data.truncatable` are ever shortened, in the order given
- * (earliest = truncated first); everything in `data.fixed` — amount,
- * transaction reference/token, date, time — is passed through untouched.
+ * Compiles a message from a template function against fixed + dynamic field
+ * values. Every field — including anything listed in the legacy
+ * `data.truncatable` shape — is always rendered in full: nothing is ever
+ * shortened or ellipsized here. A real business name, reference, or any
+ * other field must read exactly as typed, the same way an M-Pesa
+ * confirmation SMS never clips the paybill/till name it's confirming.
+ * `truncated`/`length` in the return value are purely informational — they
+ * tell a caller the message will go out as more than one concatenated GSM-7
+ * segment (>160 chars), which costs more but is standard, fully-supported
+ * SMS behaviour (Africa's Talking — and every carrier — delivers a
+ * concatenated multi-part message to the handset as one seamless text, not
+ * as separate broken messages).
  *
  * @param {(fields: Record<string, string>) => string} templateFunc
  *        Builds the final SMS body from a flat object of fixed + dynamic
  *        field values.
  * @param {{
  *   fixed?: Record<string, string>,
- *   truncatable?: Array<{ key: string, value: string, minLength?: number }>
+ *   truncatable?: Array<{ key: string, value: string }>
  * }} data
- * @param {number} [maxLength=160]
+ * @param {number} [segmentLength=160]
+ *        Only used to compute the informational `truncated`/`length` flags.
  * @returns {{ message: string, truncated: boolean, length: number }}
  *
  * @example
@@ -103,106 +119,54 @@ export function sanitizeGsmText(rawText) {
  *       `${transId} Confirmed. KES ${amount} paid to ${businessName} for account ${accountRef} on ${date} at ${time}. Thank you for your payment.`,
  *     {
  *       fixed: { transId: 'QGH7X9K2M', amount: '5,000', accountRef: '00005421', date: '12/7/26', time: '2:09 PM' },
- *       truncatable: [{ key: 'businessName', value: 'Mama Mboga General Green Grocers Ltd', minLength: 10 }],
+ *       truncatable: [{ key: 'businessName', value: 'Mama Mboga General Green Grocers Ltd' }],
  *     }
  *   );
- *   // => { message: "QGH7X9K2M Confirmed. KES 5,000 paid to Mama Mboga Gen... for account 00005421 on 12/7/26 at 2:09 PM. Thank you for your payment.", truncated: true, length: 160 }
+ *   // => { message: "QGH7X9K2M Confirmed. KES 5,000 paid to Mama Mboga General Green Grocers Ltd for account 00005421 on 12/7/26 at 2:09 PM. Thank you for your payment.", truncated: true, length: 172 }
  */
-export function buildStrictSms(templateFunc, data, maxLength = SINGLE_SEGMENT_LIMIT) {
+export function buildStrictSms(templateFunc, data, segmentLength = SINGLE_SEGMENT_LIMIT) {
   const { fixed = {}, truncatable = [] } = data ?? {};
 
-  // Sanitize every input value up front — truncation math must run against
-  // the character count that will actually be sent, not the raw input.
   const sanitizedFixed = Object.fromEntries(
     Object.entries(fixed).map(([key, value]) => [key, sanitizeGsmText(value)])
   );
-  const fields = truncatable.map((f) => ({
-    ...f,
-    value: sanitizeGsmText(f.value),
-    minLength: f.minLength ?? 8,
-  }));
+  const merged = { ...sanitizedFixed };
+  for (const f of truncatable) merged[f.key] = sanitizeGsmText(f.value);
 
-  const compile = () => {
-    const merged = { ...sanitizedFixed };
-    for (const f of fields) merged[f.key] = f.current ?? f.value;
-    return templateFunc(merged);
-  };
+  const message = templateFunc(merged);
 
-  let message = compile();
-  let truncated = false;
-
-  // Shorten the lowest-priority dynamic field first, one field at a time,
-  // re-measuring after every step — never touches `fixed` values (amount,
-  // token, date, time) no matter how far over budget the message is.
-  let fieldIndex = 0;
-  while (message.length > maxLength && fieldIndex < fields.length) {
-    const field = fields[fieldIndex];
-    const current = field.current ?? field.value;
-
-    if (current.length <= field.minLength) {
-      fieldIndex += 1; // this field is already as short as it's allowed to go
-      continue;
-    }
-
-    const overBy = message.length - maxLength;
-    const ellipsis = '...';
-    const targetLength = Math.max(field.minLength, current.length - overBy - ellipsis.length);
-    const next = current.slice(0, targetLength).trimEnd() + ellipsis;
-
-    // Once a field has already been truncated down near its floor, slicing
-    // an already-ellipsized string can reproduce the exact same string on
-    // every subsequent pass (e.g. "Paybil..." sliced to 6 chars + "..." is
-    // "Paybil..." again) — an infinite loop that never shrinks the message
-    // and never advances fieldIndex. If this pass made no real progress,
-    // move on to the next field instead of retrying forever. A message that
-    // still exceeds maxLength after every field is exhausted falls through
-    // to safeSendSMS's own hard-truncate backstop.
-    if (next.length >= current.length) {
-      fieldIndex += 1;
-      continue;
-    }
-
-    field.current = next;
-    truncated = true;
-    message = compile();
-  }
-
-  return { message, truncated, length: message.length };
+  return { message, truncated: message.length > segmentLength, length: message.length };
 }
 
 /**
- * Production-safe send wrapper: sanitizes + hard-truncates as a last-resort
- * backstop (callers should already be using buildStrictSms so this rarely
- * has to actually cut anything), then delegates to the real sendSMS().
- * Never throws — matches utils/sms.js's contract, always resolves
- * { success, error?, truncated, trackingCode? }.
+ * Production-safe send wrapper: sanitizes for GSM-7 (still real — dropping
+ * an emoji/curly-quote is what keeps a message billed at 160 chars/segment
+ * instead of collapsing to UCS-2's 70), then delegates to the real
+ * sendSMS() with the message exactly as built — never shortened, never
+ * ellipsized. A message longer than one segment is sent in full as a
+ * standard concatenated multi-part SMS (Africa's Talking, like every SMS
+ * gateway, handles this natively and the handset renders it as one
+ * complete text) — logged as informational so segment cost is visible, not
+ * as an error to fix. Never throws — matches utils/sms.js's contract,
+ * always resolves { success, error?, truncated, trackingCode? }.
  *
  * @param {{ to: string, message: string }} options
  */
 export async function safeSendSMS({ to, message } = {}) {
-  const sanitized = sanitizeGsmText(message);
-  let finalMessage = sanitized;
-  let truncated = false;
+  const finalMessage = sanitizeGsmText(message);
+  const truncated = finalMessage.length > SINGLE_SEGMENT_LIMIT;
   let trackingCode = null;
 
-  if (finalMessage.length > SINGLE_SEGMENT_LIMIT) {
-    truncated = true;
-    trackingCode = `SMS-TRUNC-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
-    finalMessage = finalMessage.slice(0, SINGLE_SEGMENT_LIMIT - 3).trimEnd() + '...';
-
-    // Critical, not warn — this means a caller built a message without
-    // going through buildStrictSms and it overflowed a single segment.
-    // That's either a silent double-billing event narrowly avoided, or (if
-    // this hard truncation still isn't acceptable for that message) a bug
-    // that needs a real fix upstream, not just this backstop.
-    console.error(
+  if (truncated) {
+    trackingCode = `SMS-MULTIPART-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+    console.log(
       JSON.stringify({
-        level: 'error',
-        event: 'sms_hard_truncated',
+        level: 'info',
+        event: 'sms_multi_segment',
         trackingCode,
         to,
-        originalLength: sanitized.length,
-        finalLength: finalMessage.length,
+        length: finalMessage.length,
+        segments: Math.ceil(finalMessage.length / 153), // 153, not 160 — concatenated GSM-7 segments reserve 7 chars each for the UDH part header
         ts: new Date().toISOString(),
       })
     );

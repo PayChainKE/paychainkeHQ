@@ -105,22 +105,19 @@ export function buildPaymentRequestSms({ businessName, baseAmount, fee }) {
   const showFee = fee > 0;
   return buildStrictSms(
     ({ name, amt, feeLine, total }) =>
-      `${name} is requesting Ksh ${amt} via PayChain.${feeLine} Enter your M-PESA PIN when prompted to pay Ksh ${total}.`,
+      `${name} is requesting Ksh ${amt} via PayChain.${feeLine} Enter M-PESA PIN to pay Ksh ${total}.`,
     {
       fixed: {
         amt: formatKes(baseAmount),
         feeLine: showFee ? ` Transaction cost, Ksh ${formatKes(fee)}.` : '',
         total: formatKes(total),
       },
-      // Previously fixed/non-truncatable on the theory that a business name
-      // must always show in full — but most real business names (anything
-      // past ~20 chars, which is common) pushed this past one GSM-7 segment
-      // on their own, guaranteeing safeSendSMS's crude end-of-string
-      // hard-truncate fired and mangled the message every time. Truncating
-      // the name here (with a real ellipsis, at a sentence-safe point) is
-      // still readable and vastly better than a message that just stops
-      // mid-word.
-      truncatable: [{ key: 'name', value: businessName || 'A PayChain business', minLength: 15 }],
+      // The business name always renders in full — buildStrictSms never
+      // shortens anything. Kept concise wording around it (rather than
+      // truncating the name) so a normal business name still fits one
+      // segment; a genuinely long name is sent complete regardless, as a
+      // standard multi-part SMS.
+      truncatable: [{ key: 'name', value: businessName || 'A PayChain business' }],
     }
   );
 }
@@ -143,16 +140,12 @@ export function buildCustomerPaidSms({ ref, amount, businessName, accountRef, da
         // up, the same way an M-Pesa "Transaction cost" line does.
         feeLine: showFee ? ` Transaction cost Ksh ${formatKes(fee)}.` : '',
       },
-      // Both merchant-typed free text, both capable of running long enough
-      // on their own to push a normal-length message over one segment —
-      // name truncates first (a customer can still recognise a shortened
-      // business name), account ref second, so the closing "Thank you for
-      // your payment." line — previously getting silently guillotined by
-      // safeSendSMS's crude end-of-string hard-truncate whenever both
-      // fields were long — always survives intact.
+      // Both render in full — buildStrictSms never shortens a field. A long
+      // business name or account ref just makes this a multi-part SMS
+      // rather than losing "Thank you for your payment." off the end.
       truncatable: [
-        { key: 'name', value: businessName || 'PayChain', minLength: 5 },
-        { key: 'acct', value: accountRef || '', minLength: 4 },
+        { key: 'name', value: businessName || 'PayChain' },
+        { key: 'acct', value: accountRef || '' },
       ],
     }
   );

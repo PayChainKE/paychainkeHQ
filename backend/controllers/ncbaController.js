@@ -133,11 +133,17 @@ export const handleNcbaReconciliationWebhook = async (req, res) => {
       newBalance: ledgerResult.merchant.kesBalance,
     });
 
+    // Merchant-facing copy (notification + SMS below) shows netAmount, not
+    // grossAmount — grossAmount includes PayChain's fee, which was never
+    // the merchant's money and isn't what actually landed in kesBalance
+    // (see the $inc: { kesBalance: netAmount } in creditNcbaCollection).
+    // The customer's own receipt further down correctly keeps grossAmount,
+    // since that's genuinely what they paid.
     createNotification({
       merchantId: merchant._id,
       kind: 'payment',
       title: 'Payment received',
-      message: `You received KES ${grossAmount.toLocaleString()} via your PayChain Virtual Account. Ref: ${transactionReference}.`,
+      message: `You received KES ${ledgerResult.netAmount.toLocaleString()} via your PayChain Virtual Account. Ref: ${transactionReference}.`,
     }).catch((e) => logEvent('error', 'ncba_reconciliation_notification_failed', { transactionReference, error: e.message }));
 
     // Non-blocking customer + merchant SMS — sendSMS never throws (see
@@ -177,7 +183,7 @@ export const handleNcbaReconciliationWebhook = async (req, res) => {
         to: merchant.phone,
         message: buildPaymentReceivedSms({
           ref: transactionReference,
-          amount: grossAmount,
+          amount: ledgerResult.netAmount,
           payerName: null,
           payerPhone: customerPhone,
           date,

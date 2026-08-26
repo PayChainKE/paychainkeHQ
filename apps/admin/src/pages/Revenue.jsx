@@ -625,6 +625,11 @@ const Revenue = () => {
                 </button>
               ))}
             </div>
+            {data?.windowStart && (
+              <span className="text-2xs font-medium text-on-surface-variant/70 px-1">
+                {range === 'all' ? 'All time since launch' : fmtPeriod({ from: data.windowStart, to: data.windowEnd })}
+              </span>
+            )}
             <div className="w-px h-6 bg-outline-variant/60 mx-1" />
             <div className="flex items-center gap-2 px-2">
               <span className="material-symbols-outlined text-on-surface-variant text-base">filter_alt</span>
@@ -667,6 +672,11 @@ const Revenue = () => {
                   </span>
                   <span className="text-on-surface-variant">vs prev period</span>
                 </div>
+              )}
+              {!loading && data?.windowStart && (
+                <span className="text-2xs text-on-surface-variant/60">
+                  {range === 'all' ? 'All time since launch — never shrinks' : fmtPeriod({ from: data.windowStart, to: data.windowEnd })}
+                </span>
               )}
             </div>
 
@@ -728,7 +738,7 @@ const Revenue = () => {
         <section>
           <div className="flex items-end justify-between mb-4">
             <div>
-              <h3 className="text-base font-bold text-on-surface tracking-tight font-headline">Cash Position — This Period</h3>
+              <h3 className="text-base font-bold text-on-surface tracking-tight font-headline">Cash Position — {range === 'all' ? 'All Time' : 'This Period'}</h3>
               <p className="text-xs text-on-surface-variant mt-1">
                 What actually moved. Money In is fees collected into the pooled FBO account; Money Out is what real sweep attempts
                 (below) actually transferred to the corporate account in this window — not a projection.
