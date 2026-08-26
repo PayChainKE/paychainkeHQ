@@ -60,7 +60,7 @@ export const addPayee = async (req, res) => {
   try {
     let {
       name, type, paymentMethod, mobileMoneyType, mobileNetwork, phone, paybillNumber,
-      businessAccount, tillNumber, bankName, accountNumber, bankCode, utilityProvider,
+      businessAccount, tillNumber, bankName, accountNumber, bankCode, utilityProvider, utilityType,
       kraPin, idNumber, nssfNumber, shifNumber, etimsInvoiceNumber, cuNumber, defaultAmount
     } = req.body;
 
@@ -83,7 +83,7 @@ export const addPayee = async (req, res) => {
     const payee = new Payee({
       merchantId: req.merchant._id,
       name, type, paymentMethod, mobileMoneyType, mobileNetwork, phone, paybillNumber,
-      businessAccount, tillNumber, bankName, accountNumber, bankCode, utilityProvider,
+      businessAccount, tillNumber, bankName, accountNumber, bankCode, utilityProvider, utilityType,
       kraPin, idNumber, nssfNumber, shifNumber, etimsInvoiceNumber, cuNumber, defaultAmount
     });
 
@@ -101,7 +101,7 @@ export const updatePayee = async (req, res) => {
   try {
     let {
       name, type, paymentMethod, mobileMoneyType, mobileNetwork, phone, paybillNumber,
-      businessAccount, tillNumber, bankName, accountNumber, bankCode, utilityProvider,
+      businessAccount, tillNumber, bankName, accountNumber, bankCode, utilityProvider, utilityType,
       kraPin, idNumber, nssfNumber, shifNumber, etimsInvoiceNumber, cuNumber, defaultAmount
     } = req.body;
 
@@ -128,7 +128,7 @@ export const updatePayee = async (req, res) => {
       { _id: req.params.id, merchantId: req.merchant._id },
       {
         name, type, paymentMethod, mobileMoneyType, mobileNetwork, phone, paybillNumber,
-        businessAccount, tillNumber, bankName, accountNumber, bankCode, utilityProvider,
+        businessAccount, tillNumber, bankName, accountNumber, bankCode, utilityProvider, utilityType,
         kraPin, idNumber, nssfNumber, shifNumber, etimsInvoiceNumber, cuNumber, defaultAmount,
         updatedAt: new Date()
       },
