@@ -21,6 +21,7 @@ import Onboarding from '../pages/Onboarding';
 import PinSetup from '../pages/PinSetup';
 import PinEntry from '../pages/PinEntry';
 import BiometricSetup from '../pages/BiometricSetup';
+import TourTarget from '../components/TourTarget';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -60,30 +61,30 @@ function MainTabs() {
           )
         }}
       />
-      <Tab.Screen 
-        name="Collections" 
-        component={Collections} 
+      <Tab.Screen
+        name="Collections"
+        component={Collections}
         options={{
           tabBarIcon: ({ color }) => (
-            <Feather name="arrow-down-circle" size={22} color={color} />
+            <TourTarget id="tab-collections"><Feather name="arrow-down-circle" size={22} color={color} /></TourTarget>
           )
         }}
       />
-      <Tab.Screen 
-        name="Pay" 
-        component={BulkPay} 
+      <Tab.Screen
+        name="Pay"
+        component={BulkPay}
         options={{
           tabBarIcon: ({ color }) => (
-            <Feather name="users" size={22} color={color} />
+            <TourTarget id="tab-pay"><Feather name="users" size={22} color={color} /></TourTarget>
           )
         }}
       />
-      <Tab.Screen 
-        name="Advance" 
-        component={CashAdvance} 
+      <Tab.Screen
+        name="Advance"
+        component={CashAdvance}
         options={{
           tabBarIcon: ({ color }) => (
-            <Feather name="trending-up" size={22} color={color} />
+            <TourTarget id="tab-advance"><Feather name="trending-up" size={22} color={color} /></TourTarget>
           )
         }}
       />
@@ -92,7 +93,7 @@ function MainTabs() {
         component={Profile}
         options={{
           tabBarIcon: ({ color }) => (
-            <Feather name="grid" size={22} color={color} />
+            <TourTarget id="tab-more"><Feather name="grid" size={22} color={color} /></TourTarget>
           )
         }}
       />

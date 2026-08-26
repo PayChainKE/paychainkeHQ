@@ -16,6 +16,7 @@ import SupportTab from '../components/tabs/SupportTab';
 import SettingsTab from '../components/tabs/SettingsTab';
 import SecurityTab from '../components/tabs/SecurityTab';
 import ProfileWalkthrough from '../components/ProfileWalkthrough';
+import TourTarget from '../components/TourTarget';
 
 type SectionKey = 'my-accounts' | 'support' | 'settings' | 'security' | 'wallet' | 'payment-link' | 'statement' | 'business-profile';
 
@@ -319,14 +320,16 @@ function BusinessProfilePanel({ merchant }: { merchant: any }) {
           <Text className="text-[#707971] text-[14px] font-jakarta-medium leading-relaxed opacity-80">Your registered business identity and key merchant details.</Text>
         </View>
 
-        <View className="bg-white rounded-[32px] border border-[#eff4ef] shadow-sm shadow-[#00351d]/5 p-6 gap-5">
+        <TourTarget id="profile-identity-card" className="bg-white rounded-[32px] border border-[#eff4ef] shadow-sm shadow-[#00351d]/5 p-6 gap-5">
           <ProfileRow label="Business Name" value={merchant?.businessName || 'N/A'} />
           <ProfileRow label="Email" value={merchant?.email || 'N/A'} />
           <ProfileRow label="Phone" value={merchant?.phone || 'N/A'} />
           <ProfileRow label="PayChain Account" value={formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending')} />
-          <ProfileRow label="KRA PIN" value={merchant?.kraPin || 'Not set'} />
+          <TourTarget id="kra-pin-field">
+            <ProfileRow label="KRA PIN" value={merchant?.kraPin || 'Not set'} />
+          </TourTarget>
           <ProfileRow label="Business Reg Number" value={merchant?.businessNumber || 'Not set'} />
-        </View>
+        </TourTarget>
       </View>
     </ScrollView>
   );
