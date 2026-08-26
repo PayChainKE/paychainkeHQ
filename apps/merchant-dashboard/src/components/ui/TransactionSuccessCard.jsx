@@ -171,7 +171,12 @@ export default function TransactionSuccessCard({
             {isPending ? 'schedule' : 'check_circle'}
           </span>
         </div>
-        <h2 className="font-headline text-3xl font-bold text-primary tracking-tight mb-1">{isPending ? 'Payment Sent' : 'Transaction Successful'}</h2>
+        <h2 className="font-headline text-3xl font-bold text-primary tracking-tight mb-1">{isPending ? 'Payment Processing' : 'Transaction Successful'}</h2>
+        {isPending && (
+          <p className="text-xs text-amber-700/80 max-w-xs mx-auto -mt-1 mb-1">
+            We've submitted this but haven't confirmed it landed yet. We'll update this transaction automatically — no need to retry.
+          </p>
+        )}
         <p className="font-headline text-4xl font-bold text-[#00351D] tracking-tight mt-3 mb-4">{formatKES(amount)}</p>
         <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
           isPending ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'

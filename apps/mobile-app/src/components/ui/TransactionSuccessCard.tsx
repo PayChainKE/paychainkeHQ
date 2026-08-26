@@ -142,8 +142,13 @@ export default function TransactionSuccessCard({
           <Feather name={isPending ? 'clock' : 'check-circle'} size={40} color={isPending ? '#b45309' : '#006c4e'} />
         </View>
         <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[26px] text-[#00351d] mb-1 text-center">
-          {isPending ? 'Payment Sent' : 'Transaction Successful'}
+          {isPending ? 'Payment Processing' : 'Transaction Successful'}
         </Text>
+        {isPending && (
+          <Text className="text-[12px] text-amber-700/80 text-center max-w-[260px] mb-1">
+            We've submitted this but haven't confirmed it landed yet. We'll update this transaction automatically — no need to retry.
+          </Text>
+        )}
         <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[32px] text-[#00351d] mt-2 mb-3 text-center">
           {formatKES(amount)}
         </Text>
