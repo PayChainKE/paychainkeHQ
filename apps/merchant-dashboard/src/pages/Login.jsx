@@ -6,6 +6,7 @@ import mainLogo from '../assets/signin-logo.png'
 import footerBrandsLogo from '../assets/signin-footer-logo.png'
 import poweredByLogo from '../assets/poweredby-logo.png'
 import { ValidatedInput } from '../components/ValidatedInput'
+import { validators } from '../utils/validators'
 import { BiometricLoginButton } from '../components/BiometricButton'
 
 const KENYAN_COUNTIES = [
@@ -101,6 +102,12 @@ export default function Login() {
   const [signupEmployees, setSignupEmployees] = useState('')
   const [signupEcommerce, setSignupEcommerce] = useState('')
   const [agreedToTerms, setAgreedToTerms] = useState(false)
+  // Flipped true the first time Continue is pressed with an invalid field —
+  // forces every ValidatedInput on this step to show its own inline error
+  // immediately (via forceTouched), not just the ones the user happened to
+  // already blur, so a failed Continue attempt points at every problem
+  // field at once instead of only the generic banner error.
+  const [signupStepTouched, setSignupStepTouched] = useState(false)
 
   // Reset Flow States
   const [isResetMode, setIsResetMode] = useState(false)
@@ -352,8 +359,30 @@ export default function Login() {
 
   async function handleSignup(e) {
     e.preventDefault()
-    if (!signupPhone || signupPhone.length < 9) {
+    // Real validators, not the previous name/phone presence-or-length-only
+    // checks — those were weaker than what ValidatedInput itself uses to
+    // show the inline error on this exact screen (e.g. phone only checked
+    // `.length < 9`, so a 9+ digit but not-actually-Kenyan number displayed
+    // an error yet still passed this gate and reached the password step).
+    // Marks the whole step touched first so every field's own inline error
+    // renders immediately (forceTouched), pointing at each specific problem
+    // rather than only a generic banner.
+    setSignupStepTouched(true)
+
+    if (!validators.personName(signupName).valid) {
+      setErr('Please enter a valid name before continuing.')
+      return
+    }
+    if (!validators.email(signupEmail).valid) {
+      setErr('Please enter a valid email address before continuing.')
+      return
+    }
+    if (!validators.phoneKE(signupPhone).valid) {
       setErr('Please enter a valid Kenyan phone number before continuing.')
+      return
+    }
+    if (!validators.businessName(signupBusinessName).valid) {
+      setErr('Please enter a valid business name before continuing.')
       return
     }
     if (!signupBusinessType) {
@@ -377,6 +406,7 @@ export default function Login() {
       return
     }
     setErr('')
+    setSignupStepTouched(false)
     setIsSignupPasswordStep(true)
   }
 
@@ -667,30 +697,37 @@ export default function Login() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Your Name *</label>
-                    <ValidatedInput kind="personName" required value={signupName} onChange={e => setSignupName(e.target.value)} placeholder="John Doe"
+                    <ValidatedInput kind="personName" required value={signupName} onChange={e => setSignupName(e.target.value)} placeholder="John Doe" forceTouched={signupStepTouched}
                       className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" />
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Your Email *</label>
-                    <ValidatedInput kind="email" required value={signupEmail} onChange={e => setSignupEmail(e.target.value)} placeholder="john@example.com"
+                    <ValidatedInput kind="email" required value={signupEmail} onChange={e => setSignupEmail(e.target.value)} placeholder="john@example.com" forceTouched={signupStepTouched}
                       className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" />
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Your Phone *</label>
-                  <div className="flex group">
-                    <div className="bg-surface-container-low border border-outline-variant/15 border-r-0 rounded-l-xl px-3 flex items-center justify-center text-primary/40 group-focus-within:border-primary transition-colors">
+                  {/* Icon is absolutely positioned inside the input's own padding, not a
+                      flex sibling of it — ValidatedInput renders <input> and its error
+                      <p> as siblings (a Fragment), so putting it inside a `flex` row
+                      alongside the icon previously made the error paragraph itself a
+                      flex item in that same row (next to the icon/input) instead of
+                      stacking below the field — it visually landed inside/overlapping
+                      the input and could intercept clicks meant for it. */}
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center text-primary/40 group-focus-within:text-primary transition-colors pointer-events-none">
                       <span className="material-symbols-outlined text-sm">smartphone</span>
                     </div>
-                    <ValidatedInput kind="phoneKE" value={signupPhone} onChange={e => setSignupPhone(e.target.value)} placeholder="0712 345 678"
-                      className="flex-1 w-full bg-white border border-outline-variant/15 rounded-r-xl py-3 px-3 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" />
+                    <ValidatedInput kind="phoneKE" value={signupPhone} onChange={e => setSignupPhone(e.target.value)} placeholder="0712 345 678" forceTouched={signupStepTouched}
+                      className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 pl-10 pr-3 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" />
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Business Name *</label>
-                  <ValidatedInput kind="businessName" required value={signupBusinessName} onChange={e => setSignupBusinessName(e.target.value)} placeholder="Acme Corp"
+                  <ValidatedInput kind="businessName" required value={signupBusinessName} onChange={e => setSignupBusinessName(e.target.value)} placeholder="Acme Corp" forceTouched={signupStepTouched}
                     className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" />
                 </div>
 
