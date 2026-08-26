@@ -77,11 +77,14 @@ export default function Login() {
   // security timeout, not an unexpected sign-out.
   useEffect(() => {
     const reason = new URLSearchParams(location.search).get('reason')
-    if (reason === 'idle-timeout') {
-      addNotification({
-        title: 'Signed Out',
-        message: 'You were signed out after 15 minutes of inactivity. Please sign in again.',
-      })
+    const REASON_MESSAGES = {
+      'idle-timeout': 'You were signed out after 15 minutes of inactivity. Please sign in again.',
+      'session-expired': 'Your session has expired. Please sign in again.',
+      'session-revoked': 'This session was signed out remotely. Please sign in again.',
+      'account-unavailable': 'This account is no longer available. Please contact support if you believe this is a mistake.',
+    }
+    if (REASON_MESSAGES[reason]) {
+      addNotification({ title: 'Signed Out', message: REASON_MESSAGES[reason] })
       nav('/login', { replace: true })
     }
   }, [])
