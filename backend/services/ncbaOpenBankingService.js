@@ -40,42 +40,21 @@ const ncbaOpenBankingAccountNumber  = process.env.NCBA_OPENBANKING_ACCOUNT_NUMBE
 // on PesaLink payment payloads, separate from the account number itself.
 const ncbaOpenBankingSenderCif      = process.env.NCBA_OPENBANKING_SENDER_CIF;
 
-// Mobile B2W's "senderNumber" ("mobile number to receive the notification"
-// per the UAT Guide) — despite being undocumented as required, NCBA's live
-// API rejects the payload with a 422 ("SenderMsisdn is required and must be
-// 9 to 15 digits and must not start with 0") when it's blank. Every sample
-// in NCBA's own UAT Guide/Postman collection uses one fixed 254-prefixed
-// number regardless of recipient, so this is PayChain's own business
-// number, not something derived per-transaction — confirmed a real payout
-// batch failed 100% of rows with this exact error until it's set.
-const ncbaOpenBankingSenderMsisdn   = process.env.NCBA_OPENBANKING_SENDER_MSISDN;
-
 // Per the UAT Guide's Payment Rules for PesaLink: "Minimum payments of
 // KES. 50 ... and a maximum of KES. 999,999".
 const MIN_TRANSFER_AMOUNT = 50;
 const MAX_TRANSFER_AMOUNT = 999999;
 
+// Per NCBA (Rose, email 2026-08-26) for MobileMoneyTransfer/Mobile B2W:
+// "Process Bank to Wallet Payments to recipient's Mpesa numbers for amounts
+// between KES. 50.00 – KES. 250,000.00 Per transaction."
+const MOBILE_B2W_MIN_AMOUNT = 50;
+const MOBILE_B2W_MAX_AMOUNT = 250000;
+
 // Real network calls to NCBA (test or live) only happen when this is
 // explicitly 'true' — everything else simulates, so the payout flow is
 // fully exercisable offline before NCBA finishes IP whitelisting.
 const liveCallsEnabled = process.env.NCBA_OPENBANKING_LIVE_ENABLED === 'true';
-
-// Hakikisha/Airtel Money mobile-number validation path — a prerequisite for
-// submitMobileB2wPayment below. Not shown in the UAT Guide's text (only its
-// request/response JSON was) — the default below is NCBA's own "Open
-// Banking V2 - Callback Enabled" Postman collection's saved request path,
-// which matches what UAT actually accepts.
-//
-// Confirmed live 2026-08-26: production does NOT accept this same path —
-// it 404s. Probing NCBA's own production gateway directly found production
-// instead uses /api/v1/MpesaB2WValidation/validate-account — the literal
-// name of the Postman collection's folder, which its own saved request
-// (and therefore this default) does NOT use. So UAT and production
-// genuinely use two different paths for this one call; this isn't
-// documented anywhere NCBA gave us. Set NCBA_MOBILE_WALLET_VALIDATION_PATH
-// on Render for live traffic — do not change the default below, it's still
-// correct for sandbox/UAT.
-const ncbaMobileWalletValidationPath = process.env.NCBA_MOBILE_WALLET_VALIDATION_PATH || '/api/v1/MobileB2WValidation/validate-account';
 
 export class NcbaOpenBankingAuthError extends Error {
   constructor(message) {
@@ -252,37 +231,6 @@ function assertTransferAmountInBounds(amount) {
 }
 
 /**
- * Confirms a destination bank account is real before money is sent to it —
- * catches typo'd account numbers before they cost a merchant a failed
- * transfer. Always attempted before submitPesaLinkTransfer.
- *
- * Per NCBA's UAT Guide, a resolvable-but-invalid account still comes back
- * as an HTTP 200 with StatusCode !== '00' (not an HTTP error) — so this
- * must inspect the body, not just catch network/HTTP failures.
- */
-export async function validatePesaLinkAccount({ bankCode, accountNumber, debitAccount }) {
-  if (!bankCode || !accountNumber) {
-    throw new NcbaOpenBankingValidationError('bankCode and accountNumber are required to validate a PesaLink destination');
-  }
-
-  if (!liveCallsEnabled) {
-    return simulate('ncba_openbanking_pesalink_validate_sandbox', { bankCode, accountNumber });
-  }
-
-  const result = await ncbaOpenBankingPost('/api/v1/PesalinkValidation/validate-account', {
-    targetPic: bankCode,
-    accountToVerify: accountNumber,
-    debitAccount: debitAccount || ncbaOpenBankingAccountNumber,
-  });
-
-  if (result?.StatusCode !== '00') {
-    throw new NcbaOpenBankingValidationError(result?.StatusMessage || 'Could not verify the destination bank account');
-  }
-
-  return result;
-}
-
-/**
  * Looks up which bank(s) a phone number is registered to on PesaLink —
  * lets a sender pay "to a phone number" without already knowing the
  * recipient's bank/account number, by resolving PesaLink's own registered
@@ -390,7 +338,7 @@ export async function submitPesaLinkTransfer({
  * in the UAT Guide's own text, only its request/response JSON was — same
  * situation as several other calls in this file).
  *
- * This must NOT go through validatePesaLinkAccount/submitPesaLinkTransfer —
+ * This must NOT go through submitPesaLinkTransfer —
  * PesaLink is the interbank switch, and NCBA's own account-to-account
  * transfers routed through it come back with a hard decline (observed
  * live: StatusCode/reason "RC01" on a real, correct NCBA account number).
@@ -527,48 +475,11 @@ export async function submitRtgsTransfer({
 }
 
 /**
- * Validates a recipient's M-Pesa (Hakikisha) or Airtel Money number before a
- * Mobile B2W payout — required prerequisite per the UAT Guide, which
- * returns a validationId that must be echoed back on the actual payment.
- * Simulates whenever NCBA_OPENBANKING_LIVE_ENABLED is off, same as every
- * other function in this file.
- *
- * @param {object} params
- * @param {'safaricom'|'airtel'} params.provider
- * @param {string} params.msisdn - 254XXXXXXXXX
- * @returns {{ validationId: string, customerName: string }}
- */
-export async function validateMobileWalletNumber({ provider, msisdn }) {
-  if (!provider || !msisdn) {
-    throw new NcbaOpenBankingValidationError('provider and msisdn are required to validate a mobile wallet number');
-  }
-
-  if (!liveCallsEnabled) {
-    const result = simulate('ncba_openbanking_mobile_wallet_validate_sandbox', { provider, msisdn });
-    return { validationId: `SIM-VALID-${Date.now()}`, customerName: null, ...result };
-  }
-
-  const result = await ncbaOpenBankingPost(ncbaMobileWalletValidationPath, { provider, msisdn });
-  if (!result?.validationId) {
-    // Same reasoning as the LNM validator's rejection log — ncbaMobileWalletValidationPath
-    // was sourced from NCBA's Postman collection, not the UAT Guide's own
-    // text (which documents this call's request/response shape but never
-    // states its endpoint path), so a rejection here could mean a genuinely
-    // invalid number OR a path/shape mismatch. This is the only way to tell
-    // them apart from Render logs alone.
-    logEvent('warn', 'ncba_openbanking_mobile_wallet_validate_rejected', { provider, msisdn, path: ncbaMobileWalletValidationPath, response: result });
-    throw new NcbaOpenBankingValidationError(result?.message || 'Could not validate the destination mobile number.');
-  }
-
-  return { validationId: result.validationId, customerName: result.customerName || null };
-}
-
-/**
  * Validates a KPLC (Kenya Power) postpaid account before a bill payment —
  * "This is a validation service to check the account/meter number validity
  * and confirm balance due" per the UAT Guide. Returns a validationId that
- * must be echoed back on the actual payment (same validate-then-pay shape
- * as validateMobileWalletNumber/validateLipaNaMpesaAccount above). Endpoint
+ * must be echoed back if reused elsewhere — submitKplcPayment itself no
+ * longer requires it (see that function's own comment). Endpoint
  * confirmed from NCBA's "Open Banking V2 - Callback Enabled" Postman
  * collection (not shown as a path in the UAT Guide's own text, only its
  * request/response JSON was — same situation as the other validate calls
@@ -633,7 +544,6 @@ export async function validateKplcAccount({ meterNumber, msisdn }) {
  */
 export async function submitKplcPayment({
   transactionId,
-  validationId,
   customerName,
   meterNumber,
   msisdn,
@@ -641,12 +551,15 @@ export async function submitKplcPayment({
   narration,
   debitAccount,
 }) {
-  if (!transactionId || !validationId || !meterNumber || !amount) {
-    throw new NcbaOpenBankingValidationError('transactionId, validationId, meterNumber and amount are required for a KPLC payment');
+  if (!transactionId || !meterNumber || !amount) {
+    throw new NcbaOpenBankingValidationError('transactionId, meterNumber and amount are required for a KPLC payment');
   }
 
+  // No pre-payment meter validation — KPLCValidation is one of the NCBA
+  // validation endpoints that's been blocking real payouts platform-wide,
+  // so this goes straight to submission; validationId is left blank.
   const payload = {
-    validationId,
+    validationId: '',
     customerName: customerName || 'PayChain Merchant',
     meterNumber,
     msisdn: msisdn || '',
@@ -724,7 +637,6 @@ export async function validateKplcPrepaidAccount({ meterNumber, msisdn }) {
  */
 export async function submitKplcPrepaidPayment({
   transactionId,
-  validationId,
   customerName,
   meterNumber,
   msisdn,
@@ -732,12 +644,13 @@ export async function submitKplcPrepaidPayment({
   narration,
   debitAccount,
 }) {
-  if (!transactionId || !validationId || !meterNumber || !amount) {
-    throw new NcbaOpenBankingValidationError('transactionId, validationId, meterNumber and amount are required for a KPLC prepaid token purchase');
+  if (!transactionId || !meterNumber || !amount) {
+    throw new NcbaOpenBankingValidationError('transactionId, meterNumber and amount are required for a KPLC prepaid token purchase');
   }
 
+  // See submitKplcPayment's comment above — same situation.
   const payload = {
-    validationId,
+    validationId: '',
     customerName: customerName || 'PayChain Merchant',
     meterNumber,
     msisdn: msisdn || '',
@@ -825,7 +738,6 @@ export async function validateNcwscAccount({ meterNumber, msisdn }) {
  */
 export async function submitNcwscPayment({
   transactionId,
-  validationId,
   customerName,
   meterNumber,
   msisdn,
@@ -833,12 +745,14 @@ export async function submitNcwscPayment({
   narration,
   debitAccount,
 }) {
-  if (!transactionId || !validationId || !meterNumber || !amount) {
-    throw new NcbaOpenBankingValidationError('transactionId, validationId, meterNumber and amount are required for an NCWSC payment');
+  if (!transactionId || !meterNumber || !amount) {
+    throw new NcbaOpenBankingValidationError('transactionId, meterNumber and amount are required for an NCWSC payment');
   }
 
+  // Same NCBA validation-not-ready situation as KPLC above — no
+  // pre-payment meter validation here either.
   const payload = {
-    validationId,
+    validationId: '',
     customerName: customerName || 'PayChain Merchant',
     meterNumber,
     msisdn: msisdn || '',
@@ -859,89 +773,6 @@ export async function submitNcwscPayment({
     throw new NcbaOpenBankingRequestError(result?.data?.message || result?.message || 'This NCWSC payment was rejected');
   }
   return result;
-}
-
-/**
- * Validates a destination Paybill or Till number before a Lipa na M-Pesa
- * payout — "This is a prerequisite for Bill Payments" per the UAT Guide's
- * "LIPA NA MPESA VALIDATION (LNM)" section. identifierType is "4" for
- * Paybill, "2" for Till (per that section's own labeling).
- *
- * NCBA's own docs disagree on request-field casing for this exact call:
- * the UAT Guide's prose shows it capitalized (Identifier/IdentifierType),
- * while the "Open Banking V2 - Callback Enabled" Postman collection shows
- * lowercase (identifier/identifierType). Live traffic confirms the
- * lowercase form is the one that actually works, so it's tried first with
- * the capitalized form kept only as a fallback in case a future NCBA
- * change flips this.
- *
- * The UAT Guide's documented response fields (errorCode/errorMessage/
- * OrganizationName/origanizationShortCode) do NOT match what NCBA's live
- * endpoint actually returns — confirmed via production logs on
- * 2026-08-12. The real response shape is:
- *   { ResponseCode, ResponseMessage, DetailedMessage, OrganizationName,
- *     OrganizationShortCode, ChargeProfileID, ConversationID }
- * Success is ResponseCode "4000" / ResponseMessage "Success" (e.g. Paybill
- * 880100).
- *
- * NCBA validates Till and Paybill numbers against two separate Safaricom
- * registries (identifierType "2" vs "4"), and a number that's genuinely
- * active under one type gets the exact same "SFC_IC0003 / The operator does
- * not exist" rejection if queried under the other — indistinguishable from a
- * truly invalid number. Since merchants often don't know (or mis-select)
- * which one a given number is, a rejection under the caller's chosen
- * paymentType is retried once under the other type before giving up; the
- * resolved type (which may differ from the one passed in) is returned so
- * callers submit the actual payout under the type that validated.
- *
- * @param {object} params
- * @param {'Paybill'|'Till'} params.paymentType
- * @param {string} params.payBillTillNo
- */
-export async function validateLipaNaMpesaAccount({ paymentType, payBillTillNo }) {
-  if (!paymentType || !payBillTillNo) {
-    throw new NcbaOpenBankingValidationError('paymentType and payBillTillNo are required to validate a Paybill/Till destination');
-  }
-
-  if (!liveCallsEnabled) {
-    return simulate('ncba_openbanking_lnm_validate_sandbox', { paymentType, payBillTillNo });
-  }
-
-  const path = '/api/v1/LipaNaMpesaValidation/accountdetails';
-  const isSuccess = (r) => r?.ResponseCode === '4000' || r?.ResponseMessage === 'Success';
-
-  const attempt = async (type) => {
-    const identifierType = type === 'Till' ? '2' : '4';
-    let result = await ncbaOpenBankingPost(path, { identifier: payBillTillNo, identifierType });
-    if (!isSuccess(result)) {
-      logEvent('warn', 'ncba_openbanking_lnm_validate_lowercase_rejected', { paymentType: type, payBillTillNo, response: result });
-      result = await ncbaOpenBankingPost(path, { Identifier: payBillTillNo, IdentifierType: identifierType });
-    }
-    return result;
-  };
-
-  let result = await attempt(paymentType);
-  let resolvedType = paymentType;
-
-  if (!isSuccess(result)) {
-    // The client only ever sees a generic "could not verify" message (never
-    // raw upstream data) — this log line is the only way to tell a
-    // genuinely invalid Paybill/Till apart from a request shape NCBA still
-    // doesn't recognize even after the casing retry above.
-    logEvent('warn', 'ncba_openbanking_lnm_validate_rejected', { paymentType, payBillTillNo, response: result });
-    const otherType = paymentType === 'Till' ? 'Paybill' : 'Till';
-    const retryResult = await attempt(otherType);
-    if (isSuccess(retryResult)) {
-      result = retryResult;
-      resolvedType = otherType;
-    }
-  }
-
-  if (!isSuccess(result)) {
-    throw new NcbaOpenBankingValidationError(result?.ResponseMessage || result?.DetailedMessage || 'Could not verify the destination Paybill/Till number');
-  }
-
-  return { organizationName: result.OrganizationName || null, shortCode: result.OrganizationShortCode || null, paymentType: resolvedType };
 }
 
 /**
@@ -1011,72 +842,73 @@ export async function submitLipaNaMpesaPayment({
 }
 
 /**
- * Submits a Mobile B2W (Bank-to-Wallet) payout to an M-Pesa or Airtel Money
- * number — NCBA's direct replacement for Daraja B2C. Per the UAT Guide this
- * is an ASYNCHRONOUS rail: a `succeeded: true` response only means NCBA
- * accepted the instruction into its processing queue (same shape as the
- * doc's KPLC/Water/E-Citizen examples, all explicitly documented as
- * resolving via a later callback) — unlike submitPesaLinkTransfer above,
- * which resolves synchronously. callbackUrl is left
- * blank (the doc marks it optional), matching how services/
- * ncbaBulkPaymentService.js's existing utility-payment calls already handle
- * this — NCBA posts back to whatever webhook was registered during
- * onboarding (the same /webhooks/ncba-openbanking-callback route this app
- * already exposes), not a per-request URL. channelRef/reqChnlId are set to
- * PayChain's own transactionId, so handlePesaLinkCallback (already generic
- * — see ncbaOpenBankingController.js) can match the eventual callback back
- * to this specific payout without any new webhook route.
+ * Submits a Bank-to-Wallet payout to an M-Pesa number — NCBA's
+ * MobileMoneyTransfer rail. This replaces the old MobileB2WPayment +
+ * MobileB2WValidation pair entirely: Rose (NCBA) sent this exact
+ * endpoint/payload directly via email 2026-08-26 as the working
+ * replacement, after MobileB2WValidation was confirmed 404ing in
+ * production. Unlike the old pair, NCBA's own spec for this endpoint has no
+ * validate-then-pay step — this is the only call needed.
+ *
+ * Per NCBA's email this only covers KES 50.00–KES 250,000.00 per
+ * transaction, and is scoped to "recipient's Mpesa numbers" — NCBA hasn't
+ * given an equivalent for Airtel Money, so an Airtel-destined payout will
+ * still be attempted through this same call (there is no other rail) and
+ * NCBA is expected to reject it cleanly (surfaces as a normal
+ * NcbaOpenBankingRequestError below, refunded by the caller like any other
+ * rejection) rather than misroute it.
+ *
+ * Async rail, same as every other bill/wallet payout in this file — a
+ * `succeeded: true` response only means NCBA accepted the transfer, not
+ * that it landed; resolves later via the callback/reconciliation sweep
+ * (handlePesaLinkCallback/ncbaOpenBankingReconciliationService.js).
+ * uniqueReferenceNumber is set to PayChain's own transactionId so that
+ * resolution can match it back to Transaction.reference, same convention
+ * as channelRef/reqChnlId on every other rail in this file.
  *
  * @param {object} params
- * @param {string} params.transactionId - PayChain's own reference; becomes
- *        both channelRef/reqChnlId here and Transaction.reference at the
- *        call site, so the eventual callback can find the pending row.
- * @param {string} params.validationId - from validateMobileWalletNumber
- * @param {'safaricom'|'airtel'} params.provider
+ * @param {string} params.transactionId - PayChain's own reference; sent as
+ *        uniqueReferenceNumber here and stored as Transaction.reference at
+ *        the call site.
+ * @param {string} params.beneficiaryName
  * @param {number} params.amount
  * @param {string} params.recipientNumber - 254XXXXXXXXX
- * @param {string} [params.senderNumber] - number to receive NCBA's own notification; despite the doc's phrasing, NCBA's live API requires this (falls back to NCBA_OPENBANKING_SENDER_MSISDN, format 254XXXXXXXXX)
  * @param {string} [params.narration]
+ * @param {string} [params.debitAccount] - defaults to PayChain's own NCBA account
  */
 export async function submitMobileB2wPayment({
   transactionId,
-  validationId,
-  provider,
+  beneficiaryName,
   amount,
   recipientNumber,
-  senderNumber,
   narration,
+  debitAccount,
 }) {
-  if (!transactionId || !validationId || !provider || !amount || !recipientNumber) {
-    throw new NcbaOpenBankingValidationError('transactionId, validationId, provider, amount and recipientNumber are required for a Mobile B2W payout');
+  if (!transactionId || !beneficiaryName || !amount || !recipientNumber) {
+    throw new NcbaOpenBankingValidationError('transactionId, beneficiaryName, amount and recipientNumber are required for a Mobile Money payout');
   }
-
-  const resolvedSenderNumber = senderNumber || ncbaOpenBankingSenderMsisdn;
-  if (liveCallsEnabled && !resolvedSenderNumber) {
-    throw new NcbaOpenBankingValidationError('NCBA_OPENBANKING_SENDER_MSISDN is not configured — NCBA rejects Mobile B2W payouts without a senderNumber');
+  const numericAmount = Number(amount);
+  if (!(numericAmount >= MOBILE_B2W_MIN_AMOUNT && numericAmount <= MOBILE_B2W_MAX_AMOUNT)) {
+    throw new NcbaOpenBankingValidationError(
+      `Amount must be between KES ${MOBILE_B2W_MIN_AMOUNT} and KES ${MOBILE_B2W_MAX_AMOUNT.toLocaleString()} (NCBA Mobile Money Transfer limits)`
+    );
   }
 
   const payload = {
-    validationId,
-    provider,
-    amount: String(amount),
-    debitAccount: ncbaOpenBankingAccountNumber,
-    // UAT Guide's own field name for this ("receipientNumber") is a typo in
-    // NCBA's spec — kept exactly as documented since it's what their API
-    // actually expects.
-    receipientNumber: recipientNumber,
-    senderNumber: resolvedSenderNumber || '',
-    channelRef: transactionId,
-    narration: narration || 'PayChain Payout',
-    callbackUrl: '',
-    reqChnlId: transactionId,
+    beneficiaryName,
+    date: new Date().toISOString().slice(0, 10),
+    debitAccount: debitAccount || ncbaOpenBankingAccountNumber,
+    debitAmount: numericAmount.toFixed(2),
+    mobileNumber: recipientNumber,
+    transactionNarration: narration || 'PayChain Payout',
+    uniqueReferenceNumber: transactionId,
   };
 
   if (!liveCallsEnabled) {
     return simulate('ncba_openbanking_mobile_b2w_submit_sandbox', { transactionId, amount });
   }
 
-  const result = await ncbaOpenBankingPost('/api/v1/MobileB2WPayment/mobileb2wpayment', payload);
+  const result = await ncbaOpenBankingPost('/api/v1/MobileMoneyTransfer/mobilemoneytransfer', payload);
   if (!result?.succeeded) {
     throw new NcbaOpenBankingRequestError(result?.message || 'The payout could not be completed. Please try again.');
   }

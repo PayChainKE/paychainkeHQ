@@ -20,7 +20,7 @@ import { formatPhoneDisplay } from '../utils/formatPhoneDisplay.js';
 import { AUTO_INFLATION_SHIELD_ENABLED } from '../config/inflationShieldFlag.js';
 import { buildPaymentReceivedSms, buildCustomerPaidSms, buildPaymentRequestSms } from '../utils/paymentSmsTemplates.js';
 import { initiateStkPush as ncbaInitiateStkPush, queryStkPush as ncbaQueryStkPush, generateQrCode as ncbaGenerateQrCode } from '../services/ncbaStkPushService.js';
-import { validateMobileWalletNumber as ncbaValidateMobileWalletNumber, submitMobileB2wPayment as ncbaSubmitMobileB2wPayment, validateLipaNaMpesaAccount as ncbaValidateLnmAccount, submitLipaNaMpesaPayment as ncbaSubmitLnmPayment, NcbaOpenBankingValidationError } from '../services/ncbaOpenBankingService.js';
+import { submitMobileB2wPayment as ncbaSubmitMobileB2wPayment, submitLipaNaMpesaPayment as ncbaSubmitLnmPayment } from '../services/ncbaOpenBankingService.js';
 import { validatePhoneNumber, NcbaValidationError, getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
 import { generateBrandedQrDataUri } from '../utils/qrCode.js';
 import DeveloperPayment from '../models/DeveloperPayment.js';
@@ -885,7 +885,7 @@ export const initiateB2C = async (req, res) => {
   let debited = false;
   let totalDebit = 0;
   try {
-    const { amount, destination, pin } = req.body;
+    const { amount, destination, reference, pin } = req.body;
     const merchantId = req.merchant._id;
     const provider = req.body.provider === 'airtel' ? 'airtel' : 'safaricom';
 
@@ -915,20 +915,6 @@ export const initiateB2C = async (req, res) => {
       ({ totalFee: b2cFee } = getB2cTariff(amount));
     } catch (e) {
       if (e instanceof B2cTariffBoundsError) return res.status(400).json({ error: e.message });
-      throw e;
-    }
-
-    // Fail fast on a number NCBA doesn't recognize as a real M-Pesa/Airtel
-    // wallet before ever touching the merchant's balance or asking for
-    // their PIN — same ordering as initiateB2B's Paybill/Till check below.
-    // Previously this validated only after the PIN check and the debit,
-    // which meant an invalid destination still cost the merchant a PIN
-    // entry and a debit-then-refund round trip for no reason.
-    let validationId;
-    try {
-      ({ validationId } = await ncbaValidateMobileWalletNumber({ provider, msisdn: phone }));
-    } catch (e) {
-      if (e instanceof NcbaOpenBankingValidationError) return res.status(400).json({ error: e.message });
       throw e;
     }
 
@@ -983,12 +969,16 @@ export const initiateB2C = async (req, res) => {
 
     // Mobile B2W payout via NCBA (or simulated — see
     // services/ncbaOpenBankingService.js's NCBA_OPENBANKING_LIVE_ENABLED gate).
-    // validationId was already obtained above, before the PIN check/debit.
+    // No pre-payout wallet-number validation — NCBA's MobileB2WValidation
+    // service isn't live yet and was blocking every payout.
     const transactionId = `PAYOUT-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    // `destination` is a UI category label ("Primary M-PESA Number"/"Any
+    // M-PESA Number"), not a person's name — reference (if the merchant
+    // typed one) is the actual name NCBA's beneficiaryName field wants,
+    // same as the Bank branch already sends it as accountName.
     await ncbaSubmitMobileB2wPayment({
       transactionId,
-      validationId,
-      provider,
+      beneficiaryName: reference || destination,
       amount,
       recipientNumber: phone,
       narration: `Withdrawal to ${destination}`,
@@ -1058,21 +1048,9 @@ export const initiateB2B = async (req, res) => {
       return res.status(400).json({ error: 'A valid amount is required.' });
     }
 
-    // Fail fast on a bad destination before ever touching the merchant's
-    // balance or asking for their PIN. The merchant's Till/Paybill selection
-    // is only a starting guess — NCBA checks each against a separate
-    // Safaricom registry, so ncbaValidateLnmAccount silently retries under
-    // the other type on rejection and returns whichever one actually
-    // resolved. Everything downstream uses that resolved type, not the
-    // merchant's original selection.
-    let destination;
-    try {
-      destination = await ncbaValidateLnmAccount({ paymentType: billType === 'paybill' ? 'Paybill' : 'Till', payBillTillNo: partyB });
-    } catch (e) {
-      if (e instanceof NcbaOpenBankingValidationError) return res.status(400).json({ error: e.message });
-      throw e;
-    }
-    const paymentType = destination.paymentType;
+    // No pre-payout Paybill/Till validation — takes the merchant's own
+    // billType selection as given rather than resolving it against NCBA.
+    const paymentType = billType === 'paybill' ? 'Paybill' : 'Till';
 
     // B2B PayBill & Till Payout Tariff (config/lipaNaMpesaTariffCard.js) —
     // tiered third-party base cost + PayChain service fee. Sourced from the
@@ -1123,7 +1101,7 @@ export const initiateB2B = async (req, res) => {
     }
     debited = true;
 
-    const recipientName = destination.organizationName || reference || `${paymentType} ${partyB}`;
+    const recipientName = reference || `${paymentType} ${partyB}`;
     const transactionId = `PAYOUT-B2B-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 
     // Throws (caught by the outer catch below, which refunds) if NCBA
