@@ -655,6 +655,14 @@ const MIN_ATTEMPTS_BEFORE_FAILURE = 5; // 5 * NCBA_STK_POLL_INTERVAL_MS = 10s
 export function pollAndResolveNcbaStkPush(checkoutRequestId, transactionId) {
   let attempts = 0;
   let consecutiveFailures = 0;
+  // Last FAILED description seen that wasn't credible enough to resolve on
+  // its own (see isCredibleDecline below) — kept so the eventual timeout
+  // resolution (if it comes to that) can say what NCBA actually reported
+  // instead of a generic "customer didn't respond", which is misleading
+  // when NCBA's own message was e.g. "Error Occurred while sending push
+  // request" (the prompt never reached the phone at all) rather than a
+  // real non-response.
+  let lastUnresolvedFailureDescription = null;
 
   const poll = async () => {
     attempts += 1;
@@ -678,6 +686,7 @@ export function pollAndResolveNcbaStkPush(checkoutRequestId, transactionId) {
           // Not logged as an error — see doc comment above, this is the
           // expected transient/unrecognized shape, not a real problem yet.
           console.log(`ℹ️ NCBA STK query reported FAILED for ${checkoutRequestId} (attempt ${attempts}, confirmed declines ${consecutiveFailures}/${REQUIRED_CONSECUTIVE_FAILURES}) — not treating as final:`, description);
+          if (description) lastUnresolvedFailureDescription = description;
         } else {
           const stkReq = await STKRequest.findOne({ checkoutRequestId });
           if (!stkReq) {
@@ -700,10 +709,23 @@ export function pollAndResolveNcbaStkPush(checkoutRequestId, transactionId) {
     if (attempts >= NCBA_STK_POLL_MAX_ATTEMPTS) {
       const stkReq = await STKRequest.findOne({ checkoutRequestId });
       if (stkReq && stkReq.status === 'pending') {
+        // resultDesc flows verbatim into merchant/customer-facing UI (see
+        // FundAccountModal.jsx, PaymentPage.jsx, RequestMoney.jsx, etc.), so
+        // this stays plain-language rather than naming NCBA or echoing its
+        // raw wording — the full diagnostic detail is already in the
+        // "not treating as final" log line above for anyone debugging.
+        // If NCBA never once reported FAILED, this is a genuine no-response
+        // timeout; if it did (just never credibly enough to resolve early —
+        // see isCredibleDecline above), the real cause was a delivery
+        // failure, not the customer ignoring a prompt they may never have
+        // received.
+        const resultDesc = lastUnresolvedFailureDescription
+          ? 'The payment prompt could not be delivered — please try again.'
+          : 'Timed out waiting for customer response';
         await resolveStkOutcome(stkReq, {
           succeeded: false,
           receipt: transactionId,
-          resultDesc: 'Timed out waiting for customer response',
+          resultDesc,
         });
       }
       return;
