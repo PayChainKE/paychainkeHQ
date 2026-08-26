@@ -782,7 +782,7 @@ const Merchants = () => {
 
       {/* KYB Detail Drawer */}
       {detailMerchant && (
-        <KybDrawer merchant={detailMerchant} loading={detailLoading} error={detailError} onClose={closeDetail} />
+        <KybDrawer merchant={detailMerchant} loading={detailLoading} error={detailError} onClose={closeDetail} onBusinessNameUpdated={fetchMerchants} />
       )}
 
       {/* Flag merchant modal */}
@@ -1073,7 +1073,17 @@ const Chip = ({ children, onClear }) => (
 // ── KYB Detail Drawer ───────────────────────────────────────────────────
 // Right-side slide-over showing every submitted field grouped by purpose so
 // the admin can sight-verify the merchant's KYB submission.
-const KybDrawer = ({ merchant, loading, error, onClose }) => {
+// Same taxonomy as backend/models/Merchant.js's kybDocuments.type enum /
+// adminController.js's KYC_DOC_TYPES — human labels for the drawer's upload
+// rows below.
+const KYC_DOC_TYPES = [
+  { type: 'business_registration', label: 'Business Registration' },
+  { type: 'kra_pin',               label: 'KRA PIN Certificate' },
+  { type: 'national_id',           label: 'National ID' },
+  { type: 'address_proof',         label: 'Proof of Address' },
+];
+
+const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated }) => {
   const [updatingFeatures, setUpdatingFeatures] = React.useState(false);
   // Transient placeholder only, shown for the split second before the
   // useEffect below syncs from the real merchant.features (which the
@@ -1081,12 +1091,142 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
   // adminController.js#getMerchantDetail) — matches the current schema
   // default (false) rather than the old default, since this never persists.
   const [features, setFeatures] = React.useState(merchant?.features || { digitalWallet: false, inflationShield: false });
+  const [kybDocuments, setKybDocuments] = React.useState(merchant?.kybDocuments || []);
+  const [uploadingDocType, setUploadingDocType] = React.useState(null);
+  const [docUploadError, setDocUploadError] = React.useState('');
+  const [businessName, setBusinessName] = React.useState(merchant?.businessName || '');
+  const [editingBusinessName, setEditingBusinessName] = React.useState(false);
+  const [businessNameDraft, setBusinessNameDraft] = React.useState('');
+  const [savingBusinessName, setSavingBusinessName] = React.useState(false);
+  const [businessNameError, setBusinessNameError] = React.useState('');
 
   React.useEffect(() => {
     if (merchant?.features) {
       setFeatures(merchant.features);
     }
+    setKybDocuments(merchant?.kybDocuments || []);
+    setBusinessName(merchant?.businessName || '');
+    setEditingBusinessName(false);
+    setBusinessNameError('');
   }, [merchant]);
+
+  const startEditBusinessName = () => {
+    setBusinessNameDraft(businessName);
+    setBusinessNameError('');
+    setEditingBusinessName(true);
+  };
+
+  const [newsletterStatus, setNewsletterStatus] = React.useState('idle'); // idle | saving | added | already
+  const [newsletterError, setNewsletterError] = React.useState('');
+
+  React.useEffect(() => {
+    setNewsletterStatus('idle');
+    setNewsletterError('');
+  }, [merchant?._id]);
+
+  const addToNewsletter = async () => {
+    if (!merchant?.email) return;
+    setNewsletterStatus('saving');
+    setNewsletterError('');
+    try {
+      await api.post('/api/newsletter/admin', { email: merchant.email });
+      setNewsletterStatus('added');
+    } catch (err) {
+      if (err.response?.status === 409) {
+        setNewsletterStatus('already');
+      } else {
+        setNewsletterStatus('idle');
+        setNewsletterError(err.response?.data?.error || 'Could not add to newsletter.');
+      }
+    }
+  };
+
+  const [downloadingSticker, setDownloadingSticker] = React.useState(false);
+  const [downloadingQr, setDownloadingQr] = React.useState(false);
+  const [downloadError, setDownloadError] = React.useState('');
+
+  const downloadFile = async (url, filenameFallback, setBusy) => {
+    setBusy(true);
+    setDownloadError('');
+    try {
+      const res = await api.get(url, { responseType: 'blob' });
+      const disposition = res.headers?.['content-disposition'] || '';
+      const match = disposition.match(/filename="?([^"]+)"?/);
+      const filename = match?.[1] || filenameFallback;
+      const objectUrl = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(objectUrl);
+    } catch (err) {
+      console.error('Download failed', err);
+      // res.data is a Blob here (responseType: 'blob'), so the JSON error
+      // body the backend sends on failure needs its own decode — the axios
+      // error interceptor never sees it as parsed JSON.
+      let message = 'Download failed. Please try again.';
+      if (err.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text();
+          message = JSON.parse(text)?.error || message;
+        } catch { /* not JSON — keep default message */ }
+      }
+      setDownloadError(message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveBusinessName = async () => {
+    const trimmed = businessNameDraft.trim();
+    if (!trimmed) {
+      setBusinessNameError('Business name is required.');
+      return;
+    }
+    if (trimmed === businessName) {
+      setEditingBusinessName(false);
+      return;
+    }
+    setSavingBusinessName(true);
+    setBusinessNameError('');
+    try {
+      const res = await api.patch(`/api/admin/merchants/${merchant._id}/business-name`, { businessName: trimmed });
+      if (res.data.success) {
+        setBusinessName(res.data.businessName);
+        setEditingBusinessName(false);
+        onBusinessNameUpdated?.();
+      }
+    } catch (err) {
+      console.error('Failed to update business name', err);
+      setBusinessNameError(err.response?.data?.error || 'Failed to update business name.');
+    } finally {
+      setSavingBusinessName(false);
+    }
+  };
+
+  const handleUploadKycDocument = async (type, file) => {
+    if (!file) return;
+    setDocUploadError('');
+    setUploadingDocType(type);
+    try {
+      const formData = new FormData();
+      formData.append('document', file);
+      formData.append('type', type);
+      const res = await api.patch(`/api/admin/merchants/${merchant._id}/kyc-documents`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      if (res.data.success) {
+        setKybDocuments(res.data.kybDocuments);
+      }
+    } catch (err) {
+      console.error('Failed to upload KYC document', err);
+      setDocUploadError(err.response?.data?.error || 'Failed to upload document. Please try again.');
+    } finally {
+      setUploadingDocType(null);
+    }
+  };
 
   const handleToggleFeature = async (featureName, value) => {
     try {
@@ -1105,40 +1245,6 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
     }
   };
 
-  const [verification, setVerification] = React.useState({
-    kraAdminVerified: merchant?.kraAdminVerified || false,
-    businessNumberAdminVerified: merchant?.businessNumberAdminVerified || false,
-  });
-  const [updatingVerification, setUpdatingVerification] = React.useState(null); // 'kra' | 'businessNumber' | null
-
-  React.useEffect(() => {
-    if (merchant) {
-      setVerification({
-        kraAdminVerified: merchant.kraAdminVerified || false,
-        businessNumberAdminVerified: merchant.businessNumberAdminVerified || false,
-      });
-    }
-  }, [merchant]);
-
-  const handleToggleVerification = async (field, value) => {
-    try {
-      setUpdatingVerification(field === 'kraAdminVerified' ? 'kra' : 'businessNumber');
-      const res = await api.patch(`/api/admin/merchants/${merchant._id}/verification`, {
-        [field]: value,
-      });
-      if (res.data.success) {
-        setVerification({
-          kraAdminVerified: res.data.kraAdminVerified,
-          businessNumberAdminVerified: res.data.businessNumberAdminVerified,
-        });
-      }
-    } catch (err) {
-      alert(err.response?.data?.error || 'Failed to update verification status.');
-    } finally {
-      setUpdatingVerification(null);
-    }
-  };
-
   const m = merchant;
   const ready = !loading && !error && m && m.email;
 
@@ -1154,7 +1260,7 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
           <div>
             <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40 mb-0.5">KYB Profile</p>
             <h3 className="text-xl font-bold text-on-surface tracking-tight">
-              {ready ? m.businessName : 'Loading…'}
+              {ready ? businessName : 'Loading…'}
             </h3>
             {ready && (
               <p className="text-[12px] text-on-surface-variant/70 mt-0.5">{m.name} · {m.email}</p>
@@ -1190,10 +1296,8 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
                 {m.isVerified ? 'Account Verified' : 'Unverified'}
               </Badge>
               <Badge tone={m.isKRAVerified ? 'emerald' : 'gray'} icon={m.isKRAVerified ? 'verified_user' : 'help'}>
-                {m.isKRAVerified ? 'KRA Format Valid' : 'KRA Format Not Checked'}
+                {m.isKRAVerified ? 'KRA Verified' : 'KRA Not Verified'}
               </Badge>
-              {m.kraAdminVerified && <Badge tone="emerald" icon="workspace_premium">KRA Admin Verified</Badge>}
-              {m.businessNumberAdminVerified && <Badge tone="emerald" icon="workspace_premium">Business # Admin Verified</Badge>}
               <Badge tone={(ACTIVITY_STYLE[m.activityTier] || ACTIVITY_STYLE.dormant).pillTone || 'gray'} icon="bolt">
                 {ACTIVITY_STYLE[m.activityTier]?.label || 'Dormant'}
               </Badge>
@@ -1235,57 +1339,98 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
 
             {/* Business Identity */}
             <Section title="Business Identity" icon="storefront">
-              <Row label="Business Name" value={m.businessName} />
-              <Row label="KRA PIN" value={
-                <span className="flex items-center gap-2 flex-wrap">
-                  <span className="font-mono">{m.kraPin || '—'}</span>
-                  <span className={`text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full border ${m.isKRAVerified ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-50 text-gray-600 border-gray-200'}`}>
-                    {m.isKRAVerified ? 'Format Valid' : 'Format Not Checked'}
-                  </span>
-                  {m.kraPin && (
-                    <button
-                      type="button"
-                      disabled={updatingVerification === 'kra'}
-                      onClick={() => handleToggleVerification('kraAdminVerified', !verification.kraAdminVerified)}
-                      className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-full border transition-all disabled:opacity-50 ${
-                        verification.kraAdminVerified
-                          ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700'
-                          : 'bg-white text-emerald-700 border-emerald-300 hover:bg-emerald-50'
-                      }`}
-                    >
-                      {updatingVerification === 'kra' ? 'Saving…' : verification.kraAdminVerified ? '✓ Admin Verified' : 'Mark Admin Verified'}
-                    </button>
-                  )}
-                  {verification.kraAdminVerified && m.kraAdminVerifiedAt && (
-                    <span className="text-[10px] text-on-surface-variant/60">since {fmtDate(m.kraAdminVerifiedAt)}</span>
-                  )}
-                </span>
-              } />
-              <Row label="Business Reg #" value={
-                <span className="flex items-center gap-2 flex-wrap">
-                  <span className="font-mono">{m.businessNumber || '—'}</span>
-                  {m.businessNumber && (
-                    <button
-                      type="button"
-                      disabled={updatingVerification === 'businessNumber'}
-                      onClick={() => handleToggleVerification('businessNumberAdminVerified', !verification.businessNumberAdminVerified)}
-                      className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-full border transition-all disabled:opacity-50 ${
-                        verification.businessNumberAdminVerified
-                          ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700'
-                          : 'bg-white text-emerald-700 border-emerald-300 hover:bg-emerald-50'
-                      }`}
-                    >
-                      {updatingVerification === 'businessNumber' ? 'Saving…' : verification.businessNumberAdminVerified ? '✓ Admin Verified' : 'Mark Admin Verified'}
-                    </button>
-                  )}
-                  {verification.businessNumberAdminVerified && m.businessNumberAdminVerifiedAt && (
-                    <span className="text-[10px] text-on-surface-variant/60">since {fmtDate(m.businessNumberAdminVerifiedAt)}</span>
-                  )}
-                </span>
-              } />
+              <Row
+                label="Business Name"
+                value={
+                  editingBusinessName ? (
+                    <div className="flex items-center gap-2 flex-wrap w-full">
+                      <input
+                        type="text"
+                        value={businessNameDraft}
+                        onChange={(e) => setBusinessNameDraft(e.target.value)}
+                        maxLength={80}
+                        autoFocus
+                        disabled={savingBusinessName}
+                        className="flex-1 min-w-[180px] bg-white border border-outline-variant/30 rounded-lg px-2.5 py-1.5 text-sm font-semibold text-on-surface focus:ring-0 focus:border-primary/50 outline-none"
+                      />
+                      <button
+                        onClick={saveBusinessName}
+                        disabled={savingBusinessName}
+                        className="px-2.5 py-1.5 rounded-lg bg-primary text-white text-[11px] font-bold uppercase tracking-widest hover:shadow-md disabled:opacity-50 transition-all"
+                      >
+                        {savingBusinessName ? 'Saving…' : 'Save'}
+                      </button>
+                      <button
+                        onClick={() => { setEditingBusinessName(false); setBusinessNameError(''); }}
+                        disabled={savingBusinessName}
+                        className="px-2.5 py-1.5 rounded-lg border border-outline-variant/30 text-on-surface-variant text-[11px] font-bold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-50 transition-all"
+                      >
+                        Cancel
+                      </button>
+                      {businessNameError && <p className="w-full text-[11px] text-red-600 font-medium">{businessNameError}</p>}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span>{businessName}</span>
+                      <button
+                        onClick={startEditBusinessName}
+                        className="p-1 rounded-md text-on-surface-variant/50 hover:text-primary hover:bg-primary/10 transition-all"
+                        title="Edit business name"
+                      >
+                        <span className="material-symbols-outlined text-[15px]">edit</span>
+                      </button>
+                    </div>
+                  )
+                }
+              />
+              <Row label="KRA PIN" value={m.kraPin} mono badge={m.isKRAVerified ? { tone: 'emerald', text: 'Verified' } : { tone: 'gray', text: 'Not verified' }} />
+              <Row label="Business Reg #" value={m.businessNumber} mono />
               <Row label="Certificate" value={m.certificateUrl
                 ? <a href={m.certificateUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-semibold underline">View document ↗</a>
                 : '— not uploaded —'} />
+            </Section>
+
+            {/* KYC/KYB Documents — admin can add or replace any of these
+                regardless of whether this merchant ever went through the
+                officer review queue (see adminController.js#updateMerchantKycDocument's
+                doc comment). */}
+            <Section title="KYC/KYB Documents" icon="folder_shared">
+              {docUploadError && (
+                <div className="px-4 py-2.5 bg-red-50 border-b border-red-100 text-[12px] text-red-700 font-medium">{docUploadError}</div>
+              )}
+              {KYC_DOC_TYPES.map(({ type, label }) => {
+                const doc = kybDocuments.find((d) => d.type === type);
+                const busy = uploadingDocType === type;
+                const statusBadge = !doc ? null
+                  : doc.status === 'approved' ? { tone: 'emerald', text: 'Approved' }
+                  : doc.status === 'rejected' ? { tone: 'red', text: 'Rejected' }
+                  : { tone: 'amber', text: 'Pending Review' };
+                return (
+                  <Row
+                    key={type}
+                    label={label}
+                    badge={statusBadge}
+                    value={
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {doc
+                          ? <a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-semibold underline">View document ↗</a>
+                          : <span className="text-on-surface-variant/50">— not uploaded —</span>}
+                        <label className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-widest cursor-pointer transition-all ${busy ? 'opacity-50 pointer-events-none' : ''} ${doc ? 'border border-outline-variant/30 text-on-surface-variant hover:bg-surface-container-low' : 'bg-primary/10 text-primary hover:bg-primary/15'}`}>
+                          <span className="material-symbols-outlined text-[13px]">upload</span>
+                          {busy ? 'Uploading…' : doc ? 'Replace' : 'Upload'}
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/jpg,application/pdf"
+                            className="hidden"
+                            disabled={busy}
+                            onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; handleUploadKycDocument(type, f); }}
+                          />
+                        </label>
+                      </div>
+                    }
+                  />
+                );
+              })}
             </Section>
 
             {/* Contact */}
@@ -1293,12 +1438,60 @@ const KybDrawer = ({ merchant, loading, error, onClose }) => {
               <Row label="Full Name" value={m.name} />
               <Row label="Email" value={m.email} />
               <Row label="Phone" value={m.phone} mono />
+              <Row
+                label="Newsletter"
+                value={
+                  newsletterStatus === 'added' ? (
+                    <Badge tone="emerald" icon="check">Added</Badge>
+                  ) : newsletterStatus === 'already' ? (
+                    <Badge tone="gray" icon="mail">Already subscribed</Badge>
+                  ) : (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        onClick={addToNewsletter}
+                        disabled={newsletterStatus === 'saving' || !m.email}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/15 text-[11px] font-bold uppercase tracking-widest transition-all disabled:opacity-50"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">{newsletterStatus === 'saving' ? 'hourglass_empty' : 'mail'}</span>
+                        {newsletterStatus === 'saving' ? 'Adding…' : 'Add to Newsletter'}
+                      </button>
+                      {newsletterError && <p className="text-[11px] text-red-600 font-medium">{newsletterError}</p>}
+                    </div>
+                  )
+                }
+              />
             </Section>
 
             {/* Account */}
             <Section title="PayChain Account" icon="account_balance_wallet">
               <Row label="Account Number" value={<span className="font-mono font-bold text-base text-on-surface bg-surface-container-low px-2 py-1 rounded">{formatAccountNumber(m.ncbaVirtualAccountNumber || m.ncbaMerchantCode) || '—'}</span>} />
               <Row label="Paybill" value={<span className="font-mono">880100</span>} />
+              <Row
+                label="Downloads"
+                value={
+                  <div className="flex flex-col gap-1.5 w-full">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        onClick={() => downloadFile(`/api/admin/merchants/${m._id}/sticker`, `PayChain-Sticker-${m._id}.pdf`, setDownloadingSticker)}
+                        disabled={downloadingSticker}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-outline-variant/30 text-on-surface-variant hover:bg-surface-container-low text-[11px] font-bold uppercase tracking-widest transition-all disabled:opacity-50"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">{downloadingSticker ? 'hourglass_empty' : 'sticky_note_2'}</span>
+                        {downloadingSticker ? 'Downloading…' : 'Account Sticker'}
+                      </button>
+                      <button
+                        onClick={() => downloadFile(`/api/admin/merchants/${m._id}/qr-code`, `PayChain-QR-${m._id}.pdf`, setDownloadingQr)}
+                        disabled={downloadingQr}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-outline-variant/30 text-on-surface-variant hover:bg-surface-container-low text-[11px] font-bold uppercase tracking-widest transition-all disabled:opacity-50"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">{downloadingQr ? 'hourglass_empty' : 'qr_code_2'}</span>
+                        {downloadingQr ? 'Downloading…' : 'QR Code'}
+                      </button>
+                    </div>
+                    {downloadError && <p className="text-[11px] text-red-600 font-medium">{downloadError}</p>}
+                  </div>
+                }
+              />
               <Row label="Registration Source" value={m.registrationSource === 'mobile' ? 'Mobile App' : 'Web Dashboard'} />
               <Row label="Registered" value={fmtDate(m.createdAt)} />
               {m.invitedBy?.email && <Row label="Onboarded By" value={m.invitedBy.email} />}
@@ -1421,6 +1614,7 @@ const Row = ({ label, value, mono, badge }) => (
         <span className={`text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full border ${
           badge.tone === 'emerald' ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
           : badge.tone === 'amber' ? 'bg-amber-50 text-amber-700 border-amber-200'
+          : badge.tone === 'red' ? 'bg-red-50 text-red-700 border-red-200'
           : 'bg-gray-50 text-gray-600 border-gray-200'
         }`}>{badge.text}</span>
       )}

@@ -65,6 +65,7 @@ export default function Newsletter() {
   // seeds the composer's editor with when continuing one.
   const [drafts, setDrafts] = useState([]);
   const [draftsLoading, setDraftsLoading] = useState(true);
+  const [loadingDraftId, setLoadingDraftId] = useState(null);
   const [activeDraftId, setActiveDraftId] = useState(null);
   const [composeInitialContent, setComposeInitialContent] = useState('');
   const [draftStatus, setDraftStatus] = useState(null); // null | 'saving' | 'saved' | 'error'
@@ -197,14 +198,30 @@ export default function Newsletter() {
     setComposeOpen(true);
   }
 
-  function continueDraft(draft) {
-    setComposeSubject(draft.subject || '');
-    setComposeInitialContent(draft.body || '');
-    setActiveDraftId(draft._id);
-    setDraftStatus(null);
-    setComposeError('');
-    setComposeDone(null);
-    setComposeOpen(true);
+  // `draft` here is a row from the /drafts LIST response, which deliberately
+  // omits `body` (see listDrafts's doc comment — only a truncated `snippet`
+  // is sent for the list view, to avoid shipping full HTML for every draft
+  // just to render a preview). Loading it into the composer needs the full
+  // record from GET /drafts/:id — using draft.body directly here was the
+  // bug: it's always undefined on a list row, so the editor opened empty
+  // while the subject (which the list DOES carry) looked fine.
+  async function continueDraft(draft) {
+    setLoadingDraftId(draft._id);
+    try {
+      const res = await api.get(`/api/newsletter/drafts/${draft._id}`);
+      const full = res.data?.data || draft;
+      setComposeSubject(full.subject || '');
+      setComposeInitialContent(full.body || '');
+      setActiveDraftId(full._id);
+      setDraftStatus(null);
+      setComposeError('');
+      setComposeDone(null);
+      setComposeOpen(true);
+    } catch (e) {
+      showToast(e?.response?.data?.error || 'Could not load this draft.');
+    } finally {
+      setLoadingDraftId(null);
+    }
   }
 
   async function saveDraft(html) {
@@ -507,7 +524,7 @@ export default function Newsletter() {
               <div className="divide-y divide-outline-variant/8">
                 {drafts.map((d) => (
                   <div key={d._id} className="px-6 py-4 flex items-center justify-between gap-4 hover:bg-secondary-container/5 transition-colors group">
-                    <button onClick={() => continueDraft(d)} className="min-w-0 flex-1 text-left">
+                    <button onClick={() => continueDraft(d)} disabled={loadingDraftId === d._id} className="min-w-0 flex-1 text-left disabled:opacity-50">
                       <p className="font-bold text-on-surface tracking-tight truncate text-sm">{d.subject?.trim() || '(no subject)'}</p>
                       <p className="text-2xs text-on-surface-variant/50 truncate mt-0.5">
                         {d.snippet || '(empty)'}
@@ -517,9 +534,9 @@ export default function Newsletter() {
                       </p>
                     </button>
                     <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => continueDraft(d)}
-                        className="px-3 py-1.5 rounded-lg text-2xs font-bold uppercase tracking-widest text-primary hover:bg-primary/10 transition-colors">
-                        Continue
+                      <button onClick={() => continueDraft(d)} disabled={loadingDraftId === d._id}
+                        className="px-3 py-1.5 rounded-lg text-2xs font-bold uppercase tracking-widest text-primary hover:bg-primary/10 transition-colors disabled:opacity-50">
+                        {loadingDraftId === d._id ? 'Loading…' : 'Continue'}
                       </button>
                       <button onClick={() => startDiscardDraft(d)}
                         className="p-1.5 rounded-lg hover:bg-red-50 text-on-surface-variant/60 hover:text-red-600 transition-colors" title="Discard draft">

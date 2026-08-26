@@ -12,6 +12,9 @@ import {
   unflagMerchant,
   updateMerchantFeatures,
   updateMerchantVerification,
+  updateMerchantKycDocument,
+  updateMerchantBusinessName,
+  downloadMerchantQrCode,
   getMerchantsMap,
   geocodeSearch,
   setMerchantLocation,
@@ -75,6 +78,7 @@ import {
   getBookkeepingSummary,
 } from '../controllers/bookkeepingController.js';
 import { protect, protectAdminSSE, requireRole } from '../middleware/authMiddleware.js';
+import { upload } from '../utils/cloudinary.js';
 import { registerAdminEventClient } from '../utils/adminEventStream.js';
 
 const router = express.Router();
@@ -141,9 +145,12 @@ router.post('/merchants/:id/flag', protect, requireMutator, sensitiveActionLimit
 router.post('/merchants/:id/unflag', protect, requireMutator, sensitiveActionLimiter, unflagMerchant);
 router.patch('/merchants/:id/features', protect, requireMutator, sensitiveActionLimiter, updateMerchantFeatures);
 router.patch('/merchants/:id/verification', protect, requireMutator, sensitiveActionLimiter, updateMerchantVerification);
+router.patch('/merchants/:id/kyc-documents', protect, requireMutator, sensitiveActionLimiter, upload.single('document'), updateMerchantKycDocument);
+router.patch('/merchants/:id/business-name', protect, requireMutator, sensitiveActionLimiter, updateMerchantBusinessName);
 router.patch('/merchants/:id/location', protect, requireMutator, sensitiveActionLimiter, setMerchantLocation);
 router.delete('/merchants/:id/location', protect, requireMutator, sensitiveActionLimiter, removeMerchantLocation);
 router.get('/merchants/:id/sticker', protect, excludeOfficer, downloadMerchantSticker);
+router.get('/merchants/:id/qr-code', protect, excludeOfficer, downloadMerchantQrCode);
 router.get('/merchants/:id/audit-log', protect, excludeOfficer, getMerchantAuditLog);
 
 // Executive insights — aggregated KPIs / GTV / funnel / leaderboards.
