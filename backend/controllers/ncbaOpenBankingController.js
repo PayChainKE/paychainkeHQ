@@ -663,8 +663,23 @@ export async function resolvePendingOpenBankingTransaction({ reference, succeede
     // bulkPayController.js) never reach this webhook in 'pending' state, so
     // in practice every 'ncba_outbound' row that does land here is a real
     // bank payout, not a mislabeled one.
-    const NON_BANK_TYPE_LABELS = { ncba_kplc: 'KPLC bill payment', ncba_kplc_prepaid: 'KPLC prepaid token purchase', ncba_ncwsc: 'NCWSC bill payment' };
-    const isBankPayout = !['ncba_mobile_b2w', 'ncba_lipa_na_mpesa', ...Object.keys(NON_BANK_TYPE_LABELS)].includes(transaction.type);
+    //
+    // ncba_mobile_b2w/ncba_lipa_na_mpesa used to fall through to the generic
+    // 'Payout' default below — every failure notification/SMS for a B2C
+    // withdrawal or a B2B Till/Paybill payment read "Payout Failed" instead
+    // of naming the actual rail, inconsistent with initiateB2C's own
+    // success-path SMS (mpesaController.js), which already says
+    // "Withdrawal Sent". Lipa na M-Pesa doesn't persist Paybill vs Till on
+    // the Transaction itself, so "Till/Paybill Payment" is the most specific
+    // label available without adding a new field just for wording.
+    const NON_BANK_TYPE_LABELS = {
+      ncba_kplc: 'KPLC bill payment',
+      ncba_kplc_prepaid: 'KPLC prepaid token purchase',
+      ncba_ncwsc: 'NCWSC bill payment',
+      ncba_mobile_b2w: 'Withdrawal',
+      ncba_lipa_na_mpesa: 'Till/Paybill Payment',
+    };
+    const isBankPayout = !Object.keys(NON_BANK_TYPE_LABELS).includes(transaction.type);
     const payoutLabel = isBankPayout ? 'Bank payout' : (NON_BANK_TYPE_LABELS[transaction.type] || 'Payout');
 
     createNotification({
