@@ -386,7 +386,7 @@ export default function Profile() {
           <div className="contents lg:block lg:col-span-8 lg:space-y-8">
 
             {/* Section 1: Administrator Profile */}
-            <div className="order-2 col-span-12 bg-white p-6 lg:p-10 rounded-[32px] lg:rounded-[40px] border border-slate-100 shadow-sm editorial-shadow animate-fade-in-up [animation-delay:100ms]">
+            <div data-tour="profile-identity-card" className="order-2 col-span-12 bg-white p-6 lg:p-10 rounded-[32px] lg:rounded-[40px] border border-slate-100 shadow-sm editorial-shadow animate-fade-in-up [animation-delay:100ms]">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
                 <div>
                   <h3 className="font-headline font-bold text-2xl text-primary tracking-tight">Profile</h3>
@@ -425,7 +425,7 @@ export default function Profile() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-y-6 lg:gap-y-8 gap-x-12 mt-8 border-t border-slate-100 pt-8">
-                <div id="kra-pin-field" className={`space-y-2 group rounded-2xl transition-all duration-500 ${highlightFields.has('kraPin') ? 'ring-2 ring-emerald-400 ring-offset-4 ring-offset-white' : ''}`}>
+                <div id="kra-pin-field" data-tour="kra-pin-field" className={`space-y-2 group rounded-2xl transition-all duration-500 ${highlightFields.has('kraPin') ? 'ring-2 ring-emerald-400 ring-offset-4 ring-offset-white' : ''}`}>
                   <div className="flex justify-between items-center pr-1">
                     <label className="text-[9px] text-on-surface-variant font-black uppercase tracking-[0.2em] pl-1 opacity-50 group-hover:opacity-100 transition-opacity">KRA PIN</label>
                     {kraPinLocked && (
@@ -489,7 +489,8 @@ export default function Profile() {
               
               <div className="mt-10 lg:mt-12 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 pt-8 border-t border-slate-100">
                 <p className="text-[10px] text-on-surface-variant font-medium max-w-[240px]">Failed PIN attempts: <span className="text-primary font-black">{merchant?.failedPinAttempts ?? 0}</span> • PIN Blocked: <span className={`font-black ${merchant?.pinBlocked ? 'text-red-500' : 'text-emerald-600'}`}>{merchant?.pinBlocked ? 'Yes' : 'No'}</span></p>
-                <button 
+                <button
+                  data-tour="update-profile-btn"
                   onClick={save}
                   disabled={isUpdatingProfile}
                   className="w-full md:w-auto bg-[#06201B] text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:opacity-90 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -525,7 +526,7 @@ export default function Profile() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-10">
                   {/* Change Password Sub-section */}
-                  <div className="space-y-6">
+                  <div data-tour="change-password-section" className="space-y-6">
                     <h4 className="text-[10px] text-white/30 font-black uppercase tracking-widest flex items-center gap-2">
                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                        Change your password
@@ -601,7 +602,7 @@ export default function Profile() {
                       {/* Payment PIN Reset — the single PIN used to authorize
                           every payment, including bulk pay batches. */}
                       {merchant?.hasAppPin && (
-                        <div className="space-y-4 bg-white/5 p-5 rounded-[24px] border border-white/5">
+                        <div data-tour="change-pin-section" className="space-y-4 bg-white/5 p-5 rounded-[24px] border border-white/5">
                           <h5 className="text-xs font-black text-white">Reset Payment PIN</h5>
                           <div className="space-y-3">
                             <ValidatedInput
@@ -1010,7 +1011,7 @@ export default function Profile() {
                 )}
               </div>
 
-              <div className="mt-6 pt-6 border-t border-outline-variant/10">
+              <div data-tour="biometrics-register" className="mt-6 pt-6 border-t border-outline-variant/10">
                 <BiometricRegisterButton
                   token={token}
                   onSuccess={fetchPasskeys}

@@ -244,7 +244,7 @@ export default function Overview() {
       {/* Section 1: Balance Cards Row */}
       <section className={`grid grid-cols-1 ${showWalletCard ? 'lg:grid-cols-2' : ''} gap-8 animate-fade-in-up [animation-delay:100ms] relative z-20`}>
         {/* KES Balance Card */}
-        <div className="bg-gradient-to-br from-[#00351D] via-[#022916] to-[#011C0F] text-white p-6 lg:p-8 rounded-[24px] shadow-[0_20px_40px_-15px_rgba(0,53,29,0.5)] relative z-20 group border border-emerald-900/50 hover:border-emerald-500/30 transition-all duration-500">
+        <div data-tour="balance-card" className="bg-gradient-to-br from-[#00351D] via-[#022916] to-[#011C0F] text-white p-6 lg:p-8 rounded-[24px] shadow-[0_20px_40px_-15px_rgba(0,53,29,0.5)] relative z-20 group border border-emerald-900/50 hover:border-emerald-500/30 transition-all duration-500">
           {/* Ambient Glow */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-[24px]">
             <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-400/10 rounded-full -mr-20 -mt-20 blur-[80px] group-hover:scale-110 transition-transform duration-1000"></div>
@@ -292,7 +292,8 @@ export default function Overview() {
                 <span className={`material-symbols-outlined text-sm leading-none transition-transform duration-500 ${showFundAccount ? 'rotate-180' : ''}`}>expand_more</span>
               </button>
 
-              <button 
+              <button
+                data-tour="move-money-trigger"
                 onClick={() => { setShowMoveMoney(!showMoveMoney); setShowFundAccount(false); }}
                 className={`flex-1 py-3 px-4 ${showMoveMoney ? 'bg-white text-[#00351D] shadow-[0_0_20px_rgba(255,255,255,0.3)]' : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-100'} rounded-[14px] text-[10px] font-black transition-all duration-300 border border-emerald-500/20 hover:border-emerald-500/40 uppercase tracking-widest leading-none flex items-center justify-center gap-2 z-50`}
               >

@@ -145,6 +145,19 @@
     animation: slideInRight 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 
+  /* Slow, subtle ring-glow pulse — the spotlight tour's highlight ring
+     (SpotlightTour.jsx) uses this instead of .animate-pulse-subtle, which
+     scales/dims too fast and too much for something meant to sit steady
+     around a UI element for several seconds while the merchant reads. */
+  .animate-pulse-slow {
+    animation: pulseSlow 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes pulseSlow {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+  }
+
   .material-symbols-outlined {
     font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
     vertical-align: middle;

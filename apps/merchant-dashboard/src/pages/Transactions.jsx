@@ -668,7 +668,7 @@ export default function Transactions() {
             </div>
 
         {/* Section 2: Filter Bar */}
-        <div className="flex flex-col md:flex-row gap-4 items-center justify-between mb-8">
+        <div data-tour="transactions-filter-bar" className="flex flex-col md:flex-row gap-4 items-center justify-between mb-8">
           <div className="flex items-center gap-1 bg-surface-container-low/40 backdrop-blur-md p-1.5 rounded-full w-full md:w-auto overflow-x-auto no-scrollbar scroll-smooth border border-on-surface-variant/30 shadow-md">
             {['All', 'Inbound', 'Outbound', 'FX Swaps'].map((tab) => (
               <button
@@ -694,7 +694,8 @@ export default function Transactions() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <button 
+            <button
+              data-tour="export-statement-btn"
               onClick={() => setShowExportModal(true)}
               className="bg-[#0A2540] backdrop-blur-md border border-white/10 text-blue-100 p-3 rounded-full transition-all flex items-center justify-center gap-2 md:px-6 shadow-xl hover:bg-[#0C2D4E] hover:text-white active:scale-95 duration-200 group shrink-0"
             >
