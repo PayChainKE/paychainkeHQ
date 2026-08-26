@@ -10,6 +10,10 @@ import TopBar from '../components/layout/TopBar';
 
 type SwapDirection = 'KES_TO_USDC' | 'USDC_TO_KES';
 
+// Platform-wide kill switch — flip to false to restore this screen once
+// stablecoin/digital wallet features are re-enabled for merchants.
+const STABLECOIN_FEATURES_DISABLED = true;
+
 function formatKES(amount: number) {
   return `Ksh ${Number(amount || 0).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
@@ -128,13 +132,14 @@ export default function InflationShield({ navigation }: any) {
 
   const Header = () => <TopBar title="Inflation Shield" subtitle="Money Hub" />;
 
-  // ── Hard gate: not enabled for this merchant ────────────────────────────
-  // Admin-controlled (Merchants.jsx's "Feature Access" panel), hidden by
-  // default for new signups. The Dashboard quick-action that links here is
-  // already hidden when this is false — this is the defense-in-depth
-  // backstop for anyone who still lands here directly (deep link, stale
-  // cached nav state), matching the web app's route-level FeatureGuard.
-  if (merchant?.features?.inflationShield === false) {
+  // ── Hard gate: platform-wide kill switch ─────────────────────────────────
+  // Stablecoin/digital wallet features pulled for all merchants until
+  // further notice, regardless of each merchant's own
+  // `features.inflationShield` flag. The Dashboard quick-action that links
+  // here is already hidden too — this is the defense-in-depth backstop for
+  // anyone who still lands here directly (deep link, stale cached nav
+  // state), matching the web app's route-level FeatureGuard.
+  if (STABLECOIN_FEATURES_DISABLED || merchant?.features?.inflationShield === false) {
     return (
       <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
         <Header />

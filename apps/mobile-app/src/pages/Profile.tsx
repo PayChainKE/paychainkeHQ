@@ -350,7 +350,11 @@ export default function Profile({ navigation }: any) {
   const { merchant, logout } = useAuth();
   const [activeSection, setActiveSection] = useState<SectionKey>('my-accounts');
 
-  const digitalWalletEnabled = merchant?.features?.digitalWallet === true;
+  // Platform-wide kill switch — stablecoin/digital wallet features pulled
+  // for all merchants until further notice. Flip to
+  // `merchant?.features?.digitalWallet === true` to restore, matching
+  // Dashboard.tsx/DigitalWallet.tsx.
+  const digitalWalletEnabled = false;
   // Payment Link is a basic collection method (same tier as STK Push / QR),
   // unrelated to the crypto/Stellar Digital Wallet feature flag — it was
   // previously (and incorrectly) hidden alongside 'wallet' any time

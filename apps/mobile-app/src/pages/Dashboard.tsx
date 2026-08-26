@@ -15,6 +15,13 @@ import { formatAccountNumber } from '../utils/formatAccountNumber';
 import { formatName } from '../utils/formatName';
 
 type Timeframe = '7D' | '30D' | '6M';
+
+// Platform-wide kill switch — flip to false to restore the USDC Vault card
+// and Swap quick-action once stablecoin/digital wallet features are
+// re-enabled for merchants. Mirrored in DigitalWallet.tsx and
+// InflationShield.tsx.
+const STABLECOIN_FEATURES_DISABLED = true;
+
 const DAY_NAMES = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const MONTH_NAMES = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
@@ -202,11 +209,13 @@ export default function Dashboard({ navigation }: any) {
   const monthOverMonthPct = lastMonthTotal > 0 ? ((monthTotal - lastMonthTotal) / lastMonthTotal) * 100 : null;
 
   const walletActivated = !!merchant?.stellarPublicKey;
-  // Admin-controlled per-merchant visibility (Merchants.jsx's "Feature
-  // Access" panel) — hidden by default for new signups now, matches the
-  // web dashboard's MerchantSidebar.jsx/Overview.jsx gating.
-  const digitalWalletEnabled = merchant?.features?.digitalWallet === true;
-  const inflationShieldEnabled = merchant?.features?.inflationShield === true;
+  // Platform-wide kill switch — stablecoin/digital wallet features pulled
+  // for all merchants until further notice, regardless of each merchant's
+  // own feature flags. Flip STABLECOIN_FEATURES_DISABLED to false (see top
+  // of file) to restore, matching the web dashboard's Overview.jsx/App.jsx
+  // gating.
+  const digitalWalletEnabled = !STABLECOIN_FEATURES_DISABLED && merchant?.features?.digitalWallet === true;
+  const inflationShieldEnabled = !STABLECOIN_FEATURES_DISABLED && merchant?.features?.inflationShield === true;
   const usdcBalance = merchant?.usdcBalance || 0;
   const usdcInKes = liveRate != null ? usdcBalance * liveRate : null;
 

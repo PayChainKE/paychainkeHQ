@@ -32,7 +32,12 @@ export default function Overview() {
   // Stellar wallet (presence of `stellarPublicKey`). Until then the card —
   // and its show/hide toggle — would just be a confusing empty surface.
   // Additionally, Admins can globally disable the feature for a merchant.
-  const featureEnabled = merchant?.features?.digitalWallet === true;
+  //
+  // Platform-wide kill switch on top of that: stablecoin/digital wallet
+  // features are pulled for all merchants until further notice, regardless
+  // of the per-merchant flag — flip this to `merchant?.features?.digitalWallet
+  // === true` to restore. Mirrored in App.jsx's FeatureGuard.
+  const featureEnabled = false;
   const walletActivated = !!merchant?.stellarPublicKey && featureEnabled;
   const showWalletCard  = walletActivated && showDigitalWallet
 

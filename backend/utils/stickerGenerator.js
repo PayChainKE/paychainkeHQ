@@ -39,6 +39,25 @@ function centeredBaselineY(centerY, fontSize) {
   return centerY - (fontSize * CAP_HEIGHT_RATIO) / 2;
 }
 
+// pdf-lib has no font-weight axis beyond picking a Bold-family font up
+// front, and HelveticaBold is already the boldest standard variant — so to
+// read clearly at a distance (a counter sticker is read from arm's length,
+// not up close) we thicken the strokes further by stamping the same glyphs
+// a few sub-point pixels apart, an old print-shop "faux bold" trick. The
+// offset is small enough not to disturb the centering math below.
+const BOLD_STAMP_OFFSETS = [
+  [0, 0],
+  [0.4, 0],
+  [0, 0.4],
+  [0.4, 0.4],
+];
+
+function drawBoldText(page, text, { x, y, size, font, color }) {
+  for (const [dx, dy] of BOLD_STAMP_OFFSETS) {
+    page.drawText(text, { x: x + dx, y: y + dy, size, font, color });
+  }
+}
+
 /**
  * Fills the PayChain/NCBA paybill sticker template with a merchant's real
  * 12-digit NCBA virtual account number and business name, returning the
@@ -59,7 +78,7 @@ export async function generateMerchantStickerPdf({ businessName, accountNumber }
   digits.split('').forEach((digit, i) => {
     const cx = ACCOUNT_BOX_CENTERS_X[i];
     const width = font.widthOfTextAtSize(digit, ACCOUNT_DIGIT_FONT_SIZE);
-    page.drawText(digit, {
+    drawBoldText(page, digit, {
       x: cx - width / 2,
       y: centeredBaselineY(ACCOUNT_BOX_CENTER_Y, ACCOUNT_DIGIT_FONT_SIZE),
       size: ACCOUNT_DIGIT_FONT_SIZE,
@@ -74,7 +93,7 @@ export async function generateMerchantStickerPdf({ businessName, accountNumber }
   while (fontSize > BUSINESS_NAME_MIN_FONT_SIZE && font.widthOfTextAtSize(name, fontSize) > maxWidth) {
     fontSize -= 1;
   }
-  page.drawText(name, {
+  drawBoldText(page, name, {
     x: BUSINESS_NAME_START_X,
     y: centeredBaselineY(BUSINESS_NAME_CENTER_Y, fontSize),
     size: fontSize,
