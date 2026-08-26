@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { useBiometrics } from '../hooks/useBiometrics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ValidatedTextInput } from '../components/ValidatedTextInput';
+import { validators } from '../utils/validators';
 
 const KENYAN_COUNTIES = [
   "Baringo", "Bomet", "Bungoma", "Busia", "Elgeyo-Marakwet", "Embu", "Garissa", 
@@ -33,8 +34,12 @@ export default function Login({ route }: any) {
   // silently dropping the merchant back here — surface it once, the same
   // way biometricLogin's own "Session expired" message already renders.
   useEffect(() => {
-    if (logoutReason === 'idle-timeout') {
-      setErr('You were signed out after 15 minutes of inactivity. Please sign in again.');
+    const REASON_MESSAGES: Record<string, string> = {
+      'idle-timeout': 'You were signed out after 15 minutes of inactivity. Please sign in again.',
+      'session-invalid': 'Your session is no longer valid. Please sign in again.',
+    };
+    if (logoutReason && REASON_MESSAGES[logoutReason]) {
+      setErr(REASON_MESSAGES[logoutReason]);
       clearLogoutReason();
     }
   }, [logoutReason]);
@@ -51,7 +56,13 @@ export default function Login({ route }: any) {
   const [area, setArea] = useState('');
   const [employees, setEmployees] = useState('');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
-  
+  // Flipped true the first time Continue is pressed with an invalid field —
+  // forces every ValidatedTextInput on this step to show its own inline
+  // error immediately (via forceTouched), not just the ones the user
+  // happened to already blur, so a failed Continue attempt points at every
+  // problem field at once instead of only the generic banner error.
+  const [signupStepTouched, setSignupStepTouched] = useState(false);
+
   // Modals for Selection
   const [showCountyModal, setShowCountyModal] = useState(false);
   const [showBusinessModal, setShowBusinessModal] = useState(false);
@@ -215,8 +226,30 @@ export default function Login({ route }: any) {
   };
 
   const handleSignupContinue = () => {
-    if (!signupPhone || signupPhone.length < 9) {
+    // Real validators, not the previous name/phone presence-or-length-only
+    // checks — those were weaker than what ValidatedTextInput itself uses to
+    // show the inline error on this exact screen (e.g. phone only checked
+    // `.length < 9`, so a 9+ digit but not-actually-Kenyan number displayed
+    // an error yet still passed this gate and reached the password step).
+    // Marks the whole step touched first so every field's own inline error
+    // renders immediately (forceTouched), pointing at each specific problem
+    // rather than only a generic banner.
+    setSignupStepTouched(true);
+
+    if (!validators.personName(signupName).valid) {
+      setErr('Please enter a valid name before continuing.');
+      return;
+    }
+    if (!validators.email(signupEmail).valid) {
+      setErr('Please enter a valid email address before continuing.');
+      return;
+    }
+    if (!validators.phoneKE(signupPhone).valid) {
       setErr('Please enter a valid Kenyan phone number before continuing.');
+      return;
+    }
+    if (!validators.businessName(signupBusinessName).valid) {
+      setErr('Please enter a valid business name before continuing.');
       return;
     }
     if (!businessType) {
@@ -240,6 +273,7 @@ export default function Login({ route }: any) {
       return;
     }
     setErr('');
+    setSignupStepTouched(false);
     setIsSignupPasswordStep(true);
   };
 
@@ -493,22 +527,22 @@ export default function Login({ route }: any) {
                 <View className="space-y-4">
                   <View>
                     <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Your Name *</Text>
-                    <ValidatedTextInput kind="personName" value={signupName} onChangeText={setSignupName} placeholder="John Doe"
+                    <ValidatedTextInput kind="personName" value={signupName} onChangeText={setSignupName} placeholder="John Doe" forceTouched={signupStepTouched}
                       className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-medium text-[#0c2010]" />
                   </View>
                   <View>
                     <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Your Email *</Text>
-                    <ValidatedTextInput kind="email" value={signupEmail} onChangeText={setSignupEmail} placeholder="john@example.com"
+                    <ValidatedTextInput kind="email" value={signupEmail} onChangeText={setSignupEmail} placeholder="john@example.com" forceTouched={signupStepTouched}
                       className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-medium text-[#0c2010]" />
                   </View>
                   <View>
                     <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Your Phone *</Text>
-                    <ValidatedTextInput kind="phoneKE" value={signupPhone} onChangeText={setSignupPhone} placeholder="0712 345 678"
+                    <ValidatedTextInput kind="phoneKE" value={signupPhone} onChangeText={setSignupPhone} placeholder="0712 345 678" forceTouched={signupStepTouched}
                       className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-medium text-[#0c2010]" />
                   </View>
                   <View>
                     <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Business Name *</Text>
-                    <ValidatedTextInput kind="businessName" value={signupBusinessName} onChangeText={setSignupBusinessName} placeholder="Acme Corp"
+                    <ValidatedTextInput kind="businessName" value={signupBusinessName} onChangeText={setSignupBusinessName} placeholder="Acme Corp" forceTouched={signupStepTouched}
                       className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-medium text-[#0c2010]" />
                   </View>
                   <View>

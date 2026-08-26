@@ -27,6 +27,29 @@ export function buildPaymentReceivedSms({ ref, amount, payerName, payerPhone, da
 }
 
 /**
+ * Merchant self-funding their own PayChain wallet via M-PESA — replaces a
+ * raw inline template in mpesaController.js that had no length protection
+ * (the only one in the whole self-funding/collection path that didn't go
+ * through buildStrictSms), which is what let "Your updated available
+ * balance is Ksh ..." get silently guillotined by safeSendSMS's crude
+ * hard-truncate the moment the balance figure ran a few digits long.
+ * Shorter "New balance" wording buys real headroom instead of just
+ * shrinking the odds.
+ *
+ * @param {{ ref: string, amount: number, date: string, time: string, balance: number }} params
+ * @returns {{ message: string, truncated: boolean, length: number }}
+ */
+export function buildWalletTopUpSms({ ref, amount, date, time, balance }) {
+  return buildStrictSms(
+    ({ ref, amt, date, time, balance }) =>
+      `${ref} Confirmed. Ksh ${amt} deposited to your PayChain wallet via M-PESA on ${date} at ${time}. New balance: Ksh ${balance}.`,
+    {
+      fixed: { ref, amt: formatKes(amount), date, time, balance: formatKes(balance) },
+    }
+  );
+}
+
+/**
  * @param {{ ref: string, amount: number, recipientName?: string|null, recipientPhone?: string|null, date: string, time: string, balance: number, fee?: number|null }} params
  * @returns {{ message: string, truncated: boolean, length: number }}
  */
@@ -82,18 +105,19 @@ export function buildPaymentRequestSms({ businessName, baseAmount, fee }) {
   const showFee = fee > 0;
   return buildStrictSms(
     ({ name, amt, feeLine, total }) =>
-      `${name} is requesting Ksh ${amt} via PayChain.${feeLine} You'll get an M-PESA prompt for Ksh ${total} shortly, enter your PIN to pay.`,
+      `${name} is requesting Ksh ${amt} via PayChain.${feeLine} Enter M-PESA PIN to pay Ksh ${total}.`,
     {
       fixed: {
-        // Fixed (not truncatable) — the business name must always show in
-        // full, even if that pushes the message past one GSM-7 segment;
-        // safeSendSMS's hard-truncate backstop is still the last resort if
-        // it ever does.
-        name: businessName || 'A PayChain business',
         amt: formatKes(baseAmount),
         feeLine: showFee ? ` Transaction cost, Ksh ${formatKes(fee)}.` : '',
         total: formatKes(total),
       },
+      // The business name always renders in full — buildStrictSms never
+      // shortens anything. Kept concise wording around it (rather than
+      // truncating the name) so a normal business name still fits one
+      // segment; a genuinely long name is sent complete regardless, as a
+      // standard multi-part SMS.
+      truncatable: [{ key: 'name', value: businessName || 'A PayChain business' }],
     }
   );
 }
@@ -107,7 +131,6 @@ export function buildCustomerPaidSms({ ref, amount, businessName, accountRef, da
       fixed: {
         ref,
         amt: formatKes(amount),
-        acct: accountRef || '',
         date,
         time,
         // Same rationale as buildPaymentSentSms's feeLine: this SMS is the
@@ -117,7 +140,13 @@ export function buildCustomerPaidSms({ ref, amount, businessName, accountRef, da
         // up, the same way an M-Pesa "Transaction cost" line does.
         feeLine: showFee ? ` Transaction cost Ksh ${formatKes(fee)}.` : '',
       },
-      truncatable: [{ key: 'name', value: businessName || 'PayChain', minLength: 5 }],
+      // Both render in full — buildStrictSms never shortens a field. A long
+      // business name or account ref just makes this a multi-part SMS
+      // rather than losing "Thank you for your payment." off the end.
+      truncatable: [
+        { key: 'name', value: businessName || 'PayChain' },
+        { key: 'acct', value: accountRef || '' },
+      ],
     }
   );
 }

@@ -36,8 +36,9 @@ function NavItem({ item, depth = 0 }) {
   if (hasChildren) {
     return (
       <div className="flex flex-col">
-        <NavLink 
+        <NavLink
           to={item.path}
+          data-tour={`nav-${item.path}`}
           onClick={() => setIsOpen(!isOpen)}
           className={({ isActive }) => 
             `flex items-center justify-between py-3.5 px-6 cursor-pointer transition-all relative group ${
@@ -117,7 +118,8 @@ function NavItem({ item, depth = 0 }) {
     <NavLink
       key={item.path}
       to={item.path}
-      className={({ isActive }) => 
+      data-tour={`nav-${item.path}`}
+      className={({ isActive }) =>
         `flex items-center gap-3 py-3.5 px-6 transition-all relative group ${
           isActive 
           ? 'text-[#5EFEB3] bg-[#0E3D2E] font-bold after:absolute after:left-0 after:top-0 after:bottom-0 after:w-1 after:bg-[#5EFEB3]' 

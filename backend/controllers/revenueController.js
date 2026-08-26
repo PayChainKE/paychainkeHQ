@@ -263,7 +263,11 @@ export const getRevenue = async (req, res) => {
         $project: {
           _id: 0,
           merchantId: '$_id',
-          businessName: '$merchant.businessName',
+          // Deleted merchants keep their historical revenue and volume —
+          // only the $lookup comes back empty (preserveNullAndEmptyArrays
+          // above), so this is the one spot that needs a fallback label
+          // rather than showing a blank name for real, counted revenue.
+          businessName: { $ifNull: ['$merchant.businessName', 'Deleted Merchant'] },
           email: '$merchant.email',
           status: '$merchant.status',
           revenue: { $round: ['$revenue', 2] },
@@ -550,6 +554,12 @@ export const getRevenue = async (req, res) => {
       data: {
         range,
         windowStart: since,
+        // Explicit end so the frontend can label exactly which calendar
+        // period every KPI card on this page covers ("Aug 27 - Sep 26,
+        // 2026") instead of just naming the range button ("30D") — the
+        // window's actual end is "now", not implied by anything else in
+        // this payload.
+        windowEnd: now,
         kpis: {
           // Financial-summary fields (preferred naming, used by the
           // Revenue page hero strip).

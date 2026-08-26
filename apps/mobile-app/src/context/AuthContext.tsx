@@ -246,8 +246,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
         applyBiometricsEnabled(!!fresh.mobileBiometricUnlockEnabled);
       }
-    } catch (err) {
-      console.error('Failed to refresh session:', err);
+    } catch (err: any) {
+      // A 401 here means the session itself is no longer valid (expired
+      // token, or the account was deleted/locked server-side — protectMerchant
+      // re-checks the DB on every request, see authMiddleware.js) — same
+      // reasoning as the session-restore effect above, which already does
+      // this. Without it, a merchant already using the app when their
+      // account is deleted would keep polling every 5s (see the interval
+      // below) and failing silently forever instead of being signed out.
+      if (err.response?.status === 401) {
+        logout('session-invalid');
+      } else {
+        console.error('Failed to refresh session:', err);
+      }
     }
   }
 

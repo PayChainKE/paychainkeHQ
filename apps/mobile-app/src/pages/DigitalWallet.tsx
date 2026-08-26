@@ -25,6 +25,10 @@ function formatKES(n: number | null | undefined) {
 
 type Destination = 'bank' | 'mpesa';
 
+// Platform-wide kill switch — flip to false to restore this screen once
+// stablecoin/digital wallet features are re-enabled for merchants.
+const STABLECOIN_FEATURES_DISABLED = true;
+
 export default function DigitalWallet({ navigation }: any) {
   const { merchant, refreshSession } = useAuth();
   const walletActivated = !!merchant?.stellarPublicKey;
@@ -374,13 +378,14 @@ export default function DigitalWallet({ navigation }: any) {
     };
   };
 
-  // Admin-controlled (Merchants.jsx's "Feature Access" panel), hidden by
-  // default for new signups. Placed after every hook above (never before —
-  // an early return earlier in this component would violate rules of
-  // hooks) as the defense-in-depth backstop for anyone who lands here
-  // directly (deep link, stale cached nav state) — the Dashboard cards
-  // that link here are already hidden when this is false.
-  if (merchant?.features?.digitalWallet === false) {
+  // Platform-wide kill switch — stablecoin/digital wallet features pulled
+  // for all merchants until further notice, regardless of each merchant's
+  // own `features.digitalWallet` flag. Placed after every hook above
+  // (never before — an early return earlier in this component would
+  // violate rules of hooks) as the defense-in-depth backstop for anyone
+  // who lands here directly (deep link, stale cached nav state) — the
+  // Dashboard cards that link here are already hidden too.
+  if (STABLECOIN_FEATURES_DISABLED || merchant?.features?.digitalWallet === false) {
     return (
       <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
         <TopBar title="Digital Wallet" subtitle="Global settlement, local liquidity" />

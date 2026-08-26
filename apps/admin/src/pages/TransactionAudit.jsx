@@ -202,7 +202,7 @@ const TransactionAudit = () => {
                       <td className="px-3 py-2 border-b border-outline-variant/5">
                         {t.merchant ? (
                           <p className="font-bold text-on-surface tracking-tight truncate max-w-[160px]">{t.merchant.businessName}</p>
-                        ) : <span className="text-on-surface-variant/40">—</span>}
+                        ) : <span className="text-on-surface-variant/40 italic">Deleted Merchant</span>}
                       </td>
                       <td className="px-3 py-2 border-b border-outline-variant/5">
                         <p className="text-on-surface-variant/80 font-mono truncate max-w-[140px]">{t.sender?.id || t.recipient?.id || t.accountNumber || '—'}</p>
@@ -318,16 +318,25 @@ const AuditDrawer = ({ id, onClose }) => {
                 </div>
               </Section>
 
-              {data.merchant && (
-                <Section title="Merchant">
+              <Section title="Merchant">
+                {data.merchant ? (
                   <div className="bg-indigo-50/40 border border-indigo-200/40 rounded-lg p-3">
                     <p className="font-bold text-on-surface text-sm">{data.merchant.businessName}</p>
                     <p className="text-2xs text-on-surface-variant/70">{data.merchant.email}</p>
                     {data.merchant.ncbaMerchantCode && <p className="text-2xs text-on-surface-variant/60 font-mono mt-0.5">Code: {data.merchant.ncbaMerchantCode}</p>}
                     {data.merchant.flagged && <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-2xs font-bold uppercase bg-red-100 text-red-700">Flagged</span>}
                   </div>
-                </Section>
-              )}
+                ) : (
+                  // The merchant account was permanently deleted — this
+                  // transaction record itself is intentionally kept
+                  // forever (real settled money, still counted in every
+                  // revenue/GMV figure), so this is expected, not a bug.
+                  <div className="bg-surface-container-low/60 border border-outline-variant/10 rounded-lg p-3">
+                    <p className="font-bold text-on-surface-variant/60 text-sm">Deleted Merchant</p>
+                    <p className="text-2xs text-on-surface-variant/50">Account no longer exists — this transaction record is preserved.</p>
+                  </div>
+                )}
+              </Section>
 
               {(txn.sender?.name || txn.sender?.id || txn.recipient?.name || txn.recipient?.id) && (
                 <Section title="Counterparty">

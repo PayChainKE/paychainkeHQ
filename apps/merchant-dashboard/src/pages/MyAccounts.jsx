@@ -278,6 +278,7 @@ export default function MyAccounts() {
                       <td className="py-5 px-4 border border-slate-300 text-sm font-bold text-primary">{account.manager}</td>
                       <td className="py-5 px-4 border border-slate-300">
                         <button
+                          data-tour="generate-qr-btn"
                           onClick={() => setQrAccount(account)}
                           disabled={account.status !== 'Active'}
                           title={account.status !== 'Active' ? 'This account is still pending bank assignment' : 'Generate QR code'}
@@ -289,6 +290,7 @@ export default function MyAccounts() {
                       </td>
                       <td className="py-5 px-4 border border-slate-300">
                         <button
+                          data-tour="download-sticker-btn"
                           onClick={handleDownloadSticker}
                           disabled={account.status !== 'Active' || downloadingSticker}
                           title={account.status !== 'Active' ? 'This account is still pending bank assignment' : 'Download paybill sticker'}

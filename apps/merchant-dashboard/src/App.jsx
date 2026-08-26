@@ -53,10 +53,18 @@ function Protected({ children }) {
   return children
 }
 
+// Platform-wide kill switch — stablecoin/digital wallet features pulled
+// for all merchants until further notice, regardless of each merchant's
+// own `features` flag. Flip to an empty array to restore.
+const STABLECOIN_FEATURES_DISABLED = ['digitalWallet', 'inflationShield']
+
 function FeatureGuard({ featureName, children }) {
   const { merchant, isLoading } = useMerchantAuth()
 
   if (isLoading) return <LoadingScreen />
+  if (STABLECOIN_FEATURES_DISABLED.includes(featureName)) {
+    return <Navigate to="/overview" replace />
+  }
   // If the feature object doesn't exist, we assume true for backward compatibility.
   // Otherwise we check if the flag is explicitly set to false.
   if (merchant?.features && merchant.features[featureName] === false) {

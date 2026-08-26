@@ -9,11 +9,19 @@ import api from '../api/config';
 import PrivateValue from '../components/PrivateValue';
 import FundAccountModal from '../components/FundAccountModal';
 import MerchantWalkthrough from '../components/MerchantWalkthrough';
+import TourTarget from '../components/TourTarget';
 import { isCreditTransaction, isDebitTransaction } from '../utils/transactionDirection';
 import { formatAccountNumber } from '../utils/formatAccountNumber';
 import { formatName } from '../utils/formatName';
 
 type Timeframe = '7D' | '30D' | '6M';
+
+// Platform-wide kill switch — flip to false to restore the USDC Vault card
+// and Swap quick-action once stablecoin/digital wallet features are
+// re-enabled for merchants. Mirrored in DigitalWallet.tsx and
+// InflationShield.tsx.
+const STABLECOIN_FEATURES_DISABLED = true;
+
 const DAY_NAMES = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const MONTH_NAMES = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
@@ -201,11 +209,13 @@ export default function Dashboard({ navigation }: any) {
   const monthOverMonthPct = lastMonthTotal > 0 ? ((monthTotal - lastMonthTotal) / lastMonthTotal) * 100 : null;
 
   const walletActivated = !!merchant?.stellarPublicKey;
-  // Admin-controlled per-merchant visibility (Merchants.jsx's "Feature
-  // Access" panel) — hidden by default for new signups now, matches the
-  // web dashboard's MerchantSidebar.jsx/Overview.jsx gating.
-  const digitalWalletEnabled = merchant?.features?.digitalWallet === true;
-  const inflationShieldEnabled = merchant?.features?.inflationShield === true;
+  // Platform-wide kill switch — stablecoin/digital wallet features pulled
+  // for all merchants until further notice, regardless of each merchant's
+  // own feature flags. Flip STABLECOIN_FEATURES_DISABLED to false (see top
+  // of file) to restore, matching the web dashboard's Overview.jsx/App.jsx
+  // gating.
+  const digitalWalletEnabled = !STABLECOIN_FEATURES_DISABLED && merchant?.features?.digitalWallet === true;
+  const inflationShieldEnabled = !STABLECOIN_FEATURES_DISABLED && merchant?.features?.inflationShield === true;
   const usdcBalance = merchant?.usdcBalance || 0;
   const usdcInKes = liveRate != null ? usdcBalance * liveRate : null;
 
@@ -265,7 +275,7 @@ export default function Dashboard({ navigation }: any) {
               </View>
             </View>
 
-            <View className="mb-2 pl-3">
+            <TourTarget id="home-balance" className="mb-2 pl-3">
               <Text className="text-white/80 text-[11px] font-jakarta-bold uppercase tracking-widest mb-1">Total Balance</Text>
               <PrivateValue
                 hidden={!showAmounts}
@@ -275,6 +285,8 @@ export default function Dashboard({ navigation }: any) {
               >
                 {formatCurrency(merchant?.kesBalance || 0)}
               </PrivateValue>
+            </TourTarget>
+            <View className="pl-3">
               <View className="flex-row items-center justify-between mt-4">
                 {todayTotal > 0 ? (
                   <View className="flex-row items-center gap-1.5 bg-[#83f5c6]/20 px-3 py-1.5 rounded-full border border-[#83f5c6]/20">
@@ -370,7 +382,7 @@ export default function Dashboard({ navigation }: any) {
           </View>
 
           {/* Send / Request Money */}
-          <View className="px-6 flex-row gap-3 mb-8">
+          <TourTarget id="send-request-row" className="px-6 flex-row gap-3 mb-8">
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={() => navigation?.navigate('SendMoney')}
@@ -391,7 +403,7 @@ export default function Dashboard({ navigation }: any) {
               </View>
               <Text className="text-[12px] font-jakarta-bold text-[#0c2010] uppercase tracking-wide">Request Money</Text>
             </TouchableOpacity>
-          </View>
+          </TourTarget>
 
           {/* Quick Actions — the two fastest ways to get paid, deep-linking
               into RequestMoney with the relevant option pre-selected. Back to

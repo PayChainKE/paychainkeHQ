@@ -16,6 +16,7 @@ import { formatName } from '../utils/formatName';
 import { buildStatementHtml } from '../utils/statementHtml';
 import { InlineDatePicker } from '../components/InlineDatePicker';
 import TransactionsWalkthrough from '../components/TransactionsWalkthrough';
+import TourTarget from '../components/TourTarget';
 
 const EXPORT_PRESETS = [
   { key: '7d', label: 'Last 7 Days' },
@@ -382,10 +383,11 @@ export default function Transactions({ navigation }: any) {
           </View>
 
           {/* ── Transaction List ───────────────────────────────────────────── */}
-          <View className="flex-row items-center justify-between mb-4">
+          <TourTarget id="transactions-list-header" className="flex-row items-center justify-between mb-4">
             <Text className="text-[10px] font-jakarta-bold text-[#006c4e] uppercase tracking-[0.2em]">
               All Transactions
             </Text>
+            <TourTarget id="export-statement-btn">
             <TouchableOpacity
               onPress={() => setShowExportModal(true)}
               className="flex-row items-center gap-1.5 bg-white border border-[#bfc9bf]/20 px-3 py-1.5 rounded-full"
@@ -393,7 +395,8 @@ export default function Transactions({ navigation }: any) {
               <Feather name="download" size={12} color="#00351d" />
               <Text className="text-[#00351d] text-[10px] font-jakarta-extrabold uppercase tracking-wider">Statement</Text>
             </TouchableOpacity>
-          </View>
+            </TourTarget>
+          </TourTarget>
 
           <View className="flex-row items-center gap-2 bg-white rounded-2xl border border-[#bfc9bf]/10 px-4 py-3 mb-3">
             <Feather name="search" size={15} color="#a1a1aa" />

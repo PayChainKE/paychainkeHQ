@@ -67,6 +67,7 @@ import { backfillNcbaMerchantCodes } from './migrations/backfillNcbaMerchantCode
 import { checkAndSendDormancyReminders } from './services/dormancyReminderService.js';
 import { runWeeklyRevenueSweepIfDue } from './services/revenueSweepService.js';
 import { reconcileStuckOpenBankingPayouts } from './services/ncbaOpenBankingReconciliationService.js';
+import { retryInsufficientFundsPayouts } from './services/ncbaPayoutRetryService.js';
 import { processPendingWebhookDeliveries } from './services/webhookDeliveryService.js';
 
 const allowedOrigins = [
@@ -397,6 +398,18 @@ async function bootstrap() {
   reconcileStuckOpenBankingPayouts().catch((e) => console.error('Open Banking reconciliation sweep failed:', e));
   setInterval(() => {
     reconcileStuckOpenBankingPayouts().catch((e) => console.error('Open Banking reconciliation sweep failed:', e));
+  }, 5 * 60 * 1000);
+
+  // NCBA B2C/B2B payout retry — a genuine "Insufficient Funds" rejection
+  // (unlike the ambiguous case above) means nothing moved, so it's safe to
+  // actively resubmit the same payout on the chance the pooled account has
+  // picked up more real liquidity since. Same 5-minute cadence as the
+  // reconciliation sweep above, and deliberately backs off before that
+  // sweep's own 20-minute cutoff so a payout that never clears still ends
+  // up refunded, just not endlessly retried. See ncbaPayoutRetryService.js.
+  retryInsufficientFundsPayouts().catch((e) => console.error('NCBA payout retry sweep failed:', e));
+  setInterval(() => {
+    retryInsufficientFundsPayouts().catch((e) => console.error('NCBA payout retry sweep failed:', e));
   }, 5 * 60 * 1000);
 
   // Developer API webhook retry sweep — picks up deliveries whose backoff

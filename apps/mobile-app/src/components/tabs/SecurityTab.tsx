@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ValidatedTextInput } from '../../components/ValidatedTextInput';
 import SecurityWalkthrough from '../SecurityWalkthrough';
+import TourTarget from '../TourTarget';
 import api from '../../api/config';
 
 // Fixed set — same three questions the merchant-dashboard's Profile.jsx
@@ -308,7 +309,7 @@ export default function SecurityTab() {
         </View>
 
         {/* Change Password */}
-        <View className="bg-white/5 rounded-[32px] p-7 border border-white/10 mb-6 shadow-xl relative overflow-hidden">
+        <TourTarget id="change-password-section" className="bg-white/5 rounded-[32px] p-7 border border-white/10 mb-6 shadow-xl relative overflow-hidden">
           <View className="absolute top-0 right-0 w-32 h-32 bg-[#5efeb3]/10 rounded-full -mr-16 -mt-16 blur-xl" />
 
           <View className="flex-row items-center gap-3 mb-6 relative z-10">
@@ -356,7 +357,7 @@ export default function SecurityTab() {
               />
             </View>
           </View>
-        </View>
+        </TourTarget>
 
         {/* Advanced Auth */}
         <View className="bg-white/5 rounded-[32px] p-7 border border-white/10 mb-8 shadow-xl relative overflow-hidden">
@@ -379,7 +380,7 @@ export default function SecurityTab() {
                 existing PIN found to reset." (merchant sets one for the
                 first time from the Bulk Pay flow instead). */}
             {merchant?.hasAppPin && (
-              <View className="bg-black/20 p-5 rounded-2xl border border-white/5">
+              <TourTarget id="change-pin-section" className="bg-black/20 p-5 rounded-2xl border border-white/5">
                 <Text className="text-[14px] font-jakarta-extrabold text-white mb-4">Reset Payment PIN</Text>
                 <View className="gap-3">
                   <ValidatedTextInput kind="pin4" secureTextEntry placeholder="Current PIN (4 digits)" placeholderTextColor="rgba(255,255,255,0.2)"
@@ -406,7 +407,7 @@ export default function SecurityTab() {
                     )}
                   </TouchableOpacity>
                 </View>
-              </View>
+              </TourTarget>
             )}
 
             {/* Developer API payouts — a SEPARATE PIN from the payment PIN
@@ -434,7 +435,7 @@ export default function SecurityTab() {
             </TouchableOpacity>
 
             {/* Biometric Login */}
-            <View className="w-full flex-row items-center justify-between p-5 bg-black/20 rounded-2xl border border-white/5">
+            <TourTarget id="biometrics-register" className="w-full flex-row items-center justify-between p-5 bg-black/20 rounded-2xl border border-white/5">
               <View className="flex-row items-center gap-4">
                 <View className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center">
                   <MaterialIcons name="fingerprint" size={22} color={merchant?.mobileBiometricUnlockEnabled ? "#5efeb3" : "#9ca3af"} />
@@ -458,7 +459,7 @@ export default function SecurityTab() {
                   <Text className="text-[10px] text-white font-jakarta-extrabold uppercase tracking-widest">Setup</Text>
                 </TouchableOpacity>
               )}
-            </View>
+            </TourTarget>
 
           </View>
         </View>

@@ -39,6 +39,41 @@ const transactionSchema = new mongoose.Schema({
     enum: ['pending', 'completed', 'failed', 'verified'],
     default: 'completed'
   },
+  // Distinguishes WHY a payout is sitting 'pending' — only set for NCBA
+  // Open Banking rails. 'ambiguous_response' means NCBA's response
+  // couldn't be confidently read as success or failure (it may have
+  // already gone through — never safe to blindly retry, only ever
+  // resolved by a real callback or ncbaOpenBankingReconciliationService.js's
+  // stuck-payout sweep). 'insufficient_funds' means NCBA gave a clear,
+  // definitive rejection because the pooled account was short — nothing
+  // moved, so it's safe to actively retry the same request later once
+  // there's more real liquidity (see services/ncbaPayoutRetryService.js),
+  // rather than just waiting out the reconciliation window.
+  pendingReason: {
+    type: String,
+    enum: ['ambiguous_response', 'insufficient_funds', null],
+    default: null
+  },
+  retryCount: {
+    type: Number,
+    default: 0
+  },
+  lastRetryAt: {
+    type: Date,
+    default: null
+  },
+  // Whatever services/ncbaPayoutRetryService.js needs to reconstruct the
+  // exact original NCBA submit call for a pendingReason:'insufficient_funds'
+  // transaction (e.g. Mobile B2W's beneficiaryName/recipientNumber, or
+  // Lipa na M-Pesa's paymentType/payBillTillNo/accountReference) — shape
+  // differs per rail, so this stays untyped rather than growing a new
+  // top-level field per rail's own submit params. Only ever set alongside
+  // pendingReason:'insufficient_funds'; unused/absent for every other
+  // transaction.
+  retryPayload: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null
+  },
   reference: {
     type: String,
     required: true,

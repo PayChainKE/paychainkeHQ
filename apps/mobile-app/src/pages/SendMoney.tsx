@@ -181,7 +181,12 @@ function estimateBankFee(rail: 'pesalink' | 'rtgs', amount: number) {
 export default function SendMoney({ navigation }: any) {
   const { merchant, refreshSession, setAppPin } = useAuth();
 
-  const hasPin = !!merchant?.hasAppPin;
+  // Snapshotted once at mount, not derived live from `merchant` — see the
+  // matching fix/comment in apps/merchant-dashboard/src/pages/SendMoney.jsx.
+  // A future change to setAppPin() that syncs merchant.hasAppPin mid-flow
+  // would otherwise flip confirmStep out from under an in-progress wizard
+  // and strand the CTA on a step no render branch matches.
+  const [hasPin] = useState(() => !!merchant?.hasAppPin);
   const [step, setStep] = useState(1);
   const [destination, setDestination] = useState<Destination | ''>('');
   const [recipientAccount, setRecipientAccount] = useState('');

@@ -22,15 +22,38 @@ export function MerchantAuthProvider({ children }) {
   const navigate = useNavigate();
   const interceptorRef = useRef(null);
 
-  // Axios 401 interceptor — any API call that gets a 401 (expired/invalid
-  // token) automatically clears the session and redirects to login.
+  // Axios 401 interceptor — forces a logout when the current session itself
+  // is no longer valid (expired/invalid token, account deleted, or signed
+  // out remotely). Previously a no-op ("automatic logout disabled") — an
+  // admin permanently deleting a merchant (Merchant.deleteOne, see
+  // adminController.js) only invalidated the account server-side;
+  // protectMerchant correctly rejects every request with 401
+  // MERCHANT_NOT_FOUND, but nothing ever acted on that here, so a merchant
+  // already on the dashboard when their account was deleted kept seeing
+  // the cached UI indefinitely — every real API call failed silently, but
+  // the app never logged them out or said why.
+  //
+  // Gated on `code` (not just status 401) so this can't misfire on a 401
+  // that isn't about session validity — e.g. loginMerchant's wrong-password
+  // rejection is also a plain 401 with no `code` field, and must not force
+  // a logout mid-login-attempt. Also gated on an existing local session so
+  // it's a no-op for 401s that happen before any login (there's nothing to
+  // log out of).
   useEffect(() => {
+    const SESSION_INVALID_CODES = new Set([
+      'TOKEN_EXPIRED', 'TOKEN_INVALID', 'MERCHANT_NOT_FOUND', 'SESSION_REVOKED',
+    ]);
     interceptorRef.current = axios.interceptors.response.use(
       res => res,
       err => {
-        if (err.response?.status === 401) {
-          const url = err.config?.url || '';
-          console.warn('Received 401 on', url, '- automatic logout disabled per configuration.');
+        if (err.response?.status === 401 && localStorage.getItem(TOKEN_KEY)) {
+          const code = err.response?.data?.code;
+          if (SESSION_INVALID_CODES.has(code)) {
+            const reason = code === 'MERCHANT_NOT_FOUND' ? 'account-unavailable'
+              : code === 'SESSION_REVOKED' ? 'session-revoked'
+              : 'session-expired';
+            logout(reason);
+          }
         }
         return Promise.reject(err);
       }

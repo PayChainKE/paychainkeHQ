@@ -18,7 +18,7 @@ import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard
 import { getLipaNaMpesaTariff } from '../config/lipaNaMpesaTariffCard.js';
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay.js';
 import { AUTO_INFLATION_SHIELD_ENABLED } from '../config/inflationShieldFlag.js';
-import { buildPaymentReceivedSms, buildCustomerPaidSms, buildPaymentRequestSms, buildPayoutSentSms, buildPayoutRecipientReceivedSms } from '../utils/paymentSmsTemplates.js';
+import { buildPaymentReceivedSms, buildCustomerPaidSms, buildPaymentRequestSms, buildPayoutSentSms, buildPayoutRecipientReceivedSms, buildWalletTopUpSms } from '../utils/paymentSmsTemplates.js';
 import { initiateStkPush as ncbaInitiateStkPush, queryStkPush as ncbaQueryStkPush, generateQrCode as ncbaGenerateQrCode } from '../services/ncbaStkPushService.js';
 import { submitMobileB2wPayment as ncbaSubmitMobileB2wPayment, submitLipaNaMpesaPayment as ncbaSubmitLnmPayment, NcbaOpenBankingRequestError } from '../services/ncbaOpenBankingService.js';
 import { validatePhoneNumber, NcbaValidationError, getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
@@ -526,7 +526,13 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
             topupSends.push({
               to: merchant.phone,
               message: isSelfFunding
-                ? `${receipt} Confirmed. Ksh ${formatKes(merchantCredit)} deposited to your PayChain wallet via M-PESA on ${date} at ${time}. Your updated available balance is Ksh ${formatKes(updatedMerchant.kesBalance || 0)}.`
+                ? buildWalletTopUpSms({
+                    ref: receipt,
+                    amount: merchantCredit,
+                    date,
+                    time,
+                    balance: updatedMerchant.kesBalance || 0,
+                  }).message
                 : buildPaymentReceivedSms({
                     ref: receipt,
                     amount: merchantCredit,
@@ -1007,6 +1013,15 @@ export const initiateB2C = async (req, res) => {
           kesAmount: amount,
           currency: 'KES',
           status: 'pending',
+          // A clear "insufficient funds" rejection means nothing moved —
+          // safe for ncbaPayoutRetryService.js to actively resubmit later.
+          // Anything else stays 'ambiguous_response' (unchanged behaviour):
+          // never auto-retried, only ever resolved by a real callback or
+          // the stuck-payout reconciliation sweep.
+          pendingReason: ncbaErr.isInsufficientFunds ? 'insufficient_funds' : 'ambiguous_response',
+          retryPayload: ncbaErr.isInsufficientFunds
+            ? { rail: 'ncba_mobile_b2w', beneficiaryName, recipientNumber: phone, narration: `Withdrawal to ${destination}` }
+            : null,
           reference: transactionId,
           sender: { name: merchant.businessName, id: merchant.ncbaMerchantCode },
           recipient: { name: destination, id: phone },
@@ -1214,6 +1229,18 @@ export const initiateB2B = async (req, res) => {
           kesAmount: numericAmount,
           currency: 'KES',
           status: 'pending',
+          pendingReason: ncbaErr.isInsufficientFunds ? 'insufficient_funds' : 'ambiguous_response',
+          retryPayload: ncbaErr.isInsufficientFunds
+            ? {
+                rail: 'ncba_lipa_na_mpesa',
+                paymentType,
+                payBillTillNo: partyB,
+                accountReference: paymentType === 'Paybill' ? accountReference : undefined,
+                recipientName,
+                notifyMobileNumber: merchant.phone,
+                narration: reference || `Payout to ${partyB}`,
+              }
+            : null,
           reference: transactionId,
           sender: { name: merchant.businessName, id: merchant.ncbaMerchantCode },
           recipient: { name: recipientName, id: partyB },

@@ -10,6 +10,7 @@ import { useAuth } from '../../context/AuthContext';
 import { formatAccountNumber } from '../../utils/formatAccountNumber';
 import SettlementQrCard from '../ui/SettlementQrCard';
 import MyAccountsWalkthrough from '../MyAccountsWalkthrough';
+import TourTarget from '../TourTarget';
 import api from '../../api/config';
 
 export default function MyAccountsTab() {
@@ -171,31 +172,35 @@ export default function MyAccountsTab() {
                   </View>
                 </View>
 
-                <TouchableOpacity
-                  onPress={() => setQrAccount({ name: account.name, accountNumber: account.accountNumber })}
-                  disabled={account.status !== 'Active'}
-                  activeOpacity={0.85}
-                  className="flex-row items-center justify-center gap-2 mt-4 py-3.5 bg-[#00351d] rounded-2xl"
-                  style={{ opacity: account.status !== 'Active' ? 0.35 : 1 }}
-                >
-                  <MaterialIcons name="qr-code-2" size={16} color="#5efeb3" />
-                  <Text className="text-[#5efeb3] text-[11px] font-jakarta-extrabold uppercase tracking-widest">
-                    {account.status !== 'Active' ? 'Pending Bank Assignment' : 'Generate QR'}
-                  </Text>
-                </TouchableOpacity>
+                <TourTarget id="generate-qr-btn">
+                  <TouchableOpacity
+                    onPress={() => setQrAccount({ name: account.name, accountNumber: account.accountNumber })}
+                    disabled={account.status !== 'Active'}
+                    activeOpacity={0.85}
+                    className="flex-row items-center justify-center gap-2 mt-4 py-3.5 bg-[#00351d] rounded-2xl"
+                    style={{ opacity: account.status !== 'Active' ? 0.35 : 1 }}
+                  >
+                    <MaterialIcons name="qr-code-2" size={16} color="#5efeb3" />
+                    <Text className="text-[#5efeb3] text-[11px] font-jakarta-extrabold uppercase tracking-widest">
+                      {account.status !== 'Active' ? 'Pending Bank Assignment' : 'Generate QR'}
+                    </Text>
+                  </TouchableOpacity>
+                </TourTarget>
 
-                <TouchableOpacity
-                  onPress={handleDownloadSticker}
-                  disabled={account.status !== 'Active' || downloadingSticker}
-                  activeOpacity={0.85}
-                  className="flex-row items-center justify-center gap-2 mt-2.5 py-3.5 bg-white border border-[#00351d]/15 rounded-2xl"
-                  style={{ opacity: account.status !== 'Active' ? 0.35 : 1 }}
-                >
-                  <MaterialIcons name={downloadingSticker ? 'hourglass-empty' : 'download'} size={16} color="#00351d" />
-                  <Text className="text-[#00351d] text-[11px] font-jakarta-extrabold uppercase tracking-widest">
-                    {downloadingSticker ? 'Preparing…' : 'Download Sticker'}
-                  </Text>
-                </TouchableOpacity>
+                <TourTarget id="download-sticker-btn">
+                  <TouchableOpacity
+                    onPress={handleDownloadSticker}
+                    disabled={account.status !== 'Active' || downloadingSticker}
+                    activeOpacity={0.85}
+                    className="flex-row items-center justify-center gap-2 mt-2.5 py-3.5 bg-white border border-[#00351d]/15 rounded-2xl"
+                    style={{ opacity: account.status !== 'Active' ? 0.35 : 1 }}
+                  >
+                    <MaterialIcons name={downloadingSticker ? 'hourglass-empty' : 'download'} size={16} color="#00351d" />
+                    <Text className="text-[#00351d] text-[11px] font-jakarta-extrabold uppercase tracking-widest">
+                      {downloadingSticker ? 'Preparing…' : 'Download Sticker'}
+                    </Text>
+                  </TouchableOpacity>
+                </TourTarget>
               </View>
             </View>
           ))}

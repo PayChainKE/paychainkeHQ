@@ -12,6 +12,12 @@ type Props = Omit<TextInputProps, 'onChangeText' | 'value' | 'keyboardType' | 'a
   containerClassName?: string;
   // Override the rendered error message wrapper.
   errorClassName?: string;
+  // Show this field's error immediately regardless of local blur state — for
+  // a parent step that just tried to advance and wants to point at every
+  // invalid field at once, not only the ones the user happened to already
+  // blur (e.g. a field they never touched at all, or filled in then Continue
+  // was pressed before tabbing away from it).
+  forceTouched?: boolean;
 };
 
 export function ValidatedTextInput({
@@ -21,11 +27,13 @@ export function ValidatedTextInput({
   optional = false,
   containerClassName,
   errorClassName,
+  forceTouched = false,
   onBlur,
   className,
   ...rest
 }: Props) {
   const [touched, setTouched] = useState(false);
+  const isTouched = touched || forceTouched;
 
   const format = formatters[kind];
   const validate = validators[kind];
@@ -41,8 +49,8 @@ export function ValidatedTextInput({
   };
 
   const isEmpty = !value;
-  const result = touched && (!isEmpty || !optional) ? validate(value) : { valid: true };
-  const showError = touched && !result.valid;
+  const result = isTouched && (!isEmpty || !optional) ? validate(value) : { valid: true };
+  const showError = isTouched && !result.valid;
 
   return (
     <View className={containerClassName}>

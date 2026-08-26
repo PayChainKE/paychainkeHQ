@@ -240,7 +240,7 @@ export default function SupportPage({ navigation }: any) {
               />
               <FAQItem
                 question="What are the transaction fees?"
-                answer="Collections carry PayChain's standard tiered fee. Send Money and Bulk Pay payouts — bank, M-PESA, Paybill/Till, KPLC, and Water — each carry their own tiered PayChain fee plus the relevant third-party cost, shown before you confirm. FX conversions (KES to USDC) carry no PayChain fee today."
+                answer="Collections carry PayChain's standard tiered fee. Send Money and Bulk Pay payouts — bank, M-PESA, Paybill/Till, KPLC, and Water — each carry their own tiered PayChain fee plus the relevant third-party cost, shown before you confirm."
               />
               <FAQItem
                 question="What is my PayChain Virtual Account?"
