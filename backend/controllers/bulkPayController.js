@@ -19,7 +19,7 @@ import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard
 import { getKplcPostpaidTariff, getKplcPrepaidTariff, getNcwscTariff } from '../config/billPaymentTariffCard.js';
 import { getLipaNaMpesaTariff } from '../config/lipaNaMpesaTariffCard.js';
 import { validatePhoneNumber, NcbaValidationError } from '../utils/ncbaValidators.js';
-import { submitMobileB2wPayment, submitLipaNaMpesaPayment, validateKplcAccount, submitKplcPayment, validateKplcPrepaidAccount, submitKplcPrepaidPayment, validateNcwscAccount, submitNcwscPayment, NcbaOpenBankingValidationError } from '../services/ncbaOpenBankingService.js';
+import { submitMobileB2wPayment, submitLipaNaMpesaPayment, validateKplcAccount, submitKplcPayment, validateKplcPrepaidAccount, submitKplcPrepaidPayment, validateNcwscAccount, submitNcwscPayment, NcbaOpenBankingValidationError, NcbaOpenBankingRequestError } from '../services/ncbaOpenBankingService.js';
 import { buildPayoutSentSms } from '../utils/paymentSmsTemplates.js';
 import { normalizeKraPin, isValidKraPin, KRA_PIN_FORMAT_HINT } from '../utils/kraPinValidator.js';
 
@@ -787,36 +787,52 @@ export const authorizeBatch = async (req, res) => {
           }
         }
       } else if (payee.paymentMethod === 'Mobile Money' && payee.mobileMoneyType === 'Personal Number') {
-        // NCBA Mobile B2W. Async rail — payoutStatus stays 'pending' (its
-        // default above), resolved later via handlePesaLinkCallback
-        // (ncbaOpenBankingController.js), keyed by the reference this row is
-        // stamped with below.
+        // NCBA Mobile B2W. Reaching past submitMobileB2wPayment without it
+        // throwing means its own broadened success check actually
+        // confirmed the transfer — NCBA's documented "resolves later via
+        // callback" has never been observed arriving for this rail in
+        // practice, so this is treated as synchronously resolved
+        // (payoutStatus = 'completed' below), not left 'pending' — a real
+        // success left 'pending' would otherwise get auto-marked 'failed'
+        // and refunded by the reconciliation sweep purely for lack of a
+        // callback that was never coming.
+        const mobileB2wTransactionId = `PAYOUT-BULK-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
         try {
-          const transactionId = `PAYOUT-BULK-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
           await submitMobileB2wPayment({
-            transactionId,
+            transactionId: mobileB2wTransactionId,
             beneficiaryName: payee.name,
             amount: row.netAmount,
             recipientNumber: ncbaMsisdn,
             narration: `Bulk Payout to ${payee.name}`,
           });
-          payoutRef = transactionId;
+          payoutRef = mobileB2wTransactionId;
+          payoutStatus = 'completed';
         } catch (err) {
           console.error(`❌ NCBA Mobile B2W rejected payout for ${payee.name}:`, err.message);
-          payoutStatus = 'failed';
-          refundAmount += row.netAmount + row.b2cFee;
+          if (err instanceof NcbaOpenBankingRequestError) {
+            // NCBA actually received and processed the request — same
+            // reasoning as initiateB2C (mpesaController.js): refunding on
+            // top of a transfer that may have already completed would
+            // double-cost PayChain with no record of what happened, so
+            // this row is left 'pending' under the same reference NCBA
+            // actually received, rather than marked failed/refunded here.
+            payoutRef = mobileB2wTransactionId;
+          } else {
+            payoutStatus = 'failed';
+            refundAmount += row.netAmount + row.b2cFee;
+          }
         }
       } else if (payee.paymentMethod === 'Mobile Money') {
         // Paybill/Till, via NCBA's Lipa na M-Pesa Payment API — NCBA's
         // replacement for Daraja B2B. Same async shape as Mobile B2W above.
+        const lnmTransactionId = `PAYOUT-BULK-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
         try {
           const payBillTillNo = payee.paybillNumber || payee.tillNumber;
-          const transactionId = `PAYOUT-BULK-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
           // No pre-payout Till/Paybill validation — takes the saved payee's
           // own mobileMoneyType selection as given.
           const paymentType = payee.mobileMoneyType === 'Paybill' ? 'Paybill' : 'Till';
           await submitLipaNaMpesaPayment({
-            transactionId,
+            transactionId: lnmTransactionId,
             paymentType,
             payBillTillNo,
             amount: row.netAmount,
@@ -825,11 +841,26 @@ export const authorizeBatch = async (req, res) => {
             notifyMobileNumber: merchant.phone,
             narration: `Bulk Payout to ${payee.name}`,
           });
-          payoutRef = transactionId;
+          // Async rail — payoutStatus stays 'pending' (its default above),
+          // resolved later via handlePesaLinkCallback / the reconciliation
+          // sweep, same as KPLC/NCWSC above (no evidence yet that this
+          // rail's callback is as unreliable as Mobile B2W's proved to be).
+          payoutRef = lnmTransactionId;
         } catch (err) {
           console.error(`❌ NCBA Lipa na M-Pesa rejected payout for ${payee.name}:`, err.message);
-          payoutStatus = 'failed';
-          refundAmount += row.netAmount + row.b2cFee + row.lnmFee;
+          if (err instanceof NcbaOpenBankingRequestError) {
+            // Same reasoning as the Mobile B2W branch above: NCBA actually
+            // received this request, and an NCBA rejection response has
+            // already been shown live not to reliably mean the transfer
+            // never landed. Left 'pending' under the reference NCBA
+            // actually received rather than refunded here — the
+            // reconciliation sweep still resolves it (refund included) if
+            // no success callback arrives.
+            payoutRef = lnmTransactionId;
+          } else {
+            payoutStatus = 'failed';
+            refundAmount += row.netAmount + row.b2cFee + row.lnmFee;
+          }
         }
       }
 

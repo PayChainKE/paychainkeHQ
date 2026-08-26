@@ -18,9 +18,9 @@ import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard
 import { getLipaNaMpesaTariff } from '../config/lipaNaMpesaTariffCard.js';
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay.js';
 import { AUTO_INFLATION_SHIELD_ENABLED } from '../config/inflationShieldFlag.js';
-import { buildPaymentReceivedSms, buildCustomerPaidSms, buildPaymentRequestSms } from '../utils/paymentSmsTemplates.js';
+import { buildPaymentReceivedSms, buildCustomerPaidSms, buildPaymentRequestSms, buildPayoutSentSms, buildPayoutRecipientReceivedSms } from '../utils/paymentSmsTemplates.js';
 import { initiateStkPush as ncbaInitiateStkPush, queryStkPush as ncbaQueryStkPush, generateQrCode as ncbaGenerateQrCode } from '../services/ncbaStkPushService.js';
-import { submitMobileB2wPayment as ncbaSubmitMobileB2wPayment, submitLipaNaMpesaPayment as ncbaSubmitLnmPayment } from '../services/ncbaOpenBankingService.js';
+import { submitMobileB2wPayment as ncbaSubmitMobileB2wPayment, submitLipaNaMpesaPayment as ncbaSubmitLnmPayment, NcbaOpenBankingRequestError } from '../services/ncbaOpenBankingService.js';
 import { validatePhoneNumber, NcbaValidationError, getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
 import { generateBrandedQrDataUri } from '../utils/qrCode.js';
 import DeveloperPayment from '../models/DeveloperPayment.js';
@@ -976,17 +976,63 @@ export const initiateB2C = async (req, res) => {
     // M-PESA Number"), not a person's name — reference (if the merchant
     // typed one) is the actual name NCBA's beneficiaryName field wants,
     // same as the Bank branch already sends it as accountName.
-    await ncbaSubmitMobileB2wPayment({
-      transactionId,
-      beneficiaryName: reference || destination,
-      amount,
-      recipientNumber: phone,
-      narration: `Withdrawal to ${destination}`,
-    });
+    const beneficiaryName = reference || destination;
+    try {
+      await ncbaSubmitMobileB2wPayment({
+        transactionId,
+        beneficiaryName,
+        amount,
+        recipientNumber: phone,
+        narration: `Withdrawal to ${destination}`,
+      });
+    } catch (ncbaErr) {
+      // NcbaOpenBankingRequestError means NCBA actually received and
+      // processed the request — this is not the same as the request never
+      // reaching NCBA. A live test (2026-08-26) confirmed NCBA can accept
+      // and complete a transfer (recipient paid) while returning a
+      // response this integration couldn't confidently read as success —
+      // refunding the merchant here on top of that would double-cost
+      // PayChain (real payout + refund) with zero record of what
+      // happened. Recorded as 'pending' instead of refunded so there's a
+      // paper trail, resolved later like every other async rail's
+      // uncertain case (webhook callback, or the reconciliation sweep in
+      // ncbaOpenBankingReconciliationService.js) rather than assumed
+      // failed here.
+      if (ncbaErr instanceof NcbaOpenBankingRequestError) {
+        const tx = await Transaction.create({
+          merchantId: merchant._id,
+          accountNumber: merchant.ncbaMerchantCode || 'WALLET_FUND',
+          type: 'ncba_mobile_b2w',
+          amount: amount,
+          kesAmount: amount,
+          currency: 'KES',
+          status: 'pending',
+          reference: transactionId,
+          sender: { name: merchant.businessName, id: merchant.ncbaMerchantCode },
+          recipient: { name: destination, id: phone },
+          mobileNetwork: provider,
+        });
+        return res.status(202).json({
+          success: true,
+          pending: true,
+          message: "We've submitted your transfer but couldn't immediately confirm the outcome with NCBA. We'll update this transaction shortly — please don't retry with the same details in the meantime.",
+          transaction: tx,
+        });
+      }
+      throw ncbaErr;
+    }
 
-    // type: 'ncba_mobile_b2w' — see utils/feeCalculator.js for the matching
-    // fee branch and ncbaOpenBankingController.js's handlePesaLinkCallback
-    // for how this resolves from 'pending'.
+    // type: 'ncba_mobile_b2w' — status is 'completed', not 'pending':
+    // reaching this line means submitMobileB2wPayment's broadened success
+    // check actually confirmed the transfer (see that function's own doc
+    // comment) — NCBA's documented "resolves later via callback" shape
+    // has never actually been observed arriving for this rail in
+    // practice, so a real success left 'pending' here would eventually
+    // get auto-marked 'failed' and refunded by the reconciliation sweep
+    // (ncbaOpenBankingReconciliationService.js) purely because no callback
+    // ever came — the exact double-loss bug this rail already had once,
+    // just delayed 20 minutes instead of immediate. See utils/feeCalculator.js
+    // for the fee branch.
     const tx = await Transaction.create({
       merchantId: merchant._id,
       accountNumber: merchant.ncbaMerchantCode || 'WALLET_FUND',
@@ -994,11 +1040,39 @@ export const initiateB2C = async (req, res) => {
       amount: amount,
       kesAmount: amount,
       currency: 'KES',
-      status: 'pending',
+      status: 'completed',
       reference: transactionId,
       sender: { name: merchant.businessName, id: merchant.ncbaMerchantCode },
       recipient: { name: destination, id: phone },
       mobileNetwork: provider,
+    });
+
+    // Fire-and-forget, matching bulkPayController.js's identical pattern —
+    // never blocks the response on an SMS provider hiccup.
+    const { date: txDate, time: txTime } = formatTransactionDateTime();
+    if (merchant.phone) {
+      const { message: merchantSmsMessage } = buildPayoutSentSms({
+        ref: transactionId,
+        label: 'Withdrawal',
+        amount,
+        recipientName: beneficiaryName,
+        date: txDate,
+        time: txTime,
+        balance: merchant.kesBalance,
+      });
+      safeSendSMS({ to: merchant.phone, message: merchantSmsMessage }).then((result) => {
+        if (!result.success) console.error(`B2C merchant SMS failed for merchant ${merchant._id}:`, result.error);
+      });
+    }
+    const { message: recipientSmsMessage } = buildPayoutRecipientReceivedSms({
+      ref: transactionId,
+      amount,
+      businessName: merchant.businessName,
+      date: txDate,
+      time: txTime,
+    });
+    safeSendSMS({ to: phone, message: recipientSmsMessage }).then((result) => {
+      if (!result.success) console.error(`B2C recipient SMS failed for transaction ${transactionId}:`, result.error);
     });
 
     res.status(200).json({ success: true, message: 'Transfer initiated successfully', transaction: tx });
@@ -1007,7 +1081,9 @@ export const initiateB2C = async (req, res) => {
     // Refund the merchant only if the deduction actually happened — an
     // earlier failure (e.g. PIN check) never touched the balance. Refunds
     // the full totalDebit (amount + B2C fee), matching what was actually
-    // reserved above.
+    // reserved above. Only reached for errors before NCBA ever received
+    // the request (validation, config, etc.) — see the NcbaOpenBankingRequestError
+    // branch above for the case where NCBA did receive it.
     if (debited && totalDebit > 0) {
       await Merchant.findByIdAndUpdate(req.merchant._id, { $inc: { kesBalance: totalDebit } });
     }
@@ -1104,18 +1180,53 @@ export const initiateB2B = async (req, res) => {
     const recipientName = reference || `${paymentType} ${partyB}`;
     const transactionId = `PAYOUT-B2B-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 
-    // Throws (caught by the outer catch below, which refunds) if NCBA
-    // rejects the instruction outright.
-    await ncbaSubmitLnmPayment({
-      transactionId,
-      paymentType,
-      payBillTillNo: partyB,
-      amount: numericAmount,
-      accountReference: paymentType === 'Paybill' ? accountReference : undefined,
-      recipientName,
-      notifyMobileNumber: merchant.phone,
-      narration: reference || `Payout to ${partyB}`,
-    });
+    try {
+      await ncbaSubmitLnmPayment({
+        transactionId,
+        paymentType,
+        payBillTillNo: partyB,
+        amount: numericAmount,
+        accountReference: paymentType === 'Paybill' ? accountReference : undefined,
+        recipientName,
+        notifyMobileNumber: merchant.phone,
+        narration: reference || `Payout to ${partyB}`,
+      });
+    } catch (ncbaErr) {
+      // Same reasoning as initiateB2C above: NcbaOpenBankingRequestError
+      // means NCBA actually received the request and responded with a
+      // rejection (e.g. "Insufficient Funds For Transaction") — but this
+      // integration has already proven live that an NCBA rejection
+      // response isn't a reliable signal the transfer never landed (see
+      // submitMobileB2wPayment's doc comment). Refunding here on top of a
+      // transfer NCBA actually processed would double-cost PayChain the
+      // same way. Recorded 'pending' instead of refunded — 'ncba_lipa_na_mpesa'
+      // is already covered by the reconciliation sweep
+      // (ncbaOpenBankingReconciliationService.js), which refunds it for
+      // real after STUCK_AFTER_MS only if no success callback ever arrives,
+      // so a genuine rejection like insufficient funds still gets refunded,
+      // just up to 20 minutes later instead of instantly.
+      if (ncbaErr instanceof NcbaOpenBankingRequestError) {
+        const tx = await Transaction.create({
+          merchantId: merchant._id,
+          accountNumber: merchant.ncbaMerchantCode || 'WALLET_FUND',
+          type: 'ncba_lipa_na_mpesa',
+          amount: numericAmount,
+          kesAmount: numericAmount,
+          currency: 'KES',
+          status: 'pending',
+          reference: transactionId,
+          sender: { name: merchant.businessName, id: merchant.ncbaMerchantCode },
+          recipient: { name: recipientName, id: partyB },
+        });
+        return res.status(202).json({
+          success: true,
+          pending: true,
+          message: "We've submitted your transfer but couldn't immediately confirm the outcome with NCBA. We'll update this transaction shortly — please don't retry with the same details in the meantime.",
+          transaction: tx,
+        });
+      }
+      throw ncbaErr;
+    }
 
     const tx = await Transaction.create({
       merchantId: merchant._id,

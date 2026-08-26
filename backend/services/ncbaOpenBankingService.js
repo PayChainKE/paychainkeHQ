@@ -221,6 +221,34 @@ function simulate(event, payload) {
   return { simulated: true };
 }
 
+// NCBA's response field names have already been shown (see
+// submitMobileB2wPayment's own doc comment) to not reliably match this
+// file's documented examples — different rails in this same API use
+// `succeeded`, `resultCode`, or `resErrorCode` for the same concept, and
+// nothing guarantees Mobile B2W's real field names match Rose's emailed
+// spec exactly. Scans known success/message field names case-insensitively
+// across both the top-level response and its nested `data` object instead
+// of trusting one exact key spelling — a missed field here is what causes a
+// real success (or a real, specific rejection reason) to fall through to a
+// generic fallback message.
+function findNcbaField(result, patterns) {
+  for (const obj of [result, result?.data]) {
+    if (!obj || typeof obj !== 'object') continue;
+    for (const key of Object.keys(obj)) {
+      if (patterns.some((p) => p.test(key))) {
+        const val = obj[key];
+        if (val !== undefined && val !== null && val !== '') return val;
+      }
+    }
+  }
+  return undefined;
+}
+
+const NCBA_SUCCESS_FLAG_PATTERNS = [/^succeeded$/i, /^success$/i, /^issuccess(ful)?$/i];
+const NCBA_SUCCESS_CODE_PATTERNS = [/^resultcode$/i, /^reserrorcode$/i, /^statuscode$/i, /^respcode$/i, /^responsecode$/i];
+const NCBA_MESSAGE_PATTERNS = [/message/i, /description/i, /desc$/i, /reason/i];
+const NCBA_SUCCESS_CODES = ['000', '0', '200'];
+
 function assertTransferAmountInBounds(amount) {
   const numeric = Number(amount);
   if (numeric < MIN_TRANSFER_AMOUNT || numeric > MAX_TRANSFER_AMOUNT) {
@@ -909,8 +937,31 @@ export async function submitMobileB2wPayment({
   }
 
   const result = await ncbaOpenBankingPost('/api/v1/MobileMoneyTransfer/mobilemoneytransfer', payload);
-  if (!result?.succeeded) {
-    throw new NcbaOpenBankingRequestError(result?.message || 'The payout could not be completed. Please try again.');
+  // A live test (2026-08-26) confirmed the recipient was actually paid by
+  // NCBA on a call where result?.succeeded was falsy — Rose's documented
+  // response shape (top-level `succeeded: true`) doesn't match what this
+  // endpoint actually returns live, same doc/reality mismatch already seen
+  // elsewhere in this file (see validateLipaNaMpesaAccount's history). A
+  // second live rejection afterward came back with none of the originally
+  // checked fields populated at all (fell through to the generic fallback
+  // message below) — findNcbaField widens the search to every plausible
+  // key spelling instead of the few exact names Rose's spec used, so both a
+  // real success and a real, specific rejection reason are readable
+  // whatever casing/field name NCBA actually used. Always logs the full raw
+  // response on rejection so the real shape is visible in Render logs —
+  // critical since a false negative here means callers refund a payout that
+  // actually already landed.
+  const successFlag = findNcbaField(result, NCBA_SUCCESS_FLAG_PATTERNS);
+  const successCode = findNcbaField(result, NCBA_SUCCESS_CODE_PATTERNS);
+  const messageField = findNcbaField(result, NCBA_MESSAGE_PATTERNS);
+  const succeeded =
+    successFlag === true ||
+    String(successFlag).toUpperCase() === 'TRUE' ||
+    String(messageField || '').toUpperCase() === 'SUCCESS' ||
+    (successCode !== undefined && NCBA_SUCCESS_CODES.includes(String(successCode)));
+  if (!succeeded) {
+    logEvent('warn', 'ncba_openbanking_mobile_b2w_submit_rejected', { transactionId, response: result });
+    throw new NcbaOpenBankingRequestError(messageField ? String(messageField) : 'The payout could not be completed. Please try again.');
   }
   return result;
 }

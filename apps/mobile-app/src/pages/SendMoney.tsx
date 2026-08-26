@@ -205,6 +205,12 @@ export default function SendMoney({ navigation }: any) {
   const [pinError, setPinError] = useState('');
   const [success, setSuccess] = useState(false);
   const [completedTx, setCompletedTx] = useState<any>(null);
+  // See SendMoney.jsx's identical state for why: locks the confirm step to
+  // a single attempt once a transfer is actually submitted, since NCBA can
+  // accept and complete a transfer while returning a response this app
+  // reads as a failure — re-tapping Confirm in that case would risk a
+  // second real transfer.
+  const [confirmLocked, setConfirmLocked] = useState(false);
 
   const selectedDest = DESTINATIONS.find((d) => d.id === destination);
   const isMobileDest = destination === 'mpesa-primary' || destination === 'mobile';
@@ -233,6 +239,7 @@ export default function SendMoney({ navigation }: any) {
       return (
         !!amount &&
         Number(amount) > 0 &&
+        (!isMobileDest || (Number(amount) >= 50 && Number(amount) <= 250000)) &&
         !!recipientAccount &&
         (destination !== 'bank' || !!bankCode) &&
         (destination !== 'bank' || bankRail !== 'rtgs' || !!beneficiaryCountry) &&
@@ -276,7 +283,18 @@ export default function SendMoney({ navigation }: any) {
 
       setIsLoading(true);
       try {
-        await api.post('/api/auth/merchant/verify-payment-pin', { pin });
+        // A wrong PIN here is safe to let the merchant retry immediately:
+        // no transfer attempt has happened yet.
+        try {
+          await api.post('/api/auth/merchant/verify-payment-pin', { pin });
+        } catch (pinErr: any) {
+          if (pinErr?.response?.status === 401) {
+            setPinError('Incorrect PIN. Please try again.');
+            setPin('');
+            return;
+          }
+          throw pinErr;
+        }
 
         let tx: any = null;
         if (isMobileDest) {
@@ -319,20 +337,23 @@ export default function SendMoney({ navigation }: any) {
         setSuccess(true);
       } catch (e: any) {
         const msg = e?.response?.data?.error || 'Transfer failed. Please try again.';
-        if (e?.response?.status === 401) {
-          setPinError('Incorrect PIN. Please try again.');
-          setPin('');
-        } else {
-          Alert.alert('Transfer Failed', msg);
-        }
+        Alert.alert('Transfer Failed', msg);
+        setPinError(msg);
+        setConfirmLocked(true);
       } finally {
         setIsLoading(false);
       }
     }
   };
 
+  const handleTryAgain = () => {
+    setConfirmLocked(false);
+    setPinError('');
+    setPin('');
+  };
+
   const goBack = () => {
-    if (step > 1) setStep((s) => s - 1);
+    if (step > 1) { setConfirmLocked(false); setStep((s) => s - 1); }
     else navigation?.goBack();
   };
 
@@ -627,6 +648,16 @@ export default function SendMoney({ navigation }: any) {
                 placeholderTextColor="#a1a1aa"
                 className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-5 py-4 text-[18px] font-jakarta-extrabold text-[#00351d]"
               />
+              {isMobileDest && (
+                <Text className="text-[11px] font-jakarta-bold mt-2 text-[#a1a1aa]">
+                  Mobile Money transfers: min KES 50, max KES 250,000 per transaction
+                </Text>
+              )}
+              {Number(amount) > 0 && isMobileDest && (Number(amount) < 50 || Number(amount) > 250000) && (
+                <Text className="text-[11px] font-jakarta-bold mt-2 text-red-500">
+                  {Number(amount) < 50 ? 'Amount must be at least KES 50' : 'Amount cannot exceed KES 250,000 per transaction'}
+                </Text>
+              )}
               {Number(amount) > 0 && (
                 <Text className={`text-[11px] font-jakarta-bold mt-2 mb-1 ${totalAmount > balance ? 'text-red-500' : 'text-[#006c4e]'}`}>
                   Total deduction: {formatKES(totalAmount)}{totalAmount > balance ? ' — exceeds balance' : ''}
@@ -721,34 +752,57 @@ export default function SendMoney({ navigation }: any) {
                 </View>
               </View>
 
-              <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#00351d]/60 mb-2 text-center">Enter Payment PIN</Text>
-              {isLoading ? (
-                <PinBounceBoxes />
-              ) : (
-                <TextInput
-                  value={pin}
-                  onChangeText={(t) => setPin(t.replace(/\D/g, '').slice(0, 4))}
-                  keyboardType="numeric"
-                  secureTextEntry
-                  maxLength={4}
-                  autoFocus
-                  className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-5 py-4 text-[#00351d] font-jakarta-extrabold text-[20px] tracking-[0.5em] text-center"
-                  placeholder="••••"
-                  placeholderTextColor="#a1a1aa"
-                />
-              )}
-              {pinError ? (
-                <View className="flex-row items-center justify-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 mt-4">
-                  <Feather name="alert-circle" size={14} color="#dc2626" />
-                  <Text className="text-[12px] font-jakarta-bold text-red-700">{pinError}</Text>
+              {confirmLocked ? (
+                <View>
+                  <View className="items-center gap-3 bg-red-50 border border-red-200 rounded-2xl px-5 py-6">
+                    <Feather name="alert-circle" size={28} color="#dc2626" />
+                    <Text className="text-[13px] font-jakarta-bold text-red-700 text-center">{pinError}</Text>
+                    <Text className="text-[11px] text-red-700/70 font-jakarta-medium text-center">
+                      If you're not sure this went through, check your Transactions page before trying again — don't submit the same transfer twice.
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={handleTryAgain}
+                    activeOpacity={0.9}
+                    className="w-full py-4 rounded-2xl items-center justify-center mt-4 border border-[#eff4ef]"
+                  >
+                    <Text className="font-jakarta-extrabold text-[12px] uppercase tracking-widest text-[#00351d]">Try Again</Text>
+                  </TouchableOpacity>
                 </View>
-              ) : null}
+              ) : (
+                <>
+                  <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#00351d]/60 mb-2 text-center">Enter Payment PIN</Text>
+                  {isLoading ? (
+                    <PinBounceBoxes />
+                  ) : (
+                    <TextInput
+                      value={pin}
+                      onChangeText={(t) => setPin(t.replace(/\D/g, '').slice(0, 4))}
+                      keyboardType="numeric"
+                      secureTextEntry
+                      maxLength={4}
+                      autoFocus
+                      className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-5 py-4 text-[#00351d] font-jakarta-extrabold text-[20px] tracking-[0.5em] text-center"
+                      placeholder="••••"
+                      placeholderTextColor="#a1a1aa"
+                    />
+                  )}
+                  {pinError ? (
+                    <View className="flex-row items-center justify-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 mt-4">
+                      <Feather name="alert-circle" size={14} color="#dc2626" />
+                      <Text className="text-[12px] font-jakarta-bold text-red-700">{pinError}</Text>
+                    </View>
+                  ) : null}
+                </>
+              )}
             </View>
           )}
         </View>
       </ScrollView>
 
-      {/* CTA */}
+      {/* CTA — hidden once the confirm step is locked; the status card
+          above owns the only available action (Try Again) then. */}
+      {!(step === confirmStep && confirmLocked) && (
       <View className="px-6 pb-6 pt-3 bg-[#f0fdf4] border-t border-[#eff4ef]">
         <TouchableOpacity
           onPress={goNext}
@@ -774,6 +828,7 @@ export default function SendMoney({ navigation }: any) {
           )}
         </TouchableOpacity>
       </View>
+      )}
     </SafeAreaView>
   );
 }

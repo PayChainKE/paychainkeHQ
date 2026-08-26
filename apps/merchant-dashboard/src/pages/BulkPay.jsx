@@ -14,6 +14,119 @@ import paychainLogo from '../assets/paychain-logo-dark.png'
 import paychainLogoWhite from '../assets/paychain-logo-white.png'
 import axios from 'axios'
 
+// ── Fee estimates for the client-side liquidity check ───────────────────
+// Mirror backend/config/mpesaB2cTariffCard.js#getB2cTariff and
+// backend/config/lipaNaMpesaTariffCard.js#getLipaNaMpesaTariff — same bands
+// already mirrored in SendMoney.jsx's estimateB2cFee/estimateB2bFee.
+const B2C_TARIFF_BANDS = [
+  { max: 49,      totalFee: 0   },
+  { max: 100,     totalFee: 5   },
+  { max: 500,     totalFee: 11  },
+  { max: 1_000,   totalFee: 17  },
+  { max: 1_500,   totalFee: 24  },
+  { max: 2_500,   totalFee: 29  },
+  { max: 3_500,   totalFee: 34  },
+  { max: 5_000,   totalFee: 37  },
+  { max: 7_500,   totalFee: 57  },
+  { max: 10_000,  totalFee: 67  },
+  { max: 20_000,  totalFee: 84  },
+  { max: 50_000,  totalFee: 113 },
+  { max: 100_000, totalFee: 163 },
+  { max: 250_000, totalFee: 213 },
+]
+function estimateB2cFee(amount) {
+  if (!amount || amount <= 0) return 0
+  const band = B2C_TARIFF_BANDS.find(b => amount <= b.max) || B2C_TARIFF_BANDS[B2C_TARIFF_BANDS.length - 1]
+  return band.totalFee
+}
+
+const B2B_TARIFF_BANDS = [
+  { max: 100,      totalFee: 0   },
+  { max: 500,      totalFee: 10  },
+  { max: 1_000,    totalFee: 15  },
+  { max: 2_500,    totalFee: 23  },
+  { max: 5_000,    totalFee: 27  },
+  { max: 10_000,   totalFee: 35  },
+  { max: 20_000,   totalFee: 57  },
+  { max: 30_000,   totalFee: 64  },
+  { max: 40_000,   totalFee: 72  },
+  { max: 50_000,   totalFee: 79  },
+  { max: 100_000,  totalFee: 86  },
+  { max: 150_000,  totalFee: 104 },
+  { max: 200_000,  totalFee: 122 },
+  { max: 250_000,  totalFee: 140 },
+]
+function estimateB2bFee(amount) {
+  if (!amount || amount <= 0) return 0
+  const band = B2B_TARIFF_BANDS.find(b => amount <= b.max) || B2B_TARIFF_BANDS[B2B_TARIFF_BANDS.length - 1]
+  return band.totalFee
+}
+
+// Mirrors backend/config/bankTransferTariffCard.js#getPesaLinkTariff — Bulk
+// Pay never requests RTGS (bulkPayController.js always prices Bank rows as
+// PesaLink), except a destination that's NCBA's own bank code, which is
+// forced onto the fee-exempt IFT rail instead (see NCBA_OWN_BANK_CODE in
+// ncbaOpenBankingController.js).
+const PESALINK_BANDS = [
+  { max: 500,      totalFee: 50  },
+  { max: 3_500,    totalFee: 97  },
+  { max: 7_000,    totalFee: 122 },
+  { max: 10_000,   totalFee: 147 },
+  { max: 250_000,  totalFee: 210 },
+]
+const NCBA_OWN_BANK_CODE = '07000'
+function estimateBankFee(bankCode, amount) {
+  if (bankCode === NCBA_OWN_BANK_CODE) return 0
+  if (!amount || amount <= 0) return 0
+  const band = PESALINK_BANDS.find(b => amount <= b.max) || PESALINK_BANDS[PESALINK_BANDS.length - 1]
+  return band.totalFee
+}
+
+// Mirrors backend/config/billPaymentTariffCard.js — KPLC postpaid and NCWSC
+// are flat (baseCost 10 + serviceFee 27), KPLC prepaid is tiered.
+const KPLC_PREPAID_BANDS = [
+  { max: 500,      totalFee: 12 },
+  { max: 2_000,    totalFee: 17 },
+  { max: 4_000,    totalFee: 29 },
+  { max: 7_000,    totalFee: 39 },
+  { max: 10_000,   totalFee: 50 },
+  { max: 25_000,   totalFee: 57 },
+  { max: 50_000,   totalFee: 66 },
+  { max: 100_000,  totalFee: 75 },
+  { max: 250_000,  totalFee: 84 },
+]
+const KPLC_POSTPAID_FLAT_FEE = 37
+const NCWSC_FLAT_FEE = 37
+function estimateUtilityFee(utilityProvider, amount) {
+  if (utilityProvider === 'KPLC') return KPLC_POSTPAID_FLAT_FEE
+  if (utilityProvider === 'WATER') return NCWSC_FLAT_FEE
+  if (utilityProvider === 'KPLC_PREPAID') {
+    if (!amount || amount <= 0) return 0
+    const band = KPLC_PREPAID_BANDS.find(b => amount <= b.max) || KPLC_PREPAID_BANDS[KPLC_PREPAID_BANDS.length - 1]
+    return band.totalFee
+  }
+  return 0
+}
+
+// Dispatches a saved Payee to the right estimator above — mirrors
+// bulkPayController.js#authorizeBatch's own row.isB2cRow/isLnmRow/
+// isKplcRow/isKplcPrepaidRow/isNcwscRow/isBankRow branching.
+function estimatePayoutFee(payee, amount) {
+  if (payee.type === 'utility' && payee.utilityProvider) {
+    return estimateUtilityFee(payee.utilityProvider, amount)
+  }
+  if (payee.paymentMethod === 'Mobile Money' && payee.mobileMoneyType === 'Personal Number') {
+    return estimateB2cFee(amount)
+  }
+  if (payee.paymentMethod === 'Mobile Money') {
+    return estimateB2bFee(amount)
+  }
+  if (payee.paymentMethod === 'Bank') {
+    return estimateBankFee(payee.bankCode, amount)
+  }
+  return 0
+}
+
 export default function BulkPay() {
   const { showAmounts } = usePrivacyMode()
   const { addNotification } = useNotification()
@@ -865,8 +978,26 @@ export default function BulkPay() {
     .filter((id) => selectedPayees[id])
     .reduce((sum, id) => sum + (payoutAmounts[id] || 0), 0)
 
+  // Fee estimate for the liquidity check only — mirrors the same backend
+  // tariff tables bulkPayController.js's authorize-batch resolve pass
+  // actually charges (getB2cTariff/getLipaNaMpesaTariff/getKplcPostpaidTariff/
+  // getKplcPrepaidTariff/getNcwscTariff/getPesaLinkTariff), same bands
+  // already mirrored client-side in SendMoney.jsx. batchTotal itself (the
+  // "Total Payout" figure shown to the merchant) stays principal-only —
+  // this only widens what the balance is checked against, so a batch that
+  // clears the client-side check doesn't then fail server-side once the
+  // real fees are added, and a merchant can't submit a batch they can't
+  // actually afford once fees are folded in.
+  const batchFees = Object.keys(selectedPayees)
+    .filter((id) => selectedPayees[id])
+    .reduce((sum, id) => {
+      const payee = payeesList.find((p) => p.id === id)
+      if (!payee) return sum
+      return sum + estimatePayoutFee(payee, payoutAmounts[id] || 0)
+    }, 0)
+
   const balance = merchant?.kesBalance ?? 0
-  const isLiquidityLow = batchTotal > balance
+  const isLiquidityLow = (batchTotal + batchFees) > balance
 
   const [authorizedReceipts, setAuthorizedReceipts] = useState([])
 
@@ -1983,7 +2114,7 @@ export default function BulkPay() {
                     {isLiquidityLow && (
                       <div className="text-right hidden sm:block">
                         <p className="text-[8px] text-amber-400 font-bold uppercase tracking-widest mb-0.5">Insufficient Liquidity</p>
-                        <p className="text-[9px] text-white/60">Balance: {formatKES(balance)}</p>
+                        <p className="text-[9px] text-white/60">Balance: {formatKES(balance)} · Batch + fees: {formatKES(batchTotal + batchFees)}</p>
                       </div>
                     )}
                     <button 
