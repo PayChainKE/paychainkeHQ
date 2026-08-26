@@ -33,7 +33,6 @@ export const formatters = {
   integer:      (raw) => raw.replace(/\D/g, ''),
   personName:   (raw) => raw.replace(/[^A-Za-z\s'.\-]/g, '').slice(0, 60),
   businessName: (raw) => raw.replace(/[^\w\s&.,'()\-]/g, '').slice(0, 80),
-  utilityName:  (raw) => raw.replace(/[^\w\s&.,'()\-]/g, '').slice(0, 80),
   email:        (raw) => raw.toLowerCase().replace(/\s/g, '').slice(0, 100),
   nssf:         (raw) => raw.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12),
   shif:         (raw) => raw.replace(/\D/g, '').slice(0, 12),
@@ -107,11 +106,6 @@ export const validators = {
   },
   businessName: (v) => {
     if (!v) return { valid: false, error: 'Business name is required.' };
-    if (v.trim().length < 2) return { valid: false, error: 'Name must be at least 2 characters.' };
-    return VALID;
-  },
-  utilityName: (v) => {
-    if (!v) return { valid: false, error: 'Utility name is required.' };
     if (v.trim().length < 2) return { valid: false, error: 'Name must be at least 2 characters.' };
     return VALID;
   },
@@ -207,7 +201,6 @@ export const inputAttrs = {
   integer:      { type: 'text',   inputMode: 'numeric', autoComplete: 'off',          autoCapitalize: 'off' },
   personName:   { type: 'text',   inputMode: 'text',    autoComplete: 'name',         autoCapitalize: 'words' },
   businessName: { type: 'text',   inputMode: 'text',    autoComplete: 'organization', autoCapitalize: 'words' },
-  utilityName:  { type: 'text',   inputMode: 'text',    autoComplete: 'off',          autoCapitalize: 'words' },
   email:        { type: 'email',  inputMode: 'email',   autoComplete: 'email',        autoCapitalize: 'off' },
   nssf:         { type: 'text',   inputMode: 'text',    autoComplete: 'off',          autoCapitalize: 'characters' },
   shif:         { type: 'text',   inputMode: 'numeric', autoComplete: 'off',          autoCapitalize: 'off' },
