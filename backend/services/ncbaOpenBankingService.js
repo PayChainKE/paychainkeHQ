@@ -909,8 +909,23 @@ export async function submitMobileB2wPayment({
   }
 
   const result = await ncbaOpenBankingPost('/api/v1/MobileMoneyTransfer/mobilemoneytransfer', payload);
-  if (!result?.succeeded) {
-    throw new NcbaOpenBankingRequestError(result?.message || 'The payout could not be completed. Please try again.');
+  // A live test (2026-08-26) confirmed the recipient was actually paid by
+  // NCBA on a call where result?.succeeded was falsy — Rose's documented
+  // response shape (top-level `succeeded: true`) doesn't match what this
+  // endpoint actually returns live, same doc/reality mismatch already seen
+  // elsewhere in this file (see validateLipaNaMpesaAccount's history).
+  // Checks every plausible success signal instead of trusting one field,
+  // and always logs the full raw response on rejection so the real shape
+  // is visible in Render logs — critical since a false negative here means
+  // callers refund a payout that actually already landed.
+  const succeeded =
+    result?.succeeded === true ||
+    result?.data?.succeeded === true ||
+    String(result?.message || '').toUpperCase() === 'SUCCESS' ||
+    String(result?.data?.message || '').toUpperCase() === 'SUCCESS';
+  if (!succeeded) {
+    logEvent('warn', 'ncba_openbanking_mobile_b2w_submit_rejected', { transactionId, response: result });
+    throw new NcbaOpenBankingRequestError(result?.message || result?.data?.message || 'The payout could not be completed. Please try again.');
   }
   return result;
 }

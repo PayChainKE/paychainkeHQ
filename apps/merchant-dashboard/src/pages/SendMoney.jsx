@@ -136,6 +136,13 @@ export default function SendMoney() {
   const [pinError, setPinError]             = useState('')
   const [success, setSuccess]               = useState(false)
   const [completedTx, setCompletedTx]       = useState(null)
+  // Locks the Confirm & Send step to a single attempt once submitted — a
+  // merchant who sees an error and isn't sure whether it actually went
+  // through (NCBA can accept a transfer but return a response this app
+  // reads as a rejection) must explicitly tap "Try Again" rather than the
+  // PIN boxes + Confirm button just silently staying live and inviting an
+  // instant re-tap that sends a second real transfer.
+  const [confirmLocked, setConfirmLocked]   = useState(false)
 
   const hasPin       = !!merchant?.hasAppPin
   const selectedDest = DESTINATIONS.find(d => d.id === destination)
@@ -206,10 +213,23 @@ export default function SendMoney() {
 
       setIsLoading(true)
       try {
-        // 1. Verify PIN
-        await axios.post(`${API_URL}/api/auth/merchant/verify-payment-pin`, { pin }, cfg())
+        // 1. Verify PIN — a wrong PIN here is safe to let the merchant
+        // retry immediately: no transfer attempt has happened yet.
+        try {
+          await axios.post(`${API_URL}/api/auth/merchant/verify-payment-pin`, { pin }, cfg())
+        } catch (pinErr) {
+          if (pinErr.response?.status === 401) {
+            setPinError('Incorrect PIN. Please try again.')
+            setPin('')
+            return
+          }
+          throw pinErr
+        }
 
-        // 2. Execute transfer
+        // 2. Execute transfer — once this starts, lock the step on any
+        // failure below (see confirmLocked's own comment) since NCBA may
+        // have actually received and processed the request even if this
+        // call throws.
         const isMobile = destination === 'mpesa-primary' || destination === 'mobile'
         let tx = null
         if (isMobile) {
@@ -252,21 +272,30 @@ export default function SendMoney() {
         setSuccess(true)
       } catch (e) {
         const msg = e.response?.data?.error || 'Transfer failed. Please try again.'
-        if (e.response?.status === 401) {
-          setPinError('Incorrect PIN. Please try again.')
-          setPin('')
-        } else {
-          addNotification({ title: 'Transfer Failed', message: msg, type: 'error' })
-        }
+        addNotification({ title: 'Transfer Failed', message: msg, type: 'error' })
+        setPinError(msg)
+        setConfirmLocked(true)
       } finally {
         setIsLoading(false)
       }
     }
   }
 
+  const handleTryAgain = () => {
+    setConfirmLocked(false)
+    setPinError('')
+    setPin('')
+  }
+
+  const handleBack = () => {
+    if (step === 1) { navigate('/overview'); return }
+    setConfirmLocked(false)
+    setStep(s => s - 1)
+  }
+
   const canContinue = () => {
     if (step === 1) return !!destination
-    if (step === 2) return !!amount && Number(amount) > 0 && !!recipientAccount && (destination !== 'bank' || !!bankCode) && (destination !== 'bank' || bankRail !== 'rtgs' || !!beneficiaryCountry) && (destination !== 'paybill' || !!paybillAccountRef)
+    if (step === 2) return !!amount && Number(amount) > 0 && (!isMobileDest || (Number(amount) >= 50 && Number(amount) <= 250000)) && !!recipientAccount && (destination !== 'bank' || !!bankCode) && (destination !== 'bank' || bankRail !== 'rtgs' || !!beneficiaryCountry) && (destination !== 'paybill' || !!paybillAccountRef)
     if (!hasPin && step === 3) return newPin.length === 4 && confirmPin.length === 4
     if (step === confirmStep) return pin.length === 4
     return true
@@ -332,7 +361,7 @@ export default function SendMoney() {
       <div className="max-w-lg mx-auto animate-fade-in-up">
 
         {/* Back */}
-        <button onClick={() => step > 1 ? setStep(s => s - 1) : navigate('/overview')}
+        <button onClick={handleBack}
           className="flex items-center gap-2 text-slate-400 hover:text-primary transition-colors mb-8 group">
           <span className="material-symbols-outlined text-lg group-hover:-translate-x-1 transition-transform">arrow_back</span>
           <span className="text-[10px] font-black uppercase tracking-widest">{step > 1 ? 'Back' : 'Dashboard'}</span>
@@ -620,6 +649,16 @@ export default function SendMoney() {
                     required
                   />
                 </div>
+                {isMobileDest && (
+                  <p className="text-[11px] font-bold text-slate-400">
+                    Mobile Money transfers: min KES 50, max KES 250,000 per transaction
+                  </p>
+                )}
+                {Number(amount) > 0 && isMobileDest && (Number(amount) < 50 || Number(amount) > 250000) && (
+                  <p className="text-[11px] font-bold text-red-500">
+                    {Number(amount) < 50 ? 'Amount must be at least KES 50' : 'Amount cannot exceed KES 250,000 per transaction'}
+                  </p>
+                )}
                 {Number(amount) > 0 && (
                   <p className={`text-[11px] font-bold ${Number(amount) + fee > balance ? 'text-red-500' : 'text-emerald-600'}`}>
                     Total deduction: {formatKES(totalAmount)}
@@ -716,28 +755,51 @@ export default function SendMoney() {
                 </div>
               </div>
 
-              {/* PIN entry */}
-              <div className="space-y-4">
-                <div className="text-center">
-                  <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-1">Enter Payment PIN</p>
-                  {hasPin && (
-                    <p className="text-[10px] text-slate-400">
-                      {merchant?.hasAppPin ? 'Use the PIN you set on the mobile app or web dashboard.' : ''}
+              {/* PIN entry, or a locked status once a transfer attempt has
+                  been made — never both, so a merchant can't re-tap Confirm
+                  and risk sending a second real transfer while unsure
+                  whether the first one landed. */}
+              {confirmLocked ? (
+                <div className="space-y-4">
+                  <div className="flex flex-col items-center gap-3 bg-red-50 border border-red-200 rounded-2xl px-5 py-6 text-center">
+                    <span className="material-symbols-outlined text-red-500 text-3xl">error_outline</span>
+                    <p className="text-sm font-bold text-red-700">{pinError}</p>
+                    <p className="text-[11px] text-red-700/70 font-medium">
+                      If you're not sure this went through, check your Transactions page before trying again — don't submit the same transfer twice.
                     </p>
+                  </div>
+                  <button
+                    onClick={handleTryAgain}
+                    className="w-full py-4 rounded-2xl border border-slate-200 text-primary font-black text-sm uppercase tracking-widest hover:bg-slate-50 transition-all"
+                  >
+                    Try Again
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="text-center">
+                    <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-1">Enter Payment PIN</p>
+                    {hasPin && (
+                      <p className="text-[10px] text-slate-400">
+                        {merchant?.hasAppPin ? 'Use the PIN you set on the mobile app or web dashboard.' : ''}
+                      </p>
+                    )}
+                  </div>
+                  <PinBoxes value={pin} onChange={setPin} autoFocus loading={isLoading} />
+                  {pinError && (
+                    <div className="flex items-center justify-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 animate-shake">
+                      <span className="material-symbols-outlined text-red-500 text-base shrink-0">error_outline</span>
+                      <p className="text-xs font-bold text-red-700">{pinError}</p>
+                    </div>
                   )}
                 </div>
-                <PinBoxes value={pin} onChange={setPin} autoFocus loading={isLoading} />
-                {pinError && (
-                  <div className="flex items-center justify-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 animate-shake">
-                    <span className="material-symbols-outlined text-red-500 text-base shrink-0">error_outline</span>
-                    <p className="text-xs font-bold text-red-700">{pinError}</p>
-                  </div>
-                )}
-              </div>
+              )}
             </div>
           )}
 
-          {/* CTA */}
+          {/* CTA — hidden once the confirm step is locked; the status card
+              above owns the only available action (Try Again) then. */}
+          {!(step === confirmStep && confirmLocked) && (
           <div className="px-7 lg:px-9 pb-7 lg:pb-9">
             <button
               onClick={goNext}
@@ -765,6 +827,7 @@ export default function SendMoney() {
               }
             </button>
           </div>
+          )}
         </div>
 
         <p className="mt-6 text-center text-[10px] font-bold text-slate-300 uppercase tracking-widest">
