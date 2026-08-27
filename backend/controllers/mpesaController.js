@@ -85,6 +85,24 @@ export const initiateSTKPush = async (req, res) => {
       throw e;
     }
 
+    // Only one STK Push in flight per merchant at a time, regardless of
+    // amount/phone/kind — the double-submission guard above only catches an
+    // exact repeat; two DIFFERENT concurrent pushes (e.g. two rapid clicks
+    // that raced past the guard with a slightly different amount, or two
+    // Request Money prompts fired close together) are a separate way to end
+    // up with more than one real charge/credit in flight, which is exactly
+    // the shape of bug that caused the 2026-08-27 STK double-credit
+    // incident. A merchant with a still-unanswered prompt must wait for it
+    // to resolve (succeed, fail, or time out — at most ~2 minutes, see
+    // NCBA_STK_POLL_MAX_ATTEMPTS below) before sending another. Scoped to
+    // channel:'stk' only — Dynamic QR requests (channel:'qr') have no
+    // "prompt in flight" concept to conflict with, they just sit waiting to
+    // be scanned.
+    const alreadyPending = await STKRequest.findOne({ merchantId, channel: 'stk', status: 'pending' });
+    if (alreadyPending) {
+      return res.status(409).json({ error: 'You already have a payment prompt waiting for a response. Please wait for it to complete (or time out, within about 2 minutes) before sending another.' });
+    }
+
     // Request Money is the one STK flow where the customer never lands on
     // any PayChain page first — Payment Links / Pay Account already show
     // the fee breakdown on-screen before the customer submits, but here the
