@@ -65,6 +65,7 @@ import { ensurePrimaryOwner } from './migrations/ensurePrimaryOwner.js';
 import { backfillTransactionFees } from './migrations/backfillTransactionFees.js';
 import { backfillNcbaMerchantCodes } from './migrations/backfillNcbaMerchantCodes.js';
 import { checkAndSendDormancyReminders } from './services/dormancyReminderService.js';
+import { checkAndSendTaxDeadlineReminders } from './services/taxDeadlineReminderService.js';
 import { runWeeklyRevenueSweepIfDue } from './services/revenueSweepService.js';
 import { reconcileStuckOpenBankingPayouts } from './services/ncbaOpenBankingReconciliationService.js';
 import { retryInsufficientFundsPayouts } from './services/ncbaPayoutRetryService.js';
@@ -379,6 +380,13 @@ async function bootstrap() {
   // once every 24h for as long as this process stays up.
   checkAndSendDormancyReminders();
   setInterval(checkAndSendDormancyReminders, 24 * 60 * 60 * 1000);
+
+  // Daily KRA tax-filing-deadline reminder sweep — same shape as the
+  // dormancy sweep above (checkAndSendTaxDeadlineReminders already
+  // catches its own errors internally, so no wrapper needed here either).
+  // See services/taxDeadlineReminderService.js.
+  checkAndSendTaxDeadlineReminders();
+  setInterval(checkAndSendTaxDeadlineReminders, 24 * 60 * 60 * 1000);
 
   // Weekly PayChain revenue sweep — checks daily, only actually attempts a
   // transfer on the configured weekday (PAYCHAIN_REVENUE_SWEEP_DAY, default

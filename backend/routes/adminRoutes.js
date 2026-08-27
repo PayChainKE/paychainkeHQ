@@ -83,6 +83,12 @@ import {
   getBookkeepingSummary,
   exportKraRevenueCsv,
 } from '../controllers/bookkeepingController.js';
+import {
+  listTaxDeadlines,
+  createTaxDeadline,
+  updateTaxDeadline,
+  deleteTaxDeadline,
+} from '../controllers/taxDeadlineController.js';
 import { protect, protectAdminSSE, requireRole } from '../middleware/authMiddleware.js';
 import { upload, uploadReceipt } from '../utils/cloudinary.js';
 import { registerAdminEventClient } from '../utils/adminEventStream.js';
@@ -207,6 +213,11 @@ router.patch('/cash-advance/requests/:id', protect, requireMutator, sensitiveAct
 // Bookkeeping — expense ledger + P&L summary for KRA-ready record keeping.
 router.get('/bookkeeping/summary',        protect, excludeOfficer, getBookkeepingSummary);
 router.get('/bookkeeping/kra-export',     protect, excludeOfficer, exportKraRevenueCsv);
+
+router.get('/tax-deadlines',        protect, excludeOfficer, listTaxDeadlines);
+router.post('/tax-deadlines',       protect, requireMutator, createTaxDeadline);
+router.put('/tax-deadlines/:id',    protect, requireMutator, updateTaxDeadline);
+router.delete('/tax-deadlines/:id', protect, requireMutator, deleteTaxDeadline);
 router.get('/bookkeeping/expenses',       protect, excludeOfficer, listExpenses);
 router.post('/bookkeeping/expenses',      protect, requireMutator, uploadReceipt.single('receipt'), createExpense);
 router.put('/bookkeeping/expenses/:id',   protect, requireMutator, updateExpense);

@@ -37,6 +37,4 @@ const taxDeadlineSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-taxDeadlineSchema.index({ active: 1 });
-
 export default mongoose.model('TaxDeadline', taxDeadlineSchema);
