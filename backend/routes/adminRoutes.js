@@ -28,6 +28,7 @@ import {
   getSystemStatus,
   getStkRequests,
   searchTransactionAudit,
+  exportPayoutAuditCsv,
   getTransactionAuditDetail,
 } from '../controllers/adminController.js';
 import {
@@ -78,10 +79,18 @@ import {
   createExpense,
   updateExpense,
   deleteExpense,
+  updateExpenseReceipt,
   getBookkeepingSummary,
+  exportKraRevenueCsv,
 } from '../controllers/bookkeepingController.js';
+import {
+  listTaxDeadlines,
+  createTaxDeadline,
+  updateTaxDeadline,
+  deleteTaxDeadline,
+} from '../controllers/taxDeadlineController.js';
 import { protect, protectAdminSSE, requireRole } from '../middleware/authMiddleware.js';
-import { upload } from '../utils/cloudinary.js';
+import { upload, uploadReceipt } from '../utils/cloudinary.js';
 import { registerAdminEventClient } from '../utils/adminEventStream.js';
 
 const router = express.Router();
@@ -203,9 +212,16 @@ router.patch('/cash-advance/requests/:id', protect, requireMutator, sensitiveAct
 
 // Bookkeeping — expense ledger + P&L summary for KRA-ready record keeping.
 router.get('/bookkeeping/summary',        protect, excludeOfficer, getBookkeepingSummary);
+router.get('/bookkeeping/kra-export',     protect, excludeOfficer, exportKraRevenueCsv);
+
+router.get('/tax-deadlines',        protect, excludeOfficer, listTaxDeadlines);
+router.post('/tax-deadlines',       protect, requireMutator, createTaxDeadline);
+router.put('/tax-deadlines/:id',    protect, requireMutator, updateTaxDeadline);
+router.delete('/tax-deadlines/:id', protect, requireMutator, deleteTaxDeadline);
 router.get('/bookkeeping/expenses',       protect, excludeOfficer, listExpenses);
-router.post('/bookkeeping/expenses',      protect, requireMutator, createExpense);
+router.post('/bookkeeping/expenses',      protect, requireMutator, uploadReceipt.single('receipt'), createExpense);
 router.put('/bookkeeping/expenses/:id',   protect, requireMutator, updateExpense);
+router.patch('/bookkeeping/expenses/:id/receipt', protect, requireMutator, uploadReceipt.single('receipt'), updateExpenseReceipt);
 router.delete('/bookkeeping/expenses/:id',protect, requireMutator, deleteExpense);
 
 // Compact health pulse for the sidebar widget.
@@ -216,6 +232,7 @@ router.get('/stk-requests', protect, excludeOfficer, getStkRequests);
 // into a full forensic detail view (related STK Push attempt + SMS receipts),
 // for resolving merchant/customer disputes.
 router.get('/transaction-audit', protect, excludeOfficer, searchTransactionAudit);
+router.get('/transaction-audit/export', protect, excludeOfficer, exportPayoutAuditCsv);
 router.get('/transaction-audit/:id', protect, excludeOfficer, getTransactionAuditDetail);
 
 // Global audit log (filterable, paginated).

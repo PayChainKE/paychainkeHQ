@@ -3,6 +3,7 @@ import Layout from '../components/layout/Layout';
 import api from '../api/api';
 import { useToast } from '../context/ToastContext';
 import { formatKES } from '../utils/formatCurrency';
+import UploadableDocRow from '../components/modals/UploadableDocRow';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 // Mirrors backend/models/Expense.js EXPENSE_CATEGORIES / PAYMENT_METHODS —
@@ -199,7 +200,20 @@ const Bookkeeping = () => {
       const res = await api.put(`/api/admin/bookkeeping/expenses/${existing._id}`, payload);
       return res.data;
     }
-    const res = await api.post('/api/admin/bookkeeping/expenses', payload);
+    // A receipt attached at creation time means the request must be
+    // multipart/form-data (the file can't ride inside a JSON body) — the
+    // backend route already accepts both shapes (uploadReceipt.single
+    // no-ops on a non-multipart request), so JSON stays the path for the
+    // common case of no receipt yet.
+    const { receiptFile, ...fields } = payload;
+    if (receiptFile) {
+      const form = new FormData();
+      Object.entries(fields).forEach(([k, v]) => form.append(k, v));
+      form.append('receipt', receiptFile);
+      const res = await api.post('/api/admin/bookkeeping/expenses', form);
+      return res.data;
+    }
+    const res = await api.post('/api/admin/bookkeeping/expenses', fields);
     return res.data;
   }
 
@@ -657,9 +671,11 @@ const ExpenseForm = ({ existing, categories, paymentMethods, onClose, onSave, on
     vatAmount: existing?.vatAmount || '',
     deductible: existing?.deductible !== false,
     notes: existing?.notes || '',
+    receiptFile: null,
   });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [receiptUrl, setReceiptUrl] = useState(existing?.receiptUrl || null);
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target?.type === 'checkbox' ? e.target.checked : e.target.value }));
 
@@ -689,6 +705,7 @@ const ExpenseForm = ({ existing, categories, paymentMethods, onClose, onSave, on
         vatAmount: form.vatApplicable ? Number(form.vatAmount) || 0 : 0,
         deductible: form.deductible,
         notes: form.notes.trim(),
+        receiptFile: form.receiptFile,
       };
       const res = await onSave(payload, existing);
       if (res?.success) {
@@ -747,6 +764,36 @@ const ExpenseForm = ({ existing, categories, paymentMethods, onClose, onSave, on
               <input type="text" value={form.reference} onChange={set('reference')} className={inputClass} maxLength={100} />
             </Field>
           </div>
+
+          <Field label="Receipt / Invoice file" hint="Optional scanned copy — the actual document backing this expense.">
+            {existing ? (
+              <UploadableDocRow
+                url={receiptUrl}
+                label="Receipt"
+                onUpload={async (file) => {
+                  const form2 = new FormData();
+                  form2.append('receipt', file);
+                  const res = await api.patch(`/api/admin/bookkeeping/expenses/${existing._id}/receipt`, form2);
+                  setReceiptUrl(res.data.receiptUrl);
+                  return res.data.receiptUrl;
+                }}
+              />
+            ) : (
+              <div className="flex items-center gap-2 flex-wrap">
+                <label className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-widest cursor-pointer transition-all bg-primary/10 text-primary hover:bg-primary/15">
+                  <span className="material-symbols-outlined text-[13px]">upload</span>
+                  {form.receiptFile ? 'Change file' : 'Attach file'}
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/jpg,application/pdf"
+                    className="hidden"
+                    onChange={(e) => { const f = e.target.files?.[0] || null; setForm((f2) => ({ ...f2, receiptFile: f })); }}
+                  />
+                </label>
+                {form.receiptFile && <span className="text-2xs text-on-surface-variant/60 truncate max-w-50">{form.receiptFile.name}</span>}
+              </div>
+            )}
+          </Field>
 
           <div className="flex items-center gap-3 p-3 rounded-lg border border-outline-variant/20 bg-surface-container-low/40">
             <input type="checkbox" id="vatApplicable" checked={form.vatApplicable} onChange={set('vatApplicable')} className="w-4 h-4 accent-primary" />

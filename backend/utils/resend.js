@@ -1785,3 +1785,64 @@ export const sendReconciliationAlertEmail = async (email, record) => {
     throw error;
   }
 };
+
+// @desc    Reminds an owner that a KRA filing deadline (services/
+//          taxDeadlineReminderService.js) is coming up within its
+//          configured lead time. Amber/urgent theming — a heads-up, not a
+//          security alert like sendReconciliationAlertEmail above.
+export const sendTaxDeadlineReminderEmail = async (email, deadline, dueDate, daysRemaining) => {
+  try {
+    const dueLabel = new Date(dueDate).toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Africa/Nairobi' });
+    const daysLabel = daysRemaining === 0 ? 'today' : daysRemaining === 1 ? 'tomorrow' : `in ${daysRemaining} days`;
+
+    const data = await resend.emails.send({
+      from: 'PayChain Compliance <info@paychain.co.ke>',
+      to: [email],
+      subject: `[PayChain] ${deadline.label} due ${daysLabel} — ${dueLabel}`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 560px; margin: auto; background: #ffffff; border: 1px solid #eef0ee; border-radius: 18px; overflow: hidden;">
+          <div style="background: linear-gradient(135deg, #451a03 0%, #78350f 100%); padding: 32px 32px 36px;">
+            <div style="margin-bottom: 20px;">${logoImgWhite(108, 'left')}</div>
+            <div style="display: inline-flex; align-items: center; gap: 10px;">
+              <span style="display: inline-block; width: 36px; height: 36px; border-radius: 999px; background: rgba(255,255,255,0.15); text-align: center; line-height: 36px; color: #fcd34d; font-size: 18px; font-weight: 800;">!</span>
+              <div>
+                <p style="margin: 0; color: #fcd34d; font-size: 11px; font-weight: 800; letter-spacing: 2.5px; text-transform: uppercase;">${deadline.taxType} · Filing Reminder</p>
+                <h1 style="margin: 4px 0 0; color: #fff; font-size: 22px; font-weight: 800; letter-spacing: -0.3px;">${deadline.label} is due ${daysLabel}</h1>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding: 36px 32px;">
+            <p style="margin: 0 0 22px; color: #4b5563; font-size: 15px; line-height: 1.6;">
+              <strong>${deadline.label}</strong> falls due on <strong>${dueLabel}</strong> (Nairobi time). This is an automated reminder based on the filing calendar configured in the admin Tax &amp; Compliance dashboard — not a confirmation the filing has been prepared or submitted.
+            </p>
+
+            <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 20px 22px; margin: 0 0 22px;">
+              <div style="display: flex; justify-content: space-between; padding: 6px 0;">
+                <span style="color: #78350f; font-size: 13px;">Tax type</span>
+                <span style="color: #451a03; font-size: 13px; font-weight: 700;">${deadline.taxType}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding: 6px 0;">
+                <span style="color: #78350f; font-size: 13px;">Due date</span>
+                <span style="color: #451a03; font-size: 13px; font-weight: 700;">${dueLabel}</span>
+              </div>
+              ${deadline.notes ? `<div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #fde68a;"><span style="color: #78350f; font-size: 12px;">${deadline.notes}</span></div>` : ''}
+            </div>
+
+            <a href="${ADMIN_URL}/tax-compliance" style="display: inline-block; background: #451a03; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 12px; font-weight: 800; font-size: 14px; letter-spacing: 0.4px;">Open Tax &amp; Compliance →</a>
+          </div>
+
+          <div style="padding: 22px 30px; background: #fafafa; border-top: 1px solid #eef0ee; text-align: center;">
+            <p style="margin: 0; color: #9ca3af; font-size: 11px;">Automated reminder — do not reply. Deadlines are editable in the admin dashboard.</p>
+            <p style="margin: 8px 0 0; color: #bbb; font-size: 11px;">&copy; ${new Date().getFullYear()} PayChainKE · Nairobi, Kenya</p>
+          </div>
+        </div>
+      `,
+    });
+    console.log(`📧 Tax deadline reminder → ${email} (${deadline.label}, due ${dueLabel})`);
+    return data;
+  } catch (error) {
+    console.error('❌ Resend Tax Deadline Reminder Error:', error);
+    throw error;
+  }
+};

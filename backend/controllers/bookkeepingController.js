@@ -5,6 +5,7 @@ import { adminActor } from './adminController.js';
 import { REVENUE_STREAMS } from '../config/revenueRateCard.js';
 import { LIVE_DATA_CUTOFF } from '../config/liveDataCutoff.js';
 import { excludeDemoMerchantsMatch } from '../utils/demoMerchantExclusion.js';
+import { CORPORATE_TAX_RATE } from '../config/taxRateCard.js';
 
 // Same whitelist Revenue's getRevenue uses — top_up/withdrawal and any
 // other type with no revenue stream must never count as "income" here
@@ -124,6 +125,15 @@ export const createExpense = async (req, res) => {
       return res.status(400).json({ error: 'Enter a valid amount greater than zero.' });
     }
 
+    // This route now also accepts multipart/form-data (when a receipt file
+    // is attached — see uploadReceipt.single('receipt') on the route), where
+    // every field including booleans arrives as a string. A plain JSON
+    // request (no file) still sends real booleans. isTrue() handles both:
+    // the string "false" must not be treated as truthy.
+    const isTrue = (v) => v === true || v === 'true';
+    const isVatApplicable = isTrue(vatApplicable);
+    const isDeductible = deductible === undefined ? true : !(deductible === false || deductible === 'false');
+
     const expense = await Expense.create({
       date: date ? new Date(date) : new Date(),
       category,
@@ -132,11 +142,15 @@ export const createExpense = async (req, res) => {
       amount: amt,
       paymentMethod: PAYMENT_METHODS.includes(paymentMethod) ? paymentMethod : 'Bank Transfer',
       reference: reference?.trim() || '',
-      vatApplicable: !!vatApplicable,
-      vatAmount: vatApplicable ? Math.max(0, Number(vatAmount) || 0) : 0,
-      deductible: deductible !== false,
+      vatApplicable: isVatApplicable,
+      vatAmount: isVatApplicable ? Math.max(0, Number(vatAmount) || 0) : 0,
+      deductible: isDeductible,
       notes: notes?.trim() || '',
       recordedBy: req.admin?._id || null,
+      // Optional — `upload.single('receipt')` on this route lets a receipt
+      // be attached in the same request an expense is created, rather than
+      // requiring a separate follow-up upload step.
+      receiptUrl: req.file?.path || null,
     });
 
     logAudit({
@@ -197,6 +211,37 @@ export const updateExpense = async (req, res) => {
     res.json({ success: true, expense });
   } catch (error) {
     console.error('Update Expense Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Attach or replace the scanned receipt/invoice backing an
+//          existing expense — the create-time upload (createExpense above)
+//          covers "add with receipt in one step"; this covers attaching one
+//          later, or replacing it. Modeled on adminController.js's
+//          updateMerchantCertificate.
+// @route   PATCH /api/admin/bookkeeping/expenses/:id/receipt
+// @access  Private (Admin, owner/admin only)
+export const updateExpenseReceipt = async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'A receipt file is required.' });
+
+    const expense = await Expense.findById(req.params.id);
+    if (!expense) return res.status(404).json({ error: 'Expense not found.' });
+
+    expense.receiptUrl = req.file.path;
+    await expense.save();
+
+    logAudit({
+      action: 'admin.bookkeeping.expense_receipt_updated', category: 'admin', severity: 'info',
+      message: `Attached a receipt to expense — ${expense.category}: KES ${expense.amount.toLocaleString()} (${expense.description})`,
+      actor: adminActor(req.admin), req,
+      metadata: { expenseId: String(expense._id) },
+    });
+
+    res.json({ success: true, receiptUrl: expense.receiptUrl });
+  } catch (error) {
+    console.error('Update Expense Receipt Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };
@@ -278,6 +323,12 @@ export const getBookkeepingSummary = async (req, res) => {
     const vatTotal = Math.round(expenseRow.vatTotal * 100) / 100;
     const netProfit = Math.round((income - totalExpenses) * 100) / 100;
     const taxableProfit = Math.round((income - deductibleExpenses) * 100) / 100;
+    // Floored at zero — a loss-making period has no tax liability to
+    // estimate (KRA doesn't refund a negative corporate tax this way).
+    // Computed once, here, so every page that shows this figure (currently
+    // Bookkeeping and Tax & Compliance) reads the exact same number rather
+    // than each re-deriving it from taxableProfit independently.
+    const estimatedTaxLiability = Math.round(Math.max(0, taxableProfit) * CORPORATE_TAX_RATE * 100) / 100;
 
     const categories = categoryAgg.map((c) => ({ category: c._id, total: Math.round(c.total * 100) / 100, count: c.count }));
 
@@ -296,13 +347,85 @@ export const getBookkeepingSummary = async (req, res) => {
       success: true,
       data: {
         period: { since, until, label, preset: resolvedPreset },
-        pnl: { income, totalExpenses, deductibleExpenses, netProfit, taxableProfit, vatTotal, expenseCount: expenseRow.count },
+        pnl: { income, totalExpenses, deductibleExpenses, netProfit, taxableProfit, vatTotal, expenseCount: expenseRow.count, estimatedTaxLiability, taxRate: CORPORATE_TAX_RATE },
         categories,
         monthly: Array.from(monthMap.values()),
       },
     });
   } catch (error) {
     console.error('Bookkeeping Summary Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    PayChain's own monthly fee revenue as a KRA-ready CSV — a
+//          revenue listing an accountant can use directly when filing
+//          PayChain's VAT/income tax return on iTax. NOT a live submission
+//          to KRA (PayChain already has a separate, real eTIMS/OSCU
+//          integration for MERCHANTS' own sales fiscalization — this is
+//          unrelated and deliberately does not touch it). Same
+//          period/type/demo-exclusion rules as getBookkeepingSummary
+//          above, so this export's total always reconciles to that page's
+//          "Income" figure for the same period.
+//
+//          Deliberately no VAT column — nothing in this codebase tracks
+//          whether PayChain's own fee revenue is itself VATable; adding a
+//          fabricated number here would be worse than omitting it.
+// @route   GET /api/admin/bookkeeping/kra-export?preset=&from=&to=
+// @access  Private (Admin)
+export const exportKraRevenueCsv = async (req, res) => {
+  try {
+    const { preset, from, to } = req.query;
+    const { since, until, label } = resolvePeriod({ preset, from, to });
+    const excludeDemo = await excludeDemoMerchantsMatch();
+
+    const transactions = await Transaction.find({
+      createdAt: { $gte: since, $lte: until },
+      status: { $in: ['completed', 'verified'] },
+      type: { $in: REVENUE_TX_TYPES },
+      ...excludeDemo,
+    })
+      .sort({ createdAt: 1 })
+      .populate('merchantId', 'businessName')
+      .lean();
+
+    const header = [
+      'Date', 'Reference', 'Transaction Type', 'Merchant',
+      'Gross Amount (KES)', 'PayChain Fee / Net Revenue (KES)',
+      'Revenue Stream', 'Settlement Rail', 'Status',
+    ];
+    // Excel/Sheets-safe CSV cell — same RFC-4180 helper as
+    // revenueController.js's exportRevenueSweeps.
+    const cell = (v) => {
+      const s = v === null || v === undefined ? '' : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const rows = transactions.map((t) => [
+      t.createdAt?.toISOString() || '',
+      t.reference || '',
+      t.type,
+      t.merchantId?.businessName || 'Deleted Merchant',
+      t.kesAmount ?? t.amount ?? 0,
+      t.paychainFee || 0,
+      t.revenueStream || '',
+      t.settlementRail || '',
+      t.status,
+    ].map(cell).join(','));
+
+    const csv = [header.map(cell).join(','), ...rows].join('\r\n');
+
+    logAudit({
+      action: 'admin.tax.kra_export', category: 'admin', severity: 'info',
+      message: `Exported ${transactions.length} revenue transactions as a KRA-ready CSV (${label})`,
+      actor: adminActor(req.admin), req,
+      metadata: { count: transactions.length, since, until },
+    });
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="paychain-kra-revenue-export-${new Date().toISOString().slice(0, 10)}.csv"`);
+    res.send(csv);
+  } catch (error) {
+    console.error('Export KRA Revenue CSV Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };
