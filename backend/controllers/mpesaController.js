@@ -26,6 +26,7 @@ import { generateBrandedQrDataUri } from '../utils/qrCode.js';
 import DeveloperPayment from '../models/DeveloperPayment.js';
 import { publicDeveloperPayment } from '../utils/developerPaymentView.js';
 import { dispatchDeveloperEvent } from '../services/webhookDeliveryService.js';
+import { wasAlreadyCreditedByOtherNcbaFeed } from '../services/ncbaLedgerService.js';
 
 const FRONTEND_URL = process.env.MERCHANT_DASHBOARD_URL || 'https://app.paychain.co.ke';
 
@@ -167,6 +168,32 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
   stkReq.resultDesc = claimed.resultDesc;
 
   if (succeeded) {
+      // Mirrors ncbaAccountNotificationController.js's wasAlreadySettledByStkPush
+      // check, but in the opposite direction. That check only catches the
+      // case where THIS poll resolves first and the webhook arrives second
+      // (STKRequest.status is already 'success' by the time the webhook
+      // looks). It does nothing for the reverse order — the generic
+      // account-notification webhook seeing the same NCBA credit BEFORE
+      // this poll loop's own queryStkPush call reports SUCCESS, crediting
+      // the merchant via creditNcbaCollection while STKRequest.status is
+      // still 'pending' (so the atomic claim above wins normally, sees no
+      // conflict, and this function would otherwise credit the exact same
+      // payment a second time — a real double credit, not just a display
+      // duplicate: two Transaction rows and two real $inc's to kesBalance).
+      // wasAlreadyCreditedByOtherNcbaFeed is the same "same amount, recent
+      // window, different reference" check the webhook uses for its own
+      // cross-feed race; reused symmetrically here closes the gap in this
+      // direction too.
+      const alreadyCredited = await wasAlreadyCreditedByOtherNcbaFeed(
+        { _id: stkReq.merchantId },
+        stkReq.amount,
+        receipt
+      );
+      if (alreadyCredited) {
+        console.warn(`⚠️ STK ${stkReq.checkoutRequestId} (receipt ${receipt}) already credited via the NCBA account-notification feed — skipping duplicate credit.`);
+        return;
+      }
+
       const { date, time } = formatTransactionDateTime(transTime);
 
       if (stkReq.linkId) {
@@ -357,10 +384,16 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
             // how the NCBA controllers already handle this. Account
             // reference mirrors M-Pesa's own "for account X" convention:
             // the invoice number if this settled an invoice, else the
-            // merchant's NCBA account code, else the raw payment-link id
-            // as a last resort.
+            // merchant's full 12-digit NCBA virtual account number (never
+            // the bare 8-digit ncbaMerchantCode — a customer paying that
+            // truncated number back into M-Pesa/NCBA directly would send it
+            // to the wrong place), else the raw payment-link id as a last
+            // resort.
             const payerLabel = link.invoiceId ? 'invoice' : 'payment link';
-            const accountRef = paidInvoice?.invoiceNumber || merchant.ncbaMerchantCode || stkReq.linkId;
+            const accountRef = paidInvoice?.invoiceNumber
+              || getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode)
+              || merchant.ncbaMerchantCode
+              || stkReq.linkId;
             const linkSends = [];
             if (stkReq.phone) {
               linkSends.push({
@@ -557,7 +590,10 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
                 ref: receipt,
                 amount: stkReq.amount,
                 businessName: merchant.businessName,
-                accountRef: merchant.ncbaMerchantCode,
+                // Full 12-digit virtual account number, not the bare
+                // 8-digit ncbaMerchantCode — see the identical fix/comment
+                // on the Payment Link branch above.
+                accountRef: getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode) || merchant.ncbaMerchantCode,
                 date,
                 time,
                 fee: customerFee,
@@ -760,16 +796,37 @@ export async function initiateAndTrackNcbaStk({ merchantId, phone, checkoutTotal
   const ncbaAccountNo = getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode) || merchant.ncbaMerchantCode;
   const { transactionId } = await ncbaInitiateStkPush({ phone, amount: checkoutTotal, accountNo: ncbaAccountNo });
 
-  await STKRequest.create({
-    merchantId,
-    checkoutRequestId: transactionId,
-    amount: checkoutTotal,
-    phone,
-    status: 'pending',
-    ...extra,
-  });
-
-  pollAndResolveNcbaStkPush(transactionId, transactionId);
+  // Past this point, NCBA has already sent the real prompt to the
+  // customer's phone — a failure below is a local bookkeeping problem, not
+  // a failed push, and must never be reported to the merchant as "failed to
+  // send" (initiateSTKPush's caller would otherwise show a false failure on
+  // a push that actually went out, and the customer may already be paying).
+  // Best-effort: if the tracking record can't be created, there's no poll
+  // loop watching this payment, but it still resolves correctly once it
+  // lands — ncbaAccountNotificationController.js's generic credit path
+  // doesn't require an STKRequest to exist, it just falls through to a
+  // plain NCBA collection credit instead of the STK-aware dual-sided split.
+  try {
+    await STKRequest.create({
+      merchantId,
+      checkoutRequestId: transactionId,
+      amount: checkoutTotal,
+      phone,
+      status: 'pending',
+      ...extra,
+    });
+    pollAndResolveNcbaStkPush(transactionId, transactionId);
+  } catch (err) {
+    console.error(JSON.stringify({
+      level: 'error',
+      event: 'ncba_stk_push_sent_but_tracking_failed',
+      message: 'NCBA accepted and sent a real STK Push, but the local STKRequest tracking record failed to save — no poll loop will run for this one. It will still settle via the account-notification webhook\'s generic credit path once paid, just without the STK-aware fee split. Verify manually if in doubt.',
+      merchantId: String(merchantId),
+      transactionId,
+      amount: checkoutTotal,
+      error: err.message,
+    }));
+  }
 
   return transactionId;
 }
