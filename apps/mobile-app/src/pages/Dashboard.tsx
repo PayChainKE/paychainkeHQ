@@ -10,7 +10,7 @@ import PrivateValue from '../components/PrivateValue';
 import FundAccountModal from '../components/FundAccountModal';
 import MerchantWalkthrough from '../components/MerchantWalkthrough';
 import TourTarget from '../components/TourTarget';
-import { isCreditTransaction, isDebitTransaction } from '../utils/transactionDirection';
+import { isCreditTransaction, isDebitTransaction, netBalanceImpact, excludeReversedDuplicates } from '../utils/transactionDirection';
 import { formatAccountNumber } from '../utils/formatAccountNumber';
 import { formatName } from '../utils/formatName';
 
@@ -31,8 +31,13 @@ function computeChartData(transactions: any[]) {
   const inboundTxs = transactions.filter((t) => isCreditTransaction(t.type));
   const outboundTxs = transactions.filter((t) => isDebitTransaction(t.type));
   const now = new Date();
+  // Math.abs(netBalanceImpact(t)) instead of the raw amount field — txs is
+  // already filtered to inboundTxs/outboundTxs (by type) above, so the sign
+  // is already known; this corrects the magnitude for unsettled rows and
+  // the NCBA gross/fee mismatch (see netBalanceImpact's doc comment in
+  // utils/transactionDirection.ts).
   const sumFor = (txs: any[], matches: (t: any) => boolean) =>
-    txs.filter(matches).reduce((sum, t) => sum + (t.kesAmount || t.amount || 0), 0);
+    txs.filter(matches).reduce((sum, t) => sum + Math.abs(netBalanceImpact(t)), 0);
 
   const labels7D: string[] = [];
   const inbound7D: number[] = [];
@@ -57,7 +62,7 @@ function computeChartData(transactions: any[]) {
       if (txDate >= thirtyDaysAgo) {
         const diffDays = Math.floor(Math.abs(now.getTime() - txDate.getTime()) / (1000 * 60 * 60 * 24));
         const weekIndex = 3 - Math.floor(diffDays / 7);
-        if (weekIndex >= 0 && weekIndex < 4) bucket[weekIndex] += t.kesAmount || t.amount || 0;
+        if (weekIndex >= 0 && weekIndex < 4) bucket[weekIndex] += Math.abs(netBalanceImpact(t));
       }
     });
   };
@@ -139,7 +144,10 @@ export default function Dashboard({ navigation }: any) {
         : Array.isArray(txRes.data?.transactions)
         ? txRes.data.transactions
         : [];
-      setTransactions(txList);
+      // Drops any duplicate-credit + its correction entry as a matched pair
+      // at the source, so every downstream stat/chart in this file is
+      // automatically clean — see excludeReversedDuplicates' doc comment.
+      setTransactions(excludeReversedDuplicates(txList));
       if (scoreRes.data) setTrustScore(scoreRes.data);
       if (rateRes?.data?.success) setLiveRate(rateRes.data.rate);
 
@@ -200,12 +208,18 @@ export default function Dashboard({ navigation }: any) {
   const inboundTransactions = transactions.filter((tx) => isCreditTransaction(tx.type));
   const todayInbound = inboundTransactions.filter((tx) => isSameDay(new Date(tx.createdAt), now));
   const monthInbound = inboundTransactions.filter((tx) => isSameMonth(new Date(tx.createdAt), now));
-  const todayTotal = todayInbound.reduce((sum, tx) => sum + (tx.kesAmount || tx.amount || 0), 0);
-  const monthTotal = monthInbound.reduce((sum, tx) => sum + (tx.kesAmount || tx.amount || 0), 0);
+  // netBalanceImpact (not the raw amount field) — inboundTransactions is
+  // already type-filtered to credits, so Math.abs just corrects the
+  // magnitude for unsettled rows and the NCBA gross/fee mismatch (see its
+  // doc comment in utils/transactionDirection.ts). A raw sum counted a
+  // failed/pending row as real revenue and overstated ncba_inbound rows by
+  // the fee that never actually reached the merchant's balance.
+  const todayTotal = todayInbound.reduce((sum, tx) => sum + Math.abs(netBalanceImpact(tx)), 0);
+  const monthTotal = monthInbound.reduce((sum, tx) => sum + Math.abs(netBalanceImpact(tx)), 0);
 
   const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const lastMonthInbound = inboundTransactions.filter((tx) => isSameMonth(new Date(tx.createdAt), lastMonthDate));
-  const lastMonthTotal = lastMonthInbound.reduce((sum, tx) => sum + (tx.kesAmount || tx.amount || 0), 0);
+  const lastMonthTotal = lastMonthInbound.reduce((sum, tx) => sum + Math.abs(netBalanceImpact(tx)), 0);
   const monthOverMonthPct = lastMonthTotal > 0 ? ((monthTotal - lastMonthTotal) / lastMonthTotal) * 100 : null;
 
   const walletActivated = !!merchant?.stellarPublicKey;

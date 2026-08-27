@@ -216,6 +216,13 @@ export default function Invoices() {
       addNotification({ title: 'Missing Customer', message: 'Enter a customer name first.', type: 'error' });
       return;
     }
+    // Only enforced once eTIMS is actually eligible (etimsEnabled) — same
+    // condition the field itself is shown under, and what the backend
+    // re-checks server-side (see invoiceController.js's createInvoice).
+    if (etimsEnabled && !invoiceDetails.customer.kraPin?.trim()) {
+      addNotification({ title: 'Missing KRA PIN', message: "Enter the buyer's KRA PIN — required for electronic tax invoices.", type: 'error' });
+      return;
+    }
 
     setIsSavingInvoice(true);
     try {
@@ -252,6 +259,11 @@ export default function Invoices() {
     }
     if (!invoiceDetails.customer.email?.trim()) {
       addNotification({ title: 'Missing Email', message: "Add the customer's email address to send this invoice.", type: 'error' });
+      return;
+    }
+    // See handleSaveDraft's identical check.
+    if (etimsEnabled && !invoiceDetails.customer.kraPin?.trim()) {
+      addNotification({ title: 'Missing KRA PIN', message: "Enter the buyer's KRA PIN — required for electronic tax invoices.", type: 'error' });
       return;
     }
 
@@ -630,9 +642,10 @@ export default function Invoices() {
 
                   {etimsEnabled && (
                     <div className="space-y-2">
-                       <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60">Buyer KRA PIN (optional)</label>
+                       <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60">Buyer KRA PIN *</label>
                        <input
                          type="text"
+                         required
                          value={invoiceDetails.customer.kraPin || ''}
                          onChange={e => setInvoiceDetails({...invoiceDetails, customer: { ...invoiceDetails.customer, kraPin: e.target.value.toUpperCase() }})}
                          placeholder="P051892647A"

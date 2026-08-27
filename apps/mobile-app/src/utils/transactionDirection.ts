@@ -56,7 +56,29 @@ export type BalanceImpactTx = {
   kesAmount?: number;
   paychainFee?: number;
   safaricomFee?: number;
+  reference?: string;
 };
+
+// Drops a fake duplicate credit AND its correction entry as a matched pair
+// — see the identical function in
+// apps/merchant-dashboard/src/utils/transactionDirection.js for the full
+// explanation. Manual corrections always use a `REVERSAL-<originalReference>`
+// reference. Call once on the raw transaction list before any total/
+// statement/chart math runs.
+export function excludeReversedDuplicates<T extends { reference?: string }>(transactions: T[]): T[] {
+  const reversedOriginalRefs = new Set<string>();
+  for (const t of transactions) {
+    if (typeof t.reference === 'string' && t.reference.startsWith('REVERSAL-')) {
+      reversedOriginalRefs.add(t.reference.slice('REVERSAL-'.length));
+    }
+  }
+  if (reversedOriginalRefs.size === 0) return transactions;
+  return transactions.filter((t) => {
+    if (t.reference && reversedOriginalRefs.has(t.reference)) return false;
+    if (typeof t.reference === 'string' && t.reference.startsWith('REVERSAL-') && reversedOriginalRefs.has(t.reference.slice('REVERSAL-'.length))) return false;
+    return true;
+  });
+}
 
 // The true, signed kesBalance impact of a transaction — 0 for anything that
 // never settled. Single source of truth for every balance total/running-

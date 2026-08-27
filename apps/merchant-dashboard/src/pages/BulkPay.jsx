@@ -111,16 +111,23 @@ export default function BulkPay() {
       .catch(e => console.error('Failed to load bank codes', e))
   }, [newPayee.paymentMethod])
 
-  // Utility meter verification (KPLC/NCWSC) — pure UX confirmation before
-  // saving a payee (shows the merchant the real account holder name +
-  // balance due so a typo'd meter number is caught early). Deliberately
-  // not persisted: the validationId NCBA returns here is not reused at
-  // payment time — the backend re-validates immediately before every
-  // actual payout, since a saved payee might not be paid for weeks (see
-  // backend's validateKplcMeter/validateNcwscMeter doc comments).
+  // Utility meter verification (KPLC) — pure UX confirmation before saving a
+  // payee (shows the merchant the real account holder name + balance due so
+  // a typo'd meter number is caught early). Deliberately not persisted: the
+  // validationId NCBA returns here is not reused at payment time — the
+  // backend re-validates immediately before every actual payout, since a
+  // saved payee might not be paid for weeks (see backend's
+  // validateKplcMeter doc comment).
   const [utilityCheck, setUtilityCheck] = useState({ status: 'idle', customerName: '', serviceName: '', balance: null, error: '' })
   const resetUtilityCheck = () => setUtilityCheck({ status: 'idle', customerName: '', serviceName: '', balance: null, error: '' })
-  const DEDICATED_RAIL_UTILITIES = ['KPLC', 'KPLC_PREPAID', 'WATER']
+  // NCWSC (Nairobi Water)'s dedicated rail was reverted back out — its NCBA
+  // integration was the broken one 01b7a5d originally replaced with generic
+  // utility payments, and restoring it alongside KPLC (d6c4b3b) brought that
+  // back. Only KPLC's dedicated rail (meter validation + NCBA's KPLC Payment
+  // API) was meant to stay; Water goes through the same generic
+  // Mobile Money/Paybill/Bank payout every non-dedicated utility type uses
+  // (see the utilityProvider mapping below — Water no longer sets 'WATER').
+  const DEDICATED_RAIL_UTILITIES = ['KPLC', 'KPLC_PREPAID']
 
   // Filter payees based on active tab
   const filteredPayees = payeesList.filter(p => {
@@ -1123,16 +1130,18 @@ export default function BulkPay() {
                         <div className="space-y-4 pt-4 animate-in fade-in duration-500">
                           <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Utility Type</label>
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                            {['Water', 'Electricity', 'Rent', 'Internet'].map((u) => {
-                              const logo = u === 'Electricity' ? '/utilities%20logo/kplc.png' : u === 'Water' ? '/utilities%20logo/ncwsc.png' : null
+                            {['Water', 'Electricity', 'Rent', 'Internet', 'Other'].map((u) => {
+                              const logo = u === 'Electricity' ? '/utilities%20logo/kplc.png' : null
                               return (
                                 <button
                                   key={u}
                                   onClick={() => {
                                     resetUtilityCheck();
                                     // Default Electricity to Postpaid — the account-type toggle
-                                    // below lets the merchant switch to Prepaid.
-                                    setNewPayee({...newPayee, utilityType: u, utilityProvider: u === 'Electricity' ? 'KPLC' : u === 'Water' ? 'WATER' : ''})
+                                    // below lets the merchant switch to Prepaid. Everything
+                                    // else (including Water) is generic — only KPLC has a
+                                    // dedicated NCBA rail, see DEDICATED_RAIL_UTILITIES above.
+                                    setNewPayee({...newPayee, utilityType: u, utilityProvider: u === 'Electricity' ? 'KPLC' : ''})
                                   }}
                                   className={`py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border flex flex-col items-center justify-center gap-1.5 ${
                                     newPayee.utilityType === u
@@ -1145,7 +1154,7 @@ export default function BulkPay() {
                                       <img src={logo} alt={u} className="h-7 w-auto object-contain" />
                                     </span>
                                   )}
-                                  {u === 'Electricity' ? 'Electricity (KPLC)' : u === 'Water' ? 'Water (NCWSC)' : u}
+                                  {u === 'Electricity' ? 'Electricity (KPLC)' : u}
                                 </button>
                               )
                             })}

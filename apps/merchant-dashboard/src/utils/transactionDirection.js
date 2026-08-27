@@ -49,6 +49,34 @@ const DEBIT_EXCLUDES_FEE_TYPES = new Set(['ncba_outbound', 'ncba_mobile_b2w', 'n
 // balance total/running-balance calculation so they can't drift from each
 // other or from the real account balance the way Total Money In/the running
 // BALANCE column did before this existed.
+// Drops a fake duplicate credit AND its correction entry as a matched pair,
+// so neither shows up anywhere — not as an inflated "money in" figure, not
+// as an offsetting "money out" line the merchant has to net out themselves.
+// netBalanceImpact's fee correction alone isn't enough for this: a reversed
+// duplicate is still a real, 'completed' credit row (see
+// backend/services/ncbaLedgerService.js — the double-credit bug that
+// created these actually did increment kesBalance at the time), so it still
+// counts as legitimate "money in" unless explicitly excluded. Manual
+// corrections created this way (see the 2026-08-27 incident writeup) always
+// use a `REVERSAL-<originalReference>` reference — that's the only
+// contract this depends on. Call once on the raw transaction list before
+// any total/statement/chart math runs; safe to call on an already-filtered
+// list (a no-op when no REVERSAL- rows are present).
+export function excludeReversedDuplicates(transactions) {
+  const reversedOriginalRefs = new Set()
+  for (const t of transactions) {
+    if (typeof t.reference === 'string' && t.reference.startsWith('REVERSAL-')) {
+      reversedOriginalRefs.add(t.reference.slice('REVERSAL-'.length))
+    }
+  }
+  if (reversedOriginalRefs.size === 0) return transactions
+  return transactions.filter((t) => {
+    if (reversedOriginalRefs.has(t.reference)) return false // the fake original credit
+    if (typeof t.reference === 'string' && t.reference.startsWith('REVERSAL-') && reversedOriginalRefs.has(t.reference.slice('REVERSAL-'.length))) return false // its correction entry
+    return true
+  })
+}
+
 export function netBalanceImpact(tx) {
   if (!isSettledStatus(tx.status)) return 0
   const rawAmt = tx.kesAmount || tx.amount || 0

@@ -10,7 +10,7 @@ import { formatAccountNumber } from '../utils/formatAccountNumber'
 import { formatPhoneDisplay, formatPhoneOrDash } from '../utils/formatPhoneDisplay'
 import { formatName } from '../utils/formatName'
 import { drawBarcodePdf } from '../utils/barcode'
-import { getAmountSign, getAmountColorClass, isCreditTransaction, isDebitTransaction, netBalanceImpact } from '../utils/transactionDirection'
+import { getAmountSign, getAmountColorClass, isCreditTransaction, isDebitTransaction, netBalanceImpact, excludeReversedDuplicates } from '../utils/transactionDirection'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useNotification } from '../context/NotificationContext'
 import logo from '../assets/logo2.png'
@@ -39,7 +39,11 @@ export default function Transactions() {
       const res = await axios.get(`${API_URL}/api/transactions`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setLiveTransactions(res.data);
+      // Drops any duplicate-credit + its correction entry as a matched pair
+      // at the source, so every downstream total/statement/table in this
+      // file is automatically clean — see excludeReversedDuplicates' doc
+      // comment (utils/transactionDirection.js).
+      setLiveTransactions(excludeReversedDuplicates(res.data));
     } catch (err) {
       console.error('Failed to load transactions', err);
       setLiveTransactions([]);
