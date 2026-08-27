@@ -1592,8 +1592,15 @@ export default function BulkPay() {
         {/* Right Column: Create Payment Batch */}
         <section className="flex-1 flex flex-col gap-6">
           {/* Step Indicator */}
-          <div className="bg-surface-container-low px-4 py-3 md:px-5 md:py-3.5 rounded-2xl flex items-center justify-between relative overflow-hidden editorial-shadow border border-outline-variant/10">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full -mr-12 -mt-12 blur-2xl"></div>
+          <div className="bg-surface-container-low px-4 py-3 md:px-5 md:py-3.5 rounded-2xl flex items-center justify-between relative editorial-shadow border border-outline-variant/10">
+            {/* Clipped to its own circular shape (rounded-full), not the bar's
+                overflow — the bar itself must NOT clip overflow, since the
+                Fund Account dropdown below needs to extend past its bottom
+                edge. It used to (overflow-hidden here silently clipped the
+                dropdown to invisible while the fixed backdrop blur still
+                showed, since fixed positioning isn't affected by an
+                ancestor's overflow). */}
+            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full -mr-12 -mt-12 blur-2xl overflow-hidden"></div>
             <div className="flex items-center gap-3 md:gap-8 relative z-10 overflow-x-auto no-scrollbar">
               {[1, 2, 3, 4].map((s) => (
                 <div key={s} className="flex items-center gap-3 md:gap-4 shrink-0">
