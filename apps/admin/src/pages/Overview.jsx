@@ -249,44 +249,42 @@ const Overview = () => {
 
         <section>
           <div className="flex items-center gap-3 mb-4 text-slate-400">
-            <span className="text-2xs font-bold uppercase tracking-widest font-label">Waitlist Pipeline</span>
+            <span className="text-2xs font-bold uppercase tracking-widest font-label">Merchant Pipeline</span>
             <div className="flex-1 h-[1px] bg-outline-variant/10"></div>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
             <div className="bg-surface-container-lowest p-3 md:p-5 rounded-xl border border-outline-variant/20 flex flex-col gap-1 transition-all hover:scale-[1.01] hover:shadow-premium-glow">
-              <span className="text-xs font-medium text-on-surface-variant/60">Total Entries</span>
+              <span className="text-xs font-medium text-on-surface-variant/60">Total Merchants</span>
               <div className="flex items-baseline gap-2">
                 {loading
                   ? <Skel className="w-14 h-7" />
-                  : <span className="text-xl md:text-3xl font-semibold text-on-surface tracking-tighter">{stats.total}</span>}
+                  : <span className="text-xl md:text-3xl font-semibold text-on-surface tracking-tighter">{merchantAnalytics?.totalMerchants ?? 0}</span>}
                 <span className="text-xs font-bold text-secondary tracking-tight">Live</span>
               </div>
             </div>
-            <div className="bg-surface-container-lowest p-3 md:p-5 rounded-xl border border-outline-variant/20 flex flex-col gap-1 relative overflow-hidden transition-all hover:scale-[1.01] hover:shadow-sm">
-              {!loading && stats.pending > 0 && <div className="absolute top-0 right-0 w-1 h-full bg-amber-400"></div>}
-              <span className="text-xs font-medium text-on-surface-variant/60">Pending Review</span>
+            <div className="bg-surface-container-lowest p-3 md:p-5 rounded-xl border border-outline-variant/20 flex flex-col gap-1 transition-all hover:scale-[1.01] hover:shadow-sm">
+              <span className="text-xs font-medium text-on-surface-variant/60">New This Week</span>
               <div className="flex items-baseline gap-2">
                 {loading
                   ? <Skel className="w-14 h-7" />
-                  : <span className="text-xl md:text-3xl font-semibold text-on-surface tracking-tighter">{stats.pending}</span>}
-                {!loading && stats.pending > 0 && <span className="w-2 h-2 bg-amber-400 rounded-full"></span>}
+                  : <span className="text-xl md:text-3xl font-semibold text-on-surface tracking-tighter">{merchantAnalytics?.recentMerchants ?? 0}</span>}
               </div>
             </div>
             <div className="bg-surface-container-lowest p-3 md:p-5 rounded-xl border border-outline-variant/20 flex flex-col gap-1 transition-all hover:scale-[1.01] hover:shadow-premium-glow">
-              <span className="text-xs font-medium text-on-surface-variant/60">Approved</span>
+              <span className="text-xs font-medium text-on-surface-variant/60">Active This Month</span>
               <div className="flex items-baseline gap-2">
                 {loading
                   ? <Skel className="w-14 h-7" />
-                  : <span className="text-xl md:text-3xl font-semibold text-on-surface tracking-tighter">{stats.approved}</span>}
+                  : <span className="text-xl md:text-3xl font-semibold text-on-surface tracking-tighter">{merchantAnalytics?.activeMerchants30d ?? 0}</span>}
               </div>
             </div>
             <div className="bg-surface-container-lowest p-3 md:p-5 rounded-xl border border-outline-variant/20 flex flex-col gap-1 transition-all hover:scale-[1.01] hover:shadow-sm">
-              <span className="text-xs font-medium text-on-surface-variant/60">Conversion Rate</span>
+              <span className="text-xs font-medium text-on-surface-variant/60">Verification Rate</span>
               <div className="flex items-baseline gap-2">
                 {loading
                   ? <Skel className="w-16 h-7" />
                   : <span className="text-xl md:text-3xl font-semibold text-on-surface tracking-tighter">
-                      {stats.total > 0 ? ((stats.converted / stats.total) * 100).toFixed(1) : 0}%
+                      {merchantAnalytics?.totalMerchants > 0 ? ((merchantAnalytics.verifiedMerchants / merchantAnalytics.totalMerchants) * 100).toFixed(1) : 0}%
                     </span>}
                 <span className="text-xs font-bold text-secondary tracking-tight">Live</span>
               </div>

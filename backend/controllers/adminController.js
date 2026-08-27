@@ -2105,6 +2105,14 @@ export const getMerchantAnalytics = async (req, res) => {
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     const recentMerchants = await Merchant.countDocuments({ createdAt: { $gte: sevenDaysAgo } });
 
+    // Real usage signal, distinct from recentMerchants (new signups) —
+    // merchants who actually moved money in the last 30 days, not just
+    // ones who exist. Distinct merchantId count, not transaction count.
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const activeMerchantIds = await Transaction.distinct('merchantId', { createdAt: { $gte: thirtyDaysAgo }, merchantId: { $ne: null } });
+    const activeMerchants30d = activeMerchantIds.length;
+
     // Digital Wallet Stats
     const activeWallets = await Merchant.countDocuments({ stellarPublicKey: { $ne: null } });
     
@@ -2121,6 +2129,7 @@ export const getMerchantAnalytics = async (req, res) => {
         verifiedMerchants,
         unverifiedMerchants,
         recentMerchants,
+        activeMerchants30d,
         activeWallets,
         totalUsdcLocked
       }
