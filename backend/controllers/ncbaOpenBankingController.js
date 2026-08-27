@@ -27,6 +27,7 @@ import { buildPayoutSentSms, buildPayoutFailedSms, buildPayoutRecipientReceivedS
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { claimPayoutSubmission, DuplicateSubmissionError } from '../utils/idempotencyGuard.js';
+import { debitAvailableBalance } from '../utils/availableBalance.js';
 import { KENYAN_BANK_CODES } from '../config/kenyanBankCodes.js';
 import { getB2cTariff } from '../config/mpesaB2cTariffCard.js';
 import { getLipaNaMpesaTariff } from '../config/lipaNaMpesaTariffCard.js';
@@ -230,11 +231,10 @@ export async function executeNcbaBankPayout({
   // through. Mirrors services/ncbaBulkPaymentService.js's reservation
   // pattern. Reserves totalDebit (principal + fee), not just the
   // principal, so the merchant needs enough balance to cover the fee too.
-  const reservedMerchant = await Merchant.findOneAndUpdate(
-    { _id: merchantId, kesBalance: { $gte: totalDebit } },
-    { $inc: { kesBalance: -totalDebit } },
-    { returnDocument: 'after' }
-  );
+  // debitAvailableBalance also holds back money credited in the last 2
+  // minutes (see utils/availableBalance.js) so a bad/duplicate credit
+  // can't be withdrawn before it's had a chance to be caught.
+  const reservedMerchant = await debitAvailableBalance(merchantId, totalDebit);
 
   if (!reservedMerchant) {
     const merchant = await Merchant.findById(merchantId);
@@ -322,11 +322,10 @@ export async function executeNcbaMobileMoneyPayout({ merchantId, phone, network,
   const { totalFee } = getB2cTariff(numericAmount);
   const totalDebit = Math.round((numericAmount + totalFee) * 100) / 100;
 
-  const reservedMerchant = await Merchant.findOneAndUpdate(
-    { _id: merchantId, kesBalance: { $gte: totalDebit } },
-    { $inc: { kesBalance: -totalDebit } },
-    { returnDocument: 'after' }
-  );
+  // debitAvailableBalance also holds back money credited in the last 2
+  // minutes (see utils/availableBalance.js) so a bad/duplicate credit
+  // can't be withdrawn before it's had a chance to be caught.
+  const reservedMerchant = await debitAvailableBalance(merchantId, totalDebit);
   if (!reservedMerchant) {
     const merchant = await Merchant.findById(merchantId);
     throw new InsufficientFundsError(merchantId, totalDebit, merchant?.kesBalance ?? 0);
@@ -412,11 +411,10 @@ export async function executeNcbaLipaNaMpesaPayout({ merchantId, paymentType, pa
   const { totalFee } = getLipaNaMpesaTariff(numericAmount);
   const totalDebit = Math.round((numericAmount + totalFee) * 100) / 100;
 
-  const reservedMerchant = await Merchant.findOneAndUpdate(
-    { _id: merchantId, kesBalance: { $gte: totalDebit } },
-    { $inc: { kesBalance: -totalDebit } },
-    { returnDocument: 'after' }
-  );
+  // debitAvailableBalance also holds back money credited in the last 2
+  // minutes (see utils/availableBalance.js) so a bad/duplicate credit
+  // can't be withdrawn before it's had a chance to be caught.
+  const reservedMerchant = await debitAvailableBalance(merchantId, totalDebit);
   if (!reservedMerchant) {
     const merchant = await Merchant.findById(merchantId);
     throw new InsufficientFundsError(merchantId, totalDebit, merchant?.kesBalance ?? 0);

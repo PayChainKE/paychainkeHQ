@@ -27,6 +27,7 @@ import DeveloperPayment from '../models/DeveloperPayment.js';
 import { publicDeveloperPayment } from '../utils/developerPaymentView.js';
 import { dispatchDeveloperEvent } from '../services/webhookDeliveryService.js';
 import { wasAlreadyCreditedByOtherNcbaFeed } from '../services/ncbaLedgerService.js';
+import { debitAvailableBalance } from '../utils/availableBalance.js';
 
 const FRONTEND_URL = process.env.MERCHANT_DASHBOARD_URL || 'https://app.paychain.co.ke';
 
@@ -1062,14 +1063,13 @@ export const initiateB2C = async (req, res) => {
     // passing a stale in-memory balance check and over-withdrawing. Amount
     // sent to NCBA stays the raw `amount` — the fee is PayChain's own
     // separate deduction, never sent to NCBA as part of the payout.
+    // debitAvailableBalance also holds back money credited in the last 2
+    // minutes (see utils/availableBalance.js) so a bad/duplicate credit
+    // can't be withdrawn before it's had a chance to be caught.
     totalDebit = Math.round((Number(amount) + b2cFee) * 100) / 100;
-    const merchant = await Merchant.findOneAndUpdate(
-      { _id: merchantId, kesBalance: { $gte: totalDebit } },
-      { $inc: { kesBalance: -totalDebit } },
-      { returnDocument: 'after' }
-    );
+    const merchant = await debitAvailableBalance(merchantId, totalDebit);
     if (!merchant) {
-      return res.status(400).json({ error: 'Insufficient KES balance for this transfer, including the M-Pesa B2C charge' });
+      return res.status(400).json({ error: 'Insufficient available KES balance for this transfer, including the M-Pesa B2C charge — a recent credit may still be briefly held.' });
     }
     debited = true;
 
@@ -1333,15 +1333,13 @@ export const initiateB2B = async (req, res) => {
       throw e;
     }
 
-    // Atomic conditional deduct — same race-avoidance as initiateB2C.
+    // Atomic conditional deduct — same race-avoidance as initiateB2C, also
+    // holding back any still-unmatured recent credit (see
+    // utils/availableBalance.js).
     totalDebit = Math.round((numericAmount + fee) * 100) / 100;
-    const merchant = await Merchant.findOneAndUpdate(
-      { _id: merchantId, kesBalance: { $gte: totalDebit } },
-      { $inc: { kesBalance: -totalDebit } },
-      { returnDocument: 'after' }
-    );
+    const merchant = await debitAvailableBalance(merchantId, totalDebit);
     if (!merchant) {
-      return res.status(400).json({ error: 'Insufficient KES balance for this transfer, including the PayChain service fee.' });
+      return res.status(400).json({ error: 'Insufficient available KES balance for this transfer, including the PayChain service fee — a recent credit may still be briefly held.' });
     }
     debited = true;
 

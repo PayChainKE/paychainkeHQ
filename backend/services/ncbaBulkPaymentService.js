@@ -2,6 +2,7 @@ import axios from 'axios';
 import crypto from 'crypto';
 import mongoose from 'mongoose';
 import Merchant from '../models/Merchant.js';
+import { debitAvailableBalance } from '../utils/availableBalance.js';
 import Transaction from '../models/Transaction.js';
 import PayoutBatch from '../models/PayoutBatch.js';
 
@@ -177,11 +178,10 @@ export async function initiateBulkPayment(merchantId, payoutItems) {
   // Atomically reserve funds — the $gte guard means this either fully
   // succeeds (balance was sufficient) or matches zero documents (it wasn't).
   // No read-then-write gap for a concurrent request to race through.
-  const reservedMerchant = await Merchant.findOneAndUpdate(
-    { _id: merchantId, kesBalance: { $gte: totalAmount } },
-    { $inc: { kesBalance: -totalAmount } },
-    { returnDocument: 'after' }
-  );
+  // debitAvailableBalance also holds back money credited in the last 2
+  // minutes (see utils/availableBalance.js) so a bad/duplicate credit
+  // can't be withdrawn before it's had a chance to be caught.
+  const reservedMerchant = await debitAvailableBalance(merchantId, totalAmount);
 
   if (!reservedMerchant) {
     const merchant = await Merchant.findById(merchantId);

@@ -14,6 +14,7 @@ import { safeSendSMS, formatKes } from '../utils/smsSanitizer.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { claimPayoutSubmission, DuplicateSubmissionError } from '../utils/idempotencyGuard.js';
+import { debitAvailableBalance } from '../utils/availableBalance.js';
 import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard.js';
 import { getKplcPostpaidTariff, getKplcPrepaidTariff, getNcwscTariff } from '../config/billPaymentTariffCard.js';
 import { getLipaNaMpesaTariff } from '../config/lipaNaMpesaTariffCard.js';
@@ -566,13 +567,12 @@ export const authorizeBatch = async (req, res) => {
     // totalDebit (recipient payouts + B2C fees + bill payment fees + B2B
     // PayBill/Till fees + bank transfer fees), not just totalNet, so the
     // merchant needs enough balance to cover the fees too, upfront.
-    const debitedMerchant = await Merchant.findOneAndUpdate(
-      { _id: merchant._id, kesBalance: { $gte: totalDebit } },
-      { $inc: { kesBalance: -totalDebit } },
-      { returnDocument: 'after' }
-    );
+    // debitAvailableBalance also holds back money credited in the last 2
+    // minutes (see utils/availableBalance.js) so a bad/duplicate credit
+    // can't be withdrawn before it's had a chance to be caught.
+    const debitedMerchant = await debitAvailableBalance(merchant._id, totalDebit);
     if (!debitedMerchant) {
-      return res.status(400).json({ message: 'Insufficient funds to process this batch, including the applicable B2C, bill payment, B2B PayBill/Till, and bank transfer charges' });
+      return res.status(400).json({ message: 'Insufficient available funds to process this batch, including the applicable B2C, bill payment, B2B PayBill/Till, and bank transfer charges — a recent credit may still be briefly held.' });
     }
     merchant.kesBalance = debitedMerchant.kesBalance;
 
