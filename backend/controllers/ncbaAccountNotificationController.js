@@ -15,7 +15,7 @@ import { isReconcilableTxnType } from '../config/ncbaAccountNotificationCodes.js
 import { verifyNcbaHashVal } from '../utils/ncbaHashVal.js';
 import { timingSafeStringEqual } from '../utils/timingSafeCompare.js';
 import { buildNcbaOkResult, buildNcbaFailResult } from '../utils/ncbaSoapResponses.js';
-import { creditNcbaCollection, DuplicateCollectionError, wasAlreadySettledByStkPush, findFalselyFailedStkRequest } from '../services/ncbaLedgerService.js';
+import { creditNcbaCollection, DuplicateCollectionError, wasAlreadySettledByStkPush, findFalselyFailedStkRequest, wasAlreadyCreditedByOtherNcbaFeed } from '../services/ncbaLedgerService.js';
 import { resolveStkOutcome } from './mpesaController.js';
 import STKRequest from '../models/STKRequest.js';
 import { NcbaTariffBoundsError } from '../config/ncbaTariffCard.js';
@@ -262,6 +262,15 @@ export const handleNcbaAccountNotification = async (req, res) => {
       });
       logEvent('info', 'ncba_account_notification_resolved_via_qr', { transId, merchantId: merchant._id.toString(), transAmount });
       return respondOk(res, 'Settled via QR code');
+    }
+
+    // See wasAlreadyCreditedByOtherNcbaFeed's doc comment
+    // (services/ncbaLedgerService.js) — catches the same real collection
+    // arriving on ncbaController.js's separate reconciliation feed under a
+    // different reference before this one does.
+    if (await wasAlreadyCreditedByOtherNcbaFeed(merchant, transAmount, transId)) {
+      logEvent('info', 'ncba_account_notification_already_settled_via_other_feed', { transId, merchantId: merchant._id.toString(), transAmount });
+      return respondOk(res, 'Already settled via reconciliation feed');
     }
 
     let ledgerResult;

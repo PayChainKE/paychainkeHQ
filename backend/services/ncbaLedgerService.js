@@ -15,15 +15,43 @@ import { getNcbaTariffBand } from '../config/ncbaTariffCard.js';
 // config/ncbaAccountNotificationCodes.js) — without this guard that would
 // double-credit the merchant. Both NCBA webhook controllers must call this
 // before creditNcbaCollection.
+//
+// This used to be a 10-minute (briefly 24-hour) time window, on the
+// assumption NCBA's account-notification feed arrives close behind the STK
+// poll's own resolution. A real production incident (2026-08-26) proved
+// that assumption unsafe at ANY fixed width: NCBA's webhook landed 45–70
+// minutes after the STK poll's own success for three separate payments —
+// already past the original 10-minute window — and there is no guarantee
+// some future delivery couldn't land even later than a wider window too.
+// Any time-bounded guard leaves a residual gap where the same real money
+// gets credited twice — once here, once via the STK-aware path — inflating
+// a merchant's balance with money that was never actually deposited, which
+// is then withdrawable as real cash (confirmed: this is exactly what let
+// one merchant cash out more than they'd genuinely paid in).
+//
+// Fixed by removing the time bound entirely: `notificationMatched` makes
+// this an atomic, one-time claim on the specific STKRequest instead of a
+// guess bounded by elapsed time. findOneAndUpdate's own atomicity is what
+// makes this safe under concurrent/redelivered webhooks — two callers can
+// never both win the claim on the same STKRequest, so it can never
+// contribute to a double-credit no matter how long NCBA takes to deliver.
+//
+// The tradeoff this accepts: if the SAME merchant is ever paid the exact
+// same KES amount twice via STK, and the second payment's own webhook
+// notification happens to race in before its own STK poll resolves, it
+// could in theory match this (older, already-claimed) request's sibling
+// instead of its own — but that only ever causes a webhook to correctly
+// no-op (because ITS OWN poll-based resolveStkOutcome call independently
+// credits that second payment regardless of this function's outcome — see
+// this function's other caller sites). It can never cause a double-credit;
+// at worst a coincidental-amount non-STK deposit is skipped and needs
+// manual reconciliation, which is recoverable — unlike fabricated balance.
 export async function wasAlreadySettledByStkPush(merchant, grossAmount) {
-  const recentWindow = new Date(Date.now() - 10 * 60 * 1000);
-  const match = await STKRequest.findOne({
-    merchantId: merchant._id,
-    status: 'success',
-    amount: grossAmount,
-    updatedAt: { $gte: recentWindow },
-  });
-  return !!match;
+  const claimed = await STKRequest.findOneAndUpdate(
+    { merchantId: merchant._id, status: 'success', amount: grossAmount, notificationMatched: { $ne: true } },
+    { $set: { notificationMatched: true } }
+  );
+  return !!claimed;
 }
 
 // Finds an STKRequest that pollAndResolveNcbaStkPush (mpesaController.js)
@@ -37,11 +65,12 @@ export async function wasAlreadySettledByStkPush(merchant, grossAmount) {
 // actually succeeded, and the merchant would only ever get credited via the
 // generic (wrong fee-split) path below instead of the STK-aware one.
 //
-// A wider window than wasAlreadySettledByStkPush's 10 minutes on purpose —
+// Matches wasAlreadySettledByStkPush's 24-hour window above (see its comment
+// for why 10/30 minutes proved too short against real NCBA webhook delay) —
 // this is catching a poll loop that already exhausted its own multi-minute
 // retry budget before giving up, so the webhook confirming success can
 // legitimately arrive well after that.
-const FALSE_FAILURE_RECHECK_WINDOW_MS = 30 * 60 * 1000;
+const FALSE_FAILURE_RECHECK_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export async function findFalselyFailedStkRequest(merchant, grossAmount) {
   return STKRequest.findOne({
@@ -51,6 +80,45 @@ export async function findFalselyFailedStkRequest(merchant, grossAmount) {
     amount: grossAmount,
     updatedAt: { $gte: new Date(Date.now() - FALSE_FAILURE_RECHECK_WINDOW_MS) },
   });
+}
+
+// A second, independent double-credit vector — distinct from the STK one
+// above. NCBA reports collections through TWO separate live webhooks:
+// ncbaController.js's reconciliation push (keyed by NCBA's
+// `transactionReference`) and ncbaAccountNotificationController.js's
+// account-notification push (keyed by NCBA's `TransID`) — and per that
+// controller's own doc comment, the account-notification feed "fires on
+// every debit/credit on PayChain's NCBA account, not just merchant virtual
+// account collections", meaning its scope overlaps the reconciliation
+// push's. If NCBA ever reports the same real collection on both feeds using
+// two DIFFERENT reference strings (which is how each feed names the same
+// event in its own scheme), Transaction.reference's unique index can't
+// catch it — that index only rejects the exact same reference appearing
+// twice, e.g. one feed redelivering. Both webhook controllers must call
+// this immediately before creditNcbaCollection, alongside
+// wasAlreadySettledByStkPush, so a genuine non-STK collection reported on
+// both feeds doesn't get credited twice either.
+//
+// This is a window check, not an atomic claim like wasAlreadySettledByStkPush
+// above — there's no shared, indexed, single-use record to claim against
+// across two independent external feeds. Both NCBA integrations are
+// documented as real-time, so 30 minutes is a generous margin over any
+// realistic delivery gap between them; the narrow remaining risk is two
+// deliveries landing within milliseconds of each other on concurrent
+// requests, which is a far smaller and lower-probability window than the
+// 45–70 minute gap that caused the STK incident this guard's sibling fixes.
+const CROSS_FEED_DEDUP_WINDOW_MS = 30 * 60 * 1000;
+
+export async function wasAlreadyCreditedByOtherNcbaFeed(merchant, grossAmount, currentBankRef) {
+  const match = await Transaction.findOne({
+    merchantId: merchant._id,
+    type: 'ncba_inbound',
+    status: 'completed',
+    amount: grossAmount,
+    reference: { $ne: currentBankRef },
+    createdAt: { $gte: new Date(Date.now() - CROSS_FEED_DEDUP_WINDOW_MS) },
+  });
+  return !!match;
 }
 
 export class DuplicateCollectionError extends Error {
