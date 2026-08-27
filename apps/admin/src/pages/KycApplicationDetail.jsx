@@ -2,6 +2,9 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import api from '../api/api';
+import EditableField from '../components/modals/EditableField';
+import UploadableDocRow from '../components/modals/UploadableDocRow';
+import ResetContactModal from '../components/modals/ResetContactModal';
 
 // Same review workspace as apps/officer's Workstation.jsx, against the same
 // /api/officer/applications/:id endpoints — owner/admin roles are already
@@ -46,6 +49,7 @@ const KycApplicationDetail = () => {
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
   const [revisionOpen, setRevisionOpen] = useState(false);
+  const [resetContactOpen, setResetContactOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [noteText, setNoteText] = useState('');
 
@@ -145,18 +149,42 @@ const KycApplicationDetail = () => {
 
         <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl p-6 shadow-editorial">
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap mb-1">
-                <h1 className="text-2xl font-bold text-on-surface tracking-tight font-headline">{app.businessName}</h1>
+                <div className="text-2xl font-bold text-on-surface tracking-tight font-headline">
+                  <EditableField
+                    value={app.businessName}
+                    inputClassName="min-w-[220px] bg-white border border-outline-variant/30 rounded-lg px-2.5 py-1 text-lg font-bold text-on-surface focus:ring-0 focus:border-primary/50 outline-none"
+                    onSave={async (businessName) => {
+                      const res = await api.patch(`/api/admin/merchants/${app._id}/business-name`, { businessName });
+                      setApp((a) => ({ ...a, businessName: res.data.businessName }));
+                    }}
+                  />
+                </div>
                 <span className={`inline-flex px-2 py-0.5 rounded-full text-2xs font-bold uppercase tracking-widest border ${statusStyle.pill}`}>{statusStyle.label}</span>
               </div>
               <p className="text-xs text-on-surface-variant/60">{app.businessType || 'Business type not set'} {app.businessNumber ? `· Reg #${app.businessNumber}` : ''}</p>
               <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                <p><span className="text-on-surface-variant/50">Owner:</span> {app.name}</p>
+                <div className="flex items-center gap-1"><span className="text-on-surface-variant/50">Owner:</span>
+                  <EditableField
+                    value={app.name}
+                    onSave={async (name) => {
+                      const res = await api.patch(`/api/admin/merchants/${app._id}/contact-name`, { name });
+                      setApp((a) => ({ ...a, name: res.data.name }));
+                    }}
+                  />
+                </div>
                 <p><span className="text-on-surface-variant/50">Phone:</span> {app.phone}</p>
                 <p><span className="text-on-surface-variant/50">Email:</span> {app.email}</p>
                 <p><span className="text-on-surface-variant/50">KRA PIN:</span> {app.kraPin || '—'}</p>
               </div>
+              <button
+                onClick={() => setResetContactOpen(true)}
+                className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-outline-variant/30 text-on-surface-variant hover:bg-surface-container-low text-2xs font-bold uppercase tracking-widest transition-all"
+              >
+                <span className="material-symbols-outlined text-[14px]">contact_mail</span>
+                Reset Email / Phone
+              </button>
             </div>
             <div className="flex flex-col items-start md:items-end gap-2">
               <span className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50">
@@ -177,37 +205,57 @@ const KycApplicationDetail = () => {
             <p><span className="text-on-surface-variant/50">Account Status:</span> {app.status || '—'}{app.isVerified ? ' · Verified' : ''}</p>
             <p><span className="text-on-surface-variant/50">Business Number:</span> {app.businessNumber || '—'}</p>
             <p><span className="text-on-surface-variant/50">KRA PIN Format Check:</span> {app.isKRAVerified ? 'Passed' : 'Not verified'}</p>
-            <p>
+            <div className="sm:col-span-2">
               <span className="text-on-surface-variant/50">Business Certificate:</span>{' '}
-              {app.certificateUrl
-                ? <a href={app.certificateUrl} target="_blank" rel="noreferrer" className="text-primary underline">Open document</a>
-                : '— not uploaded —'}
-            </p>
+              <UploadableDocRow
+                url={app.certificateUrl}
+                label="Certificate"
+                onUpload={async (file) => {
+                  const formData = new FormData();
+                  formData.append('certificate', file);
+                  const res = await api.patch(`/api/admin/merchants/${app._id}/certificate`, formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' },
+                  });
+                  setApp((a) => ({ ...a, certificateUrl: res.data.certificateUrl }));
+                }}
+              />
+            </div>
           </div>
         </div>
 
         <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl p-6 shadow-editorial">
           <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-3">KYC Documents</p>
-          {app.kybDocuments?.length === 0 ? (
-            <p className="text-xs text-on-surface-variant/50">
-              {app.kybStatus ? 'No documents uploaded yet.' : 'Not applicable — this merchant signed up directly and was never routed through officer document review.'}
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {app.kybDocuments.map((doc) => (
-                <div key={doc.type} className="flex items-center justify-between gap-3 p-3 bg-surface-container-low rounded-lg">
+          <div className="space-y-2">
+            {Object.entries(DOC_LABELS).map(([type, label]) => {
+              const doc = app.kybDocuments?.find((d) => d.type === type);
+              return (
+                <div key={type} className="flex items-center justify-between gap-3 p-3 bg-surface-container-low rounded-lg flex-wrap">
                   <div className="min-w-0">
-                    <p className="text-xs font-bold text-on-surface">{DOC_LABELS[doc.type] || doc.type}</p>
-                    <a href={doc.url} target="_blank" rel="noreferrer" className="text-2xs text-primary underline">Open document</a>
-                    {doc.note && <p className="text-2xs text-on-surface-variant/50 mt-0.5">{doc.note}</p>}
+                    <p className="text-xs font-bold text-on-surface">{label}</p>
+                    {doc?.note && <p className="text-2xs text-on-surface-variant/50 mt-0.5">{doc.note}</p>}
                   </div>
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <span className={`inline-flex px-2 py-0.5 rounded-full text-2xs font-bold uppercase tracking-widest border ${
-                      doc.status === 'approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                      doc.status === 'rejected' ? 'bg-red-50 text-red-700 border-red-200' :
-                      'bg-amber-50 text-amber-700 border-amber-200'
-                    }`}>{doc.status}</span>
-                    {canDecide && (
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {doc && (
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-2xs font-bold uppercase tracking-widest border ${
+                        doc.status === 'approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                        doc.status === 'rejected' ? 'bg-red-50 text-red-700 border-red-200' :
+                        'bg-amber-50 text-amber-700 border-amber-200'
+                      }`}>{doc.status}</span>
+                    )}
+                    <UploadableDocRow
+                      url={doc?.url}
+                      label={label}
+                      onUpload={async (file) => {
+                        const formData = new FormData();
+                        formData.append('document', file);
+                        formData.append('type', type);
+                        const res = await api.patch(`/api/admin/merchants/${app._id}/kyc-documents`, formData, {
+                          headers: { 'Content-Type': 'multipart/form-data' },
+                        });
+                        setApp((a) => ({ ...a, kybDocuments: res.data.kybDocuments }));
+                      }}
+                    />
+                    {doc && canDecide && (
                       <>
                         <button onClick={() => setDocStatus(doc.type, 'approved')} title="Approve document" className="text-emerald-600 hover:text-emerald-700"><span className="material-symbols-outlined text-lg">check_circle</span></button>
                         <button onClick={() => setDocStatus(doc.type, 'rejected')} title="Flag document" className="text-red-600 hover:text-red-700"><span className="material-symbols-outlined text-lg">cancel</span></button>
@@ -215,9 +263,9 @@ const KycApplicationDetail = () => {
                     )}
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
+              );
+            })}
+          </div>
         </div>
 
         <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl p-6 shadow-editorial">
@@ -316,6 +364,13 @@ const KycApplicationDetail = () => {
 
         {revisionOpen && <RevisionModal onClose={() => setRevisionOpen(false)} onSubmit={handleRequestRevision} />}
         {rejectOpen && <RejectModal onClose={() => setRejectOpen(false)} onSubmit={handleReject} />}
+        {resetContactOpen && (
+          <ResetContactModal
+            merchant={app}
+            onClose={() => setResetContactOpen(false)}
+            onSuccess={(data) => setApp((a) => ({ ...a, ...data }))}
+          />
+        )}
       </div>
     </Layout>
   );

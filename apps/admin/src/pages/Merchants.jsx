@@ -4,7 +4,10 @@ import api from '../api/api';
 import TablePagination from '../components/ui/TablePagination';
 import MerchantsMap from '../components/merchants-map/MerchantsMap';
 import LocationPickerModal from '../components/merchants-map/LocationPickerModal';
-import { formatAccountNumber } from '../utils/formatAccountNumber';
+import { formatAccountNumber } from '../utils/formatAccountNumber'
+import EditableField from '../components/modals/EditableField'
+import UploadableDocRow from '../components/modals/UploadableDocRow'
+import ResetContactModal from '../components/modals/ResetContactModal';
 
 const PAGE_SIZE = 20;
 
@@ -1099,6 +1102,10 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
   const [businessNameDraft, setBusinessNameDraft] = React.useState('');
   const [savingBusinessName, setSavingBusinessName] = React.useState(false);
   const [businessNameError, setBusinessNameError] = React.useState('');
+  const [contactName, setContactName] = React.useState(merchant?.name || '');
+  const [certificateUrl, setCertificateUrl] = React.useState(merchant?.certificateUrl || null);
+  const [resetContactOpen, setResetContactOpen] = React.useState(false);
+  const [contactOverride, setContactOverride] = React.useState(null); // { email, phone } after a reset_contact confirm
 
   React.useEffect(() => {
     if (merchant?.features) {
@@ -1108,6 +1115,9 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
     setBusinessName(merchant?.businessName || '');
     setEditingBusinessName(false);
     setBusinessNameError('');
+    setContactName(merchant?.name || '');
+    setCertificateUrl(merchant?.certificateUrl || null);
+    setContactOverride(null);
   }, [merchant]);
 
   const startEditBusinessName = () => {
@@ -1385,9 +1395,20 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
               />
               <Row label="KRA PIN" value={m.kraPin} mono badge={m.isKRAVerified ? { tone: 'emerald', text: 'Verified' } : { tone: 'gray', text: 'Not verified' }} />
               <Row label="Business Reg #" value={m.businessNumber} mono />
-              <Row label="Certificate" value={m.certificateUrl
-                ? <a href={m.certificateUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-semibold underline">View document ↗</a>
-                : '— not uploaded —'} />
+              <Row label="Certificate" value={
+                <UploadableDocRow
+                  url={certificateUrl}
+                  label="Certificate"
+                  onUpload={async (file) => {
+                    const formData = new FormData();
+                    formData.append('certificate', file);
+                    const res = await api.patch(`/api/admin/merchants/${m._id}/certificate`, formData, {
+                      headers: { 'Content-Type': 'multipart/form-data' },
+                    });
+                    setCertificateUrl(res.data.certificateUrl);
+                  }}
+                />
+              } />
             </Section>
 
             {/* KYC/KYB Documents — admin can add or replace any of these
@@ -1435,9 +1456,26 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
 
             {/* Contact */}
             <Section title="Primary Contact" icon="person">
-              <Row label="Full Name" value={m.name} />
-              <Row label="Email" value={m.email} />
-              <Row label="Phone" value={m.phone} mono />
+              <Row label="Full Name" value={
+                <EditableField
+                  value={contactName}
+                  onSave={async (name) => {
+                    const res = await api.patch(`/api/admin/merchants/${m._id}/contact-name`, { name });
+                    setContactName(res.data.name);
+                  }}
+                />
+              } />
+              <Row label="Email" value={contactOverride?.email ?? m.email} />
+              <Row label="Phone" value={contactOverride?.phone ?? m.phone} mono />
+              <Row label="Reset Email / Phone" value={
+                <button
+                  onClick={() => setResetContactOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-outline-variant/30 text-on-surface-variant hover:bg-surface-container-low text-[11px] font-bold uppercase tracking-widest transition-all"
+                >
+                  <span className="material-symbols-outlined text-[14px]">contact_mail</span>
+                  Reset Contact
+                </button>
+              } />
               <Row
                 label="Newsletter"
                 value={
@@ -1590,6 +1628,13 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
           </div>
         )}
       </div>
+      {resetContactOpen && (
+        <ResetContactModal
+          merchant={m}
+          onClose={() => setResetContactOpen(false)}
+          onSuccess={(data) => setContactOverride(data)}
+        />
+      )}
       <style>{`@keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }`}</style>
     </div>
   );

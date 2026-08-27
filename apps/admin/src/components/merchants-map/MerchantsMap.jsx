@@ -110,9 +110,9 @@ export default function MerchantsMap({ onViewMerchantDetails }) {
       {!loading && merchants.length === 0 && !error && (
         <div className="absolute inset-0 z-[1500] bg-white flex flex-col items-center justify-center gap-2 text-center px-6">
           <span className="material-symbols-outlined text-[40px] text-on-surface-variant/25">location_off</span>
-          <p className="text-[14px] font-semibold text-on-surface-variant/70">No merchants pinned yet</p>
+          <p className="text-[14px] font-semibold text-on-surface-variant/70">No merchants to show yet</p>
           <p className="text-[12px] text-on-surface-variant/50 max-w-xs">
-            Use "Set map location" from a merchant's menu in the list view to place them here.
+            Merchants appear here automatically from the county they gave at signup. This only shows empty if none of them have a county on file — use "Set map location" from a merchant's menu in the list view to place one manually.
           </p>
         </div>
       )}

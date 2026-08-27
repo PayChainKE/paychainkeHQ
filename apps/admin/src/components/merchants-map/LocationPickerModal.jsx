@@ -52,11 +52,17 @@ function FlyToSearchResult({ target }) {
   return null;
 }
 
-// Manual pin-drop — merchants have no address/town field to geocode from
-// (see mapLocation's comment in Merchant.js), so this is how a location
-// gets onto the map at all: an admin clicks where the business actually is.
+// Manual pin-drop — lets an admin set (or correct) a merchant's EXACT
+// location, overriding the approximate county-centroid MerchantsMap.jsx
+// otherwise falls back to (see getMerchantsMap's doc comment). `merchant`
+// arrives shaped differently depending on which entry point opened this:
+// the map popup passes `.location` (which may be that approximate
+// fallback, not a real manual pin — excluded below), the merchant list
+// view passes the raw `.mapLocation` (manual-only, no approximate concept
+// there at all).
 export default function LocationPickerModal({ merchant, onClose, onSaved }) {
-  const existing = merchant.location || merchant.mapLocation;
+  const manualLocation = merchant.location && !merchant.location.isApproximate ? merchant.location : null;
+  const existing = manualLocation || merchant.mapLocation;
   const [pos, setPos] = useState(
     existing?.lat != null ? [existing.lat, existing.lng] : null
   );
