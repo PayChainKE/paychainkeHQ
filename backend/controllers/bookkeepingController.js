@@ -357,3 +357,75 @@ export const getBookkeepingSummary = async (req, res) => {
     res.status(500).json({ error: 'Server Error' });
   }
 };
+
+// @desc    PayChain's own monthly fee revenue as a KRA-ready CSV — a
+//          revenue listing an accountant can use directly when filing
+//          PayChain's VAT/income tax return on iTax. NOT a live submission
+//          to KRA (PayChain already has a separate, real eTIMS/OSCU
+//          integration for MERCHANTS' own sales fiscalization — this is
+//          unrelated and deliberately does not touch it). Same
+//          period/type/demo-exclusion rules as getBookkeepingSummary
+//          above, so this export's total always reconciles to that page's
+//          "Income" figure for the same period.
+//
+//          Deliberately no VAT column — nothing in this codebase tracks
+//          whether PayChain's own fee revenue is itself VATable; adding a
+//          fabricated number here would be worse than omitting it.
+// @route   GET /api/admin/bookkeeping/kra-export?preset=&from=&to=
+// @access  Private (Admin)
+export const exportKraRevenueCsv = async (req, res) => {
+  try {
+    const { preset, from, to } = req.query;
+    const { since, until, label } = resolvePeriod({ preset, from, to });
+    const excludeDemo = await excludeDemoMerchantsMatch();
+
+    const transactions = await Transaction.find({
+      createdAt: { $gte: since, $lte: until },
+      status: { $in: ['completed', 'verified'] },
+      type: { $in: REVENUE_TX_TYPES },
+      ...excludeDemo,
+    })
+      .sort({ createdAt: 1 })
+      .populate('merchantId', 'businessName')
+      .lean();
+
+    const header = [
+      'Date', 'Reference', 'Transaction Type', 'Merchant',
+      'Gross Amount (KES)', 'PayChain Fee / Net Revenue (KES)',
+      'Revenue Stream', 'Settlement Rail', 'Status',
+    ];
+    // Excel/Sheets-safe CSV cell — same RFC-4180 helper as
+    // revenueController.js's exportRevenueSweeps.
+    const cell = (v) => {
+      const s = v === null || v === undefined ? '' : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const rows = transactions.map((t) => [
+      t.createdAt?.toISOString() || '',
+      t.reference || '',
+      t.type,
+      t.merchantId?.businessName || 'Deleted Merchant',
+      t.kesAmount ?? t.amount ?? 0,
+      t.paychainFee || 0,
+      t.revenueStream || '',
+      t.settlementRail || '',
+      t.status,
+    ].map(cell).join(','));
+
+    const csv = [header.map(cell).join(','), ...rows].join('\r\n');
+
+    logAudit({
+      action: 'admin.tax.kra_export', category: 'admin', severity: 'info',
+      message: `Exported ${transactions.length} revenue transactions as a KRA-ready CSV (${label})`,
+      actor: adminActor(req.admin), req,
+      metadata: { count: transactions.length, since, until },
+    });
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="paychain-kra-revenue-export-${new Date().toISOString().slice(0, 10)}.csv"`);
+    res.send(csv);
+  } catch (error) {
+    console.error('Export KRA Revenue CSV Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};

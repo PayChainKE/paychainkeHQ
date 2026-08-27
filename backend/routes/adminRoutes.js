@@ -28,6 +28,7 @@ import {
   getSystemStatus,
   getStkRequests,
   searchTransactionAudit,
+  exportPayoutAuditCsv,
   getTransactionAuditDetail,
 } from '../controllers/adminController.js';
 import {
@@ -80,6 +81,7 @@ import {
   deleteExpense,
   updateExpenseReceipt,
   getBookkeepingSummary,
+  exportKraRevenueCsv,
 } from '../controllers/bookkeepingController.js';
 import { protect, protectAdminSSE, requireRole } from '../middleware/authMiddleware.js';
 import { upload, uploadReceipt } from '../utils/cloudinary.js';
@@ -204,6 +206,7 @@ router.patch('/cash-advance/requests/:id', protect, requireMutator, sensitiveAct
 
 // Bookkeeping — expense ledger + P&L summary for KRA-ready record keeping.
 router.get('/bookkeeping/summary',        protect, excludeOfficer, getBookkeepingSummary);
+router.get('/bookkeeping/kra-export',     protect, excludeOfficer, exportKraRevenueCsv);
 router.get('/bookkeeping/expenses',       protect, excludeOfficer, listExpenses);
 router.post('/bookkeeping/expenses',      protect, requireMutator, uploadReceipt.single('receipt'), createExpense);
 router.put('/bookkeeping/expenses/:id',   protect, requireMutator, updateExpense);
@@ -218,6 +221,7 @@ router.get('/stk-requests', protect, excludeOfficer, getStkRequests);
 // into a full forensic detail view (related STK Push attempt + SMS receipts),
 // for resolving merchant/customer disputes.
 router.get('/transaction-audit', protect, excludeOfficer, searchTransactionAudit);
+router.get('/transaction-audit/export', protect, excludeOfficer, exportPayoutAuditCsv);
 router.get('/transaction-audit/:id', protect, excludeOfficer, getTransactionAuditDetail);
 
 // Global audit log (filterable, paginated).

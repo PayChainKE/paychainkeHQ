@@ -2233,15 +2233,29 @@ export const searchTransactionAudit = async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(100, Math.max(5, parseInt(req.query.limit, 10) || 25));
-    const type = req.query.type && req.query.type !== 'all' ? req.query.type : null;
+    // Comma-separated list accepted (not just a single type) — the payout-
+    // audit-trail view (Tax & Compliance) scopes to every payout-shaped
+    // type (outbound, bulk_pay, mpesa_b2c, ncba_outbound, ...) in one call
+    // rather than a plain type dropdown.
+    const typeList = req.query.type && req.query.type !== 'all'
+      ? String(req.query.type).split(',').map((t) => t.trim()).filter(Boolean)
+      : null;
     const status = req.query.status && req.query.status !== 'all' ? req.query.status : null;
     const q = (req.query.q || '').trim();
     const from = req.query.from ? new Date(req.query.from) : null;
     const to = req.query.to ? new Date(req.query.to) : null;
+    // Direct merchant scoping — the payout-audit-trail view (Tax &
+    // Compliance) picks one merchant and needs everything paid to them,
+    // rather than relying on `q` resolving a name/email search into a
+    // merchant match.
+    const merchantId = req.query.merchantId && mongoose.Types.ObjectId.isValid(req.query.merchantId)
+      ? req.query.merchantId
+      : null;
 
     const filter = {};
-    if (type) filter.type = type;
+    if (typeList) filter.type = typeList.length === 1 ? typeList[0] : { $in: typeList };
     if (status) filter.status = status;
+    if (merchantId) filter.merchantId = merchantId;
     if ((from && !isNaN(from)) || (to && !isNaN(to))) {
       filter.createdAt = {};
       if (from && !isNaN(from)) filter.createdAt.$gte = from;
@@ -2297,6 +2311,8 @@ export const searchTransactionAudit = async (req, res) => {
         recipient: t.recipient,
         settlementRail: t.settlementRail,
         mobileNetwork: t.mobileNetwork,
+        paychainFee: t.paychainFee,
+        balanceAfter: t.balanceAfter,
         merchant: t.merchantId
           ? {
               _id: t.merchantId._id,
@@ -2311,6 +2327,92 @@ export const searchTransactionAudit = async (req, res) => {
     });
   } catch (error) {
     console.error('Search Transaction Audit Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Payout audit trail as CSV — every payment reference tied to
+//          merchant payouts in the given window/filters, for reconciling
+//          against a real monthly bank statement. Same filters as
+//          searchTransactionAudit above (type/status/from/to/merchantId/q),
+//          so the download always matches whatever's on screen. Capped at
+//          20,000 rows (well above realistic monthly payout volume today;
+//          revisit if that ever changes).
+// @route   GET /api/admin/transaction-audit/export
+// @access  Private (Admin)
+export const exportPayoutAuditCsv = async (req, res) => {
+  try {
+    const typeList = req.query.type && req.query.type !== 'all'
+      ? String(req.query.type).split(',').map((t) => t.trim()).filter(Boolean)
+      : null;
+    const status = req.query.status && req.query.status !== 'all' ? req.query.status : null;
+    const q = (req.query.q || '').trim();
+    const from = req.query.from ? new Date(req.query.from) : null;
+    const to = req.query.to ? new Date(req.query.to) : null;
+    const merchantId = req.query.merchantId && mongoose.Types.ObjectId.isValid(req.query.merchantId)
+      ? req.query.merchantId
+      : null;
+
+    const filter = {};
+    if (typeList) filter.type = typeList.length === 1 ? typeList[0] : { $in: typeList };
+    if (status) filter.status = status;
+    if (merchantId) filter.merchantId = merchantId;
+    if ((from && !isNaN(from)) || (to && !isNaN(to))) {
+      filter.createdAt = {};
+      if (from && !isNaN(from)) filter.createdAt.$gte = from;
+      if (to && !isNaN(to)) filter.createdAt.$lte = to;
+    }
+    if (q) {
+      const safeQ = String(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const rx = { $regex: safeQ, $options: 'i' };
+      const matchingMerchants = await Merchant.find({
+        $or: [{ businessName: rx }, { email: rx }, { ncbaMerchantCode: rx }],
+      }).select('_id').lean();
+      const merchantIds = matchingMerchants.map((m) => m._id);
+      filter.$or = [
+        { reference: rx }, { accountNumber: rx }, { 'sender.name': rx }, { 'sender.id': rx },
+        { 'recipient.name': rx }, { 'recipient.id': rx },
+        ...(merchantIds.length ? [{ merchantId: { $in: merchantIds } }] : []),
+      ];
+    }
+
+    const transactions = await Transaction.find(filter)
+      .sort('-createdAt')
+      .limit(20000)
+      .populate('merchantId', 'businessName')
+      .lean();
+
+    const header = ['Date', 'Reference', 'Merchant', 'Type', 'Status', 'Settlement Rail', 'Amount (KES)', 'Fee (KES)', 'Balance After (KES)'];
+    const cell = (v) => {
+      const s = v === null || v === undefined ? '' : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const rows = transactions.map((t) => [
+      t.createdAt?.toISOString() || '',
+      t.reference || '',
+      t.merchantId?.businessName || 'Deleted Merchant',
+      t.type,
+      t.status,
+      t.settlementRail || '',
+      t.kesAmount ?? t.amount ?? 0,
+      t.paychainFee || 0,
+      t.balanceAfter ?? '',
+    ].map(cell).join(','));
+
+    const csv = [header.map(cell).join(','), ...rows].join('\r\n');
+
+    logAudit({
+      action: 'admin.tax.payout_audit_exported', category: 'admin', severity: 'info',
+      message: `Exported ${transactions.length} payout audit rows as CSV`,
+      actor: adminActor(req.admin), req,
+      metadata: { count: transactions.length, merchantId: merchantId || null },
+    });
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="paychain-payout-audit-${new Date().toISOString().slice(0, 10)}.csv"`);
+    res.send(csv);
+  } catch (error) {
+    console.error('Export Payout Audit CSV Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };
