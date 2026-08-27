@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import axios from 'axios'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import RevenueChart from '../components/charts/RevenueChart'
-import { formatKES, formatUSDC } from '../utils/formatCurrency'
+import { formatKES } from '../utils/formatCurrency'
 import { formatAccountNumber } from '../utils/formatAccountNumber'
 import { formatTxDate, formatTxTime } from '../utils/formatDate'
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay'
@@ -25,27 +25,6 @@ export default function Overview() {
   const [showMoveMoney, setShowMoveMoney] = useState(false)
   const [showFundAccount, setShowFundAccount] = useState(false)
   const [activeFundMethod, setActiveFundMethod] = useState(null)
-  const [showDigitalWallet, setShowDigitalWallet] = useState(() => localStorage.getItem('paychain_show_wallet') !== 'false')
-  const [liveRate, setLiveRate] = useState(132.45)
-
-  // A merchant only sees the Digital Wallet card after they've provisioned a
-  // Stellar wallet (presence of `stellarPublicKey`). Until then the card —
-  // and its show/hide toggle — would just be a confusing empty surface.
-  // Additionally, Admins can globally disable the feature for a merchant.
-  //
-  // Platform-wide kill switch on top of that: stablecoin/digital wallet
-  // features are pulled for all merchants until further notice, regardless
-  // of the per-merchant flag — flip this to `merchant?.features?.digitalWallet
-  // === true` to restore. Mirrored in App.jsx's FeatureGuard.
-  const featureEnabled = false;
-  const walletActivated = !!merchant?.stellarPublicKey && featureEnabled;
-  const showWalletCard  = walletActivated && showDigitalWallet
-
-  const toggleDigitalWallet = () => {
-    const newVal = !showDigitalWallet
-    setShowDigitalWallet(newVal)
-    localStorage.setItem('paychain_show_wallet', newVal)
-  }
 
   const fetchData = React.useCallback(async () => {
     if (!merchant) return
@@ -65,26 +44,6 @@ export default function Overview() {
     } finally {
       setIsLoading(false)
     }
-  }, [merchant])
-
-  // Live USDC->KES rate for the digital wallet card's estimate — was
-  // previously a hardcoded *130 multiplier that would silently drift from
-  // the real market rate shown on the Wallet page.
-  useEffect(() => {
-    if (!merchant) return
-    const fetchRate = async () => {
-      try {
-        const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
-        const token = localStorage.getItem('paychain_merchant_token')
-        const res = await axios.get(`${API_URL}/api/transactions/live-rate`, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        if (res.data?.rate) setLiveRate(res.data.rate)
-      } catch (err) {
-        console.error('Failed to fetch live rate', err)
-      }
-    }
-    fetchRate()
   }, [merchant])
 
   // Initial load
@@ -127,9 +86,14 @@ export default function Overview() {
     .filter(t => new Date(t.createdAt) >= today)
     .reduce((s, t) => { const d = netBalanceImpact(t); return d > 0 ? s + d : s }, 0)
 
-  const thisMonthRevenue = realTransactions
+  // Net change to the merchant's actual balance this month — money in MINUS
+  // money out, not gross inflow volume. A merchant who received KES 100,000
+  // but paid out KES 90,000 in the same month doesn't have KES 100,000 —
+  // showing gross volume under a plain "This Month" label reads as money
+  // they currently hold, which isn't true once payouts are accounted for.
+  const thisMonthNetChange = realTransactions
     .filter(t => new Date(t.createdAt) >= monthAgo)
-    .reduce((s, t) => { const d = netBalanceImpact(t); return d > 0 ? s + d : s }, 0)
+    .reduce((s, t) => s + netBalanceImpact(t), 0)
 
   const recentTx = [...realTransactions]
     .sort((a, b) => new Date(b.createdAt || b.timestamp) - new Date(a.createdAt || a.timestamp))
@@ -245,24 +209,10 @@ export default function Overview() {
           </h2>
           <p className="text-on-surface-variant text-[11px] lg:text-sm mt-1.5 opacity-80 font-medium leading-relaxed">Here's how your business is doing today.</p>
         </div>
-        
-        {walletActivated && (
-          <button
-            onClick={toggleDigitalWallet}
-            className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-[#E5E7EB] hover:bg-surface-container-low transition-all shadow-sm group"
-          >
-            <span className={`material-symbols-outlined text-[16px] transition-colors ${showDigitalWallet ? 'text-primary/60 group-hover:text-red-500' : 'text-emerald-500'}`}>
-              {showDigitalWallet ? 'visibility_off' : 'account_balance_wallet'}
-            </span>
-            <span className="text-[10px] font-bold text-primary opacity-80 uppercase tracking-widest">
-              {showDigitalWallet ? 'Hide Wallet' : 'Show Wallet'}
-            </span>
-          </button>
-        )}
       </section>
 
       {/* Section 1: Balance Cards Row */}
-      <section className={`grid grid-cols-1 ${showWalletCard ? 'lg:grid-cols-2' : ''} gap-8 animate-fade-in-up [animation-delay:100ms] relative z-20`}>
+      <section className="grid grid-cols-1 gap-8 animate-fade-in-up [animation-delay:100ms] relative z-20">
         {/* KES Balance Card */}
         <div data-tour="balance-card" className="bg-gradient-to-br from-[#00351D] via-[#022916] to-[#011C0F] text-white p-6 lg:p-8 rounded-[24px] shadow-[0_20px_40px_-15px_rgba(0,53,29,0.5)] relative z-20 group border border-emerald-900/50 hover:border-emerald-500/30 transition-all duration-500">
           {/* Ambient Glow */}
@@ -429,53 +379,13 @@ export default function Overview() {
             </div>
           </div>
         </div>
-
-        {/* USDC Balance Card — only after the merchant has activated their Stellar wallet */}
-        {showWalletCard && (
-          <div className="bg-gradient-to-br from-[#0A162B] via-[#050B14] to-[#02050A] text-white p-6 lg:p-8 rounded-[24px] shadow-[0_20px_40px_-15px_rgba(10,22,43,0.6)] relative z-10 group border border-blue-900/30 hover:border-blue-500/30 transition-all duration-500 animate-in fade-in zoom-in duration-500">
-            {/* Ambient Glow */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-[24px]">
-              <div className="absolute top-0 left-0 w-96 h-96 bg-blue-500/10 rounded-full -ml-20 -mt-20 blur-[80px] group-hover:scale-110 transition-transform duration-1000"></div>
-              <div className="absolute bottom-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full -mr-20 -mb-20 blur-[60px] group-hover:scale-110 transition-transform duration-1000"></div>
-            </div>
-
-            {/* Card Texture/Pattern */}
-            <div className="absolute inset-0 opacity-[0.02] pointer-events-none mix-blend-overlay rounded-[24px] overflow-hidden" style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '16px 16px' }}></div>
-            
-            {/* Glass Top Highlight */}
-            <div className="absolute top-0 inset-x-0 h-[1px] bg-gradient-to-r from-transparent via-blue-400/30 to-transparent rounded-t-[24px]"></div>
-
-            <div className="relative z-10 flex flex-col h-full">
-              <div className="flex justify-between items-start mb-8 lg:mb-10">
-                <span className="bg-[#243B5C] text-[#A6C8FF] px-3 lg:px-4 py-1.5 rounded-full text-[8px] lg:text-[9px] font-black tracking-[0.15em] uppercase border border-white/10">Business Digital wallet</span>
-                <button onClick={togglePrivacy} className="text-white/40 hover:text-white transition-colors p-1">
-                  <span className="material-symbols-outlined text-base lg:text-lg leading-none">{showAmounts ? 'visibility' : 'visibility_off'}</span>
-                </button>
-              </div>
-              <div className="flex-1">
-                <h3 className={`font-headline font-bold text-3xl lg:text-4xl tracking-tighter tabular-nums mb-2 lg:mb-3 transition-all duration-300 ${!showAmounts && 'blur-lg grayscale'}`}>
-                  {formatUSDC(merchant?.usdcBalance || 0)}
-                </h3>
-                <p className={`text-white/40 text-[9px] lg:text-[10px] font-bold tracking-tight opacity-70 uppercase transition-all duration-300 ${!showAmounts && 'blur-sm grayscale'}`}>
-                  ≈ {formatKES((merchant?.usdcBalance || 0) * liveRate)}
-                </p>
-              </div>
-              <div className="flex gap-3 lg:gap-4 mt-8">
-                <button onClick={() => navigate('/inflation-shield')} className="flex-1 py-3 px-4 bg-blue-500/10 hover:bg-blue-500/20 text-blue-100 rounded-[14px] text-[10px] font-black transition-all duration-300 border border-blue-500/20 hover:border-blue-500/40 uppercase tracking-widest leading-none flex items-center justify-center gap-2">
-                  <span className="material-symbols-outlined text-sm">currency_exchange</span>
-                  Swap
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </section>
 
       {/* Section 2: Stats Row */}
       <section className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 animate-fade-in-up [animation-delay:200ms] relative z-10">
         {[
           { label: "Today's Revenue", value: formatKES(todaysRevenue), trend: "", trendColor: "text-on-surface-variant" },
-          { label: "This Month", value: formatKES(thisMonthRevenue), trend: "", trendColor: "text-emerald-600" },
+          { label: "This Month", value: formatKES(thisMonthNetChange), trend: "", trendColor: "text-emerald-600" },
         ].map((stat, i) => (
           <div key={i} className="bg-white p-6 lg:p-8 rounded-[12px] border border-[#E5E7EB] shadow-sm editorial-shadow transition-all group">
             <div className="flex justify-between items-center mb-4 lg:mb-6">

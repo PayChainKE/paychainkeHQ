@@ -15,12 +15,6 @@ import { formatName } from '../utils/formatName';
 
 type Timeframe = '7D' | '30D' | '6M';
 
-// Platform-wide kill switch — flip to false to restore the USDC Vault card
-// and Swap quick-action once stablecoin/digital wallet features are
-// re-enabled for merchants. Mirrored in DigitalWallet.tsx and
-// InflationShield.tsx.
-const STABLECOIN_FEATURES_DISABLED = true;
-
 const DAY_NAMES = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const MONTH_NAMES = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
@@ -104,7 +98,6 @@ export default function Dashboard({ navigation }: any) {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [trustScore, setTrustScore] = useState<any>({ current: 0, eligibleForAdvance: false });
   const [approvedLimit, setApprovedLimit] = useState<number | null>(null);
-  const [liveRate, setLiveRate] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [now, setNow] = useState(new Date());
@@ -131,10 +124,9 @@ export default function Dashboard({ navigation }: any) {
   const fetchDashboardData = useCallback(async () => {
     if (!merchant) return;
     try {
-      const [txRes, scoreRes, rateRes, cashAdvRes] = await Promise.all([
+      const [txRes, scoreRes, cashAdvRes] = await Promise.all([
         api.get('/api/transactions'),
         api.get('/api/trust-score').catch(() => ({ data: { current: 0, eligibleForAdvance: false } })),
-        api.get('/api/transactions/live-rate').catch(() => null),
         api.get('/api/cash-advance/my-applications').catch(() => null),
       ]);
 
@@ -148,7 +140,6 @@ export default function Dashboard({ navigation }: any) {
       // automatically clean — see excludeReversedDuplicates' doc comment.
       setTransactions(excludeReversedDuplicates(txList));
       if (scoreRes.data) setTrustScore(scoreRes.data);
-      if (rateRes?.data?.success) setLiveRate(rateRes.data.rate);
 
       const applications = cashAdvRes?.data?.applications || [];
       const latestApproved = applications.find((a: any) => a.status === 'approved' && a.approvedLimit);
@@ -215,22 +206,6 @@ export default function Dashboard({ navigation }: any) {
   // the fee that never actually reached the merchant's balance.
   const todayTotal = todayInbound.reduce((sum, tx) => sum + Math.abs(netBalanceImpact(tx)), 0);
   const monthTotal = monthInbound.reduce((sum, tx) => sum + Math.abs(netBalanceImpact(tx)), 0);
-
-  const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const lastMonthInbound = inboundTransactions.filter((tx) => isSameMonth(new Date(tx.createdAt), lastMonthDate));
-  const lastMonthTotal = lastMonthInbound.reduce((sum, tx) => sum + Math.abs(netBalanceImpact(tx)), 0);
-  const monthOverMonthPct = lastMonthTotal > 0 ? ((monthTotal - lastMonthTotal) / lastMonthTotal) * 100 : null;
-
-  const walletActivated = !!merchant?.stellarPublicKey;
-  // Platform-wide kill switch — stablecoin/digital wallet features pulled
-  // for all merchants until further notice, regardless of each merchant's
-  // own feature flags. Flip STABLECOIN_FEATURES_DISABLED to false (see top
-  // of file) to restore, matching the web dashboard's Overview.jsx/App.jsx
-  // gating.
-  const digitalWalletEnabled = !STABLECOIN_FEATURES_DISABLED && merchant?.features?.digitalWallet === true;
-  const inflationShieldEnabled = !STABLECOIN_FEATURES_DISABLED && merchant?.features?.inflationShield === true;
-  const usdcBalance = merchant?.usdcBalance || 0;
-  const usdcInKes = liveRate != null ? usdcBalance * liveRate : null;
 
   const chartData = computeChartData(transactions);
   const activeChart = chartData[activeTimeframe];
@@ -317,11 +292,6 @@ export default function Dashboard({ navigation }: any) {
                   <Text className="text-white text-[10px] font-jakarta-bold uppercase tracking-widest">Account No: {formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'PENDING')}</Text>
                 </View>
               </View>
-              {/* Always visible regardless of the digitalWallet feature flag
-                  — unlike DigitalWallet.tsx's own Top Up modal, which is
-                  hidden behind that flag (off by default for new signups).
-                  A merchant in that state previously had no way to fund
-                  their account from the app at all. */}
               <TouchableOpacity
                 activeOpacity={0.85}
                 onPress={() => setShowFundAccount(true)}
@@ -354,17 +324,6 @@ export default function Dashboard({ navigation }: any) {
               </View>
               <Text className="text-[11px] font-jakarta-bold text-[#0c2010] uppercase tracking-widest">Pay</Text>
             </TouchableOpacity>
-
-            {inflationShieldEnabled && (
-              <TouchableOpacity className="items-center" activeOpacity={0.8} onPress={() => navigation?.navigate('InflationShield')}>
-                <View className="w-[72px] h-[72px] rounded-full bg-white shadow-lg shadow-black/10 items-center justify-center mb-2.5">
-                  <View className="w-12 h-12 rounded-full bg-[#83f5c6] items-center justify-center">
-                    <MaterialIcons name="swap-horiz" size={24} color="#00351d" />
-                  </View>
-                </View>
-                <Text className="text-[11px] font-jakarta-bold text-[#0c2010] uppercase tracking-widest">Swap</Text>
-              </TouchableOpacity>
-            )}
 
             <TouchableOpacity className="items-center" activeOpacity={0.8} onPress={() => navigation?.navigate('Advance')}>
               <View className="w-[72px] h-[72px] rounded-full bg-white shadow-lg shadow-black/10 items-center justify-center mb-2.5">
@@ -456,102 +415,6 @@ export default function Dashboard({ navigation }: any) {
               </TouchableOpacity>
             </View>
           </View>
-
-          {/* Digital Ledgers — admin-controlled, hidden by default for new signups */}
-          {digitalWalletEnabled && (
-          <View className="mb-8">
-              <View className="px-6 flex-row items-center justify-between mb-4">
-                <Text className="text-lg font-jakarta-bold text-[#0c2010]">Digital Ledgers</Text>
-                <TouchableOpacity onPress={() => navigation?.navigate('DigitalWallet')}>
-                  <Text className="text-[#006c4e] text-[11px] font-jakarta-bold uppercase tracking-widest">View All</Text>
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView
-                horizontal={true}
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ paddingLeft: 24, paddingRight: 24 }}
-                snapToInterval={296} // 280 (card) + 16 (margin)
-                decelerationRate="fast"
-                bounces={true}
-                alwaysBounceHorizontal={true}
-                overScrollMode="always"
-                className="w-full"
-              >
-                <TouchableOpacity
-                  activeOpacity={0.9}
-                  onPress={() => navigation?.navigate('DigitalWallet')}
-                  className="bg-[#0b4d2e] w-[280px] h-[160px] rounded-[32px] p-6 mr-4 relative overflow-hidden shadow-md shadow-[#0b4d2e]/30">
-                  <View className="absolute -right-8 -top-8 opacity-10">
-                    <MaterialIcons name="account-balance-wallet" size={140} color="white" />
-                  </View>
-                  <Text className="text-[#96d4ab] text-[11px] font-jakarta-bold uppercase tracking-[0.15em] mb-2">Operating Balance</Text>
-                  <PrivateValue hidden={!showAmounts} tint="dark" className="text-white text-3xl font-jakarta-extrabold tracking-tight mb-auto">
-                    {formatCurrency(merchant?.kesBalance || 0)}
-                  </PrivateValue>
-                  <View className="flex-row items-center gap-1.5 mt-4">
-                    {monthOverMonthPct != null ? (
-                      <>
-                        <Feather name={monthOverMonthPct >= 0 ? 'arrow-up' : 'arrow-down'} size={14} color="#96d4ab" />
-                        <Text className="text-[#96d4ab] text-[13px] font-jakarta-medium">
-                          {monthOverMonthPct >= 0 ? '+' : ''}{monthOverMonthPct.toFixed(1)}% vs last month
-                        </Text>
-                      </>
-                    ) : (
-                      <Text className="text-[#96d4ab] text-[13px] font-jakarta-medium">{formatCurrency(monthTotal)} collected this month</Text>
-                    )}
-                  </View>
-                </TouchableOpacity>
-
-                {walletActivated ? (
-                  <TouchableOpacity
-                    activeOpacity={0.9}
-                    onPress={() => navigation?.navigate('DigitalWallet')}
-                    className="bg-[#1e293b] w-[280px] h-[160px] rounded-[32px] p-6 mr-4 relative overflow-hidden shadow-md shadow-[#1e293b]/30"
-                  >
-                    <View className="absolute -right-4 -top-4 opacity-10">
-                      <MaterialIcons name="shield" size={100} color="white" />
-                    </View>
-                    <Text className="text-[#94a3b8] text-[11px] font-jakarta-bold uppercase tracking-[0.15em] mb-2">USDC Vault</Text>
-                    <PrivateValue hidden={!showAmounts} tint="dark" className="text-white text-3xl font-jakarta-extrabold tracking-tight mb-auto">
-                      {usdcBalance.toFixed(2)}
-                    </PrivateValue>
-                    <View className="flex-row items-center gap-1.5 mt-4">
-                      <Feather name="refresh-cw" size={14} color="#94a3b8" />
-                      {usdcInKes != null ? (
-                        <View className="flex-row items-center">
-                          <Text className="text-[#94a3b8] text-[13px] font-jakarta-medium">≈ </Text>
-                          <PrivateValue hidden={!showAmounts} tint="dark" className="text-[#94a3b8] text-[13px] font-jakarta-medium">
-                            {formatCurrency(usdcInKes)}
-                          </PrivateValue>
-                        </View>
-                      ) : (
-                        <Text className="text-[#94a3b8] text-[13px] font-jakarta-medium">Fetching rate…</Text>
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity
-                    activeOpacity={0.85}
-                    onPress={() => navigation?.navigate('DigitalWallet')}
-                    className="bg-[#0A2540] w-[280px] h-[160px] rounded-[32px] p-6 mr-4 relative overflow-hidden shadow-md shadow-[#0A2540]/30"
-                  >
-                    <View className="absolute -right-4 -top-4 opacity-10">
-                      <MaterialIcons name="shield" size={100} color="white" />
-                    </View>
-                    <Text className="text-[#93c5fd] text-[11px] font-jakarta-bold uppercase tracking-[0.15em] mb-2">USDC Vault</Text>
-                    <Text className="text-white text-[16px] font-jakarta-extrabold tracking-tight mb-auto leading-relaxed">
-                      Activate your Digital Wallet to shield revenue in USDC
-                    </Text>
-                    <View className="flex-row items-center gap-1.5 mt-4">
-                      <Text className="text-[#93c5fd] text-[13px] font-jakarta-bold uppercase tracking-widest">Activate now</Text>
-                      <Feather name="arrow-right" size={14} color="#93c5fd" />
-                    </View>
-                  </TouchableOpacity>
-                )}
-              </ScrollView>
-          </View>
-          )}
 
           {/* This Month Performance */}
           <View className="px-6 mb-8">

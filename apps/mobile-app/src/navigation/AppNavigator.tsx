@@ -9,8 +9,6 @@ import Collections from '../pages/Collections';
 import BulkPay from '../pages/BulkPay';
 import CashAdvance from '../pages/CashAdvance';
 import Profile from '../pages/Profile';
-import InflationShield from '../pages/InflationShield';
-import DigitalWallet from '../pages/DigitalWallet';
 import SendMoney from '../pages/SendMoney';
 import RequestMoney from '../pages/RequestMoney';
 import SupportPage from '../pages/SupportPage';
@@ -96,16 +94,6 @@ function MainTabs() {
             <TourTarget id="tab-more"><Feather name="grid" size={22} color={color} /></TourTarget>
           )
         }}
-      />
-      <Tab.Screen
-        name="InflationShield"
-        component={InflationShield}
-        options={{ tabBarButton: () => null, tabBarItemStyle: { flex: 0, width: 0, padding: 0 } }}
-      />
-      <Tab.Screen
-        name="DigitalWallet"
-        component={DigitalWallet}
-        options={{ tabBarButton: () => null, tabBarItemStyle: { flex: 0, width: 0, padding: 0 } }}
       />
       <Tab.Screen
         name="SendMoney"

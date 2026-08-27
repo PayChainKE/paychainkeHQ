@@ -196,8 +196,8 @@ export const simulateIncomingPayment = async (req, res) => {
 export const swapKesToUsdc = async (req, res) => {
   try {
     const { amount, direction = 'KES_TO_USDC' } = req.body;
-    
-    if (!amount || amount <= 0) {
+    const numericSwapAmount = Number(amount);
+    if (!Number.isFinite(numericSwapAmount) || numericSwapAmount <= 0) {
       return res.status(400).json({ error: 'Valid amount is required' });
     }
 
@@ -207,17 +207,34 @@ export const swapKesToUsdc = async (req, res) => {
       return res.status(404).json({ error: 'Merchant not found' });
     }
 
-    // Same server-side enforcement as activateWallet above — the client-side
-    // FeatureGuard alone doesn't stop a direct API call. This endpoint backs
-    // BOTH the Wallet page (digitalWallet) and Inflation Shield page
-    // (inflationShield), so only block when an admin has explicitly turned
-    // off both — turning off just one shouldn't silently break the other.
-    if (merchant.features && merchant.features.digitalWallet === false && merchant.features.inflationShield === false) {
-      return res.status(403).json({ error: 'This feature is not available on your account right now.' });
+    // FX swap / USDC is a demo-only feature — the merchant-dashboard and
+    // mobile-app no longer expose any Wallet/Inflation Shield UI at all (see
+    // apps/merchant-dashboard/src/App.jsx and apps/mobile-app's
+    // DigitalWallet.tsx/InflationShield.tsx, both removed); the only
+    // real-money entry point left is apps/demo, which always authenticates
+    // as one specific admin-onboarded isDemoMerchant:true account. This is
+    // the actual enforcement boundary — the old features.digitalWallet/
+    // inflationShield check alone left a real merchant reachable the moment
+    // an admin toggled either flag on via updateMerchantFeatures, since
+    // nothing tied those flags to isDemoMerchant.
+    if (!merchant.isDemoMerchant) {
+      return res.status(403).json({ error: 'This feature is not available on your account.' });
     }
 
     if (!merchant.stellarPublicKey) {
       return res.status(400).json({ error: 'No Stellar wallet configured for this merchant' });
+    }
+
+    // Same double-click/retry guard every other money-movement endpoint in
+    // this codebase uses — without it, a client retrying a slow/timed-out
+    // response could execute two real conversions instead of one. Doesn't
+    // affect balance safety on its own (each swap independently re-checks
+    // and atomically debits/credits), just prevents an unintended duplicate.
+    try {
+      await claimPayoutSubmission(merchant._id, ['swap', direction, numericSwapAmount]);
+    } catch (e) {
+      if (e instanceof DuplicateSubmissionError) return res.status(409).json({ error: e.message });
+      throw e;
     }
 
     const liveRate = await getLiveKesToUsdcRate(); // Returns USDC per 1 KES
@@ -289,7 +306,13 @@ export const swapKesToUsdc = async (req, res) => {
         return res.status(400).json({ error: 'Insufficient USDC balance' });
       }
 
-      const kesPayoutValue = amount / liveRate;
+      // Rounded to 2dp before it ever touches kesBalance, matching every
+      // other credit in the codebase — an unrounded float here would drift
+      // computeExpectedPoolBalance's aggregate (revenueSweepService.js)
+      // away from the real bank balance by fractions of a shilling per
+      // swap, invisible until it accumulates into a real reconciliation
+      // mismatch.
+      const kesPayoutValue = Math.round((amount / liveRate) * 100) / 100;
       console.log(`💱 Manual Swap: Converting ${amount} USDC to ${kesPayoutValue} KES for ${merchant.ncbaMerchantCode}`);
 
       try {
@@ -362,12 +385,12 @@ export const activateWallet = async (req, res) => {
       return res.status(404).json({ error: 'Merchant not found' });
     }
 
-    // The frontend only hides the Wallet page behind FeatureGuard when this
-    // is false — that's UI convenience, not enforcement. Without this check
-    // any merchant could call this endpoint directly regardless of whether
-    // an admin explicitly disabled digital wallet access on their account.
-    if (merchant.features && merchant.features.digitalWallet === false) {
-      return res.status(403).json({ error: 'Digital wallet is not available on your account right now.' });
+    // Demo-only — see swapKesToUsdc's matching comment above. Demo merchants
+    // normally already get a wallet auto-provisioned at creation time
+    // (adminController.js's createMerchant); this stays reachable for a
+    // demo account whose provisioning failed and needs a manual retry.
+    if (!merchant.isDemoMerchant) {
+      return res.status(403).json({ error: 'This feature is not available on your account.' });
     }
 
     if (merchant.stellarPublicKey) {
@@ -566,7 +589,15 @@ export const syncWalletBalance = async (req, res) => {
   try {
     const merchant = await Merchant.findById(req.merchant._id);
 
-    if (!merchant || !merchant.stellarPublicKey) {
+    // Demo-only — see swapKesToUsdc's matching comment above. This endpoint
+    // previously had no feature gate at all beyond requiring a
+    // stellarPublicKey, which was only an incidental block (a real merchant
+    // could never reach it in practice since nothing set stellarPublicKey
+    // for them) — explicit here so it stays true even if that changes.
+    if (!merchant || !merchant.isDemoMerchant) {
+      return res.status(403).json({ error: 'This feature is not available on your account.' });
+    }
+    if (!merchant.stellarPublicKey) {
       return res.status(400).json({ error: 'Digital Wallet not activated' });
     }
 

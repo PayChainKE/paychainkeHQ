@@ -1,6 +1,6 @@
 // Single source of truth for "is this transaction money coming in or going
 // out" — used everywhere a transaction's amount, sign, or color is
-// rendered (Dashboard, Collections, Transactions, DigitalWallet) so real
+// rendered (Dashboard, Collections, Transactions) so real
 // NCBA-routed transactions (ncba_inbound/ncba_outbound — the type actual
 // live NCBA virtual account payments use, not just the legacy 'inbound'/
 // 'outbound') are classified the same way everywhere. Mirrors

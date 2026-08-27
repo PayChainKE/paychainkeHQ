@@ -9,11 +9,7 @@ import api from '../api/config';
 
 // Mirrors the merchant-dashboard's FundAccountModal.jsx exactly — same
 // three funding methods, same endpoints, same copy — so a merchant sees
-// the identical flow on either app. Always reachable from Dashboard.tsx
-// (unlike DigitalWallet.tsx's own Top Up modal, which is hidden behind the
-// digitalWallet feature flag that's off by default for new signups — a
-// merchant in that state previously had NO way to fund their account from
-// the app at all).
+// the identical flow on either app.
 
 type FundingMethod = 'mobile' | 'bank' | 'paybill';
 
