@@ -70,6 +70,20 @@ export const initiateSTKPush = async (req, res) => {
     const kind = purpose === 'request_money' ? 'request_money' : 'topup';
     const checkoutTotal = getCheckoutTotal(intAmount);
 
+    // Same double-submission guard used by every payout endpoint — a
+    // double-click or a client retry (previously also provoked by the STK
+    // "failed" false-negative this function used to produce even after a
+    // real send, since a merchant naturally retries what looks like a
+    // failure) sending the exact same STK Push twice within a few seconds
+    // otherwise means the customer gets prompted, and possibly pays, twice
+    // for one intended payment.
+    try {
+      await claimPayoutSubmission(merchantId, ['stk-push', formattedPhone, intAmount, kind]);
+    } catch (e) {
+      if (e instanceof DuplicateSubmissionError) return res.status(409).json({ error: e.message });
+      throw e;
+    }
+
     // Request Money is the one STK flow where the customer never lands on
     // any PayChain page first — Payment Links / Pay Account already show
     // the fee breakdown on-screen before the customer submits, but here the
