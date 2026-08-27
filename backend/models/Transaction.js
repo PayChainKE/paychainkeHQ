@@ -138,6 +138,22 @@ const transactionSchema = new mongoose.Schema({
 // and `new Transaction().save()`. We re-stamp on amount/type change because
 // admins may correct a transaction before it's finalised, but never re-stamp
 // once the doc is saved (`isNew` guard) so historical fees stay immutable.
+//
+// This hook cannot tell a real revenue-generating transaction apart from a
+// manually-inserted ledger correction (e.g. a REVERSAL-* entry undoing a
+// duplicate credit — see the 2026-08-27 incident) — it prices purely off
+// type + amount, unconditionally. A manual correction created via
+// Transaction.create()/insertMany WILL get auto-stamped a nonzero
+// paychainFee/safaricomFee/revenueStream here even though no real fee was
+// ever collected, and every revenue aggregation in this codebase
+// (backend/controllers/revenueController.js, backend/services/
+// revenueSweepService.js's computeUnsweptRevenue — which decides how much
+// REAL money the weekly sweep transfers out of the pooled NCBA account)
+// sums directly off these persisted fields. Any script that inserts a
+// correction/reversal Transaction MUST explicitly zero paychainFee,
+// safaricomFee, and revenueStream in a follow-up update — this hook will
+// not do it for you, and skipping it silently inflates PayChain's reported
+// revenue with money that includes real merchant balance.
 transactionSchema.pre('save', function() {
   if (this.isNew || this.isModified('amount') || this.isModified('kesAmount') || this.isModified('type')) {
     const basis = this.kesAmount > 0 ? this.kesAmount : this.amount;

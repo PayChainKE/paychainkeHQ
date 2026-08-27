@@ -253,6 +253,17 @@ export const createInvoice = async (req, res) => {
       return res.status(400).json({ error: 'Customer name is required.' });
     }
 
+    // Mirrors etimsController.js's own eligibility check — the merchant-
+    // dashboard invoice form only shows the Buyer KRA PIN field at all once
+    // a merchant is eTIMS-eligible (a verified KRA PIN on file), so this can
+    // only ever reject a submission from a merchant who could see and fill
+    // in that field. KRA's electronic tax invoice requires the buyer's PIN
+    // once the seller is registered for eTIMS — this can no longer be
+    // skipped just by leaving the field blank.
+    if (req.merchant.kraPin && req.merchant.isKRAVerified && !customer?.kraPin?.trim()) {
+      return res.status(400).json({ error: 'Buyer KRA PIN is required for electronic tax invoices.' });
+    }
+
     // Reuse a number already reserved via /next-number (so the number shown
     // in the editor matches what actually gets saved); otherwise allocate
     // a fresh one from the same global counter.
@@ -306,6 +317,10 @@ export const updateInvoice = async (req, res) => {
 
     if (customer) {
       if (!customer.name?.trim()) return res.status(400).json({ error: 'Customer name is required.' });
+      // See createInvoice's identical check above.
+      if (req.merchant.kraPin && req.merchant.isKRAVerified && !customer.kraPin?.trim()) {
+        return res.status(400).json({ error: 'Buyer KRA PIN is required for electronic tax invoices.' });
+      }
       invoice.customer = sanitizeCustomer(customer);
     }
     if (items) invoice.items = sanitizeItems(items);

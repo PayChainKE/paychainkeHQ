@@ -44,6 +44,14 @@ export const createDeveloperInvoice = async (req, res) => {
       return res.status(400).json({ error: 'customer.name is required.' });
     }
 
+    // Mirrors invoiceController.js's createInvoice — see its identical
+    // check for why this only ever rejects a merchant who's actually
+    // eTIMS-eligible (a verified KRA PIN on file).
+    const linkedMerchant = await Merchant.findById(merchantId).select('kraPin isKRAVerified');
+    if (linkedMerchant?.kraPin && linkedMerchant?.isKRAVerified && !customer.kraPin?.trim()) {
+      return res.status(400).json({ error: 'customer.kraPin is required for electronic tax invoices.' });
+    }
+
     const invoice = await Invoice.create({
       merchantId,
       invoiceNumber: await getNextInvoiceNumber(),

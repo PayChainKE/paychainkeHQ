@@ -7,7 +7,7 @@ import { formatAccountNumber } from '../utils/formatAccountNumber'
 import { formatTxDate, formatTxTime } from '../utils/formatDate'
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay'
 import { formatName } from '../utils/formatName'
-import { getAmountSign, getAmountColorClassWithHover, isCreditTransaction, isDebitTransaction, isSwapTransaction } from '../utils/transactionDirection'
+import { getAmountSign, getAmountColorClassWithHover, isCreditTransaction, isDebitTransaction, isSwapTransaction, netBalanceImpact, excludeReversedDuplicates } from '../utils/transactionDirection'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { useNavigate } from 'react-router-dom'
@@ -113,15 +113,25 @@ export default function Overview() {
   const monthAgo = new Date(today)
   monthAgo.setMonth(today.getMonth() - 1)
 
-  const todaysRevenue = liveTransactions
-    .filter(t => isCreditTransaction(t.type) && new Date(t.createdAt) >= today)
-    .reduce((s, t) => s + (t.kesAmount || t.amount || 0), 0)
+  // Drops any duplicate-credit + its correction entry as a matched pair —
+  // see excludeReversedDuplicates' doc comment. Without this, a reversed
+  // fake credit (see backend/services/ncbaLedgerService.js) still shows up
+  // as real revenue here even after it's been corrected in the ledger.
+  const realTransactions = excludeReversedDuplicates(liveTransactions)
 
-  const thisMonthRevenue = liveTransactions
-    .filter(t => isCreditTransaction(t.type) && new Date(t.createdAt) >= monthAgo)
-    .reduce((s, t) => s + (t.kesAmount || t.amount || 0), 0)
+  // netBalanceImpact (not the raw amount field) — a raw sum counts a
+  // failed/pending transaction as real revenue, and overstates ncba_inbound
+  // rows by the fee NCBA's gross report includes but that never actually
+  // credited kesBalance. See its doc comment (utils/transactionDirection.js).
+  const todaysRevenue = realTransactions
+    .filter(t => new Date(t.createdAt) >= today)
+    .reduce((s, t) => { const d = netBalanceImpact(t); return d > 0 ? s + d : s }, 0)
 
-  const recentTx = [...liveTransactions]
+  const thisMonthRevenue = realTransactions
+    .filter(t => new Date(t.createdAt) >= monthAgo)
+    .reduce((s, t) => { const d = netBalanceImpact(t); return d > 0 ? s + d : s }, 0)
+
+  const recentTx = [...realTransactions]
     .sort((a, b) => new Date(b.createdAt || b.timestamp) - new Date(a.createdAt || a.timestamp))
     .slice(0, 5)
 
@@ -130,13 +140,18 @@ export default function Overview() {
   // app (transactionDirection.js) so real NCBA-routed transactions
   // (ncba_inbound/ncba_outbound) are counted here too, not just 'inbound'.
   const generateChartData = () => {
-    const inboundTxs = liveTransactions.filter(t => isCreditTransaction(t.type));
-    const outboundTxs = liveTransactions.filter(t => isDebitTransaction(t.type));
+    const inboundTxs = realTransactions.filter(t => isCreditTransaction(t.type));
+    const outboundTxs = realTransactions.filter(t => isDebitTransaction(t.type));
     const now = new Date();
 
+    // Math.abs(netBalanceImpact(t)) instead of the raw amount field — txs is
+    // already filtered to inboundTxs/outboundTxs (by type) above, so the
+    // sign is already known; this just corrects the magnitude for
+    // unsettled rows and the NCBA gross/fee mismatch (see netBalanceImpact's
+    // doc comment in utils/transactionDirection.js).
     const sumFor = (txs, matches) => txs
       .filter(matches)
-      .reduce((sum, t) => sum + (t.kesAmount || t.amount || 0), 0);
+      .reduce((sum, t) => sum + Math.abs(netBalanceImpact(t)), 0);
 
     // Helper to format date
     const getDayName = (date) => ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][date.getDay()];
@@ -170,7 +185,7 @@ export default function Overview() {
           const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
           const weekIndex = 3 - Math.floor(diffDays / 7);
           if (weekIndex >= 0 && weekIndex < 4) {
-            bucket[weekIndex] += (t.kesAmount || t.amount || 0);
+            bucket[weekIndex] += Math.abs(netBalanceImpact(t));
           }
         }
       });

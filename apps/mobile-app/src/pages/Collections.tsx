@@ -9,7 +9,7 @@ import * as Sharing from 'expo-sharing';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/config';
 import TopBar from '../components/layout/TopBar';
-import { isCreditTransaction as isInboundType, isDebitTransaction as isOutboundType, typeLabel as txTypeLabel } from '../utils/transactionDirection';
+import { isCreditTransaction as isInboundType, isDebitTransaction as isOutboundType, typeLabel as txTypeLabel, netBalanceImpact, excludeReversedDuplicates } from '../utils/transactionDirection';
 import { formatAccountNumber } from '../utils/formatAccountNumber';
 import { buildAuditReceiptHtml } from '../utils/auditReceiptHtml';
 import { formatName } from '../utils/formatName';
@@ -33,6 +33,8 @@ type Tx = {
   kesAmount: number;
   usdcAmount: number;
   currency: string;
+  paychainFee?: number;
+  safaricomFee?: number;
   reference: string;
   sender?: { name?: string; id?: string };
   recipient?: { name?: string; id?: string };
@@ -138,7 +140,10 @@ export default function Collections() {
         : Array.isArray(res.data?.transactions)
         ? res.data.transactions
         : [];
-      setTransactions(list);
+      // Drops any duplicate-credit + its correction entry as a matched pair
+      // at the source, so every downstream stat/statement in this file is
+      // automatically clean — see excludeReversedDuplicates' doc comment.
+      setTransactions(excludeReversedDuplicates(list));
     } catch (error) {
       console.error('Error fetching collections', error);
       setTransactions([]);
@@ -278,7 +283,13 @@ export default function Collections() {
         return d >= start && d <= end;
       });
     };
-    const sum = (arr: Tx[]) => arr.reduce((acc, tx) => acc + kesValue(tx), 0);
+    // Math.abs(netBalanceImpact(t)) instead of kesValue(t) — arr is already
+    // filtered to inbound (credit) types above, so this only corrects the
+    // magnitude for unsettled rows and the NCBA gross/fee mismatch (see
+    // netBalanceImpact's doc comment in utils/transactionDirection.ts). A
+    // raw kesValue sum counted a failed/pending row as real revenue and
+    // overstated ncba_inbound rows by a fee that never reached the balance.
+    const sum = (arr: Tx[]) => arr.reduce((acc, tx) => acc + Math.abs(netBalanceImpact(tx)), 0);
     const todayTxs = inRange('today');
     const weekTxs = inRange('week');
     const monthTxs = inRange('month');
@@ -315,9 +326,11 @@ export default function Collections() {
     const inbound = periodTxs.filter((t) => isInboundType(t.type));
     const outbound = periodTxs.filter((t) => isOutboundType(t.type));
     const swaps = periodTxs.filter((t) => t.type === 'fx_swap');
-    const inboundTotal = inbound.reduce((a, t) => a + kesValue(t), 0);
-    const outboundTotal = outbound.reduce((a, t) => a + kesValue(t), 0);
-    const swapKesTotal = swaps.reduce((a, t) => a + kesValue(t), 0);
+    // Math.abs(netBalanceImpact(t)) instead of kesValue(t) — see the stats
+    // block's identical comment above.
+    const inboundTotal = inbound.reduce((a, t) => a + Math.abs(netBalanceImpact(t)), 0);
+    const outboundTotal = outbound.reduce((a, t) => a + Math.abs(netBalanceImpact(t)), 0);
+    const swapKesTotal = swaps.reduce((a, t) => a + Math.abs(netBalanceImpact(t)), 0);
     const swapUsdcTotal = swaps.reduce((a, t) => a + (t.usdcAmount || 0), 0);
     const net = inboundTotal - outboundTotal;
 

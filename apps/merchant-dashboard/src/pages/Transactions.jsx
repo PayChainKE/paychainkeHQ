@@ -10,7 +10,7 @@ import { formatAccountNumber } from '../utils/formatAccountNumber'
 import { formatPhoneDisplay, formatPhoneOrDash } from '../utils/formatPhoneDisplay'
 import { formatName } from '../utils/formatName'
 import { drawBarcodePdf } from '../utils/barcode'
-import { getAmountSign, getAmountColorClass, isCreditTransaction, isDebitTransaction, isSettledStatus } from '../utils/transactionDirection'
+import { getAmountSign, getAmountColorClass, isCreditTransaction, isDebitTransaction, netBalanceImpact, excludeReversedDuplicates } from '../utils/transactionDirection'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useNotification } from '../context/NotificationContext'
 import logo from '../assets/logo2.png'
@@ -39,7 +39,11 @@ export default function Transactions() {
       const res = await axios.get(`${API_URL}/api/transactions`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setLiveTransactions(res.data);
+      // Drops any duplicate-credit + its correction entry as a matched pair
+      // at the source, so every downstream total/statement/table in this
+      // file is automatically clean — see excludeReversedDuplicates' doc
+      // comment (utils/transactionDirection.js).
+      setLiveTransactions(excludeReversedDuplicates(res.data));
     } catch (err) {
       console.error('Failed to load transactions', err);
       setLiveTransactions([]);
@@ -259,13 +263,15 @@ export default function Transactions() {
     })
 
     // ── SUMMARY STRIP ────────────────────────────────────────────────────────
-    // Only 'completed'/'verified' rows ever actually moved money — a
-    // 'failed' payout gets refunded and a 'pending' one hasn't landed yet
-    // (see isSettledStatus's doc comment). Counting them here is what made
+    // netBalanceImpact (not the raw amount field) both filters to
+    // 'completed'/'verified' rows AND corrects for the NCBA types that don't
+    // store the true balance-moving figure (ncba_inbound stores the gross
+    // pre-fee amount; the NCBA payout types store principal only, excluding
+    // their fee) — see its doc comment. Skipping either check is what made
     // Total Money In/Out (and the running BALANCE column below) diverge from
     // the merchant's real account balance.
-    const totalIn   = rows.filter(t => isCreditTransaction(t.type) && isSettledStatus(t.status)).reduce((s, o) => s + (o.kesAmount || o.amount || 0), 0)
-    const totalOut  = rows.filter(t => isDebitTransaction(t.type) && isSettledStatus(t.status)).reduce((s, o) => s + (o.kesAmount || o.amount || 0), 0)
+    const totalIn   = rows.reduce((s, t) => { const d = netBalanceImpact(t); return d > 0 ? s + d : s }, 0)
+    const totalOut  = rows.reduce((s, t) => { const d = netBalanceImpact(t); return d < 0 ? s - d : s }, 0)
     const fmtKES    = (n) => formatKES(n)
     const fmtNum    = (n) => Number(n).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
@@ -275,17 +281,11 @@ export default function Transactions() {
     // merchant's actual account balance. Work backwards from that real,
     // authoritative balance (merchant.kesBalance) by undoing every
     // transaction that happened after this period ended.
-    const signedKesDelta = (t) => {
-      if (!isSettledStatus(t.status)) return 0 // never actually moved money
-      if (isCreditTransaction(t.type)) return (t.kesAmount || t.amount || 0)
-      if (t.type === 'fx_swap') return -(t.kesAmount || 0)
-      return -(t.kesAmount || t.amount || 0) // debit
-    }
-    const netChangeWithinPeriod = rows.reduce((s, t) => s + signedKesDelta(t), 0)
+    const netChangeWithinPeriod = rows.reduce((s, t) => s + netBalanceImpact(t), 0)
     const netChangeAfterPeriod = periodEnd
       ? liveTransactions
           .filter(t => new Date(t.createdAt || t.timestamp) > periodEnd)
-          .reduce((s, t) => s + signedKesDelta(t), 0)
+          .reduce((s, t) => s + netBalanceImpact(t), 0)
       : 0
     const openingBalance = (merchant?.kesBalance || 0) - netChangeWithinPeriod - netChangeAfterPeriod
 
@@ -331,15 +331,19 @@ export default function Transactions() {
         const isSwp = tx.type === 'fx_swap'
         const rawAmt = tx.amount || tx.kesAmount || 0
 
-        // The amount still displays either way (a merchant reviewing a
-        // failed payout needs to see what was attempted) — only the running
-        // BALANCE column, which must track the real account balance, skips
-        // rows that never actually settled (see isSettledStatus above).
-        const settled = isSettledStatus(tx.status)
+        // PAID IN/OUT still shows the row's own face amount either way (a
+        // merchant reviewing a failed payout needs to see what was
+        // attempted, and a completed NCBA row should show what the customer
+        // actually paid / what the recipient actually received) — only the
+        // running BALANCE column uses netBalanceImpact, since that's the
+        // only figure guaranteed to match what really happened to the
+        // account balance (zero for unsettled rows, fee-corrected for the
+        // NCBA types that don't store the true balance-moving amount).
         let paidIn = '', paidOut = ''
-        if (isIn)  { paidIn  = fmtNum(rawAmt); if (settled) runBalance += rawAmt }
-        if (isOut) { paidOut = fmtNum(rawAmt); if (settled) runBalance -= rawAmt }
-        if (isSwp) { paidOut = fmtNum(tx.kesAmount || 0); if (settled) runBalance -= (tx.kesAmount || 0) }
+        if (isIn)  paidIn  = fmtNum(rawAmt)
+        if (isOut) paidOut = fmtNum(rawAmt)
+        if (isSwp) paidOut = fmtNum(tx.kesAmount || 0)
+        runBalance += netBalanceImpact(tx)
 
         // Standard PDF Helvetica has no glyph for "→" — it renders as garbage.
         // Use a plain ASCII arrow here (the on-screen UI still uses the real one).

@@ -74,6 +74,15 @@ export default function SpotlightTour({
     if (!step.target) {
       setRect(null)
       setTargetMissing(false)
+      // Every other branch below eventually calls setEntered(true) once it
+      // has something to show (a measured target, or the target-missing
+      // fallback) — this targetless branch never did, so a step with no
+      // `target` (e.g. MerchantWalkthrough's "Welcome to PayChain" step 0,
+      // shown right after signup) left the card permanently opacity-0 while
+      // the full-screen dark+blurred backdrop above still painted, with no
+      // visible card and no way to dismiss it. Confirmed live: this is the
+      // "app goes blurry after registration" report.
+      setEntered(true)
       return
     }
 
@@ -160,8 +169,12 @@ export default function SpotlightTour({
     <div className="fixed inset-0 z-[999]">
       {/* Backdrop — dark PayChain-green tint rather than plain black, and a
           soft blur so the highlighted element still reads as "the same app"
-          rather than a jarring modal takeover. */}
-      <div className="absolute inset-0 bg-[#03110b]/78 backdrop-blur-[2px] transition-opacity duration-300" />
+          rather than a jarring modal takeover. Click-to-dismiss is a safety
+          net, not the primary way out (Skip/Next are) — a future rendering
+          bug that leaves the card invisible (see the targetless-step fix
+          above) would otherwise leave the whole app blurred with no
+          recovery path at all. */}
+      <div className="absolute inset-0 bg-[#03110b]/78 backdrop-blur-[2px] transition-opacity duration-300" onClick={skip} />
 
       {showSpotlight && (
         <SpotlightRing rect={rect} entered={entered} />

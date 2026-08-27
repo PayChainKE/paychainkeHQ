@@ -1,4 +1,4 @@
-import { isCreditTransaction, isDebitTransaction, isSettledStatus } from './transactionDirection';
+import { isCreditTransaction, isDebitTransaction, netBalanceImpact } from './transactionDirection';
 import { formatAccountNumber } from './formatAccountNumber';
 import { formatName } from './formatName';
 
@@ -15,6 +15,8 @@ export type StatementTx = {
   amount?: number;
   kesAmount?: number;
   usdcAmount?: number;
+  paychainFee?: number;
+  safaricomFee?: number;
   createdAt: string;
   timestamp?: string;
   sender?: { name?: string; id?: string };
@@ -34,13 +36,6 @@ const esc = (s: any) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&l
 const fmtKES = (n: number) => `Ksh ${Number(n).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmtNum = (n: number) => Number(n).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-const signedKesDelta = (t: StatementTx) => {
-  if (!isSettledStatus(t.status)) return 0; // never actually moved money — see isSettledStatus
-  if (isCreditTransaction(t.type as any)) return t.kesAmount || t.amount || 0;
-  if (t.type === 'fx_swap') return -(t.kesAmount || 0);
-  return -(t.kesAmount || t.amount || 0);
-};
-
 export function buildStatementHtml({
   rows,
   allTransactions,
@@ -59,14 +54,14 @@ export function buildStatementHtml({
   const now = new Date();
   const statementId = `PC-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 
-  const netChangeWithinPeriod = rows.reduce((s, t) => s + signedKesDelta(t), 0);
+  const netChangeWithinPeriod = rows.reduce((s, t) => s + netBalanceImpact(t), 0);
   const netChangeAfterPeriod = periodEnd
-    ? allTransactions.filter((t) => new Date(t.createdAt || t.timestamp || 0) > periodEnd).reduce((s, t) => s + signedKesDelta(t), 0)
+    ? allTransactions.filter((t) => new Date(t.createdAt || t.timestamp || 0) > periodEnd).reduce((s, t) => s + netBalanceImpact(t), 0)
     : 0;
   const openingBalance = currentBalance - netChangeWithinPeriod - netChangeAfterPeriod;
 
-  const totalIn = rows.filter((t) => isCreditTransaction(t.type as any) && isSettledStatus(t.status)).reduce((s, o) => s + (o.kesAmount || o.amount || 0), 0);
-  const totalOut = rows.filter((t) => isDebitTransaction(t.type as any) && isSettledStatus(t.status)).reduce((s, o) => s + (o.kesAmount || o.amount || 0), 0);
+  const totalIn = rows.reduce((s, t) => { const d = netBalanceImpact(t); return d > 0 ? s + d : s; }, 0);
+  const totalOut = rows.reduce((s, t) => { const d = netBalanceImpact(t); return d < 0 ? s - d : s; }, 0);
 
   let runBalance = openingBalance;
   const sorted = [...rows].sort((a, b) => new Date(a.createdAt || a.timestamp || 0).getTime() - new Date(b.createdAt || b.timestamp || 0).getTime());
@@ -80,14 +75,17 @@ export function buildStatementHtml({
     const isSwap = tx.type === 'fx_swap';
     const rawAmt = tx.amount || tx.kesAmount || 0;
 
-    // Amount still displays either way (a failed payout should still be
-    // visible) — only the running balance, which must track the real
-    // account balance, skips rows that never actually settled.
-    const settled = isSettledStatus(tx.status);
+    // PAID IN/OUT still shows the row's own face amount either way (a
+    // failed payout should still be visible, and a completed NCBA row
+    // should show what the customer actually paid / recipient actually
+    // received) — only the running balance uses netBalanceImpact, since
+    // that's the only figure guaranteed to match what really happened to
+    // the account balance.
     let paidIn = '', paidOut = '';
-    if (isIn) { paidIn = fmtNum(rawAmt); if (settled) runBalance += rawAmt; }
-    if (isOut) { paidOut = fmtNum(rawAmt); if (settled) runBalance -= rawAmt; }
-    if (isSwap) { paidOut = fmtNum(tx.kesAmount || 0); if (settled) runBalance -= (tx.kesAmount || 0); }
+    if (isIn) paidIn = fmtNum(rawAmt);
+    if (isOut) paidOut = fmtNum(rawAmt);
+    if (isSwap) paidOut = fmtNum(tx.kesAmount || 0);
+    runBalance += netBalanceImpact(tx);
 
     const desc = isSwap
       ? `FX Swap → ${tx.usdcAmount || 0} USDC`

@@ -8,7 +8,7 @@ import * as Sharing from 'expo-sharing';
 import api from '../api/config';
 import TopBar from '../components/layout/TopBar';
 import { useAuth } from '../context/AuthContext';
-import { isCreditTransaction, isDebitTransaction, typeLabel as txTypeLabel } from '../utils/transactionDirection';
+import { isCreditTransaction, isDebitTransaction, typeLabel as txTypeLabel, netBalanceImpact, excludeReversedDuplicates } from '../utils/transactionDirection';
 import { formatTxDate, formatTxTime } from '../utils/formatDate';
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay';
 import { buildAuditReceiptHtml } from '../utils/auditReceiptHtml';
@@ -101,11 +101,14 @@ export default function Transactions({ navigation }: any) {
   const fetchTransactions = useCallback(async () => {
     try {
       const res = await api.get('/api/transactions');
+      // Drops any duplicate-credit + its correction entry as a matched pair
+      // at the source, so every downstream stat in this file is
+      // automatically clean — see excludeReversedDuplicates' doc comment.
       if (res.data.success) {
-        setTransactions(res.data.transactions || []);
+        setTransactions(excludeReversedDuplicates(res.data.transactions || []));
       } else if (Array.isArray(res.data)) {
         // Fallback: some endpoints return array directly
-        setTransactions(res.data);
+        setTransactions(excludeReversedDuplicates(res.data));
       }
     } catch (error) {
       console.error('Error fetching transactions', error);
@@ -137,7 +140,14 @@ export default function Transactions({ navigation }: any) {
   const weekStart = new Date(todayStart); weekStart.setDate(todayStart.getDate() - 7);
   const monthStart = new Date(todayStart); monthStart.setMonth(todayStart.getMonth() - 1);
 
-  const getAmt = (t: any) => t.kesAmount || t.amount || 0;
+  // Math.abs(netBalanceImpact(t)) instead of the raw amount field —
+  // inboundTxs is already filtered to credit types above, so this only
+  // corrects the magnitude for unsettled rows and the NCBA gross/fee
+  // mismatch (see netBalanceImpact's doc comment in
+  // utils/transactionDirection.ts). A raw sum counted a failed/pending row
+  // as real revenue and overstated ncba_inbound rows by a fee that never
+  // actually reached the merchant's balance.
+  const getAmt = (t: any) => Math.abs(netBalanceImpact(t));
 
   const stats = {
     today:   inboundTxs.filter(t => new Date(t.createdAt || t.timestamp) >= todayStart).reduce((s, t) => s + getAmt(t), 0),

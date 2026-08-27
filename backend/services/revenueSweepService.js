@@ -5,6 +5,7 @@ import Admin from '../models/Admin.js';
 import { submitNcbaBankTransfer } from '../controllers/ncbaOpenBankingController.js';
 import { sendRevenueSweepNotification } from '../utils/resend.js';
 import { LIVE_DATA_CUTOFF } from '../config/liveDataCutoff.js';
+import { reversedTransactionExclusionMatch } from '../utils/reversedTransactions.js';
 
 // NCBA PesaLink's own per-transfer ceiling (services/ncbaOpenBankingService.js).
 // A single week's accrued fees are extremely unlikely to hit this at
@@ -82,9 +83,14 @@ function logEvent(level, event, fields) {
 // it still owes — the shortfall just carries forward automatically into
 // the next computation instead of needing its own retry bookkeeping.
 async function computeUnsweptRevenue() {
+  // See reversedTransactionExclusionMatch's doc comment — a duplicate
+  // credit and its correction entry must never contribute to what this
+  // function decides to physically transfer out of the pooled NCBA
+  // account, regardless of what their fee fields happen to say.
+  const excludeReversed = await reversedTransactionExclusionMatch();
   const [accruedAgg, sweptAgg] = await Promise.all([
     Transaction.aggregate([
-      { $match: { createdAt: { $gte: LIVE_DATA_CUTOFF }, status: { $in: ['completed', 'verified'] } } },
+      { $match: { createdAt: { $gte: LIVE_DATA_CUTOFF }, status: { $in: ['completed', 'verified'] }, ...excludeReversed } },
       { $group: { _id: null, total: { $sum: '$paychainFee' }, count: { $sum: 1 } } },
     ]),
     RevenueSweep.aggregate([

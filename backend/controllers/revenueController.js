@@ -6,6 +6,7 @@ import { REVENUE_STREAMS, SAFARICOM_TARIFF } from '../config/revenueRateCard.js'
 import { LIVE_DATA_CUTOFF } from '../config/liveDataCutoff.js';
 import { runRevenueSweep, REVENUE_SWEEP_DESTINATION } from '../services/revenueSweepService.js';
 import { recordReconciliation } from '../services/reconciliationService.js';
+import { reversedTransactionExclusionMatch } from '../utils/reversedTransactions.js';
 import { logAudit } from '../utils/auditLog.js';
 import { adminActor } from './adminController.js';
 
@@ -98,11 +99,16 @@ const KES_BASIS = {
 // summing it here can never diverge from what actually got charged.
 const FEE_EXPR = { $ifNull: ['$paychainFee', 0] };
 
-function streamMatch(stream, since) {
+// excludeReversed: see reversedTransactionExclusionMatch's doc comment —
+// a duplicate credit and its correction entry must never count as PayChain
+// revenue anywhere on this dashboard, regardless of what their fee fields
+// happen to say.
+function streamMatch(stream, since, excludeReversed) {
   return {
     type:   { $in: stream.txTypes },
     status: { $in: stream.statuses },
     createdAt: { $gte: since },
+    ...excludeReversed,
   };
 }
 
@@ -117,6 +123,7 @@ export const getRevenue = async (req, res) => {
     const range = RANGES.includes(req.query.range) ? req.query.range : '30d';
     const { since, prevSince } = resolveWindow(range);
     const fmt = bucketFormat(range);
+    const excludeReversed = await reversedTransactionExclusionMatch();
 
     // ─── Per-stream aggregates (current + previous period) ─────────────
     const streamJobs = REVENUE_STREAMS.map(async (stream) => {
@@ -126,7 +133,7 @@ export const getRevenue = async (req, res) => {
       }
       const [cur, prv] = await Promise.all([
         Transaction.aggregate([
-          { $match: streamMatch(stream, since) },
+          { $match: streamMatch(stream, since, excludeReversed) },
           {
             $group: {
               _id: null,
@@ -137,7 +144,7 @@ export const getRevenue = async (req, res) => {
           },
         ]),
         Transaction.aggregate([
-          { $match: { ...streamMatch(stream, prevSince), createdAt: { $gte: prevSince, $lt: since } } },
+          { $match: { ...streamMatch(stream, prevSince, excludeReversed), createdAt: { $gte: prevSince, $lt: since } } },
           { $group: { _id: null, revenue: { $sum: FEE_EXPR }, volume: { $sum: KES_BASIS } } },
         ]),
       ]);
@@ -169,6 +176,7 @@ export const getRevenue = async (req, res) => {
           createdAt: { $gte: since },
           status: { $in: ['completed', 'verified'] },
           type: { $in: REVENUE_STREAMS.flatMap((s) => s.txTypes) },
+          ...excludeReversed,
         },
       },
       {
@@ -232,6 +240,7 @@ export const getRevenue = async (req, res) => {
           status: { $in: ['completed', 'verified'] },
           type: { $in: REVENUE_STREAMS.flatMap((s) => s.txTypes) },
           merchantId: { $ne: null },
+          ...excludeReversed,
         },
       },
       {
@@ -320,6 +329,7 @@ export const getRevenue = async (req, res) => {
             createdAt: { $gte: since },
             type: { $in: passthroughTypes },
             status: { $in: ['completed', 'verified'] },
+            ...excludeReversed,
           },
         },
         {
@@ -340,6 +350,7 @@ export const getRevenue = async (req, res) => {
             createdAt: { $gte: prevSince, $lt: since },
             type: { $in: passthroughTypes },
             status: { $in: ['completed', 'verified'] },
+            ...excludeReversed,
           },
         },
         {
@@ -368,6 +379,7 @@ export const getRevenue = async (req, res) => {
           createdAt: { $gte: since },
           status: { $in: ['completed', 'verified'] },
           type: { $in: Object.keys(TYPE_TO_CHANNEL) },
+          ...excludeReversed,
         },
       },
       {
@@ -424,6 +436,7 @@ export const getRevenue = async (req, res) => {
           createdAt: { $gte: since },
           status: { $in: ['completed', 'verified'] },
           paychainFee: { $gt: 0 },
+          ...excludeReversed,
         },
       },
       {
