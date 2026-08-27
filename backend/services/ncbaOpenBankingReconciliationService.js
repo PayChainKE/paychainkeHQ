@@ -1,5 +1,4 @@
 import Transaction from '../models/Transaction.js';
-import { resolvePendingOpenBankingTransaction } from '../controllers/ncbaOpenBankingController.js';
 
 // NCBA Open Banking's async rails (Mobile B2W, Lipa na M-Pesa, KPLC/NCWSC
 // bill payments) are documented as resolving "via a later callback" to
@@ -24,31 +23,57 @@ function logEvent(level, event, fields) {
 }
 
 // Finds Open Banking async-rail Transactions still 'pending' long after
-// submission and resolves each one as failed (refund + notify + SMS),
-// via the exact same code path a real FAILED callback would drive. Safe
-// to run repeatedly and concurrently with real callbacks arriving —
-// resolvePendingOpenBankingTransaction's atomic {status:'pending'} claim
-// means whichever one (a genuine late callback or this sweep) gets there
-// first wins, and the other is a no-op.
+// submission and flags each one for manual review — it does NOT auto-refund
+// them. Auto-refunding on a bare timeout used to be this sweep's job (via
+// resolvePendingOpenBankingTransaction({succeeded:false})), but that's only
+// safe if silence reliably means "never landed." It doesn't: NCBA's
+// TransactionStatusQuery endpoint — the only way to actually ask NCBA
+// "did this land?" — is confirmed broken in production (see
+// scripts/probe-ncba-transaction-status-query.js and
+// scripts/probe-ncba-endpoint-matrix.js), and NCBA's own callback has
+// separately been observed to just never arrive for real payouts that DID
+// land. Auto-refunding under those conditions risks paying the merchant
+// back for a transfer that actually went through — a real shortfall in the
+// pooled account that wouldn't surface until the next manual bank
+// reconciliation. So instead this only marks the Transaction with
+// pendingReason:'stuck_timeout_needs_manual_review' and logs loudly; an
+// admin resolves it by hand after checking NCBA's portal directly (the same
+// manual process already used for pool-balance reconciliation), via
+// resolvePendingOpenBankingTransaction — status stays 'pending' and the
+// merchant's ledger balance is untouched until then.
+//
+// Safe to run repeatedly and concurrently with real callbacks arriving —
+// the atomic {status:'pending'} filter on the flagging update means a
+// genuine late callback (which flips status away from 'pending') and this
+// sweep can never both act on the same transaction; whichever gets there
+// first wins.
 export async function reconcileStuckOpenBankingPayouts() {
   const cutoff = new Date(Date.now() - STUCK_AFTER_MS);
   const stuck = await Transaction.find({
     type: { $in: ASYNC_RAIL_TYPES },
     status: 'pending',
+    pendingReason: { $ne: 'stuck_timeout_needs_manual_review' },
     createdAt: { $lt: cutoff },
   }).select('reference type createdAt');
 
   if (stuck.length === 0) return;
 
-  logEvent('warn', 'ncba_openbanking_reconciliation_found_stuck', {
+  logEvent('error', 'ncba_openbanking_reconciliation_found_stuck', {
     count: stuck.length,
     references: stuck.map((t) => t.reference),
+    message: 'These payouts are past the stuck-payout window with no callback. NOT auto-refunding — NCBA status-check is broken, so we cannot confirm they failed. Check NCBA\'s portal and resolve manually.',
   });
 
   for (const tx of stuck) {
     try {
-      await resolvePendingOpenBankingTransaction({ reference: tx.reference, succeeded: false });
-      logEvent('info', 'ncba_openbanking_reconciliation_resolved', { reference: tx.reference, type: tx.type });
+      const flagged = await Transaction.findOneAndUpdate(
+        { _id: tx._id, status: 'pending' },
+        { $set: { pendingReason: 'stuck_timeout_needs_manual_review' } },
+        { returnDocument: 'after' }
+      );
+      if (flagged) {
+        logEvent('error', 'ncba_openbanking_reconciliation_flagged_for_manual_review', { reference: tx.reference, type: tx.type });
+      }
     } catch (err) {
       logEvent('error', 'ncba_openbanking_reconciliation_error', { reference: tx.reference, error: err.message });
     }

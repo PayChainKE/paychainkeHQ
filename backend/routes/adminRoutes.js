@@ -71,6 +71,7 @@ import { runWalletAudit } from '../controllers/walletAuditController.js';
 import { adminListInvoices } from '../controllers/invoiceController.js';
 import { sendSmsBroadcast, getSmsBroadcasts, deleteSmsBroadcast, clearSmsBroadcasts } from '../controllers/smsBroadcastController.js';
 import { getRevenue, getRevenueSweeps, archiveRevenueSweep, unarchiveRevenueSweep, exportRevenueSweeps, triggerRevenueSweep, getReconciliations, submitReconciliation } from '../controllers/revenueController.js';
+import { adminListStuckOpenBankingPayouts, adminResolveStuckOpenBankingPayout } from '../controllers/ncbaOpenBankingController.js';
 import { adminListCashAdvanceRequests, adminUpdateCashAdvanceRequest } from '../controllers/cashAdvanceController.js';
 import {
   listExpenses,
@@ -180,6 +181,14 @@ router.patch('/revenue/sweeps/:id/unarchive', protect, requireMutator, sensitive
 // this flags any gap against what the ledger expects.
 router.get('/revenue/reconciliations', protect, excludeOfficer, getReconciliations);
 router.post('/revenue/reconciliations', protect, requireMutator, sensitiveActionLimiter, submitReconciliation);
+
+// NCBA async-rail payouts stuck 'pending' past the reconciliation sweep's
+// timeout (see services/ncbaOpenBankingReconciliationService.js) — flagged
+// for manual review rather than auto-refunded, since NCBA's status-check
+// endpoint is confirmed broken. An admin checks NCBA's portal directly,
+// then resolves it here.
+router.get('/ncba-payouts/stuck-review', protect, excludeOfficer, adminListStuckOpenBankingPayouts);
+router.post('/ncba-payouts/:reference/resolve', protect, requireMutator, sensitiveActionLimiter, adminResolveStuckOpenBankingPayout);
 
 // Stellar Wallet Audit (live Horizon cross-reference)
 router.get('/wallet-audit', protect, excludeOfficer, runWalletAudit);

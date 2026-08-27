@@ -17,19 +17,17 @@ import SettingsTab from '../components/tabs/SettingsTab';
 import SecurityTab from '../components/tabs/SecurityTab';
 import TourTarget from '../components/TourTarget';
 
-type SectionKey = 'my-accounts' | 'support' | 'settings' | 'security' | 'wallet' | 'payment-link' | 'statement' | 'business-profile';
+type SectionKey = 'my-accounts' | 'support' | 'settings' | 'security' | 'payment-link' | 'statement' | 'business-profile';
 
 const MENU_ITEMS: Array<{
   key: SectionKey;
   label: string;
   icon: keyof typeof MaterialIcons.glyphMap;
-  external?: boolean;
 }> = [
   { key: 'my-accounts', label: 'My Accounts', icon: 'point-of-sale' },
   { key: 'support', label: 'Help & Support', icon: 'help-outline' },
   { key: 'settings', label: 'Settings', icon: 'tune' },
   { key: 'security', label: 'Security', icon: 'security' },
-  { key: 'wallet', label: 'Digital Wallet', icon: 'account-balance-wallet', external: true },
   { key: 'payment-link', label: 'Payment Link', icon: 'link' },
   { key: 'statement', label: 'Account Statement', icon: 'description' },
   { key: 'business-profile', label: 'Business Profile', icon: 'business' },
@@ -348,23 +346,9 @@ export default function Profile({ navigation }: any) {
   const { merchant, logout } = useAuth();
   const [activeSection, setActiveSection] = useState<SectionKey>('my-accounts');
 
-  // Platform-wide kill switch — stablecoin/digital wallet features pulled
-  // for all merchants until further notice. Flip to
-  // `merchant?.features?.digitalWallet === true` to restore, matching
-  // Dashboard.tsx/DigitalWallet.tsx.
-  const digitalWalletEnabled = false;
-  // Payment Link is a basic collection method (same tier as STK Push / QR),
-  // unrelated to the crypto/Stellar Digital Wallet feature flag — it was
-  // previously (and incorrectly) hidden alongside 'wallet' any time
-  // digitalWalletEnabled was false, which is the default for every merchant.
-  const visibleMenuItems = useMemo(
-    () => MENU_ITEMS.filter((item) => item.key !== 'wallet' || digitalWalletEnabled),
-    [digitalWalletEnabled]
-  );
-
   const activeItem = useMemo(
-    () => visibleMenuItems.find((item) => item.key === activeSection) || visibleMenuItems[0],
-    [activeSection, visibleMenuItems]
+    () => MENU_ITEMS.find((item) => item.key === activeSection) || MENU_ITEMS[0],
+    [activeSection]
   );
 
   const renderContent = () => {
@@ -402,13 +386,13 @@ export default function Profile({ navigation }: any) {
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 10, paddingTop: 12, paddingBottom: 24 }}>
-            {visibleMenuItems.map((item) => (
+            {MENU_ITEMS.map((item) => (
               <MenuButton
                 key={item.key}
                 label={item.label}
                 icon={item.icon}
                 active={activeSection === item.key}
-                onPress={() => (item.external ? navigation?.navigate('DigitalWallet') : setActiveSection(item.key))}
+                onPress={() => setActiveSection(item.key)}
               />
             ))}
 

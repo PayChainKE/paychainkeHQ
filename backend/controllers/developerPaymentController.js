@@ -6,6 +6,7 @@ import {
   executeNcbaMobileMoneyPayout,
   executeNcbaLipaNaMpesaPayout,
   InsufficientFundsError,
+  NcbaPostSubmissionRecordError,
 } from './ncbaOpenBankingController.js';
 import { NcbaOpenBankingValidationError } from '../services/ncbaOpenBankingService.js';
 import { claimClientIdempotencyKey, DuplicateSubmissionError } from '../utils/idempotencyGuard.js';
@@ -299,6 +300,21 @@ export const payoutPayment = async (req, res) => {
         metadata: { merchantId: String(merchantId), amount: numericAmount, apiKeyId: String(req.apiKey._id), destinationType: destination.type },
       });
     } catch (err) {
+      if (err instanceof NcbaPostSubmissionRecordError) {
+        // NCBA already confirmed/accepted this transfer — do NOT mark the
+        // payment 'failed' (an API consumer treating 'failed' as safe to
+        // retry would cause a real, second payout). Leave it 'pending' and
+        // link the reference so it can be reconciled the same way any other
+        // async payout resolves.
+        payment.linkedPayoutReference = err.reference;
+        await payment.save();
+        console.error('Developer Payout Payment — confirmed by NCBA but recording failed:', err.message, err.reference);
+        return res.status(202).json({
+          success: true,
+          payment: publicPayment(payment),
+          message: 'Payout was submitted to NCBA; we hit an error recording it. Do not retry — check status shortly.',
+        });
+      }
       payment.status = 'failed';
       payment.failureReason = err instanceof InsufficientFundsError || err instanceof NcbaOpenBankingValidationError
         ? err.message

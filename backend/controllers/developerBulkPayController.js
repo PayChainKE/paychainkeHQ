@@ -7,6 +7,7 @@ import {
   executeNcbaMobileMoneyPayout,
   executeNcbaLipaNaMpesaPayout,
   InsufficientFundsError,
+  NcbaPostSubmissionRecordError,
 } from './ncbaOpenBankingController.js';
 import { NcbaOpenBankingValidationError } from '../services/ncbaOpenBankingService.js';
 import { parsePayoutDestination, PayoutDestinationError } from './developerPaymentController.js';
@@ -227,6 +228,18 @@ export const createDeveloperBulkPayment = async (req, res) => {
           succeeded += 1;
         }
       } catch (err) {
+        if (err instanceof NcbaPostSubmissionRecordError) {
+          // NCBA already confirmed/accepted this row — do NOT mark it
+          // 'failed' (a consumer treating 'failed' as safe to retry would
+          // cause a real, second payout for this row). Leave it 'pending'
+          // and link the reference for later reconciliation, same as the
+          // normal async-rail path above.
+          payment.linkedPayoutReference = err.reference;
+          await payment.save();
+          console.error('Developer bulk payout row — confirmed by NCBA but recording failed:', err.message, err.reference);
+          pending += 1;
+          continue;
+        }
         payment.status = 'failed';
         payment.failureReason = err instanceof InsufficientFundsError || err instanceof NcbaOpenBankingValidationError
           ? err.message

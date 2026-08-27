@@ -18,13 +18,11 @@ const Overview = lazy(() => import('./pages/Overview'))
 const Transactions = lazy(() => import('./pages/Transactions'))
 const BulkPay = lazy(() => import('./pages/BulkPay'))
 const Invoices = lazy(() => import('./pages/Invoices'))
-const InflationShield = lazy(() => import('./pages/InflationShield'))
 const CashAdvance = lazy(() => import('./pages/CashAdvance'))
 const Profile = lazy(() => import('./pages/Profile'))
 const Support = lazy(() => import('./pages/Support'))
 const Notifications = lazy(() => import('./pages/Notifications'))
 const MyAccounts = lazy(() => import('./pages/MyAccounts'))
-const Wallet = lazy(() => import('./pages/Wallet'))
 const SendMoney = lazy(() => import('./pages/SendMoney'))
 const RequestMoney = lazy(() => import('./pages/RequestMoney'))
 const PaymentPage = lazy(() => import('./pages/PaymentPage'))
@@ -49,27 +47,6 @@ function Protected({ children }) {
 
   if (isLoading) return <LoadingScreen />
   if (!isAuthenticated) return <Navigate to="/login" replace />
-
-  return children
-}
-
-// Platform-wide kill switch — stablecoin/digital wallet features pulled
-// for all merchants until further notice, regardless of each merchant's
-// own `features` flag. Flip to an empty array to restore.
-const STABLECOIN_FEATURES_DISABLED = ['digitalWallet', 'inflationShield']
-
-function FeatureGuard({ featureName, children }) {
-  const { merchant, isLoading } = useMerchantAuth()
-
-  if (isLoading) return <LoadingScreen />
-  if (STABLECOIN_FEATURES_DISABLED.includes(featureName)) {
-    return <Navigate to="/overview" replace />
-  }
-  // If the feature object doesn't exist, we assume true for backward compatibility.
-  // Otherwise we check if the flag is explicitly set to false.
-  if (merchant?.features && merchant.features[featureName] === false) {
-    return <Navigate to="/overview" replace />
-  }
 
   return children
 }
@@ -101,7 +78,6 @@ export default function App(){
               <Route path="/transactions" element={<Protected><Transactions/></Protected>} />
               <Route path="/bulk-pay" element={<Protected><BulkPay/></Protected>} />
               <Route path="/invoices" element={<Protected><Invoices/></Protected>} />
-              <Route path="/inflation-shield" element={<Protected><FeatureGuard featureName="inflationShield"><InflationShield/></FeatureGuard></Protected>} />
               <Route path="/cash-advance" element={<Protected><CashAdvance/></Protected>} />
               <Route path="/accounts" element={<Protected><MyAccounts/></Protected>} />
               {/* Old page URL — keep resolving so existing bookmarks/shared links don't break */}
@@ -109,11 +85,6 @@ export default function App(){
               <Route path="/profile" element={<Protected><Profile/></Protected>} />
               <Route path="/support" element={<Protected><Support/></Protected>} />
               <Route path="/notifications" element={<Protected><Notifications/></Protected>} />
-              <Route path="/wallet" element={<Protected><FeatureGuard featureName="digitalWallet"><Wallet/></FeatureGuard></Protected>} />
-              {/* Send/Request Money are plain KES mobile-money features, unrelated to
-                  the crypto/Stellar "digitalWallet" feature — they were previously
-                  gated behind that same flag by mistake, silently breaking these
-                  buttons for any merchant with digitalWallet disabled. */}
               <Route path="/send-money" element={<Protected><SendMoney/></Protected>} />
               <Route path="/request-money" element={<Protected><RequestMoney/></Protected>} />
               {/* Catch-all route for 404s and refreshes */}

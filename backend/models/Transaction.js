@@ -49,9 +49,18 @@ const transactionSchema = new mongoose.Schema({
   // moved, so it's safe to actively retry the same request later once
   // there's more real liquidity (see services/ncbaPayoutRetryService.js),
   // rather than just waiting out the reconciliation window.
+  // 'stuck_timeout_needs_manual_review' means the payout sat 'pending' past
+  // STUCK_AFTER_MS with no callback ever arriving. This does NOT get
+  // auto-refunded: NCBA's TransactionStatusQuery endpoint (the only way to
+  // ask "did this actually land?") is confirmed broken in production (see
+  // scripts/probe-ncba-transaction-status-query.js), so there is no way to
+  // tell "definitely never landed" apart from "landed but the callback was
+  // lost" — and auto-refunding the latter would pay the merchant twice.
+  // Stays 'pending' with the merchant's ledger balance untouched until an
+  // admin checks NCBA's portal directly and resolves it by hand.
   pendingReason: {
     type: String,
-    enum: ['ambiguous_response', 'insufficient_funds', null],
+    enum: ['ambiguous_response', 'insufficient_funds', 'stuck_timeout_needs_manual_review', null],
     default: null
   },
   retryCount: {

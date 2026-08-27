@@ -13,11 +13,12 @@ const baseNavItems = [
   { name: 'Transactions', icon: 'receipt_long', path: '/transactions' },
   { name: 'Bulk Payments', icon: 'group_add', path: '/bulk-pay' },
   { name: 'Invoices', icon: 'receipt_long', path: '/invoices' },
-  // Digital Wallet / Inflation Shield nav entry removed for now — the
-  // feature stays live only in apps/demo (the sandbox/prospect-facing
-  // showcase). Routes (/wallet, /inflation-shield) and their FeatureGuard
-  // are left in place so a re-enable is just adding this entry back, not a
-  // rebuild — see App.jsx.
+  // Digital Wallet / Inflation Shield removed entirely — those pages,
+  // routes, and the FeatureGuard that gated them are gone from this app.
+  // The feature only exists in apps/demo (the sandbox/prospect-facing
+  // showcase), backed by one specific isDemoMerchant:true account — see
+  // backend/controllers/transactionController.js's swapKesToUsdc/
+  // activateWallet/syncWalletBalance, which now enforce that server-side.
   {
     name: 'Cash Advance',
     icon: 'payments',
