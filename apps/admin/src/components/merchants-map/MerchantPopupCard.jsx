@@ -19,6 +19,9 @@ export default function MerchantPopupCard({ merchant, onClose, onViewDetails, on
             <p className="text-[12px] text-on-surface-variant/70 mt-0.5 flex items-center gap-1">
               <span className="material-symbols-outlined text-[14px]">location_on</span>
               {merchant.location.label}
+              {merchant.location.isApproximate && (
+                <span className="ml-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide border bg-slate-50 text-slate-500 border-slate-200">Approximate</span>
+              )}
             </p>
           )}
         </div>
@@ -60,7 +63,7 @@ export default function MerchantPopupCard({ merchant, onClose, onViewDetails, on
           className="w-full px-4 py-2 rounded-lg text-[12px] font-semibold text-on-surface-variant/70 hover:text-on-surface hover:bg-surface-container-high transition-colors flex items-center justify-center gap-1.5"
         >
           <span className="material-symbols-outlined text-[16px]">edit_location_alt</span>
-          Move or remove pin
+          {merchant.location?.isApproximate ? 'Set exact pin' : 'Move or remove pin'}
         </button>
       </div>
     </div>

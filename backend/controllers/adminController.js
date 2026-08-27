@@ -23,6 +23,7 @@ import { normalizeKraPin, isValidKraPin, KRA_PIN_FORMAT_HINT } from '../utils/kr
 import { isValidEmail, EMAIL_FORMAT_HINT } from '../utils/emailValidator.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { generateBrandedQrDataUri } from '../utils/qrCode.js';
+import { getCountyCentroid } from '../config/kenyaCountyCentroids.js';
 
 // Build an `actor` shape from req.admin so audit rows attribute admin-initiated
 // actions to the right operator even when the merchant is the subject.
@@ -614,9 +615,16 @@ export const geocodeSearch = async (req, res) => {
 const KENYA_BOUNDS = { minLat: -5, maxLat: 6, minLng: 33, maxLng: 42 };
 
 /**
- * Merchants Map view — only merchants an admin has manually pin-dropped a
- * location for (see setMerchantLocation below; there's no address/town
- * field anywhere to geocode from, so this is opt-in and manual). Returns a
+ * Merchants Map view. Every merchant with a manually pin-dropped exact
+ * location (setMerchantLocation below) OR a signup-time county shows up —
+ * the county ones fall back to that county's approximate centroid
+ * (config/kenyaCountyCentroids.js), so a merchant appears on the map the
+ * moment they sign up, with no admin action required. Since every merchant
+ * in the same county resolves to the same centroid, Leaflet's marker
+ * clustering on the frontend naturally shows a count bubble per county —
+ * exactly the "how many merchants in each location" view this is for. An
+ * admin's manual pin (more precise, an actual business location) always
+ * takes priority over the county fallback when both exist. Returns a
  * lightweight payload meant to be polled periodically by the map, not the
  * full merchant record.
  * @route   GET /api/admin/merchants/map
@@ -624,15 +632,17 @@ const KENYA_BOUNDS = { minLat: -5, maxLat: 6, minLng: 33, maxLng: 42 };
  */
 export const getMerchantsMap = async (req, res) => {
   try {
-    const merchants = await Merchant.find({ 'mapLocation.lat': { $ne: null } })
-      .select('businessName phone businessType status kybStatus mapLocation')
+    const merchants = await Merchant.find({
+      $or: [{ 'mapLocation.lat': { $ne: null } }, { county: { $ne: null } }],
+    })
+      .select('businessName phone businessType status kybStatus mapLocation county businessArea')
       .lean();
 
     if (merchants.length === 0) return res.json({ success: true, merchants: [] });
 
-    // Scoped to just the pinned merchants (a small subset in practice, since
-    // pins are manual) — cheap even without a date filter, unlike
-    // getMerchants' unscoped 30d/all-time aggregations above.
+    // Scoped to just the merchants actually being plotted — cheap even
+    // without a date filter, unlike getMerchants' unscoped 30d/all-time
+    // aggregations above.
     const ids = merchants.map((m) => m._id);
     const txnAgg = await Transaction.aggregate([
       { $match: { merchantId: { $in: ids } } },
@@ -641,20 +651,35 @@ export const getMerchantsMap = async (req, res) => {
     const lastTxnByMerchant = new Map(txnAgg.map((r) => [String(r._id), r.lastTxnAt]));
 
     const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
-    const result = merchants.map((m) => {
-      const lastTxnAt = lastTxnByMerchant.get(String(m._id)) || null;
-      return {
-        _id: m._id,
-        businessName: m.businessName,
-        phone: m.phone,
-        businessType: m.businessType || null,
-        status: m.status,
-        kybStatus: m.kybStatus || null,
-        location: { lat: m.mapLocation.lat, lng: m.mapLocation.lng, label: m.mapLocation.label || '' },
-        lastTxnAt,
-        activeRecently: !!(lastTxnAt && new Date(lastTxnAt).getTime() >= oneDayAgo),
-      };
-    });
+    const result = merchants
+      .map((m) => {
+        let location;
+        if (m.mapLocation?.lat != null) {
+          location = { lat: m.mapLocation.lat, lng: m.mapLocation.lng, label: m.mapLocation.label || '', isApproximate: false };
+        } else {
+          const centroid = getCountyCentroid(m.county);
+          if (!centroid) return null; // county string didn't match any known county — nothing to plot
+          location = {
+            lat: centroid.lat,
+            lng: centroid.lng,
+            label: m.businessArea ? `${m.businessArea}, ${m.county}` : m.county,
+            isApproximate: true,
+          };
+        }
+        const lastTxnAt = lastTxnByMerchant.get(String(m._id)) || null;
+        return {
+          _id: m._id,
+          businessName: m.businessName,
+          phone: m.phone,
+          businessType: m.businessType || null,
+          status: m.status,
+          kybStatus: m.kybStatus || null,
+          location,
+          lastTxnAt,
+          activeRecently: !!(lastTxnAt && new Date(lastTxnAt).getTime() >= oneDayAgo),
+        };
+      })
+      .filter(Boolean);
 
     res.json({ success: true, merchants: result });
   } catch (error) {
@@ -664,8 +689,9 @@ export const getMerchantsMap = async (req, res) => {
 };
 
 /**
- * Manually pin a merchant's location on the map (no geocoding — set by an
- * admin clicking the map, since merchants have no address/town field).
+ * Manually pin a merchant's EXACT location on the map — overrides the
+ * approximate county-centroid fallback getMerchantsMap otherwise uses, for
+ * when an admin knows precisely where the business actually is.
  * @route   PATCH /api/admin/merchants/:id/location
  * @access  Private/Admin (owner, admin)
  */
@@ -711,7 +737,9 @@ export const setMerchantLocation = async (req, res) => {
 };
 
 /**
- * Remove a merchant's map pin (e.g. it was placed in the wrong spot).
+ * Remove a merchant's exact map pin (e.g. it was placed in the wrong spot).
+ * They don't disappear from the map — getMerchantsMap falls back to their
+ * county's approximate centroid, same as any merchant who was never pinned.
  * @route   DELETE /api/admin/merchants/:id/location
  * @access  Private/Admin (owner, admin)
  */
@@ -1113,6 +1141,95 @@ export const updateMerchantBusinessName = async (req, res) => {
     res.json({ success: true, businessName: merchant.businessName, message: 'Business name updated successfully.' });
   } catch (error) {
     console.error('Update Merchant Business Name Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Admin corrects the merchant owner's display name (Merchant.name —
+//          the primary contact person, distinct from businessName). Unlike
+//          email/phone (see requestMerchantAction's 'reset_contact' action),
+//          this carries no login/session implications, so it's a plain
+//          direct update — no OTP step needed.
+// @route   PATCH /api/admin/merchants/:id/contact-name
+// @access  Private (Admin, owner/admin only)
+export const updateMerchantContactName = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid merchant id.' });
+    }
+    const trimmed = String(name ?? '').trim();
+    if (!trimmed) {
+      return res.status(400).json({ error: 'Name is required.' });
+    }
+    if (trimmed.length > 80) {
+      return res.status(400).json({ error: 'Name must be 80 characters or fewer.' });
+    }
+
+    const merchant = await Merchant.findById(id);
+    if (!merchant) return res.status(404).json({ error: 'Merchant not found' });
+
+    const previousName = merchant.name;
+    if (previousName === trimmed) {
+      return res.json({ success: true, name: merchant.name, message: 'No change.' });
+    }
+
+    merchant.name = trimmed;
+    await merchant.save();
+
+    logAudit({
+      action: 'admin.merchant.contact_name_updated', category: 'admin', severity: 'info',
+      message: `Primary contact name changed from "${previousName}" to "${trimmed}"`,
+      merchant, actor: adminActor(req.admin), req,
+      metadata: { previousName, newName: trimmed },
+    });
+
+    res.json({ success: true, name: merchant.name, message: 'Name updated successfully.' });
+  } catch (error) {
+    console.error('Update Merchant Contact Name Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Admin adds or replaces the merchant's single self-serve signup
+//          certificate (Merchant.certificateUrl) — separate from the typed,
+//          multi-document kybDocuments array (see updateMerchantKycDocument
+//          above), which is the officer-onboarding pipeline's own document
+//          set. This is the one document self-serve merchants upload at
+//          signup (merchantAuthController.js#registerMerchant), shown
+//          read-only until now in both the Merchants page drawer and the
+//          KYC/KYB detail page.
+// @route   PATCH /api/admin/merchants/:id/certificate
+// @access  Private (Admin, owner/admin only)
+export const updateMerchantCertificate = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid merchant id.' });
+    }
+    if (!req.file) {
+      return res.status(400).json({ error: 'No certificate file uploaded.' });
+    }
+
+    const merchant = await Merchant.findById(id);
+    if (!merchant) return res.status(404).json({ error: 'Merchant not found' });
+
+    const isReplace = !!merchant.certificateUrl;
+    merchant.certificateUrl = req.file.path;
+    await merchant.save();
+
+    logAudit({
+      action: 'admin.merchant.certificate_updated', category: 'admin', severity: 'info',
+      message: `${isReplace ? 'Replaced' : 'Added'} business certificate`,
+      merchant, actor: adminActor(req.admin), req,
+    });
+
+    res.json({ success: true, certificateUrl: merchant.certificateUrl, message: `Certificate ${isReplace ? 'replaced' : 'uploaded'} successfully.` });
+  } catch (error) {
+    console.error('Update Merchant Certificate Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };

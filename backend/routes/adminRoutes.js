@@ -14,6 +14,8 @@ import {
   updateMerchantVerification,
   updateMerchantKycDocument,
   updateMerchantBusinessName,
+  updateMerchantContactName,
+  updateMerchantCertificate,
   downloadMerchantQrCode,
   getMerchantsMap,
   geocodeSearch,
@@ -147,6 +149,8 @@ router.patch('/merchants/:id/features', protect, requireMutator, sensitiveAction
 router.patch('/merchants/:id/verification', protect, requireMutator, sensitiveActionLimiter, updateMerchantVerification);
 router.patch('/merchants/:id/kyc-documents', protect, requireMutator, sensitiveActionLimiter, upload.single('document'), updateMerchantKycDocument);
 router.patch('/merchants/:id/business-name', protect, requireMutator, sensitiveActionLimiter, updateMerchantBusinessName);
+router.patch('/merchants/:id/contact-name', protect, requireMutator, sensitiveActionLimiter, updateMerchantContactName);
+router.patch('/merchants/:id/certificate', protect, requireMutator, sensitiveActionLimiter, upload.single('certificate'), updateMerchantCertificate);
 router.patch('/merchants/:id/location', protect, requireMutator, sensitiveActionLimiter, setMerchantLocation);
 router.delete('/merchants/:id/location', protect, requireMutator, sensitiveActionLimiter, removeMerchantLocation);
 router.get('/merchants/:id/sticker', protect, excludeOfficer, downloadMerchantSticker);
