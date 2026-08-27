@@ -421,11 +421,24 @@ export const getLiveRate = async (req, res) => {
   }
 };
 
-// @desc    Simulate sending money (Move Money)
+// @desc    Simulate sending money (Move Money) — dev/staging tool only, same
+//          double-gate as simulateIncomingPayment above. Both the merchant
+//          dashboard and mobile app have already been fixed to never call
+//          this (see Wallet.jsx/DigitalWallet.tsx) since it debits the
+//          merchant's real balance and marks a Transaction 'completed'
+//          without ever moving real money through any payment rail — a
+//          direct API call (bypassing the frontend) could still reach it and
+//          destroy a merchant's real balance for nothing. Gated the same way
+//          the fake-credit simulator is, so it fails closed in production
+//          regardless of what any client still tries to call.
 // @route   POST /api/transactions/send-money
-// @access  Private
+// @access  Private (non-production only, and only with the env flag set)
 export const sendMoney = async (req, res) => {
   try {
+    if (process.env.NODE_ENV === 'production' || process.env.ENABLE_PAYMENT_SIMULATOR !== 'true') {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
     const { destination, amount, fee, reference, pin } = req.body;
     const merchantId = req.merchant._id;
 
