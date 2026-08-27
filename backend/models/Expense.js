@@ -34,6 +34,10 @@ const expenseSchema = new mongoose.Schema(
     paymentMethod: { type: String, enum: PAYMENT_METHODS, default: 'Bank Transfer' },
     // Receipt/invoice number — the paper trail KRA expects behind every claim.
     reference: { type: String, trim: true, maxlength: 100 },
+    // The actual scanned receipt/invoice file (Cloudinary secure URL) —
+    // complements `reference` above, which is just the human-readable
+    // receipt number. Null until an admin uploads one.
+    receiptUrl: { type: String, default: null },
     vatApplicable: { type: Boolean, default: false },
     vatAmount: { type: Number, default: 0, min: 0 },
     // Whether this expense qualifies as an allowable deduction under the
