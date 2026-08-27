@@ -5,6 +5,7 @@ import { adminActor } from './adminController.js';
 import { REVENUE_STREAMS } from '../config/revenueRateCard.js';
 import { LIVE_DATA_CUTOFF } from '../config/liveDataCutoff.js';
 import { excludeDemoMerchantsMatch } from '../utils/demoMerchantExclusion.js';
+import { CORPORATE_TAX_RATE } from '../config/taxRateCard.js';
 
 // Same whitelist Revenue's getRevenue uses — top_up/withdrawal and any
 // other type with no revenue stream must never count as "income" here
@@ -278,6 +279,12 @@ export const getBookkeepingSummary = async (req, res) => {
     const vatTotal = Math.round(expenseRow.vatTotal * 100) / 100;
     const netProfit = Math.round((income - totalExpenses) * 100) / 100;
     const taxableProfit = Math.round((income - deductibleExpenses) * 100) / 100;
+    // Floored at zero — a loss-making period has no tax liability to
+    // estimate (KRA doesn't refund a negative corporate tax this way).
+    // Computed once, here, so every page that shows this figure (currently
+    // Bookkeeping and Tax & Compliance) reads the exact same number rather
+    // than each re-deriving it from taxableProfit independently.
+    const estimatedTaxLiability = Math.round(Math.max(0, taxableProfit) * CORPORATE_TAX_RATE * 100) / 100;
 
     const categories = categoryAgg.map((c) => ({ category: c._id, total: Math.round(c.total * 100) / 100, count: c.count }));
 
@@ -296,7 +303,7 @@ export const getBookkeepingSummary = async (req, res) => {
       success: true,
       data: {
         period: { since, until, label, preset: resolvedPreset },
-        pnl: { income, totalExpenses, deductibleExpenses, netProfit, taxableProfit, vatTotal, expenseCount: expenseRow.count },
+        pnl: { income, totalExpenses, deductibleExpenses, netProfit, taxableProfit, vatTotal, expenseCount: expenseRow.count, estimatedTaxLiability, taxRate: CORPORATE_TAX_RATE },
         categories,
         monthly: Array.from(monthMap.values()),
       },
