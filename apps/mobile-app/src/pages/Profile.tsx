@@ -15,7 +15,6 @@ import MyAccountsTab from '../components/tabs/MyAccountsTab';
 import SupportTab from '../components/tabs/SupportTab';
 import SettingsTab from '../components/tabs/SettingsTab';
 import SecurityTab from '../components/tabs/SecurityTab';
-import ProfileWalkthrough from '../components/ProfileWalkthrough';
 import TourTarget from '../components/TourTarget';
 
 type SectionKey = 'my-accounts' | 'support' | 'settings' | 'security' | 'wallet' | 'payment-link' | 'statement' | 'business-profile';
@@ -313,7 +312,6 @@ function AccountStatementPanel({ navigation, merchant }: { navigation: any; merc
 function BusinessProfilePanel({ merchant }: { merchant: any }) {
   return (
     <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
-      <ProfileWalkthrough />
       <View className="w-full max-w-lg mx-auto px-6 pt-2 pb-12">
         <View className="mb-6">
           <Text className="font-jakarta-extrabold text-[28px] text-[#00351d] tracking-tight leading-tight mb-2">Business Profile</Text>

@@ -8,7 +8,6 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api/config';
 import PrivateValue from '../components/PrivateValue';
 import FundAccountModal from '../components/FundAccountModal';
-import MerchantWalkthrough from '../components/MerchantWalkthrough';
 import TourTarget from '../components/TourTarget';
 import { isCreditTransaction, isDebitTransaction, netBalanceImpact, excludeReversedDuplicates } from '../utils/transactionDirection';
 import { formatAccountNumber } from '../utils/formatAccountNumber';
@@ -335,7 +334,6 @@ export default function Dashboard({ navigation }: any) {
           </LinearGradient>
 
           <FundAccountModal visible={showFundAccount} onClose={() => setShowFundAccount(false)} />
-          <MerchantWalkthrough />
 
           {/* Action Buttons (overlapping) */}
           <View className="px-6 flex-row justify-between -mt-6 mb-10 z-10">

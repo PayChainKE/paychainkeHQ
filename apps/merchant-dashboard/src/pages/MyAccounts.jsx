@@ -4,7 +4,6 @@ import MerchantLayout from '../components/layout/MerchantLayout'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { formatAccountNumber } from '../utils/formatAccountNumber'
 import SettlementQrCard from '../components/ui/SettlementQrCard'
-import MyAccountsWalkthrough from '../components/onboarding/MyAccountsWalkthrough'
 import { useToast } from '../context/NotificationContext'
 import { escapeHtml } from '../utils/escapeHtml'
 
@@ -221,7 +220,6 @@ export default function MyAccounts() {
 
   return (
     <MerchantLayout title="My Accounts">
-      <MyAccountsWalkthrough />
       <div className="px-1 lg:px-0 max-w-7xl mx-auto w-full space-y-8 lg:space-y-12">
 
         {/* Page Header */}

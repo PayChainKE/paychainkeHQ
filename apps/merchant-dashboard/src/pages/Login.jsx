@@ -615,7 +615,7 @@ export default function Login() {
                           placeholder="Verify password"
                           autoComplete="new-password"
                         />
-                        <button 
+                        <button
                           type="button"
                           onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                           className="absolute right-4 top-1/2 -translate-y-1/2 text-primary/40 p-1"
@@ -623,6 +623,16 @@ export default function Login() {
                           <span className="material-symbols-outlined text-xl">{showConfirmPassword ? 'visibility' : 'visibility_off'}</span>
                         </button>
                       </div>
+                      {/* Create Account silently stayed disabled on any mismatch
+                          with no visible reason — reported as "the button isn't
+                          working" since there was nothing telling the merchant
+                          why it wouldn't respond. */}
+                      {confirmPassword && newPassword !== confirmPassword && (
+                        <p className="text-xs font-bold text-red-600 pl-1 flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-sm">error</span>
+                          Passwords don't match
+                        </p>
+                      )}
                     </div>
 
                     <div className="flex items-start gap-3 pt-2">
@@ -1209,7 +1219,7 @@ export default function Login() {
                       placeholder="Verify password"
                       autoComplete="new-password"
                     />
-                    <button 
+                    <button
                       type="button"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                       className="absolute right-4 top-1/2 -translate-y-1/2 text-primary/40 p-1"
@@ -1217,6 +1227,14 @@ export default function Login() {
                       <span className="material-symbols-outlined text-xl">{showConfirmPassword ? 'visibility' : 'visibility_off'}</span>
                     </button>
                   </div>
+                  {/* Same "silently disabled with no visible reason" fix as the
+                      Create Account form above. */}
+                  {confirmPassword && newPassword !== confirmPassword && (
+                    <p className="text-xs font-bold text-red-600 pl-1 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-sm">error</span>
+                      Passwords don't match
+                    </p>
+                  )}
                 </div>
 
                 {err && (
@@ -1227,8 +1245,8 @@ export default function Login() {
                 )}
 
                 <div className="pt-4">
-                  <button 
-                    className="w-full bg-[#06201B] text-white py-4 lg:py-5 rounded-2xl font-black text-lg shadow-2xl hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-white/10 disabled:opacity-30 disabled:grayscale" 
+                  <button
+                    className="w-full bg-[#06201B] text-white py-4 lg:py-5 rounded-2xl font-black text-lg shadow-2xl hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-white/10 disabled:opacity-30 disabled:grayscale"
                     disabled={loading || !Object.values(strength).every(v=>v) || !confirmPassword || newPassword !== confirmPassword}
                   >
                     {loading ? (

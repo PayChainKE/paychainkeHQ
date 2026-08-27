@@ -804,7 +804,10 @@ export const authorizeBatch = async (req, res) => {
       } else if (payee.paymentMethod === 'Mobile Money') {
         // Paybill/Till, via NCBA's Lipa na M-Pesa Payment API — NCBA's
         // replacement for Daraja B2B. Same async shape as Mobile B2W above.
-        const lnmTransactionId = `PAYOUT-BULK-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        // No hyphens — NCBA's Lipa na M-Pesa endpoint rejects reqChnlId/
+        // reqTransactionReferenceNo values containing special characters
+        // (per Rose, NCBA support, 2026-08-27).
+        const lnmTransactionId = `PAYOUTBULK${Date.now()}${Math.floor(Math.random() * 1000)}`;
         try {
           const payBillTillNo = payee.paybillNumber || payee.tillNumber;
           // No pre-payout Till/Paybill validation — takes the saved payee's
