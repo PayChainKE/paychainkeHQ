@@ -4,6 +4,7 @@ import { logAudit } from '../utils/auditLog.js';
 import { adminActor } from './adminController.js';
 import { REVENUE_STREAMS } from '../config/revenueRateCard.js';
 import { LIVE_DATA_CUTOFF } from '../config/liveDataCutoff.js';
+import { excludeDemoMerchantsMatch } from '../utils/demoMerchantExclusion.js';
 
 // Same whitelist Revenue's getRevenue uses — top_up/withdrawal and any
 // other type with no revenue stream must never count as "income" here
@@ -236,10 +237,11 @@ export const getBookkeepingSummary = async (req, res) => {
 
     const now = new Date();
     const trailingStart = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+    const excludeDemo = await excludeDemoMerchantsMatch();
 
     const [incomeAgg, expenseAgg, categoryAgg, monthlyIncomeAgg, monthlyExpenseAgg] = await Promise.all([
       Transaction.aggregate([
-        { $match: { createdAt: { $gte: since, $lte: until }, status: { $in: ['completed', 'verified'] }, type: { $in: REVENUE_TX_TYPES } } },
+        { $match: { createdAt: { $gte: since, $lte: until }, status: { $in: ['completed', 'verified'] }, type: { $in: REVENUE_TX_TYPES }, ...excludeDemo } },
         { $group: { _id: null, total: { $sum: '$paychainFee' } } },
       ]),
       Expense.aggregate([
@@ -260,7 +262,7 @@ export const getBookkeepingSummary = async (req, res) => {
         { $sort: { total: -1 } },
       ]),
       Transaction.aggregate([
-        { $match: { createdAt: { $gte: trailingStart }, status: { $in: ['completed', 'verified'] }, type: { $in: REVENUE_TX_TYPES } } },
+        { $match: { createdAt: { $gte: trailingStart }, status: { $in: ['completed', 'verified'] }, type: { $in: REVENUE_TX_TYPES }, ...excludeDemo } },
         { $group: { _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } }, total: { $sum: '$paychainFee' } } },
       ]),
       Expense.aggregate([

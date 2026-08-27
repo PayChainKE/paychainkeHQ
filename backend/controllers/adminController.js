@@ -17,6 +17,7 @@ import { logAudit } from '../utils/auditLog.js';
 import { getNcbaVirtualAccountNumber, generateRandomMerchantCode, validatePhoneNumber, isValidPhoneInputFormat, NcbaValidationError } from '../utils/ncbaValidators.js';
 import { generateMerchantStickerPdf, generateBulkStickerPdf, generateMerchantQrFlyerPdf } from '../utils/stickerGenerator.js';
 import { LIVE_DATA_CUTOFF } from '../config/liveDataCutoff.js';
+import { excludeDemoMerchantsMatch } from '../utils/demoMerchantExclusion.js';
 import { provisionMerchantWallet } from '../utils/stellarHelper.js';
 import { encryptKey } from '../utils/cryptoHelper.js';
 import { normalizeKraPin, isValidKraPin, KRA_PIN_FORMAT_HINT } from '../utils/kraPinValidator.js';
@@ -1751,6 +1752,10 @@ export const getInsights = async (req, res) => {
     // sign up during that window, that history is real and should count.
     const txnSince = since.getTime() < LIVE_DATA_CUTOFF.getTime() ? LIVE_DATA_CUTOFF : since;
     const txnPrevSince = prevSince.getTime() < LIVE_DATA_CUTOFF.getTime() ? LIVE_DATA_CUTOFF : prevSince;
+    // The demo merchant's simulated activity must never inflate PayChain's
+    // reported GTV/GMV/top-merchants figures — same discipline as
+    // revenueController.js's getRevenue.
+    const excludeDemo = await excludeDemoMerchantsMatch();
 
     const pctChange = (curr, prev) => {
       if (!prev) return curr > 0 ? 100 : 0;
@@ -1792,16 +1797,16 @@ export const getInsights = async (req, res) => {
     // ── Transaction / GTV / GMV ────────────────────────────────────────────
     const [gtvCurr, gtvPrev, gtvSeries, lifetimeAgg] = await Promise.all([
       Transaction.aggregate([
-        { $match: { createdAt: { $gte: txnSince }, status: { $in: ['completed', 'verified'] } } },
+        { $match: { createdAt: { $gte: txnSince }, status: { $in: ['completed', 'verified'] }, ...excludeDemo } },
         { $group: { _id: null, count: { $sum: 1 }, kesVolume: kesVolReal, usdcVolume: usdcVolReal } },
       ]),
       Transaction.aggregate([
-        { $match: { createdAt: { $gte: txnPrevSince, $lt: txnSince }, status: { $in: ['completed', 'verified'] } } },
+        { $match: { createdAt: { $gte: txnPrevSince, $lt: txnSince }, status: { $in: ['completed', 'verified'] }, ...excludeDemo } },
         { $group: { _id: null, count: { $sum: 1 }, kesVolume: kesVolReal, usdcVolume: usdcVolReal } },
       ]),
       // Daily volume series for the sparkline / area chart.
       Transaction.aggregate([
-        { $match: { createdAt: { $gte: txnSince }, status: { $in: ['completed', 'verified'] } } },
+        { $match: { createdAt: { $gte: txnSince }, status: { $in: ['completed', 'verified'] }, ...excludeDemo } },
         {
           $group: {
             _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
@@ -1813,7 +1818,7 @@ export const getInsights = async (req, res) => {
         { $sort: { _id: 1 } },
       ]),
       Transaction.aggregate([
-        { $match: { createdAt: { $gte: LIVE_DATA_CUTOFF }, status: { $in: ['completed', 'verified'] } } },
+        { $match: { createdAt: { $gte: LIVE_DATA_CUTOFF }, status: { $in: ['completed', 'verified'] }, ...excludeDemo } },
         { $group: { _id: null, count: { $sum: 1 }, kesVolume: kesVolReal, usdcVolume: usdcVolReal } },
       ]),
     ]);
@@ -1975,7 +1980,14 @@ export const getInsights = async (req, res) => {
     // ── Top merchants by volume ──────────────────────────────────────
     // ── Top merchants by volume ──────────────────────────────────────
     const topMerchantsRaw = await Transaction.aggregate([
-      { $match: { createdAt: { $gte: txnSince }, status: { $in: ['completed', 'verified'] }, merchantId: { $ne: null } } },
+      {
+        $match: {
+          createdAt: { $gte: txnSince },
+          status: { $in: ['completed', 'verified'] },
+          // Merged (not spread) — excludeDemo also keys off merchantId.
+          merchantId: { $ne: null, ...(excludeDemo.merchantId || {}) },
+        },
+      },
       {
         $group: {
           _id: '$merchantId',
@@ -2007,7 +2019,7 @@ export const getInsights = async (req, res) => {
     // ── Transaction type mix ─────────────────────────────────────────
     // All statuses included so fx_swap / settlement rows are never filtered out.
     const txnTypeMix = await Transaction.aggregate([
-      { $match: { createdAt: { $gte: txnSince } } },
+      { $match: { createdAt: { $gte: txnSince }, ...excludeDemo } },
       { $group: { _id: '$type', count: { $sum: 1 }, volume: kesVolReal } },
       { $sort: { volume: -1 } },
     ]);
