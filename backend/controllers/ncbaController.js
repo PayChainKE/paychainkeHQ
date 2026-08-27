@@ -21,6 +21,7 @@ import {
   initiateBulkPayment,
   InsufficientFundsError,
   NcbaPayoutValidationError,
+  NcbaPostSubmissionRecordError,
 } from '../services/ncbaBulkPaymentService.js';
 
 // NCBA's own integration guide requires HTTP 200 on every call — a non-200
@@ -279,6 +280,18 @@ export const handleInitiateBulkPayment = async (req, res) => {
   } catch (err) {
     if (err instanceof NcbaPayoutValidationError || err instanceof InsufficientFundsError) {
       return res.status(400).json({ error: err.message });
+    }
+    if (err instanceof NcbaPostSubmissionRecordError) {
+      // NCBA already accepted this batch — the merchant was NOT refunded,
+      // and must not be told this failed outright (that would invite a
+      // resubmit and a real duplicate batch).
+      console.error('❌ NCBA bulk payment — confirmed by NCBA but recording failed:', err.message, err.batchReference);
+      return res.status(202).json({
+        success: true,
+        pending: true,
+        message: 'Your bulk payment batch was submitted to NCBA, but we hit an error recording it. Please check your transaction history shortly — do not resubmit this batch.',
+        batchReference: err.batchReference,
+      });
     }
 
     console.error('❌ NCBA bulk payment error:', err);

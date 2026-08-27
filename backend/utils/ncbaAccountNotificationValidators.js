@@ -17,31 +17,39 @@ const TWELVE_DIGIT_RUN = /\b(\d{12})\b/;
 // Kenyan MSISDN in 254XXXXXXXXX form is also exactly 12 digits, and blindly
 // slicing "the last 8 digits" out of what's actually a phone number would
 // misattribute the payment instead of just failing safe.
+// `strong: true` means the code was recovered from a structurally-anchored
+// match — the full institution-prefixed virtual account number, or a
+// contiguous 12-digit run — where an accidental collision with unrelated
+// free text is implausible. `strong: false` means it only matched the bare
+// "any standalone 8-digit run anywhere in this text" fallback, which a
+// sender's own unrelated reference/invoice/date text can collide with by
+// chance. Callers should require a strong match before auto-crediting a
+// merchant off transaction types that aren't specifically customer-payment
+// codes (see isGenericTransferType in config/ncbaAccountNotificationCodes.js).
 function findEightDigitCode(text, { allowTwelveDigitFallback = false } = {}) {
   const prefix = process.env.NCBA_INSTITUTION_PREFIX;
   const str = String(text ?? '');
 
   if (prefix && /^\d{4}$/.test(prefix)) {
     const fullAccountMatch = str.match(new RegExp(`${prefix}(\\d{8})`));
-    if (fullAccountMatch) return fullAccountMatch[1];
+    if (fullAccountMatch) return { code: fullAccountMatch[1], strong: true };
   }
-
-  const bareMatch = str.match(EIGHT_DIGIT_RUN);
-  if (bareMatch) return bareMatch[1];
 
   // Safety net for when NCBA_INSTITUTION_PREFIX isn't configured yet but
   // the field already carries the full 12-digit virtual account number
   // (institution prefix + merchant code) as one contiguous run — the
-  // prefix match above can't fire without knowing the prefix's digits, and
-  // \b(\d{8})\b can never match 8 digits out of the middle of a 12-digit
-  // run (there's no word-boundary between two adjacent digits). The
+  // prefix match above can't fire without knowing the prefix's digits. The
   // merchant code is always the last 8 digits of that 12-digit number by
   // construction (see generateRandomMerchantCode/getNcbaVirtualAccountNumber),
-  // so this is a safe positional extraction, not a guess.
+  // so this is a safe positional extraction, not a guess — still "strong"
+  // since a random 12-digit collision in free text is implausible.
   if (allowTwelveDigitFallback) {
     const twelveMatch = str.match(TWELVE_DIGIT_RUN);
-    if (twelveMatch) return twelveMatch[1].slice(-8);
+    if (twelveMatch) return { code: twelveMatch[1].slice(-8), strong: true };
   }
+
+  const bareMatch = str.match(EIGHT_DIGIT_RUN);
+  if (bareMatch) return { code: bareMatch[1], strong: false };
 
   return null;
 }
@@ -90,30 +98,33 @@ function logStructuralConflict(fields) {
  *
  * Returns null (not a thrown error) if no field yields anything — the
  * caller should log this loudly, since it means a reconcilable credit
- * arrived that we couldn't attribute to any merchant.
+ * arrived that we couldn't attribute to any merchant. Otherwise returns
+ * { code, strong } — see findEightDigitCode's doc comment for what `strong`
+ * means and why callers should check it before auto-crediting a generic
+ * (non-payment-specific) transaction type.
  */
 export function extractMerchantCode({ narrative, customerName, transId } = {}) {
-  const narrativeCode = findEightDigitCode(narrative, { allowTwelveDigitFallback: true });
-  const customerNameCode = findEightDigitCode(customerName);
+  const narrativeMatch = findEightDigitCode(narrative, { allowTwelveDigitFallback: true });
+  const customerNameMatch = findEightDigitCode(customerName);
 
-  const distinctCandidates = new Set([narrativeCode, customerNameCode].filter(Boolean));
+  const distinctCandidates = new Set([narrativeMatch?.code, customerNameMatch?.code].filter(Boolean));
   if (distinctCandidates.size > 1) {
     logStructuralConflict({
       transId: transId ?? null,
-      narrativeCode,
-      customerNameCode,
+      narrativeCode: narrativeMatch?.code ?? null,
+      customerNameCode: customerNameMatch?.code ?? null,
     });
   }
 
   // Primary: Narrative is authoritative and wins outright when valid.
-  if (narrativeCode) {
-    return narrativeCode;
+  if (narrativeMatch) {
+    return narrativeMatch;
   }
 
   // Secondary checkpoint: only reached because Narrative was empty/blank
   // or structurally invalid (no 8-digit run found).
-  if (customerNameCode) {
-    return customerNameCode;
+  if (customerNameMatch) {
+    return customerNameMatch;
   }
 
   return null;

@@ -393,8 +393,10 @@ async function bootstrap() {
   // KPLC/NCWSC payouts whose settlement callback never arrives would
   // otherwise sit 'pending' forever with the merchant's balance already
   // debited (see services/ncbaOpenBankingReconciliationService.js). Checks
-  // every 5 minutes; each stuck payout only actually resolves once it's
-  // been pending past that service's own timeout.
+  // every 5 minutes; a payout stuck past that service's own timeout gets
+  // flagged pendingReason:'stuck_timeout_needs_manual_review', NOT
+  // auto-refunded — NCBA's status-check endpoint is broken, so there's no
+  // reliable way to confirm it actually failed before crediting it back.
   reconcileStuckOpenBankingPayouts().catch((e) => console.error('Open Banking reconciliation sweep failed:', e));
   setInterval(() => {
     reconcileStuckOpenBankingPayouts().catch((e) => console.error('Open Banking reconciliation sweep failed:', e));

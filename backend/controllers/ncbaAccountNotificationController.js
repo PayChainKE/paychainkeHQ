@@ -11,7 +11,7 @@ import {
   validateTransId,
   NcbaAccountNotificationError,
 } from '../utils/ncbaAccountNotificationValidators.js';
-import { isReconcilableTxnType } from '../config/ncbaAccountNotificationCodes.js';
+import { isReconcilableTxnType, isGenericTransferType } from '../config/ncbaAccountNotificationCodes.js';
 import { verifyNcbaHashVal } from '../utils/ncbaHashVal.js';
 import { timingSafeStringEqual } from '../utils/timingSafeCompare.js';
 import { buildNcbaOkResult, buildNcbaFailResult } from '../utils/ncbaSoapResponses.js';
@@ -163,7 +163,25 @@ export const handleNcbaAccountNotification = async (req, res) => {
       return respondOk(res);
     }
 
-    const merchantCode = extractMerchantCode({ narrative: rawNarrative, customerName: rawCustomerName, transId });
+    const merchantCodeMatch = extractMerchantCode({ narrative: rawNarrative, customerName: rawCustomerName, transId });
+    const merchantCode = merchantCodeMatch?.code ?? null;
+
+    // A generic transfer type (PesaLink/Internal Transfer — see
+    // isGenericTransferType's doc comment) covers ANY inbound transfer to
+    // the pooled account, not just customer Virtual Account collections.
+    // Auto-crediting one off a merchant code that only matched because some
+    // unrelated 8-digit substring (a date, an invoice number, a truncated
+    // phone number) happened to coincide with a real merchant's code would
+    // misattribute someone else's money. Require the strong, structurally-
+    // anchored match here; a weak match is parked for manual review instead
+    // of silently trusted, the same way an unattributed credit already is
+    // below.
+    if (merchantCode && !merchantCodeMatch.strong && isGenericTransferType(rawTransType)) {
+      logEvent('error', 'ncba_account_notification_weak_attribution_on_generic_type', {
+        transId, txnType: rawTransType, merchantCode, narrative: rawNarrative, customerName: rawCustomerName, transAmount,
+      });
+      return respondFail(res, 'Could not confidently attribute this credit to a merchant — needs manual review');
+    }
 
     if (!merchantCode) {
       // Before NCBA has assigned PayChain's institution prefix, virtual

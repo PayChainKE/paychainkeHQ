@@ -40,6 +40,19 @@ export class NcbaPayoutValidationError extends Error {
   }
 }
 
+// Thrown by initiateBulkPayment when NCBA has already accepted the H2H
+// batch (submitToNcbaHostToHost succeeded) but the local Mongo transaction
+// persisting the Transaction/PayoutBatch rows afterward failed. The
+// reservation is deliberately NOT refunded in this case — NCBA already has
+// the batch, so refunding it would risk a double-payment once it settles.
+export class NcbaPostSubmissionRecordError extends Error {
+  constructor(message, { batchReference } = {}) {
+    super(message);
+    this.name = 'NcbaPostSubmissionRecordError';
+    this.batchReference = batchReference;
+  }
+}
+
 /**
  * @typedef {Object} PayoutItem
  * @property {string} name
@@ -203,49 +216,68 @@ export async function initiateBulkPayment(merchantId, payoutItems) {
   const session = await mongoose.startSession();
   let batch;
   try {
-    await session.withTransaction(async () => {
-      const transactionDocs = payoutItems.map((item, index) => ({
-        merchantId,
-        accountNumber: item.accountNumber,
-        type: 'ncba_outbound',
-        amount: item.amount,
-        kesAmount: item.amount,
-        currency: 'KES',
-        status: 'pending', // Confirmed asynchronously once NCBA's H2H callback lands.
-        reference: paymentInstructions[index].PaymentReference,
-        sender: { name: reservedMerchant.businessName, id: ncbaDebitAccount || 'PAYCHAIN_SETTLEMENT_ACCOUNT' },
-        recipient: { name: item.name, id: item.accountNumber },
+    try {
+      await session.withTransaction(async () => {
+        const transactionDocs = payoutItems.map((item, index) => ({
+          merchantId,
+          accountNumber: item.accountNumber,
+          type: 'ncba_outbound',
+          amount: item.amount,
+          kesAmount: item.amount,
+          currency: 'KES',
+          status: 'pending', // Confirmed asynchronously once NCBA's H2H callback lands.
+          reference: paymentInstructions[index].PaymentReference,
+          sender: { name: reservedMerchant.businessName, id: ncbaDebitAccount || 'PAYCHAIN_SETTLEMENT_ACCOUNT' },
+          recipient: { name: item.name, id: item.accountNumber },
+        }));
+
+        const createdTransactions = await Transaction.create(transactionDocs, { session });
+
+        const [createdBatch] = await PayoutBatch.create(
+          [
+            {
+              merchantId,
+              batchReference,
+              totalGrossAmount: totalAmount,
+              totalTaxDeductions: 0,
+              totalNetAmount: totalAmount,
+              payeeCount: payoutItems.length,
+              status: 'Pending',
+              fundingSource: 'PayChain Settlement Account',
+              transactions: createdTransactions.map((tx, index) => ({
+                name: payoutItems[index].name,
+                amount: payoutItems[index].amount,
+                grossAmount: payoutItems[index].amount,
+                method: payoutItems[index].type === 'utility' ? 'Bill Pay' : 'Bank Transfer',
+                accountReference: payoutItems[index].accountNumber,
+                receiptNumber: tx.reference,
+                status: 'pending',
+              })),
+            },
+          ],
+          { session }
+        );
+
+        batch = createdBatch;
+      });
+    } catch (recordErr) {
+      // NCBA already accepted this batch (submitToNcbaHostToHost succeeded
+      // above) — the reservation must NOT be refunded here, since Mongo's
+      // transaction guarantees nothing partial was written (either both
+      // documents landed or neither did), and NCBA still has the batch
+      // either way. Surface a distinguished error so the caller doesn't
+      // mistake this for an ordinary failure and tell the merchant it's
+      // safe to retry.
+      console.error(JSON.stringify({
+        level: 'error',
+        event: 'ncba_h2h_bulk_confirmed_but_recording_failed',
+        merchantId: String(merchantId), batchReference, totalAmount, error: recordErr.message,
       }));
-
-      const createdTransactions = await Transaction.create(transactionDocs, { session });
-
-      const [createdBatch] = await PayoutBatch.create(
-        [
-          {
-            merchantId,
-            batchReference,
-            totalGrossAmount: totalAmount,
-            totalTaxDeductions: 0,
-            totalNetAmount: totalAmount,
-            payeeCount: payoutItems.length,
-            status: 'Pending',
-            fundingSource: 'PayChain Settlement Account',
-            transactions: createdTransactions.map((tx, index) => ({
-              name: payoutItems[index].name,
-              amount: payoutItems[index].amount,
-              grossAmount: payoutItems[index].amount,
-              method: payoutItems[index].type === 'utility' ? 'Bill Pay' : 'Bank Transfer',
-              accountReference: payoutItems[index].accountNumber,
-              receiptNumber: tx.reference,
-              status: 'pending',
-            })),
-          },
-        ],
-        { session }
+      throw new NcbaPostSubmissionRecordError(
+        'This bulk payment batch was accepted by NCBA but recording it locally failed — the merchant was NOT refunded.',
+        { batchReference }
       );
-
-      batch = createdBatch;
-    });
+    }
   } finally {
     await session.endSession();
   }

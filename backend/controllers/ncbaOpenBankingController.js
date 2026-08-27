@@ -32,11 +32,30 @@ import { getB2cTariff } from '../config/mpesaB2cTariffCard.js';
 import { getLipaNaMpesaTariff } from '../config/lipaNaMpesaTariffCard.js';
 import { getKplcPostpaidTariff, getKplcPrepaidTariff, getNcwscTariff } from '../config/billPaymentTariffCard.js';
 import { getBankTransferTariff } from '../config/bankTransferTariffCard.js';
+import { logAudit } from '../utils/auditLog.js';
 
 export class InsufficientFundsError extends Error {
   constructor(merchantId, requested, available) {
     super(`Merchant ${merchantId} has insufficient balance: requested ${requested}, available ${available}`);
     this.name = 'InsufficientFundsError';
+  }
+}
+
+// Thrown by executeNcbaBankPayout/executeNcbaMobileMoneyPayout/
+// executeNcbaLipaNaMpesaPayout when NCBA has already confirmed or accepted
+// a transfer but the local Transaction.create() call afterward failed.
+// Distinct from every other error these functions throw specifically so
+// callers can tell "the transfer itself failed/was rejected, and was
+// refunded" apart from "the transfer went through (or was accepted), only
+// our own record-keeping failed" — the merchant is NEVER refunded in this
+// case (refunding here would pay them back for money that actually left),
+// so a caller must not tell the merchant/API consumer this was refunded or
+// that it's safe to retry.
+export class NcbaPostSubmissionRecordError extends Error {
+  constructor(message, { reference } = {}) {
+    super(message);
+    this.name = 'NcbaPostSubmissionRecordError';
+    this.reference = reference;
   }
 }
 
@@ -235,25 +254,36 @@ export async function executeNcbaBankPayout({
     throw err;
   }
 
-  const transaction = await Transaction.create({
-    merchantId,
-    accountNumber: reservedMerchant.ncbaMerchantCode || 'WALLET_FUND',
-    // Fee-mapped to the ncba_disbursement_fee revenue stream (see
-    // config/revenueRateCard.js), priced per-rail off settlementRail below
-    // — see utils/feeCalculator.js.
-    type: 'ncba_outbound',
-    amount: numericAmount,
-    kesAmount: numericAmount,
-    currency: 'KES',
-    // 'completed', not 'pending' — PesaLink resolves synchronously (see
-    // submitNcbaBankTransfer); by this point NCBA has already confirmed
-    // the transfer succeeded, or an error was thrown and caught above.
-    status: 'completed',
-    reference: transactionId,
-    sender: { name: reservedMerchant.businessName, id: process.env.NCBA_OPENBANKING_ACCOUNT_NUMBER || 'PAYCHAIN_NCBA_ACCOUNT' },
-    recipient: { name: accountName || 'Bank Account', id: accountNumber },
-    settlementRail: actualRail,
-  });
+  // NCBA has confirmed this transfer (PesaLink/RTGS resolve synchronously)
+  // — from here on, a failure must never trigger a refund of the reservation
+  // above, since the money has genuinely already left.
+  let transaction;
+  try {
+    transaction = await Transaction.create({
+      merchantId,
+      accountNumber: reservedMerchant.ncbaMerchantCode || 'WALLET_FUND',
+      // Fee-mapped to the ncba_disbursement_fee revenue stream (see
+      // config/revenueRateCard.js), priced per-rail off settlementRail below
+      // — see utils/feeCalculator.js.
+      type: 'ncba_outbound',
+      amount: numericAmount,
+      kesAmount: numericAmount,
+      currency: 'KES',
+      status: 'completed',
+      reference: transactionId,
+      sender: { name: reservedMerchant.businessName, id: process.env.NCBA_OPENBANKING_ACCOUNT_NUMBER || 'PAYCHAIN_NCBA_ACCOUNT' },
+      recipient: { name: accountName || 'Bank Account', id: accountNumber },
+      settlementRail: actualRail,
+    });
+  } catch (recordErr) {
+    logEvent('error', 'ncba_bank_payout_confirmed_but_recording_failed', {
+      merchantId: String(merchantId), transactionId, amount: numericAmount, error: recordErr.message,
+    });
+    throw new NcbaPostSubmissionRecordError(
+      'This bank transfer was confirmed by NCBA but recording it locally failed — the merchant was NOT refunded.',
+      { reference: transactionId }
+    );
+  }
 
   return { transaction, hostResponse, merchant: reservedMerchant, fee: transferFee };
 }
@@ -330,19 +360,34 @@ export async function executeNcbaMobileMoneyPayout({ merchantId, phone, network,
   // success left 'pending' would eventually get auto-marked 'failed' and
   // refunded by the reconciliation sweep purely for lack of a callback
   // that was never coming.
-  const transaction = await Transaction.create({
-    merchantId,
-    accountNumber: reservedMerchant.ncbaMerchantCode || 'WALLET_FUND',
-    type: 'ncba_mobile_b2w',
-    amount: numericAmount,
-    kesAmount: numericAmount,
-    currency: 'KES',
-    status: ncbaConfirmed ? 'completed' : 'pending',
-    reference: transactionId,
-    sender: { name: reservedMerchant.businessName, id: process.env.NCBA_OPENBANKING_ACCOUNT_NUMBER || 'PAYCHAIN_NCBA_ACCOUNT' },
-    recipient: { name: null, id: phone },
-    mobileNetwork: resolvedNetwork,
-  });
+  // NCBA has, at minimum, received this request (the submit try/catch above
+  // only reaches here on success or a request it can't confidently read as
+  // a definite rejection) — a failure below must never refund the
+  // reservation, since the transfer may have already landed.
+  let transaction;
+  try {
+    transaction = await Transaction.create({
+      merchantId,
+      accountNumber: reservedMerchant.ncbaMerchantCode || 'WALLET_FUND',
+      type: 'ncba_mobile_b2w',
+      amount: numericAmount,
+      kesAmount: numericAmount,
+      currency: 'KES',
+      status: ncbaConfirmed ? 'completed' : 'pending',
+      reference: transactionId,
+      sender: { name: reservedMerchant.businessName, id: process.env.NCBA_OPENBANKING_ACCOUNT_NUMBER || 'PAYCHAIN_NCBA_ACCOUNT' },
+      recipient: { name: null, id: phone },
+      mobileNetwork: resolvedNetwork,
+    });
+  } catch (recordErr) {
+    logEvent('error', 'ncba_mobile_money_payout_confirmed_but_recording_failed', {
+      merchantId: String(merchantId), transactionId, amount: numericAmount, ncbaConfirmed, error: recordErr.message,
+    });
+    throw new NcbaPostSubmissionRecordError(
+      'This mobile money payout was submitted to NCBA but recording it locally failed — the merchant was NOT refunded.',
+      { reference: transactionId }
+    );
+  }
 
   return { transaction, merchant: reservedMerchant, fee: totalFee };
 }
@@ -404,19 +449,33 @@ export async function executeNcbaLipaNaMpesaPayout({ merchantId, paymentType, pa
     }
   }
 
-  const transaction = await Transaction.create({
-    merchantId,
-    accountNumber: reservedMerchant.ncbaMerchantCode || 'WALLET_FUND',
-    type: 'ncba_lipa_na_mpesa',
-    amount: numericAmount,
-    kesAmount: numericAmount,
-    currency: 'KES',
-    // 'pending' — Lipa na M-Pesa confirms asynchronously, see doc comment above.
-    status: 'pending',
-    reference: transactionId,
-    sender: { name: reservedMerchant.businessName, id: process.env.NCBA_OPENBANKING_ACCOUNT_NUMBER || 'PAYCHAIN_NCBA_ACCOUNT' },
-    recipient: { name: null, id: payBillTillNo },
-  });
+  // NCBA has, at minimum, received this request — a failure below must
+  // never refund the reservation, for the same reason as the two executors
+  // above.
+  let transaction;
+  try {
+    transaction = await Transaction.create({
+      merchantId,
+      accountNumber: reservedMerchant.ncbaMerchantCode || 'WALLET_FUND',
+      type: 'ncba_lipa_na_mpesa',
+      amount: numericAmount,
+      kesAmount: numericAmount,
+      currency: 'KES',
+      // 'pending' — Lipa na M-Pesa confirms asynchronously, see doc comment above.
+      status: 'pending',
+      reference: transactionId,
+      sender: { name: reservedMerchant.businessName, id: process.env.NCBA_OPENBANKING_ACCOUNT_NUMBER || 'PAYCHAIN_NCBA_ACCOUNT' },
+      recipient: { name: null, id: payBillTillNo },
+    });
+  } catch (recordErr) {
+    logEvent('error', 'ncba_lnm_payout_confirmed_but_recording_failed', {
+      merchantId: String(merchantId), transactionId, amount: numericAmount, error: recordErr.message,
+    });
+    throw new NcbaPostSubmissionRecordError(
+      'This Paybill/Till payout was submitted to NCBA but recording it locally failed — the merchant was NOT refunded.',
+      { reference: transactionId }
+    );
+  }
 
   return { transaction, merchant: reservedMerchant, fee: totalFee, resolvedType: resolvedPaymentType };
 }
@@ -550,6 +609,21 @@ export const handleBankPayout = async (req, res) => {
     }
     if (err instanceof NcbaOpenBankingValidationError) {
       return res.status(400).json({ error: err.message });
+    }
+    if (err instanceof NcbaPostSubmissionRecordError) {
+      // The transfer itself was confirmed by NCBA — the merchant was NOT
+      // refunded, and must not be told it was. Distinct from the generic
+      // branch below, whose "failed and was refunded" SMS would be false
+      // here.
+      logEvent('error', 'ncba_openbanking_payout_post_submission_record_error', {
+        merchantId: merchantId.toString(), reference: err.reference, error: err.message,
+      });
+      return res.status(202).json({
+        success: true,
+        pending: true,
+        message: 'Your bank transfer was sent, but we hit an error recording it. Please check your transaction history shortly — do not resubmit this payout.',
+        reference: err.reference,
+      });
     }
     logEvent('error', 'ncba_openbanking_payout_error', { merchantId: merchantId.toString(), error: err.message, stack: err.stack });
 
@@ -826,5 +900,72 @@ export async function resolvePendingOpenBankingTransaction({ reference, succeede
     logEvent('info', 'ncba_openbanking_callback_processed', { reference, succeeded });
   } catch (err) {
     logEvent('error', 'ncba_openbanking_callback_error', { reference, error: err.message, stack: err.stack });
+  }
+};
+
+// @desc    List NCBA async-rail payouts stuck 'pending' past
+//          ncbaOpenBankingReconciliationService.js's timeout window,
+//          flagged pendingReason:'stuck_timeout_needs_manual_review'
+//          instead of being auto-refunded (NCBA's TransactionStatusQuery
+//          endpoint is confirmed broken, so the sweep can no longer trust a
+//          bare timeout as proof a payout failed — see that service's own
+//          doc comment). This is the admin-facing counterpart: without it,
+//          flagged payouts had no in-app resolution path at all.
+// @route   GET /admin/ncba-payouts/stuck-review
+// @access  Private (admin, excludeOfficer)
+export const adminListStuckOpenBankingPayouts = async (req, res) => {
+  try {
+    const transactions = await Transaction.find({
+      status: 'pending',
+      pendingReason: 'stuck_timeout_needs_manual_review',
+    })
+      .sort('-createdAt')
+      .limit(200)
+      .populate('merchantId', 'businessName phone ncbaMerchantCode');
+    res.json({ transactions });
+  } catch (err) {
+    logEvent('error', 'admin_list_stuck_openbanking_payouts_error', { error: err.message });
+    res.status(500).json({ error: 'Failed to list stuck payouts' });
+  }
+};
+
+// @desc    Manually resolve one flagged stuck payout, after an admin has
+//          checked NCBA's portal directly to see whether it actually
+//          landed. Routes through the exact same resolution path a real
+//          NCBA webhook uses (resolvePendingOpenBankingTransaction) — same
+//          atomic {status:'pending'} claim, same refund-on-failure/
+//          notify-on-success behaviour — so this can never double-resolve
+//          a transaction a late-arriving real callback already settled.
+// @route   POST /admin/ncba-payouts/:reference/resolve
+// @access  Private (admin, requireMutator + sensitiveActionLimiter — this
+//          can trigger a real refund)
+export const adminResolveStuckOpenBankingPayout = async (req, res) => {
+  const { reference } = req.params;
+  const { succeeded } = req.body;
+  if (typeof succeeded !== 'boolean') {
+    return res.status(400).json({ error: 'succeeded (boolean) is required.' });
+  }
+  try {
+    const before = await Transaction.findOne({ reference }).select('status pendingReason');
+    if (!before) {
+      return res.status(404).json({ error: 'No transaction found with this reference.' });
+    }
+    if (before.status !== 'pending') {
+      return res.status(409).json({ error: `This transaction is already '${before.status}' — nothing to resolve.` });
+    }
+
+    await resolvePendingOpenBankingTransaction({ reference, succeeded });
+
+    const after = await Transaction.findOne({ reference }).select('status');
+    logAudit({
+      action: 'admin.ncba_payout.manual_resolve', category: 'wallet', severity: 'critical',
+      message: `Admin manually resolved stuck payout ${reference} as ${succeeded ? 'succeeded' : 'failed'}`,
+      req, actor: { type: 'admin', id: req.admin._id, email: req.admin.email, name: req.admin.name },
+      metadata: { reference, succeeded, resultingStatus: after?.status },
+    });
+    res.json({ success: true, reference, status: after?.status });
+  } catch (err) {
+    logEvent('error', 'admin_resolve_stuck_openbanking_payout_error', { reference, error: err.message });
+    res.status(500).json({ error: 'Failed to resolve this payout' });
   }
 };

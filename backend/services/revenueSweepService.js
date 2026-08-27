@@ -6,6 +6,7 @@ import { submitNcbaBankTransfer } from '../controllers/ncbaOpenBankingController
 import { sendRevenueSweepNotification } from '../utils/resend.js';
 import { LIVE_DATA_CUTOFF } from '../config/liveDataCutoff.js';
 import { reversedTransactionExclusionMatch } from '../utils/reversedTransactions.js';
+import { claimPayoutSubmission, DuplicateSubmissionError } from '../utils/idempotencyGuard.js';
 
 // NCBA PesaLink's own per-transfer ceiling (services/ncbaOpenBankingService.js).
 // A single week's accrued fees are extremely unlikely to hit this at
@@ -174,14 +175,38 @@ export async function runRevenueSweep() {
   const periodStart = new Date(periodEnd);
   periodStart.setUTCDate(periodStart.getUTCDate() - 7);
 
-  const { unswept, transactionCount } = await computeUnsweptRevenue();
-  const attemptedAmount = Math.min(unswept, MAX_TRANSFER_AMOUNT);
-
   const destinationAudit = {
     destinationBankCode, destinationAccountNumber,
     destinationBranchCode: REVENUE_SWEEP_DESTINATION.branchCode,
     destinationSwiftCode: REVENUE_SWEEP_DESTINATION.swiftCode,
   };
+
+  // Prevents two concurrent invocations (an admin double-clicking "Run
+  // Sweep Now", or a manual trigger racing the scheduled weekly check) from
+  // both computing the same unswept figure and both submitting a real
+  // transfer for it. That would move real merchant money out of the pooled
+  // account, not just PayChain's own revenue — computeExpectedPoolBalance
+  // above treats the pool as merchant balances + unswept fees, so
+  // over-sweeping drains merchant funds along with it. Reuses the same
+  // atomic unique-index claim every merchant payout already relies on
+  // (utils/idempotencyGuard.js) instead of a bespoke lock; the window only
+  // needs to outlast one sweep attempt (well under a minute in practice).
+  try {
+    await claimPayoutSubmission('revenue-sweep', ['run'], { windowSeconds: 120 });
+  } catch (e) {
+    if (e instanceof DuplicateSubmissionError) {
+      logEvent('warn', 'revenue_sweep_already_in_progress', {});
+      return recordSweep({
+        periodStart, periodEnd, attemptedAmount: 0, transactionCount: 0, status: 'skipped',
+        ...destinationAudit,
+        failureReason: 'A sweep was already in progress — skipped to avoid submitting a duplicate transfer.',
+      });
+    }
+    throw e;
+  }
+
+  const { unswept, transactionCount } = await computeUnsweptRevenue();
+  const attemptedAmount = Math.min(unswept, MAX_TRANSFER_AMOUNT);
 
   if (attemptedAmount < MIN_TRANSFER_AMOUNT) {
     logEvent('info', 'revenue_sweep_skipped_below_minimum', { unswept });

@@ -578,6 +578,12 @@ export const authorizeBatch = async (req, res) => {
 
     const transactions = [];
     let refundAmount = 0;
+    // Rows whose local bookkeeping (Transaction.create, the fee-correction
+    // update, or the transactions[] push below) threw after the row's own
+    // NCBA call already ran — see the per-row catch below for how each is
+    // handled. Surfaced in the response/notification rather than silently
+    // vanishing from the batch.
+    const recordingFailures = [];
 
     // 4. Process each row (payee already resolved in the pass above)
     for (const row of batchRows) {
@@ -860,58 +866,81 @@ export const authorizeBatch = async (req, res) => {
       // into totalDebit) — reused here rather than re-derived, so the two
       // can never disagree.
       const isNcbaRouted = payee.paymentMethod === 'Bank' || (payee.type === 'utility' && payee.utilityProvider);
-      const transaction = await Transaction.create({
-        merchantId: merchant._id,
-        accountNumber: merchant.ncbaMerchantCode || 'WALLET_FUND',
-        type: row.isKplcRow ? 'ncba_kplc' : row.isKplcPrepaidRow ? 'ncba_kplc_prepaid' : row.isNcwscRow ? 'ncba_ncwsc' : row.isLnmRow ? 'ncba_lipa_na_mpesa' : (isNcbaRouted ? 'ncba_outbound' : 'bulk_pay'),
-        amount: row.netAmount,
-        kesAmount: row.netAmount,
-        currency: 'KES',
-        status: payoutStatus,
-        reference: payoutRef,
-        sender: { name: merchant.businessName, id: merchant.ncbaMerchantCode },
-        recipient: { name: payee.name, id: (payee.type === 'utility' && payee.utilityProvider) ? payee.accountNumber : (payee.phone || payee.paybillNumber || payee.tillNumber) },
-        mobileNetwork: (payee.paymentMethod === 'Mobile Money' && payee.mobileMoneyType === 'Personal Number')
-          ? (payee.mobileNetwork === 'airtel' ? 'airtel' : 'safaricom')
-          : null,
-        // Only Bank rows ever set this (captured from submitNcbaBankTransfer's
-        // return above) — utils/feeCalculator.js's pre-save hook uses it to
-        // price 'ncba_outbound' per-rail. undefined for every other row,
-        // which Mongoose leaves at the schema default (null).
-        settlementRail: row.settlementRail,
-      });
+      try {
+        const transaction = await Transaction.create({
+          merchantId: merchant._id,
+          accountNumber: merchant.ncbaMerchantCode || 'WALLET_FUND',
+          type: row.isKplcRow ? 'ncba_kplc' : row.isKplcPrepaidRow ? 'ncba_kplc_prepaid' : row.isNcwscRow ? 'ncba_ncwsc' : row.isLnmRow ? 'ncba_lipa_na_mpesa' : (isNcbaRouted ? 'ncba_outbound' : 'bulk_pay'),
+          amount: row.netAmount,
+          kesAmount: row.netAmount,
+          currency: 'KES',
+          status: payoutStatus,
+          reference: payoutRef,
+          sender: { name: merchant.businessName, id: merchant.ncbaMerchantCode },
+          recipient: { name: payee.name, id: (payee.type === 'utility' && payee.utilityProvider) ? payee.accountNumber : (payee.phone || payee.paybillNumber || payee.tillNumber) },
+          mobileNetwork: (payee.paymentMethod === 'Mobile Money' && payee.mobileMoneyType === 'Personal Number')
+            ? (payee.mobileNetwork === 'airtel' ? 'airtel' : 'safaricom')
+            : null,
+          // Only Bank rows ever set this (captured from submitNcbaBankTransfer's
+          // return above) — utils/feeCalculator.js's pre-save hook uses it to
+          // price 'ncba_outbound' per-rail. undefined for every other row,
+          // which Mongoose leaves at the schema default (null).
+          settlementRail: row.settlementRail,
+        });
 
-      // The pre-save hook above stamps a generic 0.5% fee for 'bulk_pay' —
-      // replace it with the real Safaricom B2C tariff + PayChain's flat
-      // markup for rows that actually carry it (reserved from the merchant
-      // in the resolve pass above), so the persisted figures match what
-      // was really charged. Skipped for rows that failed synchronously —
-      // their fee was refunded above, so PayChain kept nothing.
-      // handlePesaLinkCallback later flips status pending → completed/failed
-      // for rows still pending here; it only touches `status`, so this
-      // reconciliation isn't clobbered by that follow-up save.
-      if (row.isB2cRow && payoutStatus !== 'failed') {
-        await Transaction.updateOne(
-          { _id: transaction._id },
-          { $set: { paychainFee: row.b2cMarkup, safaricomFee: row.b2cSafaricomFee, revenueStream: 'mpesa_b2c_fee' } }
-        );
+        // The pre-save hook above stamps a generic 0.5% fee for 'bulk_pay' —
+        // replace it with the real Safaricom B2C tariff + PayChain's flat
+        // markup for rows that actually carry it (reserved from the merchant
+        // in the resolve pass above), so the persisted figures match what
+        // was really charged. Skipped for rows that failed synchronously —
+        // their fee was refunded above, so PayChain kept nothing.
+        // handlePesaLinkCallback later flips status pending → completed/failed
+        // for rows still pending here; it only touches `status`, so this
+        // reconciliation isn't clobbered by that follow-up save.
+        if (row.isB2cRow && payoutStatus !== 'failed') {
+          await Transaction.updateOne(
+            { _id: transaction._id },
+            { $set: { paychainFee: row.b2cMarkup, safaricomFee: row.b2cSafaricomFee, revenueStream: 'mpesa_b2c_fee' } }
+          );
+        }
+
+        transactions.push({
+          payeeId: payee._id,
+          name: payee.name,
+          amount: row.netAmount,
+          grossAmount: row.grossAmount,
+          taxDeductions: row.taxDeductions || { paye: 0, nssf: 0, shif: 0 },
+          method: payee.paymentMethod,
+          accountReference: payee.phone || payee.paybillNumber || payee.tillNumber || payee.accountNumber || 'N/A',
+          receiptNumber: payoutRef,
+          status: payoutStatus,
+          b2cFee: payoutStatus !== 'failed' ? row.b2cFee : 0,
+          utilityFee: payoutStatus !== 'failed' ? row.utilityFee : 0,
+          lnmFee: payoutStatus !== 'failed' ? row.lnmFee : 0,
+          bankFee: payoutStatus !== 'failed' ? row.bankFee : 0,
+        });
+      } catch (recordErr) {
+        // The row's own NCBA outcome (payoutStatus, above) already happened
+        // and is final — only the local bookkeeping for it failed. If NCBA
+        // was never actually contacted for this row (payoutStatus ===
+        // 'failed'), it's safe to refund like any other synchronous
+        // failure. Otherwise NCBA already has it (or already sent it) —
+        // refunding would risk paying the merchant back for money that
+        // moved, so this is left unrefunded and flagged loudly for manual
+        // reconciliation instead of silently vanishing from the batch.
+        console.error(`❌ Bulk Pay row bookkeeping failed for ${payee.name} (payoutStatus was '${payoutStatus}'):`, recordErr.message);
+        if (payoutStatus === 'failed') {
+          refundAmount += row.netAmount + row.b2cFee + row.utilityFee + row.lnmFee + row.bankFee;
+        } else {
+          console.error(JSON.stringify({
+            level: 'error',
+            event: 'bulk_pay_row_confirmed_but_recording_failed',
+            merchantId: String(merchant._id), payeeName: payee.name, payoutRef, payoutStatus,
+            netAmount: row.netAmount, error: recordErr.message,
+          }));
+        }
+        recordingFailures.push({ payeeName: payee.name, payoutRef, payoutStatus, netAmount: row.netAmount });
       }
-
-      transactions.push({
-        payeeId: payee._id,
-        name: payee.name,
-        amount: row.netAmount,
-        grossAmount: row.grossAmount,
-        taxDeductions: row.taxDeductions || { paye: 0, nssf: 0, shif: 0 },
-        method: payee.paymentMethod,
-        accountReference: payee.phone || payee.paybillNumber || payee.tillNumber || payee.accountNumber || 'N/A',
-        receiptNumber: payoutRef,
-        status: payoutStatus,
-        b2cFee: payoutStatus !== 'failed' ? row.b2cFee : 0,
-        utilityFee: payoutStatus !== 'failed' ? row.utilityFee : 0,
-        lnmFee: payoutStatus !== 'failed' ? row.lnmFee : 0,
-        bankFee: payoutStatus !== 'failed' ? row.bankFee : 0,
-      });
     }
 
     // Refund whatever was rejected synchronously so the batch deduction stays accurate
@@ -951,13 +980,34 @@ export const authorizeBatch = async (req, res) => {
       transactions,
     });
 
-    const savedBatch = await batch.save();
+    let savedBatch;
+    try {
+      savedBatch = await batch.save();
+    } catch (batchSaveErr) {
+      // Every row above is already resolved and accounted for (refunded if
+      // it failed synchronously, or has its own Transaction record if NCBA
+      // has it) — only this batch-level summary document failed to
+      // persist. Money is not at risk here, but responding with the
+      // generic "Failed to authorize batch" message below would wrongly
+      // suggest nothing happened and invite a resubmit, double-sending
+      // every row that actually went out. Log loudly and tell the merchant
+      // the truth instead.
+      console.error(JSON.stringify({
+        level: 'error',
+        event: 'bulk_pay_batch_save_failed',
+        merchantId: String(merchant._id), rowCount: transactions.length, totalNet, error: batchSaveErr.message,
+      }));
+      return res.status(202).json({
+        message: `Your ${transactions.length}-payout batch (KES ${totalNet.toLocaleString()}) was processed, but we hit an error saving the batch summary. Check your transaction history for each payout — do not resubmit this batch.`,
+        recordingFailures,
+      });
+    }
 
     createNotification({
       merchantId: req.merchant._id,
       kind: 'payment',
       title: 'Bulk payout submitted',
-      message: `Batch of ${transactions.length} payout${transactions.length === 1 ? '' : 's'} (KES ${totalNet.toLocaleString()}) has been submitted${refundAmount > 0 ? `; KES ${refundAmount.toLocaleString()} was refunded for payouts that failed to send.` : '.'}`,
+      message: `Batch of ${transactions.length} payout${transactions.length === 1 ? '' : 's'} (KES ${totalNet.toLocaleString()}) has been submitted${refundAmount > 0 ? `; KES ${refundAmount.toLocaleString()} was refunded for payouts that failed to send.` : '.'}${recordingFailures.length > 0 ? ` ${recordingFailures.length} payout(s) need manual reconciliation.` : ''}`,
     });
 
     // Non-blocking — a pending row here still gets its own resolution SMS
@@ -989,6 +1039,7 @@ export const authorizeBatch = async (req, res) => {
     res.status(200).json({
       message: 'Batch authorized and processed successfully.',
       batch: savedBatch,
+      ...(recordingFailures.length > 0 ? { recordingFailures } : {}),
     });
 
   } catch (error) {

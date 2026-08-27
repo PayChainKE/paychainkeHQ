@@ -912,6 +912,13 @@ export const getSTKStatus = async (req, res) => {
 export const initiateB2C = async (req, res) => {
   let debited = false;
   let totalDebit = 0;
+  // Set once ncbaSubmitMobileB2wPayment has actually confirmed the payout —
+  // from that point on, a later local failure (e.g. Transaction.create
+  // throwing) must NOT trigger the catch block's refund below, since the
+  // money has already genuinely left for the recipient. Carries the fields
+  // needed for a best-effort Transaction record + loud alert in that case,
+  // since transactionId/merchant/etc are otherwise scoped to the try block.
+  let ncbaConfirmedContext = null;
   try {
     const { amount, destination, reference, pin } = req.body;
     const merchantId = req.merchant._id;
@@ -1059,6 +1066,13 @@ export const initiateB2C = async (req, res) => {
       throw ncbaErr;
     }
 
+    // Past this point NCBA has confirmed the transfer — nothing below may
+    // trigger the catch block's refund anymore.
+    ncbaConfirmedContext = {
+      transactionId, merchantId: merchant._id, amount, destination, phone, provider,
+      beneficiaryName, businessName: merchant.businessName, ncbaMerchantCode: merchant.ncbaMerchantCode,
+    };
+
     // type: 'ncba_mobile_b2w' — status is 'completed', not 'pending':
     // reaching this line means submitMobileB2wPayment's broadened success
     // check actually confirmed the transfer (see that function's own doc
@@ -1115,6 +1129,47 @@ export const initiateB2C = async (req, res) => {
     res.status(200).json({ success: true, message: 'Transfer initiated successfully', transaction: tx });
 
   } catch (error) {
+    if (ncbaConfirmedContext) {
+      // NCBA already confirmed this payout landed — refunding now would pay
+      // the merchant back for money that genuinely left the pooled account,
+      // a real, unrecovered loss. Never refund past this point; best-effort
+      // record the completed Transaction (the thing that actually failed
+      // above) so there's still a paper trail, and alert loudly either way
+      // since this always needs a human to confirm nothing's missing.
+      console.error(JSON.stringify({
+        level: 'error',
+        event: 'b2c_local_failure_after_ncba_confirmed',
+        message: 'A B2C payout was confirmed by NCBA but a local step afterward failed — the merchant was NOT refunded (the transfer already happened). Verify a Transaction record exists for this reference; if not, one was reconstructed below on a best-effort basis.',
+        ...ncbaConfirmedContext,
+        merchantId: String(ncbaConfirmedContext.merchantId),
+        error: error.message,
+      }));
+      try {
+        await Transaction.findOneAndUpdate(
+          { reference: ncbaConfirmedContext.transactionId },
+          {
+            $setOnInsert: {
+              merchantId: ncbaConfirmedContext.merchantId,
+              accountNumber: ncbaConfirmedContext.ncbaMerchantCode || 'WALLET_FUND',
+              type: 'ncba_mobile_b2w',
+              amount: ncbaConfirmedContext.amount,
+              kesAmount: ncbaConfirmedContext.amount,
+              currency: 'KES',
+              status: 'completed',
+              reference: ncbaConfirmedContext.transactionId,
+              sender: { name: ncbaConfirmedContext.businessName, id: ncbaConfirmedContext.ncbaMerchantCode },
+              recipient: { name: ncbaConfirmedContext.destination, id: ncbaConfirmedContext.phone },
+              mobileNetwork: ncbaConfirmedContext.provider,
+            },
+          },
+          { upsert: true }
+        );
+      } catch (reconcileErr) {
+        console.error('❌ B2C post-confirmation Transaction reconstruction also failed — needs manual reconciliation:', reconcileErr.message);
+      }
+      return serverError(res, 500, 'Your transfer went through, but we hit an error recording it. Please check your transaction history shortly.', error, '❌ B2C Transfer Error (post-confirmation):');
+    }
+
     // Refund the merchant only if the deduction actually happened — an
     // earlier failure (e.g. PIN check) never touched the balance. Refunds
     // the full totalDebit (amount + B2C fee), matching what was actually
@@ -1143,6 +1198,11 @@ export const initiateB2C = async (req, res) => {
 export const initiateB2B = async (req, res) => {
   let debited = false;
   let totalDebit = 0;
+  // Set once NCBA has accepted the submission — from that point on, a
+  // local failure (e.g. Transaction.create throwing) must NOT refund the
+  // merchant, since NCBA has already taken on the transfer. See the
+  // matching comment in initiateB2C above for the full reasoning.
+  let ncbaAcceptedContext = null;
   try {
     const { billType, partyB, accountReference, amount, reference, pin } = req.body;
     const merchantId = req.merchant._id;
@@ -1280,6 +1340,14 @@ export const initiateB2B = async (req, res) => {
       throw ncbaErr;
     }
 
+    // Past this point NCBA has accepted the submission — nothing below may
+    // trigger the catch block's refund anymore.
+    ncbaAcceptedContext = {
+      transactionId, merchantId: merchant._id, amount: numericAmount,
+      businessName: merchant.businessName, ncbaMerchantCode: merchant.ncbaMerchantCode,
+      recipientName, partyB,
+    };
+
     const tx = await Transaction.create({
       merchantId: merchant._id,
       accountNumber: merchant.ncbaMerchantCode || 'WALLET_FUND',
@@ -1297,6 +1365,48 @@ export const initiateB2B = async (req, res) => {
 
   } catch (error) {
     if (error.response?.data) console.error('❌ B2B Transfer Error (NCBA response):', error.response.data);
+
+    if (ncbaAcceptedContext) {
+      // NCBA already accepted this payout for processing — refunding now
+      // risks a double-payment once it settles. Also, without a Transaction
+      // row for this reference, handlePesaLinkCallback/the reconciliation
+      // sweep would have nothing to resolve later — so best-effort create
+      // the same 'pending' row the happy path would have, letting the
+      // normal async resolution machinery (webhook or stuck-payout sweep)
+      // decide the real outcome instead of guessing here.
+      console.error(JSON.stringify({
+        level: 'error',
+        event: 'b2b_local_failure_after_ncba_accepted',
+        message: 'A B2B payout was accepted by NCBA but a local step afterward failed — the merchant was NOT refunded. Verify a pending Transaction record exists for this reference.',
+        ...ncbaAcceptedContext,
+        merchantId: String(ncbaAcceptedContext.merchantId),
+        error: error.message,
+      }));
+      try {
+        await Transaction.findOneAndUpdate(
+          { reference: ncbaAcceptedContext.transactionId },
+          {
+            $setOnInsert: {
+              merchantId: ncbaAcceptedContext.merchantId,
+              accountNumber: ncbaAcceptedContext.ncbaMerchantCode || 'WALLET_FUND',
+              type: 'ncba_lipa_na_mpesa',
+              amount: ncbaAcceptedContext.amount,
+              kesAmount: ncbaAcceptedContext.amount,
+              currency: 'KES',
+              status: 'pending',
+              reference: ncbaAcceptedContext.transactionId,
+              sender: { name: ncbaAcceptedContext.businessName, id: ncbaAcceptedContext.ncbaMerchantCode },
+              recipient: { name: ncbaAcceptedContext.recipientName, id: ncbaAcceptedContext.partyB },
+            },
+          },
+          { upsert: true }
+        );
+      } catch (reconcileErr) {
+        console.error('❌ B2B post-acceptance Transaction reconstruction also failed — needs manual reconciliation:', reconcileErr.message);
+      }
+      return serverError(res, 500, 'Your transfer was submitted, but we hit an error recording it. Please check your transaction history shortly.', error, '❌ B2B Transfer Error (post-acceptance):');
+    }
+
     // Refund the merchant only if the deduction actually happened.
     if (debited && totalDebit > 0) {
       await Merchant.findByIdAndUpdate(req.merchant._id, { $inc: { kesBalance: totalDebit } });

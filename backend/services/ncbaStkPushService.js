@@ -55,6 +55,28 @@ const ncbaStkSubscriptionKey = process.env.NCBA_STK_SUBSCRIPTION_KEY || process.
 // whitelisting are confirmed.
 const liveCallsEnabled = process.env.NCBA_STK_LIVE_ENABLED === 'true';
 
+// Real credentials configured but live calls off is either (a) the
+// legitimate mid-whitelisting state this flag exists for, or (b)
+// NCBA_STK_LIVE_ENABLED silently dropped/misspelled on a redeploy that was
+// previously live — which would make queryStkPush's simulate() branch below
+// report every real customer's STK prompt as an instant SUCCESS with no
+// NCBA call ever made, crediting merchants for money nobody paid. This
+// codebase has no reliable signal to tell those two cases apart (NODE_ENV
+// can't be trusted — see ncbaOpenBankingService.js's own comment on hosting
+// platforms setting it to 'production' on staging too), so this can't
+// safely refuse to boot without breaking the legitimate case. Logging loud
+// and early is the safe middle ground: it surfaces case (b) in Render's
+// logs the moment the process starts, instead of only being discovered
+// later via a reconciliation mismatch.
+if (!liveCallsEnabled && ncbaStkUsername && ncbaStkPassword) {
+  console.error(JSON.stringify({
+    level: 'error',
+    event: 'ncba_stk_live_disabled_with_credentials_present',
+    ts: new Date().toISOString(),
+    message: "NCBA_STK_LIVE_ENABLED is not 'true' but real STK credentials are configured — every STK Push/QR/Pay-Account collection will be SIMULATED as an instant success with no NCBA call and no customer PIN entry. If this deployment is meant to be live, NCBA_STK_LIVE_ENABLED is almost certainly missing or misspelled.",
+  }));
+}
+
 export class NcbaStkAuthError extends Error {
   constructor(message) {
     super(message);
