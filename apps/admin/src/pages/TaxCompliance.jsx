@@ -4,6 +4,8 @@ import api from '../api/api';
 import { useToast } from '../context/ToastContext';
 import { formatKES } from '../utils/formatCurrency';
 import TaxDeadlineCalendar from '../components/ui/TaxDeadlineCalendar';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 const PERIODS = [
@@ -120,6 +122,7 @@ const TaxCompliance = () => {
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [summaryError, setSummaryError] = useState('');
   const [kraExporting, setKraExporting] = useState(false);
+  const [pdfGenerating, setPdfGenerating] = useState(false);
 
   const [deadlines, setDeadlines] = useState([]);
   const [deadlinesLoading, setDeadlinesLoading] = useState(true);
@@ -205,6 +208,119 @@ const TaxCompliance = () => {
       showToast('Could not download the KRA revenue export.', 'error');
     } finally {
       setKraExporting(false);
+    }
+  }
+
+  // Built purely from `summary` — the exact same response the KPI strip
+  // above already renders, not a second server round trip or a separate
+  // calculation. That's deliberate: a persisted server-side PDF would be a
+  // fourth copy of these numbers that could silently go stale the moment
+  // an expense is edited after generation; regenerating on demand from
+  // whatever's already on screen means it's always current.
+  function downloadMonthlySummaryPdf() {
+    if (!summary?.pnl) { showToast('Nothing to summarize yet — wait for the period to load.', 'error'); return; }
+    setPdfGenerating(true);
+    try {
+      const { pnl, period: p, categories } = summary;
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const W = doc.internal.pageSize.getWidth();
+      const L = 14, R = W - 14;
+      const now = new Date();
+
+      // Header band
+      doc.setFillColor(6, 32, 27);
+      doc.rect(0, 0, W, 34, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(16);
+      doc.text('PayChain Kenya', L, 15);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(94, 254, 179);
+      doc.text('MONTHLY TAX & REVENUE SUMMARY', L, 22);
+      doc.setTextColor(200, 220, 210);
+      doc.setFontSize(8);
+      doc.text(`Period: ${p.label}`, L, 28);
+      doc.text(`Generated: ${now.toLocaleString('en-KE', { dateStyle: 'medium', timeStyle: 'short' })}`, R, 28, { align: 'right' });
+
+      // KPI block
+      let y = 46;
+      doc.setTextColor(6, 32, 27);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.text('Profit & Loss Summary', L, y);
+      doc.setDrawColor(220, 230, 225);
+      doc.line(L, y + 2, R, y + 2);
+      y += 9;
+
+      const rows = [
+        ['Income (Fee Revenue)', fmtKES(pnl.income)],
+        ['Total Expenses', fmtKES(pnl.totalExpenses)],
+        ['Deductible Expenses', fmtKES(pnl.deductibleExpenses)],
+        ['Net Profit', fmtKES(pnl.netProfit)],
+        ['Taxable Profit', fmtKES(pnl.taxableProfit)],
+        ['Input VAT (on expenses)', fmtKES(pnl.vatTotal)],
+        [`Estimated Tax Liability (${(pnl.taxRate * 100).toFixed(0)}% corporate rate)`, fmtKES(pnl.estimatedTaxLiability)],
+      ];
+      rows.forEach(([label, value], i) => {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(90, 100, 95);
+        doc.text(label, L, y);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(6, 32, 27);
+        doc.text(value, R, y, { align: 'right' });
+        y += 7;
+        if (i === rows.length - 1) {
+          doc.setDrawColor(6, 32, 27);
+          doc.setLineWidth(0.5);
+          doc.line(L, y - 4.5, R, y - 4.5);
+        }
+      });
+
+      // Category breakdown table
+      y += 6;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(6, 32, 27);
+      doc.text('Expense by Category', L, y);
+      y += 4;
+
+      if (categories?.length) {
+        autoTable(doc, {
+          startY: y,
+          margin: { left: L, right: L },
+          head: [['Category', 'Entries', 'Total (KES)']],
+          body: categories.map((c) => [c.category, String(c.count), fmtKES(c.total)]),
+          styles: { font: 'helvetica', fontSize: 8.5, textColor: [60, 70, 65] },
+          headStyles: { fillColor: [6, 32, 27], textColor: [255, 255, 255], fontStyle: 'bold' },
+          alternateRowStyles: { fillColor: [244, 247, 245] },
+        });
+        y = doc.lastAutoTable.finalY + 10;
+      } else {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(120, 130, 125);
+        doc.text('No expenses recorded for this period.', L, y + 6);
+        y += 16;
+      }
+
+      // Footer disclaimer
+      const pageH = doc.internal.pageSize.getHeight();
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(7.5);
+      doc.setTextColor(140, 150, 145);
+      doc.text(
+        'Generated by PayChain Admin for accountant use in KRA filing — not an official KRA document.',
+        L, pageH - 12
+      );
+      doc.text(`© ${now.getFullYear()} PayChainKE · Nairobi, Kenya`, L, pageH - 8);
+
+      doc.save(`paychain-monthly-tax-summary-${p.preset}-${now.toISOString().slice(0, 10)}.pdf`);
+    } catch (e) {
+      showToast('Could not generate the summary PDF.', 'error');
+    } finally {
+      setPdfGenerating(false);
     }
   }
 
@@ -311,6 +427,10 @@ const TaxCompliance = () => {
               <button onClick={downloadKraExport} disabled={kraExporting} className="flex items-center gap-2 px-3.5 py-2 bg-white/10 hover:bg-white/15 backdrop-blur-sm border border-white/10 text-white text-2xs font-bold rounded-xl uppercase tracking-widest transition-all disabled:opacity-50">
                 <span className={`material-symbols-outlined text-base ${kraExporting ? 'animate-spin' : ''}`}>{kraExporting ? 'progress_activity' : 'file_download'}</span>
                 {kraExporting ? 'Preparing…' : 'KRA Export'}
+              </button>
+              <button onClick={downloadMonthlySummaryPdf} disabled={pdfGenerating || !summary} className="flex items-center gap-2 px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-white text-2xs font-bold rounded-xl uppercase tracking-widest transition-all shadow-lg disabled:opacity-50">
+                <span className={`material-symbols-outlined text-base ${pdfGenerating ? 'animate-spin' : ''}`}>{pdfGenerating ? 'progress_activity' : 'picture_as_pdf'}</span>
+                {pdfGenerating ? 'Generating…' : 'Monthly Summary PDF'}
               </button>
             </div>
           </div>
