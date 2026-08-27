@@ -125,6 +125,15 @@ export const createExpense = async (req, res) => {
       return res.status(400).json({ error: 'Enter a valid amount greater than zero.' });
     }
 
+    // This route now also accepts multipart/form-data (when a receipt file
+    // is attached — see uploadReceipt.single('receipt') on the route), where
+    // every field including booleans arrives as a string. A plain JSON
+    // request (no file) still sends real booleans. isTrue() handles both:
+    // the string "false" must not be treated as truthy.
+    const isTrue = (v) => v === true || v === 'true';
+    const isVatApplicable = isTrue(vatApplicable);
+    const isDeductible = deductible === undefined ? true : !(deductible === false || deductible === 'false');
+
     const expense = await Expense.create({
       date: date ? new Date(date) : new Date(),
       category,
@@ -133,11 +142,15 @@ export const createExpense = async (req, res) => {
       amount: amt,
       paymentMethod: PAYMENT_METHODS.includes(paymentMethod) ? paymentMethod : 'Bank Transfer',
       reference: reference?.trim() || '',
-      vatApplicable: !!vatApplicable,
-      vatAmount: vatApplicable ? Math.max(0, Number(vatAmount) || 0) : 0,
-      deductible: deductible !== false,
+      vatApplicable: isVatApplicable,
+      vatAmount: isVatApplicable ? Math.max(0, Number(vatAmount) || 0) : 0,
+      deductible: isDeductible,
       notes: notes?.trim() || '',
       recordedBy: req.admin?._id || null,
+      // Optional — `upload.single('receipt')` on this route lets a receipt
+      // be attached in the same request an expense is created, rather than
+      // requiring a separate follow-up upload step.
+      receiptUrl: req.file?.path || null,
     });
 
     logAudit({
@@ -198,6 +211,37 @@ export const updateExpense = async (req, res) => {
     res.json({ success: true, expense });
   } catch (error) {
     console.error('Update Expense Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Attach or replace the scanned receipt/invoice backing an
+//          existing expense — the create-time upload (createExpense above)
+//          covers "add with receipt in one step"; this covers attaching one
+//          later, or replacing it. Modeled on adminController.js's
+//          updateMerchantCertificate.
+// @route   PATCH /api/admin/bookkeeping/expenses/:id/receipt
+// @access  Private (Admin, owner/admin only)
+export const updateExpenseReceipt = async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'A receipt file is required.' });
+
+    const expense = await Expense.findById(req.params.id);
+    if (!expense) return res.status(404).json({ error: 'Expense not found.' });
+
+    expense.receiptUrl = req.file.path;
+    await expense.save();
+
+    logAudit({
+      action: 'admin.bookkeeping.expense_receipt_updated', category: 'admin', severity: 'info',
+      message: `Attached a receipt to expense — ${expense.category}: KES ${expense.amount.toLocaleString()} (${expense.description})`,
+      actor: adminActor(req.admin), req,
+      metadata: { expenseId: String(expense._id) },
+    });
+
+    res.json({ success: true, receiptUrl: expense.receiptUrl });
+  } catch (error) {
+    console.error('Update Expense Receipt Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };

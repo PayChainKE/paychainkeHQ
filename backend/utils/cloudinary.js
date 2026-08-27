@@ -28,3 +28,25 @@ export const upload = multer({
     cb(null, ok.includes(file.mimetype));
   },
 });
+
+// Separate folder from `upload` above — expense receipts/invoices are
+// financial audit documents (tax filing support), not KYC/certificate
+// paperwork, and are worth being able to find independently in the
+// Cloudinary dashboard.
+const receiptStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'paychain_expense_receipts',
+    allowedFormats: ['jpg', 'png', 'jpeg', 'pdf'],
+    transformation: [{ width: 1000, height: 1000, crop: 'limit' }]
+  }
+});
+
+export const uploadReceipt = multer({
+  storage: receiptStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  fileFilter: (_req, file, cb) => {
+    const ok = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+    cb(null, ok.includes(file.mimetype));
+  },
+});

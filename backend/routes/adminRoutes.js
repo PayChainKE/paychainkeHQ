@@ -78,10 +78,11 @@ import {
   createExpense,
   updateExpense,
   deleteExpense,
+  updateExpenseReceipt,
   getBookkeepingSummary,
 } from '../controllers/bookkeepingController.js';
 import { protect, protectAdminSSE, requireRole } from '../middleware/authMiddleware.js';
-import { upload } from '../utils/cloudinary.js';
+import { upload, uploadReceipt } from '../utils/cloudinary.js';
 import { registerAdminEventClient } from '../utils/adminEventStream.js';
 
 const router = express.Router();
@@ -204,8 +205,9 @@ router.patch('/cash-advance/requests/:id', protect, requireMutator, sensitiveAct
 // Bookkeeping — expense ledger + P&L summary for KRA-ready record keeping.
 router.get('/bookkeeping/summary',        protect, excludeOfficer, getBookkeepingSummary);
 router.get('/bookkeeping/expenses',       protect, excludeOfficer, listExpenses);
-router.post('/bookkeeping/expenses',      protect, requireMutator, createExpense);
+router.post('/bookkeeping/expenses',      protect, requireMutator, uploadReceipt.single('receipt'), createExpense);
 router.put('/bookkeeping/expenses/:id',   protect, requireMutator, updateExpense);
+router.patch('/bookkeeping/expenses/:id/receipt', protect, requireMutator, uploadReceipt.single('receipt'), updateExpenseReceipt);
 router.delete('/bookkeeping/expenses/:id',protect, requireMutator, deleteExpense);
 
 // Compact health pulse for the sidebar widget.
