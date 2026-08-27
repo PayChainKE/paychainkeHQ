@@ -37,7 +37,14 @@ export default function Overview() {
         axios.get(`${API_URL}/api/transactions`, config),
         axios.get(`${API_URL}/api/trust-score`, config).catch(() => ({ data: { current: 0, eligibleForAdvance: false } }))
       ])
-      setLiveTransactions(txRes.data)
+      // A 200 response body that isn't an array (a stale cache, a proxy
+      // interstitial, a misbehaving intermediary — exactly the kind of thing
+      // more likely right after a tab was backgrounded and just reconnected)
+      // used to reach excludeReversedDuplicates() below unguarded, whose
+      // `for...of` throws synchronously during render — an uncaught crash
+      // landing on AppErrorBoundary's "Something went wrong" screen instead
+      // of just a harmlessly stale dashboard.
+      setLiveTransactions(Array.isArray(txRes.data) ? txRes.data : [])
       setTrustData(trustRes.data)
     } catch (err) {
       console.error('Failed to fetch dashboard data', err)
@@ -76,7 +83,10 @@ export default function Overview() {
   // see excludeReversedDuplicates' doc comment. Without this, a reversed
   // fake credit (see backend/services/ncbaLedgerService.js) still shows up
   // as real revenue here even after it's been corrected in the ledger.
-  const realTransactions = excludeReversedDuplicates(liveTransactions)
+  // Array.isArray guard: this runs unguarded on every render (not inside
+  // fetchData's try/catch), so a non-array liveTransactions would otherwise
+  // throw synchronously here — see the matching comment in fetchData above.
+  const realTransactions = excludeReversedDuplicates(Array.isArray(liveTransactions) ? liveTransactions : [])
 
   // netBalanceImpact (not the raw amount field) — a raw sum counts a
   // failed/pending transaction as real revenue, and overstates ncba_inbound
@@ -86,14 +96,14 @@ export default function Overview() {
     .filter(t => new Date(t.createdAt) >= today)
     .reduce((s, t) => { const d = netBalanceImpact(t); return d > 0 ? s + d : s }, 0)
 
-  // Net change to the merchant's actual balance this month — money in MINUS
-  // money out, not gross inflow volume. A merchant who received KES 100,000
-  // but paid out KES 90,000 in the same month doesn't have KES 100,000 —
-  // showing gross volume under a plain "This Month" label reads as money
-  // they currently hold, which isn't true once payouts are accounted for.
+  // Total money collected into this account this month — gross inflow
+  // only, same "credits only" pattern as todaysRevenue above. A payout
+  // going out later in the month must never reduce this figure; "This
+  // Month" answers "how much came in", not "what's the net change to my
+  // balance".
   const thisMonthNetChange = realTransactions
     .filter(t => new Date(t.createdAt) >= monthAgo)
-    .reduce((s, t) => s + netBalanceImpact(t), 0)
+    .reduce((s, t) => { const d = netBalanceImpact(t); return d > 0 ? s + d : s }, 0)
 
   const recentTx = [...realTransactions]
     .sort((a, b) => new Date(b.createdAt || b.timestamp) - new Date(a.createdAt || a.timestamp))
