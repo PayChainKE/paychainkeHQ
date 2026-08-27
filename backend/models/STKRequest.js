@@ -74,7 +74,21 @@ const stkRequestSchema = new Schema({
   resultDesc: {
     type: String,
     default: 'Awaiting user PIN'
-  }
+  },
+  // Set once services/ncbaLedgerService.js's wasAlreadySettledByStkPush
+  // matches this request against NCBA's separate account-notification
+  // webhook for the same money — makes that match a one-time atomic claim
+  // (via findOneAndUpdate) instead of a time-windowed guess. A real
+  // production incident (2026-08-26) proved the previous 10-minute window
+  // wasn't wide enough: NCBA's webhook arrived 45–70 minutes after the STK
+  // poll's own success, so the guard missed it and the same money got
+  // credited twice. This flag removes the time bound entirely — once
+  // claimed, this specific STKRequest can never be matched again, so no
+  // window width can ever be "too short" again.
+  notificationMatched: {
+    type: Boolean,
+    default: false,
+  },
 }, {
   timestamps: true
 });

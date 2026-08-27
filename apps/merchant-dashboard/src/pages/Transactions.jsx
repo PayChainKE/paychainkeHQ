@@ -10,7 +10,7 @@ import { formatAccountNumber } from '../utils/formatAccountNumber'
 import { formatPhoneDisplay, formatPhoneOrDash } from '../utils/formatPhoneDisplay'
 import { formatName } from '../utils/formatName'
 import { drawBarcodePdf } from '../utils/barcode'
-import { getAmountSign, getAmountColorClass, isCreditTransaction, isDebitTransaction } from '../utils/transactionDirection'
+import { getAmountSign, getAmountColorClass, isCreditTransaction, isDebitTransaction, isSettledStatus } from '../utils/transactionDirection'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useNotification } from '../context/NotificationContext'
 import logo from '../assets/logo2.png'
@@ -259,8 +259,13 @@ export default function Transactions() {
     })
 
     // ── SUMMARY STRIP ────────────────────────────────────────────────────────
-    const totalIn   = rows.filter(t => isCreditTransaction(t.type)).reduce((s, o) => s + (o.kesAmount || o.amount || 0), 0)
-    const totalOut  = rows.filter(t => isDebitTransaction(t.type)).reduce((s, o) => s + (o.kesAmount || o.amount || 0), 0)
+    // Only 'completed'/'verified' rows ever actually moved money — a
+    // 'failed' payout gets refunded and a 'pending' one hasn't landed yet
+    // (see isSettledStatus's doc comment). Counting them here is what made
+    // Total Money In/Out (and the running BALANCE column below) diverge from
+    // the merchant's real account balance.
+    const totalIn   = rows.filter(t => isCreditTransaction(t.type) && isSettledStatus(t.status)).reduce((s, o) => s + (o.kesAmount || o.amount || 0), 0)
+    const totalOut  = rows.filter(t => isDebitTransaction(t.type) && isSettledStatus(t.status)).reduce((s, o) => s + (o.kesAmount || o.amount || 0), 0)
     const fmtKES    = (n) => formatKES(n)
     const fmtNum    = (n) => Number(n).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
@@ -271,6 +276,7 @@ export default function Transactions() {
     // authoritative balance (merchant.kesBalance) by undoing every
     // transaction that happened after this period ended.
     const signedKesDelta = (t) => {
+      if (!isSettledStatus(t.status)) return 0 // never actually moved money
       if (isCreditTransaction(t.type)) return (t.kesAmount || t.amount || 0)
       if (t.type === 'fx_swap') return -(t.kesAmount || 0)
       return -(t.kesAmount || t.amount || 0) // debit
@@ -325,10 +331,15 @@ export default function Transactions() {
         const isSwp = tx.type === 'fx_swap'
         const rawAmt = tx.amount || tx.kesAmount || 0
 
+        // The amount still displays either way (a merchant reviewing a
+        // failed payout needs to see what was attempted) — only the running
+        // BALANCE column, which must track the real account balance, skips
+        // rows that never actually settled (see isSettledStatus above).
+        const settled = isSettledStatus(tx.status)
         let paidIn = '', paidOut = ''
-        if (isIn)  { paidIn  = fmtNum(rawAmt); runBalance += rawAmt }
-        if (isOut) { paidOut = fmtNum(rawAmt); runBalance -= rawAmt }
-        if (isSwp) { paidOut = fmtNum(tx.kesAmount || 0); runBalance -= (tx.kesAmount || 0) }
+        if (isIn)  { paidIn  = fmtNum(rawAmt); if (settled) runBalance += rawAmt }
+        if (isOut) { paidOut = fmtNum(rawAmt); if (settled) runBalance -= rawAmt }
+        if (isSwp) { paidOut = fmtNum(tx.kesAmount || 0); if (settled) runBalance -= (tx.kesAmount || 0) }
 
         // Standard PDF Helvetica has no glyph for "→" — it renders as garbage.
         // Use a plain ASCII arrow here (the on-screen UI still uses the real one).

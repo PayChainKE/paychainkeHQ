@@ -1,4 +1,4 @@
-import { isCreditTransaction, isDebitTransaction } from './transactionDirection';
+import { isCreditTransaction, isDebitTransaction, isSettledStatus } from './transactionDirection';
 import { formatAccountNumber } from './formatAccountNumber';
 import { formatName } from './formatName';
 
@@ -35,6 +35,7 @@ const fmtKES = (n: number) => `Ksh ${Number(n).toLocaleString('en-KE', { minimum
 const fmtNum = (n: number) => Number(n).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const signedKesDelta = (t: StatementTx) => {
+  if (!isSettledStatus(t.status)) return 0; // never actually moved money — see isSettledStatus
   if (isCreditTransaction(t.type as any)) return t.kesAmount || t.amount || 0;
   if (t.type === 'fx_swap') return -(t.kesAmount || 0);
   return -(t.kesAmount || t.amount || 0);
@@ -64,8 +65,8 @@ export function buildStatementHtml({
     : 0;
   const openingBalance = currentBalance - netChangeWithinPeriod - netChangeAfterPeriod;
 
-  const totalIn = rows.filter((t) => isCreditTransaction(t.type as any)).reduce((s, o) => s + (o.kesAmount || o.amount || 0), 0);
-  const totalOut = rows.filter((t) => isDebitTransaction(t.type as any)).reduce((s, o) => s + (o.kesAmount || o.amount || 0), 0);
+  const totalIn = rows.filter((t) => isCreditTransaction(t.type as any) && isSettledStatus(t.status)).reduce((s, o) => s + (o.kesAmount || o.amount || 0), 0);
+  const totalOut = rows.filter((t) => isDebitTransaction(t.type as any) && isSettledStatus(t.status)).reduce((s, o) => s + (o.kesAmount || o.amount || 0), 0);
 
   let runBalance = openingBalance;
   const sorted = [...rows].sort((a, b) => new Date(a.createdAt || a.timestamp || 0).getTime() - new Date(b.createdAt || b.timestamp || 0).getTime());
@@ -79,10 +80,14 @@ export function buildStatementHtml({
     const isSwap = tx.type === 'fx_swap';
     const rawAmt = tx.amount || tx.kesAmount || 0;
 
+    // Amount still displays either way (a failed payout should still be
+    // visible) — only the running balance, which must track the real
+    // account balance, skips rows that never actually settled.
+    const settled = isSettledStatus(tx.status);
     let paidIn = '', paidOut = '';
-    if (isIn) { paidIn = fmtNum(rawAmt); runBalance += rawAmt; }
-    if (isOut) { paidOut = fmtNum(rawAmt); runBalance -= rawAmt; }
-    if (isSwap) { paidOut = fmtNum(tx.kesAmount || 0); runBalance -= (tx.kesAmount || 0); }
+    if (isIn) { paidIn = fmtNum(rawAmt); if (settled) runBalance += rawAmt; }
+    if (isOut) { paidOut = fmtNum(rawAmt); if (settled) runBalance -= rawAmt; }
+    if (isSwap) { paidOut = fmtNum(tx.kesAmount || 0); if (settled) runBalance -= (tx.kesAmount || 0); }
 
     const desc = isSwap
       ? `FX Swap → ${tx.usdcAmount || 0} USDC`

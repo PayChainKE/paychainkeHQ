@@ -8,6 +8,20 @@ const SWAP_TYPES = new Set(['fx_swap'])
 // Everything else (outbound, withdrawal, bulk_pay, settlement,
 // ncba_outbound, and any future debit type) is treated as money leaving.
 
+// A 'failed' or still-'pending' Transaction never actually moved money —
+// a failed payout gets refunded (see resolvePendingOpenBankingTransaction,
+// backend/controllers/ncbaOpenBankingController.js) and a pending one
+// hasn't landed yet. Only 'completed' and 'verified' (the same pairing the
+// backend's own revenue/reporting queries use — see e.g.
+// backend/controllers/revenueController.js) represent a real, permanent
+// balance change. Any statement/total/running-balance math that skips this
+// check counts failed attempts as if they'd actually gone through.
+const SETTLED_STATUSES = new Set(['completed', 'verified'])
+
+export function isSettledStatus(status) {
+  return SETTLED_STATUSES.has(status)
+}
+
 export function isCreditTransaction(type) {
   return CREDIT_TYPES.has(type)
 }

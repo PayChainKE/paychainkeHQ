@@ -14,7 +14,7 @@ import {
   NcbaValidationError,
 } from '../utils/ncbaValidators.js';
 import { toE164Kenyan } from '../utils/notificationService.js';
-import { creditNcbaCollection, DuplicateCollectionError, wasAlreadySettledByStkPush, findFalselyFailedStkRequest } from '../services/ncbaLedgerService.js';
+import { creditNcbaCollection, DuplicateCollectionError, wasAlreadySettledByStkPush, findFalselyFailedStkRequest, wasAlreadyCreditedByOtherNcbaFeed } from '../services/ncbaLedgerService.js';
 import { resolveStkOutcome } from './mpesaController.js';
 import { NcbaTariffBoundsError } from '../config/ncbaTariffCard.js';
 import {
@@ -108,6 +108,15 @@ export const handleNcbaReconciliationWebhook = async (req, res) => {
         allowFailedRetry: true,
       });
       logEvent('info', 'ncba_reconciliation_corrected_false_stk_failure', { transactionReference, merchantId: merchant._id.toString(), grossAmount, stkRequestId: falselyFailedStk._id.toString() });
+      return accept(res, transactionReference);
+    }
+
+    // See wasAlreadyCreditedByOtherNcbaFeed's doc comment
+    // (services/ncbaLedgerService.js) — catches the same real collection
+    // arriving on ncbaAccountNotificationController.js's separate feed
+    // under a different reference before this one does.
+    if (await wasAlreadyCreditedByOtherNcbaFeed(merchant, grossAmount, transactionReference)) {
+      logEvent('info', 'ncba_reconciliation_already_settled_via_other_feed', { transactionReference, merchantId: merchant._id.toString(), grossAmount });
       return accept(res, transactionReference);
     }
 
