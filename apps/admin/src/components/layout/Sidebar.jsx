@@ -31,6 +31,7 @@ const NAV_SECTIONS = [
       { icon: 'point_of_sale',   label: 'STK Monitor',            path: '/stk-monitor'            },
       { icon: 'gavel',           label: 'Transaction Audit',      path: '/transaction-audit'      },
       { icon: 'calculate',       label: 'Bookkeeping',            path: '/bookkeeping'            },
+      { icon: 'request_quote',   label: 'Tax & Compliance',       path: '/tax-compliance'         },
       { icon: 'receipt_long',    label: 'Invoices',                path: '/invoices'               },
       { icon: 'savings',         label: 'Cash Advance Requests', path: '/cash-advance-requests' },
       { icon: 'security',        label: 'Wallet Audit',           path: '/wallet-audit'           },

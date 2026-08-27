@@ -24,6 +24,7 @@ import TransactionAudit from './pages/TransactionAudit';
 import Security from './pages/Security';
 import Revenue from './pages/Revenue';
 import Bookkeeping from './pages/Bookkeeping';
+import TaxCompliance from './pages/TaxCompliance';
 import SmsBroadcast from './pages/SmsBroadcast';
 import KycVerification from './pages/KycVerification';
 import KycApplicationDetail from './pages/KycApplicationDetail';
@@ -63,6 +64,7 @@ export default function App(){
             <Route path="/kyc-verification" element={<Protected><KycVerification/></Protected>} />
             <Route path="/kyc-verification/:id" element={<Protected><KycApplicationDetail/></Protected>} />
             <Route path="/bookkeeping" element={<Protected><Bookkeeping/></Protected>} />
+            <Route path="/tax-compliance" element={<Protected><TaxCompliance/></Protected>} />
             <Route path="/wallet-audit" element={<Protected><WalletAudit/></Protected>} />
             <Route path="/invoices" element={<Protected><Invoices/></Protected>} />
             <Route path="/audit-log" element={<Protected><AuditLog/></Protected>} />
