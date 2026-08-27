@@ -37,6 +37,44 @@ export function isSettledStatus(status: string | undefined | null): boolean {
   return !!status && SETTLED_STATUSES.has(status);
 }
 
+// `amount`/`kesAmount` doesn't uniformly mean "what the balance actually
+// moved by" — see the identical constants/function in
+// apps/merchant-dashboard/src/utils/transactionDirection.js for the full
+// explanation (backend controllers that create 'ncba_inbound' store NCBA's
+// gross reported amount, not the net-of-fee figure that actually credited
+// kesBalance; the NCBA payout types store principal only, excluding the fee
+// that was also debited). Verified against real production data
+// (2026-08-27): totals only reconciled to the merchant's actual kesBalance
+// once this adjustment was applied.
+const CREDIT_STORES_GROSS_TYPES = new Set(['ncba_inbound']);
+const DEBIT_EXCLUDES_FEE_TYPES = new Set(['ncba_outbound', 'ncba_mobile_b2w', 'ncba_lipa_na_mpesa', 'ncba_kplc', 'ncba_kplc_prepaid', 'ncba_ncwsc', 'mpesa_b2c', 'mpesa_b2b']);
+
+export type BalanceImpactTx = {
+  type: TxType;
+  status?: string;
+  amount?: number;
+  kesAmount?: number;
+  paychainFee?: number;
+  safaricomFee?: number;
+};
+
+// The true, signed kesBalance impact of a transaction — 0 for anything that
+// never settled. Single source of truth for every balance total/running-
+// balance calculation so they can't drift from each other or from the real
+// account balance.
+export function netBalanceImpact(tx: BalanceImpactTx): number {
+  if (!isSettledStatus(tx.status)) return 0;
+  const rawAmt = tx.kesAmount || tx.amount || 0;
+  const fee = (tx.paychainFee || 0) + (tx.safaricomFee || 0);
+  if (isCreditTransaction(tx.type)) {
+    return CREDIT_STORES_GROSS_TYPES.has(tx.type) ? rawAmt - fee : rawAmt;
+  }
+  if (isSwapTransaction(tx.type)) {
+    return -(tx.kesAmount || 0);
+  }
+  return DEBIT_EXCLUDES_FEE_TYPES.has(tx.type) ? -(rawAmt + fee) : -rawAmt;
+}
+
 export function isCreditTransaction(type: TxType): boolean {
   return CREDIT_TYPES.has(type);
 }

@@ -22,6 +22,46 @@ export function isSettledStatus(status) {
   return SETTLED_STATUSES.has(status)
 }
 
+// `amount`/`kesAmount` doesn't uniformly mean "what the balance actually
+// moved by" — it depends on type, per how the backend controllers that
+// create these rows populate them:
+//   - 'ncba_inbound' (backend/services/ncbaLedgerService.js#creditNcbaCollection)
+//     stores NCBA's GROSS reported amount; the real kesBalance credit is
+//     amount - (paychainFee + safaricomFee) — the fee never reached the
+//     merchant's balance in the first place.
+//   - These debit types store PRINCIPAL ONLY; the real kesBalance debit was
+//     amount + (paychainFee + safaricomFee) — see e.g.
+//     backend/controllers/ncbaOpenBankingController.js's
+//     `totalDebit = numericAmount + fee` pattern, mirrored across every
+//     NCBA payout rail.
+//   - Every other type (inbound, top_up, the 'outbound' ledger-correction
+//     type) already stores the exact net figure that was $inc'd — no
+//     adjustment needed, and subtracting the fee again would double-count.
+// Verified against real production data (2026-08-27): totals only
+// reconciled to the merchant's actual kesBalance once this adjustment was
+// applied — without it, Total Money In/Out and the running balance column
+// silently drift from the real balance for every fee-bearing NCBA row.
+const CREDIT_STORES_GROSS_TYPES = new Set(['ncba_inbound'])
+const DEBIT_EXCLUDES_FEE_TYPES = new Set(['ncba_outbound', 'ncba_mobile_b2w', 'ncba_lipa_na_mpesa', 'ncba_kplc', 'ncba_kplc_prepaid', 'ncba_ncwsc', 'mpesa_b2c', 'mpesa_b2b'])
+
+// The true, signed kesBalance impact of a transaction — 0 for anything that
+// never settled (see isSettledStatus). Single source of truth for every
+// balance total/running-balance calculation so they can't drift from each
+// other or from the real account balance the way Total Money In/the running
+// BALANCE column did before this existed.
+export function netBalanceImpact(tx) {
+  if (!isSettledStatus(tx.status)) return 0
+  const rawAmt = tx.kesAmount || tx.amount || 0
+  const fee = (tx.paychainFee || 0) + (tx.safaricomFee || 0)
+  if (isCreditTransaction(tx.type)) {
+    return CREDIT_STORES_GROSS_TYPES.has(tx.type) ? rawAmt - fee : rawAmt
+  }
+  if (isSwapTransaction(tx.type)) {
+    return -(tx.kesAmount || 0)
+  }
+  return DEBIT_EXCLUDES_FEE_TYPES.has(tx.type) ? -(rawAmt + fee) : -rawAmt
+}
+
 export function isCreditTransaction(type) {
   return CREDIT_TYPES.has(type)
 }
