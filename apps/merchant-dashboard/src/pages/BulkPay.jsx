@@ -1356,22 +1356,6 @@ export default function BulkPay() {
                                     className="w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 md:px-6 md:py-4 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none"
                                   />
                                 </div>
-                                <div className="grid grid-cols-2 gap-2">
-                                  {['safaricom', 'airtel'].map((net) => (
-                                    <button
-                                      key={net}
-                                      type="button"
-                                      onClick={() => setNewPayee({...newPayee, mobileNetwork: net})}
-                                      className={`py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all border ${
-                                        (newPayee.mobileNetwork || 'safaricom') === net
-                                          ? 'bg-[#00351D] text-white border-[#00351D]'
-                                          : 'bg-white text-on-surface-variant/40 border-outline-variant/20 hover:border-emerald-500/30'
-                                      }`}
-                                    >
-                                      {net === 'airtel' ? 'Airtel Money' : 'M-PESA'}
-                                    </button>
-                                  ))}
-                                </div>
                               </div>
                             )}
 
@@ -1592,15 +1576,8 @@ export default function BulkPay() {
         {/* Right Column: Create Payment Batch */}
         <section className="flex-1 flex flex-col gap-6">
           {/* Step Indicator */}
-          <div className="bg-surface-container-low px-4 py-3 md:px-5 md:py-3.5 rounded-2xl flex items-center justify-between relative editorial-shadow border border-outline-variant/10">
-            {/* Clipped to its own circular shape (rounded-full), not the bar's
-                overflow — the bar itself must NOT clip overflow, since the
-                Fund Account dropdown below needs to extend past its bottom
-                edge. It used to (overflow-hidden here silently clipped the
-                dropdown to invisible while the fixed backdrop blur still
-                showed, since fixed positioning isn't affected by an
-                ancestor's overflow). */}
-            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full -mr-12 -mt-12 blur-2xl overflow-hidden"></div>
+          <div className="bg-surface-container-low px-4 py-3 md:px-5 md:py-3.5 rounded-2xl flex items-center justify-between relative overflow-hidden editorial-shadow border border-outline-variant/10">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full -mr-12 -mt-12 blur-2xl"></div>
             <div className="flex items-center gap-3 md:gap-8 relative z-10 overflow-x-auto no-scrollbar">
               {[1, 2, 3, 4].map((s) => (
                 <div key={s} className="flex items-center gap-3 md:gap-4 shrink-0">

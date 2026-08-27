@@ -26,6 +26,8 @@ import { generateBrandedQrDataUri } from '../utils/qrCode.js';
 import DeveloperPayment from '../models/DeveloperPayment.js';
 import { publicDeveloperPayment } from '../utils/developerPaymentView.js';
 import { dispatchDeveloperEvent } from '../services/webhookDeliveryService.js';
+import { wasAlreadyCreditedByOtherNcbaFeed } from '../services/ncbaLedgerService.js';
+import { debitAvailableBalance } from '../utils/availableBalance.js';
 
 const FRONTEND_URL = process.env.MERCHANT_DASHBOARD_URL || 'https://app.paychain.co.ke';
 
@@ -68,6 +70,38 @@ export const initiateSTKPush = async (req, res) => {
     // whether the fee applies.
     const kind = purpose === 'request_money' ? 'request_money' : 'topup';
     const checkoutTotal = getCheckoutTotal(intAmount);
+
+    // Same double-submission guard used by every payout endpoint — a
+    // double-click or a client retry (previously also provoked by the STK
+    // "failed" false-negative this function used to produce even after a
+    // real send, since a merchant naturally retries what looks like a
+    // failure) sending the exact same STK Push twice within a few seconds
+    // otherwise means the customer gets prompted, and possibly pays, twice
+    // for one intended payment.
+    try {
+      await claimPayoutSubmission(merchantId, ['stk-push', formattedPhone, intAmount, kind]);
+    } catch (e) {
+      if (e instanceof DuplicateSubmissionError) return res.status(409).json({ error: e.message });
+      throw e;
+    }
+
+    // Only one STK Push in flight per merchant at a time, regardless of
+    // amount/phone/kind — the double-submission guard above only catches an
+    // exact repeat; two DIFFERENT concurrent pushes (e.g. two rapid clicks
+    // that raced past the guard with a slightly different amount, or two
+    // Request Money prompts fired close together) are a separate way to end
+    // up with more than one real charge/credit in flight, which is exactly
+    // the shape of bug that caused the 2026-08-27 STK double-credit
+    // incident. A merchant with a still-unanswered prompt must wait for it
+    // to resolve (succeed, fail, or time out — at most ~2 minutes, see
+    // NCBA_STK_POLL_MAX_ATTEMPTS below) before sending another. Scoped to
+    // channel:'stk' only — Dynamic QR requests (channel:'qr') have no
+    // "prompt in flight" concept to conflict with, they just sit waiting to
+    // be scanned.
+    const alreadyPending = await STKRequest.findOne({ merchantId, channel: 'stk', status: 'pending' });
+    if (alreadyPending) {
+      return res.status(409).json({ error: 'You already have a payment prompt waiting for a response. Please wait for it to complete (or time out, within about 2 minutes) before sending another.' });
+    }
 
     // Request Money is the one STK flow where the customer never lands on
     // any PayChain page first — Payment Links / Pay Account already show
@@ -167,6 +201,32 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
   stkReq.resultDesc = claimed.resultDesc;
 
   if (succeeded) {
+      // Mirrors ncbaAccountNotificationController.js's wasAlreadySettledByStkPush
+      // check, but in the opposite direction. That check only catches the
+      // case where THIS poll resolves first and the webhook arrives second
+      // (STKRequest.status is already 'success' by the time the webhook
+      // looks). It does nothing for the reverse order — the generic
+      // account-notification webhook seeing the same NCBA credit BEFORE
+      // this poll loop's own queryStkPush call reports SUCCESS, crediting
+      // the merchant via creditNcbaCollection while STKRequest.status is
+      // still 'pending' (so the atomic claim above wins normally, sees no
+      // conflict, and this function would otherwise credit the exact same
+      // payment a second time — a real double credit, not just a display
+      // duplicate: two Transaction rows and two real $inc's to kesBalance).
+      // wasAlreadyCreditedByOtherNcbaFeed is the same "same amount, recent
+      // window, different reference" check the webhook uses for its own
+      // cross-feed race; reused symmetrically here closes the gap in this
+      // direction too.
+      const alreadyCredited = await wasAlreadyCreditedByOtherNcbaFeed(
+        { _id: stkReq.merchantId },
+        stkReq.amount,
+        receipt
+      );
+      if (alreadyCredited) {
+        console.warn(`⚠️ STK ${stkReq.checkoutRequestId} (receipt ${receipt}) already credited via the NCBA account-notification feed — skipping duplicate credit.`);
+        return;
+      }
+
       const { date, time } = formatTransactionDateTime(transTime);
 
       if (stkReq.linkId) {
@@ -357,10 +417,16 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
             // how the NCBA controllers already handle this. Account
             // reference mirrors M-Pesa's own "for account X" convention:
             // the invoice number if this settled an invoice, else the
-            // merchant's NCBA account code, else the raw payment-link id
-            // as a last resort.
+            // merchant's full 12-digit NCBA virtual account number (never
+            // the bare 8-digit ncbaMerchantCode — a customer paying that
+            // truncated number back into M-Pesa/NCBA directly would send it
+            // to the wrong place), else the raw payment-link id as a last
+            // resort.
             const payerLabel = link.invoiceId ? 'invoice' : 'payment link';
-            const accountRef = paidInvoice?.invoiceNumber || merchant.ncbaMerchantCode || stkReq.linkId;
+            const accountRef = paidInvoice?.invoiceNumber
+              || getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode)
+              || merchant.ncbaMerchantCode
+              || stkReq.linkId;
             const linkSends = [];
             if (stkReq.phone) {
               linkSends.push({
@@ -557,7 +623,10 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
                 ref: receipt,
                 amount: stkReq.amount,
                 businessName: merchant.businessName,
-                accountRef: merchant.ncbaMerchantCode,
+                // Full 12-digit virtual account number, not the bare
+                // 8-digit ncbaMerchantCode — see the identical fix/comment
+                // on the Payment Link branch above.
+                accountRef: getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode) || merchant.ncbaMerchantCode,
                 date,
                 time,
                 fee: customerFee,
@@ -760,16 +829,37 @@ export async function initiateAndTrackNcbaStk({ merchantId, phone, checkoutTotal
   const ncbaAccountNo = getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode) || merchant.ncbaMerchantCode;
   const { transactionId } = await ncbaInitiateStkPush({ phone, amount: checkoutTotal, accountNo: ncbaAccountNo });
 
-  await STKRequest.create({
-    merchantId,
-    checkoutRequestId: transactionId,
-    amount: checkoutTotal,
-    phone,
-    status: 'pending',
-    ...extra,
-  });
-
-  pollAndResolveNcbaStkPush(transactionId, transactionId);
+  // Past this point, NCBA has already sent the real prompt to the
+  // customer's phone — a failure below is a local bookkeeping problem, not
+  // a failed push, and must never be reported to the merchant as "failed to
+  // send" (initiateSTKPush's caller would otherwise show a false failure on
+  // a push that actually went out, and the customer may already be paying).
+  // Best-effort: if the tracking record can't be created, there's no poll
+  // loop watching this payment, but it still resolves correctly once it
+  // lands — ncbaAccountNotificationController.js's generic credit path
+  // doesn't require an STKRequest to exist, it just falls through to a
+  // plain NCBA collection credit instead of the STK-aware dual-sided split.
+  try {
+    await STKRequest.create({
+      merchantId,
+      checkoutRequestId: transactionId,
+      amount: checkoutTotal,
+      phone,
+      status: 'pending',
+      ...extra,
+    });
+    pollAndResolveNcbaStkPush(transactionId, transactionId);
+  } catch (err) {
+    console.error(JSON.stringify({
+      level: 'error',
+      event: 'ncba_stk_push_sent_but_tracking_failed',
+      message: 'NCBA accepted and sent a real STK Push, but the local STKRequest tracking record failed to save — no poll loop will run for this one. It will still settle via the account-notification webhook\'s generic credit path once paid, just without the STK-aware fee split. Verify manually if in doubt.',
+      merchantId: String(merchantId),
+      transactionId,
+      amount: checkoutTotal,
+      error: err.message,
+    }));
+  }
 
   return transactionId;
 }
@@ -991,14 +1081,13 @@ export const initiateB2C = async (req, res) => {
     // passing a stale in-memory balance check and over-withdrawing. Amount
     // sent to NCBA stays the raw `amount` — the fee is PayChain's own
     // separate deduction, never sent to NCBA as part of the payout.
+    // debitAvailableBalance also holds back money credited in the last 2
+    // minutes (see utils/availableBalance.js) so a bad/duplicate credit
+    // can't be withdrawn before it's had a chance to be caught.
     totalDebit = Math.round((Number(amount) + b2cFee) * 100) / 100;
-    const merchant = await Merchant.findOneAndUpdate(
-      { _id: merchantId, kesBalance: { $gte: totalDebit } },
-      { $inc: { kesBalance: -totalDebit } },
-      { returnDocument: 'after' }
-    );
+    const merchant = await debitAvailableBalance(merchantId, totalDebit);
     if (!merchant) {
-      return res.status(400).json({ error: 'Insufficient KES balance for this transfer, including the M-Pesa B2C charge' });
+      return res.status(400).json({ error: 'Insufficient available KES balance for this transfer, including the M-Pesa B2C charge — a recent credit may still be briefly held.' });
     }
     debited = true;
 
@@ -1262,15 +1351,13 @@ export const initiateB2B = async (req, res) => {
       throw e;
     }
 
-    // Atomic conditional deduct — same race-avoidance as initiateB2C.
+    // Atomic conditional deduct — same race-avoidance as initiateB2C, also
+    // holding back any still-unmatured recent credit (see
+    // utils/availableBalance.js).
     totalDebit = Math.round((numericAmount + fee) * 100) / 100;
-    const merchant = await Merchant.findOneAndUpdate(
-      { _id: merchantId, kesBalance: { $gte: totalDebit } },
-      { $inc: { kesBalance: -totalDebit } },
-      { returnDocument: 'after' }
-    );
+    const merchant = await debitAvailableBalance(merchantId, totalDebit);
     if (!merchant) {
-      return res.status(400).json({ error: 'Insufficient KES balance for this transfer, including the PayChain service fee.' });
+      return res.status(400).json({ error: 'Insufficient available KES balance for this transfer, including the PayChain service fee — a recent credit may still be briefly held.' });
     }
     debited = true;
 

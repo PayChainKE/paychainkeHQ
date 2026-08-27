@@ -198,9 +198,10 @@ export default function SendMoney({ navigation }: any) {
   const [beneficiaryCountry, setBeneficiaryCountry] = useState('KE');
   const [beneficiaryAddress, setBeneficiaryAddress] = useState('');
   const [purposeCode, setPurposeCode] = useState('MSC');
-  // Which mobile wallet network to pay into — see dashboard SendMoney.jsx's
-  // equivalent comment.
-  const [provider, setProvider] = useState<'safaricom' | 'airtel'>('safaricom');
+  // Mobile Money payouts always go out over M-PESA — see dashboard
+  // SendMoney.jsx's equivalent comment (no real Airtel Money equivalent on
+  // NCBA's Mobile B2W rail, so no longer a picker).
+  const provider = 'safaricom' as const;
   const [amount, setAmount] = useState('');
   const [reference, setReference] = useState('');
   const [pin, setPin] = useState('');
@@ -364,7 +365,7 @@ export default function SendMoney({ navigation }: any) {
 
   if (success) {
     const methodLabel = isMobileDest
-      ? `M-PESA (${provider === 'airtel' ? 'Airtel Money' : 'Safaricom'})`
+      ? 'M-PESA (Safaricom)'
       : destination === 'bank'
       ? `Bank Transfer · ${bankRail === 'rtgs' ? 'RTGS' : 'PesaLink'}`
       : destination === 'till'
@@ -604,26 +605,6 @@ export default function SendMoney({ navigation }: any) {
                 />
               )}
 
-              {isMobileDest && (
-                <View className="mb-5">
-                  <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#00351d]/60 mb-2 ml-1">Network</Text>
-                  <View className="flex-row gap-2 p-1.5 bg-[#f7faf7] rounded-2xl border border-[#eff4ef]">
-                    {[
-                      { id: 'safaricom' as const, label: 'M-PESA' },
-                      { id: 'airtel' as const, label: 'Airtel Money' },
-                    ].map((opt) => (
-                      <TouchableOpacity
-                        key={opt.id}
-                        onPress={() => setProvider(opt.id)}
-                        className={`flex-1 py-2.5 rounded-xl items-center ${provider === opt.id ? 'bg-[#00351d]' : ''}`}
-                      >
-                        <Text className={`font-jakarta-bold text-[13px] ${provider === opt.id ? 'text-white' : 'text-[#707971]'}`}>{opt.label}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              )}
-
               {isB2bDest && (
                 <View className="mb-5">
                   <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#00351d]/60 mb-2 ml-1">
@@ -740,7 +721,6 @@ export default function SendMoney({ navigation }: any) {
                   ...(destination === 'bank' && bankRail === 'rtgs' ? [['Beneficiary Bank BIC', bankCode]] : []),
                   ...(destination === 'bank' ? [['Transfer Speed', bankRail === 'rtgs' ? 'International (RTGS)' : 'Instant (PesaLink)']] : []),
                   ...(destination === 'bank' && bankRail === 'rtgs' ? [['Beneficiary Country', ({ KE: 'Kenya', UG: 'Uganda', TZ: 'Tanzania', RW: 'Rwanda' } as Record<string, string>)[beneficiaryCountry] || beneficiaryCountry]] : []),
-                  ...(isMobileDest ? [['Network', provider === 'airtel' ? 'Airtel Money' : 'M-PESA']] : []),
                   ['Recipient', formatPhoneDisplay(recipientAccount)],
                   ...(isB2bDest && paybillAccountRef ? [['Account Number', paybillAccountRef]] : []),
                   ['Amount', formatKES(Number(amount) || 0)],

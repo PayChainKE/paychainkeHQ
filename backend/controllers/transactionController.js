@@ -18,6 +18,7 @@ import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLocked
 import { getNcbaVirtualAccountNumber, validatePhoneNumber, NcbaValidationError } from '../utils/ncbaValidators.js';
 import { generateMerchantStickerPdf } from '../utils/stickerGenerator.js';
 import { claimPayoutSubmission, DuplicateSubmissionError } from '../utils/idempotencyGuard.js';
+import { debitAvailableBalance } from '../utils/availableBalance.js';
 import { notifyAdmins, escapeHtml } from '../utils/securityAlerts.js';
 
 // Transfers at or above this amount get an admin visibility alert — not a
@@ -241,14 +242,11 @@ export const swapKesToUsdc = async (req, res) => {
 
     if (direction === 'KES_TO_USDC') {
       // Atomic conditional deduct — avoids two concurrent swaps both
-      // passing a stale in-memory balance check.
-      const debited = await Merchant.findOneAndUpdate(
-        { _id: merchant._id, kesBalance: { $gte: amount } },
-        { $inc: { kesBalance: -amount } },
-        { returnDocument: 'after' }
-      );
+      // passing a stale in-memory balance check. Also holds back money
+      // credited in the last 2 minutes (see utils/availableBalance.js).
+      const debited = await debitAvailableBalance(merchant._id, amount);
       if (!debited) {
-        return res.status(400).json({ error: 'Insufficient KES balance' });
+        return res.status(400).json({ error: 'Insufficient available KES balance — a recent credit may still be briefly held.' });
       }
 
       const usdcPayoutValue = (amount * liveRate).toFixed(7);
@@ -516,14 +514,11 @@ export const sendMoney = async (req, res) => {
     // Atomic conditional deduct — avoids the read-then-write race of
     // fetching balance, checking it, then saving separately, where two
     // concurrent requests could both pass the check against the same
-    // starting balance.
-    const merchant = await Merchant.findOneAndUpdate(
-      { _id: merchantId, kesBalance: { $gte: totalDeduction } },
-      { $inc: { kesBalance: -totalDeduction } },
-      { returnDocument: 'after' }
-    );
+    // starting balance. Also holds back money credited in the last 2
+    // minutes (see utils/availableBalance.js).
+    const merchant = await debitAvailableBalance(merchantId, totalDeduction);
     if (!merchant) {
-      return res.status(400).json({ error: 'Insufficient KES balance for this transfer.' });
+      return res.status(400).json({ error: 'Insufficient available KES balance for this transfer — a recent credit may still be briefly held.' });
     }
 
     if (totalDeduction >= LARGE_TRANSACTION_ALERT_KES) {

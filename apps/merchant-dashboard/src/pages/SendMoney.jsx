@@ -124,9 +124,12 @@ export default function SendMoney() {
   const [beneficiaryCountry, setBeneficiaryCountry] = useState('KE')
   const [beneficiaryAddress, setBeneficiaryAddress] = useState('')
   const [purposeCode, setPurposeCode]       = useState('MSC')
-  // Which mobile wallet network to pay into — only shown/used for the
-  // 'mpesa-primary'/'mobile' destinations (NCBA Mobile B2W supports both).
-  const [provider, setProvider]             = useState('safaricom')
+  // Mobile Money payouts always go out over M-PESA — NCBA's Mobile B2W rail
+  // has no real Airtel Money equivalent (an Airtel-destined payout just gets
+  // submitted anyway and NCBA rejects it), so there's nothing to actually
+  // choose here. No longer a picker; kept as a constant so the payload shape
+  // and existing labels below don't need to change.
+  const provider = 'safaricom'
   const [amount, setAmount]                 = useState('')
   const [reference, setReference]           = useState('')
   const [pin, setPin]                       = useState('')
@@ -312,7 +315,7 @@ export default function SendMoney() {
   // ── SUCCESS STATE ──────────────────────────────────────────────────────────
   if (success) {
     const methodLabel =
-      selectedDest?.id === 'mpesa-primary' || selectedDest?.id === 'mobile' ? `M-PESA (${provider === 'airtel' ? 'Airtel Money' : 'Safaricom'})`
+      selectedDest?.id === 'mpesa-primary' || selectedDest?.id === 'mobile' ? 'M-PESA (Safaricom)'
       : selectedDest?.id === 'bank' ? `Bank Transfer · ${bankRail === 'rtgs' ? 'RTGS' : 'PesaLink'}`
       : selectedDest?.id === 'till' ? 'Till Payment'
       : 'Paybill Payment'
@@ -597,29 +600,6 @@ export default function SendMoney() {
                 )}
               </div>
 
-              {isMobileDest && (
-                <div className="space-y-2">
-                  <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Network</label>
-                  <div className="flex gap-2 p-1.5 bg-slate-50 rounded-2xl border border-slate-100">
-                    {[
-                      { id: 'safaricom', label: 'M-PESA' },
-                      { id: 'airtel', label: 'Airtel Money' },
-                    ].map((opt) => (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        onClick={() => setProvider(opt.id)}
-                        className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                          provider === opt.id ? 'bg-[#00351D] text-white' : 'text-slate-500'
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {isB2bDest && (
                 <div className="space-y-2">
                   <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">
@@ -745,7 +725,6 @@ export default function SendMoney() {
                     ...(destination === 'bank' && bankRail === 'rtgs' ? [['Beneficiary Bank BIC', bankCode]] : []),
                     ...(destination === 'bank' ? [['Transfer Speed', bankRail === 'rtgs' ? 'International (RTGS)' : 'Instant (PesaLink)']] : []),
                     ...(destination === 'bank' && bankRail === 'rtgs' ? [['Beneficiary Country', { KE: 'Kenya', UG: 'Uganda', TZ: 'Tanzania', RW: 'Rwanda' }[beneficiaryCountry] || beneficiaryCountry]] : []),
-                    ...(isMobileDest ? [['Network', provider === 'airtel' ? 'Airtel Money' : 'M-PESA']] : []),
                     ['Recipient',   formatPhoneDisplay(recipientAccount)],
                     ...(isB2bDest && paybillAccountRef ? [['Account Number', paybillAccountRef]] : []),
                     ['Amount',      formatKES(amount || 0)],
