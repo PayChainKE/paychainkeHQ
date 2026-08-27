@@ -15,7 +15,6 @@ import { buildAuditReceiptHtml } from '../utils/auditReceiptHtml';
 import { formatName } from '../utils/formatName';
 import { buildStatementHtml } from '../utils/statementHtml';
 import { InlineDatePicker } from '../components/InlineDatePicker';
-import TransactionsWalkthrough from '../components/TransactionsWalkthrough';
 import TourTarget from '../components/TourTarget';
 
 const EXPORT_PRESETS = [
@@ -310,8 +309,6 @@ export default function Transactions({ navigation }: any) {
   // ─── Render ────────────────────────────────────────────────────────────────
   return (
     <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
-      <TransactionsWalkthrough />
-
       <TopBar title="Transactions" subtitle="Full payment history" />
 
       <ScrollView

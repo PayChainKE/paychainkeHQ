@@ -9,7 +9,6 @@ import * as SecureStore from 'expo-secure-store';
 import { useAuth } from '../../context/AuthContext';
 import { formatAccountNumber } from '../../utils/formatAccountNumber';
 import SettlementQrCard from '../ui/SettlementQrCard';
-import MyAccountsWalkthrough from '../MyAccountsWalkthrough';
 import TourTarget from '../TourTarget';
 import api from '../../api/config';
 
@@ -98,7 +97,6 @@ export default function MyAccountsTab() {
 
   return (
     <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
-      <MyAccountsWalkthrough />
       <View className="w-full max-w-lg mx-auto px-6 pt-2 pb-12">
 
         {/* Page Header */}

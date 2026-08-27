@@ -7,8 +7,6 @@ import { ValidatedInput } from '../components/ValidatedInput'
 import { formatAccountNumber } from '../utils/formatAccountNumber'
 import { formatKES } from '../utils/formatCurrency'
 import { BiometricRegisterButton } from '../components/BiometricButton'
-import SecurityWalkthrough from '../components/onboarding/SecurityWalkthrough'
-import ProfileWalkthrough from '../components/onboarding/ProfileWalkthrough'
 import { useNavigate, useLocation } from 'react-router-dom'
 import axios from 'axios'
 
@@ -369,8 +367,6 @@ export default function Profile() {
 
   return (
     <MerchantLayout title="Settings">
-      <ProfileWalkthrough />
-      <SecurityWalkthrough />
       <div className="px-1 lg:px-0 max-w-7xl mx-auto w-full">
         {/* Header */}
         <div className="mb-6 lg:mb-10">

@@ -1215,7 +1215,10 @@ export const initiateB2B = async (req, res) => {
     debited = true;
 
     const recipientName = reference || `${paymentType} ${partyB}`;
-    const transactionId = `PAYOUT-B2B-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    // No hyphens — NCBA's Lipa na M-Pesa endpoint rejects reqChnlId/
+    // reqTransactionReferenceNo values containing special characters (per
+    // Rose, NCBA support, 2026-08-27).
+    const transactionId = `PAYOUTB2B${Date.now()}${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 
     try {
       await ncbaSubmitLnmPayment({

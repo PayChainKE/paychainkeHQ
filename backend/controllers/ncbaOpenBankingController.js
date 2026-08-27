@@ -377,7 +377,10 @@ export async function executeNcbaLipaNaMpesaPayout({ merchantId, paymentType, pa
     throw new InsufficientFundsError(merchantId, totalDebit, merchant?.kesBalance ?? 0);
   }
 
-  const transactionId = `PAYOUT-API-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  // No hyphens — NCBA's Lipa na M-Pesa endpoint rejects reqChnlId/
+  // reqTransactionReferenceNo values containing special characters (per
+  // Rose, NCBA support, 2026-08-27).
+  const transactionId = `PAYOUTAPI${Date.now()}${Math.floor(Math.random() * 1000)}`;
   const resolvedPaymentType = paymentType === 'paybill' ? 'Paybill' : 'Till';
   try {
     await submitLipaNaMpesaPayment({
