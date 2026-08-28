@@ -523,6 +523,23 @@ const merchantSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  // Set once, the first time apps/merchant-dashboard's `appinstalled` event
+  // fires (src/hooks/useInstallPrompt.js) — i.e. the merchant actually
+  // added the web app (PWA) to their home screen, not just visited it in a
+  // browser. Never cleared back to null once set (an uninstall doesn't
+  // reliably fire any browser event PayChain could listen for), so this is
+  // "installed at least once," not "currently installed." Distinct from
+  // apps/mobile-app, the separate native app — this only tracks the PWA.
+  pwaInstalledAt: {
+    type: Date,
+    default: null,
+  },
+  // Last time an admin used the "Resend Install Link" action (Merchants
+  // page) to nudge a merchant who hasn't installed the PWA yet.
+  pwaInstallReminderSentAt: {
+    type: Date,
+    default: null,
+  },
   settlementBankName: {
     type: String,
     default: null,

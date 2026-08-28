@@ -28,6 +28,7 @@ import {
   getMerchantMe,
   updateMerchantProfile,
   toggleBiometrics,
+  reportPwaInstalled,
   setAppPin,
   resetAppPin,
   verifyPaymentPin,
@@ -200,6 +201,7 @@ router.post('/merchant/logout', protectMerchant, signOutAllDevices);
 router.get('/merchant/me', protectMerchant, getMerchantMe);
 router.put('/merchant/profile', protectMerchant, updateMerchantProfile);
 router.put('/merchant/biometrics', protectMerchant, toggleBiometrics);
+router.put('/merchant/pwa-installed', protectMerchant, reportPwaInstalled);
 router.put('/merchant/onboarding-walkthrough', protectMerchant, completeOnboardingWalkthrough);
 router.put('/merchant/accounts-walkthrough', protectMerchant, completeAccountsWalkthrough);
 router.put('/merchant/security-walkthrough', protectMerchant, completeSecurityWalkthrough);

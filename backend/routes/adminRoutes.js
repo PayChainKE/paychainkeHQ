@@ -13,6 +13,7 @@ import {
   updateMerchantFeatures,
   getPlatformSettings,
   updatePlatformSettings,
+  sendInstallReminder,
   updateMerchantVerification,
   updateMerchantKycDocument,
   updateMerchantBusinessName,
@@ -158,6 +159,7 @@ router.post('/merchants/:id/confirm-action', protect, requireMutator, sensitiveA
 router.post('/merchants/:id/flag', protect, requireMutator, sensitiveActionLimiter, flagMerchant);
 router.post('/merchants/:id/unflag', protect, requireMutator, sensitiveActionLimiter, unflagMerchant);
 router.patch('/merchants/:id/features', protect, requireMutator, sensitiveActionLimiter, updateMerchantFeatures);
+router.post('/merchants/:id/send-install-reminder', protect, requireMutator, sensitiveActionLimiter, sendInstallReminder);
 router.get('/platform-settings', protect, excludeOfficer, getPlatformSettings);
 router.patch('/platform-settings', protect, requireMutator, sensitiveActionLimiter, updatePlatformSettings);
 router.patch('/merchants/:id/verification', protect, requireMutator, sensitiveActionLimiter, updateMerchantVerification);
