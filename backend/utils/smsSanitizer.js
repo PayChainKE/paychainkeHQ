@@ -32,6 +32,19 @@ export function formatKes(amount) {
   return Number(amount).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// Bank/M-Pesa-sourced names (NCBA's CustomerName field, Safaricom's payer
+// name) arrive in ALL CAPS — fine on a bank statement, not how a
+// PayChain SMS should read. "JACOB BRANDON OMUTITI" -> "Jacob Brandon
+// Omutiti". Lowercases everything first (so a mixed-case input like
+// "McDonald's" doesn't get mangled further) then capitalizes the first
+// letter of each whitespace-separated word. Display-only — never applied
+// to a stored record, only at the point a name is rendered into an SMS.
+export function toTitleCase(name) {
+  const str = String(name ?? '').trim();
+  if (!str) return str;
+  return str.toLowerCase().replace(/(^|\s)(\S)/g, (_, sep, ch) => sep + ch.toUpperCase());
+}
+
 // GSM 03.38 default alphabet (basic table only — the extension table
 // characters like ^ { } \ [ ~ ] | € are deliberately excluded here too,
 // since each one silently costs 2 characters of the 160 budget). Anything

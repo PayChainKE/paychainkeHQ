@@ -22,6 +22,7 @@ import { buildPaymentReceivedSms, buildCustomerPaidSms, buildPaymentRequestSms, 
 import { initiateStkPush as ncbaInitiateStkPush, queryStkPush as ncbaQueryStkPush, generateQrCode as ncbaGenerateQrCode } from '../services/ncbaStkPushService.js';
 import { submitMobileB2wPayment as ncbaSubmitMobileB2wPayment, submitLipaNaMpesaPayment as ncbaSubmitLnmPayment, NcbaOpenBankingRequestError } from '../services/ncbaOpenBankingService.js';
 import { validatePhoneNumber, NcbaValidationError, getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
+import { isLipaNaMpesaBetaMerchant, LIPA_NA_MPESA_NOT_AVAILABLE_MESSAGE } from '../config/lipaNaMpesaBetaAllowlist.js';
 import { generateBrandedQrDataUri } from '../utils/qrCode.js';
 import DeveloperPayment from '../models/DeveloperPayment.js';
 import { publicDeveloperPayment } from '../utils/developerPaymentView.js';
@@ -1295,6 +1296,10 @@ export const initiateB2B = async (req, res) => {
   try {
     const { billType, partyB, accountReference, amount, reference, pin } = req.body;
     const merchantId = req.merchant._id;
+
+    if (!isLipaNaMpesaBetaMerchant(merchantId)) {
+      return res.status(403).json({ error: LIPA_NA_MPESA_NOT_AVAILABLE_MESSAGE });
+    }
 
     if (billType !== 'paybill' && billType !== 'till') {
       return res.status(400).json({ error: 'billType must be "paybill" or "till".' });

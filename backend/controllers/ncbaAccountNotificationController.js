@@ -23,6 +23,8 @@ import { getNcbaVirtualAccountNumber, formatAccountNumberDisplay } from '../util
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay.js';
 import { toE164Kenyan } from '../utils/notificationService.js';
 import { buildPaymentReceivedSms, buildPaybillPaymentReceiptSms } from '../utils/paymentSmsTemplates.js';
+import { toTitleCase } from '../utils/smsSanitizer.js';
+import NcbaPhoneExtractionMiss from '../models/NcbaPhoneExtractionMiss.js';
 
 const respondOk = (res, detail) => res.status(200).type('application/xml').send(buildNcbaOkResult(detail));
 const respondFail = (res, detail) => res.status(200).type('application/xml').send(buildNcbaFailResult(detail));
@@ -361,7 +363,11 @@ export const handleNcbaAccountNotification = async (req, res) => {
     // no phone to confirm it to.
     const validPayerPhone = [parsedCustomer.phone, rawPhoneNr, extractMsisdnFromText(rawNarrative)]
       .find((candidate) => candidate && toE164Kenyan(candidate)) || null;
-    const customerDisplayName = parsedCustomer.name || 'a customer';
+    // NCBA's CustomerName arrives in ALL CAPS ("JACOB BRANDON OMUTITI") —
+    // toTitleCase renders it as "Jacob Brandon Omutiti" for the merchant's
+    // SMS. Display-only: parsedCustomer.name itself (used above for
+    // attribution/logging) stays untouched.
+    const customerDisplayName = parsedCustomer.name ? toTitleCase(parsedCustomer.name) : 'a customer';
 
     // Staggered (not simultaneous) — confirmed live that firing both SMS
     // back-to-back gets the first dispatched in under a second but leaves
@@ -394,6 +400,14 @@ export const handleNcbaAccountNotification = async (req, res) => {
         rawCustomerName,
         rawNarrative,
       });
+      // Same fields as the log line above, mirrored into the DB — a live
+      // 100% skip rate on this webhook (confirmed 2026-08-28: 25/25 real
+      // collections over the prior 30 days) means this needs to be
+      // queryable after the fact, not just visible in Render's live log
+      // tail at the exact moment a payment lands.
+      NcbaPhoneExtractionMiss.create({
+        transId, merchantId: merchant._id, rawTransType, rawPhoneNr, rawCustomerName, rawNarrative,
+      }).catch((e) => logEvent('error', 'ncba_phone_extraction_miss_log_failed', { transId, error: e.message }));
     }
 
     if (merchant.phone) {

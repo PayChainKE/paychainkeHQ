@@ -22,6 +22,7 @@ import { validatePhoneNumber, NcbaValidationError } from '../utils/ncbaValidator
 import { submitMobileB2wPayment, submitLipaNaMpesaPayment, validateKplcAccount, submitKplcPayment, validateKplcPrepaidAccount, submitKplcPrepaidPayment, validateNcwscAccount, submitNcwscPayment, NcbaOpenBankingValidationError, NcbaOpenBankingRequestError } from '../services/ncbaOpenBankingService.js';
 import { buildPayoutSentSms } from '../utils/paymentSmsTemplates.js';
 import { normalizeKraPin, isValidKraPin, KRA_PIN_FORMAT_HINT } from '../utils/kraPinValidator.js';
+import { isLipaNaMpesaBetaMerchant, LIPA_NA_MPESA_NOT_AVAILABLE_MESSAGE } from '../config/lipaNaMpesaBetaAllowlist.js';
 
 // Every catch block in this file used to respond with { error: error.message }
 // directly, which bypasses server.js's global error handler entirely (that
@@ -64,6 +65,10 @@ export const addPayee = async (req, res) => {
       kraPin, idNumber, nssfNumber, shifNumber, etimsInvoiceNumber, cuNumber, defaultAmount
     } = req.body;
 
+    if ((mobileMoneyType === 'Paybill' || mobileMoneyType === 'Buy Goods') && !isLipaNaMpesaBetaMerchant(req.merchant._id)) {
+      return res.status(403).json({ message: LIPA_NA_MPESA_NOT_AVAILABLE_MESSAGE });
+    }
+
     kraPin = kraPin ? normalizeKraPin(kraPin) : kraPin;
     if (kraPin && !isValidKraPin(kraPin)) {
       return res.status(400).json({ message: `Invalid KRA PIN format. ${KRA_PIN_FORMAT_HINT}` });
@@ -104,6 +109,10 @@ export const updatePayee = async (req, res) => {
       businessAccount, tillNumber, bankName, accountNumber, bankCode, utilityProvider, utilityType,
       kraPin, idNumber, nssfNumber, shifNumber, etimsInvoiceNumber, cuNumber, defaultAmount
     } = req.body;
+
+    if ((mobileMoneyType === 'Paybill' || mobileMoneyType === 'Buy Goods') && !isLipaNaMpesaBetaMerchant(req.merchant._id)) {
+      return res.status(403).json({ message: LIPA_NA_MPESA_NOT_AVAILABLE_MESSAGE });
+    }
 
     kraPin = kraPin ? normalizeKraPin(kraPin) : kraPin;
     if (kraPin && !isValidKraPin(kraPin)) {
@@ -813,41 +822,53 @@ export const authorizeBatch = async (req, res) => {
         // No hyphens — NCBA's Lipa na M-Pesa endpoint rejects reqChnlId/
         // reqTransactionReferenceNo values containing special characters
         // (per Rose, NCBA support, 2026-08-27).
-        const lnmTransactionId = `PAYOUTBULK${Date.now()}${Math.floor(Math.random() * 1000)}`;
-        try {
-          const payBillTillNo = payee.paybillNumber || payee.tillNumber;
-          // No pre-payout Till/Paybill validation — takes the saved payee's
-          // own mobileMoneyType selection as given.
-          const paymentType = payee.mobileMoneyType === 'Paybill' ? 'Paybill' : 'Till';
-          await submitLipaNaMpesaPayment({
-            transactionId: lnmTransactionId,
-            paymentType,
-            payBillTillNo,
-            amount: row.netAmount,
-            accountReference: paymentType === 'Paybill' ? payee.businessAccount : undefined,
-            recipientName: payee.name,
-            notifyMobileNumber: merchant.phone,
-            narration: `Bulk Payout to ${payee.name}`,
-          });
-          // Async rail — payoutStatus stays 'pending' (its default above),
-          // resolved later via handlePesaLinkCallback / the reconciliation
-          // sweep, same as KPLC/NCWSC above (no evidence yet that this
-          // rail's callback is as unreliable as Mobile B2W's proved to be).
-          payoutRef = lnmTransactionId;
-        } catch (err) {
-          console.error(`❌ NCBA Lipa na M-Pesa rejected payout for ${payee.name}:`, err.message);
-          if (err instanceof NcbaOpenBankingRequestError) {
-            // Same reasoning as the Mobile B2W branch above: NCBA actually
-            // received this request, and an NCBA rejection response has
-            // already been shown live not to reliably mean the transfer
-            // never landed. Left 'pending' under the reference NCBA
-            // actually received rather than refunded here — the
-            // reconciliation sweep still resolves it (refund included) if
-            // no success callback arrives.
+        // Defense in depth — addPayee/updatePayee already refuse to save a
+        // Paybill/Buy Goods payee for anyone outside the beta allowlist, so
+        // this should be unreachable in practice; kept here so a payee
+        // saved before that restriction existed can't still slip a real
+        // payout through. Same fall-through-to-shared-bookkeeping shape as
+        // every other failure branch above (no early `continue`).
+        if (!isLipaNaMpesaBetaMerchant(merchant._id)) {
+          payoutStatus = 'failed';
+          refundAmount += row.netAmount;
+          console.error(`❌ Blocked Lipa na M-Pesa payout for non-beta merchant ${merchant._id} — payee ${payee.name}`);
+        } else {
+          const lnmTransactionId = `PAYOUTBULK${Date.now()}${Math.floor(Math.random() * 1000)}`;
+          try {
+            const payBillTillNo = payee.paybillNumber || payee.tillNumber;
+            // No pre-payout Till/Paybill validation — takes the saved payee's
+            // own mobileMoneyType selection as given.
+            const paymentType = payee.mobileMoneyType === 'Paybill' ? 'Paybill' : 'Till';
+            await submitLipaNaMpesaPayment({
+              transactionId: lnmTransactionId,
+              paymentType,
+              payBillTillNo,
+              amount: row.netAmount,
+              accountReference: paymentType === 'Paybill' ? payee.businessAccount : undefined,
+              recipientName: payee.name,
+              notifyMobileNumber: merchant.phone,
+              narration: `Bulk Payout to ${payee.name}`,
+            });
+            // Async rail — payoutStatus stays 'pending' (its default above),
+            // resolved later via handlePesaLinkCallback / the reconciliation
+            // sweep, same as KPLC/NCWSC above (no evidence yet that this
+            // rail's callback is as unreliable as Mobile B2W's proved to be).
             payoutRef = lnmTransactionId;
-          } else {
-            payoutStatus = 'failed';
-            refundAmount += row.netAmount + row.b2cFee + row.lnmFee;
+          } catch (err) {
+            console.error(`❌ NCBA Lipa na M-Pesa rejected payout for ${payee.name}:`, err.message);
+            if (err instanceof NcbaOpenBankingRequestError) {
+              // Same reasoning as the Mobile B2W branch above: NCBA actually
+              // received this request, and an NCBA rejection response has
+              // already been shown live not to reliably mean the transfer
+              // never landed. Left 'pending' under the reference NCBA
+              // actually received rather than refunded here — the
+              // reconciliation sweep still resolves it (refund included) if
+              // no success callback arrives.
+              payoutRef = lnmTransactionId;
+            } else {
+              payoutStatus = 'failed';
+              refundAmount += row.netAmount + row.b2cFee + row.lnmFee;
+            }
           }
         }
       }

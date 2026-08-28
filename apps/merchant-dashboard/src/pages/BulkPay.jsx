@@ -14,10 +14,17 @@ import paychainLogo from '../assets/paychain-logo-dark.png'
 import paychainLogoWhite from '../assets/paychain-logo-white.png'
 import axios from 'axios'
 
+// Lipa na M-Pesa (Till/Paybill) outbound payouts are still being verified
+// end-to-end — restricted to Brantech Solutions (the account used for live
+// testing, matching backend/config/lipaNaMpesaBetaAllowlist.js) until
+// confirmed working, then opened up to every merchant.
+const LIPA_NA_MPESA_BETA_MERCHANT_ID = '6a8f30cb228671cacc4361fe' // Brantech Solutions
+
 export default function BulkPay() {
   const { showAmounts } = usePrivacyMode()
   const { addNotification } = useNotification()
   const { merchant, refreshSession } = useMerchantAuth()
+  const isLipaNaMpesaBetaMerchant = merchant?._id === LIPA_NA_MPESA_BETA_MERCHANT_ID
   const [payeesList, setPayeesList] = useState([])
 
   useEffect(() => {
@@ -1328,19 +1335,28 @@ export default function BulkPay() {
                             <div className="space-y-3">
                               <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Mobile Money Type</label>
                               <div className="grid grid-cols-3 gap-2">
-                                {['Personal Number', 'Paybill', 'Buy Goods'].map((mType) => (
-                                  <button
-                                    key={mType}
-                                    onClick={() => setNewPayee({...newPayee, mobileMoneyType: mType})}
-                                    className={`py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${
-                                      newPayee.mobileMoneyType === mType 
-                                        ? 'bg-[#00351D] text-white border-[#00351D]' 
-                                        : 'bg-white text-on-surface-variant/40 border-outline-variant/20 hover:border-emerald-500/30'
-                                    }`}
-                                  >
-                                    {mType}
-                                  </button>
-                                ))}
+                                {['Personal Number', 'Paybill', 'Buy Goods'].map((mType) => {
+                                  const comingSoon = (mType === 'Paybill' || mType === 'Buy Goods') && !isLipaNaMpesaBetaMerchant
+                                  return (
+                                    <button
+                                      key={mType}
+                                      type="button"
+                                      disabled={comingSoon}
+                                      title={comingSoon ? 'Coming Soon' : undefined}
+                                      onClick={() => { if (comingSoon) return; setNewPayee({...newPayee, mobileMoneyType: mType}) }}
+                                      className={`py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border flex flex-col items-center gap-0.5 ${
+                                        comingSoon
+                                          ? 'bg-white text-on-surface-variant/30 border-outline-variant/10 opacity-60 cursor-not-allowed'
+                                          : newPayee.mobileMoneyType === mType
+                                          ? 'bg-[#00351D] text-white border-[#00351D]'
+                                          : 'bg-white text-on-surface-variant/40 border-outline-variant/20 hover:border-emerald-500/30'
+                                      }`}
+                                    >
+                                      <span>{mType}</span>
+                                      {comingSoon && <span className="text-[7px] font-black text-amber-700 normal-case tracking-normal">Coming Soon</span>}
+                                    </button>
+                                  )
+                                })}
                               </div>
                             </div>
 

@@ -93,12 +93,18 @@ function formatKES(n: number | null | undefined) {
 
 type Destination = 'mpesa-primary' | 'mobile' | 'bank' | 'till' | 'paybill';
 
-const DESTINATIONS: Array<{ id: Destination; label: string; icon: keyof typeof MaterialIcons.glyphMap; hint: string; feeLabel: string }> = [
+// Lipa na M-Pesa (Till/Paybill) outbound payouts are still being verified
+// end-to-end — restricted to Brantech Solutions (the account used for live
+// testing, matching backend/config/lipaNaMpesaBetaAllowlist.js) until
+// confirmed working, then opened up to every merchant.
+const LIPA_NA_MPESA_BETA_MERCHANT_ID = '6a8f30cb228671cacc4361fe'; // Brantech Solutions
+
+const DESTINATIONS: Array<{ id: Destination; label: string; icon: keyof typeof MaterialIcons.glyphMap; hint: string; feeLabel: string; betaOnly?: boolean }> = [
   { id: 'mpesa-primary', label: 'Primary M-PESA Number', icon: 'smartphone', hint: 'Your registered phone number', feeLabel: 'Varies' },
   { id: 'mobile', label: 'Any M-PESA Number', icon: 'smartphone', hint: 'Send to any Kenyan mobile number', feeLabel: 'Varies' },
   { id: 'bank', label: 'Bank Account', icon: 'account-balance', hint: 'Direct bank transfer', feeLabel: 'Varies' },
-  { id: 'till', label: 'Till Number', icon: 'point-of-sale', hint: 'Pay to a Safaricom Till', feeLabel: 'Varies' },
-  { id: 'paybill', label: 'Paybill', icon: 'receipt-long', hint: 'Pay to a Paybill number', feeLabel: 'Varies' },
+  { id: 'till', label: 'Till Number', icon: 'point-of-sale', hint: 'Pay to a Safaricom Till', feeLabel: 'Varies', betaOnly: true },
+  { id: 'paybill', label: 'Paybill', icon: 'receipt-long', hint: 'Pay to a Paybill number', feeLabel: 'Varies', betaOnly: true },
 ];
 
 // Mirrors merchant-dashboard's SendMoney.jsx and backend/config/lipaNaMpesaTariffCard.js's
@@ -218,6 +224,7 @@ export default function SendMoney({ navigation }: any) {
   // second real transfer.
   const [confirmLocked, setConfirmLocked] = useState(false);
 
+  const isLipaNaMpesaBetaMerchant = merchant?._id === LIPA_NA_MPESA_BETA_MERCHANT_ID;
   const selectedDest = DESTINATIONS.find((d) => d.id === destination);
   const isMobileDest = destination === 'mpesa-primary' || destination === 'mobile';
   const isB2bDest = destination === 'till' || destination === 'paybill';
@@ -447,25 +454,35 @@ export default function SendMoney({ navigation }: any) {
               <View className="gap-2.5">
                 {DESTINATIONS.map((d) => {
                   const active = destination === d.id;
+                  const comingSoon = d.betaOnly && !isLipaNaMpesaBetaMerchant;
                   return (
                     <TouchableOpacity
                       key={d.id}
+                      disabled={comingSoon}
                       onPress={() => {
+                        if (comingSoon) return;
                         setDestination(d.id);
                         setRecipientAccount(d.id === 'mpesa-primary' ? merchant?.phone || '' : '');
                         if (d.id === 'bank') fetchBankCodes();
                       }}
-                      activeOpacity={0.85}
-                      className={`flex-row items-center gap-3 p-4 rounded-2xl border-2 ${active ? 'border-[#00351d] bg-[#f0fdf4]' : 'border-[#eff4ef] bg-white'}`}
+                      activeOpacity={comingSoon ? 1 : 0.85}
+                      className={`flex-row items-center gap-3 p-4 rounded-2xl border-2 ${comingSoon ? 'border-[#eff4ef] bg-white opacity-60' : active ? 'border-[#00351d] bg-[#f0fdf4]' : 'border-[#eff4ef] bg-white'}`}
                     >
-                      <View className={`w-10 h-10 rounded-xl items-center justify-center ${active ? 'bg-[#00351d]' : 'bg-[#f7faf7]'}`}>
-                        <MaterialIcons name={d.icon} size={18} color={active ? '#5efeb3' : '#707971'} />
+                      <View className={`w-10 h-10 rounded-xl items-center justify-center ${comingSoon ? 'bg-[#f7faf7]' : active ? 'bg-[#00351d]' : 'bg-[#f7faf7]'}`}>
+                        <MaterialIcons name={d.icon} size={18} color={comingSoon ? '#a3aca5' : active ? '#5efeb3' : '#707971'} />
                       </View>
                       <View className="flex-1">
-                        <Text className={`text-[14px] font-jakarta-bold ${active ? 'text-[#00351d]' : 'text-[#0c2010]'}`}>{d.label}</Text>
+                        <View className="flex-row items-center gap-2 flex-wrap">
+                          <Text className={`text-[14px] font-jakarta-bold ${comingSoon ? 'text-[#a3aca5]' : active ? 'text-[#00351d]' : 'text-[#0c2010]'}`}>{d.label}</Text>
+                          {comingSoon && (
+                            <View className="px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200">
+                              <Text className="text-[9px] font-jakarta-extrabold uppercase tracking-widest text-amber-700">Coming Soon</Text>
+                            </View>
+                          )}
+                        </View>
                         <Text className="text-[10px] text-[#707971] font-jakarta-medium mt-0.5">{d.hint}</Text>
                       </View>
-                      {active && <Feather name="check-circle" size={18} color="#00351d" />}
+                      {!comingSoon && active && <Feather name="check-circle" size={18} color="#00351d" />}
                     </TouchableOpacity>
                   );
                 })}
