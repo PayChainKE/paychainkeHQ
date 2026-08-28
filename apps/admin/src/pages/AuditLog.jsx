@@ -42,6 +42,26 @@ const ACTION_META = {
   'admin.merchant.deleted':                   { label: 'Admin · deleted',          icon: 'delete_forever' },
   'admin.merchant.features_updated':          { label: 'Admin · feature access updated', icon: 'toggle_on' },
   'admin.cash_advance.status_updated':        { label: 'Admin · cash advance decision', icon: 'fact_check' },
+  // Real payments/transfers — merged in from the Transaction collection at
+  // query time (see backend/controllers/auditLogController.js), not
+  // written to AuditLog itself. `merchant.transaction.<type>` mirrors
+  // Transaction.type exactly, so every rail gets its own row here.
+  'merchant.transaction.inbound':             { label: 'Received payment',         icon: 'call_received' },
+  'merchant.transaction.outbound':            { label: 'Sent payment',             icon: 'call_made' },
+  'merchant.transaction.bulk_pay':            { label: 'Bulk payment',             icon: 'groups' },
+  'merchant.transaction.settlement':          { label: 'Settled to bank',          icon: 'account_balance' },
+  'merchant.transaction.fx_swap':             { label: 'FX swap (KES ↔ USDC)',     icon: 'currency_exchange' },
+  'merchant.transaction.top_up':              { label: 'Wallet top-up',            icon: 'add_card' },
+  'merchant.transaction.withdrawal':          { label: 'Withdrawal',               icon: 'payments' },
+  'merchant.transaction.ncba_inbound':        { label: 'Received payment (NCBA)',  icon: 'call_received' },
+  'merchant.transaction.ncba_outbound':       { label: 'Sent payment (NCBA)',      icon: 'call_made' },
+  'merchant.transaction.mpesa_b2c':           { label: 'M-Pesa withdrawal',        icon: 'smartphone' },
+  'merchant.transaction.mpesa_b2b':           { label: 'M-Pesa B2B payout',        icon: 'point_of_sale' },
+  'merchant.transaction.ncba_mobile_b2w':     { label: 'Mobile money payout (NCBA)', icon: 'smartphone' },
+  'merchant.transaction.ncba_lipa_na_mpesa':  { label: 'Paybill/Till payout (NCBA)', icon: 'point_of_sale' },
+  'merchant.transaction.ncba_kplc':           { label: 'KPLC bill payment',        icon: 'bolt' },
+  'merchant.transaction.ncba_kplc_prepaid':   { label: 'KPLC prepaid token',       icon: 'bolt' },
+  'merchant.transaction.ncba_ncwsc':          { label: 'Water bill payment (NCWSC)', icon: 'water_drop' },
 };
 
 const SEVERITY_TONE = {

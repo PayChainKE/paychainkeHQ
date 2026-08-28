@@ -1,9 +1,131 @@
 import mongoose from 'mongoose';
 import AuditLog from '../models/AuditLog.js';
+import Transaction from '../models/Transaction.js';
+import Merchant from '../models/Merchant.js';
+
+// Transaction types that represent money arriving without the merchant
+// themselves initiating anything (a customer paid them, or a webhook
+// credited them) — shown with actor.type 'system' rather than 'self' in
+// the merged feed below, matching how every other webhook-driven credit
+// in this codebase is framed.
+const INBOUND_TXN_TYPES = ['inbound', 'ncba_inbound', 'top_up'];
+
+// A merchant's actual payment activity (send/receive money, M-Pesa/NCBA
+// transfers) has never been written to AuditLog anywhere in this codebase
+// — it only ever lived in the Transaction collection, so the Audit Log
+// page could never show it no matter what an admin filtered for. Rather
+// than double-write every transaction into AuditLog (2x write volume,
+// duplicate storage, and TTL semantics that don't fit permanent financial
+// records), this merges Transaction documents into the SAME query via
+// MongoDB's $unionWith — reshaped on the fly into the exact field shape
+// AuditLog rows already have, so the existing frontend renders them with
+// no changes. Nothing is persisted; the merge happens per-request.
+//
+// Returns null when the current filters couldn't possibly match a
+// transaction-shaped row (skips the union entirely rather than running a
+// pipeline that would just return nothing) — the transaction branch is
+// always category 'wallet', platform 'unknown', and actor.type is either
+// 'self' or 'system', never 'admin'/'officer'.
+function buildTransactionUnionStage({ merchantId, action, category, severity, actor, platform, q, from, to }) {
+  if (category && category !== 'wallet') return null;
+  if (platform && platform !== 'unknown') return null;
+  if (actor && !['self', 'system'].includes(actor)) return null;
+  if (action && !action.startsWith('merchant.transaction.')) return null;
+
+  const match = {};
+  if (merchantId && mongoose.Types.ObjectId.isValid(merchantId)) {
+    match.merchantId = new mongoose.Types.ObjectId(merchantId);
+  }
+  if (from || to) {
+    match.createdAt = {};
+    if (from) match.createdAt.$gte = new Date(from);
+    if (to) match.createdAt.$lte = new Date(to);
+  }
+
+  const pipeline = [{ $match: match }];
+
+  pipeline.push(
+    { $lookup: { from: Merchant.collection.name, localField: 'merchantId', foreignField: '_id', as: 'merchantDoc' } },
+    { $unwind: { path: '$merchantDoc', preserveNullAndEmptyArrays: true } },
+    {
+      $project: {
+        _id: 1,
+        merchantId: 1,
+        merchantEmail: '$merchantDoc.email',
+        merchantName: '$merchantDoc.businessName',
+        actor: {
+          type: { $cond: [{ $in: ['$type', INBOUND_TXN_TYPES] }, 'system', 'self'] },
+          id: '$merchantId',
+          email: '$merchantDoc.email',
+          name: '$merchantDoc.businessName',
+        },
+        action: { $concat: ['merchant.transaction.', '$type'] },
+        category: { $literal: 'wallet' },
+        severity: {
+          $switch: {
+            branches: [
+              { case: { $in: ['$status', ['completed', 'verified']] }, then: 'success' },
+              { case: { $eq: ['$status', 'failed'] }, then: 'warning' },
+            ],
+            default: 'info',
+          },
+        },
+        message: {
+          $concat: [
+            'Ksh ', { $toString: { $round: [{ $ifNull: ['$kesAmount', '$amount'] }, 2] } },
+            ' · Ref ', '$reference',
+          ],
+        },
+        ip: { $literal: null },
+        userAgent: { $literal: null },
+        platform: { $literal: 'unknown' },
+        metadata: {
+          reference: '$reference',
+          transactionType: '$type',
+          status: '$status',
+          kesAmount: '$kesAmount',
+          usdcAmount: '$usdcAmount',
+          currency: '$currency',
+          paychainFee: '$paychainFee',
+          settlementRail: '$settlementRail',
+          mobileNetwork: '$mobileNetwork',
+          sender: '$sender',
+          recipient: '$recipient',
+        },
+        createdAt: 1,
+        updatedAt: '$createdAt',
+      },
+    },
+  );
+
+  const postMatch = {};
+  if (severity) postMatch.severity = severity;
+  if (action) postMatch.action = action;
+  if (actor) postMatch['actor.type'] = actor;
+  if (q && String(q).trim()) {
+    const safe = String(q).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const rx = new RegExp(safe, 'i');
+    postMatch.$or = [
+      { merchantEmail: rx },
+      { merchantName: rx },
+      { action: rx },
+      { message: rx },
+      { 'metadata.reference': rx },
+      { 'metadata.sender.name': rx },
+      { 'metadata.recipient.name': rx },
+    ];
+  }
+  if (Object.keys(postMatch).length) pipeline.push({ $match: postMatch });
+
+  return pipeline;
+}
 
 // @desc    Paginated audit log feed with filters. Powers both the global
 //          /audit-log admin page and the per-merchant log panel in the KYB
-//          drawer (just pass ?merchantId=...).
+//          drawer (just pass ?merchantId=...). Merges in the merchant's
+//          real transaction activity (see buildTransactionUnionStage above)
+//          so "all merchant activity" actually means all of it, not just
+//          auth/security/admin events.
 //
 // @route   GET /api/admin/audit-log
 //          Query: ?merchantId=&action=&category=&severity=&actor=&q=&from=&to=&page=&limit=
@@ -19,7 +141,10 @@ export const getAuditLog = async (req, res) => {
     const filter = {};
 
     if (merchantId && mongoose.Types.ObjectId.isValid(merchantId)) {
-      filter.merchantId = merchantId;
+      // Aggregate()'s $match, unlike find(), does NOT auto-cast a string to
+      // the schema's ObjectId type — an uncast string here would silently
+      // match nothing once this ran through .aggregate() instead of .find().
+      filter.merchantId = new mongoose.Types.ObjectId(merchantId);
     }
     if (action)   filter.action   = action;
     if (category) filter.category = category;
@@ -54,12 +179,40 @@ export const getAuditLog = async (req, res) => {
     const pageSize = Math.min(5000, Math.max(1, parseInt(limit, 10) || 25));
     const skip     = (pageNum - 1) * pageSize;
 
-    // Run the data fetch and the KPI rollup in parallel.
-    const [rows, total, kpis] = await Promise.all([
-      AuditLog.find(filter).sort({ createdAt: -1 }).skip(skip).limit(pageSize).lean(),
-      AuditLog.countDocuments(filter),
-      // Last-24h health pulse — independent of the filter so the header
-      // KPIs reflect overall platform activity, not the filtered view.
+    const txnUnionPipeline = buildTransactionUnionStage({ merchantId, action, category, severity, actor, platform, q, from, to });
+
+    // Combined pipeline: real AuditLog rows (reshaped to drop internal-only
+    // fields like expiresAt) unioned with the reshaped Transaction rows
+    // above, sorted/paginated as one feed, plus a total count of the union.
+    const combinedPipeline = [
+      { $match: filter },
+      {
+        $project: {
+          _id: 1, merchantId: 1, merchantEmail: 1, merchantName: 1, actor: 1,
+          action: 1, category: 1, severity: 1, message: 1, ip: 1, userAgent: 1,
+          platform: 1, metadata: 1, createdAt: 1, updatedAt: 1,
+        },
+      },
+      ...(txnUnionPipeline ? [{ $unionWith: { coll: Transaction.collection.name, pipeline: txnUnionPipeline } }] : []),
+      { $sort: { createdAt: -1 } },
+      {
+        $facet: {
+          data: [{ $skip: skip }, { $limit: pageSize }],
+          totalCount: [{ $count: 'count' }],
+        },
+      },
+    ];
+
+    // Run the merged feed and the KPI rollup in parallel. The KPI pulse
+    // stays AuditLog-only (last-24h sign-ins/resets/admin-actions) — those
+    // are specifically security/auth metrics, not transaction volume, so
+    // merging Transaction into it wouldn't change what it's measuring.
+    const [combined, kpis] = await Promise.all([
+      // allowDiskUse: an unfiltered ("All time") view unions the full
+      // AuditLog + Transaction collections before sorting — fine at
+      // today's volume, but this is the honest way to avoid a hard error
+      // once the in-memory sort would otherwise exceed Mongo's 100MB cap.
+      AuditLog.aggregate(combinedPipeline).allowDiskUse(true),
       AuditLog.aggregate([
         { $match: { createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } } },
         {
@@ -80,6 +233,9 @@ export const getAuditLog = async (req, res) => {
         },
       ]),
     ]);
+
+    const rows  = combined[0]?.data || [];
+    const total = combined[0]?.totalCount?.[0]?.count || 0;
 
     res.json({
       success: true,
