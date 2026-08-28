@@ -137,6 +137,19 @@ const protectMerchant = async (req, res, next) => {
   }
 };
 
+// Same relaxation as protectAdminSSE above, for the exact same reason:
+// EventSource can't set an Authorization header, so the merchant dashboard's
+// live-events stream alone accepts the token as a query param too. Reuses
+// protectMerchant's own status/tokenVersion checks rather than duplicating
+// them, so a locked account or a revoked session can't keep an SSE
+// connection open either.
+const protectMerchantSSE = async (req, res, next) => {
+  if (!extractToken(req) && typeof req.query.token === 'string' && req.query.token) {
+    req.headers.authorization = `Bearer ${req.query.token}`;
+  }
+  return protectMerchant(req, res, next);
+};
+
 const protectDeveloper = async (req, res, next) => {
   const token = extractToken(req);
   if (!token) return fail(res, 401, 'NO_TOKEN', 'Authentication required. Please sign in.');
@@ -229,4 +242,4 @@ const requireRole = (...allowedRoles) => (req, res, next) => {
   return next();
 };
 
-export { protect, protectAdminSSE, protectMerchant, protectDeveloper, authenticateApiKey, requireRole };
+export { protect, protectAdminSSE, protectMerchant, protectMerchantSSE, protectDeveloper, authenticateApiKey, requireRole };

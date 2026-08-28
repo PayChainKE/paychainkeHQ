@@ -19,6 +19,10 @@ export function MerchantAuthProvider({ children }) {
   const [merchant, setMerchant] = useState(null);
   const [token, setToken] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  // Bumped on every live-pushed event (see the SSE effect below) — other
+  // pages/hooks can watch this in their own polling effect's dependency
+  // array to refetch immediately instead of waiting for their next tick.
+  const [liveEventAt, setLiveEventAt] = useState(0);
   const navigate = useNavigate();
   const interceptorRef = useRef(null);
 
@@ -123,11 +127,42 @@ export function MerchantAuthProvider({ children }) {
   // derived from `merchant`) stays live across every page without each one
   // needing its own refresh loop. Keyed on merchant._id (not the whole
   // object) so the interval isn't torn down and recreated on every tick.
+  // This is now the fallback path — the SSE connection below normally
+  // beats it to any real change — kept as-is in case the stream drops
+  // (network hiccup, proxy timeout) without the browser noticing yet.
   useEffect(() => {
     if (!merchant?._id) return;
     const interval = setInterval(refreshSession, 5000);
     return () => clearInterval(interval);
   }, [merchant?._id]);
+
+  // Live push — the instant PayChain changes anything on this merchant's
+  // account (a transaction settles, a notification arrives, an admin
+  // action touches their record — see backend/utils/merchantEventStream.js
+  // and its call sites), refresh immediately instead of waiting up to 5s
+  // for the poll above. EventSource can't set an Authorization header, so
+  // the token travels as a query param — protectMerchantSSE on the backend
+  // accepts that alongside the normal header. liveEventAt is bumped on
+  // every event (not just merchant profile changes) so pages like
+  // Overview/Transactions, which poll their own data independently, can
+  // also react immediately by watching it — see their own useEffect deps.
+  useEffect(() => {
+    if (!merchant?._id || !token) return;
+    const es = new EventSource(`${API_URL}/api/auth/merchant/events/stream?token=${encodeURIComponent(token)}`);
+    const onEvent = () => {
+      refreshSession();
+      setLiveEventAt(Date.now());
+    };
+    es.addEventListener('transaction', onEvent);
+    es.addEventListener('notification', onEvent);
+    es.addEventListener('profile', onEvent);
+    es.onerror = () => {
+      // EventSource auto-reconnects on its own; nothing to do here beyond
+      // not letting an error bubble up as an uncaught rejection. The 5s
+      // poll above covers any gap while it's reconnecting.
+    };
+    return () => es.close();
+  }, [merchant?._id, token]);
 
   // Idle auto-logout — 15 min of no activity (any tab, any app), warned at
   // 13 min. See hooks/useIdleTimer.js for why this shape was chosen. Passes
@@ -304,7 +339,8 @@ export function MerchantAuthProvider({ children }) {
       verifyResetOTP,
       resetPassword,
       logout,
-      refreshSession
+      refreshSession,
+      liveEventAt
     }}>
       {children}
       {showIdleWarning && (

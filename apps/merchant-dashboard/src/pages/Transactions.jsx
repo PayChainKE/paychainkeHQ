@@ -21,7 +21,7 @@ const PAYCHAIN_PHONE = '+254 743 283 782'
 const PAYCHAIN_SLOGAN = 'Collect, Pay, Protect, Grow'
 
 export default function Transactions() {
-  const { merchant } = useMerchantAuth()
+  const { merchant, liveEventAt } = useMerchantAuth()
   const { showAmounts } = usePrivacyMode()
   const { addNotification } = useNotification()
   const [activeTab, setActiveTab] = useState('All')
@@ -61,12 +61,22 @@ export default function Transactions() {
     }
   }, [merchant, fetchTransactions]);
 
-  // Poll every 5s so the transaction list stays live without a manual refresh
+  // Poll every 5s so the transaction list stays live without a manual
+  // refresh — fallback for whatever the live push below doesn't catch.
   useEffect(() => {
     if (!merchant) return;
     const interval = setInterval(fetchTransactions, 3000);
     return () => clearInterval(interval);
   }, [merchant, fetchTransactions]);
+
+  // Live push — refetch immediately the instant PayChain changes anything
+  // on this account (see MerchantAuthContext's SSE connection), instead of
+  // waiting up to 3s for the poll above.
+  useEffect(() => {
+    if (!merchant || !liveEventAt) return;
+    fetchTransactions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveEventAt]);
 
   // Also refresh instantly when the user returns to the tab
   useEffect(() => {

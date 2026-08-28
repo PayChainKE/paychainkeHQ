@@ -1,7 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import rateLimit from 'express-rate-limit';
-import { getPayees, getPayeeById, addPayee, updatePayee, deletePayee, getBatches, getBatchById, uploadCSV, authorizeBatch, validateKplcMeter, validateNcwscMeter, validateKplcPrepaidMeter } from '../controllers/bulkPayController.js';
+import { getPayees, getPayeeById, addPayee, updatePayee, deletePayee, getBatches, getBatchById, uploadCSV, authorizeBatch, previewBatchFees, validateKplcMeter, validateNcwscMeter, validateKplcPrepaidMeter } from '../controllers/bulkPayController.js';
 import { protectMerchant } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -47,22 +47,10 @@ const utilityValidationLimiter = rateLimit({
   message: { error: 'Too many meter lookups. Try again in 15 minutes.' },
 });
 
-// Authenticated but otherwise unthrottled writes — only the global 600/15min
-// IP backstop covered these before. Generous limit since a merchant
-// legitimately adding payees or re-uploading a CSV a few times in a
-// session shouldn't ever come close to it.
-const writeLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 30,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many requests. Try again in 15 minutes.' },
-});
-
 // Payee routes
 router.route('/payees')
   .get(getPayees)
-  .post(writeLimiter, addPayee);
+  .post(addPayee);
 
 router.post('/validate-kplc-meter', utilityValidationLimiter, validateKplcMeter);
 router.post('/validate-kplc-prepaid-meter', utilityValidationLimiter, validateKplcPrepaidMeter);
@@ -81,7 +69,8 @@ router.route('/batches/:id')
   .get(getBatchById);
 
 // CSV and Authorization
-router.post('/upload-csv', writeLimiter, upload.single('file'), uploadCSV);
+router.post('/upload-csv', upload.single('file'), uploadCSV);
+router.post('/preview-fees', previewBatchFees);
 router.post('/authorize', pinLimiter, authorizeBatch);
 
 export default router;

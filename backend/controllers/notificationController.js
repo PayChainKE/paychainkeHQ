@@ -1,4 +1,5 @@
 import Notification from '../models/Notification.js';
+import { broadcastMerchantEvent } from '../utils/merchantEventStream.js';
 
 // Internal helper — called from other controllers when a notification-worthy
 // event happens (payment received, link paid, new sign-in, wallet activated).
@@ -6,6 +7,10 @@ import Notification from '../models/Notification.js';
 export const createNotification = async ({ merchantId, kind, title, message }) => {
   try {
     await Notification.create({ merchantId, kind, title, message });
+    // Push-notify any open dashboard/web app tab for this merchant so the
+    // notification bell (and whatever it's about — profile change, admin
+    // action) reflects immediately instead of waiting on the next poll.
+    broadcastMerchantEvent(merchantId, 'notification', { kind, title });
   } catch (error) {
     console.error('❌ Failed to create notification:', error.message);
   }

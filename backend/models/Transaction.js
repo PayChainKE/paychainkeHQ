@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { calculateFees } from '../utils/feeCalculator.js';
 import { broadcastAdminEvent } from '../utils/adminEventStream.js';
+import { broadcastMerchantEvent } from '../utils/merchantEventStream.js';
 
 const transactionSchema = new mongoose.Schema({
   merchantId: {
@@ -209,6 +210,17 @@ function broadcastIfSettled(doc) {
     });
   } catch (err) {
     console.error('Admin event broadcast failed:', err?.message || err);
+  }
+  if (doc.merchantId) {
+    try {
+      broadcastMerchantEvent(doc.merchantId, 'transaction', {
+        transactionId: String(doc._id),
+        type: doc.type,
+        status: doc.status,
+      });
+    } catch (err) {
+      console.error('Merchant event broadcast failed:', err?.message || err);
+    }
   }
 }
 

@@ -15,6 +15,14 @@ function relTime(iso) {
   return `${days}d ago`;
 }
 
+// Same convention as AuditLog.jsx's identical helper — relTime alone
+// ("3h ago") collapses to the same vague bucket for anything over an hour,
+// which isn't enough to actually pin down when an STK push happened.
+function absTime(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString('en-KE', { dateStyle: 'medium', timeStyle: 'medium' });
+}
+
 const KIND_LABELS = { topup: 'Wallet Top-up', request_money: 'Request Money', pay_account: 'Pay Account', qr: 'QR Scan' };
 
 const PAGE_SIZE = 25;
@@ -212,7 +220,10 @@ const StkRow = ({ row }) => {
         </span>
       </td>
       <td className="px-3 py-4 text-xs text-slate-500 max-w-[220px] truncate" title={row.resultDesc}>{row.resultDesc || '—'}</td>
-      <td className="px-6 py-4 text-xs font-medium text-slate-500">{relTime(row.createdAt)}</td>
+      <td className="px-6 py-4">
+        <p className="text-xs font-bold text-slate-600 tracking-tight">{relTime(row.createdAt)}</p>
+        <p className="text-2xs text-slate-400 mt-0.5">{absTime(row.createdAt)}</p>
+      </td>
     </tr>
   );
 };

@@ -23,6 +23,7 @@ import { submitMobileB2wPayment, submitLipaNaMpesaPayment, validateKplcAccount, 
 import { buildPayoutSentSms } from '../utils/paymentSmsTemplates.js';
 import { normalizeKraPin, isValidKraPin, KRA_PIN_FORMAT_HINT } from '../utils/kraPinValidator.js';
 import { isLipaNaMpesaBetaMerchant, LIPA_NA_MPESA_NOT_AVAILABLE_MESSAGE } from '../config/lipaNaMpesaBetaAllowlist.js';
+import { computeBulkPayoutRowFee } from '../utils/bulkPayFeeCalculator.js';
 
 // Every catch block in this file used to respond with { error: error.message }
 // directly, which bypasses server.js's global error handler entirely (that
@@ -51,6 +52,54 @@ export const getPayees = async (req, res) => {
     res.json(payees);
   } catch (error) {
     serverError(res, 500, 'Server error fetching payees', error);
+  }
+};
+
+// @desc    Read-only estimate of the transaction cost a batch will incur,
+//          shown before the merchant authorizes it — so "Total Payout"
+//          (the sum of what recipients receive) isn't the only figure they
+//          see before a PIN-confirmed debit that also includes fees. Never
+//          moves money, never touches balance, never creates a Transaction
+//          — see bulkPayFeeCalculator.js's own doc comment for why this
+//          intentionally does NOT share code with authorizeBatch's real
+//          fee logic.
+// @route   POST /api/bulkpay/preview-fees
+//          Body: { items: [{ payeeId, amount }, ...] }
+// @access  Private
+export const previewBatchFees = async (req, res) => {
+  try {
+    const items = Array.isArray(req.body?.items) ? req.body.items : [];
+    if (!items.length) {
+      return res.json({ totalFee: 0, rows: [] });
+    }
+
+    const payeeIds = items.map((i) => i.payeeId).filter(Boolean);
+    const payees = await Payee.find({ _id: { $in: payeeIds }, merchantId: req.merchant._id }).lean();
+    const payeeById = Object.fromEntries(payees.map((p) => [String(p._id), p]));
+
+    let totalFee = 0;
+    const rows = items.map((item) => {
+      const payee = payeeById[item.payeeId];
+      const netAmount = Number(item.amount) || 0;
+      if (!payee || netAmount <= 0) return { payeeId: item.payeeId, fee: 0, category: null };
+
+      let fee = 0;
+      let category = null;
+      try {
+        ({ fee, category } = computeBulkPayoutRowFee(payee, netAmount));
+      } catch {
+        // Amount out of bounds for this rail's tariff — authorizeBatch
+        // surfaces this properly at authorize time with the actual payee
+        // name; the estimate just shows 0 for this one row rather than
+        // failing the whole preview over it.
+      }
+      totalFee += fee;
+      return { payeeId: item.payeeId, fee, category };
+    });
+
+    res.json({ totalFee: Math.round(totalFee * 100) / 100, rows });
+  } catch (error) {
+    serverError(res, 500, 'Failed to estimate transaction costs', error);
   }
 };
 

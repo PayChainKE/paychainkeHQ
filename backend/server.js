@@ -70,6 +70,7 @@ import { runWeeklyRevenueSweepIfDue } from './services/revenueSweepService.js';
 import { reconcileStuckOpenBankingPayouts } from './services/ncbaOpenBankingReconciliationService.js';
 import { retryInsufficientFundsPayouts } from './services/ncbaPayoutRetryService.js';
 import { processPendingWebhookDeliveries } from './services/webhookDeliveryService.js';
+import { reconcileStuckStkRequests } from './services/stkRequestReconciliationService.js';
 
 const allowedOrigins = [
   // Public marketing site
@@ -430,6 +431,19 @@ async function bootstrap() {
   setInterval(() => {
     processPendingWebhookDeliveries().catch((e) => console.error('Webhook delivery sweep failed:', e));
   }, 60 * 1000);
+
+  // STK Push stuck-pending sweep — backstop for pollAndResolveNcbaStkPush's
+  // in-memory poll loop (mpesaController.js) getting abandoned mid-flight
+  // by a server restart, which otherwise leaves a merchant permanently
+  // unable to send any new STK push (initiateSTKPush refuses to start one
+  // while ANY prior request is still 'pending', with no staleness
+  // exception). See services/stkRequestReconciliationService.js — found
+  // live 2026-08-28 (Bridging The Gap) after a merchant reported STK
+  // completely broken since the previous evening.
+  reconcileStuckStkRequests().catch((e) => console.error('STK reconciliation sweep failed:', e));
+  setInterval(() => {
+    reconcileStuckStkRequests().catch((e) => console.error('STK reconciliation sweep failed:', e));
+  }, 5 * 60 * 1000);
 }
 
 bootstrap();

@@ -19,7 +19,7 @@ const mapNotification = (n) => ({
 })
 
 export function NotificationProvider({ children }) {
-  const { merchant, token } = useMerchantAuth()
+  const { merchant, token, liveEventAt } = useMerchantAuth()
 
   const [notifications, setNotifications] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
@@ -69,6 +69,16 @@ export function NotificationProvider({ children }) {
 
     return () => clearInterval(pollRef.current)
   }, [merchant?._id, token, fetchNotifications, fetchUnreadCount])
+
+  // Live push — refetch immediately the instant PayChain changes anything
+  // on this account (see MerchantAuthContext's SSE connection), instead of
+  // waiting up to 30s for the poll above.
+  useEffect(() => {
+    if (!merchant?._id || !token || !liveEventAt) return
+    fetchNotifications()
+    fetchUnreadCount()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveEventAt])
 
   // Ephemeral toast only — real notifications come from the backend via the
   // events above. Kept as `addNotification` for the many existing call sites
