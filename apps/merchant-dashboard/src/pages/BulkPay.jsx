@@ -80,6 +80,13 @@ export default function BulkPay() {
   
   const [selectedPayees, setSelectedPayees] = useState({})
   const [payoutAmounts, setPayoutAmounts] = useState({})
+  // Read-only estimate of the batch's total transaction cost, shown
+  // alongside "Total Payout" so a merchant doesn't only see what
+  // recipients receive — they see the fee too before ever reaching PIN
+  // confirmation. Debounced and re-fetched whenever the selected payees or
+  // their amounts change; never blocks batch review/authorization if it
+  // fails, since it's purely informational.
+  const [estimatedFee, setEstimatedFee] = useState(0)
 
   const [newPayee, setNewPayee] = useState({
     name: '',
@@ -854,6 +861,31 @@ export default function BulkPay() {
 
   const balance = merchant?.kesBalance ?? 0
   const isLiquidityLow = batchTotal > balance
+
+  useEffect(() => {
+    const selectedIds = Object.keys(selectedPayees).filter((id) => selectedPayees[id])
+    if (!selectedIds.length) { setEstimatedFee(0); return }
+
+    const timer = setTimeout(async () => {
+      try {
+        const token = localStorage.getItem('paychain_merchant_token')
+        if (!token) return
+        const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+        const items = selectedIds.map((id) => ({ payeeId: id, amount: payoutAmounts[id] || 0 }))
+        const res = await axios.post(`${API_URL}/api/bulkpay/preview-fees`, { items }, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        setEstimatedFee(res.data?.totalFee || 0)
+      } catch (error) {
+        // Purely informational — a failed estimate shouldn't block review
+        // or authorization, so just leave the last known figure showing.
+        console.error('Error estimating batch fees:', error)
+      }
+    }, 400)
+
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(selectedPayees), JSON.stringify(payoutAmounts)])
 
   const [authorizedReceipts, setAuthorizedReceipts] = useState([])
 
@@ -1992,6 +2024,18 @@ export default function BulkPay() {
                         <span className={`font-headline text-lg md:text-2xl tracking-tighter tabular-nums transition-all duration-300 ${!showAmounts && 'blur-md'}`}>{batchTotal.toLocaleString()}</span>
                       </div>
                     </div>
+                    {estimatedFee > 0 && (
+                      <>
+                        <div className="w-px h-6 bg-white/10 shrink-0"></div>
+                        <div className="flex flex-col min-w-fit">
+                          <span className="text-[8px] text-emerald-300 font-bold uppercase tracking-[0.2em] mb-0.5">Est. Transaction Cost</span>
+                          <div className="flex items-baseline gap-1.5">
+                            <span className="text-[9px] md:text-xs font-bold text-emerald-400">KES</span>
+                            <span className={`font-headline text-lg md:text-2xl tracking-tighter tabular-nums transition-all duration-300 ${!showAmounts && 'blur-md'}`}>{estimatedFee.toLocaleString()}</span>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                   <div className="flex items-center gap-4 relative z-10 w-full sm:w-auto justify-center sm:justify-end">
                     {isLiquidityLow && (

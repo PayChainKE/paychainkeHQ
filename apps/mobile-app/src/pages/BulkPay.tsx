@@ -144,6 +144,11 @@ export default function BulkPay() {
 
   const [selectedPayees, setSelectedPayees] = useState<Record<string, boolean>>({});
   const [payoutAmounts, setPayoutAmounts] = useState<Record<string, number>>({});
+  // Read-only estimate of the batch's total transaction cost, shown in the
+  // Authorize Batch review modal so "Total Payout" isn't the only figure a
+  // merchant sees before a PIN-confirmed debit that also includes fees.
+  // Never blocks review/authorization if it fails — purely informational.
+  const [estimatedFee, setEstimatedFee] = useState(0);
 
   // Modals
   const [showPinSetup, setShowPinSetup] = useState(false);
@@ -583,6 +588,23 @@ export default function BulkPay() {
     () => Object.keys(selectedPayees).filter(id => selectedPayees[id]),
     [selectedPayees]
   );
+
+  useEffect(() => {
+    if (!selectedIds.length) { setEstimatedFee(0); return; }
+    const timer = setTimeout(async () => {
+      try {
+        const items = selectedIds.map((id) => ({ payeeId: id, amount: payoutAmounts[id] || 0 }));
+        const res = await api.post('/api/bulkpay/preview-fees', { items });
+        setEstimatedFee(res.data?.totalFee || 0);
+      } catch (error) {
+        // Purely informational — a failed estimate shouldn't block review
+        // or authorization, so just leave the last known figure showing.
+        console.error('Error estimating batch fees:', error);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIds, JSON.stringify(payoutAmounts)]);
 
   const batchTotal = useMemo(
     () => selectedIds.reduce((sum, id) => sum + (payoutAmounts[id] || 0), 0),
@@ -1528,6 +1550,12 @@ export default function BulkPay() {
                 <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider">Total Payout</Text>
                 <Text className="font-jakarta-bold text-[#00351d] text-[16px]">{formatKES(batchTotal)}</Text>
               </View>
+              {estimatedFee > 0 && (
+                <View className="flex-row justify-between items-center mt-2">
+                  <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider">Est. Transaction Cost</Text>
+                  <Text className="font-jakarta-bold text-[#0c2010] text-[13px]">{formatKES(estimatedFee)}</Text>
+                </View>
+              )}
             </View>
             <TouchableOpacity
               onPress={() => proceedToFundingSourceSelect('manual')}
