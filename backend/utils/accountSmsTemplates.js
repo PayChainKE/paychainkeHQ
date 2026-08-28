@@ -61,7 +61,7 @@ export function buildMerchantWelcomeSms({ businessName, accountNumber, accountIs
 export function buildInstallReminderSms({ businessName, loginUrl }) {
   return buildStrictSms(
     ({ name, url }) =>
-      `Hi ${name}, install the PayChain app for instant access — no need to open your browser every time. Open this link on your phone and log in: ${url}. Then add it to your home screen when prompted.`,
+      `Hi ${name}, install the PayChain app for instant access. No need to open your browser every time. Open this link on your phone and log in: ${url}. Then add it to your home screen when prompted.`,
     {
       fixed: { url: loginUrl },
       truncatable: [{ key: 'name', value: businessName || 'there' }],
