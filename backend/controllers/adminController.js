@@ -27,6 +27,7 @@ import { generateBrandedQrDataUri } from '../utils/qrCode.js';
 import { getCountyCentroid } from '../config/kenyaCountyCentroids.js';
 import { getOrCreatePlatformSettings } from '../models/PlatformSettings.js';
 import { resolvePeriod } from '../utils/resolvePeriod.js';
+import { buildInstallReminderSms } from '../utils/accountSmsTemplates.js';
 
 // Build an `actor` shape from req.admin so audit rows attribute admin-initiated
 // actions to the right operator even when the merchant is the subject.
@@ -1007,6 +1008,60 @@ export const updatePlatformSettings = async (req, res) => {
   }
 };
 
+// Minimum gap between two "Resend Install Link" SMS to the same merchant —
+// the admin-wide sensitiveActionLimiter already caps overall abuse, but
+// this stops one merchant being re-texted repeatedly within the same
+// admin session (e.g. a double-click).
+const INSTALL_REMINDER_COOLDOWN_MS = 5 * 60 * 1000;
+
+// @desc    Re-send the merchant a text nudging them to install the web app
+//          (PWA) to their home screen — for a merchant whose
+//          Merchant.pwaInstalledAt is still null (Merchants page, per-
+//          merchant "Web App" status).
+// @route   POST /api/admin/merchants/:id/send-install-reminder
+// @access  Private/Admin
+export const sendInstallReminder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid merchant id.' });
+    }
+
+    const merchant = await Merchant.findById(id);
+    if (!merchant) return res.status(404).json({ error: 'Merchant not found' });
+    if (!merchant.phone) return res.status(400).json({ error: 'This merchant has no phone number on file.' });
+
+    if (merchant.pwaInstallReminderSentAt && Date.now() - merchant.pwaInstallReminderSentAt.getTime() < INSTALL_REMINDER_COOLDOWN_MS) {
+      const waitSec = Math.ceil((INSTALL_REMINDER_COOLDOWN_MS - (Date.now() - merchant.pwaInstallReminderSentAt.getTime())) / 1000);
+      return res.status(429).json({ error: `A reminder was already sent moments ago. Try again in ${waitSec}s.` });
+    }
+
+    const message = buildInstallReminderSms({
+      businessName: merchant.businessName,
+      loginUrl: `${MERCHANT_DASHBOARD_URL.replace(/\/$/, '')}/login`,
+    }).message;
+
+    const result = await safeSendSMS({ to: merchant.phone, message });
+    if (!result.success) {
+      return res.status(502).json({ error: result.error || 'Failed to send the SMS. Please try again.' });
+    }
+
+    merchant.pwaInstallReminderSentAt = new Date();
+    await merchant.save();
+
+    logAudit({
+      action: 'admin.merchant.install_reminder_sent', category: 'admin', severity: 'info',
+      message: 'Sent web app install reminder SMS',
+      merchant, actor: adminActor(req.admin), req,
+    });
+
+    res.json({ success: true, pwaInstallReminderSentAt: merchant.pwaInstallReminderSentAt });
+  } catch (error) {
+    console.error('Send Install Reminder Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
 // @desc    Admin manually confirms (or revokes) that a merchant's KRA PIN
 //          and/or Business/License Number are genuinely real — distinct
 //          from isKRAVerified, which only means the KRA PIN's format
@@ -1430,6 +1485,10 @@ export const getMerchantDetail = async (req, res) => {
         hasAppPin: !!merchant.appPin,
         hasStellarKey: !!merchant.stellarEncryptedSecretKey,
         biometricsEnabled: merchant.biometricsEnabled,
+        // Web app (PWA) install state — see Merchant.pwaInstalledAt's doc
+        // comment and apps/merchant-dashboard/src/hooks/useInstallPrompt.js.
+        pwaInstalledAt: merchant.pwaInstalledAt || null,
+        pwaInstallReminderSentAt: merchant.pwaInstallReminderSentAt || null,
         // Activity
         lastLogin: merchant.lastLogin,
         loginCount: merchant.loginCount,

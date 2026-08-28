@@ -9,7 +9,8 @@ import { provisionMerchantWallet, getWalletBalance } from '../utils/stellarHelpe
 import { encryptKey } from '../utils/cryptoHelper.js';
 import bcrypt from 'bcryptjs';
 import { createNotification } from './notificationController.js';
-import { getNcbaVirtualAccountNumber, validatePhoneNumber, isValidPhoneInputFormat, NcbaValidationError } from '../utils/ncbaValidators.js';
+import { getNcbaVirtualAccountNumber, formatAccountNumberDisplay, validatePhoneNumber, isValidPhoneInputFormat, NcbaValidationError } from '../utils/ncbaValidators.js';
+import { buildMerchantWelcomeSms } from '../utils/accountSmsTemplates.js';
 import { isValidEmail, EMAIL_FORMAT_HINT } from '../utils/emailValidator.js';
 import { toE164Kenyan } from '../utils/notificationService.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
@@ -214,9 +215,26 @@ export const registerMerchant = async (req, res) => {
     });
 
     console.log(`📧 Dispatching Welcome Email to: ${merchant.email}`);
-    sendWelcomeEmail(merchant.email, merchant.name, password, merchant.phone, getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode), merchant.ncbaMerchantCode, merchant.businessName).catch(err => {
+    const ncbaVirtualAccountNumber = getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode);
+    sendWelcomeEmail(merchant.email, merchant.name, password, merchant.phone, ncbaVirtualAccountNumber, merchant.ncbaMerchantCode, merchant.businessName).catch(err => {
       console.error(`📧 Resend Error: Failed to send Welcome Email to ${merchant.email}:`, err);
     });
+
+    // Same account-number resolution as the welcome email above — never
+    // let the SMS and email disagree on what the merchant's account number
+    // is. Fire-and-forget, same as the email: a slow/down SMS provider must
+    // never delay the signup response.
+    const welcomePhone = toE164Kenyan(merchant.phone);
+    if (welcomePhone) {
+      safeSendSMS({
+        to: welcomePhone,
+        message: buildMerchantWelcomeSms({
+          businessName: merchant.businessName,
+          accountNumber: formatAccountNumberDisplay(ncbaVirtualAccountNumber || merchant.ncbaMerchantCode),
+          accountIsInterim: !ncbaVirtualAccountNumber,
+        }).message,
+      }).catch((err) => console.error(`📱 SMS Error: Failed to send welcome SMS to ${welcomePhone}:`, err));
+    }
 
     // Wallet provisioning is intentionally NOT done here. The Digital Wallet
     // is opt-in: a merchant activates it whenever they want via
@@ -1146,6 +1164,28 @@ export const toggleBiometrics = async (req, res) => {
   }
 };
 
+// @desc    Record that this merchant actually installed the web app (PWA)
+//          to their home screen — fired once by useInstallPrompt.js's
+//          `appinstalled` listener. Idempotent and never cleared back to
+//          null (an uninstall doesn't reliably fire a browser event this
+//          could listen for), so this stays "installed at least once" —
+//          only set it the first time to avoid the timestamp drifting
+//          forward on a merchant who installs on a second device later.
+// @route   PUT /api/auth/merchant/pwa-installed
+// @access  Private (Merchant)
+export const reportPwaInstalled = async (req, res) => {
+  try {
+    await Merchant.updateOne(
+      { _id: req.merchant._id, pwaInstalledAt: null },
+      { $set: { pwaInstalledAt: new Date() } }
+    );
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Report PWA Installed Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
 // @desc    Mark the one-time feature walkthrough as seen. Idempotent — the
 //          frontend calls this once the merchant finishes or skips the tour,
 //          and never shows it again for this account regardless of device.
@@ -1288,8 +1328,23 @@ export const setupPassword = async (req, res) => {
     // Send confirmation email with their official credentials so the merchant
     // has a record of their username (email/phone) and the password they just set.
     // Fire-and-forget — never block the response on email delivery.
-    sendWelcomeEmail(merchant.email, merchant.name, password, merchant.phone, getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode), merchant.ncbaMerchantCode, merchant.businessName)
+    const setupNcbaVirtualAccountNumber = getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode);
+    sendWelcomeEmail(merchant.email, merchant.name, password, merchant.phone, setupNcbaVirtualAccountNumber, merchant.ncbaMerchantCode, merchant.businessName)
       .catch((err) => console.error(`📧 Failed to send credentials email to ${merchant.email}:`, err));
+
+    // Same welcome SMS as self-signup (registerMerchant) — this is the
+    // equivalent "account now usable" moment for an admin-invited merchant.
+    const setupWelcomePhone = toE164Kenyan(merchant.phone);
+    if (setupWelcomePhone) {
+      safeSendSMS({
+        to: setupWelcomePhone,
+        message: buildMerchantWelcomeSms({
+          businessName: merchant.businessName,
+          accountNumber: formatAccountNumberDisplay(setupNcbaVirtualAccountNumber || merchant.ncbaMerchantCode),
+          accountIsInterim: !setupNcbaVirtualAccountNumber,
+        }).message,
+      }).catch((err) => console.error(`📱 SMS Error: Failed to send welcome SMS to ${setupWelcomePhone}:`, err));
+    }
 
     res.json({ success: true, message: 'Password set successfully. You can now sign in.' });
   } catch (error) {

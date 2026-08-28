@@ -1158,6 +1158,10 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
   // adminController.js#getMerchantDetail) — matches the current schema
   // default (false) rather than the old default, since this never persists.
   const [features, setFeatures] = React.useState(merchant?.features || { digitalWallet: false, inflationShield: false });
+  const [pwaInstalledAt, setPwaInstalledAt] = React.useState(merchant?.pwaInstalledAt || null);
+  const [pwaInstallReminderSentAt, setPwaInstallReminderSentAt] = React.useState(merchant?.pwaInstallReminderSentAt || null);
+  const [sendingInstallReminder, setSendingInstallReminder] = React.useState(false);
+  const [installReminderError, setInstallReminderError] = React.useState('');
   const [kybDocuments, setKybDocuments] = React.useState(merchant?.kybDocuments || []);
   const [uploadingDocType, setUploadingDocType] = React.useState(null);
   const [docUploadError, setDocUploadError] = React.useState('');
@@ -1175,6 +1179,9 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
     if (merchant?.features) {
       setFeatures(merchant.features);
     }
+    setPwaInstalledAt(merchant?.pwaInstalledAt || null);
+    setPwaInstallReminderSentAt(merchant?.pwaInstallReminderSentAt || null);
+    setInstallReminderError('');
     setKybDocuments(merchant?.kybDocuments || []);
     setBusinessName(merchant?.businessName || '');
     setEditingBusinessName(false);
@@ -1316,6 +1323,21 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
       alert('Failed to update feature access.');
     } finally {
       setUpdatingFeatures(false);
+    }
+  };
+
+  const handleSendInstallReminder = async () => {
+    try {
+      setSendingInstallReminder(true);
+      setInstallReminderError('');
+      const res = await api.post(`/api/admin/merchants/${merchant._id}/send-install-reminder`);
+      if (res.data.success) {
+        setPwaInstallReminderSentAt(res.data.pwaInstallReminderSentAt);
+      }
+    } catch (err) {
+      setInstallReminderError(err.response?.data?.error || 'Failed to send the install reminder.');
+    } finally {
+      setSendingInstallReminder(false);
     }
   };
 
@@ -1654,6 +1676,33 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
               <Row label="Mobile App PIN" value={<Badge tone={m.hasAppPin ? 'emerald' : 'gray'} icon={m.hasAppPin ? 'check' : 'remove'}>{m.hasAppPin ? 'Configured' : 'Not set'}</Badge>} />
               <Row label="Bulk Pay PIN" value={<Badge tone={m.hasBulkPayPin ? 'emerald' : 'gray'} icon={m.hasBulkPayPin ? 'check' : 'remove'}>{m.hasBulkPayPin ? 'Configured' : 'Not set'}</Badge>} />
               <Row label="Biometrics" value={<Badge tone={m.biometricsEnabled ? 'emerald' : 'gray'} icon={m.biometricsEnabled ? 'check' : 'remove'}>{m.biometricsEnabled ? 'Enabled' : 'Disabled'}</Badge>} />
+              <Row
+                label="Web App (PWA)"
+                value={
+                  pwaInstalledAt ? (
+                    <Badge tone="emerald" icon="check">Installed {relativeTime(pwaInstalledAt)}</Badge>
+                  ) : (
+                    <div className="flex flex-col items-end gap-1">
+                      <div className="flex items-center gap-2">
+                        <Badge tone="gray" icon="remove">Not installed</Badge>
+                        <button
+                          onClick={handleSendInstallReminder}
+                          disabled={sendingInstallReminder}
+                          className="text-2xs font-bold uppercase tracking-widest text-primary hover:underline disabled:opacity-50 disabled:no-underline"
+                        >
+                          {sendingInstallReminder ? 'Sending…' : 'Resend Install Link'}
+                        </button>
+                      </div>
+                      {pwaInstallReminderSentAt && !installReminderError && (
+                        <span className="text-2xs text-on-surface-variant/50">Last sent {relativeTime(pwaInstallReminderSentAt)}</span>
+                      )}
+                      {installReminderError && (
+                        <span className="text-2xs text-red-600">{installReminderError}</span>
+                      )}
+                    </div>
+                  )
+                }
+              />
             </Section>
 
             {/* Feature Access */}
