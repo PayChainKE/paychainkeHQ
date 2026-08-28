@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import Merchant from '../models/Merchant.js';
 import { createNotification } from './notificationController.js';
 import { safeSendSMS, sendStaggeredSms, formatKes } from '../utils/smsSanitizer.js';
-import { buildCustomerPaidSms, buildPaymentReceivedSms } from '../utils/paymentSmsTemplates.js';
+import { buildPaybillPaymentReceiptSms, buildPaymentReceivedSms } from '../utils/paymentSmsTemplates.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import {
@@ -177,7 +177,7 @@ export const handleNcbaReconciliationWebhook = async (req, res) => {
     if (customerPhone) {
       sends.push({
         to: customerPhone,
-        message: buildCustomerPaidSms({
+        message: buildPaybillPaymentReceiptSms({
           ref: transactionReference,
           amount: grossAmount,
           businessName: merchant.businessName,

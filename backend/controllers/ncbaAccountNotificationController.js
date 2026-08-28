@@ -22,7 +22,7 @@ import { NcbaTariffBoundsError } from '../config/ncbaTariffCard.js';
 import { getNcbaVirtualAccountNumber, formatAccountNumberDisplay } from '../utils/ncbaValidators.js';
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay.js';
 import { toE164Kenyan } from '../utils/notificationService.js';
-import { buildPaymentReceivedSms, buildCustomerPaidSms } from '../utils/paymentSmsTemplates.js';
+import { buildPaymentReceivedSms, buildPaybillPaymentReceiptSms } from '../utils/paymentSmsTemplates.js';
 
 const respondOk = (res, detail) => res.status(200).type('application/xml').send(buildNcbaOkResult(detail));
 const respondFail = (res, detail) => res.status(200).type('application/xml').send(buildNcbaFailResult(detail));
@@ -372,7 +372,7 @@ export const handleNcbaAccountNotification = async (req, res) => {
     if (validPayerPhone) {
       sends.push({
         to: validPayerPhone,
-        message: buildCustomerPaidSms({
+        message: buildPaybillPaymentReceiptSms({
           ref: transId,
           amount: transAmount,
           businessName: merchant.businessName,

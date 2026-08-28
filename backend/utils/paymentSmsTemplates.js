@@ -152,6 +152,46 @@ export function buildCustomerPaidSms({ ref, amount, businessName, accountRef, da
 }
 
 /**
+ * "You paid" receipt for a customer who paid a merchant's PayChain Virtual
+ * Account the "normal" way — typing the Paybill/account number into their
+ * own M-Pesa menu — rather than through an STK prompt PayChain triggered
+ * (that flow keeps buildCustomerPaidSms above; this one is specifically
+ * for the two NCBA webhook paths: the JSON reconciliation push and the XML
+ * account-notification push). Deliberately its own function rather than a
+ * branch inside buildCustomerPaidSms, so changing this wording can never
+ * accidentally also change the STK receipt.
+ *
+ * Only ever shows ONE reference number ("PayChain Ref") — NCBA's webhook
+ * payload for this flow carries a single transaction reference, not a
+ * separate NCBA-side ref plus a distinct M-Pesa receipt code, so there is
+ * nothing real to put in a second field.
+ *
+ * @param {{ ref: string, amount: number, businessName: string, accountRef?: string|null, date: string, time: string, fee?: number|null }} params
+ * @returns {{ message: string, truncated: boolean, length: number }}
+ */
+export function buildPaybillPaymentReceiptSms({ ref, amount, businessName, accountRef, date, time, fee }) {
+  const showFee = typeof fee === 'number' && Number.isFinite(fee) && fee > 0;
+  return buildStrictSms(
+    ({ ref, amt, name, acct, date, time, feeLine }) =>
+      `PayChain Confirmed. You have sent Ksh ${amt} to ${name}${acct ? `-${acct}` : ''}. PayChain Ref ${ref} on ${date} at ${time}.${feeLine} Thank you for your payment.`,
+    {
+      fixed: {
+        ref,
+        amt: formatKes(amount),
+        date,
+        time,
+        // Same rationale as buildCustomerPaidSms's feeLine above.
+        feeLine: showFee ? ` Transaction cost Ksh ${formatKes(fee)}.` : '',
+      },
+      truncatable: [
+        { key: 'name', value: businessName || 'PayChain' },
+        { key: 'acct', value: accountRef || '' },
+      ],
+    }
+  );
+}
+
+/**
  * Merchant-facing "your payout landed" SMS for NCBA bank/mobile-wallet
  * payouts (controllers/ncbaOpenBankingController.js's handlePesaLinkCallback)
  * — replaces a raw inline template that had no length protection, unlike
