@@ -108,9 +108,13 @@ const fmtTime = (iso) => {
   return d.toLocaleDateString();
 };
 
+// Rounding noise across many independently-rounded transaction amounts can
+// add up to a few cents; anything past this is a real gap, not float drift.
+// Mirrors services/reconciliationService.js's own TOLERANCE exactly.
+const POOL_TOLERANCE = 1;
+
 const Overview = () => {
   const navigate = useNavigate();
-  const [waitlist, setWaitlist] = useState([]);
   const [messages, setMessages] = useState([]);
   const [merchantAnalytics, setMerchantAnalytics] = useState(null);
   const [insights, setInsights] = useState(null);
@@ -119,12 +123,13 @@ const Overview = () => {
   const [fxLoading, setFxLoading] = useState(true);
   const [fxError, setFxError] = useState(null);
   const [networkVolume, setNetworkVolume] = useState(null);
+  const [poolExpected, setPoolExpected] = useState(null);
+  const [poolLive, setPoolLive] = useState(null);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [waitlistRes, messagesRes, analyticsRes, insightsRes, revenueRes] = await Promise.all([
-        api.get('/api/waitlist'),
+      const [messagesRes, analyticsRes, insightsRes, revenueRes, poolExpectedRes, poolLiveRes] = await Promise.all([
         api.get('/api/contact'),
         api.get('/api/admin/merchants/analytics').catch(() => ({ data: { data: null } })),
         api.get('/api/admin/insights?range=30d').catch(() => ({ data: { data: null } })),
@@ -133,12 +138,17 @@ const Overview = () => {
         // computed separately here, so this card can never drift from the
         // real revenue numbers elsewhere in admin.
         api.get('/api/admin/revenue', { params: { range: 'all' } }).catch(() => ({ data: { data: null } })),
+        // Pool Health snapshot — same endpoints the full Pool Reconciliation
+        // page uses, so this can never disagree with it.
+        api.get('/api/admin/revenue/pool-balance/expected').catch(() => ({ data: { data: null } })),
+        api.get('/api/admin/revenue/pool-balance/live').catch(() => ({ data: { data: null } })),
       ]);
-      setWaitlist(Array.isArray(waitlistRes.data) ? waitlistRes.data : []);
       setMessages(Array.isArray(messagesRes.data) ? messagesRes.data : []);
       setMerchantAnalytics(analyticsRes.data?.data || null);
       setInsights(insightsRes.data?.data || null);
       setNetworkVolume(revenueRes.data?.data?.kpis || null);
+      setPoolExpected(poolExpectedRes.data?.data || null);
+      setPoolLive(poolLiveRes.data?.data || null);
     } catch (err) {
       console.error('Error fetching overview data:', err);
     } finally {
@@ -184,18 +194,6 @@ const Overview = () => {
     const id = setInterval(fetchFx, 60_000);
     return () => clearInterval(id);
   }, [fetchFx]);
-
-  // Mirrors the real Waitlist status enum: pending | contacted | approved |
-  // rejected | converted (backend/models/Waitlist.js). There is no 'kyc'
-  // status in the schema — an earlier version of this funnel filtered on one
-  // and always showed zero as a result.
-  const stats = useMemo(() => ({
-    total: waitlist.length,
-    pending: waitlist.filter((w) => w.status?.toLowerCase() === 'pending').length,
-    contacted: waitlist.filter((w) => w.status?.toLowerCase() === 'contacted').length,
-    approved: waitlist.filter((w) => w.status?.toLowerCase() === 'approved').length,
-    converted: waitlist.filter((w) => ['converted', 'active'].includes((w.status || '').toLowerCase())).length,
-  }), [waitlist]);
 
   // Recent activity merges messages + recent merchants for a real cross-system pulse.
   const recentActivity = useMemo(() => {
@@ -522,20 +520,61 @@ const Overview = () => {
           </div>
         </section>
 
-        {/* Pipeline funnel */}
+        {/* Pool Health — is the pooled NCBA account holding what the ledger
+            expects? Same figures as the full Pool Reconciliation page, kept
+            in sync since both read the same two endpoints. */}
         <section>
           <div className="flex items-center gap-3 mb-4 text-slate-400">
-            <span className="text-2xs font-bold uppercase tracking-widest font-label">Pipeline Funnel</span>
+            <span className="text-2xs font-bold uppercase tracking-widest font-label">Pool Health</span>
             <div className="flex-1 h-[1px] bg-outline-variant/10"></div>
+            <button onClick={() => navigate('/pool-reconciliation')} className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 hover:text-on-surface transition-colors">
+              Full Reconciliation →
+            </button>
           </div>
-          <div className="bg-surface-container-lowest p-4 md:p-6 rounded-xl border border-outline-variant/20">
-            <div className="flex w-full gap-2 overflow-x-auto no-scrollbar">
-              <div className="flex-1 min-w-[80px] h-12 bg-primary rounded-lg flex items-center justify-center text-white text-2xs font-bold tracking-widest uppercase">WAITLIST {loading ? '' : `(${stats.total})`}</div>
-              <div className="flex-[0.85] min-w-[80px] h-12 bg-primary/90 rounded-lg flex items-center justify-center text-white text-2xs font-bold tracking-widest uppercase">CONTACTED {loading ? '' : `(${stats.contacted})`}</div>
-              <div className="flex-[0.7] min-w-[80px] h-12 bg-primary/80 rounded-lg flex items-center justify-center text-white text-2xs font-bold tracking-widest uppercase">APPROVED {loading ? '' : `(${stats.approved})`}</div>
-              <div className="flex-[0.55] min-w-[80px] h-12 bg-secondary rounded-lg flex items-center justify-center text-on-secondary text-2xs font-bold tracking-widest uppercase">CONVERTED {loading ? '' : `(${stats.converted})`}</div>
-            </div>
-          </div>
+          {(() => {
+            const discrepancy = (poolLive?.available && poolExpected)
+              ? Math.round((poolLive.balance - poolExpected.expectedPoolBalance) * 100) / 100
+              : null;
+            const matches = discrepancy !== null && Math.abs(discrepancy) <= POOL_TOLERANCE;
+            return (
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+                <div className="bg-surface-container-lowest p-3 md:p-5 rounded-xl border border-outline-variant/20 flex flex-col gap-1">
+                  <span className="text-xs font-medium text-on-surface-variant/60">Live NCBA Balance</span>
+                  {loading
+                    ? <Skel className="w-24 h-7" />
+                    : <span className="text-xl md:text-3xl font-semibold text-on-surface tracking-tighter tabular-nums">
+                        {poolLive?.available ? fmtKES(poolLive.balance) : '—'}
+                      </span>}
+                  {!loading && !poolLive?.available && <span className="text-2xs text-amber-600 font-semibold">Unavailable</span>}
+                </div>
+                <div className="bg-surface-container-lowest p-3 md:p-5 rounded-xl border border-outline-variant/20 flex flex-col gap-1">
+                  <span className="text-xs font-medium text-on-surface-variant/60">Expected Balance</span>
+                  {loading
+                    ? <Skel className="w-24 h-7" />
+                    : <span className="text-xl md:text-3xl font-semibold text-on-surface tracking-tighter tabular-nums">{fmtKES(poolExpected?.expectedPoolBalance ?? 0)}</span>}
+                </div>
+                <div className={`p-3 md:p-5 rounded-xl border flex flex-col gap-1 ${
+                  discrepancy === null ? 'bg-surface-container-lowest border-outline-variant/20'
+                  : matches ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'
+                }`}>
+                  <span className={`text-xs font-medium ${discrepancy === null ? 'text-on-surface-variant/60' : matches ? 'text-emerald-700' : 'text-red-700'}`}>Discrepancy</span>
+                  {loading
+                    ? <Skel className="w-20 h-7" />
+                    : discrepancy === null
+                      ? <span className="text-sm font-semibold text-on-surface-variant/60">No live balance</span>
+                      : <span className={`text-xl md:text-3xl font-semibold tracking-tighter tabular-nums ${matches ? 'text-emerald-700' : 'text-red-700'}`}>
+                          {matches ? 'Matches' : `${discrepancy > 0 ? '+' : ''}${fmtKES(discrepancy)}`}
+                        </span>}
+                </div>
+                <div className="bg-surface-container-lowest p-3 md:p-5 rounded-xl border border-outline-variant/20 flex flex-col gap-1">
+                  <span className="text-xs font-medium text-on-surface-variant/60">Total Merchant Money</span>
+                  {loading
+                    ? <Skel className="w-24 h-7" />
+                    : <span className="text-xl md:text-3xl font-semibold text-on-surface tracking-tighter tabular-nums">{fmtKES(poolExpected?.merchantBalanceTotal ?? 0)}</span>}
+                </div>
+              </div>
+            );
+          })()}
         </section>
 
         {/* Recent activity + Top merchants */}

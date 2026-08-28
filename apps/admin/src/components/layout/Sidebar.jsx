@@ -28,6 +28,7 @@ const NAV_SECTIONS = [
     items: [
       { icon: 'verified_user',   label: 'KYC/KYB Verification',   path: '/kyc-verification'       },
       { icon: 'account_balance', label: 'Ledger',                 path: '/ledger'                 },
+      { icon: 'balance',         label: 'Pool Reconciliation',    path: '/pool-reconciliation'    },
       { icon: 'point_of_sale',   label: 'STK Monitor',            path: '/stk-monitor'            },
       { icon: 'gavel',           label: 'Transaction Audit',      path: '/transaction-audit'      },
       { icon: 'calculate',       label: 'Bookkeeping',            path: '/bookkeeping'            },
