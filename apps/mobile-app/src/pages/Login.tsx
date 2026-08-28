@@ -530,7 +530,7 @@ export default function Login({ route }: any) {
             {activeTab === 'signup' && !isSignupPasswordStep && (
               <View>
                 <Text className="text-[#0c2010] text-[24px] font-jakarta-bold mb-2">Get started with us</Text>
-                <Text className="text-[#707971] text-[14px] font-jakarta-medium mb-6">Fill out the form below and we will connect you with the right person.</Text>
+                <Text className="text-[#707971] text-[14px] font-jakarta-medium mb-6">Fill out the form below to create your merchant account and start accepting payments.</Text>
 
                 <View className="space-y-4">
                   <View>
