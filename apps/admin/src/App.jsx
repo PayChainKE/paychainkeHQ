@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import Login from './pages/Login';
+import SetupPassword from './pages/SetupPassword';
 import Overview from './pages/Overview';
 import Waitlist from './pages/Waitlist';
 import Merchants from './pages/Merchants';
@@ -45,6 +46,7 @@ export default function App(){
         <ToastProvider>
           <Routes>
             <Route path="/login" element={<Login/>} />
+            <Route path="/setup-password" element={<SetupPassword/>} />
             <Route path="/" element={<Navigate to="/overview" replace />} />
             <Route path="/overview" element={<Protected><Overview/></Protected>} />
             <Route path="/waitlist" element={<Protected><Waitlist/></Protected>} />
