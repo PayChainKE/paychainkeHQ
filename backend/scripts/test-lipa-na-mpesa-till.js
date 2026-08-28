@@ -1,8 +1,14 @@
 // One-off live test: submits a real Lipa na M-Pesa (Till) payout of
 // KES 50 through the actual submitLipaNaMpesaPayment() service function —
-// same code path production payouts use, not a hand-rolled payload — with
-// notifyMobileNumber populated (Rose/NCBA's suggestion, 2026-08-27, after
-// prior Till attempts with an empty reqMobileNumber failed/were rejected).
+// same code path production payouts use, not a hand-rolled payload —
+// with notifyMobileNumber populated (Rose/NCBA's suggestion, 2026-08-27,
+// after prior Till attempts with an empty reqMobileNumber failed/were
+// rejected). Rose's later follow-up: reqMobileNumber must be in
+// 254XXXXXXXXX form, not 07XXXXXXXX — this script's number was still in
+// the wrong (and malformed — missing a digit) 07-style shape until this
+// fix; production callers (mpesaController.js, bulkPayController.js,
+// ncbaOpenBankingController.js) now all normalize via
+// utils/ncbaValidators.js#validatePhoneNumber before calling this.
 //
 // THIS MOVES REAL MONEY if NCBA accepts it: KES 50 debited from PayChain's
 // live NCBA operating account (1010837186) to Till 3305603. Not a
@@ -23,7 +29,7 @@ try {
     payBillTillNo: '3305603',
     amount: 50,
     recipientName: 'PayChain Merchant',
-    notifyMobileNumber: '090889066',
+    notifyMobileNumber: '254790889066',
     narration: 'PayChain Payout',
   });
   console.log('✅ NCBA accepted the payout. Raw response:');
