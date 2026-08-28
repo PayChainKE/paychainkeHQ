@@ -699,7 +699,7 @@ export default function Login() {
                   <div className="mb-6 lg:mb-8">
                      <h3 className="font-headline text-3xl lg:text-4xl text-primary tracking-tight font-black">Get started with us</h3>
                      <p className="text-on-surface-variant font-medium mt-2 opacity-70 text-sm">
-                       Fill out the form below and we will connect you with the right person.
+                       Fill out the form below to create your merchant account and start accepting payments.
                      </p>
                   </div>
                   <form onSubmit={handleSignup} className="space-y-4 max-h-[55vh] overflow-y-auto pr-2 pb-4 scrollbar-thin scrollbar-thumb-outline-variant/20 scrollbar-track-transparent">
