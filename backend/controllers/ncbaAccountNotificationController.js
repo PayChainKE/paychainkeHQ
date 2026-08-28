@@ -24,6 +24,7 @@ import { formatPhoneDisplay } from '../utils/formatPhoneDisplay.js';
 import { toE164Kenyan } from '../utils/notificationService.js';
 import { buildPaymentReceivedSms, buildPaybillPaymentReceiptSms } from '../utils/paymentSmsTemplates.js';
 import { toTitleCase } from '../utils/smsSanitizer.js';
+import NcbaDebitNotificationSample from '../models/NcbaDebitNotificationSample.js';
 import NcbaPhoneExtractionMiss from '../models/NcbaPhoneExtractionMiss.js';
 
 const respondOk = (res, detail) => res.status(200).type('application/xml').send(buildNcbaOkResult(detail));
@@ -156,7 +157,25 @@ export const handleNcbaAccountNotification = async (req, res) => {
     // (credit) value" — direction lives in the sign, not the type code. A
     // debit (PayChain paying out) is never a merchant collection.
     if (transAmount < 0) {
-      logEvent('info', 'ncba_account_notification_debit_ignored', { transId, txnType: rawTransType });
+      // Temporary full-field capture (2026-08-28) — this feed is the only
+      // one confirmed to reliably arrive for a Lipa na M-Pesa payout
+      // (NCBA's dedicated settlement callback to handlePesaLinkCallback has
+      // never been observed arriving, and TransactionStatusQuery is
+      // confirmed broken — see probe-ncba-transaction-status-query.js).
+      // Logging every raw field here, not just transId/txnType, to check
+      // whether Narrative/AccountNr/CustomerName ever echoes back our own
+      // reqTransactionReferenceNo/reqChnlId — if it does, this debit feed
+      // could resolve stuck Lipa na M-Pesa/Mobile B2W payouts (and fire
+      // their SMS) instead of waiting on the callback or status query that
+      // don't work. Revert to the plain transId/txnType log once this is
+      // resolved one way or the other.
+      logEvent('info', 'ncba_account_notification_debit_ignored', {
+        transId, txnType: rawTransType,
+        rawNarrative, rawAccountNr, rawCustomerName, rawPhoneNr, rawTransAmount,
+      });
+      NcbaDebitNotificationSample.create({
+        transId, txnType: rawTransType, rawTransAmount, rawNarrative, rawAccountNr, rawCustomerName, rawPhoneNr,
+      }).catch((e) => logEvent('error', 'ncba_debit_notification_sample_log_failed', { transId, error: e.message }));
       return respondOk(res);
     }
 
