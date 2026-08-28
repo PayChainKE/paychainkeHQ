@@ -168,7 +168,12 @@ export default function SendMoney() {
   const isB2bDest     = destination === 'till' || destination === 'paybill'
   const fee          = isMobileDest ? estimateB2cFee(Number(amount) || 0) : isB2bDest ? estimateB2bFee(Number(amount) || 0) : destination === 'bank' ? estimateBankFee(bankRail, Number(amount) || 0) : (selectedDest?.fee || 0)
   const totalAmount  = Number(amount || 0) + fee
-  const balance      = merchant?.kesBalance || 0
+  // availableBalance (kesBalance minus anything credited in the last 2
+  // minutes and still held server-side — see
+  // backend/utils/availableBalance.js) is what the backend will actually
+  // let this merchant send. Falls back to kesBalance for a session object
+  // fetched before this field existed, so this never goes undefined.
+  const balance      = merchant?.availableBalance ?? merchant?.kesBalance ?? 0
 
   const token = () => localStorage.getItem('paychain_merchant_token')
   const cfg   = () => ({ headers: { Authorization: `Bearer ${token()}` } })

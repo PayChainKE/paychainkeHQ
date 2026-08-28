@@ -111,7 +111,7 @@ export const REVENUE_STREAMS = [
   {
     id: 'fx_spread',
     label: 'FX Spread / Conversion',
-    description: 'On-chain KES ↔ USDC conversions. 2.00% spread — aligned to standard stablecoin off-ramp rates (Kotani Pay, HoneyCoin).',
+    description: 'On-chain KES ↔ USDC conversions. 2.00% spread — aligned to standard stablecoin off-ramp rates (Kotani Pay, HoneyCoin). Priced here but not yet wired to a real charge — controllers/transactionController.js\'s KES_TO_USDC/USDC_TO_KES swap handlers create the fx_swap Transaction without stamping paychainFee, so this stream always reports KES 0 today regardless of swap volume.',
     icon: 'currency_exchange',
     accent: 'pink',
     rate: FX_SPREAD_RATE,
@@ -119,6 +119,7 @@ export const REVENUE_STREAMS = [
     txTypes: ['fx_swap'],
     statuses: ['completed', 'verified'],
     basis: 'kes_volume',
+    pilot: true,
   },
   {
     id: 'stablecoin_payment',

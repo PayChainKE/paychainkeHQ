@@ -2328,7 +2328,18 @@ export const getMerchantAnalytics = async (req, res) => {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const excludeDemo = await excludeDemoMerchantsMatch();
-    const activeMerchantIds = await Transaction.distinct('merchantId', { createdAt: { $gte: thirtyDaysAgo }, merchantId: { $ne: null }, ...excludeDemo });
+    // merchantId's two conditions are merged (not spread separately) —
+    // excludeDemo also keys off merchantId, and a naive second spread here
+    // silently overwrote `$ne: null` instead of combining with it (same
+    // clobbering pattern documented in revenueController.js's
+    // topMerchantsAgg) — Transaction.distinct would then have started
+    // counting `null` itself as one more "active merchant" the moment any
+    // merchantId-less transaction (e.g. a revenue sweep) fell in this
+    // window, since nothing was actually excluding it any more.
+    const activeMerchantIds = await Transaction.distinct('merchantId', {
+      createdAt: { $gte: thirtyDaysAgo },
+      merchantId: { $ne: null, ...(excludeDemo.merchantId || {}) },
+    });
     const activeMerchants30d = activeMerchantIds.length;
 
     // Digital Wallet Stats

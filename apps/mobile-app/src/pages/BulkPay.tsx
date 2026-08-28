@@ -611,7 +611,11 @@ export default function BulkPay() {
     [selectedIds, payoutAmounts]
   );
 
-  const balance = merchant?.kesBalance ?? 0;
+  // availableBalance excludes anything credited in the last 2 minutes and
+  // still held server-side (backend/utils/availableBalance.js) — the same
+  // figure authorizeBatch's debitAvailableBalance actually enforces, so
+  // this warning can't disagree with what submitting the batch will do.
+  const balance = merchant?.availableBalance ?? merchant?.kesBalance ?? 0;
   const isLiquidityLow = batchTotal > balance && batchTotal > 0;
 
   // ── Selection ──

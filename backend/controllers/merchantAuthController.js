@@ -19,6 +19,7 @@ import { assertOtpNotLocked, recordFailedOtpAttempt, resetOtpAttempts, OtpLocked
 import { timingSafeStringEqual } from '../utils/timingSafeCompare.js';
 import { normalizeKraPin, isValidKraPin, KRA_PIN_FORMAT_HINT } from '../utils/kraPinValidator.js';
 import { getOrCreatePlatformSettings } from '../models/PlatformSettings.js';
+import { getAvailableBalance } from '../utils/availableBalance.js';
 
 // Canonical option sets for self-serve signup's business-details step —
 // kept here (not just in the frontend) so a request bypassing the UI can't
@@ -330,6 +331,7 @@ export const verifyMerchantOTP = async (req, res) => {
     });
 
     const platformSettings = await getOrCreatePlatformSettings();
+    const { availableBalance, heldAmount } = await getAvailableBalance(merchant._id, merchant.kesBalance);
 
     res.json({
       success: true,
@@ -346,6 +348,15 @@ export const verifyMerchantOTP = async (req, res) => {
         ncbaMerchantCode: merchant.ncbaMerchantCode,
         ncbaVirtualAccountNumber: getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode),
         kesBalance: merchant.kesBalance,
+        // What debitAvailableBalance will actually let this merchant send
+        // right now — kesBalance minus anything credited in the last 2
+        // minutes and still held (utils/availableBalance.js). Previously
+        // absent here, so Send Money/Bulk Pay showed the full kesBalance as
+        // "available" and a merchant who'd just been paid could pass the
+        // UI's own balance check, enter their PIN, and only then be
+        // rejected server-side.
+        availableBalance,
+        heldAmount,
         usdcBalance: merchant.usdcBalance,
         stellarPublicKey: merchant.stellarPublicKey,
         status: merchant.status,
@@ -967,6 +978,7 @@ export const getMerchantMe = async (req, res) => {
     }
 
     const platformSettings = await getOrCreatePlatformSettings();
+    const { availableBalance, heldAmount } = await getAvailableBalance(merchant._id, merchant.kesBalance);
 
     res.json({
       success: true,
@@ -983,6 +995,15 @@ export const getMerchantMe = async (req, res) => {
         ncbaMerchantCode: merchant.ncbaMerchantCode,
         ncbaVirtualAccountNumber: getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode),
         kesBalance: merchant.kesBalance,
+        // What debitAvailableBalance will actually let this merchant send
+        // right now — kesBalance minus anything credited in the last 2
+        // minutes and still held (utils/availableBalance.js). Previously
+        // absent here, so Send Money/Bulk Pay showed the full kesBalance as
+        // "available" and a merchant who'd just been paid could pass the
+        // UI's own balance check, enter their PIN, and only then be
+        // rejected server-side.
+        availableBalance,
+        heldAmount,
         usdcBalance: merchant.usdcBalance,
         stellarPublicKey: merchant.stellarPublicKey,
         status: merchant.status,
@@ -1079,6 +1100,8 @@ export const updateMerchantProfile = async (req, res) => {
       });
     }
 
+    const { availableBalance, heldAmount } = await getAvailableBalance(merchant._id, merchant.kesBalance);
+
     res.json({
       success: true,
       merchant: {
@@ -1094,6 +1117,15 @@ export const updateMerchantProfile = async (req, res) => {
         ncbaMerchantCode: merchant.ncbaMerchantCode,
         ncbaVirtualAccountNumber: getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode),
         kesBalance: merchant.kesBalance,
+        // What debitAvailableBalance will actually let this merchant send
+        // right now — kesBalance minus anything credited in the last 2
+        // minutes and still held (utils/availableBalance.js). Previously
+        // absent here, so Send Money/Bulk Pay showed the full kesBalance as
+        // "available" and a merchant who'd just been paid could pass the
+        // UI's own balance check, enter their PIN, and only then be
+        // rejected server-side.
+        availableBalance,
+        heldAmount,
         usdcBalance: merchant.usdcBalance,
         stellarPublicKey: merchant.stellarPublicKey,
         status: merchant.status,

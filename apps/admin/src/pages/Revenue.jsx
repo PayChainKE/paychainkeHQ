@@ -24,11 +24,12 @@ const PAGE_SIZE = 25;
  * @property {number} gmvChange       % change vs previous period
  * @property {number} grossRevenue    Total transaction fees collected
  * @property {number} grossChange
- * @property {number} networkCosts    Pass-through fees paid to networks
+ * @property {number} networkCosts    Pass-through fees paid to networks — informational only, NOT deducted from grossRevenue (see revenueController.js's doc comment on why paychainFee is already net of this)
  * @property {number} costsChange
- * @property {number} netRevenue      grossRevenue - networkCosts
+ * @property {number} netRevenue      Mirrors grossRevenue — kept for legacy consumers, not a second (lower) number
  * @property {number} netChange
- * @property {number} takeRate        netRevenue / gmv × 100
+ * @property {number} sweptThisPeriod Real completed, non-simulated RevenueSweep total within this window
+ * @property {number} takeRate        grossRevenue / gmv × 100
  * @property {number} projectedARR    Linear run-rate annualised
  *
  * @typedef {Object} RevenueChannel
@@ -60,6 +61,7 @@ const CHANNEL_META = {
   'Mobile Money':       { icon: 'smartphone',   dot: '#10B981' },
   'On-Chain (Stellar)': { icon: 'token',        dot: '#3B82F6' },
   'Bank Transfer':      { icon: 'account_balance', dot: '#F59E0B' },
+  'Bill Payments':      { icon: 'receipt_long', dot: '#8B5CF6' },
 };
 
 // ── Formatters ────────────────────────────────────────────────────────
@@ -380,6 +382,37 @@ const Revenue = () => {
 
   useEffect(() => { fetchRevenue(); }, [fetchRevenue]);
 
+  // True current unswept balance — Σ paychainFee since launch minus every
+  // real completed sweep, exactly what services/revenueSweepService.js
+  // physically owes the corporate account right now (same figure the Pool
+  // Reconciliation page shows as "PayChain Unswept Revenue"). Deliberately
+  // NOT derived from `range` above: this is a live running balance, not a
+  // period-windowed figure, so it stays correct no matter which date
+  // range is selected (a period-scoped "Money In − Money Out" version of
+  // this used to live here and could disagree with reality by tens of
+  // shillings on any range narrower than "All Time" — see the Cash
+  // Position card below).
+  const [unsweptNow, setUnsweptNow] = useState(null);
+  const [unsweptNowLoading, setUnsweptNowLoading] = useState(true);
+  const fetchUnsweptNow = useCallback(async (silent = false) => {
+    if (!silent) setUnsweptNowLoading(true);
+    try {
+      const res = await api.get('/api/admin/revenue/pool-balance/expected');
+      setUnsweptNow(res.data?.data?.unsweptRevenue ?? null);
+    } catch (e) {
+      if (!silent) setUnsweptNow(null);
+    } finally {
+      if (!silent) setUnsweptNowLoading(false);
+    }
+  }, []);
+  useEffect(() => { fetchUnsweptNow(); }, [fetchUnsweptNow]);
+  useEffect(() => {
+    const id = setInterval(() => fetchUnsweptNow(true), 30_000);
+    const onSync = () => fetchUnsweptNow(true);
+    window.addEventListener('paychain:sync', onSync);
+    return () => { clearInterval(id); window.removeEventListener('paychain:sync', onSync); };
+  }, [fetchUnsweptNow]);
+
   // Real sweep history — every actual RevenueSweep attempt (see
   // services/revenueSweepService.js), independent of `range` above since
   // it's a full log, not a windowed revenue figure.
@@ -510,17 +543,11 @@ const Revenue = () => {
   // collected into the pooled FBO account (kpis.grossRevenue, already
   // period-scoped); Money Out is what real RevenueSweep attempts actually
   // moved out of it into the corporate account within that same window —
-  // sourced from the full sweep log already loaded below, filtered to the
-  // period.
-  const moneyOut = useMemo(() => {
-    if (!data?.windowStart) return 0;
-    const since = new Date(data.windowStart).getTime();
-    return sweepHistory
-      .filter((s) => s.status === 'completed' && new Date(s.createdAt).getTime() >= since)
-      .reduce((sum, s) => sum + (s.amount || 0), 0);
-  }, [sweepHistory, data]);
+  // sourced server-side (kpis.sweptThisPeriod) rather than filtered from
+  // the sweep-history list below, which excludes archived rows and is
+  // capped at 500 and would silently undercount once either applied.
   const moneyIn = kpis.grossRevenue || 0;
-  const heldInFbo = Math.max(0, Math.round((moneyIn - moneyOut) * 100) / 100);
+  const moneyOut = kpis.sweptThisPeriod || 0;
 
   // The backend's own bucket resolution already varies by range (hourly for
   // 24h, daily for 7d/30d, monthly for 90d/ytd/all — see
@@ -719,7 +746,8 @@ const Revenue = () => {
               <h3 className="text-base font-bold text-on-surface tracking-tight font-headline">Cash Position — {range === 'all' ? 'All Time' : 'This Period'}</h3>
               <p className="text-xs text-on-surface-variant mt-1">
                 What actually moved. Money In is fees collected into the pooled FBO account; Money Out is what real sweep attempts
-                (below) actually transferred to the corporate account in this window — not a projection.
+                (below) actually transferred to the corporate account in this window — not a projection. Held in FBO is the current
+                running balance and always reflects right now, independent of the period selected above.
               </p>
             </div>
           </div>
@@ -736,14 +764,15 @@ const Revenue = () => {
                 <span className="text-2xs font-bold text-on-surface-variant uppercase tracking-[0.18em]">Money Out · Swept to Corporate</span>
                 <span className="material-symbols-outlined text-blue-600 text-sm" title="Real completed RevenueSweep transfers out of the FBO account this period">north_east</span>
               </div>
-              {sweepHistoryLoading ? <Skel className="w-28 h-8" /> : <span className="text-2xl font-bold text-on-surface tracking-tighter tabular-nums">{fmtKES(moneyOut)}</span>}
+              {loading ? <Skel className="w-28 h-8" /> : <span className="text-2xl font-bold text-on-surface tracking-tighter tabular-nums">{fmtKES(moneyOut)}</span>}
             </div>
             <div className="bg-surface-container-lowest p-5 flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <span className="text-2xs font-bold text-on-surface-variant uppercase tracking-[0.18em]">Held in FBO · Unswept</span>
-                <span className="material-symbols-outlined text-on-surface-variant/60 text-sm" title="Collected but not yet swept out — Money In minus Money Out">account_balance</span>
+                <span className="material-symbols-outlined text-on-surface-variant/60 text-sm" title="Collected but not yet swept out — the current running balance, right now, regardless of the period selected above">account_balance</span>
               </div>
-              {loading || sweepHistoryLoading ? <Skel className="w-28 h-8" /> : <span className="text-2xl font-bold text-on-surface tracking-tighter tabular-nums">{fmtKES(heldInFbo)}</span>}
+              {unsweptNowLoading ? <Skel className="w-28 h-8" /> : <span className="text-2xl font-bold text-on-surface tracking-tighter tabular-nums">{fmtKES(unsweptNow)}</span>}
+              <Link to="/pool-reconciliation" className="text-2xs text-on-surface-variant hover:text-on-surface underline underline-offset-2 w-fit">Verify against real NCBA balance →</Link>
             </div>
           </div>
         </section>
