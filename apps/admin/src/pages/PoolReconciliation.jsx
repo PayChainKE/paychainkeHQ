@@ -59,43 +59,71 @@ const PoolReconciliation = () => {
   const [toast, setToast] = useState('');
   const showToast = useCallback((msg) => { setToast(msg); setTimeout(() => setToast(''), 4000); }, []);
 
-  const fetchExpected = useCallback(async () => {
-    setExpectedLoading(true);
+  // `silent` — background refreshes (sync events, polling) hold the previous
+  // render instead of flashing the skeleton back in. Only a real initial
+  // load shows loading state. Same pattern Revenue.jsx uses for the same
+  // reason (bank-dashboard-style refresh without disturbing what the admin
+  // is looking at).
+  const fetchExpected = useCallback(async (silent = false) => {
+    if (!silent) setExpectedLoading(true);
     try {
       const res = await api.get('/api/admin/revenue/pool-balance/expected');
       setExpected(res.data?.data || null);
     } catch (e) {
-      setExpected(null);
+      if (!silent) setExpected(null);
     } finally {
-      setExpectedLoading(false);
+      if (!silent) setExpectedLoading(false);
     }
   }, []);
 
-  const fetchLive = useCallback(async () => {
-    setLiveLoading(true);
+  // Live NCBA balance is a real external API call (auth token + request to
+  // NCBA) — deliberately NOT tied to paychain:sync, which fires on every
+  // transaction platform-wide. Polling NCBA that often risks rate limits
+  // for no real benefit, since the pool balance doesn't need to be that
+  // fresh. Its own gentle fixed-interval poll instead, plus the manual
+  // refresh button already on the card.
+  const fetchLive = useCallback(async (silent = false) => {
+    if (!silent) setLiveLoading(true);
     try {
       const res = await api.get('/api/admin/revenue/pool-balance/live');
       setLive(res.data?.data || null);
     } catch (e) {
-      setLive({ available: false, reason: 'Request failed.' });
+      if (!silent) setLive({ available: false, reason: 'Request failed.' });
     } finally {
-      setLiveLoading(false);
+      if (!silent) setLiveLoading(false);
     }
   }, []);
 
-  const fetchHistory = useCallback(async () => {
-    setHistoryLoading(true);
+  const fetchHistory = useCallback(async (silent = false) => {
+    if (!silent) setHistoryLoading(true);
     try {
       const res = await api.get('/api/admin/revenue/reconciliations');
       setHistory(res.data?.data || []);
     } catch (e) {
-      setHistory([]);
+      if (!silent) setHistory([]);
     } finally {
-      setHistoryLoading(false);
+      if (!silent) setHistoryLoading(false);
     }
   }, []);
 
   useEffect(() => { fetchExpected(); fetchLive(); fetchHistory(); }, [fetchExpected, fetchLive, fetchHistory]);
+
+  // Ledger-derived figures + history refresh instantly on any real-time
+  // platform event (see context/AuthContext.jsx's SSE connection), plus a
+  // 30s fallback poll — matches Revenue.jsx's live-refresh convention.
+  useEffect(() => {
+    const id = setInterval(() => { fetchExpected(true); fetchHistory(true); }, 30_000);
+    const onSync = () => { fetchExpected(true); fetchHistory(true); };
+    window.addEventListener('paychain:sync', onSync);
+    return () => { clearInterval(id); window.removeEventListener('paychain:sync', onSync); };
+  }, [fetchExpected, fetchHistory]);
+
+  // Live NCBA balance — its own slower, independent cadence (see fetchLive's
+  // doc comment above for why this isn't tied to paychain:sync).
+  useEffect(() => {
+    const id = setInterval(() => fetchLive(true), 2 * 60_000);
+    return () => clearInterval(id);
+  }, [fetchLive]);
 
   const submitCheck = useCallback(async (e) => {
     e.preventDefault();
@@ -148,7 +176,7 @@ const PoolReconciliation = () => {
             <div className="flex items-center justify-between">
               <span className="text-2xs font-bold text-emerald-200/70 uppercase tracking-widest">Live NCBA Balance</span>
               <button
-                onClick={fetchLive}
+                onClick={() => fetchLive()}
                 title="Refresh live balance"
                 className="text-emerald-200/60 hover:text-white transition-colors"
               >
