@@ -688,23 +688,22 @@ export const getExpectedPoolBalance = async (req, res) => {
 };
 
 // @desc    Live pooled-account balance straight from NCBA's AccountDetails
-//          endpoint — never called anywhere in this codebase before now,
-//          so its response shape isn't confirmed (see
+//          endpoint — confirmed working live 2026-08-29 (see
 //          services/ncbaOpenBankingService.js#getNcbaAccountBalance's doc
-//          comment). Always returns 200 with `available: false` on any
-//          failure (auth error, network error, unparseable response) —
-//          this must never break the reconciliation page, since the manual
-//          entry flow below is the proven fallback the whole reconciliation
-//          system was originally built around.
+//          comment for the real response shape). Still always returns 200
+//          with `available: false` on any failure (auth error, network
+//          error, unparseable response) — this must never break the
+//          reconciliation page, since the manual entry flow below remains
+//          a valid independent cross-check even with the live pull working.
 // @route   GET /api/admin/revenue/pool-balance/live
 // @access  Private (Admin)
 export const getLivePoolBalance = async (req, res) => {
   try {
-    const { raw, balance } = await getNcbaAccountBalance();
+    const { raw, balance, totalBalance } = await getNcbaAccountBalance();
     if (balance === null) {
       return res.json({ success: true, data: { available: false, raw, reason: 'Could not identify a balance field in NCBA\'s response — see raw response.' } });
     }
-    res.json({ success: true, data: { available: true, balance, raw, fetchedAt: new Date() } });
+    res.json({ success: true, data: { available: true, balance, totalBalance, raw, fetchedAt: new Date() } });
   } catch (error) {
     console.error('Get Live Pool Balance Error:', error);
     res.json({ success: true, data: { available: false, reason: error.message } });

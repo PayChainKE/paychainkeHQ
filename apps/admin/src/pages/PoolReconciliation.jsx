@@ -163,7 +163,12 @@ const PoolReconciliation = () => {
               <span className="text-lg font-bold text-amber-300">Unavailable</span>
             )}
             {!liveLoading && live?.available && (
-              <p className="text-2xs text-emerald-200/50">As of {fmtDateTime(live.fetchedAt)} · pulled directly from NCBA</p>
+              <p className="text-2xs text-emerald-200/50">
+                As of {fmtDateTime(live.fetchedAt)} · pulled directly from NCBA
+                {live.totalBalance != null && live.totalBalance !== live.balance && (
+                  <> · Ledger balance {formatKES(live.totalBalance)} (incl. uncleared)</>
+                )}
+              </p>
             )}
             {!liveLoading && !live?.available && (
               <div className="text-2xs text-emerald-200/50 space-y-1">

@@ -300,21 +300,20 @@ function assertTransferAmountInBounds(amount) {
 /**
  * Fetches live account details (incl. balance) for a PayChain NCBA account
  * — /api/v1/AccountDetails/accountdetails, from "API documents/Open Banking
- * V2- Callback Enabled.postman_collection.json". Unlike every payment rail
- * in this file, nothing has ever called this endpoint in production before
- * — its response shape is unconfirmed (the Postman collection's saved
- * example has an empty body), so this returns the RAW response verbatim
- * rather than assuming a field name, alongside a best-effort `balance`
- * extracted by scanning common candidate field names. Callers (the pool
- * reconciliation page) must treat `balance: null` as "could not confirm
- * NCBA's live balance" and fall back to the ledger-derived expected figure,
- * never silently show 0 or a guessed field as if it were real — same
- * "don't invent a number to fill a gap" rule as everywhere else this
- * session's NCBA integrations have hit an unreliable/unknown response.
+ * V2- Callback Enabled.postman_collection.json". Confirmed live 2026-08-29
+ * via scripts/probe-ncba-account-details.js — real shape is:
+ *   { ErrorCode: "000", ErrorMessage: "success", AccountNumber, AccountName,
+ *     CIF, Currency, AvailableBalance: "1577.12", TotalBalance: "1677.12",
+ *     AccountStatusDesc: "Active" }
+ * (flat, PascalCase, numbers as strings — not the Postman collection's own
+ * documented shape, which was an empty example). AvailableBalance excludes
+ * uncleared funds and is what "is the money really there right now" should
+ * read off; TotalBalance (ledger balance) is returned alongside for
+ * transparency but is not what `balance` resolves to.
  *
  * @param {object} [params]
  * @param {string} [params.accountNo] - defaults to PayChain's own NCBA account
- * @returns {{ raw: object, balance: number|null }}
+ * @returns {{ raw: object, balance: number|null, totalBalance: number|null }}
  */
 export async function getNcbaAccountBalance({ accountNo } = {}) {
   const acct = accountNo || ncbaOpenBankingAccountNumber;
@@ -323,29 +322,47 @@ export async function getNcbaAccountBalance({ accountNo } = {}) {
   }
 
   if (!liveCallsEnabled) {
-    return { raw: simulate('ncba_openbanking_account_details_sandbox', { accountNo: acct }), balance: null };
+    return { raw: simulate('ncba_openbanking_account_details_sandbox', { accountNo: acct }), balance: null, totalBalance: null };
   }
 
   const raw = await ncbaOpenBankingPost('/api/v1/AccountDetails/accountdetails', { country: 'KE', accountNo: acct });
 
-  // Scan both the top-level response and a nested `data` object (the same
-  // "don't trust one exact key spelling" defensiveness submitMobileB2wPayment
-  // already applies to success/message fields) for anything balance-shaped.
-  const candidates = [raw, raw?.data].filter(Boolean);
-  const balanceKeys = ['availableBalance', 'ledgerBalance', 'accountBalance', 'balance', 'currentBalance', 'clearBalance'];
-  let balance = null;
-  for (const obj of candidates) {
-    for (const key of balanceKeys) {
-      const v = obj?.[key];
-      if (typeof v === 'number' || (typeof v === 'string' && v.trim() !== '' && !isNaN(Number(v)))) {
-        balance = Number(v);
-        break;
-      }
-    }
-    if (balance !== null) break;
+  if (raw?.ErrorCode && raw.ErrorCode !== '000') {
+    return { raw, balance: null, totalBalance: null };
   }
 
-  return { raw, balance };
+  // Case-insensitive key match, scanning both the top-level response and a
+  // nested `data` object — same "don't trust one exact key spelling"
+  // defensiveness submitMobileB2wPayment already applies elsewhere in this
+  // file, since NCBA's own rails are inconsistent about it.
+  const numeric = (v) => (typeof v === 'number' || (typeof v === 'string' && v.trim() !== '' && !isNaN(Number(v)))) ? Number(v) : null;
+  const findKey = (obj, patterns) => {
+    if (!obj || typeof obj !== 'object') return null;
+    for (const key of Object.keys(obj)) {
+      const lower = key.toLowerCase();
+      if (patterns.some((p) => lower.includes(p))) {
+        const v = numeric(obj[key]);
+        if (v !== null) return v;
+      }
+    }
+    return null;
+  };
+  const candidates = [raw, raw?.data].filter(Boolean);
+  let balance = null;
+  let totalBalance = null;
+  for (const obj of candidates) {
+    if (balance === null) balance = findKey(obj, ['available']);
+    if (totalBalance === null) totalBalance = findKey(obj, ['totalbalance', 'ledgerbalance']);
+  }
+  // No "available"-labeled field found — fall back to any generic balance field.
+  if (balance === null) {
+    for (const obj of candidates) {
+      balance = findKey(obj, ['balance']);
+      if (balance !== null) break;
+    }
+  }
+
+  return { raw, balance, totalBalance };
 }
 
 export async function validatePesaLinkMobileNumber({ phoneNumber, debitAccount }) {
