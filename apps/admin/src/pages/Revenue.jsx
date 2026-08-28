@@ -38,16 +38,6 @@ const PAGE_SIZE = 25;
  * @property {number} costs
  * @property {number} net
  * @property {number} count
- *
- * @typedef {Object} SweepBatch
- * @property {string} id
- * @property {{from: string, to: string}} period
- * @property {number} gross
- * @property {number} costs
- * @property {number} net
- * @property {number} count
- * @property {'Settled to Corporate'|'Pending Bank Clearing'|'Accruing'|'Failed'} status
- * @property {string} destination
  */
 
 // ── Constants ─────────────────────────────────────────────────────────
@@ -70,22 +60,6 @@ const CHANNEL_META = {
   'Mobile Money':       { icon: 'smartphone',   dot: '#10B981' },
   'On-Chain (Stellar)': { icon: 'token',        dot: '#3B82F6' },
   'Bank Transfer':      { icon: 'account_balance', dot: '#F59E0B' },
-};
-
-const STATUS_META = {
-  'Settled to Corporate':   { dot: 'bg-emerald-500',                 text: 'text-emerald-700', border: 'border-emerald-200', bg: 'bg-emerald-50' },
-  'Accruing':               { dot: 'bg-sky-500',                     text: 'text-sky-700',     border: 'border-sky-200',     bg: 'bg-sky-50'     },
-  'Failed':                 { dot: 'bg-red-500',                     text: 'text-red-700',     border: 'border-red-200',     bg: 'bg-red-50'     },
-  // Real outcome of an actual sweep attempt (services/revenueSweepService.js)
-  // that ran but moved nothing — e.g. below NCBA's minimum transfer, or the
-  // destination account wasn't configured yet. Distinct from "Accruing"
-  // (nothing has been attempted yet) and from the old fake "Pending Bank
-  // Clearing" guess this replaced, which implied a transfer was queued when
-  // none actually was.
-  'Skipped':                { dot: 'bg-amber-500',                   text: 'text-amber-800',   border: 'border-amber-200',   bg: 'bg-amber-50'   },
-  // No real RevenueSweep record's periodEnd falls in this week at all —
-  // predates the real sweep system, or the automated day simply never ran.
-  'No Sweep Attempted':     { dot: 'bg-slate-400',                   text: 'text-slate-600',   border: 'border-slate-200',   bg: 'bg-slate-50'   },
 };
 
 // ── Formatters ────────────────────────────────────────────────────────
@@ -376,7 +350,6 @@ const Revenue = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
-  const [sweepsPage, setSweepsPage] = useState(1);
 
   // `silent` powers the live auto-refresh below — the dashboard holds its
   // previous render (no skeleton, no layout jump) while a background poll
@@ -425,9 +398,7 @@ const Revenue = () => {
 
   useEffect(() => { fetchSweepHistory(); }, [fetchSweepHistory]);
 
-  // Manual "Run Sweep Now" — POST /api/admin/revenue/sweeps/run. Distinct
-  // from the `sweeps`/sweepBatches table below, which is a projected estimate
-  // re-derived from transactions on every request; this actually attempts a
+  // Manual "Run Sweep Now" — POST /api/admin/revenue/sweeps/run. Attempts a
   // real PesaLink transfer of PayChain's accrued fee revenue (or a simulated
   // one, if NCBA_OPENBANKING_LIVE_ENABLED is off on the backend — this page
   // has no way to know which, so the confirmation copy covers both).
@@ -525,7 +496,6 @@ const Revenue = () => {
 
   const kpis     = data?.kpis     || {};
   const channels = data?.channels || [];
-  const sweeps   = data?.sweepBatches || [];
   const series   = data?.series   || [];
   const streams  = useMemo(
     () => [...(data?.streams || [])].sort((a, b) => b.revenue - a.revenue),
@@ -535,10 +505,10 @@ const Revenue = () => {
   // Real cash movement for the selected period — distinct from the fee
   // economics above (Gross/Net/Take Rate). Money In is what was actually
   // collected into the pooled FBO account (kpis.grossRevenue, already
-  // period-scoped); Money Out is what real RevenueSweep attempts (not the
-  // projected sweepBatches estimate) actually moved out of it into the
-  // corporate account within that same window — sourced from the full
-  // sweep log already loaded below, filtered to the period.
+  // period-scoped); Money Out is what real RevenueSweep attempts actually
+  // moved out of it into the corporate account within that same window —
+  // sourced from the full sweep log already loaded below, filtered to the
+  // period.
   const moneyOut = useMemo(() => {
     if (!data?.windowStart) return 0;
     const since = new Date(data.windowStart).getTime();
@@ -557,11 +527,7 @@ const Revenue = () => {
   // groupKey falls back to treating each YYYY-MM as a single fake week)
   // silently produced one misleading data point per month labeled as a
   // week, so the switcher is hidden and reset outside that range.
-  useEffect(() => { setGranularity('daily'); setChannelFilter('all'); setSweepsPage(1); }, [range]);
-  const pagedSweeps = useMemo(
-    () => sweeps.slice((sweepsPage - 1) * PAGE_SIZE, sweepsPage * PAGE_SIZE),
-    [sweeps, sweepsPage]
-  );
+  useEffect(() => { setGranularity('daily'); setChannelFilter('all'); }, [range]);
 
   const pagedSweepHistory = useMemo(
     () => sweepHistory.slice((sweepHistoryPage - 1) * PAGE_SIZE, sweepHistoryPage * PAGE_SIZE),
@@ -955,16 +921,18 @@ const Revenue = () => {
           </div>
         </section>
 
-        {/* ── C. Sweep & Settlement batches ────────────────────────── */}
+        {/* ── C. Revenue Sweeps — the real RevenueSweep log. Only ever
+            shows attempts that actually happened; "how much has accrued
+            but not swept yet" is already answered above in Cash Position
+            ("Held in FBO · Unswept"), so this section doesn't need its own
+            projected/estimated view of the same thing. ─────────────── */}
         <section>
-          <div className="flex items-end justify-between mb-4">
+          <div className="flex items-end justify-between mb-4 flex-wrap gap-3">
             <div>
-              <h3 className="text-base font-bold text-on-surface tracking-tight font-headline">Revenue Sweeps &amp; Settlement Batches</h3>
-              <p className="text-xs text-on-surface-variant mt-1">
-                Automated movement of accumulated fees from the PayChain FBO settlement account into the corporate operating account.
-                Only <strong>Gross Fees</strong> is the amount actually swept — <strong>Net Margin</strong> is after absorbing Safaricom's
-                pass-through cost (Processor Cuts) and can go negative on weeks dominated by free-tier transactions PayChain doesn't
-                mark up but still pays Safaricom's real cost on; that's a margin figure, not money leaving the account.
+              <h3 className="text-base font-bold text-on-surface tracking-tight font-headline">Revenue Sweeps</h3>
+              <p className="text-xs text-on-surface-variant mt-1 max-w-2xl">
+                Every real transfer of PayChain's fee revenue out of the pooled FBO account into the corporate account —
+                what actually ran, not an estimate. Independent of the date range above.
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -974,6 +942,15 @@ const Revenue = () => {
                   <span>Destination: <span className="text-on-surface font-bold">{data.corporateDestination}</span></span>
                 </div>
               )}
+              <button
+                onClick={exportSweepHistoryCsv}
+                disabled={exportingCsv}
+                title="Download the complete sweep history (including cleared rows) as CSV"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-surface-container border border-outline-variant/40 text-on-surface text-2xs font-bold uppercase tracking-widest hover:bg-surface-container-high transition-colors disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined text-sm">{exportingCsv ? 'progress_activity' : 'download'}</span>
+                {exportingCsv ? 'Preparing…' : 'Download CSV'}
+              </button>
               {canRunSweep && (
                 <button
                   onClick={() => setSweepConfirmOpen(true)}
@@ -984,113 +961,6 @@ const Revenue = () => {
                 </button>
               )}
             </div>
-          </div>
-          <div className="bg-surface-container-lowest border border-outline-variant/40 rounded-lg overflow-hidden">
-            {loading ? (
-              <div className="p-8"><Skel className="w-full h-32" /></div>
-            ) : sweeps.length === 0 ? (
-              <div className="p-12 text-center text-on-surface-variant text-xs">
-                No sweep batches in this window yet.
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead className="bg-surface-container/70 border-b border-outline-variant/40">
-                    <tr className="text-2xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-                      <th className="text-left px-5 py-3">Batch ID</th>
-                      <th className="text-left px-3 py-3">Period</th>
-                      <th className="text-right px-3 py-3">Gross Fees</th>
-                      <th className="text-right px-3 py-3">Processor Cuts</th>
-                      <th className="text-right px-3 py-3" title="Gross Fees minus the absorbed Safaricom pass-through cost — PayChain's retained margin, not the amount physically swept (that's Gross Fees).">Net Margin</th>
-                      <th className="text-left px-3 py-3">Status</th>
-                      <th className="text-left px-5 py-3">Destination</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pagedSweeps.map((b) => {
-                      const s = STATUS_META[b.status] || STATUS_META['Accruing'];
-                      return (
-                        <tr key={b.id} className="border-b border-outline-variant/40 last:border-b-0 hover:bg-surface-container/70 transition-colors">
-                          <td className="px-5 py-3.5">
-                            <div className="font-mono text-on-surface font-bold">{b.id}</div>
-                            <div className="text-2xs text-on-surface-variant">{fmtNum(b.count)} fees</div>
-                          </td>
-                          <td className="px-3 py-3.5 text-on-surface tabular-nums">
-                            {fmtPeriod(b.period)}
-                          </td>
-                          <td className="px-3 py-3.5 text-right tabular-nums text-on-surface-variant">
-                            {fmtKESPrecise(b.gross)}
-                          </td>
-                          <td className="px-3 py-3.5 text-right tabular-nums text-on-surface-variant">
-                            −{fmtKESPrecise(b.costs)}
-                          </td>
-                          <td className="px-3 py-3.5 text-right">
-                            <span className={`font-bold tabular-nums ${b.net < 0 ? 'text-red-600' : 'text-on-surface'}`}>{fmtKESPrecise(b.net)}</span>
-                          </td>
-                          <td className="px-3 py-3.5">
-                            <span
-                              title={b.note || undefined}
-                              className={`inline-flex items-center gap-1.5 px-2 py-1 rounded border ${s.border} ${s.bg} ${s.text} text-2xs font-bold uppercase tracking-wider ${b.note ? 'cursor-help' : ''}`}
-                            >
-                              <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
-                              {b.status}
-                            </span>
-                          </td>
-                          <td className="px-5 py-3.5 text-on-surface-variant tabular-nums">
-                            {b.destination}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-            {!loading && sweeps.length > 0 && (
-              <TablePagination page={sweepsPage} pageSize={PAGE_SIZE} total={sweeps.length} onPage={setSweepsPage} />
-            )}
-          </div>
-
-          {/* Reconciliation footer — totals always reconcile to the KPIs above, not just the current page */}
-          {!loading && sweeps.length > 0 && (
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-surface-container-lowest border border-outline-variant/40 rounded-md text-2xs">
-              <span className="text-on-surface-variant">
-                Showing {sweeps.length} batches · figures reconcile to KPI strip
-              </span>
-              <div className="flex items-center gap-5 tabular-nums">
-                <span className="text-on-surface-variant">Σ Gross <span className="text-on-surface font-bold">{fmtKESPrecise(sweeps.reduce((s, b) => s + b.gross, 0))}</span></span>
-                <span className="text-on-surface-variant">Σ Cuts <span className="text-on-surface font-bold">−{fmtKESPrecise(sweeps.reduce((s, b) => s + b.costs, 0))}</span></span>
-                {(() => {
-                  const totalNet = sweeps.reduce((s, b) => s + b.net, 0);
-                  return (
-                    <span className={`font-bold ${totalNet < 0 ? 'text-red-600' : 'text-emerald-700'}`}>
-                      Σ Net Margin {fmtKESPrecise(totalNet)}
-                    </span>
-                  );
-                })()}
-              </div>
-            </div>
-          )}
-        </section>
-
-        {/* ── C2. Sweep History — the real RevenueSweep log ─────────── */}
-        <section>
-          <div className="flex items-end justify-between mb-4">
-            <div>
-              <h3 className="text-base font-bold text-on-surface tracking-tight font-headline">Sweep History</h3>
-              <p className="text-xs text-on-surface-variant mt-1">
-                Every real sweep attempt on record — what actually ran, not a projection. Independent of the date range above.
-              </p>
-            </div>
-            <button
-              onClick={exportSweepHistoryCsv}
-              disabled={exportingCsv}
-              title="Download the complete sweep history (including cleared rows) as CSV"
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-surface-container border border-outline-variant/40 text-on-surface text-2xs font-bold uppercase tracking-widest hover:bg-surface-container-high transition-colors disabled:opacity-50"
-            >
-              <span className="material-symbols-outlined text-sm">{exportingCsv ? 'progress_activity' : 'download'}</span>
-              {exportingCsv ? 'Preparing…' : 'Download CSV'}
-            </button>
           </div>
           <div className="bg-surface-container-lowest border border-outline-variant/40 rounded-lg overflow-hidden">
             {sweepHistoryLoading ? (

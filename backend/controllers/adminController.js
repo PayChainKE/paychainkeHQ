@@ -18,6 +18,7 @@ import { getNcbaVirtualAccountNumber, generateRandomMerchantCode, validatePhoneN
 import { generateMerchantStickerPdf, generateBulkStickerPdf, generateMerchantQrFlyerPdf } from '../utils/stickerGenerator.js';
 import { LIVE_DATA_CUTOFF } from '../config/liveDataCutoff.js';
 import { excludeDemoMerchantsMatch } from '../utils/demoMerchantExclusion.js';
+import { reversedTransactionExclusionMatch } from '../utils/reversedTransactions.js';
 import { provisionMerchantWallet } from '../utils/stellarHelper.js';
 import { encryptKey } from '../utils/cryptoHelper.js';
 import { normalizeKraPin, isValidKraPin, KRA_PIN_FORMAT_HINT } from '../utils/kraPinValidator.js';
@@ -1865,8 +1866,12 @@ export const getInsights = async (req, res) => {
     const txnPrevSince = prevSince.getTime() < LIVE_DATA_CUTOFF.getTime() ? LIVE_DATA_CUTOFF : prevSince;
     // The demo merchant's simulated activity must never inflate PayChain's
     // reported GTV/GMV/top-merchants figures — same discipline as
-    // revenueController.js's getRevenue.
+    // revenueController.js's getRevenue. excludeReversed additionally drops
+    // both halves of any REVERSAL-<ref> correction pair, which this
+    // function was previously missing entirely (revenueController.js has
+    // always applied it; this one hadn't caught up).
     const excludeDemo = await excludeDemoMerchantsMatch();
+    const excludeReversed = await reversedTransactionExclusionMatch();
 
     const pctChange = (curr, prev) => {
       if (!prev) return curr > 0 ? 100 : 0;
@@ -1908,16 +1913,16 @@ export const getInsights = async (req, res) => {
     // ── Transaction / GTV / GMV ────────────────────────────────────────────
     const [gtvCurr, gtvPrev, gtvSeries, lifetimeAgg] = await Promise.all([
       Transaction.aggregate([
-        { $match: { createdAt: { $gte: txnSince }, status: { $in: ['completed', 'verified'] }, ...excludeDemo } },
+        { $match: { createdAt: { $gte: txnSince }, status: { $in: ['completed', 'verified'] }, ...excludeDemo, ...excludeReversed } },
         { $group: { _id: null, count: { $sum: 1 }, kesVolume: kesVolReal, usdcVolume: usdcVolReal } },
       ]),
       Transaction.aggregate([
-        { $match: { createdAt: { $gte: txnPrevSince, $lt: txnSince }, status: { $in: ['completed', 'verified'] }, ...excludeDemo } },
+        { $match: { createdAt: { $gte: txnPrevSince, $lt: txnSince }, status: { $in: ['completed', 'verified'] }, ...excludeDemo, ...excludeReversed } },
         { $group: { _id: null, count: { $sum: 1 }, kesVolume: kesVolReal, usdcVolume: usdcVolReal } },
       ]),
       // Daily volume series for the sparkline / area chart.
       Transaction.aggregate([
-        { $match: { createdAt: { $gte: txnSince }, status: { $in: ['completed', 'verified'] }, ...excludeDemo } },
+        { $match: { createdAt: { $gte: txnSince }, status: { $in: ['completed', 'verified'] }, ...excludeDemo, ...excludeReversed } },
         {
           $group: {
             _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
@@ -1929,7 +1934,7 @@ export const getInsights = async (req, res) => {
         { $sort: { _id: 1 } },
       ]),
       Transaction.aggregate([
-        { $match: { createdAt: { $gte: LIVE_DATA_CUTOFF }, status: { $in: ['completed', 'verified'] }, ...excludeDemo } },
+        { $match: { createdAt: { $gte: LIVE_DATA_CUTOFF }, status: { $in: ['completed', 'verified'] }, ...excludeDemo, ...excludeReversed } },
         { $group: { _id: null, count: { $sum: 1 }, kesVolume: kesVolReal, usdcVolume: usdcVolReal } },
       ]),
     ]);
@@ -2097,6 +2102,7 @@ export const getInsights = async (req, res) => {
           status: { $in: ['completed', 'verified'] },
           // Merged (not spread) — excludeDemo also keys off merchantId.
           merchantId: { $ne: null, ...(excludeDemo.merchantId || {}) },
+          ...excludeReversed,
         },
       },
       {
@@ -2130,7 +2136,7 @@ export const getInsights = async (req, res) => {
     // ── Transaction type mix ─────────────────────────────────────────
     // All statuses included so fx_swap / settlement rows are never filtered out.
     const txnTypeMix = await Transaction.aggregate([
-      { $match: { createdAt: { $gte: txnSince }, ...excludeDemo } },
+      { $match: { createdAt: { $gte: txnSince }, ...excludeDemo, ...excludeReversed } },
       { $group: { _id: '$type', count: { $sum: 1 }, volume: kesVolReal } },
       { $sort: { volume: -1 } },
     ]);
@@ -2219,28 +2225,38 @@ export const getInsights = async (req, res) => {
 // @access  Private (Admin)
 export const getMerchantAnalytics = async (req, res) => {
   try {
-    const totalMerchants = await Merchant.countDocuments();
-    const verifiedMerchants = await Merchant.countDocuments({ isVerified: true });
+    // Demo merchant(s) — Merchant.isDemoMerchant — must never count toward
+    // headline figures shown to admin (merchant counts, wallet counts, USDC
+    // locked). This mirrors revenueController.js's excludeDemo discipline,
+    // which these same figures had drifted from: a demo merchant's
+    // simulated usdcBalance was previously summed straight into "Total USDC
+    // Locked" on the Overview page.
+    const notDemo = { isDemoMerchant: { $ne: true } };
+
+    const totalMerchants = await Merchant.countDocuments(notDemo);
+    const verifiedMerchants = await Merchant.countDocuments({ ...notDemo, isVerified: true });
     const unverifiedMerchants = totalMerchants - verifiedMerchants;
 
     // Get recently added merchants (last 7 days)
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const recentMerchants = await Merchant.countDocuments({ createdAt: { $gte: sevenDaysAgo } });
+    const recentMerchants = await Merchant.countDocuments({ ...notDemo, createdAt: { $gte: sevenDaysAgo } });
 
     // Real usage signal, distinct from recentMerchants (new signups) —
     // merchants who actually moved money in the last 30 days, not just
     // ones who exist. Distinct merchantId count, not transaction count.
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const activeMerchantIds = await Transaction.distinct('merchantId', { createdAt: { $gte: thirtyDaysAgo }, merchantId: { $ne: null } });
+    const excludeDemo = await excludeDemoMerchantsMatch();
+    const activeMerchantIds = await Transaction.distinct('merchantId', { createdAt: { $gte: thirtyDaysAgo }, merchantId: { $ne: null }, ...excludeDemo });
     const activeMerchants30d = activeMerchantIds.length;
 
     // Digital Wallet Stats
-    const activeWallets = await Merchant.countDocuments({ stellarPublicKey: { $ne: null } });
-    
+    const activeWallets = await Merchant.countDocuments({ ...notDemo, stellarPublicKey: { $ne: null } });
+
     // Total USDC Locked (Sum of all usdcBalance)
     const usdcAggregation = await Merchant.aggregate([
+      { $match: notDemo },
       { $group: { _id: null, totalUsdc: { $sum: "$usdcBalance" } } }
     ]);
     const totalUsdcLocked = usdcAggregation.length > 0 ? usdcAggregation[0].totalUsdc : 0;
