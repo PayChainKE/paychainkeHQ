@@ -1159,7 +1159,7 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
   // backend always resolves to a concrete object, see
   // adminController.js#getMerchantDetail) — matches the current schema
   // default (false) rather than the old default, since this never persists.
-  const [features, setFeatures] = React.useState(merchant?.features || { digitalWallet: false, inflationShield: false });
+  const [features, setFeatures] = React.useState(merchant?.features || { digitalWallet: false, inflationShield: false, cashAdvanceForm: false });
   const [pwaInstalledAt, setPwaInstalledAt] = React.useState(merchant?.pwaInstalledAt || null);
   const [pwaInstallReminderSentAt, setPwaInstallReminderSentAt] = React.useState(merchant?.pwaInstallReminderSentAt || null);
   const [sendingInstallReminder, setSendingInstallReminder] = React.useState(false);
@@ -1727,11 +1727,11 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
                   </div>
                 } 
               />
-              <Row 
-                label="Inflation Shield" 
+              <Row
+                label="Inflation Shield"
                 value={
                   <div className="flex items-center gap-3">
-                    <button 
+                    <button
                       onClick={() => handleToggleFeature('inflationShield', !features.inflationShield)}
                       disabled={updatingFeatures}
                       className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${features.inflationShield ? 'bg-primary' : 'bg-outline-variant/40'}`}
@@ -1740,7 +1740,22 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
                     </button>
                     <span className="text-[12px] font-semibold text-on-surface-variant/80">{features.inflationShield ? 'Enabled' : 'Disabled'}</span>
                   </div>
-                } 
+                }
+              />
+              <Row
+                label="Cash Advance Form"
+                value={
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => handleToggleFeature('cashAdvanceForm', !features.cashAdvanceForm)}
+                      disabled={updatingFeatures}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${features.cashAdvanceForm ? 'bg-primary' : 'bg-outline-variant/40'}`}
+                    >
+                      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${features.cashAdvanceForm ? 'translate-x-4.5' : 'translate-x-1'}`} />
+                    </button>
+                    <span className="text-[12px] font-semibold text-on-surface-variant/80">{features.cashAdvanceForm ? 'Enabled' : 'Disabled'}</span>
+                  </div>
+                }
               />
             </Section>
           </div>

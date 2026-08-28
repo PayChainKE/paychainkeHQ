@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import Transaction from '../models/Transaction.js';
 import RevenueSweep from '../models/RevenueSweep.js';
 import BankReconciliation from '../models/BankReconciliation.js';
-import { REVENUE_STREAMS, SAFARICOM_TARIFF } from '../config/revenueRateCard.js';
+import { REVENUE_STREAMS } from '../config/revenueRateCard.js';
 import { LIVE_DATA_CUTOFF } from '../config/liveDataCutoff.js';
 import { runRevenueSweep, REVENUE_SWEEP_DESTINATION } from '../services/revenueSweepService.js';
 import { recordReconciliation } from '../services/reconciliationService.js';
@@ -306,7 +306,7 @@ export const getRevenue = async (req, res) => {
       };
       
       const lifetimeVolsAgg = await Transaction.aggregate([
-        { $match: { merchantId: { $in: topMerchantIds }, status: { $in: ['completed', 'verified'] } } },
+        { $match: { merchantId: { $in: topMerchantIds }, status: { $in: ['completed', 'verified'] }, ...excludeReversed } },
         { $group: { _id: '$merchantId', kesVolume: { $sum: KES_VOL_REAL }, usdcVolume: { $sum: USDC_VOL_REAL } } }
       ]);
       
@@ -320,61 +320,42 @@ export const getRevenue = async (req, res) => {
       });
     }
 
-    // ─── Safaricom passthrough — what customers paid Safaricom in fees.
-    // Pure transparency line, not PayChain revenue. We build a $switch
-    // that picks the tier fee for each doc by KES amount.
-    const safaricomBranches = SAFARICOM_TARIFF.map((tier) => ({
-      case: { $lte: [KES_BASIS, tier.max] },
-      then: tier.fee,
-    }));
-    const passthroughTypes = REVENUE_STREAMS
-      .filter((s) => s.passthrough === 'safaricom')
-      .flatMap((s) => s.txTypes);
-
+    // ─── Network & partner costs — what PayChain actually paid out to
+    // Safaricom/NCBA on top of its own fee. Reads the persisted
+    // Transaction.safaricomFee field (stamped once per transaction by
+    // calculateFees at creation time — see models/Transaction.js), same
+    // as channelAgg and sweepAgg below, instead of live-recomputing a
+    // tariff lookup scoped to only the old Daraja-era passthrough types.
+    // That old approach silently excluded every NCBA-rail transaction
+    // (ncba_inbound, ncba_lipa_na_mpesa, ncba_kplc, etc.) even though
+    // those also carry a real safaricomFee, understating this KPI's costs
+    // (and overstating Net Revenue) the moment NCBA rails carried real
+    // volume — exactly the drift the sweep batch table's own "figures
+    // reconcile to KPI strip" footer assumes can't happen.
     const [safCur, safPrv] = await Promise.all([
       Transaction.aggregate([
         {
           $match: {
             createdAt: { $gte: since },
-            type: { $in: passthroughTypes },
             status: { $in: ['completed', 'verified'] },
+            paychainFee: { $gt: 0 },
             ...excludeReversed,
             ...excludeDemo,
           },
         },
-        {
-          $addFields: {
-            _saf: {
-              $switch: {
-                branches: safaricomBranches,
-                default: SAFARICOM_TARIFF[SAFARICOM_TARIFF.length - 1].fee,
-              },
-            },
-          },
-        },
-        { $group: { _id: null, fees: { $sum: '$_saf' }, count: { $sum: 1 } } },
+        { $group: { _id: null, fees: { $sum: '$safaricomFee' }, count: { $sum: 1 } } },
       ]),
       Transaction.aggregate([
         {
           $match: {
             createdAt: { $gte: prevSince, $lt: since },
-            type: { $in: passthroughTypes },
             status: { $in: ['completed', 'verified'] },
+            paychainFee: { $gt: 0 },
             ...excludeReversed,
             ...excludeDemo,
           },
         },
-        {
-          $addFields: {
-            _saf: {
-              $switch: {
-                branches: safaricomBranches,
-                default: SAFARICOM_TARIFF[SAFARICOM_TARIFF.length - 1].fee,
-              },
-            },
-          },
-        },
-        { $group: { _id: null, fees: { $sum: '$_saf' } } },
+        { $group: { _id: null, fees: { $sum: '$safaricomFee' } } },
       ]),
     ]);
     const safaricomFees     = Math.round((safCur[0]?.fees || 0) * 100) / 100;
@@ -430,105 +411,7 @@ export const getRevenue = async (req, res) => {
       { $sort: { net: -1 } },
     ]);
 
-    // ─── Sweep batches — week-by-week roll-up of accumulated PayChain
-    // fees, presented as the settlement-batch log finance teams expect.
-    // Gross/Costs/Net are derived on the fly from fees data (so they always
-    // exactly match the headline KPIs), but `status` is looked up from the
-    // real services/revenueSweepService.js RevenueSweep records below — it
-    // used to be guessed purely from "is this the current/most-recently-
-    // finished week", which could show "Pending Bank Clearing" on a week
-    // whose real sweep attempt had already come back 'skipped' or 'failed'.
-    // The real sweep runs on its own "since last attempt" cadence, not
-    // aligned to calendar weeks, so a week can have zero, one, or several
-    // real attempts — matched below by whichever real attempt's periodEnd
-    // falls inside that ISO week.
-    const sweepAgg = await Transaction.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: since },
-          status: { $in: ['completed', 'verified'] },
-          paychainFee: { $gt: 0 },
-          ...excludeReversed,
-          ...excludeDemo,
-        },
-      },
-      {
-        $group: {
-          _id: { yr: { $isoWeekYear: '$createdAt' }, wk: { $isoWeek: '$createdAt' } },
-          gross: { $sum: '$paychainFee' },
-          costs: { $sum: '$safaricomFee' },
-          count: { $sum: 1 },
-          first: { $min: '$createdAt' },
-          last:  { $max: '$createdAt' },
-        },
-      },
-      { $sort: { '_id.yr': -1, '_id.wk': -1 } },
-      { $limit: 24 },
-    ]);
-
     const now = new Date();
-    // ISO week of "now" — approximate to flag the current accruing week.
-    const isoNow = (() => {
-      const d = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
-      const dayN = (d.getUTCDay() + 6) % 7;
-      d.setUTCDate(d.getUTCDate() - dayN + 3);
-      const firstThu = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
-      const wk = 1 + Math.round(((d - firstThu) / 86400000 - 3 + ((firstThu.getUTCDay() + 6) % 7)) / 7);
-      return { yr: d.getUTCFullYear(), wk };
-    })();
-
-    // Inverse of the isoNow computation above: given an ISO (year, week),
-    // return that week's real Monday 00:00:00 -> Sunday 23:59:59.999 UTC
-    // boundary, for matching real RevenueSweep attempts to the week they
-    // actually happened in.
-    function isoWeekBounds(isoYear, isoWeek) {
-      const jan4 = new Date(Date.UTC(isoYear, 0, 4));
-      const jan4Day = (jan4.getUTCDay() + 6) % 7; // 0 = Monday
-      const monday = new Date(jan4);
-      monday.setUTCDate(jan4.getUTCDate() - jan4Day + (isoWeek - 1) * 7);
-      const sunday = new Date(monday);
-      sunday.setUTCDate(monday.getUTCDate() + 6);
-      sunday.setUTCHours(23, 59, 59, 999);
-      return { start: monday, end: sunday };
-    }
-
-    // Real sweep attempts (services/revenueSweepService.js) covering this
-    // window — matched below to whichever ISO week each attempt's
-    // periodEnd actually falls in. Sorted newest-first so the first match
-    // per week is the most recent attempt, if a week had more than one.
-    const realSweeps = await RevenueSweep.find({ periodEnd: { $gte: since } })
-      .sort({ periodEnd: -1 })
-      .lean();
-
-    const sweepBatches = sweepAgg.map((row) => {
-      const isCurrent = row._id.yr === isoNow.yr && row._id.wk === isoNow.wk;
-      const { start: weekStart, end: weekEnd } = isoWeekBounds(row._id.yr, row._id.wk);
-      const realSweep = realSweeps.find((s) => s.periodEnd >= weekStart && s.periodEnd <= weekEnd);
-
-      let status = 'Accruing';
-      let note = null;
-      if (realSweep) {
-        status = { completed: 'Settled to Corporate', failed: 'Failed', skipped: 'Skipped' }[realSweep.status] || realSweep.status;
-        note = realSweep.status === 'completed' ? realSweep.ncbaReference : realSweep.failureReason;
-      } else if (!isCurrent) {
-        status = 'No Sweep Attempted';
-      }
-
-      const id = `SWP-${row._id.yr}W${String(row._id.wk).padStart(2, '0')}`;
-      const gross = Math.round(row.gross * 100) / 100;
-      const costs = Math.round(row.costs * 100) / 100;
-      return {
-        id,
-        period: { from: row.first, to: row.last },
-        gross,
-        costs,
-        net: Math.round((gross - costs) * 100) / 100,
-        count: row.count,
-        status,
-        note,
-        destination: status === 'Settled to Corporate' ? CORPORATE_DESTINATION : '— (held in FBO)',
-      };
-    });
 
     // ─── Wait for stream aggregates and roll up totals ─────────────────
     const streams = await Promise.all(streamJobs);
@@ -613,7 +496,6 @@ export const getRevenue = async (req, res) => {
         series,
         topMerchants: topMerchantsAgg,
         channels: channelAgg,
-        sweepBatches,
         corporateDestination: CORPORATE_DESTINATION,
       },
     });
@@ -626,9 +508,12 @@ export const getRevenue = async (req, res) => {
 // @desc    Real sweep history — actual PesaLink transfers of PayChain's
 //          accrued fee revenue out of the pooled NCBA paybill into
 //          PayChain's own account (see services/revenueSweepService.js).
-//          Distinct from `sweepBatches` above, which is a projected/accrual
-//          estimate re-derived from transaction fees on every request; this
-//          is the real settlement record.
+//          The only sweep record surfaced to admin — a projected/estimated
+//          weekly batch view used to sit alongside this, re-derived from
+//          transaction fees on every request, but it duplicated (and could
+//          silently disagree with) this real settlement record while adding
+//          little the Cash Position "Held in FBO · Unswept" figure and this
+//          history don't already cover, so it was removed.
 // @route   GET /api/admin/revenue/sweeps
 // @access  Private (Admin)
 export const getRevenueSweeps = async (req, res) => {

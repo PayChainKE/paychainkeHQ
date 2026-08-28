@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import api from '../api/api';
 import { formatKES as fmtKES } from '../utils/formatCurrency';
@@ -118,20 +118,27 @@ const Overview = () => {
   const [fx, setFx] = useState(null);
   const [fxLoading, setFxLoading] = useState(true);
   const [fxError, setFxError] = useState(null);
+  const [networkVolume, setNetworkVolume] = useState(null);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [waitlistRes, messagesRes, analyticsRes, insightsRes] = await Promise.all([
+      const [waitlistRes, messagesRes, analyticsRes, insightsRes, revenueRes] = await Promise.all([
         api.get('/api/waitlist'),
         api.get('/api/contact'),
         api.get('/api/admin/merchants/analytics').catch(() => ({ data: { data: null } })),
         api.get('/api/admin/insights?range=30d').catch(() => ({ data: { data: null } })),
+        // Same /api/admin/revenue endpoint the Revenue page reads its KPI
+        // strip from (range=all = since launch) — reused as-is rather than
+        // computed separately here, so this card can never drift from the
+        // real revenue numbers elsewhere in admin.
+        api.get('/api/admin/revenue', { params: { range: 'all' } }).catch(() => ({ data: { data: null } })),
       ]);
       setWaitlist(Array.isArray(waitlistRes.data) ? waitlistRes.data : []);
       setMessages(Array.isArray(messagesRes.data) ? messagesRes.data : []);
       setMerchantAnalytics(analyticsRes.data?.data || null);
       setInsights(insightsRes.data?.data || null);
+      setNetworkVolume(revenueRes.data?.data?.kpis || null);
     } catch (err) {
       console.error('Error fetching overview data:', err);
     } finally {
@@ -246,6 +253,50 @@ const Overview = () => {
             <p className="text-sm font-semibold text-on-surface tracking-tight">{new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })}</p>
           </div>
         </div>
+
+        <section>
+          <div className="flex items-center gap-3 mb-4 text-slate-400">
+            <span className="text-2xs font-bold uppercase tracking-widest font-label">Platform Growth</span>
+            <div className="flex-1 h-[1px] bg-outline-variant/10"></div>
+            <Link to="/revenue" className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 hover:text-on-surface transition-colors">
+              Full Revenue Report →
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
+            {/* All-time GMV — the headline growth number. Sourced from the
+                same /api/admin/revenue endpoint (range=all) the Revenue page
+                itself uses, so this can never show a different figure than
+                the page an admin would click through to for detail. */}
+            <div className="bg-gradient-to-br from-[#06201B] via-[#0a3029] to-[#0f3a30] p-4 md:p-6 rounded-xl border border-emerald-900/40 flex flex-col gap-1 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-400/10 rounded-full -mr-10 -mt-10 blur-2xl pointer-events-none"></div>
+              <span className="text-2xs font-bold text-emerald-200/70 uppercase tracking-widest">Total Volume Processed · All-Time</span>
+              <div className="flex items-baseline gap-2 mt-1">
+                {loading
+                  ? <Skel className="w-32 h-9 bg-white/10" />
+                  : <span className="text-2xl md:text-4xl font-bold text-white tracking-tighter tabular-nums">{fmtKES(networkVolume?.gmv ?? 0)}</span>}
+              </div>
+              <p className="text-2xs text-emerald-200/50 mt-1">Every shilling moved through PayChain since launch</p>
+            </div>
+            <div className="bg-surface-container-lowest p-4 md:p-6 rounded-xl border border-outline-variant/20 flex flex-col gap-1 transition-all hover:scale-[1.01] hover:shadow-sm">
+              <span className="text-xs font-medium text-on-surface-variant/60">Total Transactions · All-Time</span>
+              <div className="flex items-baseline gap-2 mt-1">
+                {loading
+                  ? <Skel className="w-20 h-8" />
+                  : <span className="text-xl md:text-3xl font-semibold text-on-surface tracking-tighter tabular-nums">{(networkVolume?.totalCount ?? 0).toLocaleString()}</span>}
+              </div>
+              <p className="text-2xs text-on-surface-variant/60 mt-1">Successful, verified transactions only</p>
+            </div>
+            <div className="bg-surface-container-lowest p-4 md:p-6 rounded-xl border border-outline-variant/20 flex flex-col gap-1 transition-all hover:scale-[1.01] hover:shadow-sm">
+              <span className="text-xs font-medium text-on-surface-variant/60">Net Platform Revenue · All-Time</span>
+              <div className="flex items-baseline gap-2 mt-1">
+                {loading
+                  ? <Skel className="w-24 h-8" />
+                  : <span className="text-xl md:text-3xl font-semibold text-on-surface tracking-tighter tabular-nums">{fmtKES(networkVolume?.netRevenue ?? 0)}</span>}
+              </div>
+              <p className="text-2xs text-on-surface-variant/60 mt-1">After Safaricom/NCBA pass-through costs</p>
+            </div>
+          </div>
+        </section>
 
         <section>
           <div className="flex items-center gap-3 mb-4 text-slate-400">
