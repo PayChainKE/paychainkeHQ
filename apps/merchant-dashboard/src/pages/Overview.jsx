@@ -16,7 +16,7 @@ import FundAccountModal from '../components/modals/FundAccountModal'
 export default function Overview() {
   const navigate = useNavigate()
   const { showAmounts, togglePrivacy } = usePrivacyMode()
-  const { merchant } = useMerchantAuth()
+  const { merchant, liveEventAt } = useMerchantAuth()
   
   const [liveTransactions, setLiveTransactions] = useState([])
   const [isLoading, setIsLoading] = useState(true)
@@ -59,12 +59,23 @@ export default function Overview() {
     else setIsLoading(false)
   }, [merchant, fetchData])
 
-  // Poll every 5s so revenue chart and recent transactions stay live
+  // Poll every 5s so revenue chart and recent transactions stay live —
+  // fallback for whatever the live push below doesn't catch (e.g. a stream
+  // reconnect gap).
   useEffect(() => {
     if (!merchant) return
     const interval = setInterval(fetchData, 3000)
     return () => clearInterval(interval)
   }, [merchant, fetchData])
+
+  // Live push — refetch immediately the instant PayChain changes anything
+  // on this account (see MerchantAuthContext's SSE connection), instead of
+  // waiting up to 3s for the poll above.
+  useEffect(() => {
+    if (!merchant || !liveEventAt) return
+    fetchData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveEventAt])
 
   // Also refresh instantly when the user returns to the tab
   useEffect(() => {

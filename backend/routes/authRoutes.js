@@ -40,7 +40,8 @@ import {
   completeProfileWalkthrough,
   completeTransactionsWalkthrough
 } from '../controllers/merchantAuthController.js';
-import { protectMerchant, protectDeveloper } from '../middleware/authMiddleware.js';
+import { protectMerchant, protectMerchantSSE, protectDeveloper } from '../middleware/authMiddleware.js';
+import { registerMerchantEventClient } from '../utils/merchantEventStream.js';
 import { upload } from '../utils/cloudinary.js';
 import {
   registerDeveloper,
@@ -199,6 +200,30 @@ router.post('/merchant/sign-out-all-devices', protectMerchant, signOutAllDevices
 // local token clear that leaves the JWT valid until its 30-day expiry.
 router.post('/merchant/logout', protectMerchant, signOutAllDevices);
 router.get('/merchant/me', protectMerchant, getMerchantMe);
+
+// Live dashboard updates (Server-Sent Events) — mirrors the admin
+// dashboard's identical stream (routes/adminRoutes.js#/events/stream). The
+// merchant frontend opens one long-lived connection per session and gets a
+// pushed event the instant something changes on their own account (a
+// transaction settles, a notification arrives — see
+// utils/merchantEventStream.js's call sites), so the dashboard can refetch
+// immediately instead of waiting on its next poll interval.
+router.get('/merchant/events/stream', protectMerchantSSE, (req, res) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no', // disable nginx/proxy response buffering, if any sits in front
+  });
+  res.write('\n');
+  const unregister = registerMerchantEventClient(req.merchant._id, res);
+  // res.on('close'), not req.on('close') — see adminRoutes.js's identical
+  // comment: the request stream reports 'close' as soon as it's done being
+  // read (essentially immediately on a bodyless GET), long before the
+  // client actually disconnects. res's 'close' event is the one that
+  // actually reflects the response connection closing.
+  res.on('close', unregister);
+});
 router.put('/merchant/profile', protectMerchant, updateMerchantProfile);
 router.put('/merchant/biometrics', protectMerchant, toggleBiometrics);
 router.put('/merchant/pwa-installed', protectMerchant, reportPwaInstalled);

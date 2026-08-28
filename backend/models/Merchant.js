@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { generateRandomMerchantCode } from '../utils/ncbaValidators.js';
 import RetiredMerchantCode from './RetiredMerchantCode.js';
 import { normalizeKraPin, isValidKraPin, KRA_PIN_FORMAT_HINT } from '../utils/kraPinValidator.js';
+import { broadcastMerchantEvent } from '../utils/merchantEventStream.js';
 
 const merchantSchema = new mongoose.Schema({
   name: {
@@ -754,6 +755,26 @@ merchantSchema.pre('save', async function() {
 merchantSchema.methods.matchPassword = async function(enteredPassword) {
   return await bcrypt.compare(String(enteredPassword).trim(), this.password);
 };
+
+// Live-push the merchant dashboard/web app the instant this merchant's own
+// record changes, however it changed — an admin action (KYC verdict,
+// verification status, business name correction, install reminder,
+// flag/unflag, feature toggle) or the merchant's own request (Bulk Pay's
+// balance debit, profile edit). Deliberately broadcasts on every save
+// rather than trying to detect which fields actually changed and whether
+// they're dashboard-visible — same trade-off Transaction.js's identical
+// hook already accepts: an occasional redundant refetch costs one harmless
+// extra request, far cheaper than auditing every one of the ~15 admin
+// mutation points (and every future one) to remember to broadcast
+// individually. Frontend just needs "something changed, go refetch," never
+// the actual document. Never let a broadcast failure break the save.
+merchantSchema.post('save', function(doc) {
+  try {
+    broadcastMerchantEvent(doc._id, 'profile', {});
+  } catch (err) {
+    console.error('Merchant event broadcast failed:', err?.message || err);
+  }
+});
 
 const Merchant = mongoose.model('Merchant', merchantSchema);
 
