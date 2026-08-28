@@ -1371,6 +1371,14 @@ export const initiateB2B = async (req, res) => {
     // reqTransactionReferenceNo values containing special characters (per
     // Rose, NCBA support, 2026-08-27).
     const transactionId = `PAYOUTB2B${Date.now()}${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    // NCBA's Lipa na M-Pesa endpoint needs reqMobileNumber in 254XXXXXXXXX
+    // form, not merchant.phone's stored 07XXXXXXXX (per Rose, NCBA support)
+    // — every other NCBA Open Banking rail in this file already normalizes
+    // its own msisdn field the same way; this one was the exception. Falls
+    // back to the raw value on a malformed phone rather than blocking the
+    // payout over a notification-only field.
+    let notifyMobileNumber = merchant.phone;
+    try { notifyMobileNumber = validatePhoneNumber(merchant.phone); } catch { /* left as raw */ }
 
     try {
       await ncbaSubmitLnmPayment({
@@ -1380,7 +1388,7 @@ export const initiateB2B = async (req, res) => {
         amount: numericAmount,
         accountReference: paymentType === 'Paybill' ? accountReference : undefined,
         recipientName,
-        notifyMobileNumber: merchant.phone,
+        notifyMobileNumber,
         narration: reference || `Payout to ${partyB}`,
       });
     } catch (ncbaErr) {
@@ -1414,7 +1422,7 @@ export const initiateB2B = async (req, res) => {
                 payBillTillNo: partyB,
                 accountReference: paymentType === 'Paybill' ? accountReference : undefined,
                 recipientName,
-                notifyMobileNumber: merchant.phone,
+                notifyMobileNumber,
                 narration: reference || `Payout to ${partyB}`,
               }
             : null,

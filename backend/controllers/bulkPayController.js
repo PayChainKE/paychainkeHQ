@@ -585,6 +585,16 @@ export const authorizeBatch = async (req, res) => {
     }
     merchant.kesBalance = debitedMerchant.kesBalance;
 
+    // NCBA's Lipa na M-Pesa endpoint needs reqMobileNumber in 254XXXXXXXXX
+    // form, not merchant.phone's stored 07XXXXXXXX (per Rose, NCBA support)
+    // — same normalization the KPLC/NCWSC/Mobile B2W branches below already
+    // apply per-payee via ncbaMsisdn. merchant is fixed for the whole batch,
+    // so this is computed once rather than per row. Falls back to the raw
+    // value on a malformed phone rather than blocking the payout over a
+    // notification-only field.
+    let merchantNotifyMobileNumber = merchant.phone;
+    try { merchantNotifyMobileNumber = validatePhoneNumber(merchant.phone); } catch { /* left as raw */ }
+
     const transactions = [];
     let refundAmount = 0;
     // Rows whose local bookkeeping (Transaction.create, the fee-correction
@@ -846,7 +856,7 @@ export const authorizeBatch = async (req, res) => {
               amount: row.netAmount,
               accountReference: paymentType === 'Paybill' ? payee.businessAccount : undefined,
               recipientName: payee.name,
-              notifyMobileNumber: merchant.phone,
+              notifyMobileNumber: merchantNotifyMobileNumber,
               narration: `Bulk Payout to ${payee.name}`,
             });
             // Async rail — payoutStatus stays 'pending' (its default above),

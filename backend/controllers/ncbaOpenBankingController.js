@@ -11,6 +11,7 @@ import {
   NcbaOpenBankingValidationError,
   NcbaOpenBankingRequestError,
 } from '../services/ncbaOpenBankingService.js';
+import { validatePhoneNumber } from '../utils/ncbaValidators.js';
 import DeveloperPayment from '../models/DeveloperPayment.js';
 import { publicDeveloperPayment } from '../utils/developerPaymentView.js';
 import { dispatchDeveloperEvent } from '../services/webhookDeliveryService.js';
@@ -425,12 +426,17 @@ export async function executeNcbaLipaNaMpesaPayout({ merchantId, paymentType, pa
   // Rose, NCBA support, 2026-08-27).
   const transactionId = `PAYOUTAPI${Date.now()}${Math.floor(Math.random() * 1000)}`;
   const resolvedPaymentType = paymentType === 'paybill' ? 'Paybill' : 'Till';
+  // NCBA's Lipa na M-Pesa endpoint needs reqMobileNumber in 254XXXXXXXXX
+  // form, not the stored 07XXXXXXXX (per Rose, NCBA support) — same
+  // normalization applied at every other submitLipaNaMpesaPayment call site.
+  let notifyMobileNumber = reservedMerchant.phone;
+  try { notifyMobileNumber = validatePhoneNumber(reservedMerchant.phone); } catch { /* left as raw */ }
   try {
     await submitLipaNaMpesaPayment({
       transactionId, paymentType: resolvedPaymentType, payBillTillNo, amount: numericAmount,
       accountReference: resolvedPaymentType === 'Paybill' ? accountReference : undefined,
       recipientName: null,
-      notifyMobileNumber: reservedMerchant.phone,
+      notifyMobileNumber,
       narration: narration || 'Developer API payout',
     });
   } catch (err) {
