@@ -672,6 +672,11 @@ export default function SendMoney() {
                     {Number(amount) < 50 ? 'Amount must be at least KES 50' : 'Amount cannot exceed KES 250,000 per transaction'}
                   </p>
                 )}
+                {Number(amount) > 0 && fee > 0 && (
+                  <p className="text-[11px] font-bold text-slate-400">
+                    Transaction cost: {formatKES(fee)}
+                  </p>
+                )}
                 {Number(amount) > 0 && (
                   <p className={`text-[11px] font-bold ${Number(amount) + fee > balance ? 'text-red-500' : 'text-emerald-600'}`}>
                     Total deduction: {formatKES(totalAmount)}
@@ -753,6 +758,7 @@ export default function SendMoney() {
                     ['Recipient',   formatPhoneDisplay(recipientAccount)],
                     ...(isB2bDest && paybillAccountRef ? [['Account Number', paybillAccountRef]] : []),
                     ['Amount',      formatKES(amount || 0)],
+                    ...(fee > 0 ? [['Transaction Cost', formatKES(fee)]] : []),
                     ...(reference ? [['Reference', reference]] : []),
                   ].map(([k, v]) => (
                     <div key={k} className="flex justify-between items-start gap-4 px-5 py-3">
