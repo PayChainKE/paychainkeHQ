@@ -8,6 +8,7 @@ import { formatAccountNumber } from '../utils/formatAccountNumber'
 import EditableField from '../components/modals/EditableField'
 import UploadableDocRow from '../components/modals/UploadableDocRow'
 import ResetContactModal from '../components/modals/ResetContactModal';
+import { useToast } from '../context/ToastContext';
 
 const PAGE_SIZE = 20;
 
@@ -1151,6 +1152,7 @@ const KYC_DOC_TYPES = [
 ];
 
 const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated }) => {
+  const { showToast } = useToast();
   const [updatingFeatures, setUpdatingFeatures] = React.useState(false);
   // Transient placeholder only, shown for the split second before the
   // useEffect below syncs from the real merchant.features (which the
@@ -1333,9 +1335,12 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
       const res = await api.post(`/api/admin/merchants/${merchant._id}/send-install-reminder`);
       if (res.data.success) {
         setPwaInstallReminderSentAt(res.data.pwaInstallReminderSentAt);
+        showToast(`Install link sent to ${merchant.phone || 'the merchant'}.`, 'success');
       }
     } catch (err) {
-      setInstallReminderError(err.response?.data?.error || 'Failed to send the install reminder.');
+      const msg = err.response?.data?.error || 'Failed to send the install reminder.';
+      setInstallReminderError(msg);
+      showToast(msg, 'error');
     } finally {
       setSendingInstallReminder(false);
     }

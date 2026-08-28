@@ -59,7 +59,7 @@ const AuditLogSchema = new mongoose.Schema({
   //   critical / warning  →  21 days  (security events, longer retention)
   //   info    / success   →  14 days  (routine auth events)
   // Existing documents without this field are unaffected by the TTL index.
-  expiresAt: { type: Date, default: null, index: true },
+  expiresAt: { type: Date, default: null },
 }, { timestamps: true });
 
 // Compound index — the most common query is "this merchant's recent activity".

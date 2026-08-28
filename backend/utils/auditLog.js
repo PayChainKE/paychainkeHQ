@@ -32,13 +32,17 @@ export function detectPlatform(req) {
   return 'unknown';
 }
 
-// Retention windows by severity.
-// critical/warning events are kept longer because they are security-relevant.
+// Retention windows by severity. Was 14/21 days — far too short for "the
+// audit log shows all merchant activity" to hold true in practice, since
+// MongoDB's TTL index (AuditLog.js) physically deletes a document once its
+// expiresAt passes, regardless of what date range an admin selects.
+// Extended to a real archival window; critical/warning still outlive
+// success/info since they're the security-relevant ones.
 const RETENTION_MS = {
-  critical: 21 * 24 * 60 * 60 * 1000,  // 21 days
-  warning:  21 * 24 * 60 * 60 * 1000,  // 21 days
-  success:  14 * 24 * 60 * 60 * 1000,  // 14 days
-  info:     14 * 24 * 60 * 60 * 1000,  // 14 days
+  critical: 730 * 24 * 60 * 60 * 1000, // 2 years
+  warning:  730 * 24 * 60 * 60 * 1000, // 2 years
+  success:  365 * 24 * 60 * 60 * 1000, // 1 year
+  info:     365 * 24 * 60 * 60 * 1000, // 1 year
 };
 
 // Fire-and-forget audit write. Never throws — if Mongo is down or the schema
