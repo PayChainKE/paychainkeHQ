@@ -303,13 +303,13 @@ const Overview = () => {
               <p className="text-2xs text-on-surface-variant/60 mt-1">Successful, verified transactions only</p>
             </div>
             <div className="bg-surface-container-lowest p-4 md:p-6 rounded-xl border border-outline-variant/20 flex flex-col gap-1 transition-all hover:scale-[1.01] hover:shadow-sm">
-              <span className="text-xs font-medium text-on-surface-variant/60">Net Platform Revenue · All-Time</span>
+              <span className="text-xs font-medium text-on-surface-variant/60">Platform Revenue · All-Time</span>
               <div className="flex items-baseline gap-2 mt-1">
                 {loading
                   ? <Skel className="w-24 h-8" />
                   : <span className="text-xl md:text-3xl font-semibold text-on-surface tracking-tighter tabular-nums">{fmtKES(networkVolume?.netRevenue ?? 0)}</span>}
               </div>
-              <p className="text-2xs text-on-surface-variant/60 mt-1">After Safaricom/NCBA pass-through costs</p>
+              <p className="text-2xs text-on-surface-variant/60 mt-1">What PayChain actually earns and keeps</p>
             </div>
           </div>
         </section>

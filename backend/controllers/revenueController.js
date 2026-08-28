@@ -235,7 +235,10 @@ export const getRevenue = async (req, res) => {
       node.total = Math.round((node.total + rev) * 100) / 100;
       node.gmv = Math.round((node.gmv + gmv) * 100) / 100;
       node.cost = Math.round((node.cost + cost) * 100) / 100;
-      node.net = Math.round((node.total - node.cost) * 100) / 100;
+      // 'total' (paychainFee) is already net of 'cost' (safaricomFee) — see
+      // the channelAgg $project stage above for the full explanation. 'net'
+      // mirrors 'total', not total-minus-cost.
+      node.net = node.total;
     }
     const series = Array.from(seriesMap.values());
 
@@ -405,7 +408,17 @@ export const getRevenue = async (req, res) => {
           gmv:   { $round: ['$gmv', 2] },
           gross: { $round: ['$gross', 2] },
           costs: { $round: ['$costs', 2] },
-          net:   { $round: [{ $subtract: ['$gross', '$costs'] }, 2] },
+          // 'gross' (Transaction.paychainFee) is PayChain's markup ALREADY
+          // net of the Safaricom/NCBA pass-through cost — see
+          // ncbaLedgerService.js#creditNcbaCollection's doc comment and
+          // utils/feeCalculator.js: 'costs' (safaricomFee) is money that
+          // passed through PayChain to the network partner and was never
+          // PayChain's revenue to begin with, so it must NOT be subtracted
+          // from 'gross' a second time here. 'net' therefore just mirrors
+          // 'gross' — kept as its own field (rather than removed) so this
+          // table's own column header can stay "Net Margin" without every
+          // consumer needing to know gross and net are now the same number.
+          net:   { $round: ['$gross', 2] },
           count: '$count',
         },
       },
@@ -479,8 +492,20 @@ export const getRevenue = async (req, res) => {
           grossChange:   pctChange(totalRevenue, prevTotalRevenue),
           networkCosts:  safaricomFees,
           costsChange:   pctChange(safaricomFees, safaricomFeesPrev),
-          netRevenue:    Math.round((totalRevenue - safaricomFees) * 100) / 100,
-          netChange:     pctChange(totalRevenue - safaricomFees, prevTotalRevenue - safaricomFeesPrev),
+          // totalRevenue (Σ Transaction.paychainFee) is PayChain's markup
+          // ALREADY net of the Safaricom/NCBA pass-through cost — see
+          // ncbaLedgerService.js#creditNcbaCollection's doc comment ("markup
+          // alone is... the number the admin Revenue dashboard reports as
+          // PayChain's actual earned revenue") and utils/feeCalculator.js.
+          // networkCosts (safaricomFee) is money that passed through
+          // PayChain to Safaricom/NCBA and was never PayChain's revenue to
+          // begin with, so it must not be subtracted a second time here —
+          // doing so previously understated real revenue (showed KES 96
+          // when PayChain's actual, sweepable earned revenue was KES 121,
+          // confirmed by summing real completed sweeps + what's still
+          // unswept in services/revenueSweepService.js#computeExpectedPoolBalance).
+          netRevenue:    Math.round(totalRevenue * 100) / 100,
+          netChange:     pctChange(totalRevenue, prevTotalRevenue),
 
           // Legacy fields (kept for existing consumers / charts).
           totalRevenue: Math.round(totalRevenue * 100) / 100,
