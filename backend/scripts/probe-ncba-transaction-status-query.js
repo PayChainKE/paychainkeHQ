@@ -1,7 +1,16 @@
 // One-off diagnostic: check whether NCBA's TransactionStatusQuery endpoint
-// actually works in production, and what it returns for the two Lipa na
-// M-Pesa transfers currently stuck 'pending' (Till 3305603). Read-only —
-// a status query, never a payment submission.
+// actually works in production, and what it returns for the Lipa na M-Pesa
+// transfers currently stuck 'pending' (Till 3305603, Brantech Solutions).
+// Read-only — a status query, never a payment submission.
+//
+// Re-pointed 2026-08-28 at the real transactions from today's live test
+// (confirmed by the recipient as actually received, but PayChain's own
+// Transaction record is still 'pending' — NCBA's settlement callback never
+// arrived, same unreliable-callback pattern already seen on Mobile B2W).
+// The two IDs this script previously hardcoded were from an earlier attempt
+// that used hyphenated references, before Rose (NCBA) confirmed
+// reqTransactionReferenceNo can't contain hyphens — not representative of
+// the current, fixed code path, so this checks the current, real ones.
 //
 // Run on Render (Shell tab, already has real env vars in process.env):
 //   node backend/scripts/probe-ncba-transaction-status-query.js
@@ -17,11 +26,16 @@ if (!baseUrl || !subscriptionKey || !userId || !password) {
   process.exit(1);
 }
 
-// The two stuck transactionIds from today's B2B Lipa na M-Pesa submissions
-// (reqTransactionReferenceNo sent in the original submit payload).
+// Today's real Lipa na M-Pesa submissions (reqTransactionReferenceNo sent in
+// the original submit payload) — the first is the real Send Money payout
+// (Transaction still shows 'pending' in our DB); the other two are the raw
+// test-script runs, both confirmed settled via NCBA's account-notification
+// debit feed (ncba_account_notification_debit_ignored in the logs) even
+// though nothing in our own system ever marked them resolved.
 const transactionIds = [
-  'PAYOUT-B2B-1787699132172-FDLRZ', // 200 KES, submitted 23:05:33
-  'PAYOUT-B2B-1787699520290-JHIWQ', // 150 KES, submitted 23:12:01
+  'PAYOUTB2B178792940952583B30',  // 10 KES, Brantech Send Money, submitted 15:03:32 — still 'pending' in our DB
+  'TEST-B2B-1787928897665',       // 50 KES, raw test script (old phone format), confirmed debited
+  'TEST-B2B-1787929295910',       // 50 KES, raw test script (254 phone format), confirmed debited
 ];
 
 async function getToken() {
