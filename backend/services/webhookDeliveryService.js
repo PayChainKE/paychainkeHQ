@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import axios from 'axios';
 import DeveloperWebhook from '../models/DeveloperWebhook.js';
 import WebhookDelivery from '../models/WebhookDelivery.js';
+import { assertPublicHttpsUrl } from '../utils/urlSsrfGuard.js';
 
 // The full set of events a developer can subscribe a webhook to. Enterprise
 // integrations (a CRM syncing payment records, an ISP auto-reconnecting a
@@ -37,6 +38,20 @@ async function attemptDelivery(delivery, webhook) {
   let response = null;
   let networkError = null;
   try {
+    // Re-checked on every single delivery attempt, not just at
+    // registration (createWebhook/updateWebhook already call this too) —
+    // a URL that resolved to a public IP when the developer registered it
+    // can be repointed at an internal address (169.254.169.254, 127.0.0.1,
+    // an RFC1918 range) at any later moment simply by changing that
+    // domain's DNS record, since the developer controls it. Without
+    // re-validating here, every subsequent real payment event would fire
+    // an authenticated outbound POST from PayChain's own backend straight
+    // at whatever that hostname now resolves to — a classic DNS-rebinding
+    // SSRF, and the automatic retry schedule below would keep re-arming it
+    // for hours. This call makes that structurally impossible: the
+    // destination is re-resolved and re-checked immediately before every
+    // attempt, registration-time validation alone was never enough.
+    await assertPublicHttpsUrl(webhook.url);
     response = await axios.post(webhook.url, rawBody, {
       timeout: DELIVERY_TIMEOUT_MS,
       headers: {
