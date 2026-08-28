@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Layout from '../components/layout/Layout';
 import api from '../api/api';
 import { useAuth } from '../context/AuthContext';
@@ -51,6 +51,12 @@ const PoolReconciliation = () => {
 
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(true);
+
+  const [merchantBalances, setMerchantBalances] = useState([]);
+  const [merchantBalancesTotal, setMerchantBalancesTotal] = useState(0);
+  const [merchantBalancesLoading, setMerchantBalancesLoading] = useState(true);
+  const [merchantSearch, setMerchantSearch] = useState('');
+  const [exportingBalances, setExportingBalances] = useState(false);
 
   const [reportedBalance, setReportedBalance] = useState('');
   const [note, setNote] = useState('');
@@ -106,17 +112,30 @@ const PoolReconciliation = () => {
     }
   }, []);
 
-  useEffect(() => { fetchExpected(); fetchLive(); fetchHistory(); }, [fetchExpected, fetchLive, fetchHistory]);
+  const fetchMerchantBalances = useCallback(async (silent = false) => {
+    if (!silent) setMerchantBalancesLoading(true);
+    try {
+      const res = await api.get('/api/admin/merchants/balances');
+      setMerchantBalances(res.data?.data || []);
+      setMerchantBalancesTotal(res.data?.total ?? 0);
+    } catch (e) {
+      if (!silent) { setMerchantBalances([]); setMerchantBalancesTotal(0); }
+    } finally {
+      if (!silent) setMerchantBalancesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchExpected(); fetchLive(); fetchHistory(); fetchMerchantBalances(); }, [fetchExpected, fetchLive, fetchHistory, fetchMerchantBalances]);
 
   // Ledger-derived figures + history refresh instantly on any real-time
   // platform event (see context/AuthContext.jsx's SSE connection), plus a
   // 30s fallback poll — matches Revenue.jsx's live-refresh convention.
   useEffect(() => {
-    const id = setInterval(() => { fetchExpected(true); fetchHistory(true); }, 30_000);
-    const onSync = () => { fetchExpected(true); fetchHistory(true); };
+    const id = setInterval(() => { fetchExpected(true); fetchHistory(true); fetchMerchantBalances(true); }, 30_000);
+    const onSync = () => { fetchExpected(true); fetchHistory(true); fetchMerchantBalances(true); };
     window.addEventListener('paychain:sync', onSync);
     return () => { clearInterval(id); window.removeEventListener('paychain:sync', onSync); };
-  }, [fetchExpected, fetchHistory]);
+  }, [fetchExpected, fetchHistory, fetchMerchantBalances]);
 
   // Live NCBA balance — its own slower, independent cadence (see fetchLive's
   // doc comment above for why this isn't tied to paychain:sync).
@@ -147,6 +166,36 @@ const PoolReconciliation = () => {
       setSubmitting(false);
     }
   }, [reportedBalance, note, showToast]);
+
+  const exportMerchantBalancesCsv = useCallback(async () => {
+    setExportingBalances(true);
+    try {
+      const res = await api.get('/api/admin/merchants/balances/export', { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `paychain-merchant-balances-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      showToast('Could not download merchant balances.');
+    } finally {
+      setExportingBalances(false);
+    }
+  }, [showToast]);
+
+  const filteredMerchantBalances = useMemo(() => {
+    const q = merchantSearch.trim().toLowerCase();
+    if (!q) return merchantBalances;
+    return merchantBalances.filter((m) =>
+      (m.businessName || '').toLowerCase().includes(q) ||
+      (m.name || '').toLowerCase().includes(q) ||
+      (m.email || '').toLowerCase().includes(q) ||
+      (m.phone || '').toLowerCase().includes(q)
+    );
+  }, [merchantBalances, merchantSearch]);
 
   const liveDiscrepancy = (live?.available && expected)
     ? Math.round((live.balance - expected.expectedPoolBalance) * 100) / 100
@@ -288,6 +337,91 @@ const PoolReconciliation = () => {
             )}
             <p className="text-2xs text-on-surface-variant/60">PayChain's own fee revenue, collected but not yet swept to the corporate account.</p>
           </div>
+        </section>
+
+        {/* ── Merchant Balances — what's owed to each merchant, individually,
+            never mixed with PayChain's own revenue. A record an admin can
+            pull up and export during a dispute. ─────────────────────── */}
+        <section>
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-4">
+            <div>
+              <h3 className="text-base font-bold text-on-surface tracking-tight font-headline">Merchant Balances</h3>
+              <p className="text-xs text-on-surface-variant mt-1 max-w-2xl">
+                Every merchant's current KES balance — real money PayChain holds on their behalf, not PayChain's own revenue.
+                This is the record to check first if a merchant disputes what they're owed.
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <input
+                type="text"
+                value={merchantSearch}
+                onChange={(e) => setMerchantSearch(e.target.value)}
+                placeholder="Search merchant, email, phone…"
+                className="w-56 bg-surface-container border border-outline-variant/40 rounded-md px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary"
+              />
+              <button
+                onClick={exportMerchantBalancesCsv}
+                disabled={exportingBalances}
+                title="Download every merchant's balance as a timestamped CSV record"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-surface-container border border-outline-variant/40 text-on-surface text-2xs font-bold uppercase tracking-widest hover:bg-surface-container-high transition-colors disabled:opacity-50 whitespace-nowrap"
+              >
+                <span className="material-symbols-outlined text-sm">{exportingBalances ? 'progress_activity' : 'download'}</span>
+                {exportingBalances ? 'Preparing…' : 'Download CSV'}
+              </button>
+            </div>
+          </div>
+          <div className="bg-surface-container-lowest border border-outline-variant/40 rounded-lg overflow-hidden">
+            {merchantBalancesLoading ? (
+              <div className="p-8"><Skel className="w-full h-32" /></div>
+            ) : filteredMerchantBalances.length === 0 ? (
+              <div className="p-12 text-center text-on-surface-variant text-xs">
+                {merchantSearch ? 'No merchants match that search.' : 'No merchants yet.'}
+              </div>
+            ) : (
+              <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-surface-container/70 border-b border-outline-variant/40 sticky top-0">
+                    <tr className="text-2xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+                      <th className="text-left px-5 py-3">Business</th>
+                      <th className="text-left px-3 py-3">Contact</th>
+                      <th className="text-left px-3 py-3">Status</th>
+                      <th className="text-right px-5 py-3">KES Balance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredMerchantBalances.map((m) => (
+                      <tr key={m._id} className="border-b border-outline-variant/40 last:border-b-0 hover:bg-surface-container/70 transition-colors">
+                        <td className="px-5 py-3.5">
+                          <div className="font-bold text-on-surface">{m.businessName || '—'}</div>
+                          <div className="text-2xs text-on-surface-variant">{m.name || ''}</div>
+                        </td>
+                        <td className="px-3 py-3.5 text-on-surface-variant">
+                          <div>{m.email || '—'}</div>
+                          <div className="text-2xs">{m.phone || ''}</div>
+                        </td>
+                        <td className="px-3 py-3.5">
+                          <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded border text-2xs font-bold uppercase tracking-wider ${
+                            m.status === 'locked' ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                          }`}>
+                            {m.status || 'active'}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3.5 text-right font-bold text-on-surface tabular-nums">{formatKES(m.kesBalance || 0)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+          {!merchantBalancesLoading && merchantBalances.length > 0 && (
+            <div className="mt-3 flex items-center justify-between px-4 py-3 bg-surface-container-lowest border border-outline-variant/40 rounded-md text-2xs">
+              <span className="text-on-surface-variant">
+                {merchantSearch ? `${filteredMerchantBalances.length} of ${merchantBalances.length} merchants shown` : `${merchantBalances.length} merchants`}
+              </span>
+              <span className="text-on-surface-variant">Σ Total <span className="text-on-surface font-bold">{formatKES(merchantBalancesTotal)}</span></span>
+            </div>
+          )}
         </section>
 
         {/* ── Manual check ──────────────────────────────────────────── */}

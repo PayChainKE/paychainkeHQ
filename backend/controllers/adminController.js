@@ -220,6 +220,86 @@ export const getMerchants = async (req, res) => {
   }
 };
 
+// @desc    Every merchant's current KES balance — real money PayChain holds
+//          on their behalf, kept strictly separate from PayChain's own
+//          revenue. Lightweight on-screen counterpart to
+//          exportMerchantBalances below (JSON here, CSV there) — deliberately
+//          NOT reusing the much heavier getMerchants (which also computes
+//          30d/lifetime transaction volumes and risk signals this view has
+//          no use for).
+// @route   GET /api/admin/merchants/balances
+// @access  Private (Admin)
+export const getMerchantBalances = async (req, res) => {
+  try {
+    const merchants = await Merchant.find({ isDemoMerchant: { $ne: true } })
+      .select('businessName name email phone kesBalance ncbaMerchantCode status')
+      .sort('-kesBalance')
+      .lean();
+    const total = merchants.reduce((s, m) => s + (m.kesBalance || 0), 0);
+    res.json({ success: true, data: merchants, count: merchants.length, total: Math.round(total * 100) / 100 });
+  } catch (error) {
+    console.error('Get Merchant Balances Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Every merchant's current KES balance — real money PayChain holds
+//          on their behalf, kept strictly separate from PayChain's own
+//          revenue (see services/revenueSweepService.js#computeExpectedPoolBalance,
+//          whose merchantBalanceTotal this list sums to). A timestamped,
+//          exportable record an admin can pull up during a merchant dispute
+//          ("what does PayChain say we're owed as of this date") — the
+//          audit log entry below is what makes that record trustworthy.
+// @route   GET /api/admin/merchants/balances/export
+// @access  Private (Admin)
+export const exportMerchantBalances = async (req, res) => {
+  try {
+    // Demo merchant's simulated balance is not real money owed to anyone —
+    // must never appear on a record meant to settle a real dispute.
+    const merchants = await Merchant.find({ isDemoMerchant: { $ne: true } })
+      .select('businessName name email phone kesBalance ncbaMerchantCode status')
+      .sort('-kesBalance')
+      .lean();
+
+    const header = ['Business Name', 'Contact Name', 'Email', 'Phone', 'KES Balance', 'NCBA Merchant Code', 'Account Status'];
+    const cell = (v) => {
+      const s = v === null || v === undefined ? '' : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const rows = merchants.map((m) => [
+      m.businessName || '',
+      m.name || '',
+      m.email || '',
+      m.phone || '',
+      (m.kesBalance || 0).toFixed(2),
+      m.ncbaMerchantCode || '',
+      m.status || '',
+    ].map(cell).join(','));
+
+    const total = merchants.reduce((s, m) => s + (m.kesBalance || 0), 0);
+    const csv = [
+      header.map(cell).join(','),
+      ...rows,
+      '',
+      cell(`Total owed to ${merchants.length} merchants as of ${new Date().toISOString()}`) + ',,,,' + cell(total.toFixed(2)),
+    ].join('\r\n');
+
+    logAudit({
+      action: 'admin.merchant_balances.exported', category: 'admin', severity: 'info',
+      message: `Exported ${merchants.length} merchant balance records as CSV (total KES ${total.toFixed(2)})`,
+      actor: adminActor(req.admin), req,
+      metadata: { count: merchants.length, total },
+    });
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="paychain-merchant-balances-${new Date().toISOString().slice(0, 10)}.csv"`);
+    res.send(csv);
+  } catch (error) {
+    console.error('Export Merchant Balances Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
 // @desc    Request a sensitive admin action against a merchant. Mints a
 //          6-digit OTP that is bound (action + targetId) and emailed to the
 //          admin's own address. The OTP can only confirm THIS action against
