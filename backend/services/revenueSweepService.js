@@ -124,7 +124,13 @@ async function computeUnsweptRevenue() {
 // other than a merchant's own withdrawal or the revenue sweep itself.
 export async function computeExpectedPoolBalance() {
   const [merchantAgg, { unswept, transactionCount }] = await Promise.all([
-    Merchant.aggregate([{ $group: { _id: null, total: { $sum: '$kesBalance' }, count: { $sum: 1 } } }]),
+    // Demo merchant's simulated kesBalance is not real money PayChain owes
+    // anyone — must never inflate what the pool is expected to hold, same
+    // discipline computeUnsweptRevenue below already applies to fee revenue.
+    Merchant.aggregate([
+      { $match: { isDemoMerchant: { $ne: true } } },
+      { $group: { _id: null, total: { $sum: '$kesBalance' }, count: { $sum: 1 } } },
+    ]),
     computeUnsweptRevenue(),
   ]);
 

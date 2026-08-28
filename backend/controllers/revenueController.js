@@ -4,8 +4,9 @@ import RevenueSweep from '../models/RevenueSweep.js';
 import BankReconciliation from '../models/BankReconciliation.js';
 import { REVENUE_STREAMS } from '../config/revenueRateCard.js';
 import { LIVE_DATA_CUTOFF } from '../config/liveDataCutoff.js';
-import { runRevenueSweep, REVENUE_SWEEP_DESTINATION } from '../services/revenueSweepService.js';
+import { runRevenueSweep, REVENUE_SWEEP_DESTINATION, computeExpectedPoolBalance } from '../services/revenueSweepService.js';
 import { recordReconciliation } from '../services/reconciliationService.js';
+import { getNcbaAccountBalance } from '../services/ncbaOpenBankingService.js';
 import { reversedTransactionExclusionMatch } from '../utils/reversedTransactions.js';
 import { excludeDemoMerchantsMatch } from '../utils/demoMerchantExclusion.js';
 import { logAudit } from '../utils/auditLog.js';
@@ -665,6 +666,48 @@ export const triggerRevenueSweep = async (req, res) => {
   } catch (error) {
     console.error('Trigger Revenue Sweep Error:', error);
     res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    What the pooled NCBA account SHOULD contain right now, per
+//          PayChain's own ledger — every merchant's real balance (money
+//          PayChain owes back to merchants) plus PayChain's own accrued-
+//          but-not-yet-swept fee revenue. Read-only, no side effects
+//          (unlike submitReconciliation below, this never writes a
+//          BankReconciliation record) — safe to call on every page load.
+// @route   GET /api/admin/revenue/pool-balance/expected
+// @access  Private (Admin)
+export const getExpectedPoolBalance = async (req, res) => {
+  try {
+    const data = await computeExpectedPoolBalance();
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('Get Expected Pool Balance Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Live pooled-account balance straight from NCBA's AccountDetails
+//          endpoint — never called anywhere in this codebase before now,
+//          so its response shape isn't confirmed (see
+//          services/ncbaOpenBankingService.js#getNcbaAccountBalance's doc
+//          comment). Always returns 200 with `available: false` on any
+//          failure (auth error, network error, unparseable response) —
+//          this must never break the reconciliation page, since the manual
+//          entry flow below is the proven fallback the whole reconciliation
+//          system was originally built around.
+// @route   GET /api/admin/revenue/pool-balance/live
+// @access  Private (Admin)
+export const getLivePoolBalance = async (req, res) => {
+  try {
+    const { raw, balance } = await getNcbaAccountBalance();
+    if (balance === null) {
+      return res.json({ success: true, data: { available: false, raw, reason: 'Could not identify a balance field in NCBA\'s response — see raw response.' } });
+    }
+    res.json({ success: true, data: { available: true, balance, raw, fetchedAt: new Date() } });
+  } catch (error) {
+    console.error('Get Live Pool Balance Error:', error);
+    res.json({ success: true, data: { available: false, reason: error.message } });
   }
 };
 

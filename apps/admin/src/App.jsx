@@ -24,6 +24,7 @@ import AuditLog from './pages/AuditLog';
 import TransactionAudit from './pages/TransactionAudit';
 import Security from './pages/Security';
 import Revenue from './pages/Revenue';
+import PoolReconciliation from './pages/PoolReconciliation';
 import Bookkeeping from './pages/Bookkeeping';
 import TaxCompliance from './pages/TaxCompliance';
 import SmsBroadcast from './pages/SmsBroadcast';
@@ -63,6 +64,7 @@ export default function App(){
             <Route path="/ledger" element={<Protected><Ledger/></Protected>} />
             <Route path="/stk-monitor" element={<Protected><StkMonitor/></Protected>} />
             <Route path="/revenue" element={<Protected><Revenue/></Protected>} />
+            <Route path="/pool-reconciliation" element={<Protected><PoolReconciliation/></Protected>} />
             <Route path="/kyc-verification" element={<Protected><KycVerification/></Protected>} />
             <Route path="/kyc-verification/:id" element={<Protected><KycApplicationDetail/></Protected>} />
             <Route path="/bookkeeping" element={<Protected><Bookkeeping/></Protected>} />

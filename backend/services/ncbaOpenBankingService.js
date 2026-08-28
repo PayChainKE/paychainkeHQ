@@ -297,6 +297,57 @@ function assertTransferAmountInBounds(amount) {
  * @param {string} [params.debitAccount] - defaults to PayChain's own NCBA account
  * @returns {{ destName: string, banks: Array<{ bankName: string, sortCode: string, isDefault: boolean, lookupBankName: string }> }}
  */
+/**
+ * Fetches live account details (incl. balance) for a PayChain NCBA account
+ * — /api/v1/AccountDetails/accountdetails, from "API documents/Open Banking
+ * V2- Callback Enabled.postman_collection.json". Unlike every payment rail
+ * in this file, nothing has ever called this endpoint in production before
+ * — its response shape is unconfirmed (the Postman collection's saved
+ * example has an empty body), so this returns the RAW response verbatim
+ * rather than assuming a field name, alongside a best-effort `balance`
+ * extracted by scanning common candidate field names. Callers (the pool
+ * reconciliation page) must treat `balance: null` as "could not confirm
+ * NCBA's live balance" and fall back to the ledger-derived expected figure,
+ * never silently show 0 or a guessed field as if it were real — same
+ * "don't invent a number to fill a gap" rule as everywhere else this
+ * session's NCBA integrations have hit an unreliable/unknown response.
+ *
+ * @param {object} [params]
+ * @param {string} [params.accountNo] - defaults to PayChain's own NCBA account
+ * @returns {{ raw: object, balance: number|null }}
+ */
+export async function getNcbaAccountBalance({ accountNo } = {}) {
+  const acct = accountNo || ncbaOpenBankingAccountNumber;
+  if (!acct) {
+    throw new NcbaOpenBankingValidationError('No NCBA account number configured');
+  }
+
+  if (!liveCallsEnabled) {
+    return { raw: simulate('ncba_openbanking_account_details_sandbox', { accountNo: acct }), balance: null };
+  }
+
+  const raw = await ncbaOpenBankingPost('/api/v1/AccountDetails/accountdetails', { country: 'KE', accountNo: acct });
+
+  // Scan both the top-level response and a nested `data` object (the same
+  // "don't trust one exact key spelling" defensiveness submitMobileB2wPayment
+  // already applies to success/message fields) for anything balance-shaped.
+  const candidates = [raw, raw?.data].filter(Boolean);
+  const balanceKeys = ['availableBalance', 'ledgerBalance', 'accountBalance', 'balance', 'currentBalance', 'clearBalance'];
+  let balance = null;
+  for (const obj of candidates) {
+    for (const key of balanceKeys) {
+      const v = obj?.[key];
+      if (typeof v === 'number' || (typeof v === 'string' && v.trim() !== '' && !isNaN(Number(v)))) {
+        balance = Number(v);
+        break;
+      }
+    }
+    if (balance !== null) break;
+  }
+
+  return { raw, balance };
+}
+
 export async function validatePesaLinkMobileNumber({ phoneNumber, debitAccount }) {
   if (!phoneNumber) {
     throw new NcbaOpenBankingValidationError('phoneNumber is required to validate a PesaLink-registered mobile number');

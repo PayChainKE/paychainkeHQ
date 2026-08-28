@@ -74,7 +74,7 @@ import {
 import { runWalletAudit } from '../controllers/walletAuditController.js';
 import { adminListInvoices } from '../controllers/invoiceController.js';
 import { sendSmsBroadcast, getSmsBroadcasts, deleteSmsBroadcast, clearSmsBroadcasts } from '../controllers/smsBroadcastController.js';
-import { getRevenue, getRevenueSweeps, archiveRevenueSweep, unarchiveRevenueSweep, exportRevenueSweeps, triggerRevenueSweep, getReconciliations, submitReconciliation } from '../controllers/revenueController.js';
+import { getRevenue, getRevenueSweeps, archiveRevenueSweep, unarchiveRevenueSweep, exportRevenueSweeps, triggerRevenueSweep, getReconciliations, submitReconciliation, getExpectedPoolBalance, getLivePoolBalance } from '../controllers/revenueController.js';
 import { adminListStuckOpenBankingPayouts, adminResolveStuckOpenBankingPayout } from '../controllers/ncbaOpenBankingController.js';
 import { adminListCashAdvanceRequests, adminUpdateCashAdvanceRequest } from '../controllers/cashAdvanceController.js';
 import {
@@ -191,9 +191,13 @@ router.post('/revenue/sweeps/run', protect, requireMutator, sensitiveActionLimit
 router.patch('/revenue/sweeps/:id/archive', protect, requireMutator, sensitiveActionLimiter, archiveRevenueSweep);
 router.patch('/revenue/sweeps/:id/unarchive', protect, requireMutator, sensitiveActionLimiter, unarchiveRevenueSweep);
 
-// Manual bank reconciliation — no NCBA API exists to pull the real pooled
-// account balance automatically, so an admin pastes it in periodically and
-// this flags any gap against what the ledger expects.
+// Pool reconciliation — what the pooled NCBA account should contain per
+// PayChain's own ledger (read-only, always available) vs. a live pull from
+// NCBA's own AccountDetails endpoint (best-effort — unconfirmed response
+// shape, may report unavailable) vs. the manual paste-in-and-compare flow
+// that predates the live pull and remains the proven fallback.
+router.get('/revenue/pool-balance/expected', protect, excludeOfficer, getExpectedPoolBalance);
+router.get('/revenue/pool-balance/live', protect, excludeOfficer, getLivePoolBalance);
 router.get('/revenue/reconciliations', protect, excludeOfficer, getReconciliations);
 router.post('/revenue/reconciliations', protect, requireMutator, sensitiveActionLimiter, submitReconciliation);
 

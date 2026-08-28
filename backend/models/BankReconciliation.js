@@ -1,11 +1,14 @@
 import mongoose from 'mongoose';
 
-// One row per manual reconciliation check — there's no NCBA API to pull the
-// real pooled account balance automatically (no such endpoint exists in
-// their Open Banking integration), so an admin pastes in the real balance
-// from NCBA's own statement/online banking, and this records what PayChain's
-// own ledger expected it to be at that moment, so any gap is visible and
-// timestamped rather than only discovered during a manual audit.
+// One row per manual reconciliation check. NCBA does have an AccountDetails
+// endpoint that can report a live balance (see
+// services/ncbaOpenBankingService.js#getNcbaAccountBalance) but it had never
+// been called from this codebase before that was wired up, so its response
+// is not yet trusted as a sole source — this manual flow (admin pastes in
+// the real balance from NCBA's own statement/online banking) remains the
+// proven fallback/cross-check, and this records what PayChain's own ledger
+// expected it to be at that moment, so any gap is visible and timestamped
+// rather than only discovered during a manual audit.
 const bankReconciliationSchema = new mongoose.Schema({
   reportedBalance: { type: Number, required: true },
   merchantBalanceTotal: { type: Number, required: true },
