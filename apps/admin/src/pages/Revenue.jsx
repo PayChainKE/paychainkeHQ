@@ -24,11 +24,12 @@ const PAGE_SIZE = 25;
  * @property {number} gmvChange       % change vs previous period
  * @property {number} grossRevenue    Total transaction fees collected
  * @property {number} grossChange
- * @property {number} networkCosts    Pass-through fees paid to networks
+ * @property {number} networkCosts    Pass-through fees paid to networks — informational only, NOT deducted from grossRevenue (see revenueController.js's doc comment on why paychainFee is already net of this)
  * @property {number} costsChange
- * @property {number} netRevenue      grossRevenue - networkCosts
+ * @property {number} netRevenue      Mirrors grossRevenue — kept for legacy consumers, not a second (lower) number
  * @property {number} netChange
- * @property {number} takeRate        netRevenue / gmv × 100
+ * @property {number} sweptThisPeriod Real completed, non-simulated RevenueSweep total within this window
+ * @property {number} takeRate        grossRevenue / gmv × 100
  * @property {number} projectedARR    Linear run-rate annualised
  *
  * @typedef {Object} RevenueChannel
@@ -60,6 +61,7 @@ const CHANNEL_META = {
   'Mobile Money':       { icon: 'smartphone',   dot: '#10B981' },
   'On-Chain (Stellar)': { icon: 'token',        dot: '#3B82F6' },
   'Bank Transfer':      { icon: 'account_balance', dot: '#F59E0B' },
+  'Bill Payments':      { icon: 'receipt_long', dot: '#8B5CF6' },
 };
 
 // ── Formatters ────────────────────────────────────────────────────────
@@ -166,11 +168,14 @@ const Skel = ({ className = 'w-16 h-7' }) => (
 // version of "see volume and margin together". Colors are the dataviz
 // skill's validated categorical slots 1–4 (blue/orange/yellow/aqua),
 // assigned once per metric and never reassigned on interaction.
+// No separate "Net Revenue" entry — Transaction.paychainFee (the 'total'/
+// 'gross' series below) is already net of Safaricom/NCBA pass-through cost,
+// so a net line would just redraw the same values as Platform Revenue. See
+// the KPI strip's own doc comment above for the full explanation.
 const CHART_METRICS = {
-  gmv:   { key: 'gmv',   label: 'GMV',           color: '#2a78d6' },
-  gross: { key: 'total', label: 'Gross Fees',    color: '#eb6834' },
-  costs: { key: 'cost',  label: 'Network Costs', color: '#eda100' },
-  net:   { key: 'net',   label: 'Net Revenue',   color: '#1baf7a' },
+  gmv:   { key: 'gmv',   label: 'GMV',               color: '#2a78d6' },
+  gross: { key: 'total', label: 'Platform Revenue',  color: '#eb6834' },
+  costs: { key: 'cost',  label: 'Network Costs',     color: '#eda100' },
 };
 
 // "Nice" axis ticks (0, 20k, 40k, ...) rather than raw fractions of the max.
@@ -377,6 +382,37 @@ const Revenue = () => {
 
   useEffect(() => { fetchRevenue(); }, [fetchRevenue]);
 
+  // True current unswept balance — Σ paychainFee since launch minus every
+  // real completed sweep, exactly what services/revenueSweepService.js
+  // physically owes the corporate account right now (same figure the Pool
+  // Reconciliation page shows as "PayChain Unswept Revenue"). Deliberately
+  // NOT derived from `range` above: this is a live running balance, not a
+  // period-windowed figure, so it stays correct no matter which date
+  // range is selected (a period-scoped "Money In − Money Out" version of
+  // this used to live here and could disagree with reality by tens of
+  // shillings on any range narrower than "All Time" — see the Cash
+  // Position card below).
+  const [unsweptNow, setUnsweptNow] = useState(null);
+  const [unsweptNowLoading, setUnsweptNowLoading] = useState(true);
+  const fetchUnsweptNow = useCallback(async (silent = false) => {
+    if (!silent) setUnsweptNowLoading(true);
+    try {
+      const res = await api.get('/api/admin/revenue/pool-balance/expected');
+      setUnsweptNow(res.data?.data?.unsweptRevenue ?? null);
+    } catch (e) {
+      if (!silent) setUnsweptNow(null);
+    } finally {
+      if (!silent) setUnsweptNowLoading(false);
+    }
+  }, []);
+  useEffect(() => { fetchUnsweptNow(); }, [fetchUnsweptNow]);
+  useEffect(() => {
+    const id = setInterval(() => fetchUnsweptNow(true), 30_000);
+    const onSync = () => fetchUnsweptNow(true);
+    window.addEventListener('paychain:sync', onSync);
+    return () => { clearInterval(id); window.removeEventListener('paychain:sync', onSync); };
+  }, [fetchUnsweptNow]);
+
   // Real sweep history — every actual RevenueSweep attempt (see
   // services/revenueSweepService.js), independent of `range` above since
   // it's a full log, not a windowed revenue figure.
@@ -507,17 +543,11 @@ const Revenue = () => {
   // collected into the pooled FBO account (kpis.grossRevenue, already
   // period-scoped); Money Out is what real RevenueSweep attempts actually
   // moved out of it into the corporate account within that same window —
-  // sourced from the full sweep log already loaded below, filtered to the
-  // period.
-  const moneyOut = useMemo(() => {
-    if (!data?.windowStart) return 0;
-    const since = new Date(data.windowStart).getTime();
-    return sweepHistory
-      .filter((s) => s.status === 'completed' && new Date(s.createdAt).getTime() >= since)
-      .reduce((sum, s) => sum + (s.amount || 0), 0);
-  }, [sweepHistory, data]);
+  // sourced server-side (kpis.sweptThisPeriod) rather than filtered from
+  // the sweep-history list below, which excludes archived rows and is
+  // capped at 500 and would silently undercount once either applied.
   const moneyIn = kpis.grossRevenue || 0;
-  const heldInFbo = Math.max(0, Math.round((moneyIn - moneyOut) * 100) / 100);
+  const moneyOut = kpis.sweptThisPeriod || 0;
 
   // The backend's own bucket resolution already varies by range (hourly for
   // 24h, daily for 7d/30d, monthly for 90d/ytd/all — see
@@ -646,15 +676,26 @@ const Revenue = () => {
               )}
             </div>
 
-            {/* Gross Platform Revenue */}
-            <div className="bg-surface-container-lowest p-5 flex flex-col gap-2">
+            {/* Platform Revenue — THE bottom line, what PayChain actually
+                earns and keeps. Transaction.paychainFee is stamped ALREADY
+                net of the Safaricom/NCBA pass-through cost (see
+                ncbaLedgerService.js#creditNcbaCollection's doc comment) —
+                this used to be shown as "Gross Platform Revenue" with a
+                separate, smaller "Net Revenue" card subtracting Network
+                Costs from it a second time, which understated PayChain's
+                real earned revenue (showed a number lower than what
+                genuinely reconciles against real completed sweeps + what's
+                still sitting unswept — see the Pool Reconciliation page).
+                Subtle emerald tint + accent border so it pops from its
+                siblings without sacrificing contrast on the dark figure. */}
+            <div className="bg-emerald-50 p-5 flex flex-col gap-2 relative border-l-2 border-emerald-500">
               <div className="flex items-center justify-between">
-                <span className="text-2xs font-bold text-on-surface-variant uppercase tracking-[0.18em]">Gross Platform Revenue</span>
-                <span className="material-symbols-outlined text-on-surface-variant/60 text-sm" title="Total fees collected at the take rate">request_quote</span>
+                <span className="text-2xs font-bold text-emerald-700 uppercase tracking-[0.18em]">Platform Revenue</span>
+                <span className="material-symbols-outlined text-emerald-700 text-sm" title="What PayChain actually earns and keeps — already net of Safaricom/NCBA pass-through costs">savings</span>
               </div>
               {loading
                 ? <Skel className="w-28 h-9" />
-                : <span className="text-3xl md:text-3xl font-bold text-on-surface tracking-tighter leading-none tabular-nums">{fmtKES(kpis.grossRevenue)}</span>}
+                : <span className="text-3xl md:text-4xl font-bold text-on-surface tracking-tighter leading-none tabular-nums">{fmtKES(kpis.grossRevenue)}</span>}
               {!loading && (
                 <div className="flex items-baseline gap-1.5 text-2xs">
                   <span className={`font-bold tabular-nums ${(kpis.grossChange || 0) >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
@@ -665,37 +706,35 @@ const Revenue = () => {
               )}
             </div>
 
-            {/* Network & Partner Costs */}
+            {/* Network & Partner Costs — informational only. This money was
+                paid by customers/merchants to Safaricom/NCBA directly for
+                using their rails — it passed through PayChain but was never
+                PayChain's revenue, and is NOT subtracted from Platform
+                Revenue above (that revenue is already net of it). */}
             <div className="bg-surface-container-lowest p-5 flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <span className="text-2xs font-bold text-on-surface-variant uppercase tracking-[0.18em]">Network &amp; Partner Costs</span>
-                <span className="material-symbols-outlined text-on-surface-variant/60 text-sm" title="Pass-through fees paid to networks (Safaricom, etc.)">output</span>
+                <span className="material-symbols-outlined text-on-surface-variant/60 text-sm" title="Passed through to Safaricom/NCBA — informational only, not deducted from Platform Revenue">output</span>
               </div>
               {loading
                 ? <Skel className="w-24 h-9" />
-                : <span className="text-3xl md:text-3xl font-bold text-on-surface tracking-tighter leading-none tabular-nums">−{fmtKES(kpis.networkCosts)}</span>}
-              <p className="text-2xs text-on-surface-variant">Paid to M-Pesa / banking rails</p>
+                : <span className="text-3xl md:text-3xl font-bold text-on-surface tracking-tighter leading-none tabular-nums">{fmtKES(kpis.networkCosts)}</span>}
+              <p className="text-2xs text-on-surface-variant">Paid to Safaricom/NCBA — not deducted from PayChain's revenue</p>
             </div>
 
-            {/* Net Revenue — THE bottom line. Subtle emerald tint + accent
-                border so it pops from its three siblings without sacrificing
-                contrast on the dark figure. */}
-            <div className="bg-emerald-50 p-5 flex flex-col gap-2 relative border-l-2 border-emerald-500">
+            {/* Take Rate — the margin %, previously buried under the old
+                "Net Revenue" card's change line. */}
+            <div className="bg-surface-container-lowest p-5 flex flex-col gap-2">
               <div className="flex items-center justify-between">
-                <span className="text-2xs font-bold text-emerald-700 uppercase tracking-[0.18em]">Net Revenue · Platform Margin</span>
-                <span className="material-symbols-outlined text-emerald-700 text-sm" title="Gross revenue minus partner costs — PayChain's actual margin">savings</span>
+                <span className="text-2xs font-bold text-on-surface-variant uppercase tracking-[0.18em]">Take Rate</span>
+                <span className="material-symbols-outlined text-on-surface-variant/60 text-sm" title="Platform Revenue as a share of GMV">percent</span>
               </div>
               {loading
-                ? <Skel className="w-28 h-9" />
-                : <span className="text-3xl md:text-4xl font-bold text-on-surface tracking-tighter leading-none tabular-nums">{fmtKES(kpis.netRevenue)}</span>}
-              {!loading && (
-                <div className="flex items-baseline gap-1.5 text-2xs">
-                  <span className={`font-bold tabular-nums ${(kpis.netChange || 0) >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
-                    {fmtChange(kpis.netChange)}
-                  </span>
-                  <span className="text-on-surface-variant">vs prev · take {fmtPct((kpis.netRevenue || 0) / Math.max(kpis.gmv || 1, 1) * 100, 2)}</span>
-                </div>
-              )}
+                ? <Skel className="w-20 h-9" />
+                : <span className="text-3xl md:text-3xl font-bold text-on-surface tracking-tighter leading-none tabular-nums">
+                    {fmtPct((kpis.grossRevenue || 0) / Math.max(kpis.gmv || 1, 1) * 100, 2)}
+                  </span>}
+              <p className="text-2xs text-on-surface-variant">Platform Revenue ÷ GMV</p>
             </div>
           </div>
         </section>
@@ -707,7 +746,8 @@ const Revenue = () => {
               <h3 className="text-base font-bold text-on-surface tracking-tight font-headline">Cash Position — {range === 'all' ? 'All Time' : 'This Period'}</h3>
               <p className="text-xs text-on-surface-variant mt-1">
                 What actually moved. Money In is fees collected into the pooled FBO account; Money Out is what real sweep attempts
-                (below) actually transferred to the corporate account in this window — not a projection.
+                (below) actually transferred to the corporate account in this window — not a projection. Held in FBO is the current
+                running balance and always reflects right now, independent of the period selected above.
               </p>
             </div>
           </div>
@@ -724,14 +764,15 @@ const Revenue = () => {
                 <span className="text-2xs font-bold text-on-surface-variant uppercase tracking-[0.18em]">Money Out · Swept to Corporate</span>
                 <span className="material-symbols-outlined text-blue-600 text-sm" title="Real completed RevenueSweep transfers out of the FBO account this period">north_east</span>
               </div>
-              {sweepHistoryLoading ? <Skel className="w-28 h-8" /> : <span className="text-2xl font-bold text-on-surface tracking-tighter tabular-nums">{fmtKES(moneyOut)}</span>}
+              {loading ? <Skel className="w-28 h-8" /> : <span className="text-2xl font-bold text-on-surface tracking-tighter tabular-nums">{fmtKES(moneyOut)}</span>}
             </div>
             <div className="bg-surface-container-lowest p-5 flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <span className="text-2xs font-bold text-on-surface-variant uppercase tracking-[0.18em]">Held in FBO · Unswept</span>
-                <span className="material-symbols-outlined text-on-surface-variant/60 text-sm" title="Collected but not yet swept out — Money In minus Money Out">account_balance</span>
+                <span className="material-symbols-outlined text-on-surface-variant/60 text-sm" title="Collected but not yet swept out — the current running balance, right now, regardless of the period selected above">account_balance</span>
               </div>
-              {loading || sweepHistoryLoading ? <Skel className="w-28 h-8" /> : <span className="text-2xl font-bold text-on-surface tracking-tighter tabular-nums">{fmtKES(heldInFbo)}</span>}
+              {unsweptNowLoading ? <Skel className="w-28 h-8" /> : <span className="text-2xl font-bold text-on-surface tracking-tighter tabular-nums">{fmtKES(unsweptNow)}</span>}
+              <Link to="/pool-reconciliation" className="text-2xs text-on-surface-variant hover:text-on-surface underline underline-offset-2 w-fit">Verify against real NCBA balance →</Link>
             </div>
           </div>
         </section>
@@ -812,8 +853,8 @@ const Revenue = () => {
           <div className="xl:col-span-2 bg-surface-container-lowest border border-outline-variant/40 rounded-lg p-5 md:p-6">
             <div className="flex items-start justify-between mb-5">
               <div>
-                <h3 className="text-sm font-bold text-on-surface tracking-tight">Net Margin by Payment Rail</h3>
-                <p className="text-2xs text-on-surface-variant mt-1">Which channel keeps the most after partner cuts.</p>
+                <h3 className="text-sm font-bold text-on-surface tracking-tight">Platform Revenue by Payment Rail</h3>
+                <p className="text-2xs text-on-surface-variant mt-1">Which channel earns PayChain the most. Network cost shown for context — it's paid to the partner, not deducted from this revenue.</p>
               </div>
             </div>
             {loading ? (
@@ -841,15 +882,15 @@ const Revenue = () => {
                         </div>
                         <div className="text-right">
                           <div className="text-xs font-bold text-on-surface tabular-nums">{fmtKESPrecise(c.net)}</div>
-                          <div className="text-2xs text-on-surface-variant tabular-nums">{fmtPct(margin, 2)} margin</div>
+                          <div className="text-2xs text-on-surface-variant tabular-nums">{fmtPct(margin, 2)} take rate</div>
                         </div>
                       </div>
                       <div className="h-1 bg-surface-container/70 rounded-full overflow-hidden">
                         <div className="h-full transition-all duration-500" style={{ width: `${pct}%`, background: meta.dot }} />
                       </div>
                       <div className="flex items-center justify-between mt-2 text-2xs text-on-surface-variant tabular-nums">
-                        <span>Gross {fmtKES(c.gross)}</span>
-                        <span>Costs −{fmtKES(c.costs)}</span>
+                        <span>Revenue {fmtKES(c.gross)}</span>
+                        <span>Network cost {fmtKES(c.costs)} (not deducted)</span>
                       </div>
                     </div>
                   );

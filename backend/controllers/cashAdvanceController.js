@@ -5,6 +5,7 @@ import { calculateTrustScore } from './trustScoreController.js';
 import { logAudit } from '../utils/auditLog.js';
 import { adminActor } from './adminController.js';
 import { getOrCreatePlatformSettings } from '../models/PlatformSettings.js';
+import { reversedTransactionExclusionMatch } from '../utils/reversedTransactions.js';
 
 const KES_VOL_REAL = {
   $ifNull: ['$kesAmount', { $cond: [{ $eq: ['$currency', 'USDC'] }, 0, '$amount'] }]
@@ -155,19 +156,38 @@ const toAdminShape = (app, statsByMerchant) => {
   };
 };
 
-// Batch-compute 30d inbound collections + settlement rate for a set of merchant ids.
+// Every transaction type that represents real money collected from a
+// customer into the merchant's own wallet (as opposed to money going out,
+// e.g. mpesa_b2c/ncba_mobile_b2w withdrawals, or bill/utility payouts) —
+// mirrors REVENUE_STREAMS' 'transaction_fee' (inbound) and
+// 'ncba_collection_fee' (ncba_inbound) streams in config/revenueRateCard.js,
+// PayChain's two live collection rails.
+const COLLECTION_TX_TYPES = ['inbound', 'ncba_inbound'];
+
+// Batch-compute 30d inbound collections + settlement rate for a set of
+// merchant ids — this feeds a real underwriting decision (adminUpdateCashAdvanceRequest
+// approves a limit against it), so it needs the same rigor as the revenue
+// dashboards: reversedTransactionExclusionMatch (see that function's doc
+// comment) excludes duplicate-credit/correction pairs from ever counting as
+// real collected revenue, same as every other revenue aggregation in the
+// codebase. Previously only counted type: 'inbound' — silently excluding
+// every NCBA Virtual Account collection (type: 'ncba_inbound', PayChain's
+// other live collection rail) from a merchant's apparent 30-day revenue,
+// which could make a genuinely strong applicant look like they collect
+// nothing.
 async function computeMerchantStats(merchantIds) {
   if (!merchantIds.length) return new Map();
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const excludeReversed = await reversedTransactionExclusionMatch();
 
   const rows = await Transaction.aggregate([
-    { $match: { merchantId: { $in: merchantIds }, createdAt: { $gte: thirtyDaysAgo } } },
+    { $match: { merchantId: { $in: merchantIds }, createdAt: { $gte: thirtyDaysAgo }, ...excludeReversed } },
     {
       $group: {
         _id: '$merchantId',
         count: { $sum: 1 },
         completed: { $sum: { $cond: [{ $in: ['$status', ['completed', 'verified']] }, 1, 0] } },
-        collections30d: { $sum: { $cond: [{ $eq: ['$type', 'inbound'] }, KES_VOL_REAL, 0] } },
+        collections30d: { $sum: { $cond: [{ $in: ['$type', COLLECTION_TX_TYPES] }, KES_VOL_REAL, 0] } },
       },
     },
   ]);

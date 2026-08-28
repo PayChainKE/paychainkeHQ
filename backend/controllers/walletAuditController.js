@@ -1,6 +1,8 @@
 import * as StellarSdk from '@stellar/stellar-sdk';
 import Merchant from '../models/Merchant.js';
 import { HORIZON_URL, USDC_ASSET_CODE, USDC_ISSUER_ADDRESS, STELLAR_NETWORK } from '../utils/stellarHelper.js';
+import { reversedTransactionExclusionMatch } from '../utils/reversedTransactions.js';
+import { excludeDemoMerchantsMatch } from '../utils/demoMerchantExclusion.js';
 
 const server = new StellarSdk.Horizon.Server(HORIZON_URL);
 
@@ -120,17 +122,33 @@ export const runWalletAudit = async (req, res) => {
       $ifNull: ['$usdcAmount', { $cond: [{ $eq: ['$currency', 'USDC'] }, '$amount', 0] }]
     };
 
+    // Same two safeguards every other real-money aggregation in the
+    // codebase applies (see reversedTransactionExclusionMatch's and
+    // excludeDemoMerchantsMatch's doc comments) — this page previously
+    // applied neither, so the demo merchant's simulated activity inflated
+    // "Total KES/USDC Volume" alongside real merchants, and a reversed
+    // duplicate-credit pair would have double-counted into whichever real
+    // merchant's lifetime volume it belonged to.
+    const [excludeReversed, excludeDemo] = await Promise.all([
+      reversedTransactionExclusionMatch(),
+      excludeDemoMerchantsMatch(),
+    ]);
+
     const volumeAgg = await Transaction.aggregate([
-      { $match: { status: { $in: ['completed', 'verified'] } } },
+      { $match: { status: { $in: ['completed', 'verified'] }, ...excludeReversed, ...excludeDemo } },
       { $group: { _id: null, kesVolume: { $sum: KES_VOL_REAL }, usdcVolume: { $sum: USDC_VOL_REAL } } }
     ]);
 
     const totalKesVolume = volumeAgg[0]?.kesVolume || 0;
     const totalUsdcVolume = volumeAgg[0]?.usdcVolume || 0;
 
-    // Fetch lifetime volumes per merchant
+    // Fetch lifetime volumes per merchant. merchantId's two conditions are
+    // merged (not spread separately) — excludeDemo also keys off
+    // merchantId, and a naive second spread would silently overwrite
+    // `$ne: null` instead of combining with it (see the identical note in
+    // revenueController.js's topMerchantsAgg).
     const merchantVols = await Transaction.aggregate([
-      { $match: { status: { $in: ['completed', 'verified'] }, merchantId: { $ne: null } } },
+      { $match: { status: { $in: ['completed', 'verified'] }, merchantId: { $ne: null, ...(excludeDemo.merchantId || {}) }, ...excludeReversed } },
       { $group: { _id: '$merchantId', kesVolume: { $sum: KES_VOL_REAL }, usdcVolume: { $sum: USDC_VOL_REAL } } }
     ]);
     const volMap = new Map();

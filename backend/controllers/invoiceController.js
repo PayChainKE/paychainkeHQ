@@ -532,11 +532,36 @@ export const adminListInvoices = async (req, res) => {
     // Per-document totals aren't stored (items can change while a draft is
     // edited), so the summary is computed via aggregation rather than a
     // stored field — keeps a single source of truth for "what's the total".
+    // Mirrors computeTotals()'s gross-minus-discount math exactly (same
+    // clamped discountRate) — this used to sum qty*price alone, ignoring
+    // discounts entirely, so an invoice with a real per-item discount (e.g.
+    // INV-000064, a KES 50 line fully discounted to KES 0) inflated every
+    // status summary card it fell into by its undiscounted gross instead of
+    // what the invoice actually bills for.
+    const COMPUTED_TOTAL_EXPR = {
+      $let: {
+        vars: {
+          gross: { $sum: { $map: { input: '$items', as: 'i', in: { $multiply: ['$$i.qty', '$$i.price'] } } } },
+          discount: {
+            $sum: {
+              $map: {
+                input: '$items', as: 'i',
+                in: {
+                  $multiply: [
+                    { $multiply: ['$$i.qty', '$$i.price'] },
+                    { $divide: [{ $min: [100, { $max: [0, { $ifNull: ['$$i.discountRate', 0] }] }] }, 100] },
+                  ],
+                },
+              },
+            },
+          },
+        },
+        in: { $subtract: ['$$gross', '$$discount'] },
+      },
+    };
     const totalsPipeline = [
       { $match: filter },
-      { $addFields: {
-        computedTotal: { $sum: { $map: { input: '$items', as: 'i', in: { $multiply: ['$$i.qty', '$$i.price'] } } } },
-      } },
+      { $addFields: { computedTotal: COMPUTED_TOTAL_EXPR } },
       { $group: { _id: '$status', count: { $sum: 1 }, totalAmount: { $sum: '$computedTotal' } } },
     ];
 
@@ -565,9 +590,7 @@ export const adminListInvoices = async (req, res) => {
       Invoice.aggregate(totalsPipeline),
       Invoice.aggregate([
         { $match: overdueMatch },
-        { $addFields: {
-          computedTotal: { $sum: { $map: { input: '$items', as: 'i', in: { $multiply: ['$$i.qty', '$$i.price'] } } } },
-        } },
+        { $addFields: { computedTotal: COMPUTED_TOTAL_EXPR } },
         { $group: { _id: null, count: { $sum: 1 }, totalAmount: { $sum: '$computedTotal' } } },
       ]),
     ]);

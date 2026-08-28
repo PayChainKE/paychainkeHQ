@@ -129,7 +129,7 @@ const Overview = () => {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [messagesRes, analyticsRes, insightsRes, revenueRes, poolExpectedRes, poolLiveRes] = await Promise.all([
+      const [messagesRes, analyticsRes, insightsRes, revenueRes, poolExpectedRes] = await Promise.all([
         api.get('/api/contact'),
         api.get('/api/admin/merchants/analytics').catch(() => ({ data: { data: null } })),
         api.get('/api/admin/insights?range=30d').catch(() => ({ data: { data: null } })),
@@ -138,17 +138,15 @@ const Overview = () => {
         // computed separately here, so this card can never drift from the
         // real revenue numbers elsewhere in admin.
         api.get('/api/admin/revenue', { params: { range: 'all' } }).catch(() => ({ data: { data: null } })),
-        // Pool Health snapshot — same endpoints the full Pool Reconciliation
-        // page uses, so this can never disagree with it.
+        // Expected pool balance — pure ledger math (our own DB), cheap
+        // enough to refresh on every sync event alongside everything else.
         api.get('/api/admin/revenue/pool-balance/expected').catch(() => ({ data: { data: null } })),
-        api.get('/api/admin/revenue/pool-balance/live').catch(() => ({ data: { data: null } })),
       ]);
       setMessages(Array.isArray(messagesRes.data) ? messagesRes.data : []);
       setMerchantAnalytics(analyticsRes.data?.data || null);
       setInsights(insightsRes.data?.data || null);
       setNetworkVolume(revenueRes.data?.data?.kpis || null);
       setPoolExpected(poolExpectedRes.data?.data || null);
-      setPoolLive(poolLiveRes.data?.data || null);
     } catch (err) {
       console.error('Error fetching overview data:', err);
     } finally {
@@ -162,6 +160,26 @@ const Overview = () => {
     window.addEventListener('paychain:sync', h);
     return () => window.removeEventListener('paychain:sync', h);
   }, [fetchAll]);
+
+  // Live NCBA balance — a real external API call (auth token + request to
+  // NCBA), unlike everything else on this page. Deliberately NOT wired to
+  // paychain:sync (that fires on every single transaction platform-wide —
+  // hammering NCBA's API that often risks rate limits for no real benefit,
+  // since the pool balance doesn't need to be that fresh). Polls on its own
+  // fixed, gentle cadence instead.
+  const fetchPoolLive = useCallback(async () => {
+    try {
+      const res = await api.get('/api/admin/revenue/pool-balance/live');
+      setPoolLive(res.data?.data || null);
+    } catch (e) {
+      setPoolLive({ available: false, reason: 'Request failed.' });
+    }
+  }, []);
+  useEffect(() => {
+    fetchPoolLive();
+    const id = setInterval(fetchPoolLive, 2 * 60_000);
+    return () => clearInterval(id);
+  }, [fetchPoolLive]);
 
   // Live FX rates. Both feeds are CORS-friendly + keyless. We never block
   // dashboard render on FX — if the call fails we show '—' and a small hint.
@@ -285,13 +303,13 @@ const Overview = () => {
               <p className="text-2xs text-on-surface-variant/60 mt-1">Successful, verified transactions only</p>
             </div>
             <div className="bg-surface-container-lowest p-4 md:p-6 rounded-xl border border-outline-variant/20 flex flex-col gap-1 transition-all hover:scale-[1.01] hover:shadow-sm">
-              <span className="text-xs font-medium text-on-surface-variant/60">Net Platform Revenue · All-Time</span>
+              <span className="text-xs font-medium text-on-surface-variant/60">Platform Revenue · All-Time</span>
               <div className="flex items-baseline gap-2 mt-1">
                 {loading
                   ? <Skel className="w-24 h-8" />
                   : <span className="text-xl md:text-3xl font-semibold text-on-surface tracking-tighter tabular-nums">{fmtKES(networkVolume?.netRevenue ?? 0)}</span>}
               </div>
-              <p className="text-2xs text-on-surface-variant/60 mt-1">After Safaricom/NCBA pass-through costs</p>
+              <p className="text-2xs text-on-surface-variant/60 mt-1">What PayChain actually earns and keeps</p>
             </div>
           </div>
         </section>

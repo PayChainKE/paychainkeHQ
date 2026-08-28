@@ -54,6 +54,20 @@ async function getRecentlyCreditedHold(merchantId) {
   return agg?.total || 0;
 }
 
+// Read-only counterpart to debitAvailableBalance, for surfacing "what can
+// I actually send right now" to the merchant BEFORE they try — without
+// this, the merchant-dashboard/mobile-app showed the full kesBalance as
+// "available," so a merchant who'd just been paid could see enough,
+// attempt a send, enter their PIN, and only then hit
+// debitAvailableBalance's rejection — the balance shown and the balance
+// enforced disagreed. Same conservative (gross, not net-of-fee) hold sum
+// as debitAvailableBalance, so the two can never disagree with each other.
+export async function getAvailableBalance(merchantId, kesBalance) {
+  const held = await getRecentlyCreditedHold(merchantId);
+  const availableBalance = Math.max(0, Math.round((kesBalance - held) * 100) / 100);
+  return { availableBalance, heldAmount: Math.round(held * 100) / 100 };
+}
+
 // Drop-in replacement for the
 // `Merchant.findOneAndUpdate({_id, kesBalance:{$gte:amount}}, {$inc:{kesBalance:-amount}})`
 // idiom used by every payout controller — same atomicity, same null-means-

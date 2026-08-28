@@ -859,7 +859,11 @@ export default function BulkPay() {
     .filter((id) => selectedPayees[id])
     .reduce((sum, id) => sum + (payoutAmounts[id] || 0), 0)
 
-  const balance = merchant?.kesBalance ?? 0
+  // availableBalance excludes anything credited in the last 2 minutes and
+  // still held server-side (backend/utils/availableBalance.js) — the same
+  // figure authorizeBatch's debitAvailableBalance actually enforces, so
+  // this warning can't disagree with what submitting the batch will do.
+  const balance = merchant?.availableBalance ?? merchant?.kesBalance ?? 0
   const isLiquidityLow = batchTotal > balance
 
   useEffect(() => {
@@ -1875,7 +1879,7 @@ export default function BulkPay() {
                   <h4 className="text-sm font-bold text-primary uppercase tracking-widest mb-6">Select Funding Source</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {[
-                      { id: 'TILL_1', name: merchant?.businessName || 'Main Business Till', balance: merchant?.kesBalance ?? 0, number: merchant?.paybillAccount || '852300' },
+                      { id: 'TILL_1', name: merchant?.businessName || 'Main Business Till', balance: merchant?.availableBalance ?? merchant?.kesBalance ?? 0, number: merchant?.paybillAccount || '852300' },
                     ].map(till => (
                       <div 
                         key={till.id}

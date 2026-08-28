@@ -16,15 +16,38 @@ import { adminActor } from './adminController.js';
 const RANGES = ['24h', '7d', '30d', '90d', 'ytd', 'all'];
 
 // Maps each transaction type to the user-facing payment rail used in the
-// channel breakdown. Mobile Money for M-Pesa-touching flows, On-Chain for
-// Stellar swaps, Bank Transfer for off-ramp settlements.
+// channel breakdown. Mobile Money for M-Pesa-touching flows (whether routed
+// via Safaricom Daraja or NCBA's Open Banking APIs — the customer/recipient
+// side is still an M-Pesa/Airtel wallet either way), On-Chain for Stellar
+// swaps, Bank Transfer for true bank-to-bank settlement/disbursement, Bill
+// Payments for utility billers. Previously only listed the 6 legacy Daraja-
+// era types (inbound/outbound/bulk_pay/settlement/fx_swap/mpesa_b2c),
+// silently dropping every NCBA-rail type below — with channelAgg's $match
+// also filtering on this list, that meant 8 of REVENUE_STREAMS' 13
+// tx-type groups (ncba_inbound, ncba_outbound, ncba_mobile_b2w, mpesa_b2b,
+// ncba_lipa_na_mpesa, ncba_kplc, ncba_kplc_prepaid, ncba_ncwsc) never
+// appeared in "Platform Revenue by Payment Rail" at all — confirmed live
+// on 2026-08-29 to be hiding KES 112 of KES 121 (93%) of real revenue from
+// that section, including the single largest current earner
+// (ncba_mobile_b2w). See the channelAgg $match below, which no longer
+// depends on this list being exhaustive (any type not mapped here still
+// counts, tagged 'Other' by the $switch's default branch) — kept as an
+// explicit map purely for accurate labeling, not as a revenue filter.
 const TYPE_TO_CHANNEL = {
-  inbound:    'Mobile Money',
-  outbound:   'Mobile Money',
-  bulk_pay:   'Mobile Money',
-  settlement: 'Bank Transfer',
-  fx_swap:    'On-Chain (Stellar)',
-  mpesa_b2c:  'Mobile Money',
+  inbound:            'Mobile Money',
+  mpesa_b2c:          'Mobile Money',
+  mpesa_b2b:          'Mobile Money',
+  ncba_mobile_b2w:    'Mobile Money',
+  ncba_lipa_na_mpesa: 'Mobile Money',
+  ncba_inbound:       'Mobile Money',
+  outbound:           'Mobile Money',
+  bulk_pay:           'Mobile Money',
+  settlement:         'Bank Transfer',
+  ncba_outbound:      'Bank Transfer',
+  ncba_kplc:          'Bill Payments',
+  ncba_kplc_prepaid:  'Bill Payments',
+  ncba_ncwsc:         'Bill Payments',
+  fx_swap:            'On-Chain (Stellar)',
 };
 
 // Corporate operating account where accumulated fees sweep to, shown on the
@@ -235,7 +258,10 @@ export const getRevenue = async (req, res) => {
       node.total = Math.round((node.total + rev) * 100) / 100;
       node.gmv = Math.round((node.gmv + gmv) * 100) / 100;
       node.cost = Math.round((node.cost + cost) * 100) / 100;
-      node.net = Math.round((node.total - node.cost) * 100) / 100;
+      // 'total' (paychainFee) is already net of 'cost' (safaricomFee) — see
+      // the channelAgg $project stage above for the full explanation. 'net'
+      // mirrors 'total', not total-minus-cost.
+      node.net = node.total;
     }
     const series = Array.from(seriesMap.values());
 
@@ -362,6 +388,23 @@ export const getRevenue = async (req, res) => {
     const safaricomFees     = Math.round((safCur[0]?.fees || 0) * 100) / 100;
     const safaricomFeesPrev = Math.round((safPrv[0]?.fees || 0) * 100) / 100;
 
+    // ─── Real money physically swept out of the pooled account this
+    // window — status:'completed', excluding simulated rows (never
+    // actually moved money; see RevenueSweep model's doc comment) and
+    // NOT filtered by `archived` (an admin "clearing" a sweep row from the
+    // history list is documented everywhere, including that action's own
+    // confirmation dialog, as display-only and must never change a real
+    // figure). The Cash Position card's "Money Out" used to be derived
+    // client-side by filtering the sweep-history list from GET
+    // /revenue/sweeps, which both excludes archived rows and is capped at
+    // 500 — silently undercounting the moment a completed sweep was
+    // archived, or the sweep count passed 500.
+    const sweptWindowAgg = await RevenueSweep.aggregate([
+      { $match: { status: 'completed', simulated: { $ne: true }, createdAt: { $gte: since } } },
+      { $group: { _id: null, total: { $sum: '$amount' } } },
+    ]);
+    const sweptThisPeriod = Math.round((sweptWindowAgg[0]?.total || 0) * 100) / 100;
+
     // ─── Channel breakdown — group revenue by payment rail. Each rail
     // shows GMV, gross fees, partner costs and net margin so finance can
     // see which channel actually pays the bills. Aggregation uses the
@@ -371,7 +414,21 @@ export const getRevenue = async (req, res) => {
         $match: {
           createdAt: { $gte: since },
           status: { $in: ['completed', 'verified'] },
-          type: { $in: Object.keys(TYPE_TO_CHANNEL) },
+          // Every revenue-stream type (same list seriesAgg/topMerchantsAgg
+          // above already use), not the old 6-key TYPE_TO_CHANNEL whitelist —
+          // that whitelist previously doubled as a filter too, silently
+          // dropping 8 of REVENUE_STREAMS' 13 tx-type groups (see
+          // TYPE_TO_CHANNEL's doc comment). An earlier attempt at this fix
+          // matched on `paychainFee: { $gt: 0 }` instead, which reconciles
+          // the *revenue* total correctly but silently drops real free-tier
+          // transactions (paychainFee legitimately 0, e.g. small inbound
+          // receipts under PayChain's fee-free band) from this table's GMV
+          // and transaction counts — confirmed live to be undercounting by
+          // 32 real transactions / KES 431 of processed volume. Matching on
+          // type instead (as seriesAgg/topMerchantsAgg already do) keeps
+          // GMV/count complete while zero-fee rows still correctly
+          // contribute KES 0 to `gross`.
+          type: { $in: REVENUE_STREAMS.flatMap((s) => s.txTypes) },
           ...excludeReversed,
           ...excludeDemo,
         },
@@ -405,7 +462,17 @@ export const getRevenue = async (req, res) => {
           gmv:   { $round: ['$gmv', 2] },
           gross: { $round: ['$gross', 2] },
           costs: { $round: ['$costs', 2] },
-          net:   { $round: [{ $subtract: ['$gross', '$costs'] }, 2] },
+          // 'gross' (Transaction.paychainFee) is PayChain's markup ALREADY
+          // net of the Safaricom/NCBA pass-through cost — see
+          // ncbaLedgerService.js#creditNcbaCollection's doc comment and
+          // utils/feeCalculator.js: 'costs' (safaricomFee) is money that
+          // passed through PayChain to the network partner and was never
+          // PayChain's revenue to begin with, so it must NOT be subtracted
+          // from 'gross' a second time here. 'net' therefore just mirrors
+          // 'gross' — kept as its own field (rather than removed) so this
+          // table's own column header can stay "Net Margin" without every
+          // consumer needing to know gross and net are now the same number.
+          net:   { $round: ['$gross', 2] },
           count: '$count',
         },
       },
@@ -479,8 +546,21 @@ export const getRevenue = async (req, res) => {
           grossChange:   pctChange(totalRevenue, prevTotalRevenue),
           networkCosts:  safaricomFees,
           costsChange:   pctChange(safaricomFees, safaricomFeesPrev),
-          netRevenue:    Math.round((totalRevenue - safaricomFees) * 100) / 100,
-          netChange:     pctChange(totalRevenue - safaricomFees, prevTotalRevenue - safaricomFeesPrev),
+          sweptThisPeriod,
+          // totalRevenue (Σ Transaction.paychainFee) is PayChain's markup
+          // ALREADY net of the Safaricom/NCBA pass-through cost — see
+          // ncbaLedgerService.js#creditNcbaCollection's doc comment ("markup
+          // alone is... the number the admin Revenue dashboard reports as
+          // PayChain's actual earned revenue") and utils/feeCalculator.js.
+          // networkCosts (safaricomFee) is money that passed through
+          // PayChain to Safaricom/NCBA and was never PayChain's revenue to
+          // begin with, so it must not be subtracted a second time here —
+          // doing so previously understated real revenue (showed KES 96
+          // when PayChain's actual, sweepable earned revenue was KES 121,
+          // confirmed by summing real completed sweeps + what's still
+          // unswept in services/revenueSweepService.js#computeExpectedPoolBalance).
+          netRevenue:    Math.round(totalRevenue * 100) / 100,
+          netChange:     pctChange(totalRevenue, prevTotalRevenue),
 
           // Legacy fields (kept for existing consumers / charts).
           totalRevenue: Math.round(totalRevenue * 100) / 100,
@@ -688,23 +768,22 @@ export const getExpectedPoolBalance = async (req, res) => {
 };
 
 // @desc    Live pooled-account balance straight from NCBA's AccountDetails
-//          endpoint — never called anywhere in this codebase before now,
-//          so its response shape isn't confirmed (see
+//          endpoint — confirmed working live 2026-08-29 (see
 //          services/ncbaOpenBankingService.js#getNcbaAccountBalance's doc
-//          comment). Always returns 200 with `available: false` on any
-//          failure (auth error, network error, unparseable response) —
-//          this must never break the reconciliation page, since the manual
-//          entry flow below is the proven fallback the whole reconciliation
-//          system was originally built around.
+//          comment for the real response shape). Still always returns 200
+//          with `available: false` on any failure (auth error, network
+//          error, unparseable response) — this must never break the
+//          reconciliation page, since the manual entry flow below remains
+//          a valid independent cross-check even with the live pull working.
 // @route   GET /api/admin/revenue/pool-balance/live
 // @access  Private (Admin)
 export const getLivePoolBalance = async (req, res) => {
   try {
-    const { raw, balance } = await getNcbaAccountBalance();
+    const { raw, balance, totalBalance } = await getNcbaAccountBalance();
     if (balance === null) {
       return res.json({ success: true, data: { available: false, raw, reason: 'Could not identify a balance field in NCBA\'s response — see raw response.' } });
     }
-    res.json({ success: true, data: { available: true, balance, raw, fetchedAt: new Date() } });
+    res.json({ success: true, data: { available: true, balance, totalBalance, raw, fetchedAt: new Date() } });
   } catch (error) {
     console.error('Get Live Pool Balance Error:', error);
     res.json({ success: true, data: { available: false, reason: error.message } });

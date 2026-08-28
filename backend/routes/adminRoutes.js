@@ -3,6 +3,8 @@ import rateLimit from 'express-rate-limit';
 import authRoutes from './authRoutes.js';
 import {
   getMerchants,
+  getMerchantBalances,
+  exportMerchantBalances,
   getMerchantDetail,
   getMerchantAnalytics,
   createMerchant,
@@ -144,6 +146,10 @@ const geocodeLimiter = rateLimit({
 
 // Merchant Management Routes (admin-only)
 router.get('/merchants', protect, excludeOfficer, getMerchants);
+// Must be registered before /merchants/:id below, or Express would match
+// "balances" as an :id.
+router.get('/merchants/balances', protect, excludeOfficer, getMerchantBalances);
+router.get('/merchants/balances/export', protect, excludeOfficer, exportMerchantBalances);
 router.post('/merchants', protect, requireMutator, merchantCreateLimiter, createMerchant);
 router.get('/merchants/analytics', protect, excludeOfficer, getMerchantAnalytics);
 // Same reason as /merchants/analytics above — literal paths before :id.
