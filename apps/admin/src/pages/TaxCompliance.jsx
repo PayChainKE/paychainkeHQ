@@ -4,6 +4,7 @@ import api from '../api/api';
 import { useToast } from '../context/ToastContext';
 import { formatKES } from '../utils/formatCurrency';
 import TaxDeadlineCalendar from '../components/ui/TaxDeadlineCalendar';
+import TablePagination from '../components/ui/TablePagination';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -24,6 +25,8 @@ const PAYOUT_TYPES = [
   'outbound', 'bulk_pay', 'withdrawal', 'settlement', 'mpesa_b2c', 'mpesa_b2b',
   'ncba_outbound', 'ncba_mobile_b2w', 'ncba_lipa_na_mpesa', 'ncba_kplc', 'ncba_kplc_prepaid', 'ncba_ncwsc',
 ];
+
+const PAYOUT_PAGE_SIZE = 25;
 
 const TAX_TYPES = ['VAT', 'PAYE', 'Corporate Income Tax', 'Withholding Tax', 'Other'];
 const RECURRENCES = [
@@ -133,6 +136,8 @@ const TaxCompliance = () => {
   const [payoutQuery, setPayoutQuery] = useState('');
   const [payoutSearch, setPayoutSearch] = useState('');
   const [payoutRows, setPayoutRows] = useState([]);
+  const [payoutTotal, setPayoutTotal] = useState(0);
+  const [payoutPage, setPayoutPage] = useState(1);
   const [payoutLoading, setPayoutLoading] = useState(false);
   const [payoutError, setPayoutError] = useState('');
   const [payoutExporting, setPayoutExporting] = useState(false);
@@ -172,16 +177,20 @@ const TaxCompliance = () => {
     setPayoutError('');
     try {
       const res = await api.get('/api/admin/transaction-audit', {
-        params: { type: PAYOUT_TYPES.join(','), q: payoutSearch, limit: 100, preset: period },
+        params: { type: PAYOUT_TYPES.join(','), q: payoutSearch, limit: PAYOUT_PAGE_SIZE, page: payoutPage, preset: period },
       });
-      if (res.data?.success) setPayoutRows(res.data.data);
-      else setPayoutError(res.data?.error || 'Could not load the payout audit trail.');
+      if (res.data?.success) {
+        setPayoutRows(res.data.data);
+        setPayoutTotal(res.data.pagination?.total ?? res.data.data.length);
+      } else {
+        setPayoutError(res.data?.error || 'Could not load the payout audit trail.');
+      }
     } catch (e) {
       setPayoutError(e?.response?.data?.error || 'Could not load the payout audit trail.');
     } finally {
       setPayoutLoading(false);
     }
-  }, [payoutSearch, period]);
+  }, [payoutSearch, payoutPage, period]);
 
   useEffect(() => { fetchSummary(); }, [fetchSummary]);
   useEffect(() => { fetchDeadlines(); }, [fetchDeadlines]);
@@ -190,7 +199,11 @@ const TaxCompliance = () => {
   const searchTimer = useRef(null);
   useEffect(() => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => setPayoutSearch(payoutQuery), 350);
+    // Back to page 1 alongside the new search term, batched into the same
+    // update — resetting it in a separate effect keyed off payoutSearch
+    // would fire fetchPayouts once for the old page against the new
+    // filter, then again for page 1, doubling the request.
+    searchTimer.current = setTimeout(() => { setPayoutPage(1); setPayoutSearch(payoutQuery); }, 350);
     return () => searchTimer.current && clearTimeout(searchTimer.current);
   }, [payoutQuery]);
 
@@ -415,7 +428,7 @@ const TaxCompliance = () => {
                 {PERIODS.map((p) => (
                   <button
                     key={p.v}
-                    onClick={() => setPeriod(p.v)}
+                    onClick={() => { setPeriod(p.v); setPayoutPage(1); }}
                     className={`px-3 py-1.5 text-2xs font-bold uppercase tracking-widest rounded-lg transition-all ${
                       period === p.v ? 'bg-emerald-500 text-white shadow-lg' : 'text-emerald-200/60 hover:text-white'
                     }`}
@@ -532,7 +545,7 @@ const TaxCompliance = () => {
               <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-0.5">Reconciliation</p>
               <h3 className="text-base font-bold text-on-surface tracking-tight">
                 Payout Audit Trail
-                <span className="ml-2 text-2xs font-bold text-on-surface-variant/50 tabular-nums">· {payoutRows.length} shown</span>
+                <span className="ml-2 text-2xs font-bold text-on-surface-variant/50 tabular-nums">· {payoutTotal.toLocaleString()} total</span>
               </h3>
             </div>
             <div className="flex flex-col sm:flex-row gap-2">
@@ -596,6 +609,7 @@ const TaxCompliance = () => {
               </table>
             </div>
           )}
+          <TablePagination page={payoutPage} pageSize={PAYOUT_PAGE_SIZE} total={payoutTotal} onPage={setPayoutPage} />
         </div>
 
         {deadlineForm && (
