@@ -180,7 +180,12 @@ export default function CashAdvance({ navigation }: any) {
   const [businessAddress, setBusinessAddress] = useState('');
   const [contactPhone, setContactPhone] = useState('');
 
-  const formDisabled = !!(merchant?.features && merchant.features.cashAdvanceForm === false);
+  // Two independent gates: the global admin kill switch (Merchants page —
+  // "off" for every merchant regardless of their own settings) and the
+  // per-merchant features.cashAdvanceForm override. Either one being off
+  // disables the form.
+  const globallyDisabled = merchant?.platformCashAdvanceEnabled === false;
+  const formDisabled = globallyDisabled || !!(merchant?.features && merchant.features.cashAdvanceForm === false);
 
   useEffect(() => {
     const load = async () => {
@@ -295,7 +300,9 @@ export default function CashAdvance({ navigation }: any) {
               </View>
               <Text className="text-[22px] font-jakarta-extrabold text-[#00351d] mb-3 text-center">Applications Are Currently Paused</Text>
               <Text className="text-[15px] text-[#707971] font-jakarta-medium text-center leading-relaxed max-w-[280px] opacity-80 mb-6">
-                Cash advance applications aren't open for your account right now. Contact support for details.
+                {globallyDisabled
+                  ? 'Cash advance applications are temporarily paused for all merchants. Please check back later.'
+                  : "Cash advance applications aren't open for your account right now. Contact support for details."}
               </Text>
               <TouchableOpacity
                 onPress={() => Linking.openURL('mailto:support@paychain.co.ke?subject=Cash%20Advance%20Application')}

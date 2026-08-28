@@ -3,63 +3,15 @@ import Transaction from '../models/Transaction.js';
 import { logAudit } from '../utils/auditLog.js';
 import { adminActor } from './adminController.js';
 import { REVENUE_STREAMS } from '../config/revenueRateCard.js';
-import { LIVE_DATA_CUTOFF } from '../config/liveDataCutoff.js';
 import { excludeDemoMerchantsMatch } from '../utils/demoMerchantExclusion.js';
+import { reversedTransactionExclusionMatch } from '../utils/reversedTransactions.js';
 import { CORPORATE_TAX_RATE } from '../config/taxRateCard.js';
+import { resolvePeriod } from '../utils/resolvePeriod.js';
 
 // Same whitelist Revenue's getRevenue uses — top_up/withdrawal and any
 // other type with no revenue stream must never count as "income" here
 // either, or the two pages can never agree on the same window.
 const REVENUE_TX_TYPES = REVENUE_STREAMS.flatMap((s) => s.txTypes);
-
-// Never let a window start before LIVE_DATA_CUTOFF — mirrors
-// revenueController.js's own clamp() exactly, so the five weeks of
-// pre-production sandbox/simulated transactions it excludes from Revenue
-// can't quietly reappear in Bookkeeping's "all"/"ytd"/custom ranges.
-function clampSince(date) {
-  return date.getTime() < LIVE_DATA_CUTOFF.getTime() ? LIVE_DATA_CUTOFF : date;
-}
-
-// ── Period resolution ────────────────────────────────────────────────────
-// Bookkeeping periods are calendar-aligned (month/quarter/year) rather than
-// the rolling 24h/7d/30d windows used elsewhere in admin — that's what maps
-// onto how KRA actually expects returns to be filed.
-function resolvePeriod({ preset, from, to }) {
-  if (from && to) {
-    const since = new Date(from);
-    const until = new Date(to);
-    until.setHours(23, 59, 59, 999);
-    if (!isNaN(since) && !isNaN(until)) {
-      return { since: clampSince(since), until, label: 'Custom range', preset: 'custom' };
-    }
-  }
-
-  const now = new Date();
-  switch (preset) {
-    case 'last_month': {
-      const since = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const until = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
-      return { since: clampSince(since), until, label: since.toLocaleString('en-KE', { month: 'long', year: 'numeric' }), preset };
-    }
-    case 'this_quarter': {
-      const q = Math.floor(now.getMonth() / 3);
-      const since = new Date(now.getFullYear(), q * 3, 1);
-      return { since: clampSince(since), until: now, label: `Q${q + 1} ${now.getFullYear()}`, preset };
-    }
-    case 'ytd': {
-      const since = new Date(now.getFullYear(), 0, 1);
-      return { since: clampSince(since), until: now, label: `${now.getFullYear()} (Year to date)`, preset };
-    }
-    case 'all': {
-      return { since: clampSince(new Date('2020-01-01')), until: now, label: 'All time', preset };
-    }
-    case 'this_month':
-    default: {
-      const since = new Date(now.getFullYear(), now.getMonth(), 1);
-      return { since: clampSince(since), until: now, label: since.toLocaleString('en-KE', { month: 'long', year: 'numeric' }), preset: 'this_month' };
-    }
-  }
-}
 
 // @desc    List expense entries for a period, with category/search filters.
 // @route   GET /api/admin/bookkeeping/expenses
@@ -282,11 +234,14 @@ export const getBookkeepingSummary = async (req, res) => {
 
     const now = new Date();
     const trailingStart = new Date(now.getFullYear(), now.getMonth() - 11, 1);
-    const excludeDemo = await excludeDemoMerchantsMatch();
+    const [excludeDemo, excludeReversed] = await Promise.all([
+      excludeDemoMerchantsMatch(),
+      reversedTransactionExclusionMatch(),
+    ]);
 
     const [incomeAgg, expenseAgg, categoryAgg, monthlyIncomeAgg, monthlyExpenseAgg] = await Promise.all([
       Transaction.aggregate([
-        { $match: { createdAt: { $gte: since, $lte: until }, status: { $in: ['completed', 'verified'] }, type: { $in: REVENUE_TX_TYPES }, ...excludeDemo } },
+        { $match: { createdAt: { $gte: since, $lte: until }, status: { $in: ['completed', 'verified'] }, type: { $in: REVENUE_TX_TYPES }, ...excludeDemo, ...excludeReversed } },
         { $group: { _id: null, total: { $sum: '$paychainFee' } } },
       ]),
       Expense.aggregate([
@@ -307,7 +262,7 @@ export const getBookkeepingSummary = async (req, res) => {
         { $sort: { total: -1 } },
       ]),
       Transaction.aggregate([
-        { $match: { createdAt: { $gte: trailingStart }, status: { $in: ['completed', 'verified'] }, type: { $in: REVENUE_TX_TYPES }, ...excludeDemo } },
+        { $match: { createdAt: { $gte: trailingStart }, status: { $in: ['completed', 'verified'] }, type: { $in: REVENUE_TX_TYPES }, ...excludeDemo, ...excludeReversed } },
         { $group: { _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } }, total: { $sum: '$paychainFee' } } },
       ]),
       Expense.aggregate([
@@ -377,13 +332,17 @@ export const exportKraRevenueCsv = async (req, res) => {
   try {
     const { preset, from, to } = req.query;
     const { since, until, label } = resolvePeriod({ preset, from, to });
-    const excludeDemo = await excludeDemoMerchantsMatch();
+    const [excludeDemo, excludeReversed] = await Promise.all([
+      excludeDemoMerchantsMatch(),
+      reversedTransactionExclusionMatch(),
+    ]);
 
     const transactions = await Transaction.find({
       createdAt: { $gte: since, $lte: until },
       status: { $in: ['completed', 'verified'] },
       type: { $in: REVENUE_TX_TYPES },
       ...excludeDemo,
+      ...excludeReversed,
     })
       .sort({ createdAt: 1 })
       .populate('merchantId', 'businessName')

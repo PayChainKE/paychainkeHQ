@@ -25,6 +25,8 @@ import { isValidEmail, EMAIL_FORMAT_HINT } from '../utils/emailValidator.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { generateBrandedQrDataUri } from '../utils/qrCode.js';
 import { getCountyCentroid } from '../config/kenyaCountyCentroids.js';
+import { getOrCreatePlatformSettings } from '../models/PlatformSettings.js';
+import { resolvePeriod } from '../utils/resolvePeriod.js';
 
 // Build an `actor` shape from req.admin so audit rows attribute admin-initiated
 // actions to the right operator even when the merchant is the subject.
@@ -951,6 +953,56 @@ export const updateMerchantFeatures = async (req, res) => {
     });
   } catch (error) {
     console.error('Update features error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+/**
+ * Read platform-wide feature toggles (currently just cash advance).
+ * Distinct from PATCH /merchants/:id/features, which is per-merchant —
+ * this is the "off for absolutely everyone" switch.
+ * @route   GET /api/admin/platform-settings
+ * @access  Private/Admin
+ */
+export const getPlatformSettings = async (req, res) => {
+  try {
+    const settings = await getOrCreatePlatformSettings();
+    res.json({ success: true, settings: { cashAdvanceEnabled: settings.cashAdvanceEnabled } });
+  } catch (error) {
+    console.error('Get Platform Settings Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+/**
+ * Turn cash advance applications on/off for every merchant at once.
+ * Enforced server-side in cashAdvanceController.submitApplication — this
+ * isn't just a UI hide, a merchant can't apply while it's off regardless
+ * of their own per-merchant features.cashAdvanceForm setting.
+ * @route   PATCH /api/admin/platform-settings
+ * @access  Private/Admin
+ */
+export const updatePlatformSettings = async (req, res) => {
+  try {
+    const { cashAdvanceEnabled } = req.body || {};
+    if (cashAdvanceEnabled === undefined || typeof cashAdvanceEnabled !== 'boolean') {
+      return res.status(400).json({ error: 'cashAdvanceEnabled must be true or false.' });
+    }
+
+    const settings = await getOrCreatePlatformSettings();
+    settings.cashAdvanceEnabled = cashAdvanceEnabled;
+    settings.updatedBy = req.admin._id;
+    await settings.save();
+
+    logAudit({
+      action: 'admin.platform_settings.cash_advance_toggled', category: 'admin', severity: 'warning',
+      message: `Cash advance applications turned ${cashAdvanceEnabled ? 'ON' : 'OFF'} for all merchants`,
+      actor: adminActor(req.admin), req,
+    });
+
+    res.json({ success: true, settings: { cashAdvanceEnabled: settings.cashAdvanceEnabled } });
+  } catch (error) {
+    console.error('Update Platform Settings Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };
@@ -2252,11 +2304,28 @@ export const searchTransactionAudit = async (req, res) => {
       ? req.query.merchantId
       : null;
 
-    const filter = {};
+    // Demo merchant (apps/demo's showcase account) runs real-looking
+    // simulated transactions on purpose — the Tax & Compliance payout audit
+    // trail exists to reconcile real payouts against a real bank statement,
+    // so demo activity must never appear here, same as every other
+    // admin-facing financial view (excludeDemoMerchantsMatch's own doc
+    // comment).
+    const excludeDemo = await excludeDemoMerchantsMatch();
+
+    const filter = { ...excludeDemo };
     if (typeList) filter.type = typeList.length === 1 ? typeList[0] : { $in: typeList };
     if (status) filter.status = status;
     if (merchantId) filter.merchantId = merchantId;
-    if ((from && !isNaN(from)) || (to && !isNaN(to))) {
+    if (req.query.preset) {
+      // Tax & Compliance's payout audit trail sends a calendar-aligned
+      // preset (this_month/last_month/...), same as its KPI strip — without
+      // this, the period selector on that page silently did nothing here
+      // and the table always showed the same most-recent rows regardless of
+      // which period was selected.
+      const { since, until } = resolvePeriod({ preset: req.query.preset, from: req.query.from, to: req.query.to });
+      filter.createdAt = { $gte: since, $lte: until };
+    } else if ((from && !isNaN(from)) || (to && !isNaN(to))) {
+      // Plain Transaction Audit page — explicit date pickers, no preset.
       filter.createdAt = {};
       if (from && !isNaN(from)) filter.createdAt.$gte = from;
       if (to && !isNaN(to)) filter.createdAt.$lte = to;
@@ -2353,11 +2422,21 @@ export const exportPayoutAuditCsv = async (req, res) => {
       ? req.query.merchantId
       : null;
 
-    const filter = {};
+    // Same demo-merchant exclusion as searchTransactionAudit above — this
+    // export is a real bank-statement reconciliation document, so simulated
+    // demo activity must never appear in it.
+    const excludeDemo = await excludeDemoMerchantsMatch();
+
+    const filter = { ...excludeDemo };
     if (typeList) filter.type = typeList.length === 1 ? typeList[0] : { $in: typeList };
     if (status) filter.status = status;
     if (merchantId) filter.merchantId = merchantId;
-    if ((from && !isNaN(from)) || (to && !isNaN(to))) {
+    if (req.query.preset) {
+      // Same preset handling as searchTransactionAudit above — the export
+      // button must always match whatever period is showing on screen.
+      const { since, until } = resolvePeriod({ preset: req.query.preset, from: req.query.from, to: req.query.to });
+      filter.createdAt = { $gte: since, $lte: until };
+    } else if ((from && !isNaN(from)) || (to && !isNaN(to))) {
       filter.createdAt = {};
       if (from && !isNaN(from)) filter.createdAt.$gte = from;
       if (to && !isNaN(to)) filter.createdAt.$lte = to;
