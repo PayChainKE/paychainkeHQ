@@ -13,12 +13,18 @@ import TransactionSuccessCard from '../components/ui/TransactionSuccessCard'
 
 const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
 
+// Lipa na M-Pesa (Till/Paybill) outbound payouts are still being verified
+// end-to-end — restricted to Brantech Solutions (the account used for live
+// testing, matching backend/config/lipaNaMpesaBetaAllowlist.js) until
+// confirmed working, then opened up to every merchant.
+const LIPA_NA_MPESA_BETA_MERCHANT_ID = '6a8f30cb228671cacc4361fe' // Brantech Solutions
+
 const DESTINATIONS = [
   { id: 'mpesa-primary', label: 'Primary M-PESA Number',   icon: 'phone_iphone',     fee: null, hint: 'Your registered phone number' },
   { id: 'mobile',        label: 'Any M-PESA Number',        icon: 'smartphone',        fee: null, hint: 'Send to any Kenyan mobile number' },
   { id: 'bank',          label: 'Bank Account',             icon: 'account_balance',   fee: null, hint: 'Direct bank transfer' },
-  { id: 'till',          label: 'Till Number',              icon: 'point_of_sale',     fee: null, hint: 'Pay to a Safaricom Till' },
-  { id: 'paybill',       label: 'Paybill',                  icon: 'receipt_long',      fee: null, hint: 'Pay to a Paybill number' },
+  { id: 'till',          label: 'Till Number',              icon: 'point_of_sale',     fee: null, hint: 'Pay to a Safaricom Till', betaOnly: true },
+  { id: 'paybill',       label: 'Paybill',                  icon: 'receipt_long',      fee: null, hint: 'Pay to a Paybill number', betaOnly: true },
 ]
 
 // Mirrors backend/config/lipaNaMpesaTariffCard.js's LIPA_NA_MPESA_B2B_BANDS
@@ -156,6 +162,7 @@ export default function SendMoney() {
   // the wizard. Freezing it for the duration of this flow keeps the step
   // machine consistent regardless of when the underlying record refreshes.
   const [hasPin]      = useState(() => !!merchant?.hasAppPin)
+  const isLipaNaMpesaBetaMerchant = merchant?._id === LIPA_NA_MPESA_BETA_MERCHANT_ID
   const selectedDest = DESTINATIONS.find(d => d.id === destination)
   const isMobileDest = destination === 'mpesa-primary' || destination === 'mobile'
   const isB2bDest     = destination === 'till' || destination === 'paybill'
@@ -432,35 +439,53 @@ export default function SendMoney() {
               <div>
                 <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-3">Send To</p>
                 <div className="space-y-2">
-                  {DESTINATIONS.map(d => (
+                  {DESTINATIONS.map(d => {
+                    const comingSoon = d.betaOnly && !isLipaNaMpesaBetaMerchant
+                    return (
                     <button
                       key={d.id}
+                      disabled={comingSoon}
+                      aria-disabled={comingSoon}
+                      title={comingSoon ? 'Coming Soon' : undefined}
                       onClick={() => {
+                        if (comingSoon) return
                         setDestination(d.id)
                         setRecipientAccount(d.id === 'mpesa-primary' ? merchant?.phone || '' : '')
                       }}
                       className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all text-left group ${
-                        destination === d.id
+                        comingSoon
+                          ? 'border-slate-100 opacity-60 cursor-not-allowed'
+                          : destination === d.id
                           ? 'border-[#00351D] bg-[#f0fdf4]'
                           : 'border-slate-100 hover:border-emerald-200 hover:bg-slate-50'
                       }`}
                     >
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
-                        destination === d.id ? 'bg-[#00351D] text-emerald-400' : 'bg-slate-100 text-slate-500 group-hover:bg-emerald-50 group-hover:text-emerald-600'
+                        comingSoon
+                          ? 'bg-slate-100 text-slate-400'
+                          : destination === d.id ? 'bg-[#00351D] text-emerald-400' : 'bg-slate-100 text-slate-500 group-hover:bg-emerald-50 group-hover:text-emerald-600'
                       }`}>
                         <span className="material-symbols-outlined text-lg">{d.icon}</span>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-bold leading-snug transition-colors ${destination === d.id ? 'text-[#00351D]' : 'text-primary'}`}>{d.label}</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className={`text-sm font-bold leading-snug transition-colors ${comingSoon ? 'text-slate-400' : destination === d.id ? 'text-[#00351D]' : 'text-primary'}`}>{d.label}</p>
+                          {comingSoon && (
+                            <span className="text-[9px] font-black uppercase tracking-widest text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+                              Coming Soon
+                            </span>
+                          )}
+                        </div>
                         <p className="text-[10px] text-slate-400 font-medium mt-0.5">{d.hint}</p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        {destination === d.id && (
+                        {!comingSoon && destination === d.id && (
                           <span className="material-symbols-outlined text-[#00351D] text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
                         )}
                       </div>
                     </button>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             </div>
