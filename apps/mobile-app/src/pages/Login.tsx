@@ -512,8 +512,16 @@ export default function Login({ route }: any) {
                       <TextInput className="flex-1 py-4 px-5 text-[16px] font-jakarta-medium text-[#0c2010]" placeholder="••••••••" secureTextEntry={!showConfirmPassword} value={confirmPassword} onChangeText={setConfirmPassword} />
                       <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} className="p-2"><Feather name={showConfirmPassword ? "eye-off" : "eye"} size={20} color="#9ca3af" /></TouchableOpacity>
                     </View>
+                    {confirmPassword.length > 0 && newPassword !== confirmPassword ? (
+                      <Text className="text-red-500 text-[11px] font-jakarta-bold mt-1.5">Passwords do not match</Text>
+                    ) : null}
                  </View>
-                 <TouchableOpacity onPress={handleResetPassword} disabled={loading} className="w-full bg-[#06201b] py-4 rounded-2xl flex-row justify-center items-center">
+                 <TouchableOpacity
+                   onPress={handleResetPassword}
+                   disabled={loading || !confirmPassword || newPassword !== confirmPassword}
+                   style={{ opacity: (!confirmPassword || newPassword !== confirmPassword) ? 0.4 : 1 }}
+                   className="w-full bg-[#06201b] py-4 rounded-2xl flex-row justify-center items-center"
+                 >
                     {loading ? <ActivityIndicator color="white" /> : <Text className="text-white font-jakarta-bold text-[16px]">Set Password</Text>}
                  </TouchableOpacity>
               </View>
@@ -613,6 +621,9 @@ export default function Login({ route }: any) {
                       <TextInput className="flex-1 py-4 px-5 text-[16px] font-jakarta-medium text-[#0c2010]" placeholder="••••••••" secureTextEntry={!showConfirmPassword} value={confirmPassword} onChangeText={setConfirmPassword} />
                       <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} className="p-2"><Feather name={showConfirmPassword ? "eye-off" : "eye"} size={20} color="#9ca3af" /></TouchableOpacity>
                     </View>
+                    {confirmPassword.length > 0 && newPassword !== confirmPassword ? (
+                      <Text className="text-red-500 text-[11px] font-jakarta-bold mt-1.5">Passwords do not match</Text>
+                    ) : null}
                  </View>
 
                  <TouchableOpacity onPress={() => setAgreedToTerms(!agreedToTerms)} activeOpacity={0.7} className="flex-row items-start mb-6">
@@ -631,7 +642,12 @@ export default function Login({ route }: any) {
                    </Text>
                  </TouchableOpacity>
 
-                 <TouchableOpacity onPress={handleSignupCreateAccount} disabled={loading || !agreedToTerms} className="w-full bg-[#06201b] py-4 rounded-2xl flex-row justify-center items-center">
+                 <TouchableOpacity
+                   onPress={handleSignupCreateAccount}
+                   disabled={loading || !Object.values(strength).every(v => v) || !confirmPassword || newPassword !== confirmPassword || !agreedToTerms}
+                   style={{ opacity: (!Object.values(strength).every(v => v) || !confirmPassword || newPassword !== confirmPassword || !agreedToTerms) ? 0.4 : 1 }}
+                   className="w-full bg-[#06201b] py-4 rounded-2xl flex-row justify-center items-center"
+                 >
                     {loading ? <ActivityIndicator color="white" /> : <Text className="text-white font-jakarta-bold text-[16px]">Create Account</Text>}
                  </TouchableOpacity>
               </View>
