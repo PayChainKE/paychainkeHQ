@@ -4,6 +4,7 @@ import Transaction from '../models/Transaction.js';
 import { calculateTrustScore } from './trustScoreController.js';
 import { logAudit } from '../utils/auditLog.js';
 import { adminActor } from './adminController.js';
+import { getOrCreatePlatformSettings } from '../models/PlatformSettings.js';
 
 const KES_VOL_REAL = {
   $ifNull: ['$kesAmount', { $cond: [{ $eq: ['$currency', 'USDC'] }, 0, '$amount'] }]
@@ -24,6 +25,14 @@ const priorityFor = (trustScore) => {
 export const submitApplication = async (req, res) => {
   try {
     const merchant = req.merchant;
+
+    // Global kill switch — checked before the per-merchant flag since an
+    // admin turning this off platform-wide must win regardless of what any
+    // individual merchant's features.cashAdvanceForm is set to.
+    const platformSettings = await getOrCreatePlatformSettings();
+    if (!platformSettings.cashAdvanceEnabled) {
+      return res.status(403).json({ error: 'Cash advance applications are temporarily paused for all merchants. Please check back later.' });
+    }
 
     if (merchant.features && merchant.features.cashAdvanceForm === false) {
       return res.status(403).json({ error: 'Cash advance applications are not available on your account right now.' });

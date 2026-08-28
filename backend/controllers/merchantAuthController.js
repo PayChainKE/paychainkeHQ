@@ -17,6 +17,7 @@ import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLocked
 import { assertOtpNotLocked, recordFailedOtpAttempt, resetOtpAttempts, OtpLockedError } from '../utils/otpLockout.js';
 import { timingSafeStringEqual } from '../utils/timingSafeCompare.js';
 import { normalizeKraPin, isValidKraPin, KRA_PIN_FORMAT_HINT } from '../utils/kraPinValidator.js';
+import { getOrCreatePlatformSettings } from '../models/PlatformSettings.js';
 
 // Canonical option sets for self-serve signup's business-details step —
 // kept here (not just in the frontend) so a request bypassing the UI can't
@@ -310,6 +311,8 @@ export const verifyMerchantOTP = async (req, res) => {
       message: 'Your account was just accessed with a verified sign-in code.',
     });
 
+    const platformSettings = await getOrCreatePlatformSettings();
+
     res.json({
       success: true,
       merchant: {
@@ -343,6 +346,10 @@ export const verifyMerchantOTP = async (req, res) => {
         biometricsEnabled: merchant.biometricsEnabled,
         mobileBiometricUnlockEnabled: merchant.mobileBiometricUnlockEnabled,
         features: merchant.features,
+        // Global admin kill switch (Merchants page) — distinct from
+        // features.cashAdvanceForm, which is per-merchant. Either one being
+        // off means the merchant can't apply.
+        platformCashAdvanceEnabled: platformSettings.cashAdvanceEnabled,
         hasSeenOnboardingWalkthrough: merchant.hasSeenOnboardingWalkthrough,
         hasSeenAccountsWalkthrough: merchant.hasSeenAccountsWalkthrough,
         hasSeenSecurityWalkthrough: merchant.hasSeenSecurityWalkthrough,
@@ -941,6 +948,8 @@ export const getMerchantMe = async (req, res) => {
       }
     }
 
+    const platformSettings = await getOrCreatePlatformSettings();
+
     res.json({
       success: true,
       merchant: {
@@ -976,6 +985,10 @@ export const getMerchantMe = async (req, res) => {
         biometricsEnabled: merchant.biometricsEnabled,
         mobileBiometricUnlockEnabled: merchant.mobileBiometricUnlockEnabled,
         features: merchant.features,
+        // Global admin kill switch (Merchants page) — distinct from
+        // features.cashAdvanceForm, which is per-merchant. Either one being
+        // off means the merchant can't apply.
+        platformCashAdvanceEnabled: platformSettings.cashAdvanceEnabled,
         hasSeenOnboardingWalkthrough: merchant.hasSeenOnboardingWalkthrough,
         hasSeenAccountsWalkthrough: merchant.hasSeenAccountsWalkthrough,
         hasSeenSecurityWalkthrough: merchant.hasSeenSecurityWalkthrough,

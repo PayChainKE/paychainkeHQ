@@ -87,6 +87,13 @@ const Merchants = () => {
     active: 0, locked: 0, dormant: 0, total: 0, kycVerified: 0, flagged: 0,
   });
 
+  // Platform-wide (not per-merchant) cash advance kill switch — distinct
+  // from each merchant's own Feature Access > Cash Advance Form toggle in
+  // the KYB drawer. Defaults true so the banner doesn't flash "paused"
+  // before the real value loads.
+  const [platformSettings, setPlatformSettings] = useState({ cashAdvanceEnabled: true });
+  const [updatingPlatformSettings, setUpdatingPlatformSettings] = useState(false);
+
   // Flag-merchant modal — { merchant, reason, busy, error }. Reuses the same
   // 2-stage pattern as the action modal but doesn't need OTP since flagging
   // is a reversible label, not a destructive action.
@@ -204,7 +211,29 @@ const Merchants = () => {
     }
   }, []);
 
-  useEffect(() => { fetchMerchants(); }, [fetchMerchants]);
+  const fetchPlatformSettings = useCallback(async () => {
+    try {
+      const res = await api.get('/api/admin/platform-settings');
+      if (res.data?.success) setPlatformSettings(res.data.settings);
+    } catch (err) {
+      console.error('Failed to fetch platform settings:', err);
+    }
+  }, []);
+
+  const handleToggleCashAdvanceGlobal = async (value) => {
+    try {
+      setUpdatingPlatformSettings(true);
+      const res = await api.patch('/api/admin/platform-settings', { cashAdvanceEnabled: value });
+      if (res.data?.success) setPlatformSettings(res.data.settings);
+    } catch (err) {
+      console.error('Failed to update platform settings:', err);
+      alert('Failed to update cash advance availability.');
+    } finally {
+      setUpdatingPlatformSettings(false);
+    }
+  };
+
+  useEffect(() => { fetchMerchants(); fetchPlatformSettings(); }, [fetchMerchants, fetchPlatformSettings]);
 
   // Global sync (header refresh button)
   useEffect(() => {
@@ -427,6 +456,41 @@ const Merchants = () => {
               <span className="material-symbols-outlined text-[18px]">add</span>
               New Merchant
             </button>
+          </div>
+        </div>
+
+        {/* Platform-wide Cash Advance switch — off blocks every merchant
+            from applying regardless of their own per-merchant Feature
+            Access setting (enforced server-side, not just hidden here). */}
+        <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border p-4 md:p-5 ${
+          platformSettings.cashAdvanceEnabled ? 'bg-surface-container-lowest border-outline-variant/20' : 'bg-amber-50 border-amber-200'
+        }`}>
+          <div className="flex items-start gap-3">
+            <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
+              platformSettings.cashAdvanceEnabled ? 'bg-primary/10 text-primary' : 'bg-amber-100 text-amber-700'
+            }`}>
+              <span className="material-symbols-outlined text-[18px]">savings</span>
+            </div>
+            <div>
+              <p className="text-[13px] font-bold text-on-surface">Cash Advance Applications</p>
+              <p className="text-[12px] text-on-surface-variant/70 mt-0.5">
+                {platformSettings.cashAdvanceEnabled
+                  ? 'Merchants can currently apply for a cash advance (subject to their own Trust Score and account access).'
+                  : 'Paused for every merchant — no one can submit a new application until this is switched back on.'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 pl-12 sm:pl-0">
+            <button
+              onClick={() => handleToggleCashAdvanceGlobal(!platformSettings.cashAdvanceEnabled)}
+              disabled={updatingPlatformSettings}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 ${platformSettings.cashAdvanceEnabled ? 'bg-primary' : 'bg-outline-variant/40'}`}
+            >
+              <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${platformSettings.cashAdvanceEnabled ? 'translate-x-4.5' : 'translate-x-1'}`} />
+            </button>
+            <span className="text-[12px] font-semibold text-on-surface-variant/80 whitespace-nowrap">
+              {platformSettings.cashAdvanceEnabled ? 'Enabled for all merchants' : 'Disabled for all merchants'}
+            </span>
           </div>
         </div>
 

@@ -163,7 +163,7 @@ function DeclinedBanner({ application, onApplyAgain }) {
   )
 }
 
-function DisabledState() {
+function DisabledState({ global = false }) {
   return (
     <MerchantLayout title="Cash Advance">
       <div className="px-1 lg:px-0 max-w-4xl mx-auto w-full space-y-8 lg:space-y-12">
@@ -175,7 +175,9 @@ function DisabledState() {
           </div>
           <h3 className="text-2xl font-headline font-bold text-primary mb-3">Applications Are Currently Paused</h3>
           <p className="text-[15px] text-on-surface-variant font-medium max-w-md mx-auto leading-relaxed opacity-80 mb-6">
-            Cash advance applications aren't open for your account right now. Reach out to your PayChain account manager for details.
+            {global
+              ? 'Cash advance applications are temporarily paused for all merchants. Please check back later.'
+              : "Cash advance applications aren't open for your account right now. Reach out to your PayChain account manager for details."}
           </p>
           <a href="mailto:support@paychain.co.ke?subject=Cash%20Advance%20Application" className="bg-[#0B0E14] text-white px-8 py-3 rounded-xl font-bold text-sm shadow-md hover:shadow-lg hover:bg-black active:scale-95 transition-all">
             Contact Support
@@ -207,7 +209,12 @@ export default function CashAdvance() {
   const [businessAddress, setBusinessAddress] = useState('')
   const [contactPhone, setContactPhone] = useState('')
 
-  const formDisabled = !!(merchant?.features && merchant.features.cashAdvanceForm === false)
+  // Two independent gates: the global admin kill switch (Merchants page —
+  // "off" for every merchant regardless of their own settings) and the
+  // per-merchant features.cashAdvanceForm override. Either one being off
+  // disables the form.
+  const globallyDisabled = merchant?.platformCashAdvanceEnabled === false
+  const formDisabled = globallyDisabled || !!(merchant?.features && merchant.features.cashAdvanceForm === false)
 
   useEffect(() => {
     if (!merchant) {
@@ -318,7 +325,7 @@ export default function CashAdvance() {
   }
 
   if (formDisabled) {
-    return <DisabledState />
+    return <DisabledState global={globallyDisabled} />
   }
 
   if (!trustData.eligibleForAdvance) {
