@@ -555,7 +555,7 @@ export default function Dashboard({ navigation }: any) {
                   <Text className="text-[#707971] font-jakarta-medium">No recent activity</Text>
                 </View>
               ) : (
-                transactions.slice(0, 5).map((tx, index) => {
+                transactions.slice(0, 10).map((tx, index) => {
                   const isInbound = isCreditTransaction(tx.type);
                   const isSwap = tx.type === 'fx_swap';
                   const name = isInbound ? (formatName(tx.sender?.name) || 'Unknown') : (formatName(tx.recipient?.name) || formatName(tx.sender?.name) || 'Treasury');

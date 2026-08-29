@@ -5,8 +5,6 @@ import Transaction from '../models/Transaction.js';
 import { submitNcbaBankTransfer, NCBA_OWN_BANK_CODE } from './ncbaOpenBankingController.js';
 import { getBankTransferTariff } from '../config/bankTransferTariffCard.js';
 import { submitNcbaUtilityPayment } from '../services/ncbaBulkPaymentService.js';
-import csv from 'csv-parser';
-import fs from 'fs';
 import bcrypt from 'bcryptjs';
 import { sendBatchReceiptEmail } from '../utils/resend.js';
 import { createNotification } from './notificationController.js';
@@ -41,6 +39,19 @@ function serverError(res, status, publicMessage, error, logPrefix) {
     body.error = error?.message || String(error);
   }
   return res.status(status).json(body);
+}
+
+// Professional, human-readable batch reference — BAT-YYYYMMDD-XXXXX (today's
+// date plus a 5-char uppercase alphanumeric suffix) — replaces the old
+// `BAT-${Date.now()}` (a bare 13-digit millisecond timestamp with no
+// readable meaning) with something a merchant can actually recognize at a
+// glance and quote back in a support conversation, while staying just as
+// collision-safe in practice (PayoutBatch.batchReference is still a unique
+// index either way).
+function generateBatchReference() {
+  const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const suffix = Math.random().toString(36).slice(2, 7).toUpperCase();
+  return `BAT-${datePart}-${suffix}`;
 }
 
 // @desc    Get all payees for a merchant
@@ -335,102 +346,6 @@ export const validateKplcPrepaidMeter = async (req, res) => {
 // authorizeBatch below), set/changed via POST /api/auth/merchant/set-app-pin
 // and PUT /api/auth/merchant/reset-app-pin (merchantAuthController.js).
 
-// @desc    Upload and parse CSV for bulk payout preview
-// @route   POST /api/bulkpay/upload-csv
-// @access  Private
-export const uploadCSV = async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ message: 'Please upload a CSV file' });
-    }
-
-    const results = [];
-    const filePath = req.file.path;
-
-    // Fetch existing payees to match against
-    const existingPayees = await Payee.find({ merchantId: req.merchant._id });
-
-    // Guards against a malformed/non-CSV upload leaving the temp file on
-    // disk forever and the request hanging with no response — previously
-    // only the 'end' event cleaned up or replied at all.
-    let responded = false;
-    const cleanupAndFail = (error) => {
-      if (responded) return;
-      responded = true;
-      fs.unlink(filePath, () => {});
-      console.error('CSV parse error:', error.message);
-      res.status(400).json({ message: 'Could not read the uploaded file. Please check it is a valid CSV.' });
-    };
-
-    fs.createReadStream(filePath)
-      .on('error', cleanupAndFail)
-      .pipe(csv())
-      .on('error', cleanupAndFail)
-      .on('data', (data) => {
-        // Expected CSV Columns: name, type, phone, amount
-        // If type is employee, amount is considered Gross Pay
-        
-        const type = data.type?.toLowerCase() || 'employee';
-        const rawAmount = parseFloat(data.amount) || 0;
-        
-        let processedRow = {
-          rawRow: data,
-          name: data.name,
-          type: type,
-          phone: data.phone,
-          status: 'Valid',
-          grossAmount: rawAmount,
-          netAmount: rawAmount,
-          taxDeductions: null,
-          payeeMatch: null,
-        };
-
-        // Attempt to find a matching payee in the DB by name or phone
-        const matchedPayee = existingPayees.find(
-          p => (p.phone && p.phone === data.phone) || (p.name.toLowerCase() === data.name?.toLowerCase())
-        );
-        
-        if (matchedPayee) {
-          processedRow.payeeMatch = matchedPayee._id;
-        } else {
-          processedRow.status = 'Warning: New Payee (Will be created)';
-        }
-
-        // No PAYE/NSSF/SHIF withholding — PayChain has no live KRA/NSSF/SHIF
-        // remittance integration, so simulating a deduction here only paid
-        // the employee less than the merchant intended with nothing actually
-        // remitted anywhere. Employees are paid the full stated amount, same
-        // as any other payee (see authorizeBatch's matching removal below).
-        results.push(processedRow);
-      })
-      .on('end', () => {
-        if (responded) return; // already replied via cleanupAndFail
-        responded = true;
-        // Clean up uploaded file
-        fs.unlinkSync(filePath);
-
-        // Summarize
-        const summary = results.reduce((acc, curr) => {
-          acc.totalGross += curr.grossAmount;
-          acc.totalNet += curr.netAmount;
-          if (curr.taxDeductions) {
-            acc.totalPaye += curr.taxDeductions.paye;
-          }
-          return acc;
-        }, { totalGross: 0, totalNet: 0, totalPaye: 0 });
-
-        res.json({
-          message: 'CSV parsed successfully',
-          summary,
-          rows: results,
-        });
-      });
-
-  } catch (error) {
-    serverError(res, 500, 'Error processing CSV', error);
-  }
-};
-
 // @desc    Authorize and process the finalized batch
 // @route   POST /api/bulkpay/authorize
 // @access  Private
@@ -446,8 +361,8 @@ export const authorizeBatch = async (req, res) => {
       return res.status(400).json({ message: 'No transactions to process' });
     }
 
-    // batchRows is client-supplied (round-tripped from the upload-csv preview) —
-    // a negative netAmount here would make totalNet negative below, which
+    // batchRows is client-supplied — a negative netAmount here would make
+    // totalNet negative below, which
     // would pass the kesBalance >= totalNet check for free and then credit
     // the merchant via $inc: { kesBalance: -totalNet }. Every row's amounts
     // must be validated as positive before they're allowed anywhere near
@@ -519,9 +434,9 @@ export const authorizeBatch = async (req, res) => {
     let totalBankFee = 0;
 
     for (const row of batchRows) {
-      // payeeMatch is a client-supplied Payee _id round-tripped from the
-      // upload-csv preview — without the merchantId scope here, a merchant
-      // could authorize a payout against another merchant's Payee record
+      // payeeMatch is a client-supplied Payee _id — without the merchantId
+      // scope here, a merchant could authorize a payout against another
+      // merchant's Payee record
       // just by guessing/enumerating its _id, redirecting funds to (and
       // leaking the PII of) a payee they were never given.
       let payee = row.payeeMatch
@@ -1049,7 +964,7 @@ export const authorizeBatch = async (req, res) => {
     const totalB2cFeesKept = transactions.reduce((sum, t) => sum + (t.b2cFee || 0), 0);
     const batch = new PayoutBatch({
       merchantId: req.merchant._id,
-      batchReference: `BAT-${Date.now()}`,
+      batchReference: generateBatchReference(),
       totalGrossAmount: totalGross,
       totalTaxDeductions: totalTax,
       totalNetAmount: totalNet,

@@ -26,6 +26,7 @@ import { createNotification } from './notificationController.js';
 import { safeSendSMS, formatKes } from '../utils/smsSanitizer.js';
 import { buildPayoutSentSms, buildPayoutFailedSms, buildPayoutRecipientReceivedSms } from '../utils/paymentSmsTemplates.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
+import { formatPhoneDisplay } from '../utils/formatPhoneDisplay.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { claimPayoutSubmission, DuplicateSubmissionError } from '../utils/idempotencyGuard.js';
 import { debitAvailableBalance } from '../utils/availableBalance.js';
@@ -809,7 +810,18 @@ export async function resolvePendingOpenBankingTransaction({ reference, succeede
     const { date, time } = formatTransactionDateTime();
 
     if (merchantForSms?.phone) {
-      const recipientName = transaction.recipient?.name || 'the recipient';
+      // For ncba_mobile_b2w, transaction.recipient.name is the UI category
+      // label the merchant picked ("Any M-PESA Number"/"Primary M-PESA
+      // Number"), not an actual identifier — see the identical situation
+      // and comment in mpesaController.js's initiateB2C, which resolves
+      // this the same way. recipient.id IS the real destination phone for
+      // this rail (see the recipient-facing SMS block below, which already
+      // relies on that same fact) — every other rail through this webhook
+      // (bank payouts, KPLC, NCWSC, Lipa na M-Pesa) already stores a real
+      // name in recipient.name, so only this one type needs the swap.
+      const recipientName = transaction.type === 'ncba_mobile_b2w' && transaction.recipient?.id
+        ? (formatPhoneDisplay(transaction.recipient.id) || transaction.recipient.id)
+        : (transaction.recipient?.name || 'the recipient');
       const { message } = succeeded
         ? buildPayoutSentSms({ ref: reference, label: payoutLabel, amount: transaction.amount, recipientName, date, time })
         : buildPayoutFailedSms({ ref: reference, label: payoutLabel, amount: transaction.amount, recipientName, date, time, balance: merchantForSms.kesBalance || 0 });

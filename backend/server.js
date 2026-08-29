@@ -71,6 +71,7 @@ import { reconcileStuckOpenBankingPayouts } from './services/ncbaOpenBankingReco
 import { retryInsufficientFundsPayouts } from './services/ncbaPayoutRetryService.js';
 import { processPendingWebhookDeliveries } from './services/webhookDeliveryService.js';
 import { reconcileStuckStkRequests } from './services/stkRequestReconciliationService.js';
+import { cleanupOldBatchHistory } from './services/batchHistoryCleanupService.js';
 
 const allowedOrigins = [
   // Public marketing site
@@ -444,6 +445,16 @@ async function bootstrap() {
   setInterval(() => {
     reconcileStuckStkRequests().catch((e) => console.error('STK reconciliation sweep failed:', e));
   }, 5 * 60 * 1000);
+
+  // Monthly Batch History cleanup — see batchHistoryCleanupService.js's own
+  // doc comment for why this is safe (PayoutBatch is a display-only summary,
+  // never the source of truth for money movement). Checked daily like every
+  // other sweep above; the service itself only actually deletes anything
+  // once a given batch has crossed the 30-day mark.
+  cleanupOldBatchHistory().catch((e) => console.error('Batch history cleanup failed:', e));
+  setInterval(() => {
+    cleanupOldBatchHistory().catch((e) => console.error('Batch history cleanup failed:', e));
+  }, 24 * 60 * 60 * 1000);
 }
 
 bootstrap();

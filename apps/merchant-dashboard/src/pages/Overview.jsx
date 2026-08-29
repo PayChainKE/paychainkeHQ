@@ -118,7 +118,7 @@ export default function Overview() {
 
   const recentTx = [...realTransactions]
     .sort((a, b) => new Date(b.createdAt || b.timestamp) - new Date(a.createdAt || a.timestamp))
-    .slice(0, 5)
+    .slice(0, 10)
 
   // --- Dynamic Chart Data Aggregation ---
   // Uses the same credit/debit classification as every other amount in the

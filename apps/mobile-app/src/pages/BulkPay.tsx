@@ -7,7 +7,6 @@ import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import * as DocumentPicker from 'expo-document-picker';
 import * as Clipboard from 'expo-clipboard';
 import { ValidatedTextInput } from '../components/ValidatedTextInput';
 import { useAuth } from '../context/AuthContext';
@@ -156,7 +155,6 @@ export default function BulkPay() {
   const [showAmountEditor, setShowAmountEditor] = useState<Payee | null>(null);
   const [showAuthorize, setShowAuthorize] = useState(false);
   const [showReceipts, setShowReceipts] = useState(false);
-  const [showCsvUpload, setShowCsvUpload] = useState(false);
   const [showBatchDetails, setShowBatchDetails] = useState<BatchHistory | null>(null);
   const [showFundingSourceSelect, setShowFundingSourceSelect] = useState(false);
   const [showSecurity, setShowSecurity] = useState(false);
@@ -172,10 +170,6 @@ export default function BulkPay() {
   // authorizeBatch. Kept here for exact behavioral parity.
   const [securityStep, setSecurityStep] = useState<1 | 2>(1);
   const [securityOtp, setSecurityOtp] = useState('');
-
-  // Which batch is pending authorization — set right before opening the
-  // Funding Source Select -> Security flow, consumed once the PIN is confirmed.
-  const [pendingBatch, setPendingBatch] = useState<{ source: 'manual' | 'csv' } | null>(null);
 
   // Invoices
   const blankInvoice = (): Invoice => ({
@@ -201,11 +195,6 @@ export default function BulkPay() {
   const [confirmDeleteInvoiceId, setConfirmDeleteInvoiceId] = useState<string | null>(null);
   const [showLinkModal, setShowLinkModal] = useState(false);
   const invoicesPerPage = 5;
-
-  // CSV upload
-  const [csvPreview, setCsvPreview] = useState<any[]>([]);
-  const [csvSummary, setCsvSummary] = useState<any>(null);
-  const [csvUploadLoading, setCsvUploadLoading] = useState(false);
 
   // Batch history
   const [batchHistory, setBatchHistory] = useState<BatchHistory[]>([]);
@@ -533,42 +522,55 @@ export default function BulkPay() {
     }
   };
 
-  // ── Upload CSV ──
-  const handleCsvUpload = async () => {
-    try {
-      const doc = await DocumentPicker.getDocumentAsync({
-        type: ['text/csv', 'text/plain'],
-      });
-
-      if (doc.canceled || !doc.assets?.[0]) return;
-
-      setCsvUploadLoading(true);
-      setAuthPin('');
-      const file = doc.assets[0];
-
-      // Send to backend for preview — the server computes real PAYE/NSSF/SHIF
-      // tax withholding for employee rows. There is no safe client-side
-      // fallback: parsing the CSV locally would submit gross-as-net (zero
-      // withholding) for real payouts, so on failure we just surface the
-      // error and let the merchant retry instead of guessing locally.
-      const formData = new FormData();
-      formData.append('file', {
-        uri: file.uri,
-        type: 'text/csv',
-        name: file.name,
-      } as any);
-
-      const previewRes = await api.post('/api/bulkpay/upload-csv', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      setCsvPreview(previewRes.data?.rows || []);
-      setCsvSummary(previewRes.data?.summary || {});
-      setShowCsvUpload(true);
-    } catch (err: any) {
-      Alert.alert('CSV Upload Failed', err?.response?.data?.message || err?.message || 'Could not process CSV. Please try again.');
-    } finally {
-      setCsvUploadLoading(false);
+  // ── Repeat Last Batch ──
+  // Replaces the old CSV-upload path — same underlying need (build a batch
+  // fast without re-selecting every payee) without requiring the merchant
+  // to produce a spreadsheet. Reloads the most recent batch's payee
+  // selection and amounts, then switches to the Payees tab so they can
+  // review before authorizing — mirrors the dashboard's identical feature.
+  // batchHistory[0] is safe to treat as "most recent" — fetchBatches sorts
+  // by createdAt descending server-side (getBatches, bulkPayController.js).
+  const handleRepeatLastBatch = () => {
+    const lastBatch = batchHistory[0];
+    if (!lastBatch || !lastBatch.transactions?.length) {
+      Alert.alert('No Previous Batch', "You haven't sent a batch yet — select payees on the Payees tab to get started.");
+      return;
     }
+
+    const newSelected: Record<string, boolean> = {};
+    const newAmounts: Record<string, number> = {};
+    let matchedCount = 0;
+    let skippedCount = 0;
+
+    for (const row of lastBatch.transactions) {
+      const payeeId = row.payeeId ? String(row.payeeId) : null;
+      // Only pre-select a payee still on the current list — one could have
+      // been edited/removed since the last batch, with no safe amount or
+      // destination left to reuse.
+      const stillExists = payeeId && payeesList.some((p) => p._id === payeeId);
+      if (stillExists) {
+        newSelected[payeeId] = true;
+        newAmounts[payeeId] = row.amount || 0;
+        matchedCount++;
+      } else {
+        skippedCount++;
+      }
+    }
+
+    if (matchedCount === 0) {
+      Alert.alert('Nothing to Repeat', "None of last batch's payees are still on your list.");
+      return;
+    }
+
+    setSelectedPayees(newSelected);
+    setPayoutAmounts(newAmounts);
+    setActiveTab('Payees');
+    Alert.alert(
+      'Last Batch Loaded',
+      skippedCount > 0
+        ? `${matchedCount} payee${matchedCount === 1 ? '' : 's'} reloaded. ${skippedCount} from your last batch ${skippedCount === 1 ? 'is' : 'are'} no longer on your list and were skipped.`
+        : `${matchedCount} payee${matchedCount === 1 ? '' : 's'} reloaded from your last batch — review the amounts before sending.`
+    );
   };
 
   // ── Trigger PIN setup if needed ──
@@ -800,10 +802,8 @@ export default function BulkPay() {
   const fundingSourceNumber = formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending');
 
   // ── Step 3: confirm funding source, then move to Security (OTP -> PIN) ──
-  const proceedToFundingSourceSelect = (source: 'manual' | 'csv') => {
-    setPendingBatch({ source });
+  const proceedToFundingSourceSelect = () => {
     setShowAuthorize(false);
-    setShowCsvUpload(false);
     setSelectedFundingSource(false);
     setShowFundingSourceSelect(true);
   };
@@ -821,10 +821,9 @@ export default function BulkPay() {
     setSecurityStep(1);
     setSecurityOtp('');
     setAuthPin('');
-    setPendingBatch(null);
   };
 
-  // ── Final authorize (fires after Security PIN step, for either source) ──
+  // ── Final authorize (fires after Security PIN step) ──
   const handleAuthorize = async () => {
     if (authPin.length !== 4) {
       Alert.alert('Invalid PIN', 'Enter your 4-digit Bulk Pay PIN.');
@@ -832,25 +831,16 @@ export default function BulkPay() {
     }
     setIsAuthorizing(true);
     try {
-      const batchRows = pendingBatch?.source === 'csv'
-        ? csvPreview.map((row: any) => ({
-            name: row.name,
-            type: row.type || 'employee',
-            phone: row.phone,
-            grossAmount: row.grossAmount || row.amount || 0,
-            netAmount: row.netAmount || row.amount || 0,
-            taxDeductions: row.taxDeductions || { paye: 0, nssf: 0, shif: 0 },
-          }))
-        : payeesList
-            .filter(p => selectedPayees[p._id])
-            .map(p => ({
-              payeeMatch: p._id,
-              name: p.name,
-              type: p.type,
-              phone: p.phone,
-              grossAmount: payoutAmounts[p._id] || 0,
-              netAmount: payoutAmounts[p._id] || 0,
-            }));
+      const batchRows = payeesList
+        .filter(p => selectedPayees[p._id])
+        .map(p => ({
+          payeeMatch: p._id,
+          name: p.name,
+          type: p.type,
+          phone: p.phone,
+          grossAmount: payoutAmounts[p._id] || 0,
+          netAmount: payoutAmounts[p._id] || 0,
+        }));
 
       const res = await api.post('/api/bulkpay/authorize', {
         batchRows,
@@ -882,9 +872,6 @@ export default function BulkPay() {
       setSecurityOtp('');
       setSecurityStep(1);
       setSelectedPayees({});
-      setCsvPreview([]);
-      setCsvSummary(null);
-      setPendingBatch(null);
       setShowReceipts(true);
       fetchBatches();
       // Balance was just debited server-side — refresh now instead of
@@ -1157,9 +1144,9 @@ export default function BulkPay() {
           <View className="w-full max-w-lg mx-auto px-6 pt-5">
             {/* Quick actions */}
             <View className="flex-row gap-2.5 mb-5">
-              <TouchableOpacity onPress={handleCsvUpload} className="flex-1 bg-[#dbeafe] rounded-2xl p-3.5 flex-row items-center justify-center gap-2 border border-[#bfdbfe]" disabled={csvUploadLoading}>
-                <Feather name={csvUploadLoading ? 'loader' : 'upload'} size={16} color="#1e40af" />
-                <Text className="text-[#1e40af] font-jakarta-bold text-[12px]">{csvUploadLoading ? 'Uploading' : 'CSV'}</Text>
+              <TouchableOpacity onPress={handleRepeatLastBatch} className="flex-1 bg-[#dbeafe] rounded-2xl p-3.5 flex-row items-center justify-center gap-2 border border-[#bfdbfe]">
+                <Feather name="rotate-ccw" size={16} color="#1e40af" />
+                <Text className="text-[#1e40af] font-jakarta-bold text-[12px]">Repeat Last Batch</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={fetchBatches} className="flex-1 bg-[#e7f8ef] rounded-2xl p-3.5 flex-row items-center justify-center gap-2 border border-[#bbf7d0]">
                 <Feather name="refresh-cw" size={16} color="#006c4e" />
@@ -1281,7 +1268,7 @@ export default function BulkPay() {
             <View className="bg-[#5efeb3] rounded-[24px] p-6">
               <Text className="text-[#00351d] font-jakarta-extrabold text-[10px] tracking-[0.2em] uppercase mb-3">Pro Tip</Text>
               <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[#00351d] text-[18px] leading-snug">
-                Upload CSV files for bulk imports, or fund your account to increase payment limits.
+                Use Repeat Last Batch to resend a recurring payout in seconds, or fund your account to increase payment limits.
               </Text>
             </View>
           </View>
@@ -1562,7 +1549,7 @@ export default function BulkPay() {
               )}
             </View>
             <TouchableOpacity
-              onPress={() => proceedToFundingSourceSelect('manual')}
+              onPress={() => proceedToFundingSourceSelect()}
               className="w-full bg-[#00351d] h-[56px] rounded-full flex-row items-center justify-center"
             >
               <Feather name="arrow-right" size={16} color="#fff" />
@@ -1570,71 +1557,6 @@ export default function BulkPay() {
             </TouchableOpacity>
           </View>
         </View>
-      </Modal>
-
-      {/* ── CSV Upload Preview Modal ── */}
-      <Modal visible={showCsvUpload} transparent animationType="slide" onRequestClose={() => !isAuthorizing && setShowCsvUpload(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
-          <View className="flex-1 justify-end bg-black/50">
-            <TouchableOpacity className="absolute inset-0" activeOpacity={1} onPress={() => !isAuthorizing && setShowCsvUpload(false)} />
-            <View className="w-full max-w-lg mx-auto bg-white rounded-t-[36px] px-6 pt-4 pb-8 mt-auto" style={{ maxHeight: '90%' }}>
-              <View className="items-center mb-4"><View className="w-12 h-1.5 bg-[#e7ece7] rounded-full" /></View>
-              <View className="items-center mb-4">
-                <View className="w-14 h-14 rounded-full bg-[#dbeafe] items-center justify-center mb-3">
-                  <Feather name="file-text" size={22} color="#1e40af" />
-                </View>
-                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#0c2010]">Review CSV Batch</Text>
-                <Text className="text-[#707971] font-jakarta-medium text-[12px] mt-1">{csvPreview.length} row{csvPreview.length === 1 ? '' : 's'} detected</Text>
-              </View>
-
-              <View className="bg-[#f0fdf4] rounded-2xl p-4 mb-4 border border-[#e7ece7]">
-                <View className="flex-row justify-between items-center mb-2">
-                  <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider">Gross Total</Text>
-                  <Text className="font-jakarta-bold text-[#0c2010] text-[14px]">{formatKES(csvSummary?.totalGross)}</Text>
-                </View>
-                <View className="flex-row justify-between items-center">
-                  <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider">Net Payout</Text>
-                  <Text className="font-jakarta-bold text-[#00351d] text-[16px]">{formatKES(csvSummary?.totalNet)}</Text>
-                </View>
-              </View>
-
-              <ScrollView className="mb-4" showsVerticalScrollIndicator={false} style={{ maxHeight: 220 }}>
-                {csvPreview.map((row: any, idx: number) => (
-                  <View key={idx} className="bg-white rounded-2xl p-3 mb-2 border border-[#e7ece7] flex-row items-center">
-                    <View className="w-9 h-9 rounded-full bg-[#f0fdf4] items-center justify-center mr-3 border border-[#bfc9bf]/30">
-                      <Text className="font-jakarta-bold text-[10px] text-[#404942]">{initials(row.name)}</Text>
-                    </View>
-                    <View className="flex-1 min-w-0 mr-2">
-                      <Text className="font-jakarta-bold text-[13px] text-[#0c2010]" numberOfLines={1}>{row.name}</Text>
-                      <Text
-                        className={`text-[10px] font-jakarta-medium ${row.status?.startsWith('Warning') ? 'text-[#b87333]' : 'text-[#707971]'}`}
-                        numberOfLines={1}
-                      >
-                        {row.status || 'Valid'}
-                      </Text>
-                    </View>
-                    <Text className="font-jakarta-bold text-[13px] text-[#0c2010]" style={{ flexShrink: 0 }}>
-                      {formatKES(row.netAmount ?? row.amount)}
-                    </Text>
-                  </View>
-                ))}
-              </ScrollView>
-
-              <TouchableOpacity
-                onPress={() => proceedToFundingSourceSelect('csv')}
-                disabled={csvPreview.length === 0}
-                className="w-full bg-[#00351d] h-[56px] rounded-full flex-row items-center justify-center"
-                style={{ opacity: csvPreview.length === 0 ? 0.7 : 1 }}
-              >
-                <Feather name="arrow-right" size={16} color="#fff" />
-                <Text className="text-white font-jakarta-bold text-[15px] ml-2">Continue</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setShowCsvUpload(false)} className="items-center py-3 mt-2">
-                <Text className="text-[#707971] font-jakarta-semibold text-[13px]">Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
       </Modal>
 
       {/* ── Funding Source Select Modal (Step 3: Funding Source) ── */}
