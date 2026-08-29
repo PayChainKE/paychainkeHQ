@@ -1192,11 +1192,26 @@ export const initiateB2C = async (req, res) => {
     // never blocks the response on an SMS provider hiccup.
     const { date: txDate, time: txTime } = formatTransactionDateTime();
     if (merchant.phone) {
+      // beneficiaryName is destination ("Any M-PESA Number"/"Primary
+      // M-PESA Number") whenever the merchant didn't type a free-text
+      // reference — a UI category label, not an actual identifier (see the
+      // comment above beneficiaryName's own definition). Showing only that
+      // in the merchant's own confirmation SMS left them with no way to
+      // tell who they'd actually paid. The real destination number is
+      // always known regardless of what they typed, so it's appended here
+      // every time — after the reference/name if they gave one, or on its
+      // own if they didn't (the same way M-Pesa's own SMS shows both a
+      // name and a number when it has one, and falls back to the number
+      // alone when it doesn't).
+      const formattedRecipientPhone = formatPhoneDisplay(phone) || phone;
+      const recipientDisplay = reference
+        ? `${reference} (${formattedRecipientPhone})`
+        : formattedRecipientPhone;
       const { message: merchantSmsMessage } = buildPayoutSentSms({
         ref: transactionId,
         label: 'Withdrawal',
         amount,
-        recipientName: beneficiaryName,
+        recipientName: recipientDisplay,
         date: txDate,
         time: txTime,
         balance: merchant.kesBalance,
