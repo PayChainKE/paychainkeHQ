@@ -185,13 +185,34 @@ const Blog = () => {
           {/* Featured Videos Section */}
           <div className="mb-20 mt-12">
             <h2 className="text-2xl font-bold text-gray-900 mb-8 border-l-4 border-[#00bf63] pl-4 uppercase tracking-wider text-sm">Video Insights</h2>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-              {/* Video 1 */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+              {/* Video 1 (also featured on the Home page) */}
               <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 flex flex-col transition-all duration-300 hover:shadow-md group">
                 <div className="relative aspect-video overflow-hidden">
-                  <iframe 
+                  <iframe
                     className="absolute inset-0 w-full h-full"
-                    src="https://www.youtube.com/embed/MaKDVkrlHqs?si=zGtE7jtgNrEVKsVD" 
+                    src="https://www.youtube.com/embed/y2a7XuaQIfo?si=un4F7yA5yf-OYY81"
+                    title="Introducing PayChain: The Merchant Operating System Built for African Businesses"
+                    frameBorder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    allowFullScreen
+                  ></iframe>
+                </div>
+                <div className="p-6">
+                  <h3 className="text-lg font-bold text-gray-900 mb-3 group-hover:text-[#00bf63] transition-colors">Introducing PayChain: The Merchant Operating System Built for African Businesses</h3>
+                  <p className="text-gray-600 text-sm leading-relaxed">
+                    One verified dashboard to collect, pay, protect, and grow, replacing the fragmented, manual tools most Kenyan businesses run on today.
+                  </p>
+                </div>
+              </div>
+
+              {/* Video 2 */}
+              <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 flex flex-col transition-all duration-300 hover:shadow-md group">
+                <div className="relative aspect-video overflow-hidden">
+                  <iframe
+                    className="absolute inset-0 w-full h-full"
+                    src="https://www.youtube.com/embed/MaKDVkrlHqs?si=zGtE7jtgNrEVKsVD"
                     title="Introducing PayChain The Merchant OS Built for Kenyan SMEs" 
                     frameBorder="0" 
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
@@ -207,12 +228,12 @@ const Blog = () => {
                 </div>
               </div>
 
-              {/* Video 2 */}
+              {/* Video 3 */}
               <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 flex flex-col transition-all duration-300 hover:shadow-md group">
                 <div className="relative aspect-video overflow-hidden">
-                  <iframe 
+                  <iframe
                     className="absolute inset-0 w-full h-full"
-                    src="https://www.youtube.com/embed/odoTg2BWxZc?si=XL0W2IfEdFTohUsD" 
+                    src="https://www.youtube.com/embed/odoTg2BWxZc?si=XL0W2IfEdFTohUsD"
                     title="Kenya's merchant financial operating system built for serious business owners." 
                     frameBorder="0" 
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
