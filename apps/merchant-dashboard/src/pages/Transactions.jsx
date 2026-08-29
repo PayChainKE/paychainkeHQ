@@ -99,7 +99,7 @@ export default function Transactions() {
   })
 
   const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 10
+  const itemsPerPage = 15
   
   const totalItems = filteredRows.length
   const totalPages = Math.ceil(totalItems / itemsPerPage)
