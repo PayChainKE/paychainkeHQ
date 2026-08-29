@@ -248,6 +248,14 @@ export const handleNcbaAccountNotification = async (req, res) => {
     // the Transaction record itself, not just the merchant's SMS below.
     const parsedCustomer = parseNcbaCustomerField(rawCustomerName);
 
+    // Hoisted up from where this used to be computed (right before the SMS
+    // sends, far below) so the QR-resolution branch below can also use it —
+    // every input it depends on (parsedCustomer, rawPhoneNr, rawNarrative)
+    // is already available at this point. See the full explanation on its
+    // original computation further down, near the SMS sends.
+    const validPayerPhone = [parsedCustomer.phone, rawPhoneNr, extractMsisdnFromText(rawNarrative)]
+      .find((candidate) => candidate && toE164Kenyan(candidate)) || null;
+
     // See wasAlreadySettledByStkPush's doc comment — this same money may
     // have already been credited via the app-aware NCBA STK Push poll
     // resolution (mpesaController.js's resolveStkOutcome), which applies a
@@ -293,6 +301,19 @@ export const handleNcbaAccountNotification = async (req, res) => {
       amount: transAmount,
     });
     if (pendingQrRequest) {
+      // A QR scan never captures the payer's phone up front (unlike STK,
+      // where PayChain pushed the prompt to a known number) — so
+      // pendingQrRequest.phone is null at creation, and resolveStkOutcome's
+      // customer-receipt branch (gated on stkReq.phone) has never had a
+      // number to send to. This is the same webhook payload the generic
+      // credit path below already mines a payer phone out of — attaching it
+      // here, before resolving, lets resolveStkOutcome's existing
+      // buildCustomerPaidSms logic fire for QR payments too, the same way
+      // it already does for STK.
+      if (validPayerPhone && !pendingQrRequest.phone) {
+        await STKRequest.updateOne({ _id: pendingQrRequest._id }, { $set: { phone: validPayerPhone } });
+        pendingQrRequest.phone = validPayerPhone;
+      }
       await resolveStkOutcome(pendingQrRequest, {
         succeeded: true,
         receipt: transId,
@@ -364,24 +385,22 @@ export const handleNcbaAccountNotification = async (req, res) => {
     const { date, time } = formatTransactionDateTime(rawTransTime);
     const accountRef = formatAccountNumberDisplay(getNcbaVirtualAccountNumber(merchantCode) || merchantCode);
 
-    // parsedCustomer was already computed above (before the ledger write).
-    // Three sources, in order of reliability: the parsed MSISDN from
-    // CustomerName, then PhoneNr (known-unreliable — NCBA has sent the
-    // Account Number in this field instead of a phone), then a last-resort
-    // search of the free-text Narrative field (extractMsisdnFromText) in
-    // case NCBA echoed the payer's number there instead. Each candidate is
-    // checked for VALIDITY in order, not just truthiness — a plain `||`
-    // chain would short-circuit on PhoneNr the moment it's merely present
-    // (which it almost always is, just often wrong), so the Narrative
-    // fallback would never get a chance to run even when it has a real
-    // number and PhoneNr doesn't. Reused below for both the customer
-    // receipt and the merchant's "from" line, so neither ever shows
-    // something that isn't actually a phone number. When none of the three
-    // sources yield anything valid, that's a genuine data-availability gap
-    // on NCBA's side, not a bug — this merchant did get paid, we just have
-    // no phone to confirm it to.
-    const validPayerPhone = [parsedCustomer.phone, rawPhoneNr, extractMsisdnFromText(rawNarrative)]
-      .find((candidate) => candidate && toE164Kenyan(candidate)) || null;
+    // validPayerPhone was already computed above (before the ledger write,
+    // so the QR-resolution branch could use it too). Three sources, in
+    // order of reliability: the parsed MSISDN from CustomerName, then
+    // PhoneNr (known-unreliable — NCBA has sent the Account Number in this
+    // field instead of a phone), then a last-resort search of the free-text
+    // Narrative field (extractMsisdnFromText) in case NCBA echoed the
+    // payer's number there instead. Each candidate is checked for VALIDITY
+    // in order, not just truthiness — a plain `||` chain would short-circuit
+    // on PhoneNr the moment it's merely present (which it almost always is,
+    // just often wrong), so the Narrative fallback would never get a chance
+    // to run even when it has a real number and PhoneNr doesn't. Reused
+    // below for both the customer receipt and the merchant's "from" line, so
+    // neither ever shows something that isn't actually a phone number. When
+    // none of the three sources yield anything valid, that's a genuine
+    // data-availability gap on NCBA's side, not a bug — this merchant did
+    // get paid, we just have no phone to confirm it to.
     // NCBA's CustomerName arrives in ALL CAPS ("JACOB BRANDON OMUTITI") —
     // toTitleCase renders it as "Jacob Brandon Omutiti" for the merchant's
     // SMS. Display-only: parsedCustomer.name itself (used above for
