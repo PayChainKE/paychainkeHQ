@@ -4,23 +4,15 @@ import api from '../api/api';
 import TablePagination from '../components/ui/TablePagination';
 import { formatKES } from '../utils/formatCurrency';
 
-function relTime(iso) {
-  if (!iso) return null;
-  const sec = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (sec < 5)     return 'Just now';
-  if (sec < 60)    return `${sec}s ago`;
-  if (sec < 3600)  return `${Math.floor(sec / 60)}m ago`;
-  if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
-  const days = Math.floor(sec / 86400);
-  return `${days}d ago`;
-}
-
-// Same convention as AuditLog.jsx's identical helper — relTime alone
-// ("3h ago") collapses to the same vague bucket for anything over an hour,
-// which isn't enough to actually pin down when an STK push happened.
-function absTime(iso) {
+// Same convention as TransactionAudit.jsx's identical helper — a plain
+// date+time reads as a real audit record; "5m ago" reads as a live feed and
+// stops being useful the moment the page is more than an hour old.
+function fmtTime(iso) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleString('en-KE', { dateStyle: 'medium', timeStyle: 'medium' });
+  const d = new Date(iso);
+  const today = new Date();
+  if (d.toDateString() === today.toDateString()) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 const KIND_LABELS = { topup: 'Wallet Top-up', request_money: 'Request Money', pay_account: 'Pay Account', qr: 'QR Scan' };
@@ -220,10 +212,7 @@ const StkRow = ({ row }) => {
         </span>
       </td>
       <td className="px-3 py-4 text-xs text-slate-500 max-w-[220px] truncate" title={row.resultDesc}>{row.resultDesc || '—'}</td>
-      <td className="px-6 py-4">
-        <p className="text-xs font-bold text-slate-600 tracking-tight">{relTime(row.createdAt)}</p>
-        <p className="text-2xs text-slate-400 mt-0.5">{absTime(row.createdAt)}</p>
-      </td>
+      <td className="px-6 py-4 text-xs text-slate-500 whitespace-nowrap">{fmtTime(row.createdAt)}</td>
     </tr>
   );
 };
