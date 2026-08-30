@@ -177,7 +177,7 @@ export class PricingEngineError extends Error {
 // transactionController.js#processPaymentLink (Payment Links/Invoices) and
 // mpesaController.js#initiateSTKPush (wallet top-ups, Request Money, pay-
 // to-account) for these product lines, no separate code path needed.
-const CUSTOMER_SURCHARGE_BANDS = [
+export const CUSTOMER_SURCHARGE_BANDS = [
   { max: 100,      fee: 0  },
   { max: 500,      fee: 3  },
   { max: 1_000,    fee: 5  },
@@ -267,7 +267,7 @@ export function getCheckoutTotal(baseInvoiceAmount) {
 // Service Fee is given as a single flat value per compressed row in the
 // sheet (not a range) — repeated across each row's real sub-bands here
 // purely so both tables share one boundary list.
-const INVOICE_CLIENT_MARKUP_BANDS = [
+export const INVOICE_CLIENT_MARKUP_BANDS = [
   { max: 100,      fee: 0  },
   { max: 500,      fee: 3  },
   { max: 1_000,    fee: 5  },

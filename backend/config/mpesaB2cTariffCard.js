@@ -10,7 +10,7 @@
 // Note the free threshold here is KES 49 (not the platform's usual KES 100
 // FLAT_FEE_FREE_TIER_MAX_KES) — Mobile Withdrawal has its own cutoff per
 // the tariff sheet, charging KES 5 from KES 50 already.
-const B2C_REGISTERED_USER_BANDS = [
+export const B2C_REGISTERED_USER_BANDS = [
   { max: 49,      safaricomFee: 0  },
   { max: 100,     safaricomFee: 0  },
   { max: 500,     safaricomFee: 5  },
@@ -33,7 +33,7 @@ const B2C_REGISTERED_USER_BANDS = [
   { max: 250_000, safaricomFee: 13 },
 ];
 
-const B2C_SERVICE_FEE_BANDS = [
+export const B2C_SERVICE_FEE_BANDS = [
   { max: 49,      fee: 0   },
   { max: 100,     fee: 5   },
   { max: 500,     fee: 6   },

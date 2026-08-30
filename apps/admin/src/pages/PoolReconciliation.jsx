@@ -20,6 +20,10 @@ const fmtDateTime = (iso) => {
   return new Date(iso).toLocaleString('en-KE', { dateStyle: 'medium', timeStyle: 'short' });
 };
 
+const Th = ({ children, className = '' }) => (
+  <th className={`px-3 py-3 text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 ${className}`}>{children}</th>
+);
+
 /**
  * Pool Reconciliation — is the money actually sitting in PayChain's pooled
  * NCBA account what the ledger says should be there?
@@ -57,6 +61,11 @@ const PoolReconciliation = () => {
   const [merchantBalancesLoading, setMerchantBalancesLoading] = useState(true);
   const [merchantSearch, setMerchantSearch] = useState('');
   const [exportingBalances, setExportingBalances] = useState(false);
+
+  const [stuckPayouts, setStuckPayouts] = useState([]);
+  const [stuckLoading, setStuckLoading] = useState(true);
+  const [resolveTarget, setResolveTarget] = useState(null); // { transaction, succeeded }
+  const [resolveBusy, setResolveBusy] = useState(false);
 
   const [reportedBalance, setReportedBalance] = useState('');
   const [note, setNote] = useState('');
@@ -125,17 +134,38 @@ const PoolReconciliation = () => {
     }
   }, []);
 
-  useEffect(() => { fetchExpected(); fetchLive(); fetchHistory(); fetchMerchantBalances(); }, [fetchExpected, fetchLive, fetchHistory, fetchMerchantBalances]);
+  // Async-rail (Mobile B2W / Lipa na M-Pesa / KPLC / NCWSC) payouts NCBA
+  // never sent a callback for — flagged by
+  // services/ncbaOpenBankingReconciliationService.js's timeout sweep rather
+  // than auto-refunded (NCBA's own status-check endpoint is broken, so a
+  // bare timeout can't be trusted as proof of failure — see that file's doc
+  // comment). Each one sits here until an admin checks NCBA's portal
+  // directly and resolves it by hand. Real, uncredited-either-way money is
+  // exactly what drives the Discrepancy card above away from zero, so this
+  // lives right next to it.
+  const fetchStuckPayouts = useCallback(async (silent = false) => {
+    if (!silent) setStuckLoading(true);
+    try {
+      const res = await api.get('/api/admin/ncba-payouts/stuck-review');
+      setStuckPayouts(res.data?.transactions || []);
+    } catch (e) {
+      if (!silent) setStuckPayouts([]);
+    } finally {
+      if (!silent) setStuckLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchExpected(); fetchLive(); fetchHistory(); fetchMerchantBalances(); fetchStuckPayouts(); }, [fetchExpected, fetchLive, fetchHistory, fetchMerchantBalances, fetchStuckPayouts]);
 
   // Ledger-derived figures + history refresh instantly on any real-time
   // platform event (see context/AuthContext.jsx's SSE connection), plus a
   // 30s fallback poll — matches Revenue.jsx's live-refresh convention.
   useEffect(() => {
-    const id = setInterval(() => { fetchExpected(true); fetchHistory(true); fetchMerchantBalances(true); }, 30_000);
-    const onSync = () => { fetchExpected(true); fetchHistory(true); fetchMerchantBalances(true); };
+    const id = setInterval(() => { fetchExpected(true); fetchHistory(true); fetchMerchantBalances(true); fetchStuckPayouts(true); }, 30_000);
+    const onSync = () => { fetchExpected(true); fetchHistory(true); fetchMerchantBalances(true); fetchStuckPayouts(true); };
     window.addEventListener('paychain:sync', onSync);
     return () => { clearInterval(id); window.removeEventListener('paychain:sync', onSync); };
-  }, [fetchExpected, fetchHistory, fetchMerchantBalances]);
+  }, [fetchExpected, fetchHistory, fetchMerchantBalances, fetchStuckPayouts]);
 
   // Live NCBA balance — its own slower, independent cadence (see fetchLive's
   // doc comment above for why this isn't tied to paychain:sync).
@@ -207,6 +237,24 @@ const PoolReconciliation = () => {
       setClearTarget(null);
     }
   }, [clearTarget, selectedIds, showToast]);
+
+  const confirmResolveStuckPayout = useCallback(async () => {
+    if (!resolveTarget) return;
+    setResolveBusy(true);
+    try {
+      const { transaction, succeeded } = resolveTarget;
+      await api.post(`/api/admin/ncba-payouts/${encodeURIComponent(transaction.reference)}/resolve`, { succeeded });
+      setStuckPayouts((prev) => prev.filter((t) => t.reference !== transaction.reference));
+      showToast(succeeded
+        ? `Marked ${transaction.reference} as succeeded — no refund issued.`
+        : `Marked ${transaction.reference} as failed — KES ${transaction.kesAmount || transaction.amount} refunded to the merchant.`);
+    } catch (e) {
+      showToast(e?.response?.data?.error || 'Could not resolve this payout.');
+    } finally {
+      setResolveBusy(false);
+      setResolveTarget(null);
+    }
+  }, [resolveTarget, showToast]);
 
   const exportMerchantBalancesCsv = useCallback(async () => {
     setExportingBalances(true);
@@ -351,6 +399,61 @@ const PoolReconciliation = () => {
             )}
           </div>
         </section>
+
+        {/* ── Stuck payouts needing manual review ──────────────────── */}
+        {(stuckLoading || stuckPayouts.length > 0) && (
+          <section className="bg-surface-container-lowest rounded-xl border border-amber-200 overflow-hidden">
+            <div className="p-5 md:p-6 pb-3 flex items-center justify-between">
+              <div>
+                <span className="text-xs font-medium text-amber-700 flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-base">report</span>
+                  Stuck Payouts · Needs Manual Review
+                </span>
+                <p className="text-2xs text-on-surface-variant/60 mt-1 max-w-xl">
+                  These NCBA async-rail payouts (Mobile B2W / Lipa na M-Pesa / KPLC / NCWSC) never received a confirmation callback. The merchant's balance was already debited, but NCBA's own status-check API is broken, so this can't be auto-refunded safely — check NCBA's portal for each reference, then mark it resolved.
+                </p>
+              </div>
+              {!stuckLoading && stuckPayouts.length > 0 && (
+                <span className="shrink-0 text-2xs font-bold uppercase tracking-widest text-amber-700 bg-amber-100 px-2.5 py-1 rounded-full">{stuckPayouts.length}</span>
+              )}
+            </div>
+            <div className="overflow-x-auto custom-scrollbar">
+              <table className="w-full text-left font-body">
+                <thead>
+                  <tr className="bg-surface-container-low/50">
+                    <Th>Reference</Th>
+                    <Th>Type</Th>
+                    <Th>Merchant</Th>
+                    <Th>Recipient</Th>
+                    <Th className="text-right">Amount</Th>
+                    <Th>Since</Th>
+                    <Th></Th>
+                  </tr>
+                </thead>
+                <tbody className="text-xs">
+                  {stuckLoading ? (
+                    [...Array(2)].map((_, i) => (
+                      <tr key={i}><td colSpan="7" className="px-3 py-3"><div className="h-5 bg-on-surface/5 rounded animate-pulse" /></td></tr>
+                    ))
+                  ) : stuckPayouts.map((t) => (
+                    <tr key={t._id}>
+                      <td className="px-3 py-2 border-b border-outline-variant/5 font-mono text-2xs font-bold text-on-surface">{t.reference}</td>
+                      <td className="px-3 py-2 border-b border-outline-variant/5 text-on-surface-variant/70">{t.type}</td>
+                      <td className="px-3 py-2 border-b border-outline-variant/5 font-bold text-on-surface truncate max-w-[160px]">{t.merchantId?.businessName || '—'}</td>
+                      <td className="px-3 py-2 border-b border-outline-variant/5 font-mono text-on-surface-variant/70">{t.recipient?.id || t.recipient?.name || '—'}</td>
+                      <td className="px-3 py-2 border-b border-outline-variant/5 text-right font-bold text-on-surface tabular-nums">{formatKES(t.kesAmount || t.amount)}</td>
+                      <td className="px-3 py-2 border-b border-outline-variant/5 text-on-surface-variant/70 whitespace-nowrap">{fmtDateTime(t.createdAt)}</td>
+                      <td className="px-3 py-2 border-b border-outline-variant/5 text-right whitespace-nowrap">
+                        <button onClick={() => setResolveTarget({ transaction: t, succeeded: true })} className="text-2xs font-bold uppercase tracking-widest text-emerald-700 hover:text-emerald-900 px-2">Succeeded</button>
+                        <button onClick={() => setResolveTarget({ transaction: t, succeeded: false })} className="text-2xs font-bold uppercase tracking-widest text-red-700 hover:text-red-900 px-2">Failed</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
 
         {/* ── Merchant money vs PayChain money ─────────────────────── */}
         <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -627,6 +730,34 @@ const PoolReconciliation = () => {
                 <button onClick={() => setClearTarget(null)} disabled={clearBusy} className="flex-1 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40">Cancel</button>
                 <button onClick={confirmClear} disabled={clearBusy} className="flex-1 py-2.5 rounded-lg bg-on-surface text-surface-container-lowest text-sm font-semibold uppercase tracking-widest hover:opacity-90 disabled:opacity-50">
                   {clearBusy ? 'Clearing…' : 'Clear'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Resolve a stuck payout — confirmation, since this can trigger a real refund */}
+      {resolveTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => !resolveBusy && setResolveTarget(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="p-7">
+              <div className={`w-14 h-14 rounded-full flex items-center justify-center mb-4 ${resolveTarget.succeeded ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                <span className="material-symbols-outlined text-3xl">{resolveTarget.succeeded ? 'check_circle' : 'cancel'}</span>
+              </div>
+              <h3 className="text-xl font-bold text-on-surface mb-1">
+                Mark {resolveTarget.transaction.reference} as {resolveTarget.succeeded ? 'succeeded' : 'failed'}?
+              </h3>
+              <p className="text-sm text-on-surface-variant mb-5">
+                {resolveTarget.succeeded
+                  ? `Confirms this ${formatKES(resolveTarget.transaction.kesAmount || resolveTarget.transaction.amount)} payout actually landed with the recipient — no refund is issued, the transaction closes as completed.`
+                  : `Confirms this payout never landed — ${formatKES(resolveTarget.transaction.kesAmount || resolveTarget.transaction.amount)} (plus its fee) is refunded back to the merchant's balance immediately.`}
+                {' '}Only do this after checking NCBA's own portal for this reference — this cannot be undone.
+              </p>
+              <div className="flex gap-3">
+                <button onClick={() => setResolveTarget(null)} disabled={resolveBusy} className="flex-1 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40">Cancel</button>
+                <button onClick={confirmResolveStuckPayout} disabled={resolveBusy} className={`flex-1 py-2.5 rounded-lg text-sm font-semibold uppercase tracking-widest text-white disabled:opacity-50 ${resolveTarget.succeeded ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'}`}>
+                  {resolveBusy ? 'Resolving…' : `Confirm ${resolveTarget.succeeded ? 'succeeded' : 'failed'}`}
                 </button>
               </div>
             </div>

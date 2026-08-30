@@ -13,7 +13,7 @@
 const round2 = (value) => Math.round((value + Number.EPSILON) * 100) / 100;
 
 // ── KPLC Prepaid Tokens — tiered ─────────────────────────────────────────
-const KPLC_PREPAID_BANDS = [
+export const KPLC_PREPAID_BANDS = [
   { max: 500,      baseCost: 5,  serviceFee: 7  },
   { max: 2_000,    baseCost: 5,  serviceFee: 12 },
   { max: 4_000,    baseCost: 10, serviceFee: 19 },
@@ -88,7 +88,7 @@ export function getInternetTariff() {
 
 // ── Rent Settlements — tiered ─────────────────────────────────────────────
 // Same "not yet wired to a real category" situation as Internet above.
-const RENT_SETTLEMENT_BANDS = [
+export const RENT_SETTLEMENT_BANDS = [
   { max: 10_000,   baseCost: 15, serviceFee: 52  },
   { max: 20_000,   baseCost: 25, serviceFee: 75  },
   { max: 35_000,   baseCost: 25, serviceFee: 125 },

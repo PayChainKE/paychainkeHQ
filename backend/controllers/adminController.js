@@ -2608,6 +2608,7 @@ export const searchTransactionAudit = async (req, res) => {
         settlementRail: t.settlementRail,
         mobileNetwork: t.mobileNetwork,
         paychainFee: t.paychainFee,
+        safaricomFee: t.safaricomFee,
         balanceAfter: t.balanceAfter,
         merchant: t.merchantId
           ? {
