@@ -1,4 +1,15 @@
-import { KPLC_POSTPAID_SERVICE_FEE, NCWSC_SERVICE_FEE } from './billPaymentTariffCard.js';
+import { getKplcPostpaidServiceFee, getNcwscServiceFee } from './billPaymentTariffCard.js';
+import { getTariffFlat } from '../services/tariffCardCache.js';
+
+// Note: these two feed only the REVENUE_STREAMS description text below
+// (display metadata, not live pricing — ncba_kplc/ncba_ncwsc are priced via
+// their own dedicated feeCalculator.js branches, never this file's generic
+// flatFee fallback), so they're read once at module load. A later admin
+// edit to the underlying service fee is reflected the next time this
+// module reloads (server restart), same as every other description string
+// in this file that references a tariff figure.
+const KPLC_POSTPAID_SERVICE_FEE = getKplcPostpaidServiceFee();
+const NCWSC_SERVICE_FEE = getNcwscServiceFee();
 
 // Single source of truth for PayChain's revenue model. Two layers:
 //
@@ -85,10 +96,26 @@ export const FX_SPREAD_RATE       = 0.020;  // 2.00% — Kotani / HoneyCoin stan
 // real flat KES amounts now rather than a phantom percentage-of-amount
 // figure, so the dashboard shows an honest number pending each rail's own
 // pricing rollout.
-export const NCBA_DISBURSEMENT_FLAT_FEE_KES  = 50;
-export const STABLECOIN_PAYMENT_FLAT_FEE_KES = 30;
-export const SETTLEMENT_FLAT_FEE_KES         = 20;
-export const MPESA_B2B_LEGACY_FLAT_FEE_KES   = 20;
+const NCBA_DISBURSEMENT_FLAT_FEE_KES_DEFAULT  = 50;
+const STABLECOIN_PAYMENT_FLAT_FEE_KES_DEFAULT = 30;
+const SETTLEMENT_FLAT_FEE_KES_DEFAULT         = 20;
+const MPESA_B2B_LEGACY_FLAT_FEE_KES_DEFAULT   = 20;
+
+// Admin-editable (Transaction Tariffs page) — see services/tariffCardCache.js.
+// settlement_fee/stablecoin_payment/mpesa_b2b_fee are genuinely priced live
+// through these (utils/feeCalculator.js's generic fallback reads
+// `stream.flatFee` for any type without its own dedicated branch — 'settlement',
+// 'outbound'/'bulk_pay', and 'mpesa_b2b' all fall through to it), so their
+// REVENUE_STREAMS entries below use a `get flatFee()` accessor rather than a
+// static value, making every read (including inside a real Transaction's
+// pre-save hook) reflect the current cached figure rather than whatever was
+// true when this module first loaded. ncba_disbursement_fee's flatFee is
+// display-only today (ncba_outbound always resolves via its own dedicated
+// branch first) but kept live the same way for consistency.
+export function getNcbaDisbursementFlatFee()  { return getTariffFlat('ncba_disbursement_flat', NCBA_DISBURSEMENT_FLAT_FEE_KES_DEFAULT); }
+export function getStablecoinPaymentFlatFee() { return getTariffFlat('stablecoin_flat', STABLECOIN_PAYMENT_FLAT_FEE_KES_DEFAULT); }
+export function getSettlementFlatFee()        { return getTariffFlat('settlement_flat', SETTLEMENT_FLAT_FEE_KES_DEFAULT); }
+export function getMpesaB2bLegacyFlatFee()    { return getTariffFlat('mpesa_b2b_legacy_flat', MPESA_B2B_LEGACY_FLAT_FEE_KES_DEFAULT); }
 
 // ── Revenue streams ───────────────────────────────────────────────────
 // Each stream maps to one or more transaction-type buckets; the aggregator
@@ -124,11 +151,11 @@ export const REVENUE_STREAMS = [
   {
     id: 'stablecoin_payment',
     label: 'Stablecoin Payment Fee',
-    description: `PayChain's flat KES ${STABLECOIN_PAYMENT_FLAT_FEE_KES} margin on USDC outbound payments — settlements, cross-border B2B, supplier payouts, bulk pay.`,
+    description: `PayChain's flat KES ${STABLECOIN_PAYMENT_FLAT_FEE_KES_DEFAULT} margin on USDC outbound payments — settlements, cross-border B2B, supplier payouts, bulk pay.`,
     icon: 'paid',
     accent: 'blue',
     rate: null,
-    flatFee: STABLECOIN_PAYMENT_FLAT_FEE_KES,
+    get flatFee() { return getStablecoinPaymentFlatFee(); },
     minFee: 0,
     txTypes: ['outbound', 'bulk_pay'],
     statuses: ['completed', 'verified'],
@@ -138,11 +165,11 @@ export const REVENUE_STREAMS = [
   {
     id: 'settlement_fee',
     label: 'Settlement Fee',
-    description: `PayChain's flat KES ${SETTLEMENT_FLAT_FEE_KES} margin on KES off-ramp settlements to merchant bank or mobile money. Safaricom B2C tariff passes through to the merchant.`,
+    description: `PayChain's flat KES ${SETTLEMENT_FLAT_FEE_KES_DEFAULT} margin on KES off-ramp settlements to merchant bank or mobile money. Safaricom B2C tariff passes through to the merchant.`,
     icon: 'account_balance_wallet',
     accent: 'amber',
     rate: null,
-    flatFee: SETTLEMENT_FLAT_FEE_KES,
+    get flatFee() { return getSettlementFlatFee(); },
     minFee: 0,
     txTypes: ['settlement'],
     statuses: ['completed', 'verified'],
@@ -165,11 +192,11 @@ export const REVENUE_STREAMS = [
   {
     id: 'ncba_disbursement_fee',
     label: 'NCBA Disbursement Fee',
-    description: `PayChain's flat KES ${NCBA_DISBURSEMENT_FLAT_FEE_KES} margin on outbound NCBA bulk disbursements (supplier payments, KPLC/water utility payouts) routed via NCBA Host-to-Host.`,
+    description: `PayChain's flat KES ${NCBA_DISBURSEMENT_FLAT_FEE_KES_DEFAULT} margin on outbound NCBA bulk disbursements (supplier payments, KPLC/water utility payouts) routed via NCBA Host-to-Host.`,
     icon: 'account_balance',
     accent: 'blue',
     rate: null,
-    flatFee: NCBA_DISBURSEMENT_FLAT_FEE_KES,
+    get flatFee() { return getNcbaDisbursementFlatFee(); },
     minFee: 0,
     txTypes: ['ncba_outbound'],
     statuses: ['completed', 'verified'],
@@ -204,11 +231,11 @@ export const REVENUE_STREAMS = [
   {
     id: 'mpesa_b2b_fee',
     label: 'M-Pesa B2B Fee (legacy)',
-    description: `PayChain's flat KES ${MPESA_B2B_LEGACY_FLAT_FEE_KES} margin on merchant payouts to another business's Paybill or Till, from before this rail moved to NCBA (see ncba_lipa_na_mpesa_fee below) — kept for historical transactions only, no longer earned on new payouts.`,
+    description: `PayChain's flat KES ${MPESA_B2B_LEGACY_FLAT_FEE_KES_DEFAULT} margin on merchant payouts to another business's Paybill or Till, from before this rail moved to NCBA (see ncba_lipa_na_mpesa_fee below) — kept for historical transactions only, no longer earned on new payouts.`,
     icon: 'point_of_sale',
     accent: 'indigo',
     rate: null,
-    flatFee: MPESA_B2B_LEGACY_FLAT_FEE_KES,
+    get flatFee() { return getMpesaB2bLegacyFlatFee(); },
     minFee: 0,
     txTypes: ['mpesa_b2b'],
     statuses: ['completed', 'verified'],

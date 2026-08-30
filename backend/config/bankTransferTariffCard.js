@@ -1,3 +1,5 @@
+import { getTariffBands, getTariffFlat } from '../services/tariffCardCache.js';
+
 // Interbank Transfer Tariff Schedules (PesaLink, RTGS, 2026-08-12) —
 // outbound bank transfers from a merchant's PayChain balance/Virtual
 // Account (same underlying Merchant.kesBalance field — "Virtual Account"
@@ -20,7 +22,12 @@
 // destination bank code is NCBA's own — see NCBA_OWN_BANK_CODE in
 // ncbaOpenBankingController.js) — this tariff sheet is external-bank-only,
 // so IFT stays fee-exempt exactly as it is today.
-export const PESALINK_BANDS = [
+// `baseCost` (NCBA's real pass-through) is fixed — this array is also the
+// single source of the band shape (count + `max` boundaries) shared with
+// the admin-editable `serviceFee` side below. `serviceFee` values here are
+// only the fallback default; the live figure comes from getPesaLinkTariff's
+// cache lookup.
+const PESALINK_BANDS_DEFAULT = [
   { max: 500,      baseCost: 0,   serviceFee: 50  },
   { max: 3_500,    baseCost: 50,  serviceFee: 20  },
   { max: 7_000,    baseCost: 50,  serviceFee: 38  },
@@ -32,6 +39,15 @@ export const MAX_PESALINK_AMOUNT = 250_000;
 
 const round2 = (value) => Math.round((value + Number.EPSILON) * 100) / 100;
 
+// Admin-editable (PayChain's own margin only — baseCost above is NCBA's
+// real cost and stays hardcoded). See services/tariffCardCache.js.
+export function getPesaLinkServiceFeeBands() {
+  return getTariffBands(
+    'pesalink_service_fee',
+    PESALINK_BANDS_DEFAULT.map((b) => ({ max: b.max, fee: b.serviceFee }))
+  );
+}
+
 /**
  * @param {number} amount
  * @returns {{ baseCost: number, serviceFee: number, totalFee: number }}
@@ -41,11 +57,13 @@ export function getPesaLinkTariff(amount) {
   if (!Number.isFinite(value) || value <= 0) {
     return { baseCost: 0, serviceFee: 0, totalFee: 0 };
   }
-  const band = PESALINK_BANDS.find((b) => value <= b.max) || PESALINK_BANDS[PESALINK_BANDS.length - 1];
+  const baseBand = PESALINK_BANDS_DEFAULT.find((b) => value <= b.max) || PESALINK_BANDS_DEFAULT[PESALINK_BANDS_DEFAULT.length - 1];
+  const feeBands = getPesaLinkServiceFeeBands();
+  const feeBand = feeBands.find((b) => value <= b.max) || feeBands[feeBands.length - 1];
   return {
-    baseCost: round2(band.baseCost),
-    serviceFee: round2(band.serviceFee),
-    totalFee: round2(band.baseCost + band.serviceFee),
+    baseCost: round2(baseBand.baseCost),
+    serviceFee: round2(feeBand.fee),
+    totalFee: round2(baseBand.baseCost + feeBand.fee),
   };
 }
 
@@ -54,14 +72,20 @@ export function getPesaLinkTariff(amount) {
 // than cost+the standard KES 130 margin (which would total 430) — so
 // PayChain's kept margin on RTGS is KES 100, not 130.
 export const RTGS_BASE_COST = 300;
-export const RTGS_SERVICE_FEE = 100;
+const RTGS_SERVICE_FEE_DEFAULT = 100;
+
+// Admin-editable — see getPesaLinkServiceFeeBands's identical convention above.
+export function getRtgsServiceFee() {
+  return getTariffFlat('rtgs_service_fee', RTGS_SERVICE_FEE_DEFAULT);
+}
 
 /** @returns {{ baseCost: number, serviceFee: number, totalFee: number }} */
 export function getRtgsTariff() {
+  const serviceFee = getRtgsServiceFee();
   return {
     baseCost: RTGS_BASE_COST,
-    serviceFee: RTGS_SERVICE_FEE,
-    totalFee: round2(RTGS_BASE_COST + RTGS_SERVICE_FEE),
+    serviceFee,
+    totalFee: round2(RTGS_BASE_COST + serviceFee),
   };
 }
 

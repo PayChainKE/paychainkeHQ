@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Layout from '../components/layout/Layout';
 import api from '../api/api';
 import { formatKES } from '../utils/formatCurrency';
+import ConfirmTariffChangeModal from '../components/modals/ConfirmTariffChangeModal';
 
 const Th = ({ children, className = '' }) => (
   <th className={`px-3 py-3 text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 ${className}`}>{children}</th>
@@ -19,14 +20,26 @@ const RAIL_ICONS = {
   rent: 'home_work',
 };
 
+// A pending edit's identity — one entry per flat card, or per (card, band)
+// pair for a tiered one. Matches exactly what the backend's
+// requestTariffUpdate expects in `changes: [{ key, max, newFee }]`.
+const changeId = (tariffKey, max) => `${tariffKey}::${max ?? 'flat'}`;
+
 // Every fee tariff currently live on the platform — read straight from the
-// backend's own config files (see controllers/tariffController.js), so this
+// backend's own config/cache (see controllers/tariffController.js), so this
 // page can never show a stale or hand-copied number. Grouped exactly like
 // the platform's own money-in / invoices / money-out / flat-stream split.
+// PayChain's own kept margin is editable (Edit toggle); the real
+// third-party cost columns never are — those are facts about what NCBA/
+// Safaricom actually charges PayChain, not PayChain's own price to set.
 const TransactionTariffs = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  const [editMode, setEditMode] = useState(false);
+  const [changes, setChanges] = useState({}); // id -> { key, max, label, oldFee, newFee }
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const fetchTariffs = useCallback(async () => {
     setLoading(true);
@@ -44,24 +57,73 @@ const TransactionTariffs = () => {
 
   useEffect(() => { fetchTariffs(); }, [fetchTariffs]);
 
+  const setChange = useCallback((tariffKey, max, label, oldFee, rawValue) => {
+    const id = changeId(tariffKey, max);
+    setChanges((prev) => {
+      const next = { ...prev };
+      const newFee = rawValue === '' ? NaN : Number(rawValue);
+      if (rawValue === '' || Number.isNaN(newFee) || newFee === oldFee) {
+        delete next[id];
+      } else {
+        next[id] = { key: tariffKey, max: max ?? null, label, oldFee, newFee };
+      }
+      return next;
+    });
+  }, []);
+
+  const changeList = useMemo(() => Object.values(changes), [changes]);
+
+  function exitEditMode() {
+    setEditMode(false);
+    setChanges({});
+  }
+
+  function handleConfirmed(freshData) {
+    setData(freshData);
+    setShowConfirm(false);
+    exitEditMode();
+  }
+
   return (
     <Layout>
-      <div className="space-y-8 pb-12">
+      <div className="space-y-8 pb-24">
         <div className="relative overflow-hidden rounded-3xl bg-[#0B0F1A] border border-[#1E2536] shadow-[0_30px_80px_-20px_rgba(6,10,20,0.8)] p-6 md:p-10">
           <div className="absolute -top-32 -right-32 w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[100px]"></div>
-          <div className="relative">
-            <div className="flex items-center gap-3 mb-3">
-              <span className="material-symbols-outlined text-emerald-400 text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>request_quote</span>
-              <p className="text-2xs font-bold uppercase tracking-[0.3em] text-emerald-300">Transaction Tariffs · Live Rate Card</p>
+          <div className="relative flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-3 mb-3">
+                <span className="material-symbols-outlined text-emerald-400 text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>request_quote</span>
+                <p className="text-2xs font-bold uppercase tracking-[0.3em] text-emerald-300">Transaction Tariffs · Live Rate Card</p>
+              </div>
+              <h2 className="text-3xl md:text-5xl font-bold text-white tracking-tighter font-headline leading-tight">
+                Every fee, on every rail, right now
+              </h2>
+              <p className="text-xs md:text-sm text-emerald-100/60 mt-2 max-w-2xl font-body">
+                Read directly from the platform's own pricing config — PayChain's kept margin next to the real NCBA/Safaricom cost on every rail, so this can never drift from what's actually charged.
+              </p>
             </div>
-            <h2 className="text-3xl md:text-5xl font-bold text-white tracking-tighter font-headline leading-tight">
-              Every fee, on every rail, right now
-            </h2>
-            <p className="text-xs md:text-sm text-emerald-100/60 mt-2 max-w-2xl font-body">
-              Read directly from the platform's own pricing config — PayChain's kept margin next to the real NCBA/Safaricom cost on every rail, so this can never drift from what's actually charged.
-            </p>
+            {data && (
+              <button
+                onClick={() => (editMode ? exitEditMode() : setEditMode(true))}
+                className={`shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${
+                  editMode ? 'bg-white/10 text-white border border-white/20 hover:bg-white/15' : 'bg-emerald-500 text-[#0B0F1A] hover:bg-emerald-400'
+                }`}
+              >
+                <span className="material-symbols-outlined text-base">{editMode ? 'close' : 'edit'}</span>
+                {editMode ? 'Cancel Editing' : 'Edit PayChain Fees'}
+              </button>
+            )}
           </div>
         </div>
+
+        {editMode && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+            <span className="material-symbols-outlined text-amber-600 shrink-0">edit_note</span>
+            <p className="text-xs text-amber-800 font-medium leading-relaxed">
+              Editing PayChain's own margin/service-fee columns only (highlighted in green) — the real third-party cost columns stay fixed. Every change here applies platform-wide, immediately, once confirmed with a 5-minute email code — no code deploy needed.
+            </p>
+          </div>
+        )}
 
         {loading ? (
           <div className="space-y-4">
@@ -77,9 +139,12 @@ const TransactionTariffs = () => {
               <div className="p-5 pt-3">
                 <BandTable
                   rows={data.moneyIn.bands}
+                  editMode={editMode}
+                  changes={changes}
+                  setChange={setChange}
                   columns={[
-                    { key: 'safaricomFee', label: "Safaricom Fee (customer, pass-through)" },
-                    { key: 'paychainFee', label: 'PayChain Fee (customer, revenue)', accent: true },
+                    { key: 'safaricomFee', label: 'Safaricom Fee (customer, pass-through)' },
+                    { key: 'paychainFee', label: 'PayChain Fee (customer, revenue)', accent: true, editable: true, tariffKey: data.moneyIn.tariffKey },
                   ]}
                 />
                 <p className="text-2xs text-on-surface-variant/50 mt-3">Raw Paybill deposits / generic NCBA collections: <span className="font-bold text-on-surface">KES 0</span> to everyone — no PayChain fee tracked on this rail.</p>
@@ -90,15 +155,28 @@ const TransactionTariffs = () => {
             <Section title="Invoices" subtitle="The one dual-charge product" icon="receipt_long" accent="violet">
               <p className="px-5 pt-4 text-2xs text-on-surface-variant/60 leading-relaxed">{data.invoices.note}</p>
               <div className="px-5 pt-3">
-                <div className="inline-flex items-center gap-2 bg-violet-50 border border-violet-200 rounded-xl px-4 py-2.5">
+                <div className="inline-flex items-center gap-3 bg-violet-50 border border-violet-200 rounded-xl px-4 py-2.5">
                   <span className="material-symbols-outlined text-violet-600 text-lg">storefront</span>
-                  <span className="text-xs font-bold text-violet-800">Merchant fee: flat {formatKES(data.invoices.merchantFlatFee)} on every invoice</span>
+                  {editMode ? (
+                    <span className="flex items-center gap-2 text-xs font-bold text-violet-800">
+                      Merchant fee (flat):
+                      <FeeInput
+                        value={changes[changeId(data.invoices.merchantFlatFeeKey, null)]?.newFee ?? data.invoices.merchantFlatFee}
+                        onChange={(v) => setChange(data.invoices.merchantFlatFeeKey, null, 'Invoice Merchant Fee', data.invoices.merchantFlatFee, v)}
+                      />
+                    </span>
+                  ) : (
+                    <span className="text-xs font-bold text-violet-800">Merchant fee: flat {formatKES(data.invoices.merchantFlatFee)} on every invoice</span>
+                  )}
                 </div>
               </div>
               <div className="p-5 pt-3">
                 <BandTable
                   rows={data.invoices.customerMarkupBands}
-                  columns={[{ key: 'fee', label: 'Customer Markup', accent: true }]}
+                  editMode={editMode}
+                  changes={changes}
+                  setChange={setChange}
+                  columns={[{ key: 'fee', label: 'Customer Markup', accent: true, editable: true, tariffKey: data.invoices.customerMarkupKey }]}
                 />
               </div>
             </Section>
@@ -114,9 +192,19 @@ const TransactionTariffs = () => {
                       {rail.dormant && <span className="ml-auto text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 bg-surface-container px-2 py-0.5 rounded-full">Not yet live</span>}
                     </div>
                     {rail.shape === 'flat' ? (
-                      <div className="p-4 grid grid-cols-3 gap-2 text-center">
+                      <div className="p-4 grid grid-cols-3 gap-2 text-center items-center">
                         <FlatStat label="3rd-Party" value={rail.baseCost} />
-                        <FlatStat label="PayChain" value={rail.serviceFee} accent />
+                        {editMode ? (
+                          <div>
+                            <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1">PayChain</p>
+                            <FeeInput
+                              value={changes[changeId(rail.tariffKey, null)]?.newFee ?? rail.serviceFee}
+                              onChange={(v) => setChange(rail.tariffKey, null, rail.label, rail.serviceFee, v)}
+                            />
+                          </div>
+                        ) : (
+                          <FlatStat label="PayChain" value={rail.serviceFee} accent />
+                        )}
                         <FlatStat label="Total" value={rail.totalFee} bold />
                       </div>
                     ) : (
@@ -124,9 +212,12 @@ const TransactionTariffs = () => {
                         <BandTable
                           dense
                           rows={rail.bands}
+                          editMode={editMode}
+                          changes={changes}
+                          setChange={setChange}
                           columns={[
                             { key: 'baseCost', label: '3rd-Party' },
-                            { key: 'serviceFee', label: 'PayChain', accent: true },
+                            { key: 'serviceFee', label: 'PayChain', accent: true, editable: true, tariffKey: rail.tariffKey },
                             { key: 'totalFee', label: 'Total', bold: true },
                           ]}
                         />
@@ -144,7 +235,14 @@ const TransactionTariffs = () => {
                 {data.flatStreams.streams.map((s) => (
                   <div key={s.id} className="flex items-center justify-between bg-surface-container-low/60 rounded-lg px-4 py-3">
                     <span className="text-xs font-bold text-on-surface">{s.label}</span>
-                    <span className="text-sm font-bold text-emerald-700 tabular-nums">{formatKES(s.flatFee)}</span>
+                    {editMode ? (
+                      <FeeInput
+                        value={changes[changeId(s.tariffKey, null)]?.newFee ?? s.flatFee}
+                        onChange={(v) => setChange(s.tariffKey, null, s.label, s.flatFee, v)}
+                      />
+                    ) : (
+                      <span className="text-sm font-bold text-emerald-700 tabular-nums">{formatKES(s.flatFee)}</span>
+                    )}
                   </div>
                 ))}
               </div>
@@ -152,6 +250,28 @@ const TransactionTariffs = () => {
           </>
         )}
       </div>
+
+      {editMode && changeList.length > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 bg-[#0B0F1A] border-t border-[#1E2536] px-6 py-4 shadow-[0_-20px_60px_-20px_rgba(6,10,20,0.8)]">
+          <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
+            <span className="text-sm font-bold text-white">{changeList.length} change{changeList.length === 1 ? '' : 's'} pending</span>
+            <div className="flex gap-3">
+              <button onClick={exitEditMode} className="px-4 py-2.5 rounded-lg border border-white/20 text-white text-xs font-bold uppercase tracking-widest hover:bg-white/10">Discard</button>
+              <button onClick={() => setShowConfirm(true)} className="px-5 py-2.5 rounded-lg bg-emerald-500 text-[#0B0F1A] text-xs font-bold uppercase tracking-widest hover:bg-emerald-400">
+                Review {changeList.length} Change{changeList.length === 1 ? '' : 's'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showConfirm && (
+        <ConfirmTariffChangeModal
+          changes={changeList}
+          onClose={() => setShowConfirm(false)}
+          onSuccess={handleConfirmed}
+        />
+      )}
     </Layout>
   );
 };
@@ -181,7 +301,22 @@ const Section = ({ title, subtitle, icon, accent, children }) => {
   );
 };
 
-const BandTable = ({ rows, columns, dense }) => (
+const FeeInput = ({ value, onChange }) => (
+  <div className="relative inline-block">
+    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-2xs font-bold text-emerald-700/60">KES</span>
+    <input
+      type="number"
+      min="0"
+      max="10000"
+      step="1"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-24 pl-9 pr-2 py-1.5 text-right text-sm font-bold text-emerald-800 bg-emerald-50 border-2 border-emerald-300 rounded-lg focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none tabular-nums"
+    />
+  </div>
+);
+
+const BandTable = ({ rows, columns, dense, editMode, changes, setChange }) => (
   <div className="overflow-x-auto custom-scrollbar rounded-lg border border-outline-variant/10">
     <table className="w-full text-left font-body">
       <thead>
@@ -194,11 +329,22 @@ const BandTable = ({ rows, columns, dense }) => (
         {rows.map((r, i) => (
           <tr key={i} className={i % 2 === 1 ? 'bg-surface-container-low/20' : ''}>
             <td className={`px-3 ${dense ? 'py-1.5' : 'py-2'} border-b border-outline-variant/5 font-mono text-on-surface-variant/80 whitespace-nowrap`}>{r.label}</td>
-            {columns.map((c) => (
-              <td key={c.key} className={`px-3 ${dense ? 'py-1.5' : 'py-2'} border-b border-outline-variant/5 text-right tabular-nums ${c.accent ? 'font-bold text-emerald-700' : c.bold ? 'font-bold text-on-surface' : 'text-on-surface-variant/80'}`}>
-                {formatKES(r[c.key] ?? 0)}
-              </td>
-            ))}
+            {columns.map((c) => {
+              const isEditing = editMode && c.editable;
+              const id = isEditing ? changeId(c.tariffKey, r.max) : null;
+              return (
+                <td key={c.key} className={`px-3 ${dense ? 'py-1.5' : 'py-2'} border-b border-outline-variant/5 text-right tabular-nums ${c.accent ? 'font-bold text-emerald-700' : c.bold ? 'font-bold text-on-surface' : 'text-on-surface-variant/80'}`}>
+                  {isEditing ? (
+                    <FeeInput
+                      value={changes[id]?.newFee ?? r[c.key] ?? 0}
+                      onChange={(v) => setChange(c.tariffKey, r.max, `${r.label}`, r[c.key] ?? 0, v)}
+                    />
+                  ) : (
+                    formatKES(r[c.key] ?? 0)
+                  )}
+                </td>
+              );
+            })}
           </tr>
         ))}
       </tbody>

@@ -1,3 +1,5 @@
+import { getTariffBands } from '../services/tariffCardCache.js';
+
 // M-Pesa B2C ("Business Bouquet") payouts — merchant withdrawals to a
 // registered M-Pesa number. Also used for NCBA Mobile B2W (see
 // utils/feeCalculator.js's ncba_mobile_b2w branch).
@@ -33,7 +35,7 @@ export const B2C_REGISTERED_USER_BANDS = [
   { max: 250_000, safaricomFee: 13 },
 ];
 
-export const B2C_SERVICE_FEE_BANDS = [
+const B2C_SERVICE_FEE_BANDS_DEFAULT = [
   { max: 49,      fee: 0   },
   { max: 100,     fee: 5   },
   { max: 500,     fee: 6   },
@@ -49,6 +51,13 @@ export const B2C_SERVICE_FEE_BANDS = [
   { max: 100_000, fee: 150 },
   { max: 250_000, fee: 200 },
 ];
+
+// Admin-editable (PayChain's own margin only — B2C_REGISTERED_USER_BANDS
+// above is Safaricom's real cost and stays hardcoded). See
+// services/tariffCardCache.js.
+export function getB2cServiceFeeBands() {
+  return getTariffBands('mobile_withdrawal_service_fee', B2C_SERVICE_FEE_BANDS_DEFAULT);
+}
 
 export const MAX_B2C_AMOUNT = 250_000;
 
@@ -72,7 +81,8 @@ const round2 = (value) => Math.round((value + Number.EPSILON) * 100) / 100;
 export function calculateB2cServiceFee(amount) {
   const value = Number(amount);
   if (!Number.isFinite(value) || value <= 0) return 0;
-  const band = B2C_SERVICE_FEE_BANDS.find((b) => value <= b.max) || B2C_SERVICE_FEE_BANDS[B2C_SERVICE_FEE_BANDS.length - 1];
+  const bands = getB2cServiceFeeBands();
+  const band = bands.find((b) => value <= b.max) || bands[bands.length - 1];
   return round2(band.fee);
 }
 
@@ -114,13 +124,14 @@ export function getB2cTariff(amount) {
 // markup is tiered rather than a flat literal. `basisExpr` is whatever Mongo
 // expression yields the per-doc KES basis (the withdrawal amount).
 export function mpesaB2cMarkupMongoExpr(basisExpr) {
+  const bands = getB2cServiceFeeBands();
   return {
     $switch: {
-      branches: B2C_SERVICE_FEE_BANDS.map((b) => ({
+      branches: bands.map((b) => ({
         case: { $lte: [basisExpr, b.max] },
         then: b.fee,
       })),
-      default: B2C_SERVICE_FEE_BANDS[B2C_SERVICE_FEE_BANDS.length - 1].fee,
+      default: bands[bands.length - 1].fee,
     },
   };
 }

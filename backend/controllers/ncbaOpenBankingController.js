@@ -33,7 +33,6 @@ import { debitAvailableBalance } from '../utils/availableBalance.js';
 import { KENYAN_BANK_CODES } from '../config/kenyanBankCodes.js';
 import { getB2cTariff } from '../config/mpesaB2cTariffCard.js';
 import { getLipaNaMpesaTariff } from '../config/lipaNaMpesaTariffCard.js';
-import { getKplcPostpaidTariff, getKplcPrepaidTariff, getNcwscTariff } from '../config/billPaymentTariffCard.js';
 import { getBankTransferTariff } from '../config/bankTransferTariffCard.js';
 import { logAudit } from '../utils/auditLog.js';
 
@@ -743,33 +742,18 @@ export async function resolvePendingOpenBankingTransaction({ reference, succeede
       // refunding only transaction.amount here would permanently cost the
       // merchant that fee even though the transfer/bill payment never went
       // through.
-      let refundAmount = transaction.amount;
-      if (transaction.type === 'ncba_outbound') {
-        // Defensive only — executeNcbaBankPayout/bulkPayController.js's Bank
-        // branch both resolve PesaLink/RTGS synchronously today (never
-        // leaving a Transaction 'pending'), so this branch is not known to
-        // be reachable in practice. Kept so a future change that makes this
-        // rail genuinely async can't silently reintroduce the exact
-        // fee-not-refunded gap this function's other branches exist to
-        // avoid — see this function's own doc comment above.
-        const { totalFee } = getBankTransferTariff(transaction.settlementRail, transaction.amount);
-        refundAmount += totalFee;
-      } else if (transaction.type === 'ncba_mobile_b2w') {
-        const { totalFee } = getB2cTariff(transaction.amount);
-        refundAmount += totalFee;
-      } else if (transaction.type === 'ncba_lipa_na_mpesa') {
-        const { totalFee } = getLipaNaMpesaTariff(transaction.amount);
-        refundAmount += totalFee;
-      } else if (transaction.type === 'ncba_kplc') {
-        const { totalFee } = getKplcPostpaidTariff();
-        refundAmount += totalFee;
-      } else if (transaction.type === 'ncba_kplc_prepaid') {
-        const { totalFee } = getKplcPrepaidTariff(transaction.amount);
-        refundAmount += totalFee;
-      } else if (transaction.type === 'ncba_ncwsc') {
-        const { totalFee } = getNcwscTariff();
-        refundAmount += totalFee;
-      }
+      //
+      // Deliberately reads the fee straight off THIS transaction record
+      // (transaction.paychainFee/safaricomFee, stamped by the pre-save hook
+      // at debit time) rather than re-calling getB2cTariff/etc — tariffs are
+      // now admin-editable (Transaction Tariffs page), so a rate could
+      // change between when this payout was debited and when it fails days
+      // later (exactly what happened with 3 real Lipa na M-Pesa payouts
+      // stuck 2 days awaiting a callback that never arrived). Refunding at
+      // today's rate instead of the rate actually charged would refund the
+      // wrong amount — reading the stored fee is the only way the refund can
+      // never disagree with what was really taken.
+      const refundAmount = transaction.amount + (transaction.paychainFee || 0) + (transaction.safaricomFee || 0);
       merchantForSms = await Merchant.findByIdAndUpdate(
         transaction.merchantId,
         { $inc: { kesBalance: refundAmount } },
