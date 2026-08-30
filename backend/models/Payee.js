@@ -75,14 +75,11 @@ const payeeSchema = new mongoose.Schema(
       default: null,
     },
 
-    // KRA Employee / Supplier PIN — shared by both `type` values.
-    // required/presence is intentionally enforced only at the controller
-    // level (see addPayee/updatePayee, controllers/bulkPayController.js),
-    // not here: uploadCSV's batch-created payees (bulkPayController.js,
-    // authorizeBatch's `new Payee({...})` fallback) never collect a PIN at
-    // all, and a hard `required` here would break that existing flow.
-    // Format IS enforced here, but only when the value is actually being
-    // set — see the validator below.
+    // KRA Employee / Supplier PIN — shared by both `type` values. Optional
+    // for every payee type (no live KRA integration reads this field), kept
+    // purely so a merchant can record it for their own bookkeeping. Format
+    // IS enforced here, but only when the value is actually being set —
+    // see the validator below.
     kraPin: {
       type: String,
       trim: true,
@@ -134,21 +131,6 @@ const payeeSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
-
-// Optional: Validate required KRA fields based on type before saving
-payeeSchema.pre('save', async function () {
-  if (this.type === 'employee') {
-    // In a strict prod environment, we would require these:
-    // if (!this.kraPin || !this.idNumber) {
-    //   throw new Error('KRA PIN and ID Number are required for Employees');
-    // }
-  }
-  if (this.type === 'supplier') {
-    // if (!this.kraPin || !this.etimsInvoiceNumber || !this.cuNumber) {
-    //   throw new Error('KRA PIN, eTIMS Invoice Number, and CU Number are required for Suppliers');
-    // }
-  }
-});
 
 const Payee = mongoose.model('Payee', payeeSchema);
 export default Payee;

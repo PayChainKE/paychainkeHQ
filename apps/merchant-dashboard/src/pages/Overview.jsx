@@ -531,7 +531,13 @@ export default function Overview() {
                 const displayAmt = isSwp
                   ? `${(tx.usdcAmount || 0).toFixed(4)} USDC`
                   : formatKES(tx.kesAmount || tx.amount || 0)
-                const amtColor = getAmountColorClassWithHover(tx.type)
+                const isFailed = tx.status === 'failed'
+                // A failed payout is always refunded in full — showing it with
+                // the same solid debit color as a real, completed one made it
+                // look like money had actually left, when net balance impact
+                // was zero. Muted + struck-through instead, with an explicit
+                // "Refunded" tag replacing the date/time.
+                const amtColor = isFailed ? 'text-on-surface-variant/40 line-through' : getAmountColorClassWithHover(tx.type)
                 const TYPE_LABEL = { inbound: 'Payment In', outbound: 'Withdrawal', fx_swap: 'FX Swap', bulk_pay: 'Bulk Pay', settlement: 'Settlement', top_up: 'Top Up', withdrawal: 'Withdrawal', ncba_inbound: 'Payment In', ncba_outbound: 'Bank Transfer', mpesa_b2c: 'M-PESA Withdrawal', ncba_mobile_b2w: 'Mobile Money Withdrawal', mpesa_b2b: 'Paybill/Till Payout', ncba_lipa_na_mpesa: 'Paybill/Till Payout', ncba_kplc: 'KPLC Bill Payment', ncba_kplc_prepaid: 'KPLC Prepaid Token', ncba_ncwsc: 'NCWSC Bill Payment' }
                 return (
                   <div key={tx._id || tx.id} className="px-4 lg:px-8 py-2.5 lg:py-3 flex items-center justify-between hover:bg-[#00351D] transition-all group cursor-pointer border-b border-slate-200 last:border-0">
@@ -560,12 +566,18 @@ export default function Overview() {
                       <p className={`text-[12px] lg:text-[13px] font-black tabular-nums transition-colors leading-none mb-1 ${amtColor}`}>
                         {sign}{displayAmt}
                       </p>
-                      <p className="text-[8px] text-on-surface-variant font-bold opacity-30 tracking-widest group-hover:text-white/30 transition-colors uppercase tabular-nums">
-                        {formatTxDate(tx.createdAt || tx.timestamp)}
-                      </p>
-                      <p className="text-[8px] text-on-surface-variant font-bold opacity-30 tracking-widest group-hover:text-white/30 transition-colors tabular-nums">
-                        {formatTxTime(tx.createdAt || tx.timestamp)}
-                      </p>
+                      {isFailed ? (
+                        <p className="text-[8px] font-bold text-red-500 tracking-widest uppercase">Failed & Refunded</p>
+                      ) : (
+                        <>
+                          <p className="text-[8px] text-on-surface-variant font-bold opacity-30 tracking-widest group-hover:text-white/30 transition-colors uppercase tabular-nums">
+                            {formatTxDate(tx.createdAt || tx.timestamp)}
+                          </p>
+                          <p className="text-[8px] text-on-surface-variant font-bold opacity-30 tracking-widest group-hover:text-white/30 transition-colors tabular-nums">
+                            {formatTxTime(tx.createdAt || tx.timestamp)}
+                          </p>
+                        </>
+                      )}
                     </div>
                   </div>
                 )

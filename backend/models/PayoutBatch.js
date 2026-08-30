@@ -66,6 +66,14 @@ const payoutBatchSchema = new mongoose.Schema(
           enum: ['pending', 'completed', 'failed'],
           default: 'pending',
         },
+        // Why this specific row failed (NCBA's rejection message, or a
+        // client-side reason like a missing bank code) — surfaced to the
+        // merchant so "Batch Failed" isn't the only thing they see. Only
+        // ever set when status === 'failed'.
+        failureReason: {
+          type: String,
+          default: null,
+        },
         b2cFee: {
           type: Number,
           default: 0,

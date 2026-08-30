@@ -19,6 +19,12 @@ const bankReconciliationSchema = new mongoose.Schema({
   status: { type: String, enum: ['matched', 'discrepancy'], required: true },
   note: { type: String, default: null },
   checkedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', required: true },
+  // "Clear" from the admin's history list — same reversible-archive pattern
+  // as RevenueSweep, not a real delete: the record (and the fact a
+  // discrepancy was once flagged and alerted on, if it was) stays intact.
+  archived: { type: Boolean, default: false },
+  archivedAt: { type: Date, default: null },
+  archivedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },
 }, {
   timestamps: true,
 });

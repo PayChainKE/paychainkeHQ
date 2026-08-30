@@ -129,21 +129,23 @@ export const addPayee = async (req, res) => {
       return res.status(403).json({ message: LIPA_NA_MPESA_NOT_AVAILABLE_MESSAGE });
     }
 
+    // The frontend sends '' (not null) for every non-Utility payee — Payee's
+    // schema enum is ['KPLC', 'KPLC_PREPAID', 'WATER', null], which does not
+    // include '', so this crashed the save for every Employee/Supplier/
+    // Contractor with a hard ValidatorError before this normalization existed.
+    utilityProvider = utilityProvider || null;
+
     kraPin = kraPin ? normalizeKraPin(kraPin) : kraPin;
     if (kraPin && !isValidKraPin(kraPin)) {
       return res.status(400).json({ message: `Invalid KRA PIN format. ${KRA_PIN_FORMAT_HINT}` });
     }
 
-    // Employees no longer require KRA PIN/ID Number — PayChain has no live
-    // KRA payroll integration, so requiring them here only added friction
-    // with no compliance benefit (see the removed PAYE/NSSF/SHIF
-    // withholding below). kraPin/idNumber stay as optional fields on the
-    // model in case a merchant wants to record them for their own records.
-    if (type === 'supplier') {
-      if (!kraPin || !etimsInvoiceNumber || !cuNumber) {
-        return res.status(400).json({ message: 'KRA PIN, eTIMS Invoice Number, and CU Number are strictly required for Suppliers.' });
-      }
-    }
+    // Neither Employees nor Suppliers require KRA PIN/ID Number/eTIMS
+    // Invoice/CU Number anymore — PayChain has no live KRA integration on
+    // this path (no payroll withholding, no eTIMS submission), so requiring
+    // them here only added friction with no compliance benefit. They stay
+    // as optional fields on the model in case a merchant wants to record
+    // them for their own bookkeeping.
 
     const payee = new Payee({
       merchantId: req.merchant._id,
@@ -174,15 +176,20 @@ export const updatePayee = async (req, res) => {
       return res.status(403).json({ message: LIPA_NA_MPESA_NOT_AVAILABLE_MESSAGE });
     }
 
+    // See addPayee's matching comment — '' isn't a valid enum value on this
+    // field, only null or one of the three real providers. Without this,
+    // editing any non-Utility payee (Employee/Supplier/Contractor) threw a
+    // ValidatorError and the save silently "failed" from the merchant's
+    // point of view.
+    utilityProvider = utilityProvider || null;
+
     kraPin = kraPin ? normalizeKraPin(kraPin) : kraPin;
     if (kraPin && !isValidKraPin(kraPin)) {
       return res.status(400).json({ message: `Invalid KRA PIN format. ${KRA_PIN_FORMAT_HINT}` });
     }
 
-    // See addPayee's comment — employees no longer require KRA PIN/ID Number.
-    if (type === 'supplier' && (!kraPin || !etimsInvoiceNumber || !cuNumber)) {
-      return res.status(400).json({ message: 'KRA PIN, eTIMS Invoice Number, and CU Number are required for Suppliers.' });
-    }
+    // See addPayee's comment — neither Employees nor Suppliers require
+    // KRA PIN/ID Number/eTIMS Invoice/CU Number anymore.
 
     // Ownership check + update collapsed into one atomic, merchantId-scoped
     // call (was a separate findOne ownership check followed by an unscoped
@@ -593,6 +600,7 @@ export const authorizeBatch = async (req, res) => {
         // as the notification msisdn, same convention as the BILLPAY branch.
         if (!payee.accountNumber || !payee.phone) {
           payoutStatus = 'failed';
+          row.failureReason = 'Meter number or notification phone is missing for this KPLC payee.';
           refundAmount += row.netAmount + row.b2cFee + row.utilityFee;
           console.error(`❌ Bulk payout to ${payee.name} failed: meter number or notification phone missing for this KPLC payee.`);
         } else {
@@ -614,6 +622,7 @@ export const authorizeBatch = async (req, res) => {
           } catch (err) {
             console.error(`❌ NCBA KPLC payment rejected for ${payee.name}:`, err.message);
             payoutStatus = 'failed';
+            row.failureReason = err.message || 'NCBA rejected this KPLC bill payment.';
             refundAmount += row.netAmount + row.b2cFee + row.utilityFee;
           }
         }
@@ -623,6 +632,7 @@ export const authorizeBatch = async (req, res) => {
         // flag. Same accountNumber/phone convention.
         if (!payee.accountNumber || !payee.phone) {
           payoutStatus = 'failed';
+          row.failureReason = 'Meter number or notification phone is missing for this KPLC Prepaid payee.';
           refundAmount += row.netAmount + row.b2cFee + row.utilityFee;
           console.error(`❌ Bulk payout to ${payee.name} failed: meter number or notification phone missing for this KPLC prepaid payee.`);
         } else {
@@ -643,6 +653,7 @@ export const authorizeBatch = async (req, res) => {
           } catch (err) {
             console.error(`❌ NCBA KPLC prepaid token purchase rejected for ${payee.name}:`, err.message);
             payoutStatus = 'failed';
+            row.failureReason = err.message || 'NCBA rejected this KPLC Prepaid token purchase.';
             refundAmount += row.netAmount + row.b2cFee + row.utilityFee;
           }
         }
@@ -653,6 +664,7 @@ export const authorizeBatch = async (req, res) => {
         // above (accountNumber = meter number, phone = notification msisdn).
         if (!payee.accountNumber || !payee.phone) {
           payoutStatus = 'failed';
+          row.failureReason = 'Meter number or notification phone is missing for this NCWSC payee.';
           refundAmount += row.netAmount + row.b2cFee + row.utilityFee;
           console.error(`❌ Bulk payout to ${payee.name} failed: meter number or notification phone missing for this NCWSC payee.`);
         } else {
@@ -674,12 +686,14 @@ export const authorizeBatch = async (req, res) => {
           } catch (err) {
             console.error(`❌ NCBA NCWSC payment rejected for ${payee.name}:`, err.message);
             payoutStatus = 'failed';
+            row.failureReason = err.message || 'NCBA rejected this NCWSC bill payment.';
             refundAmount += row.netAmount + row.b2cFee + row.utilityFee;
           }
         }
       } else if (payee.type === 'utility' && payee.utilityProvider) {
         if (!payee.accountNumber) {
           payoutStatus = 'failed';
+          row.failureReason = 'No meter/account number on file for this utility payee.';
           refundAmount += row.netAmount + row.b2cFee;
           console.error(`❌ Bulk payout to ${payee.name} failed: no meter/account number on file for this utility payee.`);
         } else {
@@ -698,12 +712,14 @@ export const authorizeBatch = async (req, res) => {
           } catch (err) {
             console.error(`❌ NCBA BillPay rejected payout for ${payee.name}:`, err.message);
             payoutStatus = 'failed';
+            row.failureReason = err.message || 'NCBA rejected this bill payment.';
             refundAmount += row.netAmount + row.b2cFee;
           }
         }
       } else if (payee.paymentMethod === 'Bank') {
         if (!payee.bankCode || !payee.accountNumber) {
           payoutStatus = 'failed';
+          row.failureReason = 'No bank code or account number is on file for this payee.';
           refundAmount += row.netAmount + row.b2cFee + row.bankFee;
           console.error(`❌ Bulk payout to ${payee.name} failed: no bank code on file for this payee.`);
         } else {
@@ -751,6 +767,7 @@ export const authorizeBatch = async (req, res) => {
           } catch (err) {
             console.error(`❌ NCBA PesaLink rejected payout for ${payee.name}:`, err.message);
             payoutStatus = 'failed';
+            row.failureReason = err.message || 'NCBA rejected this bank transfer.';
             refundAmount += row.netAmount + row.b2cFee + row.bankFee;
           }
         }
@@ -787,6 +804,7 @@ export const authorizeBatch = async (req, res) => {
             payoutRef = mobileB2wTransactionId;
           } else {
             payoutStatus = 'failed';
+            row.failureReason = err.message || 'NCBA rejected this Mobile Money transfer.';
             refundAmount += row.netAmount + row.b2cFee;
           }
         }
@@ -804,6 +822,7 @@ export const authorizeBatch = async (req, res) => {
         // every other failure branch above (no early `continue`).
         if (!isLipaNaMpesaBetaMerchant(merchant._id)) {
           payoutStatus = 'failed';
+          row.failureReason = LIPA_NA_MPESA_NOT_AVAILABLE_MESSAGE;
           refundAmount += row.netAmount;
           console.error(`❌ Blocked Lipa na M-Pesa payout for non-beta merchant ${merchant._id} — payee ${payee.name}`);
         } else {
@@ -841,6 +860,7 @@ export const authorizeBatch = async (req, res) => {
               payoutRef = lnmTransactionId;
             } else {
               payoutStatus = 'failed';
+              row.failureReason = err.message || 'NCBA rejected this Lipa na M-Pesa payment.';
               refundAmount += row.netAmount + row.b2cFee + row.lnmFee;
             }
           }
@@ -909,6 +929,7 @@ export const authorizeBatch = async (req, res) => {
           accountReference: payee.phone || payee.paybillNumber || payee.tillNumber || payee.accountNumber || 'N/A',
           receiptNumber: payoutRef,
           status: payoutStatus,
+          failureReason: payoutStatus === 'failed' ? (row.failureReason || null) : null,
           b2cFee: payoutStatus !== 'failed' ? row.b2cFee : 0,
           utilityFee: payoutStatus !== 'failed' ? row.utilityFee : 0,
           lnmFee: payoutStatus !== 'failed' ? row.lnmFee : 0,

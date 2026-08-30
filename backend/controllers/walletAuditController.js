@@ -26,7 +26,6 @@ const auditSingleWallet = async (merchant) => {
     name: merchant.businessName || 'N/A',
     email: merchant.email || 'N/A',
     publicKey: merchant.stellarPublicKey || null,
-    status: 'No Wallet',
     xlmBalance: '0.0000000',
     usdcBalance: '0.0000000',
     dbUsdcBalance,
@@ -36,10 +35,10 @@ const auditSingleWallet = async (merchant) => {
     registeredAt: merchant.createdAt,
   };
 
-  // If merchant has never activated a wallet, return immediately
-  if (!merchant.stellarPublicKey) {
-    return baseRecord;
-  }
+  // No "No Wallet" branch anymore — the digital wallet feature is on hold
+  // platform-wide (only ever enabled for the demo account), so the caller
+  // below only ever passes merchants that already have a stellarPublicKey.
+  // A wallet-less merchant simply never reaches this function.
 
   try {
     const account = await server.loadAccount(merchant.stellarPublicKey);
@@ -88,12 +87,20 @@ const auditSingleWallet = async (merchant) => {
 // @access  Private (Admin)
 export const runWalletAudit = async (req, res) => {
   try {
-    // 1. Pull all merchants from MongoDB (exclude sensitive fields)
-    const merchants = await Merchant.find({})
-      .select('businessName email stellarPublicKey createdAt usdcBalance')
-      .sort('-createdAt');
+    // 1. Pull merchants from MongoDB (exclude sensitive fields). The digital
+    // wallet feature is on hold platform-wide (only ever enabled for the
+    // demo account) — auditing every merchant regardless produced a table
+    // that was almost entirely "No Wallet" noise. Scoped to only merchants
+    // that actually have a wallet provisioned; totalMerchantCount below
+    // keeps the platform-wide headline figure available for context.
+    const [totalMerchantCount, merchants] = await Promise.all([
+      Merchant.countDocuments({}),
+      Merchant.find({ stellarPublicKey: { $exists: true, $ne: null } })
+        .select('businessName email stellarPublicKey createdAt usdcBalance')
+        .sort('-createdAt'),
+    ]);
 
-    console.log(`\n🔍 Starting Stellar Wallet Audit for ${merchants.length} merchants...\n`);
+    console.log(`\n🔍 Starting Stellar Wallet Audit for ${merchants.length} wallet-provisioned merchant(s) (of ${totalMerchantCount} total)...\n`);
 
     // 2. Audit each wallet against the live Horizon API in parallel
     const auditResults = await Promise.all(
@@ -101,10 +108,10 @@ export const runWalletAudit = async (req, res) => {
     );
 
     // 3. Build summary statistics
-    const totalMerchants = auditResults.length;
+    const totalMerchants = totalMerchantCount;
+    const walletsProvisioned = auditResults.length;
     const activeWallets = auditResults.filter(r => r.status === 'Active').length;
-    const inactiveWallets = auditResults.filter(r => r.status === 'Inactive').length;
-    const noWallet = auditResults.filter(r => r.status === 'No Wallet').length;
+    const inactiveWallets = auditResults.filter(r => r.status === 'Inactive' || r.status === 'Unfunded').length;
     const errorCount = auditResults.filter(r => r.status === 'Error').length;
     const discrepancyCount = auditResults.filter(r => r.hasDiscrepancy).length;
     // 4-decimal precision matches the on-chain USDC display convention.
@@ -177,15 +184,15 @@ export const runWalletAudit = async (req, res) => {
       }))
     );
 
-    console.log(`\n✅ Audit Complete. Active: ${activeWallets} | Inactive: ${inactiveWallets} | No Wallet: ${noWallet}\n`);
+    console.log(`\n✅ Audit Complete. ${walletsProvisioned} wallet(s) provisioned (of ${totalMerchants} merchants) — Active: ${activeWallets} | Inactive: ${inactiveWallets}\n`);
 
     res.status(200).json({
       success: true,
       summary: {
         totalMerchants,
+        walletsProvisioned,
         activeWallets,
         inactiveWallets,
-        noWallet,
         errorCount,
         discrepancyCount,
         totalUsdcFloat,

@@ -525,13 +525,14 @@ const Overview = () => {
           </div>
           <div className="lg:col-span-4 bg-surface-container-lowest p-4 md:p-6 rounded-xl border border-outline-variant/10 shadow-editorial flex flex-col">
             <div className="flex items-baseline justify-between mb-4 md:mb-6">
-              <h3 className="text-sm md:text-base font-semibold text-on-surface">Merchant Composition</h3>
-              <span className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/40">Lifecycle</span>
+              <h3 className="text-sm md:text-base font-semibold text-on-surface">Portfolio Health</h3>
+              <span className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/40">Merchant Book</span>
             </div>
             <CompositionDonut
               total={merchantAnalytics?.totalMerchants ?? 0}
               verified={merchantAnalytics?.verifiedMerchants ?? 0}
-              wallet={merchantAnalytics?.activeWallets ?? 0}
+              active30d={merchantAnalytics?.activeMerchants30d ?? 0}
+              locked={merchantAnalytics?.lockedMerchants ?? 0}
               recent={merchantAnalytics?.recentMerchants ?? 0}
               loading={loading}
             />
@@ -716,10 +717,23 @@ const SignupsBarChart = ({ series, max, loading }) => {
 };
 
 // ── Composition donut ─────────────────────────────────────────────────
-// Single ring, three mutually exclusive segments derived from the standard
-// merchant funnel (wallet ⊆ verified ⊆ total). Counts are clamped defensively
-// so dirty data never produces negative segments.
-const CompositionDonut = ({ total = 0, verified = 0, wallet = 0, recent = 0, loading }) => {
+// Single ring, four mutually exclusive segments — a portfolio-health read
+// a bank's back office would actually want (who's locked, who still needs
+// KYC, who's genuinely transacting, who's gone quiet), not the old wallet-
+// activation breakdown. That one lost its meaning once the digital wallet
+// feature went on hold platform-wide (only ever live for the demo account),
+// which left "Verified · No Wallet" as effectively 100% of every real
+// merchant — not a useful signal.
+//
+// Classification is a strict priority order so every merchant lands in
+// exactly one bucket and the four always sum to `total`:
+//   1. Locked        — any merchant status === 'locked', regardless of else
+//   2. Pending KYC    — not locked, not yet verified
+//   3. Active (30d)   — not locked, verified, moved money in the last 30 days
+//   4. Verified · Idle — not locked, verified, no activity in 30 days
+// Counts are clamped defensively so dirty/inconsistent data never produces
+// a negative segment.
+const CompositionDonut = ({ total = 0, verified = 0, active30d = 0, locked = 0, recent = 0, loading }) => {
   if (loading) {
     return (
       <div className="flex-1 flex flex-col">
@@ -727,32 +741,43 @@ const CompositionDonut = ({ total = 0, verified = 0, wallet = 0, recent = 0, loa
           <div className="w-44 h-44 rounded-full bg-surface-container-low animate-pulse" />
         </div>
         <div className="mt-6 space-y-2">
-          {[0, 1, 2].map((i) => <Skel key={i} className="w-full h-5" />)}
+          {[0, 1, 2, 3].map((i) => <Skel key={i} className="w-full h-5" />)}
         </div>
       </div>
     );
   }
 
-  const v = Math.max(0, Math.min(verified, total));
-  const w = Math.max(0, Math.min(wallet, v));
+  const lockedN = Math.max(0, Math.min(locked, total));
+  const rem1 = total - lockedN;
+  const pendingKycN = Math.max(0, Math.min(total - verified, rem1));
+  const rem2 = rem1 - pendingKycN;
+  const activeN = Math.max(0, Math.min(active30d, rem2));
+  const idleN = rem2 - activeN;
+
   const arcs = [
     {
-      key: 'active', value: w,
-      color: '#059669', // emerald-600 — arc + dot
+      key: 'active', value: activeN,
+      color: '#059669', // emerald-600
       labelClass: 'text-emerald-700', valueClass: 'text-emerald-700',
-      label: 'Active · Wallet',
+      label: 'Active · 30d',
     },
     {
-      key: 'verified', value: v - w,
+      key: 'idle', value: idleN,
       color: '#2563eb', // blue-600
       labelClass: 'text-blue-700', valueClass: 'text-blue-700',
-      label: 'Verified · No Wallet',
+      label: 'Verified · Idle',
     },
     {
-      key: 'pending', value: Math.max(0, total - v),
+      key: 'pending', value: pendingKycN,
       color: '#d97706', // amber-600
       labelClass: 'text-amber-700', valueClass: 'text-amber-700',
       label: 'Pending KYC',
+    },
+    {
+      key: 'locked', value: lockedN,
+      color: '#dc2626', // red-600
+      labelClass: 'text-red-700', valueClass: 'text-red-700',
+      label: 'Locked',
     },
   ];
 
