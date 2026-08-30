@@ -18,6 +18,17 @@ export async function backfillTransactionFees() {
         { revenueStream: null },
       ],
       type: { $exists: true, $ne: null },
+      // FEE-REFUND-* records are manually-created zero-fee corrections
+      // (see backend scripts convention) — deliberately left with
+      // revenueStream: null, which otherwise matches this migration's
+      // filter. Recomputing calculateFees off their `type` would stamp a
+      // real revenue-stream fee onto a transaction that charged nobody
+      // anything, corrupting reported revenue on every boot (this exact
+      // bug hit production on 2026-08-30 while `type: 'settlement'` was
+      // still in use for these — now migrated to 'top_up', which has no
+      // stream mapping, but this exclusion stays as a second layer of
+      // defense against the same mistake recurring under a new pattern).
+      reference: { $not: /^FEE-REFUND-/ },
     }).cursor();
 
     let scanned = 0, updated = 0;
